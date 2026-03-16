@@ -324,6 +324,7 @@ SELECT
     u.nickname,
     u.avatar_url,
     u.read_receipts_enabled,
+    u.presence_enabled,
     u.typing_visibility_enabled,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
@@ -352,6 +353,7 @@ type GetSessionAuthByIDRow struct {
 	Nickname                string             `db:"nickname" json:"nickname"`
 	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
 	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
 	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
 	UserCreatedAt           pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
 	UserUpdatedAt           pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
@@ -379,6 +381,7 @@ func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSess
 		&i.Nickname,
 		&i.AvatarUrl,
 		&i.ReadReceiptsEnabled,
+		&i.PresenceEnabled,
 		&i.TypingVisibilityEnabled,
 		&i.UserCreatedAt,
 		&i.UserUpdatedAt,
@@ -453,6 +456,47 @@ func (q *Queries) ListDirectChatMessages(ctx context.Context, arg ListDirectChat
 			&i.DeletedAt,
 			&i.Pinned,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDirectChatPresenceStateEntries = `-- name: ListDirectChatPresenceStateEntries :many
+SELECT
+    p.user_id,
+    u.presence_enabled
+FROM direct_chat_participants AS self
+JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
+JOIN users AS u ON u.id = p.user_id
+WHERE self.user_id = $1 AND self.chat_id = $2
+ORDER BY p.joined_at ASC, p.user_id ASC
+`
+
+type ListDirectChatPresenceStateEntriesParams struct {
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+	ChatID uuid.UUID `db:"chat_id" json:"chat_id"`
+}
+
+type ListDirectChatPresenceStateEntriesRow struct {
+	UserID          uuid.UUID `db:"user_id" json:"user_id"`
+	PresenceEnabled bool      `db:"presence_enabled" json:"presence_enabled"`
+}
+
+func (q *Queries) ListDirectChatPresenceStateEntries(ctx context.Context, arg ListDirectChatPresenceStateEntriesParams) ([]ListDirectChatPresenceStateEntriesRow, error) {
+	rows, err := q.db.Query(ctx, listDirectChatPresenceStateEntries, arg.UserID, arg.ChatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDirectChatPresenceStateEntriesRow
+	for rows.Next() {
+		var i ListDirectChatPresenceStateEntriesRow
+		if err := rows.Scan(&i.UserID, &i.PresenceEnabled); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

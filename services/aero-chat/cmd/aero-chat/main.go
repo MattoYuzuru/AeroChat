@@ -62,13 +62,22 @@ func run() error {
 	if err := typingStore.Ping(context.Background()); err != nil {
 		return err
 	}
+	presenceStore := redisstate.NewPresenceStore(cfg.RedisAddress)
+	defer func() {
+		_ = presenceStore.Close()
+	}()
+	if err := presenceStore.Ping(context.Background()); err != nil {
+		return err
+	}
 
 	service := chat.NewService(
 		repository,
 		repository,
 		typingStore,
+		presenceStore,
 		libauth.NewSessionTokenManager(),
 		cfg.DirectChatTypingTTL,
+		cfg.DirectChatPresenceTTL,
 	)
 	handler := connecthandler.NewHandler(serviceName, version, service)
 
@@ -83,6 +92,9 @@ func run() error {
 		logger,
 		func(ctx context.Context) error {
 			if err := repository.Ping(ctx); err != nil {
+				return err
+			}
+			if err := presenceStore.Ping(ctx); err != nil {
 				return err
 			}
 

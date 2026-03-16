@@ -15,6 +15,8 @@ service ChatService {
   rpc MarkDirectChatRead(MarkDirectChatReadRequest) returns (MarkDirectChatReadResponse);
   rpc SetDirectChatTyping(SetDirectChatTypingRequest) returns (SetDirectChatTypingResponse);
   rpc ClearDirectChatTyping(ClearDirectChatTypingRequest) returns (ClearDirectChatTypingResponse);
+  rpc SetDirectChatPresenceHeartbeat(SetDirectChatPresenceHeartbeatRequest) returns (SetDirectChatPresenceHeartbeatResponse);
+  rpc ClearDirectChatPresence(ClearDirectChatPresenceRequest) returns (ClearDirectChatPresenceResponse);
   rpc SendTextMessage(SendTextMessageRequest) returns (SendTextMessageResponse);
   rpc ListDirectChatMessages(ListDirectChatMessagesRequest) returns (ListDirectChatMessagesResponse);
   rpc DeleteMessageForEveryone(DeleteMessageForEveryoneRequest) returns (DeleteMessageForEveryoneResponse);
@@ -96,6 +98,16 @@ message DirectChatTypingState {
   DirectChatTypingIndicator peer_typing = 2;
 }
 
+message DirectChatPresenceIndicator {
+  google.protobuf.Timestamp heartbeat_at = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message DirectChatPresenceState {
+  DirectChatPresenceIndicator self_presence = 1;
+  DirectChatPresenceIndicator peer_presence = 2;
+}
+
 message PingRequest {}
 
 message PingResponse {
@@ -124,6 +136,7 @@ message GetDirectChatResponse {
   DirectChat chat = 1;
   DirectChatReadState read_state = 2;
   DirectChatTypingState typing_state = 3;
+  DirectChatPresenceState presence_state = 4;
 }
 
 message MarkDirectChatReadRequest {
@@ -149,6 +162,22 @@ message ClearDirectChatTypingRequest {
 
 message ClearDirectChatTypingResponse {
   DirectChatTypingState typing_state = 1;
+}
+
+message SetDirectChatPresenceHeartbeatRequest {
+  string chat_id = 1;
+}
+
+message SetDirectChatPresenceHeartbeatResponse {
+  DirectChatPresenceState presence_state = 1;
+}
+
+message ClearDirectChatPresenceRequest {
+  string chat_id = 1;
+}
+
+message ClearDirectChatPresenceResponse {
+  DirectChatPresenceState presence_state = 1;
 }
 
 message SendTextMessageRequest {

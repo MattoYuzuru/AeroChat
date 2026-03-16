@@ -78,15 +78,16 @@ func (h *Handler) GetDirectChat(ctx context.Context, req *connect.Request[chatv1
 		return nil, err
 	}
 
-	directChat, readState, typingState, err := h.service.GetDirectChat(ctx, token, req.Msg.ChatId)
+	directChat, readState, typingState, presenceState, err := h.service.GetDirectChat(ctx, token, req.Msg.ChatId)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
 	return connect.NewResponse(&chatv1.GetDirectChatResponse{
-		Chat:        toProtoDirectChat(*directChat),
-		ReadState:   toProtoDirectChatReadState(readState),
-		TypingState: toProtoDirectChatTypingState(typingState),
+		Chat:          toProtoDirectChat(*directChat),
+		ReadState:     toProtoDirectChatReadState(readState),
+		TypingState:   toProtoDirectChatTypingState(typingState),
+		PresenceState: toProtoDirectChatPresenceState(presenceState),
 	}), nil
 }
 
@@ -135,6 +136,38 @@ func (h *Handler) ClearDirectChatTyping(ctx context.Context, req *connect.Reques
 
 	return connect.NewResponse(&chatv1.ClearDirectChatTypingResponse{
 		TypingState: toProtoDirectChatTypingState(typingState),
+	}), nil
+}
+
+func (h *Handler) SetDirectChatPresenceHeartbeat(ctx context.Context, req *connect.Request[chatv1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[chatv1.SetDirectChatPresenceHeartbeatResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	presenceState, err := h.service.SetDirectChatPresenceHeartbeat(ctx, token, req.Msg.ChatId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.SetDirectChatPresenceHeartbeatResponse{
+		PresenceState: toProtoDirectChatPresenceState(presenceState),
+	}), nil
+}
+
+func (h *Handler) ClearDirectChatPresence(ctx context.Context, req *connect.Request[chatv1.ClearDirectChatPresenceRequest]) (*connect.Response[chatv1.ClearDirectChatPresenceResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	presenceState, err := h.service.ClearDirectChatPresence(ctx, token, req.Msg.ChatId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.ClearDirectChatPresenceResponse{
+		PresenceState: toProtoDirectChatPresenceState(presenceState),
 	}), nil
 }
 
@@ -353,6 +386,28 @@ func toProtoDirectChatTypingIndicator(value *chat.DirectChatTypingIndicator) *ch
 	return &chatv1.DirectChatTypingIndicator{
 		UpdatedAt: timestamppb.New(value.UpdatedAt),
 		ExpiresAt: timestamppb.New(value.ExpiresAt),
+	}
+}
+
+func toProtoDirectChatPresenceState(value *chat.DirectChatPresenceState) *chatv1.DirectChatPresenceState {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatPresenceState{
+		SelfPresence: toProtoDirectChatPresenceIndicator(value.SelfPresence),
+		PeerPresence: toProtoDirectChatPresenceIndicator(value.PeerPresence),
+	}
+}
+
+func toProtoDirectChatPresenceIndicator(value *chat.DirectChatPresenceIndicator) *chatv1.DirectChatPresenceIndicator {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatPresenceIndicator{
+		HeartbeatAt: timestamppb.New(value.HeartbeatAt),
+		ExpiresAt:   timestamppb.New(value.ExpiresAt),
 	}
 }
 

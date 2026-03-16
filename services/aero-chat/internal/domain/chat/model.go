@@ -17,6 +17,7 @@ type UserSummary struct {
 	Nickname                string
 	AvatarURL               *string
 	ReadReceiptsEnabled     bool
+	PresenceEnabled         bool
 	TypingVisibilityEnabled bool
 }
 
@@ -97,10 +98,25 @@ type DirectChatTypingState struct {
 	PeerTyping *DirectChatTypingIndicator
 }
 
+type DirectChatPresenceIndicator struct {
+	HeartbeatAt time.Time
+	ExpiresAt   time.Time
+}
+
+type DirectChatPresenceState struct {
+	SelfPresence *DirectChatPresenceIndicator
+	PeerPresence *DirectChatPresenceIndicator
+}
+
 type DirectChatReadStateEntry struct {
 	UserID              string
 	ReadReceiptsEnabled bool
 	LastReadPosition    *DirectChatReadPosition
+}
+
+type DirectChatPresenceStateEntry struct {
+	UserID          string
+	PresenceEnabled bool
 }
 
 type DirectChatTypingStateEntry struct {
@@ -137,4 +153,11 @@ type PutDirectChatTypingIndicatorParams struct {
 	UserID    string
 	UpdatedAt time.Time
 	ExpiresAt time.Time
+}
+
+type PutDirectChatPresenceIndicatorParams struct {
+	ChatID      string
+	UserID      string
+	HeartbeatAt time.Time
+	ExpiresAt   time.Time
 }

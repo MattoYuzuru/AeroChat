@@ -21,6 +21,7 @@ type Repository interface {
 	ListDirectChats(context.Context, string) ([]DirectChat, error)
 	GetDirectChat(context.Context, string, string) (*DirectChat, error)
 	ListDirectChatReadStateEntries(context.Context, string, string) ([]DirectChatReadStateEntry, error)
+	ListDirectChatPresenceStateEntries(context.Context, string, string) ([]DirectChatPresenceStateEntry, error)
 	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
 	UpsertDirectChatReadReceipt(context.Context, UpsertDirectChatReadReceiptParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
@@ -41,33 +42,48 @@ type TypingStateStore interface {
 	ListDirectChatTypingIndicators(context.Context, string, []string, time.Time) (map[string]DirectChatTypingIndicator, error)
 }
 
+type PresenceStateStore interface {
+	PutDirectChatPresenceIndicator(context.Context, PutDirectChatPresenceIndicatorParams) error
+	ClearDirectChatPresenceIndicator(context.Context, string, string) error
+	ListDirectChatPresenceIndicators(context.Context, string, []string, time.Time) (map[string]DirectChatPresenceIndicator, error)
+}
+
 type Service struct {
-	repo         Repository
-	friendships  FriendshipChecker
-	typingStore  TypingStateStore
-	sessionToken *libauth.SessionTokenManager
-	typingTTL    time.Duration
-	now          func() time.Time
-	newID        func() string
+	repo          Repository
+	friendships   FriendshipChecker
+	typingStore   TypingStateStore
+	presenceStore PresenceStateStore
+	sessionToken  *libauth.SessionTokenManager
+	typingTTL     time.Duration
+	presenceTTL   time.Duration
+	now           func() time.Time
+	newID         func() string
 }
 
 func NewService(
 	repo Repository,
 	friendships FriendshipChecker,
 	typingStore TypingStateStore,
+	presenceStore PresenceStateStore,
 	sessionToken *libauth.SessionTokenManager,
 	typingTTL time.Duration,
+	presenceTTL time.Duration,
 ) *Service {
 	if typingTTL <= 0 {
 		typingTTL = 6 * time.Second
 	}
+	if presenceTTL <= 0 {
+		presenceTTL = 30 * time.Second
+	}
 
 	return &Service{
-		repo:         repo,
-		friendships:  friendships,
-		typingStore:  typingStore,
-		sessionToken: sessionToken,
-		typingTTL:    typingTTL,
+		repo:          repo,
+		friendships:   friendships,
+		typingStore:   typingStore,
+		presenceStore: presenceStore,
+		sessionToken:  sessionToken,
+		typingTTL:     typingTTL,
+		presenceTTL:   presenceTTL,
 		now: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -118,33 +134,38 @@ func (s *Service) ListDirectChats(ctx context.Context, token string) ([]DirectCh
 	return s.repo.ListDirectChats(ctx, authSession.User.ID)
 }
 
-func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string) (*DirectChat, *DirectChatReadState, *DirectChatTypingState, error) {
+func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string) (*DirectChat, *DirectChatReadState, *DirectChatTypingState, *DirectChatPresenceState, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	normalizedChatID, err := normalizeID(chatID, "chat_id")
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	readState, err := s.getDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	typingState, err := s.getDirectChatTypingState(ctx, authSession.User.ID, normalizedChatID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return directChat, readState, typingState, nil
+	presenceState, err := s.getDirectChatPresenceState(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return directChat, readState, typingState, presenceState, nil
 }
 
 func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string) (*DirectChatMessage, error) {
@@ -287,6 +308,62 @@ func (s *Service) ClearDirectChatTyping(ctx context.Context, token string, chatI
 	}
 
 	return s.getDirectChatTypingState(ctx, authSession.User.ID, normalizedChatID)
+}
+
+func (s *Service) SetDirectChatPresenceHeartbeat(ctx context.Context, token string, chatID string) (*DirectChatPresenceState, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, err
+	}
+
+	if !authSession.User.PresenceEnabled {
+		if err := s.presenceStore.ClearDirectChatPresenceIndicator(ctx, normalizedChatID, authSession.User.ID); err != nil {
+			return nil, err
+		}
+
+		return s.getDirectChatPresenceState(ctx, authSession.User.ID, normalizedChatID)
+	}
+
+	now := s.now()
+	if err := s.presenceStore.PutDirectChatPresenceIndicator(ctx, PutDirectChatPresenceIndicatorParams{
+		ChatID:      normalizedChatID,
+		UserID:      authSession.User.ID,
+		HeartbeatAt: now,
+		ExpiresAt:   now.Add(s.presenceTTL),
+	}); err != nil {
+		return nil, err
+	}
+
+	return s.getDirectChatPresenceState(ctx, authSession.User.ID, normalizedChatID)
+}
+
+func (s *Service) ClearDirectChatPresence(ctx context.Context, token string, chatID string) (*DirectChatPresenceState, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, err
+	}
+
+	if err := s.presenceStore.ClearDirectChatPresenceIndicator(ctx, normalizedChatID, authSession.User.ID); err != nil {
+		return nil, err
+	}
+
+	return s.getDirectChatPresenceState(ctx, authSession.User.ID, normalizedChatID)
 }
 
 func (s *Service) DeleteMessageForEveryone(ctx context.Context, token string, chatID string, messageID string) (*DirectChatMessage, error) {
@@ -522,6 +599,48 @@ func (s *Service) getDirectChatTypingState(ctx context.Context, viewerUserID str
 		}
 
 		state.PeerTyping = &copy
+	}
+
+	return state, nil
+}
+
+func (s *Service) getDirectChatPresenceState(ctx context.Context, viewerUserID string, chatID string) (*DirectChatPresenceState, error) {
+	entries, err := s.repo.ListDirectChatPresenceStateEntries(ctx, viewerUserID, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) == 0 {
+		return nil, ErrNotFound
+	}
+
+	userIDs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		userIDs = append(userIDs, entry.UserID)
+	}
+
+	indicators, err := s.presenceStore.ListDirectChatPresenceIndicators(ctx, chatID, userIDs, s.now())
+	if err != nil {
+		return nil, err
+	}
+
+	state := &DirectChatPresenceState{}
+	for _, entry := range entries {
+		if !entry.PresenceEnabled {
+			continue
+		}
+
+		indicator, ok := indicators[entry.UserID]
+		if !ok {
+			continue
+		}
+
+		copy := indicator
+		if entry.UserID == viewerUserID {
+			state.SelfPresence = &copy
+			continue
+		}
+
+		state.PeerPresence = &copy
 	}
 
 	return state, nil
