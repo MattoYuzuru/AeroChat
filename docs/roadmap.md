@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Image delivery и release bootstrap для single-server self-host runtime
+- [x] Server secret model и operator update flow для single-server self-host runtime
 
 ---
 
@@ -35,6 +35,7 @@
 - [ ] Dev Docker Compose
 - [x] Single-server deploy foundation
 - [x] Image delivery и release bootstrap
+- [x] Server secret model и operator update flow
 - [ ] GitHub Actions CI
 
 ---

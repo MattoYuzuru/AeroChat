@@ -21,7 +21,7 @@ jobs:
         run: docker compose --env-file .env.example -f infra/compose/docker-compose.yml config >/dev/null
 
       - name: Validate server compose
-        run: docker compose --env-file .env.server.example -f infra/compose/docker-compose.server.yml config >/dev/null
+        run: docker compose --env-file .env.server.example --env-file .env.server.secrets.example -f infra/compose/docker-compose.server.yml config >/dev/null
 
   go:
     runs-on: ubuntu-latest
