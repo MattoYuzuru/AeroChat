@@ -55,6 +55,28 @@ type BlockedUser struct {
 	BlockedAt time.Time
 }
 
+type PendingFriendRequest struct {
+	RequesterUserID string
+	AddresseeUserID string
+	CreatedAt       time.Time
+}
+
+type SocialGraphState struct {
+	HasBlock       bool
+	AreFriends     bool
+	PendingRequest *PendingFriendRequest
+}
+
+type FriendRequest struct {
+	Profile     User
+	RequestedAt time.Time
+}
+
+type Friend struct {
+	Profile      User
+	FriendsSince time.Time
+}
+
 type AuthSession struct {
 	User    User
 	Device  Device
@@ -105,6 +127,14 @@ type SessionAuth struct {
 	Device    Device
 	Session   Session
 	TokenHash string
+}
+
+func CanonicalUserPair(firstUserID string, secondUserID string) (string, string) {
+	if firstUserID < secondUserID {
+		return firstUserID, secondUserID
+	}
+
+	return secondUserID, firstUserID
 }
 
 type CreateAccountParams struct {

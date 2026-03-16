@@ -19,6 +19,14 @@ service IdentityService {
   rpc ListBlockedUsers(ListBlockedUsersRequest) returns (ListBlockedUsersResponse);
   rpc BlockUser(BlockUserRequest) returns (BlockUserResponse);
   rpc UnblockUser(UnblockUserRequest) returns (UnblockUserResponse);
+  rpc SendFriendRequest(SendFriendRequestRequest) returns (SendFriendRequestResponse);
+  rpc AcceptFriendRequest(AcceptFriendRequestRequest) returns (AcceptFriendRequestResponse);
+  rpc DeclineFriendRequest(DeclineFriendRequestRequest) returns (DeclineFriendRequestResponse);
+  rpc CancelOutgoingFriendRequest(CancelOutgoingFriendRequestRequest) returns (CancelOutgoingFriendRequestResponse);
+  rpc ListIncomingFriendRequests(ListIncomingFriendRequestsRequest) returns (ListIncomingFriendRequestsResponse);
+  rpc ListOutgoingFriendRequests(ListOutgoingFriendRequestsRequest) returns (ListOutgoingFriendRequestsResponse);
+  rpc ListFriends(ListFriendsRequest) returns (ListFriendsResponse);
+  rpc RemoveFriend(RemoveFriendRequest) returns (RemoveFriendResponse);
 }
 
 enum KeyBackupStatus {
@@ -71,6 +79,16 @@ message DeviceWithSessions {
 message BlockedUser {
   Profile profile = 1;
   google.protobuf.Timestamp blocked_at = 2;
+}
+
+message FriendRequest {
+  Profile profile = 1;
+  google.protobuf.Timestamp requested_at = 2;
+}
+
+message Friend {
+  Profile profile = 1;
+  google.protobuf.Timestamp friends_since = 2;
 }
 
 message CurrentAuth {
@@ -168,3 +186,51 @@ message UnblockUserRequest {
 }
 
 message UnblockUserResponse {}
+
+message SendFriendRequestRequest {
+  string login = 1;
+}
+
+message SendFriendRequestResponse {}
+
+message AcceptFriendRequestRequest {
+  string login = 1;
+}
+
+message AcceptFriendRequestResponse {}
+
+message DeclineFriendRequestRequest {
+  string login = 1;
+}
+
+message DeclineFriendRequestResponse {}
+
+message CancelOutgoingFriendRequestRequest {
+  string login = 1;
+}
+
+message CancelOutgoingFriendRequestResponse {}
+
+message ListIncomingFriendRequestsRequest {}
+
+message ListIncomingFriendRequestsResponse {
+  repeated FriendRequest friend_requests = 1;
+}
+
+message ListOutgoingFriendRequestsRequest {}
+
+message ListOutgoingFriendRequestsResponse {
+  repeated FriendRequest friend_requests = 1;
+}
+
+message ListFriendsRequest {}
+
+message ListFriendsResponse {
+  repeated Friend friends = 1;
+}
+
+message RemoveFriendRequest {
+  string login = 1;
+}
+
+message RemoveFriendResponse {}

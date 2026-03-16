@@ -216,6 +216,134 @@ func (h *Handler) UnblockUser(ctx context.Context, req *connect.Request[identity
 	return connect.NewResponse(&identityv1.UnblockUserResponse{}), nil
 }
 
+func (h *Handler) SendFriendRequest(ctx context.Context, req *connect.Request[identityv1.SendFriendRequestRequest]) (*connect.Response[identityv1.SendFriendRequestResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.SendFriendRequest(ctx, token, req.Msg.Login); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.SendFriendRequestResponse{}), nil
+}
+
+func (h *Handler) AcceptFriendRequest(ctx context.Context, req *connect.Request[identityv1.AcceptFriendRequestRequest]) (*connect.Response[identityv1.AcceptFriendRequestResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.AcceptFriendRequest(ctx, token, req.Msg.Login); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.AcceptFriendRequestResponse{}), nil
+}
+
+func (h *Handler) DeclineFriendRequest(ctx context.Context, req *connect.Request[identityv1.DeclineFriendRequestRequest]) (*connect.Response[identityv1.DeclineFriendRequestResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.DeclineFriendRequest(ctx, token, req.Msg.Login); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.DeclineFriendRequestResponse{}), nil
+}
+
+func (h *Handler) CancelOutgoingFriendRequest(ctx context.Context, req *connect.Request[identityv1.CancelOutgoingFriendRequestRequest]) (*connect.Response[identityv1.CancelOutgoingFriendRequestResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.CancelOutgoingFriendRequest(ctx, token, req.Msg.Login); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.CancelOutgoingFriendRequestResponse{}), nil
+}
+
+func (h *Handler) ListIncomingFriendRequests(ctx context.Context, req *connect.Request[identityv1.ListIncomingFriendRequestsRequest]) (*connect.Response[identityv1.ListIncomingFriendRequestsResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	friendRequests, err := h.service.ListIncomingFriendRequests(ctx, token)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &identityv1.ListIncomingFriendRequestsResponse{
+		FriendRequests: make([]*identityv1.FriendRequest, 0, len(friendRequests)),
+	}
+	for _, friendRequest := range friendRequests {
+		response.FriendRequests = append(response.FriendRequests, toProtoFriendRequest(friendRequest))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) ListOutgoingFriendRequests(ctx context.Context, req *connect.Request[identityv1.ListOutgoingFriendRequestsRequest]) (*connect.Response[identityv1.ListOutgoingFriendRequestsResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	friendRequests, err := h.service.ListOutgoingFriendRequests(ctx, token)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &identityv1.ListOutgoingFriendRequestsResponse{
+		FriendRequests: make([]*identityv1.FriendRequest, 0, len(friendRequests)),
+	}
+	for _, friendRequest := range friendRequests {
+		response.FriendRequests = append(response.FriendRequests, toProtoFriendRequest(friendRequest))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) ListFriends(ctx context.Context, req *connect.Request[identityv1.ListFriendsRequest]) (*connect.Response[identityv1.ListFriendsResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	friends, err := h.service.ListFriends(ctx, token)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &identityv1.ListFriendsResponse{
+		Friends: make([]*identityv1.Friend, 0, len(friends)),
+	}
+	for _, friend := range friends {
+		response.Friends = append(response.Friends, toProtoFriend(friend))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) RemoveFriend(ctx context.Context, req *connect.Request[identityv1.RemoveFriendRequest]) (*connect.Response[identityv1.RemoveFriendResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.RemoveFriend(ctx, token, req.Msg.Login); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.RemoveFriendResponse{}), nil
+}
+
 func bearerToken[T any](req *connect.Request[T]) (string, error) {
 	const prefix = "Bearer "
 
@@ -337,6 +465,20 @@ func toProtoDeviceWithSessions(value identity.DeviceWithSessions) *identityv1.De
 	}
 
 	return result
+}
+
+func toProtoFriendRequest(value identity.FriendRequest) *identityv1.FriendRequest {
+	return &identityv1.FriendRequest{
+		Profile:     toProtoProfile(value.Profile),
+		RequestedAt: timestamppb.New(value.RequestedAt),
+	}
+}
+
+func toProtoFriend(value identity.Friend) *identityv1.Friend {
+	return &identityv1.Friend{
+		Profile:      toProtoProfile(value.Profile),
+		FriendsSince: timestamppb.New(value.FriendsSince),
+	}
 }
 
 func toProtoKeyBackupStatus(status string) identityv1.KeyBackupStatus {

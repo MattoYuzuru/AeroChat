@@ -64,6 +64,30 @@ const (
 	// IdentityServiceUnblockUserProcedure is the fully-qualified name of the IdentityService's
 	// UnblockUser RPC.
 	IdentityServiceUnblockUserProcedure = "/aerochat.identity.v1.IdentityService/UnblockUser"
+	// IdentityServiceSendFriendRequestProcedure is the fully-qualified name of the IdentityService's
+	// SendFriendRequest RPC.
+	IdentityServiceSendFriendRequestProcedure = "/aerochat.identity.v1.IdentityService/SendFriendRequest"
+	// IdentityServiceAcceptFriendRequestProcedure is the fully-qualified name of the IdentityService's
+	// AcceptFriendRequest RPC.
+	IdentityServiceAcceptFriendRequestProcedure = "/aerochat.identity.v1.IdentityService/AcceptFriendRequest"
+	// IdentityServiceDeclineFriendRequestProcedure is the fully-qualified name of the IdentityService's
+	// DeclineFriendRequest RPC.
+	IdentityServiceDeclineFriendRequestProcedure = "/aerochat.identity.v1.IdentityService/DeclineFriendRequest"
+	// IdentityServiceCancelOutgoingFriendRequestProcedure is the fully-qualified name of the
+	// IdentityService's CancelOutgoingFriendRequest RPC.
+	IdentityServiceCancelOutgoingFriendRequestProcedure = "/aerochat.identity.v1.IdentityService/CancelOutgoingFriendRequest"
+	// IdentityServiceListIncomingFriendRequestsProcedure is the fully-qualified name of the
+	// IdentityService's ListIncomingFriendRequests RPC.
+	IdentityServiceListIncomingFriendRequestsProcedure = "/aerochat.identity.v1.IdentityService/ListIncomingFriendRequests"
+	// IdentityServiceListOutgoingFriendRequestsProcedure is the fully-qualified name of the
+	// IdentityService's ListOutgoingFriendRequests RPC.
+	IdentityServiceListOutgoingFriendRequestsProcedure = "/aerochat.identity.v1.IdentityService/ListOutgoingFriendRequests"
+	// IdentityServiceListFriendsProcedure is the fully-qualified name of the IdentityService's
+	// ListFriends RPC.
+	IdentityServiceListFriendsProcedure = "/aerochat.identity.v1.IdentityService/ListFriends"
+	// IdentityServiceRemoveFriendProcedure is the fully-qualified name of the IdentityService's
+	// RemoveFriend RPC.
+	IdentityServiceRemoveFriendProcedure = "/aerochat.identity.v1.IdentityService/RemoveFriend"
 )
 
 // IdentityServiceClient is a client for the aerochat.identity.v1.IdentityService service.
@@ -79,6 +103,14 @@ type IdentityServiceClient interface {
 	ListBlockedUsers(context.Context, *connect.Request[v1.ListBlockedUsersRequest]) (*connect.Response[v1.ListBlockedUsersResponse], error)
 	BlockUser(context.Context, *connect.Request[v1.BlockUserRequest]) (*connect.Response[v1.BlockUserResponse], error)
 	UnblockUser(context.Context, *connect.Request[v1.UnblockUserRequest]) (*connect.Response[v1.UnblockUserResponse], error)
+	SendFriendRequest(context.Context, *connect.Request[v1.SendFriendRequestRequest]) (*connect.Response[v1.SendFriendRequestResponse], error)
+	AcceptFriendRequest(context.Context, *connect.Request[v1.AcceptFriendRequestRequest]) (*connect.Response[v1.AcceptFriendRequestResponse], error)
+	DeclineFriendRequest(context.Context, *connect.Request[v1.DeclineFriendRequestRequest]) (*connect.Response[v1.DeclineFriendRequestResponse], error)
+	CancelOutgoingFriendRequest(context.Context, *connect.Request[v1.CancelOutgoingFriendRequestRequest]) (*connect.Response[v1.CancelOutgoingFriendRequestResponse], error)
+	ListIncomingFriendRequests(context.Context, *connect.Request[v1.ListIncomingFriendRequestsRequest]) (*connect.Response[v1.ListIncomingFriendRequestsResponse], error)
+	ListOutgoingFriendRequests(context.Context, *connect.Request[v1.ListOutgoingFriendRequestsRequest]) (*connect.Response[v1.ListOutgoingFriendRequestsResponse], error)
+	ListFriends(context.Context, *connect.Request[v1.ListFriendsRequest]) (*connect.Response[v1.ListFriendsResponse], error)
+	RemoveFriend(context.Context, *connect.Request[v1.RemoveFriendRequest]) (*connect.Response[v1.RemoveFriendResponse], error)
 }
 
 // NewIdentityServiceClient constructs a client for the aerochat.identity.v1.IdentityService
@@ -158,22 +190,78 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(identityServiceMethods.ByName("UnblockUser")),
 			connect.WithClientOptions(opts...),
 		),
+		sendFriendRequest: connect.NewClient[v1.SendFriendRequestRequest, v1.SendFriendRequestResponse](
+			httpClient,
+			baseURL+IdentityServiceSendFriendRequestProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("SendFriendRequest")),
+			connect.WithClientOptions(opts...),
+		),
+		acceptFriendRequest: connect.NewClient[v1.AcceptFriendRequestRequest, v1.AcceptFriendRequestResponse](
+			httpClient,
+			baseURL+IdentityServiceAcceptFriendRequestProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("AcceptFriendRequest")),
+			connect.WithClientOptions(opts...),
+		),
+		declineFriendRequest: connect.NewClient[v1.DeclineFriendRequestRequest, v1.DeclineFriendRequestResponse](
+			httpClient,
+			baseURL+IdentityServiceDeclineFriendRequestProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("DeclineFriendRequest")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelOutgoingFriendRequest: connect.NewClient[v1.CancelOutgoingFriendRequestRequest, v1.CancelOutgoingFriendRequestResponse](
+			httpClient,
+			baseURL+IdentityServiceCancelOutgoingFriendRequestProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("CancelOutgoingFriendRequest")),
+			connect.WithClientOptions(opts...),
+		),
+		listIncomingFriendRequests: connect.NewClient[v1.ListIncomingFriendRequestsRequest, v1.ListIncomingFriendRequestsResponse](
+			httpClient,
+			baseURL+IdentityServiceListIncomingFriendRequestsProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("ListIncomingFriendRequests")),
+			connect.WithClientOptions(opts...),
+		),
+		listOutgoingFriendRequests: connect.NewClient[v1.ListOutgoingFriendRequestsRequest, v1.ListOutgoingFriendRequestsResponse](
+			httpClient,
+			baseURL+IdentityServiceListOutgoingFriendRequestsProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("ListOutgoingFriendRequests")),
+			connect.WithClientOptions(opts...),
+		),
+		listFriends: connect.NewClient[v1.ListFriendsRequest, v1.ListFriendsResponse](
+			httpClient,
+			baseURL+IdentityServiceListFriendsProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("ListFriends")),
+			connect.WithClientOptions(opts...),
+		),
+		removeFriend: connect.NewClient[v1.RemoveFriendRequest, v1.RemoveFriendResponse](
+			httpClient,
+			baseURL+IdentityServiceRemoveFriendProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("RemoveFriend")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // identityServiceClient implements IdentityServiceClient.
 type identityServiceClient struct {
-	ping                  *connect.Client[v1.PingRequest, v1.PingResponse]
-	register              *connect.Client[v1.RegisterRequest, v1.RegisterResponse]
-	login                 *connect.Client[v1.LoginRequest, v1.LoginResponse]
-	logoutCurrentSession  *connect.Client[v1.LogoutCurrentSessionRequest, v1.LogoutCurrentSessionResponse]
-	getCurrentProfile     *connect.Client[v1.GetCurrentProfileRequest, v1.GetCurrentProfileResponse]
-	updateCurrentProfile  *connect.Client[v1.UpdateCurrentProfileRequest, v1.UpdateCurrentProfileResponse]
-	listDevices           *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
-	revokeSessionOrDevice *connect.Client[v1.RevokeSessionOrDeviceRequest, v1.RevokeSessionOrDeviceResponse]
-	listBlockedUsers      *connect.Client[v1.ListBlockedUsersRequest, v1.ListBlockedUsersResponse]
-	blockUser             *connect.Client[v1.BlockUserRequest, v1.BlockUserResponse]
-	unblockUser           *connect.Client[v1.UnblockUserRequest, v1.UnblockUserResponse]
+	ping                        *connect.Client[v1.PingRequest, v1.PingResponse]
+	register                    *connect.Client[v1.RegisterRequest, v1.RegisterResponse]
+	login                       *connect.Client[v1.LoginRequest, v1.LoginResponse]
+	logoutCurrentSession        *connect.Client[v1.LogoutCurrentSessionRequest, v1.LogoutCurrentSessionResponse]
+	getCurrentProfile           *connect.Client[v1.GetCurrentProfileRequest, v1.GetCurrentProfileResponse]
+	updateCurrentProfile        *connect.Client[v1.UpdateCurrentProfileRequest, v1.UpdateCurrentProfileResponse]
+	listDevices                 *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	revokeSessionOrDevice       *connect.Client[v1.RevokeSessionOrDeviceRequest, v1.RevokeSessionOrDeviceResponse]
+	listBlockedUsers            *connect.Client[v1.ListBlockedUsersRequest, v1.ListBlockedUsersResponse]
+	blockUser                   *connect.Client[v1.BlockUserRequest, v1.BlockUserResponse]
+	unblockUser                 *connect.Client[v1.UnblockUserRequest, v1.UnblockUserResponse]
+	sendFriendRequest           *connect.Client[v1.SendFriendRequestRequest, v1.SendFriendRequestResponse]
+	acceptFriendRequest         *connect.Client[v1.AcceptFriendRequestRequest, v1.AcceptFriendRequestResponse]
+	declineFriendRequest        *connect.Client[v1.DeclineFriendRequestRequest, v1.DeclineFriendRequestResponse]
+	cancelOutgoingFriendRequest *connect.Client[v1.CancelOutgoingFriendRequestRequest, v1.CancelOutgoingFriendRequestResponse]
+	listIncomingFriendRequests  *connect.Client[v1.ListIncomingFriendRequestsRequest, v1.ListIncomingFriendRequestsResponse]
+	listOutgoingFriendRequests  *connect.Client[v1.ListOutgoingFriendRequestsRequest, v1.ListOutgoingFriendRequestsResponse]
+	listFriends                 *connect.Client[v1.ListFriendsRequest, v1.ListFriendsResponse]
+	removeFriend                *connect.Client[v1.RemoveFriendRequest, v1.RemoveFriendResponse]
 }
 
 // Ping calls aerochat.identity.v1.IdentityService.Ping.
@@ -231,6 +319,47 @@ func (c *identityServiceClient) UnblockUser(ctx context.Context, req *connect.Re
 	return c.unblockUser.CallUnary(ctx, req)
 }
 
+// SendFriendRequest calls aerochat.identity.v1.IdentityService.SendFriendRequest.
+func (c *identityServiceClient) SendFriendRequest(ctx context.Context, req *connect.Request[v1.SendFriendRequestRequest]) (*connect.Response[v1.SendFriendRequestResponse], error) {
+	return c.sendFriendRequest.CallUnary(ctx, req)
+}
+
+// AcceptFriendRequest calls aerochat.identity.v1.IdentityService.AcceptFriendRequest.
+func (c *identityServiceClient) AcceptFriendRequest(ctx context.Context, req *connect.Request[v1.AcceptFriendRequestRequest]) (*connect.Response[v1.AcceptFriendRequestResponse], error) {
+	return c.acceptFriendRequest.CallUnary(ctx, req)
+}
+
+// DeclineFriendRequest calls aerochat.identity.v1.IdentityService.DeclineFriendRequest.
+func (c *identityServiceClient) DeclineFriendRequest(ctx context.Context, req *connect.Request[v1.DeclineFriendRequestRequest]) (*connect.Response[v1.DeclineFriendRequestResponse], error) {
+	return c.declineFriendRequest.CallUnary(ctx, req)
+}
+
+// CancelOutgoingFriendRequest calls
+// aerochat.identity.v1.IdentityService.CancelOutgoingFriendRequest.
+func (c *identityServiceClient) CancelOutgoingFriendRequest(ctx context.Context, req *connect.Request[v1.CancelOutgoingFriendRequestRequest]) (*connect.Response[v1.CancelOutgoingFriendRequestResponse], error) {
+	return c.cancelOutgoingFriendRequest.CallUnary(ctx, req)
+}
+
+// ListIncomingFriendRequests calls aerochat.identity.v1.IdentityService.ListIncomingFriendRequests.
+func (c *identityServiceClient) ListIncomingFriendRequests(ctx context.Context, req *connect.Request[v1.ListIncomingFriendRequestsRequest]) (*connect.Response[v1.ListIncomingFriendRequestsResponse], error) {
+	return c.listIncomingFriendRequests.CallUnary(ctx, req)
+}
+
+// ListOutgoingFriendRequests calls aerochat.identity.v1.IdentityService.ListOutgoingFriendRequests.
+func (c *identityServiceClient) ListOutgoingFriendRequests(ctx context.Context, req *connect.Request[v1.ListOutgoingFriendRequestsRequest]) (*connect.Response[v1.ListOutgoingFriendRequestsResponse], error) {
+	return c.listOutgoingFriendRequests.CallUnary(ctx, req)
+}
+
+// ListFriends calls aerochat.identity.v1.IdentityService.ListFriends.
+func (c *identityServiceClient) ListFriends(ctx context.Context, req *connect.Request[v1.ListFriendsRequest]) (*connect.Response[v1.ListFriendsResponse], error) {
+	return c.listFriends.CallUnary(ctx, req)
+}
+
+// RemoveFriend calls aerochat.identity.v1.IdentityService.RemoveFriend.
+func (c *identityServiceClient) RemoveFriend(ctx context.Context, req *connect.Request[v1.RemoveFriendRequest]) (*connect.Response[v1.RemoveFriendResponse], error) {
+	return c.removeFriend.CallUnary(ctx, req)
+}
+
 // IdentityServiceHandler is an implementation of the aerochat.identity.v1.IdentityService service.
 type IdentityServiceHandler interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
@@ -244,6 +373,14 @@ type IdentityServiceHandler interface {
 	ListBlockedUsers(context.Context, *connect.Request[v1.ListBlockedUsersRequest]) (*connect.Response[v1.ListBlockedUsersResponse], error)
 	BlockUser(context.Context, *connect.Request[v1.BlockUserRequest]) (*connect.Response[v1.BlockUserResponse], error)
 	UnblockUser(context.Context, *connect.Request[v1.UnblockUserRequest]) (*connect.Response[v1.UnblockUserResponse], error)
+	SendFriendRequest(context.Context, *connect.Request[v1.SendFriendRequestRequest]) (*connect.Response[v1.SendFriendRequestResponse], error)
+	AcceptFriendRequest(context.Context, *connect.Request[v1.AcceptFriendRequestRequest]) (*connect.Response[v1.AcceptFriendRequestResponse], error)
+	DeclineFriendRequest(context.Context, *connect.Request[v1.DeclineFriendRequestRequest]) (*connect.Response[v1.DeclineFriendRequestResponse], error)
+	CancelOutgoingFriendRequest(context.Context, *connect.Request[v1.CancelOutgoingFriendRequestRequest]) (*connect.Response[v1.CancelOutgoingFriendRequestResponse], error)
+	ListIncomingFriendRequests(context.Context, *connect.Request[v1.ListIncomingFriendRequestsRequest]) (*connect.Response[v1.ListIncomingFriendRequestsResponse], error)
+	ListOutgoingFriendRequests(context.Context, *connect.Request[v1.ListOutgoingFriendRequestsRequest]) (*connect.Response[v1.ListOutgoingFriendRequestsResponse], error)
+	ListFriends(context.Context, *connect.Request[v1.ListFriendsRequest]) (*connect.Response[v1.ListFriendsResponse], error)
+	RemoveFriend(context.Context, *connect.Request[v1.RemoveFriendRequest]) (*connect.Response[v1.RemoveFriendResponse], error)
 }
 
 // NewIdentityServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -319,6 +456,54 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 		connect.WithSchema(identityServiceMethods.ByName("UnblockUser")),
 		connect.WithHandlerOptions(opts...),
 	)
+	identityServiceSendFriendRequestHandler := connect.NewUnaryHandler(
+		IdentityServiceSendFriendRequestProcedure,
+		svc.SendFriendRequest,
+		connect.WithSchema(identityServiceMethods.ByName("SendFriendRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceAcceptFriendRequestHandler := connect.NewUnaryHandler(
+		IdentityServiceAcceptFriendRequestProcedure,
+		svc.AcceptFriendRequest,
+		connect.WithSchema(identityServiceMethods.ByName("AcceptFriendRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceDeclineFriendRequestHandler := connect.NewUnaryHandler(
+		IdentityServiceDeclineFriendRequestProcedure,
+		svc.DeclineFriendRequest,
+		connect.WithSchema(identityServiceMethods.ByName("DeclineFriendRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceCancelOutgoingFriendRequestHandler := connect.NewUnaryHandler(
+		IdentityServiceCancelOutgoingFriendRequestProcedure,
+		svc.CancelOutgoingFriendRequest,
+		connect.WithSchema(identityServiceMethods.ByName("CancelOutgoingFriendRequest")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceListIncomingFriendRequestsHandler := connect.NewUnaryHandler(
+		IdentityServiceListIncomingFriendRequestsProcedure,
+		svc.ListIncomingFriendRequests,
+		connect.WithSchema(identityServiceMethods.ByName("ListIncomingFriendRequests")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceListOutgoingFriendRequestsHandler := connect.NewUnaryHandler(
+		IdentityServiceListOutgoingFriendRequestsProcedure,
+		svc.ListOutgoingFriendRequests,
+		connect.WithSchema(identityServiceMethods.ByName("ListOutgoingFriendRequests")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceListFriendsHandler := connect.NewUnaryHandler(
+		IdentityServiceListFriendsProcedure,
+		svc.ListFriends,
+		connect.WithSchema(identityServiceMethods.ByName("ListFriends")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceRemoveFriendHandler := connect.NewUnaryHandler(
+		IdentityServiceRemoveFriendProcedure,
+		svc.RemoveFriend,
+		connect.WithSchema(identityServiceMethods.ByName("RemoveFriend")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/aerochat.identity.v1.IdentityService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case IdentityServicePingProcedure:
@@ -343,6 +528,22 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 			identityServiceBlockUserHandler.ServeHTTP(w, r)
 		case IdentityServiceUnblockUserProcedure:
 			identityServiceUnblockUserHandler.ServeHTTP(w, r)
+		case IdentityServiceSendFriendRequestProcedure:
+			identityServiceSendFriendRequestHandler.ServeHTTP(w, r)
+		case IdentityServiceAcceptFriendRequestProcedure:
+			identityServiceAcceptFriendRequestHandler.ServeHTTP(w, r)
+		case IdentityServiceDeclineFriendRequestProcedure:
+			identityServiceDeclineFriendRequestHandler.ServeHTTP(w, r)
+		case IdentityServiceCancelOutgoingFriendRequestProcedure:
+			identityServiceCancelOutgoingFriendRequestHandler.ServeHTTP(w, r)
+		case IdentityServiceListIncomingFriendRequestsProcedure:
+			identityServiceListIncomingFriendRequestsHandler.ServeHTTP(w, r)
+		case IdentityServiceListOutgoingFriendRequestsProcedure:
+			identityServiceListOutgoingFriendRequestsHandler.ServeHTTP(w, r)
+		case IdentityServiceListFriendsProcedure:
+			identityServiceListFriendsHandler.ServeHTTP(w, r)
+		case IdentityServiceRemoveFriendProcedure:
+			identityServiceRemoveFriendHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -394,4 +595,36 @@ func (UnimplementedIdentityServiceHandler) BlockUser(context.Context, *connect.R
 
 func (UnimplementedIdentityServiceHandler) UnblockUser(context.Context, *connect.Request[v1.UnblockUserRequest]) (*connect.Response[v1.UnblockUserResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.UnblockUser is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) SendFriendRequest(context.Context, *connect.Request[v1.SendFriendRequestRequest]) (*connect.Response[v1.SendFriendRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.SendFriendRequest is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) AcceptFriendRequest(context.Context, *connect.Request[v1.AcceptFriendRequestRequest]) (*connect.Response[v1.AcceptFriendRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.AcceptFriendRequest is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) DeclineFriendRequest(context.Context, *connect.Request[v1.DeclineFriendRequestRequest]) (*connect.Response[v1.DeclineFriendRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.DeclineFriendRequest is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) CancelOutgoingFriendRequest(context.Context, *connect.Request[v1.CancelOutgoingFriendRequestRequest]) (*connect.Response[v1.CancelOutgoingFriendRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.CancelOutgoingFriendRequest is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) ListIncomingFriendRequests(context.Context, *connect.Request[v1.ListIncomingFriendRequestsRequest]) (*connect.Response[v1.ListIncomingFriendRequestsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.ListIncomingFriendRequests is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) ListOutgoingFriendRequests(context.Context, *connect.Request[v1.ListOutgoingFriendRequestsRequest]) (*connect.Response[v1.ListOutgoingFriendRequestsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.ListOutgoingFriendRequests is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) ListFriends(context.Context, *connect.Request[v1.ListFriendsRequest]) (*connect.Response[v1.ListFriendsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.ListFriends is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) RemoveFriend(context.Context, *connect.Request[v1.RemoveFriendRequest]) (*connect.Response[v1.RemoveFriendResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.RemoveFriend is not implemented"))
 }
