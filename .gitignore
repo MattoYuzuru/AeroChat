@@ -1,8 +1,12 @@
 .DS_Store
 .env
 .env.local
+.idea/
 bin/
 node_modules/
 apps/web/dist/
+apps/web/vite.config.d.ts
+apps/web/vite.config.js
+*.tsbuildinfo
 coverage/
 tmp/
