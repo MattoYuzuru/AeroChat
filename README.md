@@ -161,3 +161,168 @@ AeroChat создаётся как проект с сильным фундаме
 
 /.github
   /workflows
+```
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Getting Started
+### Требования
+
+Перед началом убедись, что у тебя установлены:
+
+* Git
+* Go
+* Node.js
+* pnpm
+* Docker
+* Docker Compose
+
+### Локальный запуск
+
+1. Клонируй репозиторий:
+```
+git clone https://github.com/MattoYuzuru/AeroChat.git
+cd AeroChat
+```
+2. Скопируй пример переменных окружения:
+```
+cp .env.example .env
+```
+3. Подними локальную инфраструктуру:
+```
+docker compose -f infra/compose/docker-compose.yml up -d
+```
+4. Установи зависимости фронтенда и backend toolchain.
+5. Сгенерируй protobuf / codegen.
+6. Запусти локальные сервисы.
+
+> На раннем этапе точные команды могут меняться. Актуальный набор команд должен поддерживаться через Taskfile.yml.
+
+### Первый приоритет репозитория
+
+До реализации продуктовых фич проект должен:
+
+* воспроизводимо собираться;
+* запускаться локально;
+* проходить CI;
+* иметь чистую архитектурную структуру;
+* быть безопасным для дальнейшей итерационной разработки.
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Roadmap
+### Foundation
+
+-[ ] Bootstrap monorepo
+-[ ] Документация архитектуры
+-[ ] Proto/tooling foundation
+-[ ] Базовый frontend shell
+-[ ] Dev infrastructure
+-[ ] CI
+
+### Identity
+
+-[ ] Регистрация и вход
+-[ ] Immutable login / mutable nickname
+-[ ] Device sessions
+-[ ] Privacy flags
+-[ ] Block list
+-[ ] Key backup status
+
+### Chat
+
+-[ ] Друзья по логину
+-[ ] Личные чаты
+-[ ] Группы и роли
+-[ ] Markdown messages
+-[ ] Pins
+-[ ] Draft recovery
+-[ ] Tombstone deletion model
+
+## Media
+
+-[ ] Voice messages
+-[ ] Video messages
+-[ ] Attachments
+-[ ] Encrypted relay
+-[ ] Preview для изображений / аудио / видео
+
+### RTC
+
+-[ ] Signaling
+-[ ] 1:1 calls
+-[ ] Group calls
+-[ ] Screen sharing foundation
+-[ ] Recording metadata
+
+### Platform
+
+-[ ] Push notifications
+-[ ] PWA
+-[ ] Desktop shell UX
+-[ ] Mobile fullscreen UX
+-[ ] Self-host install flow
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Руководство по разработке
+
+В проекте используется строгий инженерный процесс:
+
+* архитектурные решения фиксируются в ADR;
+* изменения вносятся через отдельные ветки;
+* коммиты оформляются осмысленно и единообразно;
+* обязательны тесты на изменяемый код;
+* изменения не должны ломать сборку, CI и локальный запуск;
+* документация обновляется вместе с кодом.
+
+Подробные правила находятся в `AGENTS.md`.
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Contributing
+
+На текущем этапе основной способ работы — через контролируемые feature-ветки и small PR.
+
+Общий процесс:
+
+1. Создать ветку от `main`
+2. Реализовать одно изолированное изменение
+3. Добавить или обновить тесты
+4. Обновить документацию
+5. Убедиться, что CI проходит
+6. Открыть PR
+
+Принцип проекта:
+
+**один PR = одна завершённая инженерная задача**
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Лицензия
+
+Лицензия будет определена отдельно.
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+## Контакты
+
+Автор проекта: **MattoYuzuru**
+
+Репозиторий проекта: [AeroChat](https://github.com/MattoYuzuru/AeroChat)
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p>
+
+
+## Источники вдохновения
+
+* Эстетика Frutiger Aero / Windows Aero
+
+* Desktop-like интерфейсы старых ОС
+
+* Local-first и privacy-first подходы
+
+* Современные self-hosted communication systems
+
+* Best README Template как структурный референс для оформления README
+
+<p align="right">(<a href="#readme-top">наверх</a>)</p> 
