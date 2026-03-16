@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Web devices and sessions bootstrap в `apps/web` через `aero-gateway`
+- [x] Deploy foundation для single-server self-host runtime
 
 ---
 
@@ -33,6 +33,7 @@
 - [ ] Taskfile
 - [ ] Frontend shell scaffold
 - [ ] Dev Docker Compose
+- [x] Single-server deploy foundation
 - [ ] GitHub Actions CI
 
 ---
