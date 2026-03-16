@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
 	identityauth "github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/auth"
 )
 
@@ -366,7 +367,7 @@ func TestBlockClearsSocialGraphAndPreventsRequests(t *testing.T) {
 
 func newTestService() *Service {
 	repo := newFakeRepository()
-	service := NewService(repo, identityauth.NewPasswordHasher(), identityauth.NewSessionTokenManager())
+	service := NewService(repo, identityauth.NewPasswordHasher(), libauth.NewSessionTokenManager())
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	service.now = func() time.Time {
 		now = now.Add(time.Second)

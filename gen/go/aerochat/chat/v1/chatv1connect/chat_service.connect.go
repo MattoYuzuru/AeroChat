@@ -35,11 +35,42 @@ const (
 const (
 	// ChatServicePingProcedure is the fully-qualified name of the ChatService's Ping RPC.
 	ChatServicePingProcedure = "/aerochat.chat.v1.ChatService/Ping"
+	// ChatServiceCreateDirectChatProcedure is the fully-qualified name of the ChatService's
+	// CreateDirectChat RPC.
+	ChatServiceCreateDirectChatProcedure = "/aerochat.chat.v1.ChatService/CreateDirectChat"
+	// ChatServiceListDirectChatsProcedure is the fully-qualified name of the ChatService's
+	// ListDirectChats RPC.
+	ChatServiceListDirectChatsProcedure = "/aerochat.chat.v1.ChatService/ListDirectChats"
+	// ChatServiceGetDirectChatProcedure is the fully-qualified name of the ChatService's GetDirectChat
+	// RPC.
+	ChatServiceGetDirectChatProcedure = "/aerochat.chat.v1.ChatService/GetDirectChat"
+	// ChatServiceSendTextMessageProcedure is the fully-qualified name of the ChatService's
+	// SendTextMessage RPC.
+	ChatServiceSendTextMessageProcedure = "/aerochat.chat.v1.ChatService/SendTextMessage"
+	// ChatServiceListDirectChatMessagesProcedure is the fully-qualified name of the ChatService's
+	// ListDirectChatMessages RPC.
+	ChatServiceListDirectChatMessagesProcedure = "/aerochat.chat.v1.ChatService/ListDirectChatMessages"
+	// ChatServiceDeleteMessageForEveryoneProcedure is the fully-qualified name of the ChatService's
+	// DeleteMessageForEveryone RPC.
+	ChatServiceDeleteMessageForEveryoneProcedure = "/aerochat.chat.v1.ChatService/DeleteMessageForEveryone"
+	// ChatServicePinMessageProcedure is the fully-qualified name of the ChatService's PinMessage RPC.
+	ChatServicePinMessageProcedure = "/aerochat.chat.v1.ChatService/PinMessage"
+	// ChatServiceUnpinMessageProcedure is the fully-qualified name of the ChatService's UnpinMessage
+	// RPC.
+	ChatServiceUnpinMessageProcedure = "/aerochat.chat.v1.ChatService/UnpinMessage"
 )
 
 // ChatServiceClient is a client for the aerochat.chat.v1.ChatService service.
 type ChatServiceClient interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
+	CreateDirectChat(context.Context, *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error)
+	ListDirectChats(context.Context, *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error)
+	GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error)
+	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
+	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
+	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
+	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
+	UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error)
 }
 
 // NewChatServiceClient constructs a client for the aerochat.chat.v1.ChatService service. By
@@ -59,12 +90,68 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("Ping")),
 			connect.WithClientOptions(opts...),
 		),
+		createDirectChat: connect.NewClient[v1.CreateDirectChatRequest, v1.CreateDirectChatResponse](
+			httpClient,
+			baseURL+ChatServiceCreateDirectChatProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("CreateDirectChat")),
+			connect.WithClientOptions(opts...),
+		),
+		listDirectChats: connect.NewClient[v1.ListDirectChatsRequest, v1.ListDirectChatsResponse](
+			httpClient,
+			baseURL+ChatServiceListDirectChatsProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("ListDirectChats")),
+			connect.WithClientOptions(opts...),
+		),
+		getDirectChat: connect.NewClient[v1.GetDirectChatRequest, v1.GetDirectChatResponse](
+			httpClient,
+			baseURL+ChatServiceGetDirectChatProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("GetDirectChat")),
+			connect.WithClientOptions(opts...),
+		),
+		sendTextMessage: connect.NewClient[v1.SendTextMessageRequest, v1.SendTextMessageResponse](
+			httpClient,
+			baseURL+ChatServiceSendTextMessageProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("SendTextMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		listDirectChatMessages: connect.NewClient[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse](
+			httpClient,
+			baseURL+ChatServiceListDirectChatMessagesProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("ListDirectChatMessages")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteMessageForEveryone: connect.NewClient[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse](
+			httpClient,
+			baseURL+ChatServiceDeleteMessageForEveryoneProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("DeleteMessageForEveryone")),
+			connect.WithClientOptions(opts...),
+		),
+		pinMessage: connect.NewClient[v1.PinMessageRequest, v1.PinMessageResponse](
+			httpClient,
+			baseURL+ChatServicePinMessageProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("PinMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		unpinMessage: connect.NewClient[v1.UnpinMessageRequest, v1.UnpinMessageResponse](
+			httpClient,
+			baseURL+ChatServiceUnpinMessageProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("UnpinMessage")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // chatServiceClient implements ChatServiceClient.
 type chatServiceClient struct {
-	ping *connect.Client[v1.PingRequest, v1.PingResponse]
+	ping                     *connect.Client[v1.PingRequest, v1.PingResponse]
+	createDirectChat         *connect.Client[v1.CreateDirectChatRequest, v1.CreateDirectChatResponse]
+	listDirectChats          *connect.Client[v1.ListDirectChatsRequest, v1.ListDirectChatsResponse]
+	getDirectChat            *connect.Client[v1.GetDirectChatRequest, v1.GetDirectChatResponse]
+	sendTextMessage          *connect.Client[v1.SendTextMessageRequest, v1.SendTextMessageResponse]
+	listDirectChatMessages   *connect.Client[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse]
+	deleteMessageForEveryone *connect.Client[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse]
+	pinMessage               *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
+	unpinMessage             *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
 }
 
 // Ping calls aerochat.chat.v1.ChatService.Ping.
@@ -72,9 +159,57 @@ func (c *chatServiceClient) Ping(ctx context.Context, req *connect.Request[v1.Pi
 	return c.ping.CallUnary(ctx, req)
 }
 
+// CreateDirectChat calls aerochat.chat.v1.ChatService.CreateDirectChat.
+func (c *chatServiceClient) CreateDirectChat(ctx context.Context, req *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error) {
+	return c.createDirectChat.CallUnary(ctx, req)
+}
+
+// ListDirectChats calls aerochat.chat.v1.ChatService.ListDirectChats.
+func (c *chatServiceClient) ListDirectChats(ctx context.Context, req *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error) {
+	return c.listDirectChats.CallUnary(ctx, req)
+}
+
+// GetDirectChat calls aerochat.chat.v1.ChatService.GetDirectChat.
+func (c *chatServiceClient) GetDirectChat(ctx context.Context, req *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error) {
+	return c.getDirectChat.CallUnary(ctx, req)
+}
+
+// SendTextMessage calls aerochat.chat.v1.ChatService.SendTextMessage.
+func (c *chatServiceClient) SendTextMessage(ctx context.Context, req *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error) {
+	return c.sendTextMessage.CallUnary(ctx, req)
+}
+
+// ListDirectChatMessages calls aerochat.chat.v1.ChatService.ListDirectChatMessages.
+func (c *chatServiceClient) ListDirectChatMessages(ctx context.Context, req *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error) {
+	return c.listDirectChatMessages.CallUnary(ctx, req)
+}
+
+// DeleteMessageForEveryone calls aerochat.chat.v1.ChatService.DeleteMessageForEveryone.
+func (c *chatServiceClient) DeleteMessageForEveryone(ctx context.Context, req *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error) {
+	return c.deleteMessageForEveryone.CallUnary(ctx, req)
+}
+
+// PinMessage calls aerochat.chat.v1.ChatService.PinMessage.
+func (c *chatServiceClient) PinMessage(ctx context.Context, req *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error) {
+	return c.pinMessage.CallUnary(ctx, req)
+}
+
+// UnpinMessage calls aerochat.chat.v1.ChatService.UnpinMessage.
+func (c *chatServiceClient) UnpinMessage(ctx context.Context, req *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error) {
+	return c.unpinMessage.CallUnary(ctx, req)
+}
+
 // ChatServiceHandler is an implementation of the aerochat.chat.v1.ChatService service.
 type ChatServiceHandler interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
+	CreateDirectChat(context.Context, *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error)
+	ListDirectChats(context.Context, *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error)
+	GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error)
+	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
+	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
+	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
+	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
+	UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error)
 }
 
 // NewChatServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -90,10 +225,74 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceMethods.ByName("Ping")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceCreateDirectChatHandler := connect.NewUnaryHandler(
+		ChatServiceCreateDirectChatProcedure,
+		svc.CreateDirectChat,
+		connect.WithSchema(chatServiceMethods.ByName("CreateDirectChat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceListDirectChatsHandler := connect.NewUnaryHandler(
+		ChatServiceListDirectChatsProcedure,
+		svc.ListDirectChats,
+		connect.WithSchema(chatServiceMethods.ByName("ListDirectChats")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceGetDirectChatHandler := connect.NewUnaryHandler(
+		ChatServiceGetDirectChatProcedure,
+		svc.GetDirectChat,
+		connect.WithSchema(chatServiceMethods.ByName("GetDirectChat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceSendTextMessageHandler := connect.NewUnaryHandler(
+		ChatServiceSendTextMessageProcedure,
+		svc.SendTextMessage,
+		connect.WithSchema(chatServiceMethods.ByName("SendTextMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceListDirectChatMessagesHandler := connect.NewUnaryHandler(
+		ChatServiceListDirectChatMessagesProcedure,
+		svc.ListDirectChatMessages,
+		connect.WithSchema(chatServiceMethods.ByName("ListDirectChatMessages")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceDeleteMessageForEveryoneHandler := connect.NewUnaryHandler(
+		ChatServiceDeleteMessageForEveryoneProcedure,
+		svc.DeleteMessageForEveryone,
+		connect.WithSchema(chatServiceMethods.ByName("DeleteMessageForEveryone")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServicePinMessageHandler := connect.NewUnaryHandler(
+		ChatServicePinMessageProcedure,
+		svc.PinMessage,
+		connect.WithSchema(chatServiceMethods.ByName("PinMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceUnpinMessageHandler := connect.NewUnaryHandler(
+		ChatServiceUnpinMessageProcedure,
+		svc.UnpinMessage,
+		connect.WithSchema(chatServiceMethods.ByName("UnpinMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/aerochat.chat.v1.ChatService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChatServicePingProcedure:
 			chatServicePingHandler.ServeHTTP(w, r)
+		case ChatServiceCreateDirectChatProcedure:
+			chatServiceCreateDirectChatHandler.ServeHTTP(w, r)
+		case ChatServiceListDirectChatsProcedure:
+			chatServiceListDirectChatsHandler.ServeHTTP(w, r)
+		case ChatServiceGetDirectChatProcedure:
+			chatServiceGetDirectChatHandler.ServeHTTP(w, r)
+		case ChatServiceSendTextMessageProcedure:
+			chatServiceSendTextMessageHandler.ServeHTTP(w, r)
+		case ChatServiceListDirectChatMessagesProcedure:
+			chatServiceListDirectChatMessagesHandler.ServeHTTP(w, r)
+		case ChatServiceDeleteMessageForEveryoneProcedure:
+			chatServiceDeleteMessageForEveryoneHandler.ServeHTTP(w, r)
+		case ChatServicePinMessageProcedure:
+			chatServicePinMessageHandler.ServeHTTP(w, r)
+		case ChatServiceUnpinMessageProcedure:
+			chatServiceUnpinMessageHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -105,4 +304,36 @@ type UnimplementedChatServiceHandler struct{}
 
 func (UnimplementedChatServiceHandler) Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.Ping is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) CreateDirectChat(context.Context, *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.CreateDirectChat is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ListDirectChats(context.Context, *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ListDirectChats is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetDirectChat is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.SendTextMessage is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ListDirectChatMessages is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.DeleteMessageForEveryone is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.PinMessage is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.UnpinMessage is not implemented"))
 }

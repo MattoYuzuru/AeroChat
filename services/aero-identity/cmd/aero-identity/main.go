@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	identityv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1/identityv1connect"
+	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	"github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/app"
 	identityauth "github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/auth"
@@ -57,7 +58,7 @@ func run() error {
 	service := identity.NewService(
 		repository,
 		identityauth.NewPasswordHasher(),
-		identityauth.NewSessionTokenManager(),
+		libauth.NewSessionTokenManager(),
 	)
 	handler := connecthandler.NewHandler(serviceName, version, service)
 

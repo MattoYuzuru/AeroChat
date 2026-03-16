@@ -17,3 +17,20 @@ sql:
         overrides:
           - db_type: uuid
             go_type: github.com/google/uuid.UUID
+  - engine: postgresql
+    schema:
+      - services/aero-identity/db/schema
+      - services/aero-chat/db/schema
+    queries:
+      - services/aero-chat/db/queries
+    gen:
+      go:
+        out: services/aero-chat/internal/storage/sqlc
+        package: chatsqlc
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_json_tags: true
+        emit_db_tags: true
+        overrides:
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID

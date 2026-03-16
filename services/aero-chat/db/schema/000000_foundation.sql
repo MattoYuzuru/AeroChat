@@ -1,0 +1,1 @@
+-- Foundation phase: схема chat domain до direct chat slice ещё не была определена.
