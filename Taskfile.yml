@@ -59,6 +59,11 @@ tasks:
     cmds:
       - docker compose -f infra/compose/docker-compose.yml config
 
+  compose:server:config:
+    desc: Проверяет server/prod-like compose-конфигурацию
+    cmds:
+      - docker compose --env-file .env.server.example -f infra/compose/docker-compose.server.yml config
+
   compose:up:
     desc: Поднимает dev-окружение
     cmds:
@@ -77,3 +82,4 @@ tasks:
       - web:lint
       - web:build
       - compose:config
+      - compose:server:config

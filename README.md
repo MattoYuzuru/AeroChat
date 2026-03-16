@@ -180,6 +180,18 @@ AeroChat создаётся как проект с сильным фундаме
 
 ### Локальный запуск
 
+В репозитории теперь есть два явных режима:
+
+- `local/dev`:
+  - root `.env.example` управляет локальным compose-стеком;
+  - `infra/compose/docker-compose.yml` поднимает локальный full-stack smoke runtime;
+  - `services/*/.env.example` и `apps/web/.env.example` остаются source-mode примерами для запуска сервисов вне compose.
+
+- `server/prod-like`:
+  - `.env.server.example` служит шаблоном для одного VPS;
+  - `infra/compose/docker-compose.server.yml` даёт production-oriented single-server topology;
+  - ручной bootstrap описан в `docs/deploy/single-server-bootstrap.md`.
+
 1. Клонируй репозиторий:
 
 ```
@@ -193,15 +205,30 @@ cd AeroChat
 cp .env.example .env
 ```
 
-3. Подними локальную инфраструктуру:
+3. Подними локальный stack:
 
 ```
-docker compose -f infra/compose/docker-compose.yml up -d
+docker compose -f infra/compose/docker-compose.yml up --build -d
 ```
 
-4. Установи зависимости фронтенда и backend toolchain.
-5. Сгенерируй protobuf / codegen.
-6. Запусти локальные сервисы.
+4. Открой приложение через `http://127.0.0.1:${NGINX_PORT}` из `.env`.
+
+5. Если нужен source-mode запуск вне compose, используй:
+
+- `services/*/.env.example` для backend-сервисов;
+- `apps/web/.env.example` для web-клиента.
+
+### Single-server foundation
+
+Для server/prod-like bootstrap на одном VPS:
+
+```bash
+cp .env.server.example .env.server
+docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml config
+docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml up --build -d
+```
+
+Подробности и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
 
 > На раннем этапе точные команды могут меняться. Актуальный набор команд должен поддерживаться через Taskfile.yml.
 
@@ -333,4 +360,4 @@ docker compose -f infra/compose/docker-compose.yml up -d
 
 * Best README Template как структурный референс для оформления README
 
-<p align="right">(<a href="#readme-top">наверх</a>)</p> 
+<p align="right">(<a href="#readme-top">наверх</a>)</p>

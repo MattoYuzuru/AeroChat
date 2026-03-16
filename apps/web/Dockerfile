@@ -4,6 +4,9 @@ WORKDIR /workspace
 
 RUN npm install -g pnpm@10.19.0
 
+ARG VITE_GATEWAY_BASE_URL=/api
+ENV VITE_GATEWAY_BASE_URL=${VITE_GATEWAY_BASE_URL}
+
 COPY package.json pnpm-workspace.yaml ./
 COPY pnpm-lock.yaml ./pnpm-lock.yaml
 COPY apps/web/package.json ./apps/web/package.json
