@@ -5,6 +5,7 @@
 Цель текущего этапа:
 
 - получить воспроизводимый server/prod-like runtime;
+- получить registry-backed release bootstrap для application images;
 - не внедрять CI/CD deploy;
 - не требовать реальные боевые секреты;
 - не делать реальный production rollout.
@@ -20,7 +21,7 @@
 
 - `server/prod-like`
   - `.env.server.example` служит шаблоном для VPS;
-  - `infra/compose/docker-compose.server.yml` поднимает runtime на одном сервере;
+  - `infra/compose/docker-compose.server.yml` тянет предсобранные application images из registry;
   - наружу публикуется только `nginx`.
 
 ## Runtime topology
@@ -43,8 +44,9 @@
 
 - production-oriented compose topology для одного сервера;
 - отдельный env-шаблон для server/prod-like режима;
+- GHCR-ready модель публикации versioned application images;
 - readiness chain через `identity` → `chat` → `gateway` → `nginx`;
-- manual bootstrap flow без дополнительной automation.
+- manual bootstrap flow без дополнительной deploy automation.
 
 ## Что намеренно отложено
 
@@ -52,7 +54,6 @@
 - SSH automation;
 - реальные production secrets;
 - TLS и ACME automation;
-- GHCR image delivery;
 - backup/restore automation;
 - zero-downtime rollout;
 - firewall hardening и OS-level provisioning.
@@ -79,6 +80,21 @@ cp .env.server.example .env.server
 Для foundation smoke bootstrap можно оставить шаблонные значения на изолированном тестовом сервере.
 Для любого реального внешнего rollout их нужно заменить.
 
+Минимально важные release-переменные:
+
+- `AERO_IMAGE_NAMESPACE`:
+  - по умолчанию указывает на GHCR namespace проекта;
+  - в fork или mirror может быть заменён на свой namespace.
+
+- `AERO_IMAGE_TAG`:
+  - `edge` для latest build из default branch;
+  - `vX.Y.Z` для фиксированного release;
+  - при необходимости можно использовать точный `sha-<commit>`.
+
+`latest` намеренно не используется.
+
+На этом этапе опубликованные application images собираются только для `linux/amd64`.
+
 3. Проверь итоговую compose-конфигурацию:
 
 ```bash
@@ -88,7 +104,8 @@ docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml
 4. Подними runtime:
 
 ```bash
-docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml up --build -d
+docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml pull
+docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml up -d
 ```
 
 5. Проверь edge health:
@@ -115,17 +132,17 @@ curl -fsS http://127.0.0.1/readyz
 docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml down
 ```
 
-Пересобрать после изменения исходников:
+Обновить до другого release tag:
 
 ```bash
-docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml up --build -d
+docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml pull
+docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml up -d
 ```
 
 ## Следующий шаг после этого foundation
 
 Следующий PR должен добавлять уже не topology foundation, а реальный deploy workflow:
 
-- image delivery strategy;
 - безопасную модель секретов;
 - TLS/domain setup;
 - automation для rollout и обновлений.

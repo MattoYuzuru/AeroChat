@@ -1,0 +1,86 @@
+name: Publish Images
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: web
+            image_name: aerochat-web
+            dockerfile: apps/web/Dockerfile
+            build_args: |
+              VITE_GATEWAY_BASE_URL=/api
+          - service: aero-gateway
+            image_name: aerochat-aero-gateway
+            dockerfile: services/aero-gateway/Dockerfile
+            build_args: ""
+          - service: aero-identity
+            image_name: aerochat-aero-identity
+            dockerfile: services/aero-identity/Dockerfile
+            build_args: ""
+          - service: aero-chat
+            image_name: aerochat-aero-chat
+            dockerfile: services/aero-chat/Dockerfile
+            build_args: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Normalize image namespace
+        id: repo
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.repo.outputs.owner }}/${{ matrix.image_name }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=sha,format=long,prefix=sha-
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=${{ matrix.image_name }}
+            org.opencontainers.image.description=AeroChat ${{ matrix.service }} service image
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          build-args: ${{ matrix.build_args }}
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}

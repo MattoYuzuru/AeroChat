@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Deploy foundation для single-server self-host runtime
+- [x] Image delivery и release bootstrap для single-server self-host runtime
 
 ---
 
@@ -34,6 +34,7 @@
 - [ ] Frontend shell scaffold
 - [ ] Dev Docker Compose
 - [x] Single-server deploy foundation
+- [x] Image delivery и release bootstrap
 - [ ] GitHub Actions CI
 
 ---
