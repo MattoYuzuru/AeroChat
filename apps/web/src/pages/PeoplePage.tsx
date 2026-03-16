@@ -1,10 +1,12 @@
 import { Children, useState, type FormEvent, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import type { Profile } from "../gateway/types";
 import { usePeople } from "../people/usePeople";
 import styles from "./PeoplePage.module.css";
 
 export function PeoplePage() {
+  const navigate = useNavigate();
   const { state: authState, expireSession } = useAuth();
   const [login, setLogin] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -43,8 +45,9 @@ export function PeoplePage() {
             <p className={styles.cardLabel}>People</p>
             <h1 className={styles.title}>Друзья по точному login</h1>
             <p className={styles.subtitle}>
-              Frontend social graph bootstrap идёт только через aero-gateway. Публичного каталога,
-              fuzzy search и direct chat UI здесь пока нет.
+              Frontend social graph bootstrap идёт только через aero-gateway. Публичного каталога
+              и fuzzy search здесь нет, а direct chat создаётся только явным действием из карточки
+              друга.
             </p>
           </div>
 
@@ -188,7 +191,7 @@ export function PeoplePage() {
 
           <PeopleSection
             title="Друзья"
-            description="Friendship готова для следующего slice, но direct chat creation остаётся отдельным PR."
+            description="Direct chat создаётся только явным действием из карточки друга."
             emptyMessage="Список друзей пока пуст."
           >
             {people.state.snapshot.friends.map((friend) => {
@@ -201,6 +204,12 @@ export function PeoplePage() {
                   pendingLabel={pendingLabel}
                   profile={friend.profile}
                   primaryAction={{
+                    label: "Открыть чат",
+                    onClick: () => {
+                      navigate(`/app/chats?peer=${encodeURIComponent(friend.profile.id)}`);
+                    },
+                  }}
+                  secondaryAction={{
                     label: "Удалить из друзей",
                     onClick: () => {
                       void people.removeFriend(friend.profile.login);

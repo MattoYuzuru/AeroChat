@@ -1,16 +1,29 @@
 import type {
   CurrentAuth,
+  DirectChat,
+  DirectChatMessage,
+  DirectChatPresenceIndicator,
+  DirectChatPresenceState,
+  DirectChatReadPosition,
+  DirectChatReadState,
+  DirectChatSnapshot,
+  DirectChatTypingIndicator,
+  DirectChatTypingState,
   Device,
+  ChatUser,
   Friend,
   FriendRequest,
   GatewayClient,
   GatewayErrorCode,
+  MessageTombstone,
   Profile,
   Session,
+  TextMessageContent,
 } from "./types";
 import { GatewayError } from "./types";
 
 const identityServicePath = "aerochat.identity.v1.IdentityService";
+const chatServicePath = "aerochat.chat.v1.ChatService";
 
 interface FetchLike {
   (input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
@@ -101,40 +114,163 @@ interface ListFriendsResponseWire {
   friends?: FriendWire[];
 }
 
+interface ChatUserWire {
+  id?: string;
+  login?: string;
+  nickname?: string;
+  avatarUrl?: string;
+}
+
+interface DirectChatWire extends TimestampedWire {
+  id?: string;
+  kind?: string;
+  participants?: ChatUserWire[];
+  pinnedMessageIds?: string[];
+}
+
+interface TextMessageContentWire {
+  text?: string;
+  markdownPolicy?: string;
+}
+
+interface MessageTombstoneWire {
+  deletedByUserId?: string;
+  deletedAt?: string;
+}
+
+interface DirectChatMessageWire extends TimestampedWire {
+  id?: string;
+  chatId?: string;
+  senderUserId?: string;
+  kind?: string;
+  text?: TextMessageContentWire;
+  tombstone?: MessageTombstoneWire;
+  pinned?: boolean;
+}
+
+interface DirectChatReadPositionWire extends TimestampedWire {
+  messageId?: string;
+  messageCreatedAt?: string;
+}
+
+interface DirectChatReadStateWire {
+  selfPosition?: DirectChatReadPositionWire;
+  peerPosition?: DirectChatReadPositionWire;
+}
+
+interface DirectChatTypingIndicatorWire {
+  updatedAt?: string;
+  expiresAt?: string;
+}
+
+interface DirectChatTypingStateWire {
+  selfTyping?: DirectChatTypingIndicatorWire;
+  peerTyping?: DirectChatTypingIndicatorWire;
+}
+
+interface DirectChatPresenceIndicatorWire {
+  heartbeatAt?: string;
+  expiresAt?: string;
+}
+
+interface DirectChatPresenceStateWire {
+  selfPresence?: DirectChatPresenceIndicatorWire;
+  peerPresence?: DirectChatPresenceIndicatorWire;
+}
+
+interface CreateDirectChatResponseWire {
+  chat?: DirectChatWire;
+}
+
+interface ListDirectChatsResponseWire {
+  chats?: DirectChatWire[];
+}
+
+interface GetDirectChatResponseWire {
+  chat?: DirectChatWire;
+  readState?: DirectChatReadStateWire;
+  typingState?: DirectChatTypingStateWire;
+  presenceState?: DirectChatPresenceStateWire;
+}
+
+interface MarkDirectChatReadResponseWire {
+  readState?: DirectChatReadStateWire;
+}
+
+interface SendTextMessageResponseWire {
+  message?: DirectChatMessageWire;
+}
+
+interface ListDirectChatMessagesResponseWire {
+  messages?: DirectChatMessageWire[];
+}
+
+interface DeleteMessageForEveryoneResponseWire {
+  message?: DirectChatMessageWire;
+}
+
+interface PinMessageResponseWire {
+  message?: DirectChatMessageWire;
+}
+
+interface UnpinMessageResponseWire {
+  message?: DirectChatMessageWire;
+}
+
 export function createGatewayClient(
   fetchImpl: FetchLike,
   baseUrl = resolveGatewayBaseUrl(),
 ): GatewayClient {
   return {
     async register(input) {
-      const response = await unaryCall<RegisterResponseWire>(fetchImpl, baseUrl, "Register", {
-        login: input.login.trim(),
-        password: input.password,
-        nickname: input.nickname.trim(),
-        deviceLabel: normalizeOptionalString(input.deviceLabel),
-      });
+      const response = await unaryCall<RegisterResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "Register",
+        {
+          login: input.login.trim(),
+          password: input.password,
+          nickname: input.nickname.trim(),
+          deviceLabel: normalizeOptionalString(input.deviceLabel),
+        },
+      );
 
       return normalizeCurrentAuth(response.auth);
     },
 
     async login(input) {
-      const response = await unaryCall<LoginResponseWire>(fetchImpl, baseUrl, "Login", {
-        login: input.login.trim(),
-        password: input.password,
-        deviceLabel: normalizeOptionalString(input.deviceLabel),
-      });
+      const response = await unaryCall<LoginResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "Login",
+        {
+          login: input.login.trim(),
+          password: input.password,
+          deviceLabel: normalizeOptionalString(input.deviceLabel),
+        },
+      );
 
       return normalizeCurrentAuth(response.auth);
     },
 
     async logoutCurrentSession(token) {
-      await unaryCall(fetchImpl, baseUrl, "LogoutCurrentSession", {}, token);
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "LogoutCurrentSession",
+        {},
+        token,
+      );
     },
 
     async getCurrentProfile(token) {
       const response = await unaryCall<GetCurrentProfileResponseWire>(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "GetCurrentProfile",
         {},
         token,
@@ -143,10 +279,150 @@ export function createGatewayClient(
       return normalizeProfile(response.profile);
     },
 
+    async createDirectChat(token, peerUserId) {
+      const response = await unaryCall<CreateDirectChatResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "CreateDirectChat",
+        {
+          peerUserId: peerUserId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChat(response.chat);
+    },
+
+    async listDirectChats(token) {
+      const response = await unaryCall<ListDirectChatsResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ListDirectChats",
+        {},
+        token,
+      );
+
+      return (response.chats ?? []).map(normalizeDirectChat);
+    },
+
+    async getDirectChat(token, chatId) {
+      const response = await unaryCall<GetDirectChatResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "GetDirectChat",
+        {
+          chatId: chatId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChatSnapshot(response);
+    },
+
+    async markDirectChatRead(token, chatId, messageId) {
+      const response = await unaryCall<MarkDirectChatReadResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "MarkDirectChatRead",
+        {
+          chatId: chatId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChatReadState(response.readState);
+    },
+
+    async sendTextMessage(token, chatId, text) {
+      const response = await unaryCall<SendTextMessageResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "SendTextMessage",
+        {
+          chatId: chatId.trim(),
+          text,
+        },
+        token,
+      );
+
+      return normalizeDirectChatMessage(response.message);
+    },
+
+    async listDirectChatMessages(token, chatId, pageSize = 50) {
+      const response = await unaryCall<ListDirectChatMessagesResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ListDirectChatMessages",
+        {
+          chatId: chatId.trim(),
+          pageSize,
+        },
+        token,
+      );
+
+      return (response.messages ?? []).map(normalizeDirectChatMessage);
+    },
+
+    async deleteMessageForEveryone(token, chatId, messageId) {
+      const response = await unaryCall<DeleteMessageForEveryoneResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "DeleteMessageForEveryone",
+        {
+          chatId: chatId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChatMessage(response.message);
+    },
+
+    async pinMessage(token, chatId, messageId) {
+      const response = await unaryCall<PinMessageResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "PinMessage",
+        {
+          chatId: chatId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChatMessage(response.message);
+    },
+
+    async unpinMessage(token, chatId, messageId) {
+      const response = await unaryCall<UnpinMessageResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "UnpinMessage",
+        {
+          chatId: chatId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChatMessage(response.message);
+    },
+
     async sendFriendRequest(token, login) {
       await unaryCall(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "SendFriendRequest",
         {
           login: login.trim(),
@@ -159,6 +435,7 @@ export function createGatewayClient(
       await unaryCall(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "AcceptFriendRequest",
         {
           login: login.trim(),
@@ -171,6 +448,7 @@ export function createGatewayClient(
       await unaryCall(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "DeclineFriendRequest",
         {
           login: login.trim(),
@@ -183,6 +461,7 @@ export function createGatewayClient(
       await unaryCall(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "CancelOutgoingFriendRequest",
         {
           login: login.trim(),
@@ -195,6 +474,7 @@ export function createGatewayClient(
       const response = await unaryCall<ListIncomingFriendRequestsResponseWire>(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "ListIncomingFriendRequests",
         {},
         token,
@@ -207,6 +487,7 @@ export function createGatewayClient(
       const response = await unaryCall<ListOutgoingFriendRequestsResponseWire>(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "ListOutgoingFriendRequests",
         {},
         token,
@@ -219,6 +500,7 @@ export function createGatewayClient(
       const response = await unaryCall<ListFriendsResponseWire>(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "ListFriends",
         {},
         token,
@@ -231,6 +513,7 @@ export function createGatewayClient(
       await unaryCall(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "RemoveFriend",
         {
           login: login.trim(),
@@ -243,6 +526,7 @@ export function createGatewayClient(
       const response = await unaryCall<UpdateCurrentProfileResponseWire>(
         fetchImpl,
         baseUrl,
+        identityServicePath,
         "UpdateCurrentProfile",
         {
           nickname: input.nickname.trim(),
@@ -281,12 +565,13 @@ export function resolveGatewayBaseUrl(): string {
 async function unaryCall<TResponse>(
   fetchImpl: FetchLike,
   baseUrl: string,
+  servicePath: string,
   method: string,
   body: Record<string, unknown>,
   token?: string,
 ): Promise<TResponse> {
   const response = await fetchImpl(
-    buildPath(baseUrl, identityServicePath, method),
+    buildPath(baseUrl, servicePath, method),
     {
       method: "POST",
       headers: buildHeaders(token),
@@ -433,6 +718,203 @@ function normalizeFriend(input: FriendWire): Friend {
   return {
     profile: normalizeProfile(input.profile),
     friendsSince: input.friendsSince ?? "",
+  };
+}
+
+function normalizeChatUser(input: ChatUserWire | undefined): ChatUser {
+  return {
+    id: input?.id ?? "",
+    login: input?.login ?? "",
+    nickname: input?.nickname ?? "",
+    avatarUrl: normalizeNullableString(input?.avatarUrl),
+  };
+}
+
+function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
+  return {
+    id: input?.id ?? "",
+    kind: input?.kind ?? "CHAT_KIND_UNSPECIFIED",
+    participants: (input?.participants ?? []).map(normalizeChatUser),
+    pinnedMessageIds: (input?.pinnedMessageIds ?? []).filter(
+      (value): value is string => typeof value === "string" && value.trim() !== "",
+    ),
+    createdAt: input?.createdAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeTextMessageContent(
+  input: TextMessageContentWire | undefined,
+): TextMessageContent | null {
+  if (!input) {
+    return null;
+  }
+
+  return {
+    text: input.text ?? "",
+    markdownPolicy: input.markdownPolicy ?? "MARKDOWN_POLICY_UNSPECIFIED",
+  };
+}
+
+function normalizeMessageTombstone(
+  input: MessageTombstoneWire | undefined,
+): MessageTombstone | null {
+  if (!input) {
+    return null;
+  }
+
+  const deletedByUserId = input.deletedByUserId ?? "";
+  const deletedAt = input.deletedAt ?? "";
+  if (deletedByUserId === "" && deletedAt === "") {
+    return null;
+  }
+
+  return {
+    deletedByUserId,
+    deletedAt,
+  };
+}
+
+function normalizeDirectChatMessage(
+  input: DirectChatMessageWire | undefined,
+): DirectChatMessage {
+  return {
+    id: input?.id ?? "",
+    chatId: input?.chatId ?? "",
+    senderUserId: input?.senderUserId ?? "",
+    kind: input?.kind ?? "MESSAGE_KIND_UNSPECIFIED",
+    text: normalizeTextMessageContent(input?.text),
+    tombstone: normalizeMessageTombstone(input?.tombstone),
+    pinned: input?.pinned ?? false,
+    createdAt: input?.createdAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeDirectChatReadPosition(
+  input: DirectChatReadPositionWire | undefined,
+): DirectChatReadPosition | null {
+  if (!input) {
+    return null;
+  }
+
+  const messageId = input.messageId ?? "";
+  const messageCreatedAt = input.messageCreatedAt ?? "";
+  const updatedAt = input.updatedAt ?? "";
+  if (messageId === "" && messageCreatedAt === "" && updatedAt === "") {
+    return null;
+  }
+
+  return {
+    messageId,
+    messageCreatedAt,
+    updatedAt,
+  };
+}
+
+function normalizeDirectChatReadState(
+  input: DirectChatReadStateWire | undefined,
+): DirectChatReadState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfPosition = normalizeDirectChatReadPosition(input.selfPosition);
+  const peerPosition = normalizeDirectChatReadPosition(input.peerPosition);
+  if (!selfPosition && !peerPosition) {
+    return null;
+  }
+
+  return {
+    selfPosition,
+    peerPosition,
+  };
+}
+
+function normalizeDirectChatTypingIndicator(
+  input: DirectChatTypingIndicatorWire | undefined,
+): DirectChatTypingIndicator | null {
+  if (!input) {
+    return null;
+  }
+
+  const updatedAt = input.updatedAt ?? "";
+  const expiresAt = input.expiresAt ?? "";
+  if (updatedAt === "" && expiresAt === "") {
+    return null;
+  }
+
+  return {
+    updatedAt,
+    expiresAt,
+  };
+}
+
+function normalizeDirectChatTypingState(
+  input: DirectChatTypingStateWire | undefined,
+): DirectChatTypingState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfTyping = normalizeDirectChatTypingIndicator(input.selfTyping);
+  const peerTyping = normalizeDirectChatTypingIndicator(input.peerTyping);
+  if (!selfTyping && !peerTyping) {
+    return null;
+  }
+
+  return {
+    selfTyping,
+    peerTyping,
+  };
+}
+
+function normalizeDirectChatPresenceIndicator(
+  input: DirectChatPresenceIndicatorWire | undefined,
+): DirectChatPresenceIndicator | null {
+  if (!input) {
+    return null;
+  }
+
+  const heartbeatAt = input.heartbeatAt ?? "";
+  const expiresAt = input.expiresAt ?? "";
+  if (heartbeatAt === "" && expiresAt === "") {
+    return null;
+  }
+
+  return {
+    heartbeatAt,
+    expiresAt,
+  };
+}
+
+function normalizeDirectChatPresenceState(
+  input: DirectChatPresenceStateWire | undefined,
+): DirectChatPresenceState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfPresence = normalizeDirectChatPresenceIndicator(input.selfPresence);
+  const peerPresence = normalizeDirectChatPresenceIndicator(input.peerPresence);
+  if (!selfPresence && !peerPresence) {
+    return null;
+  }
+
+  return {
+    selfPresence,
+    peerPresence,
+  };
+}
+
+function normalizeDirectChatSnapshot(
+  input: GetDirectChatResponseWire,
+): DirectChatSnapshot {
+  return {
+    chat: normalizeDirectChat(input.chat),
+    readState: normalizeDirectChatReadState(input.readState),
+    typingState: normalizeDirectChatTypingState(input.typingState),
+    presenceState: normalizeDirectChatPresenceState(input.presenceState),
   };
 }
 

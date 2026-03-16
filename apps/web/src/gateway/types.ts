@@ -69,6 +69,82 @@ export interface Friend {
   friendsSince: string;
 }
 
+export interface ChatUser {
+  id: string;
+  login: string;
+  nickname: string;
+  avatarUrl: string | null;
+}
+
+export interface DirectChat {
+  id: string;
+  kind: string;
+  participants: ChatUser[];
+  pinnedMessageIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TextMessageContent {
+  text: string;
+  markdownPolicy: string;
+}
+
+export interface MessageTombstone {
+  deletedByUserId: string;
+  deletedAt: string;
+}
+
+export interface DirectChatMessage {
+  id: string;
+  chatId: string;
+  senderUserId: string;
+  kind: string;
+  text: TextMessageContent | null;
+  tombstone: MessageTombstone | null;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DirectChatReadPosition {
+  messageId: string;
+  messageCreatedAt: string;
+  updatedAt: string;
+}
+
+export interface DirectChatReadState {
+  selfPosition: DirectChatReadPosition | null;
+  peerPosition: DirectChatReadPosition | null;
+}
+
+export interface DirectChatTypingIndicator {
+  updatedAt: string;
+  expiresAt: string;
+}
+
+export interface DirectChatTypingState {
+  selfTyping: DirectChatTypingIndicator | null;
+  peerTyping: DirectChatTypingIndicator | null;
+}
+
+export interface DirectChatPresenceIndicator {
+  heartbeatAt: string;
+  expiresAt: string;
+}
+
+export interface DirectChatPresenceState {
+  selfPresence: DirectChatPresenceIndicator | null;
+  peerPresence: DirectChatPresenceIndicator | null;
+}
+
+export interface DirectChatSnapshot {
+  chat: DirectChat;
+  readState: DirectChatReadState | null;
+  typingState: DirectChatTypingState | null;
+  presenceState: DirectChatPresenceState | null;
+}
+
 export interface RegisterInput {
   login: string;
   password: string;
@@ -99,6 +175,39 @@ export interface GatewayClient {
   login(input: LoginInput): Promise<CurrentAuth>;
   logoutCurrentSession(token: string): Promise<void>;
   getCurrentProfile(token: string): Promise<Profile>;
+  createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
+  listDirectChats(token: string): Promise<DirectChat[]>;
+  getDirectChat(token: string, chatId: string): Promise<DirectChatSnapshot>;
+  markDirectChatRead(
+    token: string,
+    chatId: string,
+    messageId: string,
+  ): Promise<DirectChatReadState | null>;
+  sendTextMessage(
+    token: string,
+    chatId: string,
+    text: string,
+  ): Promise<DirectChatMessage>;
+  listDirectChatMessages(
+    token: string,
+    chatId: string,
+    pageSize?: number,
+  ): Promise<DirectChatMessage[]>;
+  deleteMessageForEveryone(
+    token: string,
+    chatId: string,
+    messageId: string,
+  ): Promise<DirectChatMessage>;
+  pinMessage(
+    token: string,
+    chatId: string,
+    messageId: string,
+  ): Promise<DirectChatMessage>;
+  unpinMessage(
+    token: string,
+    chatId: string,
+    messageId: string,
+  ): Promise<DirectChatMessage>;
   sendFriendRequest(token: string, login: string): Promise<void>;
   acceptFriendRequest(token: string, login: string): Promise<void>;
   declineFriendRequest(token: string, login: string): Promise<void>;

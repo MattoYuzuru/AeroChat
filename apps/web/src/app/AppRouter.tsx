@@ -5,6 +5,7 @@ import { AuthPage } from "../pages/AuthPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { SectionPlaceholder } from "../pages/SectionPlaceholder";
 import { PeoplePage } from "../pages/PeoplePage";
+import { ChatsPage } from "../pages/ChatsPage";
 import { StateScreen } from "../ui/StateScreen";
 
 export function AppRouter() {
@@ -20,16 +21,7 @@ export function AppRouter() {
           <Route path="/app" element={<AppShell />}>
             <Route index element={<Navigate replace to="profile" />} />
             <Route path="profile" element={<ProfilePage />} />
-            <Route
-              path="chats"
-              element={
-                <SectionPlaceholder
-                  title="Чаты"
-                  description="Полный direct chat UI пока не входит в этот PR. В shell остаётся только навигационный слот под следующий vertical slice."
-                  nextSlice="Следующий PR: первый chat list / direct thread foundation через gateway."
-                />
-              }
-            />
+            <Route path="chats" element={<ChatsPage />} />
             <Route path="people" element={<PeoplePage />} />
             <Route
               path="settings"

@@ -5,7 +5,7 @@ import styles from "./AppShell.module.css";
 
 const navigationItems = [
   { to: "/app/profile", label: "Профиль", meta: "identity" },
-  { to: "/app/chats", label: "Чаты", meta: "future" },
+  { to: "/app/chats", label: "Чаты", meta: "direct" },
   { to: "/app/people", label: "Люди", meta: "social" },
   { to: "/app/settings", label: "Настройки", meta: "future" },
 ];
@@ -14,6 +14,7 @@ const statusItems = [
   "gateway-only edge",
   "session bootstrap",
   "protected shell",
+  "direct chat bootstrap",
   "people bootstrap",
 ];
 
@@ -110,7 +111,7 @@ export function AppShell() {
               </div>
               <div>
                 <dt>Scope</dt>
-                <dd>login, register, profile, people</dd>
+                <dd>login, register, profile, people, chats</dd>
               </div>
             </dl>
           </section>
