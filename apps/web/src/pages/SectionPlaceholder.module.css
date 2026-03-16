@@ -1,0 +1,32 @@
+.card {
+  padding: 1.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 1.6rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.45));
+  box-shadow: var(--shadow-shell);
+  backdrop-filter: blur(18px);
+}
+
+.label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(3, 50, 82, 0.72);
+}
+
+.title {
+  margin: 0.45rem 0 0;
+  font-size: 1.8rem;
+}
+
+.description,
+.next {
+  margin: 0.9rem 0 0;
+  line-height: 1.65;
+}
+
+.next {
+  color: rgba(3, 50, 82, 0.74);
+}

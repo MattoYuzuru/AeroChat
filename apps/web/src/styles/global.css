@@ -1,9 +1,18 @@
 body {
   min-width: 320px;
-  color: #043252;
-  background: #a9e4ff;
+  color: var(--color-ink);
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.95), transparent 24%),
+    linear-gradient(180deg, #dff7ff, #9fd9f6 42%, #5c99c7);
 }
 
 a {
+  color: inherit;
+}
+
+button,
+input,
+textarea,
+select {
   color: inherit;
 }

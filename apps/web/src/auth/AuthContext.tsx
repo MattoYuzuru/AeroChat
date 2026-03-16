@@ -1,0 +1,216 @@
+import { useEffect, useRef, useState, type PropsWithChildren } from "react";
+import { bootstrapAuthSession } from "./bootstrap";
+import { AuthContext, type AuthState } from "./context";
+import { createBrowserSessionStore } from "./session-store";
+import { createGatewayClient } from "../gateway/client";
+import {
+  isGatewayErrorCode,
+  type LoginInput,
+  type RegisterInput,
+  type UpdateCurrentProfileInput,
+} from "../gateway/types";
+
+const gatewayClient = createGatewayClient(globalThis.fetch.bind(globalThis));
+const sessionStore = createBrowserSessionStore();
+
+export function AuthProvider({ children }: PropsWithChildren) {
+  const [state, setState] = useState<AuthState>({
+    status: "bootstrapping",
+    notice: null,
+  });
+  const bootstrappedRef = useRef(false);
+
+  async function retryBootstrap() {
+    setState((current) => ({
+      status: "bootstrapping",
+      notice: current.notice,
+    }));
+
+    const result = await bootstrapAuthSession(gatewayClient, sessionStore);
+    applyBootstrapResult(result);
+  }
+
+  function applyBootstrapResult(result: Awaited<ReturnType<typeof bootstrapAuthSession>>) {
+    switch (result.status) {
+      case "authenticated":
+        setState({
+          status: "authenticated",
+          token: result.token,
+          profile: result.profile,
+          notice: result.notice,
+        });
+        return;
+      case "anonymous":
+        setState({
+          status: "anonymous",
+          notice: result.notice,
+        });
+        return;
+      case "error":
+        setState((current) => ({
+          status: "error",
+          token: result.token,
+          message: result.message,
+          notice: current.notice,
+        }));
+        return;
+    }
+  }
+
+  useEffect(() => {
+    if (bootstrappedRef.current) {
+      return;
+    }
+
+    bootstrappedRef.current = true;
+    let active = true;
+
+    void bootstrapAuthSession(gatewayClient, sessionStore).then((result) => {
+      if (!active) {
+        return;
+      }
+
+      applyBootstrapResult(result);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function login(input: LoginInput) {
+    const auth = await gatewayClient.login(input);
+    sessionStore.write(auth.sessionToken);
+    setState({
+      status: "authenticated",
+      token: auth.sessionToken,
+      profile: auth.profile,
+      notice: null,
+    });
+  }
+
+  async function register(input: RegisterInput) {
+    const auth = await gatewayClient.register(input);
+    sessionStore.write(auth.sessionToken);
+    setState({
+      status: "authenticated",
+      token: auth.sessionToken,
+      profile: auth.profile,
+      notice: null,
+    });
+  }
+
+  async function logout() {
+    if (state.status !== "authenticated" && state.status !== "error") {
+      sessionStore.clear();
+      setState({
+        status: "anonymous",
+        notice: "Сессия завершена.",
+      });
+      return;
+    }
+
+    try {
+      await gatewayClient.logoutCurrentSession(state.token);
+    } catch (error) {
+      if (!isGatewayErrorCode(error, "unauthenticated")) {
+        throw error;
+      }
+    }
+
+    sessionStore.clear();
+    setState({
+      status: "anonymous",
+      notice: "Сессия завершена.",
+    });
+  }
+
+  function discardSession() {
+    sessionStore.clear();
+    setState({
+      status: "anonymous",
+      notice: "Локальная сессия очищена.",
+    });
+  }
+
+  async function refreshProfile() {
+    const token = requireAuthToken(state);
+
+    try {
+      const profile = await gatewayClient.getCurrentProfile(token);
+      setState({
+        status: "authenticated",
+        token,
+        profile,
+        notice: null,
+      });
+
+      return profile;
+    } catch (error) {
+      handleProtectedError(error);
+      throw error;
+    }
+  }
+
+  async function updateProfile(input: UpdateCurrentProfileInput) {
+    const token = requireAuthToken(state);
+
+    try {
+      const profile = await gatewayClient.updateCurrentProfile(token, input);
+      setState({
+        status: "authenticated",
+        token,
+        profile,
+        notice: "Профиль обновлён.",
+      });
+
+      return profile;
+    } catch (error) {
+      handleProtectedError(error);
+      throw error;
+    }
+  }
+
+  function clearNotice() {
+    setState((current) => ({
+      ...current,
+      notice: null,
+    }));
+  }
+
+  function handleProtectedError(error: unknown) {
+    if (isGatewayErrorCode(error, "unauthenticated")) {
+      sessionStore.clear();
+      setState({
+        status: "anonymous",
+        notice: "Сессия истекла. Войдите снова.",
+      });
+    }
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        state,
+        login,
+        register,
+        logout,
+        discardSession,
+        retryBootstrap,
+        refreshProfile,
+        updateProfile,
+        clearNotice,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+function requireAuthToken(state: AuthState): string {
+  if (state.status !== "authenticated") {
+    throw new Error("Authenticated session is required for this action.");
+  }
+
+  return state.token;
+}
