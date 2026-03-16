@@ -45,6 +45,7 @@ func (r *Repository) GetSessionAuthByID(ctx context.Context, sessionID string) (
 			Nickname:                row.Nickname,
 			AvatarURL:               textPointer(row.AvatarUrl),
 			ReadReceiptsEnabled:     row.ReadReceiptsEnabled,
+			PresenceEnabled:         row.PresenceEnabled,
 			TypingVisibilityEnabled: row.TypingVisibilityEnabled,
 		},
 		Device: chat.Device{
@@ -211,6 +212,26 @@ func (r *Repository) ListDirectChatTypingStateEntries(ctx context.Context, userI
 		result = append(result, chat.DirectChatTypingStateEntry{
 			UserID:                  row.UserID.String(),
 			TypingVisibilityEnabled: row.TypingVisibilityEnabled,
+		})
+	}
+
+	return result, nil
+}
+
+func (r *Repository) ListDirectChatPresenceStateEntries(ctx context.Context, userID string, chatID string) ([]chat.DirectChatPresenceStateEntry, error) {
+	rows, err := r.queries.ListDirectChatPresenceStateEntries(ctx, chatsqlc.ListDirectChatPresenceStateEntriesParams{
+		UserID: mustParseUUID(userID),
+		ChatID: mustParseUUID(chatID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.DirectChatPresenceStateEntry, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, chat.DirectChatPresenceStateEntry{
+			UserID:          row.UserID.String(),
+			PresenceEnabled: row.PresenceEnabled,
 		})
 	}
 

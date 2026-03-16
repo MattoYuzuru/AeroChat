@@ -79,7 +79,7 @@
 - [x] Safe markdown subset
 - [x] Read receipts
 - [x] Typing foundation
-- [ ] Presence foundation
+- [x] Presence foundation
 - [ ] Privacy toggles
 - [x] Tombstone deletion
 - [ ] Draft recovery

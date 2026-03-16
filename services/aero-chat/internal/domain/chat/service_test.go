@@ -70,7 +70,7 @@ func TestListAndGetDirectChatsAreParticipantScoped(t *testing.T) {
 		t.Fatal("ожидался один чат для Bob")
 	}
 
-	if _, _, _, err := service.GetDirectChat(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
+	if _, _, _, _, err := service.GetDirectChat(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ожидалась ошибка доступа для неучастника, получено %v", err)
 	}
 }
@@ -95,7 +95,7 @@ func TestGetDirectChatReturnsPrivacyAwareReadState(t *testing.T) {
 		t.Fatal("ожидалась собственная read position Bob на втором сообщении")
 	}
 
-	_, fetchedReadState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, fetchedReadState, _, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestMarkDirectChatReadHonorsPrivacyFlag(t *testing.T) {
 		t.Fatal("собственная read position не должна сохраняться при отключённых read receipts")
 	}
 
-	_, fetchedReadState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, fetchedReadState, _, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestSetAndClearDirectChatTypingUsesTTL(t *testing.T) {
 		t.Fatal("ожидался собственный typing state после set")
 	}
 
-	_, _, fetchedTypingState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, _, fetchedTypingState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat with typing state: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestSetAndClearDirectChatTypingUsesTTL(t *testing.T) {
 
 	currentTime = currentTime.Add(6 * time.Second)
 
-	_, _, expiredTypingState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, _, expiredTypingState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat after typing ttl: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestSetDirectChatTypingHonorsPrivacyFlag(t *testing.T) {
 		t.Fatal("собственный typing state не должен раскрываться при отключённой typing visibility")
 	}
 
-	_, _, fetchedTypingState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, _, fetchedTypingState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat after privacy change: %v", err)
 	}
@@ -243,6 +243,125 @@ func TestDirectChatTypingIsParticipantScoped(t *testing.T) {
 	}
 	if _, err := service.ClearDirectChatTyping(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ожидалась ошибка доступа для неучастника при clear typing, получено %v", err)
+	}
+}
+
+func TestSetAndClearDirectChatPresenceUsesTTLAndRefresh(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	currentTime := time.Date(2026, 3, 21, 12, 0, 0, 0, time.UTC)
+	service.now = func() time.Time {
+		return currentTime
+	}
+	service.presenceTTL = 30 * time.Second
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+
+	presenceState, err := service.SetDirectChatPresenceHeartbeat(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("set direct chat presence heartbeat: %v", err)
+	}
+	if presenceState.SelfPresence == nil {
+		t.Fatal("ожидался собственный presence state после heartbeat")
+	}
+	firstExpiry := presenceState.SelfPresence.ExpiresAt
+
+	currentTime = currentTime.Add(10 * time.Second)
+
+	presenceState, err = service.SetDirectChatPresenceHeartbeat(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("refresh direct chat presence heartbeat: %v", err)
+	}
+	if presenceState.SelfPresence == nil {
+		t.Fatal("ожидался собственный presence state после refresh heartbeat")
+	}
+	if !presenceState.SelfPresence.ExpiresAt.After(firstExpiry) {
+		t.Fatal("refresh heartbeat должен продлевать expires_at")
+	}
+
+	_, _, _, fetchedPresenceState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat with presence state: %v", err)
+	}
+	if fetchedPresenceState.PeerPresence == nil {
+		t.Fatal("ожидался peer presence state для Alice")
+	}
+
+	currentTime = currentTime.Add(31 * time.Second)
+
+	_, _, _, expiredPresenceState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat after presence ttl: %v", err)
+	}
+	if expiredPresenceState.PeerPresence != nil {
+		t.Fatal("presence state должен исчезать после TTL")
+	}
+
+	if _, err := service.SetDirectChatPresenceHeartbeat(context.Background(), bob.Token, directChat.ID); err != nil {
+		t.Fatalf("set direct chat presence before clear: %v", err)
+	}
+	clearedPresenceState, err := service.ClearDirectChatPresence(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("clear direct chat presence: %v", err)
+	}
+	if clearedPresenceState.SelfPresence != nil {
+		t.Fatal("после clear собственный presence state должен исчезнуть")
+	}
+}
+
+func TestSetDirectChatPresenceHeartbeatHonorsPrivacyFlag(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	if _, err := service.SetDirectChatPresenceHeartbeat(context.Background(), bob.Token, directChat.ID); err != nil {
+		t.Fatalf("set direct chat presence before privacy change: %v", err)
+	}
+
+	repo.setPresenceEnabled(bob.User.ID, false)
+
+	presenceState, err := service.SetDirectChatPresenceHeartbeat(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("set direct chat presence with disabled privacy flag: %v", err)
+	}
+	if presenceState.SelfPresence != nil {
+		t.Fatal("собственный presence state не должен раскрываться при отключённой presence visibility")
+	}
+
+	_, _, _, fetchedPresenceState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat after presence privacy change: %v", err)
+	}
+	if fetchedPresenceState.PeerPresence != nil {
+		t.Fatal("peer presence state не должен раскрываться при отключённой presence visibility")
+	}
+}
+
+func TestDirectChatPresenceIsParticipantScoped(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	charlie := repo.mustIssueAuth(testUUID(3), "charlie", "Charlie")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+
+	if _, err := service.SetDirectChatPresenceHeartbeat(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ожидалась ошибка доступа для неучастника при set presence, получено %v", err)
+	}
+	if _, err := service.ClearDirectChatPresence(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ожидалась ошибка доступа для неучастника при clear presence, получено %v", err)
 	}
 }
 
@@ -359,7 +478,7 @@ func TestPinAndUnpinMessage(t *testing.T) {
 
 func newTestService() (*Service, *fakeRepository) {
 	repo := newFakeRepository()
-	service := NewService(repo, repo, repo.typingStore, libauth.NewSessionTokenManager(), 6*time.Second)
+	service := NewService(repo, repo, repo.typingStore, repo.presenceStore, libauth.NewSessionTokenManager(), 6*time.Second, 30*time.Second)
 	now := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
 	service.now = func() time.Time {
 		now = now.Add(time.Second)
@@ -422,6 +541,7 @@ type fakeRepository struct {
 	messages      map[string]DirectChatMessage
 	readPositions map[string]DirectChatReadPosition
 	typingStore   *fakeTypingStore
+	presenceStore *fakePresenceStore
 }
 
 func newFakeRepository() *fakeRepository {
@@ -434,6 +554,7 @@ func newFakeRepository() *fakeRepository {
 		messages:      make(map[string]DirectChatMessage),
 		readPositions: make(map[string]DirectChatReadPosition),
 		typingStore:   newFakeTypingStore(),
+		presenceStore: newFakePresenceStore(),
 	}
 }
 
@@ -443,6 +564,7 @@ func (r *fakeRepository) mustIssueAuth(userID string, login string, nickname str
 		Login:                   login,
 		Nickname:                nickname,
 		ReadReceiptsEnabled:     true,
+		PresenceEnabled:         true,
 		TypingVisibilityEnabled: true,
 	}
 	r.users[userID] = user
@@ -536,6 +658,23 @@ func (r *fakeRepository) ListDirectChatTypingStateEntries(_ context.Context, use
 		result = append(result, DirectChatTypingStateEntry{
 			UserID:                  participant.ID,
 			TypingVisibilityEnabled: participant.TypingVisibilityEnabled,
+		})
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) ListDirectChatPresenceStateEntries(_ context.Context, userID string, chatID string) ([]DirectChatPresenceStateEntry, error) {
+	directChat, ok := r.chats[chatID]
+	if !ok || !isParticipant(directChat, userID) {
+		return nil, ErrNotFound
+	}
+
+	result := make([]DirectChatPresenceStateEntry, 0, len(directChat.Participants))
+	for _, participant := range directChat.Participants {
+		result = append(result, DirectChatPresenceStateEntry{
+			UserID:          participant.ID,
+			PresenceEnabled: participant.PresenceEnabled,
 		})
 	}
 
@@ -810,6 +949,32 @@ func (r *fakeRepository) setTypingVisibilityEnabled(userID string, enabled bool)
 	}
 }
 
+func (r *fakeRepository) setPresenceEnabled(userID string, enabled bool) {
+	user := r.users[userID]
+	user.PresenceEnabled = enabled
+	r.users[userID] = user
+
+	for sessionID, authSession := range r.sessions {
+		if authSession.User.ID != userID {
+			continue
+		}
+		authSession.User.PresenceEnabled = enabled
+		r.sessions[sessionID] = authSession
+	}
+
+	for chatID, directChat := range r.chats {
+		updatedParticipants := make([]UserSummary, 0, len(directChat.Participants))
+		for _, participant := range directChat.Participants {
+			if participant.ID == userID {
+				participant.PresenceEnabled = enabled
+			}
+			updatedParticipants = append(updatedParticipants, participant)
+		}
+		directChat.Participants = updatedParticipants
+		r.chats[chatID] = directChat
+	}
+}
+
 func pairKey(firstUserID string, secondUserID string) string {
 	userLowID, userHighID := CanonicalUserPair(firstUserID, secondUserID)
 	return userLowID + ":" + userHighID
@@ -844,6 +1009,41 @@ func (s *fakeTypingStore) ClearDirectChatTypingIndicator(_ context.Context, chat
 
 func (s *fakeTypingStore) ListDirectChatTypingIndicators(_ context.Context, chatID string, userIDs []string, now time.Time) (map[string]DirectChatTypingIndicator, error) {
 	result := make(map[string]DirectChatTypingIndicator, len(userIDs))
+	for _, userID := range userIDs {
+		indicator, ok := s.entries[readPositionKey(chatID, userID)]
+		if !ok || !indicator.ExpiresAt.After(now) {
+			continue
+		}
+		result[userID] = indicator
+	}
+	return result, nil
+}
+
+type fakePresenceStore struct {
+	entries map[string]DirectChatPresenceIndicator
+}
+
+func newFakePresenceStore() *fakePresenceStore {
+	return &fakePresenceStore{
+		entries: make(map[string]DirectChatPresenceIndicator),
+	}
+}
+
+func (s *fakePresenceStore) PutDirectChatPresenceIndicator(_ context.Context, params PutDirectChatPresenceIndicatorParams) error {
+	s.entries[readPositionKey(params.ChatID, params.UserID)] = DirectChatPresenceIndicator{
+		HeartbeatAt: params.HeartbeatAt,
+		ExpiresAt:   params.ExpiresAt,
+	}
+	return nil
+}
+
+func (s *fakePresenceStore) ClearDirectChatPresenceIndicator(_ context.Context, chatID string, userID string) error {
+	delete(s.entries, readPositionKey(chatID, userID))
+	return nil
+}
+
+func (s *fakePresenceStore) ListDirectChatPresenceIndicators(_ context.Context, chatID string, userIDs []string, now time.Time) (map[string]DirectChatPresenceIndicator, error) {
+	result := make(map[string]DirectChatPresenceIndicator, len(userIDs))
 	for _, userID := range userIDs {
 		indicator, ok := s.entries[readPositionKey(chatID, userID)]
 		if !ok || !indicator.ExpiresAt.After(now) {

@@ -53,6 +53,12 @@ const (
 	// ChatServiceClearDirectChatTypingProcedure is the fully-qualified name of the ChatService's
 	// ClearDirectChatTyping RPC.
 	ChatServiceClearDirectChatTypingProcedure = "/aerochat.chat.v1.ChatService/ClearDirectChatTyping"
+	// ChatServiceSetDirectChatPresenceHeartbeatProcedure is the fully-qualified name of the
+	// ChatService's SetDirectChatPresenceHeartbeat RPC.
+	ChatServiceSetDirectChatPresenceHeartbeatProcedure = "/aerochat.chat.v1.ChatService/SetDirectChatPresenceHeartbeat"
+	// ChatServiceClearDirectChatPresenceProcedure is the fully-qualified name of the ChatService's
+	// ClearDirectChatPresence RPC.
+	ChatServiceClearDirectChatPresenceProcedure = "/aerochat.chat.v1.ChatService/ClearDirectChatPresence"
 	// ChatServiceSendTextMessageProcedure is the fully-qualified name of the ChatService's
 	// SendTextMessage RPC.
 	ChatServiceSendTextMessageProcedure = "/aerochat.chat.v1.ChatService/SendTextMessage"
@@ -78,6 +84,8 @@ type ChatServiceClient interface {
 	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
 	SetDirectChatTyping(context.Context, *connect.Request[v1.SetDirectChatTypingRequest]) (*connect.Response[v1.SetDirectChatTypingResponse], error)
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
+	SetDirectChatPresenceHeartbeat(context.Context, *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error)
+	ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
 	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
@@ -138,6 +146,18 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("ClearDirectChatTyping")),
 			connect.WithClientOptions(opts...),
 		),
+		setDirectChatPresenceHeartbeat: connect.NewClient[v1.SetDirectChatPresenceHeartbeatRequest, v1.SetDirectChatPresenceHeartbeatResponse](
+			httpClient,
+			baseURL+ChatServiceSetDirectChatPresenceHeartbeatProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("SetDirectChatPresenceHeartbeat")),
+			connect.WithClientOptions(opts...),
+		),
+		clearDirectChatPresence: connect.NewClient[v1.ClearDirectChatPresenceRequest, v1.ClearDirectChatPresenceResponse](
+			httpClient,
+			baseURL+ChatServiceClearDirectChatPresenceProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("ClearDirectChatPresence")),
+			connect.WithClientOptions(opts...),
+		),
 		sendTextMessage: connect.NewClient[v1.SendTextMessageRequest, v1.SendTextMessageResponse](
 			httpClient,
 			baseURL+ChatServiceSendTextMessageProcedure,
@@ -173,18 +193,20 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // chatServiceClient implements ChatServiceClient.
 type chatServiceClient struct {
-	ping                     *connect.Client[v1.PingRequest, v1.PingResponse]
-	createDirectChat         *connect.Client[v1.CreateDirectChatRequest, v1.CreateDirectChatResponse]
-	listDirectChats          *connect.Client[v1.ListDirectChatsRequest, v1.ListDirectChatsResponse]
-	getDirectChat            *connect.Client[v1.GetDirectChatRequest, v1.GetDirectChatResponse]
-	markDirectChatRead       *connect.Client[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse]
-	setDirectChatTyping      *connect.Client[v1.SetDirectChatTypingRequest, v1.SetDirectChatTypingResponse]
-	clearDirectChatTyping    *connect.Client[v1.ClearDirectChatTypingRequest, v1.ClearDirectChatTypingResponse]
-	sendTextMessage          *connect.Client[v1.SendTextMessageRequest, v1.SendTextMessageResponse]
-	listDirectChatMessages   *connect.Client[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse]
-	deleteMessageForEveryone *connect.Client[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse]
-	pinMessage               *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
-	unpinMessage             *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
+	ping                           *connect.Client[v1.PingRequest, v1.PingResponse]
+	createDirectChat               *connect.Client[v1.CreateDirectChatRequest, v1.CreateDirectChatResponse]
+	listDirectChats                *connect.Client[v1.ListDirectChatsRequest, v1.ListDirectChatsResponse]
+	getDirectChat                  *connect.Client[v1.GetDirectChatRequest, v1.GetDirectChatResponse]
+	markDirectChatRead             *connect.Client[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse]
+	setDirectChatTyping            *connect.Client[v1.SetDirectChatTypingRequest, v1.SetDirectChatTypingResponse]
+	clearDirectChatTyping          *connect.Client[v1.ClearDirectChatTypingRequest, v1.ClearDirectChatTypingResponse]
+	setDirectChatPresenceHeartbeat *connect.Client[v1.SetDirectChatPresenceHeartbeatRequest, v1.SetDirectChatPresenceHeartbeatResponse]
+	clearDirectChatPresence        *connect.Client[v1.ClearDirectChatPresenceRequest, v1.ClearDirectChatPresenceResponse]
+	sendTextMessage                *connect.Client[v1.SendTextMessageRequest, v1.SendTextMessageResponse]
+	listDirectChatMessages         *connect.Client[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse]
+	deleteMessageForEveryone       *connect.Client[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse]
+	pinMessage                     *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
+	unpinMessage                   *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
 }
 
 // Ping calls aerochat.chat.v1.ChatService.Ping.
@@ -222,6 +244,16 @@ func (c *chatServiceClient) ClearDirectChatTyping(ctx context.Context, req *conn
 	return c.clearDirectChatTyping.CallUnary(ctx, req)
 }
 
+// SetDirectChatPresenceHeartbeat calls aerochat.chat.v1.ChatService.SetDirectChatPresenceHeartbeat.
+func (c *chatServiceClient) SetDirectChatPresenceHeartbeat(ctx context.Context, req *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error) {
+	return c.setDirectChatPresenceHeartbeat.CallUnary(ctx, req)
+}
+
+// ClearDirectChatPresence calls aerochat.chat.v1.ChatService.ClearDirectChatPresence.
+func (c *chatServiceClient) ClearDirectChatPresence(ctx context.Context, req *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error) {
+	return c.clearDirectChatPresence.CallUnary(ctx, req)
+}
+
 // SendTextMessage calls aerochat.chat.v1.ChatService.SendTextMessage.
 func (c *chatServiceClient) SendTextMessage(ctx context.Context, req *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error) {
 	return c.sendTextMessage.CallUnary(ctx, req)
@@ -256,6 +288,8 @@ type ChatServiceHandler interface {
 	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
 	SetDirectChatTyping(context.Context, *connect.Request[v1.SetDirectChatTypingRequest]) (*connect.Response[v1.SetDirectChatTypingResponse], error)
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
+	SetDirectChatPresenceHeartbeat(context.Context, *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error)
+	ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
 	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
@@ -312,6 +346,18 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceMethods.ByName("ClearDirectChatTyping")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceSetDirectChatPresenceHeartbeatHandler := connect.NewUnaryHandler(
+		ChatServiceSetDirectChatPresenceHeartbeatProcedure,
+		svc.SetDirectChatPresenceHeartbeat,
+		connect.WithSchema(chatServiceMethods.ByName("SetDirectChatPresenceHeartbeat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceClearDirectChatPresenceHandler := connect.NewUnaryHandler(
+		ChatServiceClearDirectChatPresenceProcedure,
+		svc.ClearDirectChatPresence,
+		connect.WithSchema(chatServiceMethods.ByName("ClearDirectChatPresence")),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatServiceSendTextMessageHandler := connect.NewUnaryHandler(
 		ChatServiceSendTextMessageProcedure,
 		svc.SendTextMessage,
@@ -358,6 +404,10 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceSetDirectChatTypingHandler.ServeHTTP(w, r)
 		case ChatServiceClearDirectChatTypingProcedure:
 			chatServiceClearDirectChatTypingHandler.ServeHTTP(w, r)
+		case ChatServiceSetDirectChatPresenceHeartbeatProcedure:
+			chatServiceSetDirectChatPresenceHeartbeatHandler.ServeHTTP(w, r)
+		case ChatServiceClearDirectChatPresenceProcedure:
+			chatServiceClearDirectChatPresenceHandler.ServeHTTP(w, r)
 		case ChatServiceSendTextMessageProcedure:
 			chatServiceSendTextMessageHandler.ServeHTTP(w, r)
 		case ChatServiceListDirectChatMessagesProcedure:
@@ -403,6 +453,14 @@ func (UnimplementedChatServiceHandler) SetDirectChatTyping(context.Context, *con
 
 func (UnimplementedChatServiceHandler) ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ClearDirectChatTyping is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) SetDirectChatPresenceHeartbeat(context.Context, *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.SetDirectChatPresenceHeartbeat is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ClearDirectChatPresence is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error) {
