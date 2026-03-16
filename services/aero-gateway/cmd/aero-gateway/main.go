@@ -10,6 +10,7 @@ import (
 
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/app"
+	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/downstream"
 )
 
 const (
@@ -37,22 +38,26 @@ func run() error {
 		return err
 	}
 
+	downstreamClient := downstream.NewHTTPClient(cfg.DownstreamTimeout)
+	clients := downstream.NewClients(downstreamClient, cfg.IdentityBaseURL, cfg.ChatBaseURL)
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	mux := observability.NewBaseMux(
+	handler := app.NewHTTPHandler(
+		logger,
 		observability.ServiceMeta{
 			Name:    serviceName,
 			Version: version,
 		},
-		logger,
-		nil,
+		cfg,
+		clients,
 	)
 
 	if err := observability.RunHTTPServer(ctx, logger, observability.HTTPServerConfig{
 		Address:         cfg.HTTPAddress,
 		ShutdownTimeout: cfg.ShutdownTimeout,
-	}, mux); err != nil && !errors.Is(err, context.Canceled) {
+	}, handler); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 

@@ -2,6 +2,7 @@ FROM golang:1.25.8-alpine AS builder
 
 WORKDIR /src
 
+COPY gen/go ./gen/go
 COPY libs/go ./libs/go
 COPY services/aero-gateway ./services/aero-gateway
 
