@@ -52,6 +52,11 @@ export interface Session {
   revokedAt: string | null;
 }
 
+export interface DeviceWithSessions {
+  device: Device;
+  sessions: Session[];
+}
+
 export interface CurrentAuth {
   profile: Profile;
   device: Device | null;
@@ -173,11 +178,26 @@ export interface UpdateCurrentProfileInput {
   typingVisibilityEnabled?: boolean;
 }
 
+export type RevokeSessionOrDeviceTarget =
+  | {
+      kind: "session";
+      sessionId: string;
+    }
+  | {
+      kind: "device";
+      deviceId: string;
+    };
+
 export interface GatewayClient {
   register(input: RegisterInput): Promise<CurrentAuth>;
   login(input: LoginInput): Promise<CurrentAuth>;
   logoutCurrentSession(token: string): Promise<void>;
   getCurrentProfile(token: string): Promise<Profile>;
+  listDevices(token: string): Promise<DeviceWithSessions[]>;
+  revokeSessionOrDevice(
+    token: string,
+    target: RevokeSessionOrDeviceTarget,
+  ): Promise<void>;
   createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
   listDirectChats(token: string): Promise<DirectChat[]>;
   getDirectChat(token: string, chatId: string): Promise<DirectChatSnapshot>;

@@ -10,6 +10,7 @@ import type {
   DirectChatTypingIndicator,
   DirectChatTypingState,
   Device,
+  DeviceWithSessions,
   ChatUser,
   Friend,
   FriendRequest,
@@ -17,6 +18,7 @@ import type {
   GatewayErrorCode,
   MessageTombstone,
   Profile,
+  RevokeSessionOrDeviceTarget,
   Session,
   TextMessageContent,
 } from "./types";
@@ -76,6 +78,11 @@ interface CurrentAuthWire {
   sessionToken?: string;
 }
 
+interface DeviceWithSessionsWire {
+  device?: DeviceWire;
+  sessions?: SessionWire[];
+}
+
 interface RegisterResponseWire {
   auth?: CurrentAuthWire;
 }
@@ -90,6 +97,10 @@ interface GetCurrentProfileResponseWire {
 
 interface UpdateCurrentProfileResponseWire {
   profile?: ProfileWire;
+}
+
+interface ListDevicesResponseWire {
+  devices?: DeviceWithSessionsWire[];
 }
 
 interface FriendRequestWire {
@@ -277,6 +288,30 @@ export function createGatewayClient(
       );
 
       return normalizeProfile(response.profile);
+    },
+
+    async listDevices(token) {
+      const response = await unaryCall<ListDevicesResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "ListDevices",
+        {},
+        token,
+      );
+
+      return (response.devices ?? []).map(normalizeDeviceWithSessions);
+    },
+
+    async revokeSessionOrDevice(token, target) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "RevokeSessionOrDevice",
+        buildRevocationPayload(target),
+        token,
+      );
     },
 
     async createDirectChat(token, peerUserId) {
@@ -697,6 +732,15 @@ function normalizeSession(input: SessionWire): Session {
   };
 }
 
+function normalizeDeviceWithSessions(
+  input: DeviceWithSessionsWire,
+): DeviceWithSessions {
+  return {
+    device: normalizeDevice(input.device ?? {}),
+    sessions: (input.sessions ?? []).map(normalizeSession),
+  };
+}
+
 function normalizeFriendRequest(input: FriendRequestWire): FriendRequest {
   return {
     profile: normalizeProfile(input.profile),
@@ -919,6 +963,20 @@ function normalizeNullableString(value: string | undefined): string | null {
 function normalizeOptionalString(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
+}
+
+function buildRevocationPayload(
+  target: RevokeSessionOrDeviceTarget,
+): Record<string, string> {
+  if (target.kind === "session") {
+    return {
+      sessionId: target.sessionId.trim(),
+    };
+  }
+
+  return {
+    deviceId: target.deviceId.trim(),
+  };
 }
 
 function buildUpdateCurrentProfileBody(
