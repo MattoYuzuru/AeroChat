@@ -35,11 +35,50 @@ const (
 const (
 	// IdentityServicePingProcedure is the fully-qualified name of the IdentityService's Ping RPC.
 	IdentityServicePingProcedure = "/aerochat.identity.v1.IdentityService/Ping"
+	// IdentityServiceRegisterProcedure is the fully-qualified name of the IdentityService's Register
+	// RPC.
+	IdentityServiceRegisterProcedure = "/aerochat.identity.v1.IdentityService/Register"
+	// IdentityServiceLoginProcedure is the fully-qualified name of the IdentityService's Login RPC.
+	IdentityServiceLoginProcedure = "/aerochat.identity.v1.IdentityService/Login"
+	// IdentityServiceLogoutCurrentSessionProcedure is the fully-qualified name of the IdentityService's
+	// LogoutCurrentSession RPC.
+	IdentityServiceLogoutCurrentSessionProcedure = "/aerochat.identity.v1.IdentityService/LogoutCurrentSession"
+	// IdentityServiceGetCurrentProfileProcedure is the fully-qualified name of the IdentityService's
+	// GetCurrentProfile RPC.
+	IdentityServiceGetCurrentProfileProcedure = "/aerochat.identity.v1.IdentityService/GetCurrentProfile"
+	// IdentityServiceUpdateCurrentProfileProcedure is the fully-qualified name of the IdentityService's
+	// UpdateCurrentProfile RPC.
+	IdentityServiceUpdateCurrentProfileProcedure = "/aerochat.identity.v1.IdentityService/UpdateCurrentProfile"
+	// IdentityServiceListDevicesProcedure is the fully-qualified name of the IdentityService's
+	// ListDevices RPC.
+	IdentityServiceListDevicesProcedure = "/aerochat.identity.v1.IdentityService/ListDevices"
+	// IdentityServiceRevokeSessionOrDeviceProcedure is the fully-qualified name of the
+	// IdentityService's RevokeSessionOrDevice RPC.
+	IdentityServiceRevokeSessionOrDeviceProcedure = "/aerochat.identity.v1.IdentityService/RevokeSessionOrDevice"
+	// IdentityServiceListBlockedUsersProcedure is the fully-qualified name of the IdentityService's
+	// ListBlockedUsers RPC.
+	IdentityServiceListBlockedUsersProcedure = "/aerochat.identity.v1.IdentityService/ListBlockedUsers"
+	// IdentityServiceBlockUserProcedure is the fully-qualified name of the IdentityService's BlockUser
+	// RPC.
+	IdentityServiceBlockUserProcedure = "/aerochat.identity.v1.IdentityService/BlockUser"
+	// IdentityServiceUnblockUserProcedure is the fully-qualified name of the IdentityService's
+	// UnblockUser RPC.
+	IdentityServiceUnblockUserProcedure = "/aerochat.identity.v1.IdentityService/UnblockUser"
 )
 
 // IdentityServiceClient is a client for the aerochat.identity.v1.IdentityService service.
 type IdentityServiceClient interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
+	Register(context.Context, *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error)
+	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
+	LogoutCurrentSession(context.Context, *connect.Request[v1.LogoutCurrentSessionRequest]) (*connect.Response[v1.LogoutCurrentSessionResponse], error)
+	GetCurrentProfile(context.Context, *connect.Request[v1.GetCurrentProfileRequest]) (*connect.Response[v1.GetCurrentProfileResponse], error)
+	UpdateCurrentProfile(context.Context, *connect.Request[v1.UpdateCurrentProfileRequest]) (*connect.Response[v1.UpdateCurrentProfileResponse], error)
+	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
+	RevokeSessionOrDevice(context.Context, *connect.Request[v1.RevokeSessionOrDeviceRequest]) (*connect.Response[v1.RevokeSessionOrDeviceResponse], error)
+	ListBlockedUsers(context.Context, *connect.Request[v1.ListBlockedUsersRequest]) (*connect.Response[v1.ListBlockedUsersResponse], error)
+	BlockUser(context.Context, *connect.Request[v1.BlockUserRequest]) (*connect.Response[v1.BlockUserResponse], error)
+	UnblockUser(context.Context, *connect.Request[v1.UnblockUserRequest]) (*connect.Response[v1.UnblockUserResponse], error)
 }
 
 // NewIdentityServiceClient constructs a client for the aerochat.identity.v1.IdentityService
@@ -59,12 +98,82 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(identityServiceMethods.ByName("Ping")),
 			connect.WithClientOptions(opts...),
 		),
+		register: connect.NewClient[v1.RegisterRequest, v1.RegisterResponse](
+			httpClient,
+			baseURL+IdentityServiceRegisterProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("Register")),
+			connect.WithClientOptions(opts...),
+		),
+		login: connect.NewClient[v1.LoginRequest, v1.LoginResponse](
+			httpClient,
+			baseURL+IdentityServiceLoginProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("Login")),
+			connect.WithClientOptions(opts...),
+		),
+		logoutCurrentSession: connect.NewClient[v1.LogoutCurrentSessionRequest, v1.LogoutCurrentSessionResponse](
+			httpClient,
+			baseURL+IdentityServiceLogoutCurrentSessionProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("LogoutCurrentSession")),
+			connect.WithClientOptions(opts...),
+		),
+		getCurrentProfile: connect.NewClient[v1.GetCurrentProfileRequest, v1.GetCurrentProfileResponse](
+			httpClient,
+			baseURL+IdentityServiceGetCurrentProfileProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("GetCurrentProfile")),
+			connect.WithClientOptions(opts...),
+		),
+		updateCurrentProfile: connect.NewClient[v1.UpdateCurrentProfileRequest, v1.UpdateCurrentProfileResponse](
+			httpClient,
+			baseURL+IdentityServiceUpdateCurrentProfileProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("UpdateCurrentProfile")),
+			connect.WithClientOptions(opts...),
+		),
+		listDevices: connect.NewClient[v1.ListDevicesRequest, v1.ListDevicesResponse](
+			httpClient,
+			baseURL+IdentityServiceListDevicesProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("ListDevices")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeSessionOrDevice: connect.NewClient[v1.RevokeSessionOrDeviceRequest, v1.RevokeSessionOrDeviceResponse](
+			httpClient,
+			baseURL+IdentityServiceRevokeSessionOrDeviceProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("RevokeSessionOrDevice")),
+			connect.WithClientOptions(opts...),
+		),
+		listBlockedUsers: connect.NewClient[v1.ListBlockedUsersRequest, v1.ListBlockedUsersResponse](
+			httpClient,
+			baseURL+IdentityServiceListBlockedUsersProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("ListBlockedUsers")),
+			connect.WithClientOptions(opts...),
+		),
+		blockUser: connect.NewClient[v1.BlockUserRequest, v1.BlockUserResponse](
+			httpClient,
+			baseURL+IdentityServiceBlockUserProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("BlockUser")),
+			connect.WithClientOptions(opts...),
+		),
+		unblockUser: connect.NewClient[v1.UnblockUserRequest, v1.UnblockUserResponse](
+			httpClient,
+			baseURL+IdentityServiceUnblockUserProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("UnblockUser")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // identityServiceClient implements IdentityServiceClient.
 type identityServiceClient struct {
-	ping *connect.Client[v1.PingRequest, v1.PingResponse]
+	ping                  *connect.Client[v1.PingRequest, v1.PingResponse]
+	register              *connect.Client[v1.RegisterRequest, v1.RegisterResponse]
+	login                 *connect.Client[v1.LoginRequest, v1.LoginResponse]
+	logoutCurrentSession  *connect.Client[v1.LogoutCurrentSessionRequest, v1.LogoutCurrentSessionResponse]
+	getCurrentProfile     *connect.Client[v1.GetCurrentProfileRequest, v1.GetCurrentProfileResponse]
+	updateCurrentProfile  *connect.Client[v1.UpdateCurrentProfileRequest, v1.UpdateCurrentProfileResponse]
+	listDevices           *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	revokeSessionOrDevice *connect.Client[v1.RevokeSessionOrDeviceRequest, v1.RevokeSessionOrDeviceResponse]
+	listBlockedUsers      *connect.Client[v1.ListBlockedUsersRequest, v1.ListBlockedUsersResponse]
+	blockUser             *connect.Client[v1.BlockUserRequest, v1.BlockUserResponse]
+	unblockUser           *connect.Client[v1.UnblockUserRequest, v1.UnblockUserResponse]
 }
 
 // Ping calls aerochat.identity.v1.IdentityService.Ping.
@@ -72,9 +181,69 @@ func (c *identityServiceClient) Ping(ctx context.Context, req *connect.Request[v
 	return c.ping.CallUnary(ctx, req)
 }
 
+// Register calls aerochat.identity.v1.IdentityService.Register.
+func (c *identityServiceClient) Register(ctx context.Context, req *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error) {
+	return c.register.CallUnary(ctx, req)
+}
+
+// Login calls aerochat.identity.v1.IdentityService.Login.
+func (c *identityServiceClient) Login(ctx context.Context, req *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error) {
+	return c.login.CallUnary(ctx, req)
+}
+
+// LogoutCurrentSession calls aerochat.identity.v1.IdentityService.LogoutCurrentSession.
+func (c *identityServiceClient) LogoutCurrentSession(ctx context.Context, req *connect.Request[v1.LogoutCurrentSessionRequest]) (*connect.Response[v1.LogoutCurrentSessionResponse], error) {
+	return c.logoutCurrentSession.CallUnary(ctx, req)
+}
+
+// GetCurrentProfile calls aerochat.identity.v1.IdentityService.GetCurrentProfile.
+func (c *identityServiceClient) GetCurrentProfile(ctx context.Context, req *connect.Request[v1.GetCurrentProfileRequest]) (*connect.Response[v1.GetCurrentProfileResponse], error) {
+	return c.getCurrentProfile.CallUnary(ctx, req)
+}
+
+// UpdateCurrentProfile calls aerochat.identity.v1.IdentityService.UpdateCurrentProfile.
+func (c *identityServiceClient) UpdateCurrentProfile(ctx context.Context, req *connect.Request[v1.UpdateCurrentProfileRequest]) (*connect.Response[v1.UpdateCurrentProfileResponse], error) {
+	return c.updateCurrentProfile.CallUnary(ctx, req)
+}
+
+// ListDevices calls aerochat.identity.v1.IdentityService.ListDevices.
+func (c *identityServiceClient) ListDevices(ctx context.Context, req *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error) {
+	return c.listDevices.CallUnary(ctx, req)
+}
+
+// RevokeSessionOrDevice calls aerochat.identity.v1.IdentityService.RevokeSessionOrDevice.
+func (c *identityServiceClient) RevokeSessionOrDevice(ctx context.Context, req *connect.Request[v1.RevokeSessionOrDeviceRequest]) (*connect.Response[v1.RevokeSessionOrDeviceResponse], error) {
+	return c.revokeSessionOrDevice.CallUnary(ctx, req)
+}
+
+// ListBlockedUsers calls aerochat.identity.v1.IdentityService.ListBlockedUsers.
+func (c *identityServiceClient) ListBlockedUsers(ctx context.Context, req *connect.Request[v1.ListBlockedUsersRequest]) (*connect.Response[v1.ListBlockedUsersResponse], error) {
+	return c.listBlockedUsers.CallUnary(ctx, req)
+}
+
+// BlockUser calls aerochat.identity.v1.IdentityService.BlockUser.
+func (c *identityServiceClient) BlockUser(ctx context.Context, req *connect.Request[v1.BlockUserRequest]) (*connect.Response[v1.BlockUserResponse], error) {
+	return c.blockUser.CallUnary(ctx, req)
+}
+
+// UnblockUser calls aerochat.identity.v1.IdentityService.UnblockUser.
+func (c *identityServiceClient) UnblockUser(ctx context.Context, req *connect.Request[v1.UnblockUserRequest]) (*connect.Response[v1.UnblockUserResponse], error) {
+	return c.unblockUser.CallUnary(ctx, req)
+}
+
 // IdentityServiceHandler is an implementation of the aerochat.identity.v1.IdentityService service.
 type IdentityServiceHandler interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
+	Register(context.Context, *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error)
+	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
+	LogoutCurrentSession(context.Context, *connect.Request[v1.LogoutCurrentSessionRequest]) (*connect.Response[v1.LogoutCurrentSessionResponse], error)
+	GetCurrentProfile(context.Context, *connect.Request[v1.GetCurrentProfileRequest]) (*connect.Response[v1.GetCurrentProfileResponse], error)
+	UpdateCurrentProfile(context.Context, *connect.Request[v1.UpdateCurrentProfileRequest]) (*connect.Response[v1.UpdateCurrentProfileResponse], error)
+	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
+	RevokeSessionOrDevice(context.Context, *connect.Request[v1.RevokeSessionOrDeviceRequest]) (*connect.Response[v1.RevokeSessionOrDeviceResponse], error)
+	ListBlockedUsers(context.Context, *connect.Request[v1.ListBlockedUsersRequest]) (*connect.Response[v1.ListBlockedUsersResponse], error)
+	BlockUser(context.Context, *connect.Request[v1.BlockUserRequest]) (*connect.Response[v1.BlockUserResponse], error)
+	UnblockUser(context.Context, *connect.Request[v1.UnblockUserRequest]) (*connect.Response[v1.UnblockUserResponse], error)
 }
 
 // NewIdentityServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -90,10 +259,90 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 		connect.WithSchema(identityServiceMethods.ByName("Ping")),
 		connect.WithHandlerOptions(opts...),
 	)
+	identityServiceRegisterHandler := connect.NewUnaryHandler(
+		IdentityServiceRegisterProcedure,
+		svc.Register,
+		connect.WithSchema(identityServiceMethods.ByName("Register")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceLoginHandler := connect.NewUnaryHandler(
+		IdentityServiceLoginProcedure,
+		svc.Login,
+		connect.WithSchema(identityServiceMethods.ByName("Login")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceLogoutCurrentSessionHandler := connect.NewUnaryHandler(
+		IdentityServiceLogoutCurrentSessionProcedure,
+		svc.LogoutCurrentSession,
+		connect.WithSchema(identityServiceMethods.ByName("LogoutCurrentSession")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceGetCurrentProfileHandler := connect.NewUnaryHandler(
+		IdentityServiceGetCurrentProfileProcedure,
+		svc.GetCurrentProfile,
+		connect.WithSchema(identityServiceMethods.ByName("GetCurrentProfile")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceUpdateCurrentProfileHandler := connect.NewUnaryHandler(
+		IdentityServiceUpdateCurrentProfileProcedure,
+		svc.UpdateCurrentProfile,
+		connect.WithSchema(identityServiceMethods.ByName("UpdateCurrentProfile")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceListDevicesHandler := connect.NewUnaryHandler(
+		IdentityServiceListDevicesProcedure,
+		svc.ListDevices,
+		connect.WithSchema(identityServiceMethods.ByName("ListDevices")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceRevokeSessionOrDeviceHandler := connect.NewUnaryHandler(
+		IdentityServiceRevokeSessionOrDeviceProcedure,
+		svc.RevokeSessionOrDevice,
+		connect.WithSchema(identityServiceMethods.ByName("RevokeSessionOrDevice")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceListBlockedUsersHandler := connect.NewUnaryHandler(
+		IdentityServiceListBlockedUsersProcedure,
+		svc.ListBlockedUsers,
+		connect.WithSchema(identityServiceMethods.ByName("ListBlockedUsers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceBlockUserHandler := connect.NewUnaryHandler(
+		IdentityServiceBlockUserProcedure,
+		svc.BlockUser,
+		connect.WithSchema(identityServiceMethods.ByName("BlockUser")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceUnblockUserHandler := connect.NewUnaryHandler(
+		IdentityServiceUnblockUserProcedure,
+		svc.UnblockUser,
+		connect.WithSchema(identityServiceMethods.ByName("UnblockUser")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/aerochat.identity.v1.IdentityService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case IdentityServicePingProcedure:
 			identityServicePingHandler.ServeHTTP(w, r)
+		case IdentityServiceRegisterProcedure:
+			identityServiceRegisterHandler.ServeHTTP(w, r)
+		case IdentityServiceLoginProcedure:
+			identityServiceLoginHandler.ServeHTTP(w, r)
+		case IdentityServiceLogoutCurrentSessionProcedure:
+			identityServiceLogoutCurrentSessionHandler.ServeHTTP(w, r)
+		case IdentityServiceGetCurrentProfileProcedure:
+			identityServiceGetCurrentProfileHandler.ServeHTTP(w, r)
+		case IdentityServiceUpdateCurrentProfileProcedure:
+			identityServiceUpdateCurrentProfileHandler.ServeHTTP(w, r)
+		case IdentityServiceListDevicesProcedure:
+			identityServiceListDevicesHandler.ServeHTTP(w, r)
+		case IdentityServiceRevokeSessionOrDeviceProcedure:
+			identityServiceRevokeSessionOrDeviceHandler.ServeHTTP(w, r)
+		case IdentityServiceListBlockedUsersProcedure:
+			identityServiceListBlockedUsersHandler.ServeHTTP(w, r)
+		case IdentityServiceBlockUserProcedure:
+			identityServiceBlockUserHandler.ServeHTTP(w, r)
+		case IdentityServiceUnblockUserProcedure:
+			identityServiceUnblockUserHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -105,4 +354,44 @@ type UnimplementedIdentityServiceHandler struct{}
 
 func (UnimplementedIdentityServiceHandler) Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.Ping is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) Register(context.Context, *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.Register is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.Login is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) LogoutCurrentSession(context.Context, *connect.Request[v1.LogoutCurrentSessionRequest]) (*connect.Response[v1.LogoutCurrentSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.LogoutCurrentSession is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) GetCurrentProfile(context.Context, *connect.Request[v1.GetCurrentProfileRequest]) (*connect.Response[v1.GetCurrentProfileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.GetCurrentProfile is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) UpdateCurrentProfile(context.Context, *connect.Request[v1.UpdateCurrentProfileRequest]) (*connect.Response[v1.UpdateCurrentProfileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.UpdateCurrentProfile is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.ListDevices is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) RevokeSessionOrDevice(context.Context, *connect.Request[v1.RevokeSessionOrDeviceRequest]) (*connect.Response[v1.RevokeSessionOrDeviceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.RevokeSessionOrDevice is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) ListBlockedUsers(context.Context, *connect.Request[v1.ListBlockedUsersRequest]) (*connect.Response[v1.ListBlockedUsersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.ListBlockedUsers is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) BlockUser(context.Context, *connect.Request[v1.BlockUserRequest]) (*connect.Response[v1.BlockUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.BlockUser is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) UnblockUser(context.Context, *connect.Request[v1.UnblockUserRequest]) (*connect.Response[v1.UnblockUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.UnblockUser is not implemented"))
 }

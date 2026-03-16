@@ -7,17 +7,909 @@ package identitysqlc
 
 import (
 	"context"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const foundationStatus = `-- name: FoundationStatus :one
-
-SELECT 'foundation'::text AS stage
+const createDevice = `-- name: CreateDevice :one
+INSERT INTO user_devices (
+    id,
+    user_id,
+    label,
+    created_at,
+    last_seen_at,
+    revoked_at
+) VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, label, created_at, last_seen_at, revoked_at
 `
 
-// Foundation phase: sqlc подключён заранее, но доменные запросы появятся только на этапе Identity foundation.
-func (q *Queries) FoundationStatus(ctx context.Context) (string, error) {
-	row := q.db.QueryRow(ctx, foundationStatus)
-	var stage string
-	err := row.Scan(&stage)
-	return stage, err
+type CreateDeviceParams struct {
+	ID         uuid.UUID          `db:"id" json:"id"`
+	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
+	Label      string             `db:"label" json:"label"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+}
+
+func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) (UserDevice, error) {
+	row := q.db.QueryRow(ctx, createDevice,
+		arg.ID,
+		arg.UserID,
+		arg.Label,
+		arg.CreatedAt,
+		arg.LastSeenAt,
+		arg.RevokedAt,
+	)
+	var i UserDevice
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Label,
+		&i.CreatedAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
+const createSession = `-- name: CreateSession :one
+INSERT INTO user_sessions (
+    id,
+    user_id,
+    device_id,
+    token_hash,
+    created_at,
+    last_seen_at,
+    revoked_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, user_id, device_id, token_hash, created_at, last_seen_at, revoked_at
+`
+
+type CreateSessionParams struct {
+	ID         uuid.UUID          `db:"id" json:"id"`
+	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
+	DeviceID   uuid.UUID          `db:"device_id" json:"device_id"`
+	TokenHash  string             `db:"token_hash" json:"token_hash"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+}
+
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error) {
+	row := q.db.QueryRow(ctx, createSession,
+		arg.ID,
+		arg.UserID,
+		arg.DeviceID,
+		arg.TokenHash,
+		arg.CreatedAt,
+		arg.LastSeenAt,
+		arg.RevokedAt,
+	)
+	var i UserSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DeviceID,
+		&i.TokenHash,
+		&i.CreatedAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (
+    id,
+    login,
+    nickname,
+    avatar_url,
+    bio,
+    timezone,
+    profile_accent,
+    status_text,
+    birthday,
+    country,
+    city,
+    read_receipts_enabled,
+    presence_enabled,
+    typing_visibility_enabled,
+    key_backup_status,
+    created_at,
+    updated_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15,
+    $16,
+    $17
+)
+RETURNING
+    id,
+    login,
+    nickname,
+    avatar_url,
+    bio,
+    timezone,
+    profile_accent,
+    status_text,
+    birthday,
+    country,
+    city,
+    read_receipts_enabled,
+    presence_enabled,
+    typing_visibility_enabled,
+    key_backup_status,
+    created_at,
+    updated_at
+`
+
+type CreateUserParams struct {
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	Login                   string             `db:"login" json:"login"`
+	Nickname                string             `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                     pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                 pgtype.Text        `db:"country" json:"country"`
+	City                    pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUser,
+		arg.ID,
+		arg.Login,
+		arg.Nickname,
+		arg.AvatarUrl,
+		arg.Bio,
+		arg.Timezone,
+		arg.ProfileAccent,
+		arg.StatusText,
+		arg.Birthday,
+		arg.Country,
+		arg.City,
+		arg.ReadReceiptsEnabled,
+		arg.PresenceEnabled,
+		arg.TypingVisibilityEnabled,
+		arg.KeyBackupStatus,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Login,
+		&i.Nickname,
+		&i.AvatarUrl,
+		&i.Bio,
+		&i.Timezone,
+		&i.ProfileAccent,
+		&i.StatusText,
+		&i.Birthday,
+		&i.Country,
+		&i.City,
+		&i.ReadReceiptsEnabled,
+		&i.PresenceEnabled,
+		&i.TypingVisibilityEnabled,
+		&i.KeyBackupStatus,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createUserBlock = `-- name: CreateUserBlock :exec
+INSERT INTO user_blocks (
+    blocker_user_id,
+    blocked_user_id,
+    created_at
+) VALUES ($1, $2, $3)
+ON CONFLICT (blocker_user_id, blocked_user_id) DO NOTHING
+`
+
+type CreateUserBlockParams struct {
+	BlockerUserID uuid.UUID          `db:"blocker_user_id" json:"blocker_user_id"`
+	BlockedUserID uuid.UUID          `db:"blocked_user_id" json:"blocked_user_id"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateUserBlock(ctx context.Context, arg CreateUserBlockParams) error {
+	_, err := q.db.Exec(ctx, createUserBlock, arg.BlockerUserID, arg.BlockedUserID, arg.CreatedAt)
+	return err
+}
+
+const createUserPasswordCredential = `-- name: CreateUserPasswordCredential :exec
+INSERT INTO user_password_credentials (
+    user_id,
+    password_hash,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4)
+`
+
+type CreateUserPasswordCredentialParams struct {
+	UserID       uuid.UUID          `db:"user_id" json:"user_id"`
+	PasswordHash string             `db:"password_hash" json:"password_hash"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateUserPasswordCredential(ctx context.Context, arg CreateUserPasswordCredentialParams) error {
+	_, err := q.db.Exec(ctx, createUserPasswordCredential,
+		arg.UserID,
+		arg.PasswordHash,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const deleteUserBlock = `-- name: DeleteUserBlock :execrows
+DELETE FROM user_blocks
+WHERE blocker_user_id = $1 AND blocked_user_id = $2
+`
+
+type DeleteUserBlockParams struct {
+	BlockerUserID uuid.UUID `db:"blocker_user_id" json:"blocker_user_id"`
+	BlockedUserID uuid.UUID `db:"blocked_user_id" json:"blocked_user_id"`
+}
+
+func (q *Queries) DeleteUserBlock(ctx context.Context, arg DeleteUserBlockParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUserBlock, arg.BlockerUserID, arg.BlockedUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getPasswordCredentialByLogin = `-- name: GetPasswordCredentialByLogin :one
+SELECT
+    u.id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.bio,
+    u.timezone,
+    u.profile_accent,
+    u.status_text,
+    u.birthday,
+    u.country,
+    u.city,
+    u.read_receipts_enabled,
+    u.presence_enabled,
+    u.typing_visibility_enabled,
+    u.key_backup_status,
+    u.created_at,
+    u.updated_at,
+    c.password_hash,
+    c.created_at AS password_created_at,
+    c.updated_at AS password_updated_at
+FROM users AS u
+JOIN user_password_credentials AS c ON c.user_id = u.id
+WHERE u.login = $1
+`
+
+type GetPasswordCredentialByLoginRow struct {
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	Login                   string             `db:"login" json:"login"`
+	Nickname                string             `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                     pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                 pgtype.Text        `db:"country" json:"country"`
+	City                    pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PasswordHash            string             `db:"password_hash" json:"password_hash"`
+	PasswordCreatedAt       pgtype.Timestamptz `db:"password_created_at" json:"password_created_at"`
+	PasswordUpdatedAt       pgtype.Timestamptz `db:"password_updated_at" json:"password_updated_at"`
+}
+
+func (q *Queries) GetPasswordCredentialByLogin(ctx context.Context, login string) (GetPasswordCredentialByLoginRow, error) {
+	row := q.db.QueryRow(ctx, getPasswordCredentialByLogin, login)
+	var i GetPasswordCredentialByLoginRow
+	err := row.Scan(
+		&i.ID,
+		&i.Login,
+		&i.Nickname,
+		&i.AvatarUrl,
+		&i.Bio,
+		&i.Timezone,
+		&i.ProfileAccent,
+		&i.StatusText,
+		&i.Birthday,
+		&i.Country,
+		&i.City,
+		&i.ReadReceiptsEnabled,
+		&i.PresenceEnabled,
+		&i.TypingVisibilityEnabled,
+		&i.KeyBackupStatus,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PasswordHash,
+		&i.PasswordCreatedAt,
+		&i.PasswordUpdatedAt,
+	)
+	return i, err
+}
+
+const getSessionAuthByID = `-- name: GetSessionAuthByID :one
+SELECT
+    s.id AS session_id,
+    s.user_id AS session_user_id,
+    s.device_id AS session_device_id,
+    s.token_hash,
+    s.created_at AS session_created_at,
+    s.last_seen_at AS session_last_seen_at,
+    s.revoked_at AS session_revoked_at,
+    d.id AS device_id,
+    d.user_id AS device_user_id,
+    d.label AS device_label,
+    d.created_at AS device_created_at,
+    d.last_seen_at AS device_last_seen_at,
+    d.revoked_at AS device_revoked_at,
+    u.id AS user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.bio,
+    u.timezone,
+    u.profile_accent,
+    u.status_text,
+    u.birthday,
+    u.country,
+    u.city,
+    u.read_receipts_enabled,
+    u.presence_enabled,
+    u.typing_visibility_enabled,
+    u.key_backup_status,
+    u.created_at AS user_created_at,
+    u.updated_at AS user_updated_at
+FROM user_sessions AS s
+JOIN user_devices AS d ON d.id = s.device_id
+JOIN users AS u ON u.id = s.user_id
+WHERE s.id = $1
+`
+
+type GetSessionAuthByIDRow struct {
+	SessionID               uuid.UUID          `db:"session_id" json:"session_id"`
+	SessionUserID           uuid.UUID          `db:"session_user_id" json:"session_user_id"`
+	SessionDeviceID         uuid.UUID          `db:"session_device_id" json:"session_device_id"`
+	TokenHash               string             `db:"token_hash" json:"token_hash"`
+	SessionCreatedAt        pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
+	SessionLastSeenAt       pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
+	SessionRevokedAt        pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
+	DeviceID                uuid.UUID          `db:"device_id" json:"device_id"`
+	DeviceUserID            uuid.UUID          `db:"device_user_id" json:"device_user_id"`
+	DeviceLabel             string             `db:"device_label" json:"device_label"`
+	DeviceCreatedAt         pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
+	DeviceLastSeenAt        pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
+	DeviceRevokedAt         pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
+	UserID                  uuid.UUID          `db:"user_id" json:"user_id"`
+	Login                   string             `db:"login" json:"login"`
+	Nickname                string             `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                     pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                 pgtype.Text        `db:"country" json:"country"`
+	City                    pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
+	UserCreatedAt           pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
+	UserUpdatedAt           pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
+}
+
+func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error) {
+	row := q.db.QueryRow(ctx, getSessionAuthByID, id)
+	var i GetSessionAuthByIDRow
+	err := row.Scan(
+		&i.SessionID,
+		&i.SessionUserID,
+		&i.SessionDeviceID,
+		&i.TokenHash,
+		&i.SessionCreatedAt,
+		&i.SessionLastSeenAt,
+		&i.SessionRevokedAt,
+		&i.DeviceID,
+		&i.DeviceUserID,
+		&i.DeviceLabel,
+		&i.DeviceCreatedAt,
+		&i.DeviceLastSeenAt,
+		&i.DeviceRevokedAt,
+		&i.UserID,
+		&i.Login,
+		&i.Nickname,
+		&i.AvatarUrl,
+		&i.Bio,
+		&i.Timezone,
+		&i.ProfileAccent,
+		&i.StatusText,
+		&i.Birthday,
+		&i.Country,
+		&i.City,
+		&i.ReadReceiptsEnabled,
+		&i.PresenceEnabled,
+		&i.TypingVisibilityEnabled,
+		&i.KeyBackupStatus,
+		&i.UserCreatedAt,
+		&i.UserUpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByID = `-- name: GetUserByID :one
+SELECT
+    id,
+    login,
+    nickname,
+    avatar_url,
+    bio,
+    timezone,
+    profile_accent,
+    status_text,
+    birthday,
+    country,
+    city,
+    read_receipts_enabled,
+    presence_enabled,
+    typing_visibility_enabled,
+    key_backup_status,
+    created_at,
+    updated_at
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Login,
+		&i.Nickname,
+		&i.AvatarUrl,
+		&i.Bio,
+		&i.Timezone,
+		&i.ProfileAccent,
+		&i.StatusText,
+		&i.Birthday,
+		&i.Country,
+		&i.City,
+		&i.ReadReceiptsEnabled,
+		&i.PresenceEnabled,
+		&i.TypingVisibilityEnabled,
+		&i.KeyBackupStatus,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByLogin = `-- name: GetUserByLogin :one
+SELECT
+    id,
+    login,
+    nickname,
+    avatar_url,
+    bio,
+    timezone,
+    profile_accent,
+    status_text,
+    birthday,
+    country,
+    city,
+    read_receipts_enabled,
+    presence_enabled,
+    typing_visibility_enabled,
+    key_backup_status,
+    created_at,
+    updated_at
+FROM users
+WHERE login = $1
+`
+
+func (q *Queries) GetUserByLogin(ctx context.Context, login string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByLogin, login)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Login,
+		&i.Nickname,
+		&i.AvatarUrl,
+		&i.Bio,
+		&i.Timezone,
+		&i.ProfileAccent,
+		&i.StatusText,
+		&i.Birthday,
+		&i.Country,
+		&i.City,
+		&i.ReadReceiptsEnabled,
+		&i.PresenceEnabled,
+		&i.TypingVisibilityEnabled,
+		&i.KeyBackupStatus,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listBlockedUsersByUserID = `-- name: ListBlockedUsersByUserID :many
+SELECT
+    b.created_at AS blocked_at,
+    u.id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.bio,
+    u.timezone,
+    u.profile_accent,
+    u.status_text,
+    u.birthday,
+    u.country,
+    u.city,
+    u.read_receipts_enabled,
+    u.presence_enabled,
+    u.typing_visibility_enabled,
+    u.key_backup_status,
+    u.created_at,
+    u.updated_at
+FROM user_blocks AS b
+JOIN users AS u ON u.id = b.blocked_user_id
+WHERE b.blocker_user_id = $1
+ORDER BY b.created_at DESC
+`
+
+type ListBlockedUsersByUserIDRow struct {
+	BlockedAt               pgtype.Timestamptz `db:"blocked_at" json:"blocked_at"`
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	Login                   string             `db:"login" json:"login"`
+	Nickname                string             `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                     pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                 pgtype.Text        `db:"country" json:"country"`
+	City                    pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListBlockedUsersByUserID(ctx context.Context, blockerUserID uuid.UUID) ([]ListBlockedUsersByUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listBlockedUsersByUserID, blockerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListBlockedUsersByUserIDRow
+	for rows.Next() {
+		var i ListBlockedUsersByUserIDRow
+		if err := rows.Scan(
+			&i.BlockedAt,
+			&i.ID,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+			&i.Bio,
+			&i.Timezone,
+			&i.ProfileAccent,
+			&i.StatusText,
+			&i.Birthday,
+			&i.Country,
+			&i.City,
+			&i.ReadReceiptsEnabled,
+			&i.PresenceEnabled,
+			&i.TypingVisibilityEnabled,
+			&i.KeyBackupStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDevicesByUserID = `-- name: ListDevicesByUserID :many
+SELECT
+    id,
+    user_id,
+    label,
+    created_at,
+    last_seen_at,
+    revoked_at
+FROM user_devices
+WHERE user_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListDevicesByUserID(ctx context.Context, userID uuid.UUID) ([]UserDevice, error) {
+	rows, err := q.db.Query(ctx, listDevicesByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserDevice
+	for rows.Next() {
+		var i UserDevice
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Label,
+			&i.CreatedAt,
+			&i.LastSeenAt,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSessionsByUserID = `-- name: ListSessionsByUserID :many
+SELECT
+    id,
+    user_id,
+    device_id,
+    token_hash,
+    created_at,
+    last_seen_at,
+    revoked_at
+FROM user_sessions
+WHERE user_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]UserSession, error) {
+	rows, err := q.db.Query(ctx, listSessionsByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserSession
+	for rows.Next() {
+		var i UserSession
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.DeviceID,
+			&i.TokenHash,
+			&i.CreatedAt,
+			&i.LastSeenAt,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const revokeDevice = `-- name: RevokeDevice :execrows
+UPDATE user_devices
+SET revoked_at = $3
+WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
+`
+
+type RevokeDeviceParams struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	RevokedAt pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+}
+
+func (q *Queries) RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeDevice, arg.ID, arg.UserID, arg.RevokedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeDeviceSessions = `-- name: RevokeDeviceSessions :exec
+UPDATE user_sessions
+SET revoked_at = $3
+WHERE device_id = $1 AND user_id = $2 AND revoked_at IS NULL
+`
+
+type RevokeDeviceSessionsParams struct {
+	DeviceID  uuid.UUID          `db:"device_id" json:"device_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	RevokedAt pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+}
+
+func (q *Queries) RevokeDeviceSessions(ctx context.Context, arg RevokeDeviceSessionsParams) error {
+	_, err := q.db.Exec(ctx, revokeDeviceSessions, arg.DeviceID, arg.UserID, arg.RevokedAt)
+	return err
+}
+
+const revokeSession = `-- name: RevokeSession :execrows
+UPDATE user_sessions
+SET revoked_at = $3
+WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
+`
+
+type RevokeSessionParams struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	RevokedAt pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+}
+
+func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeSession, arg.ID, arg.UserID, arg.RevokedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const touchSessionAndDevice = `-- name: TouchSessionAndDevice :exec
+WITH touched_session AS (
+    UPDATE user_sessions AS s
+    SET last_seen_at = $3
+    WHERE s.id = $1 AND s.device_id = $2
+), touched_device AS (
+    UPDATE user_devices AS d
+    SET last_seen_at = $3
+    WHERE d.id = $2
+)
+SELECT 1
+`
+
+type TouchSessionAndDeviceParams struct {
+	ID         uuid.UUID          `db:"id" json:"id"`
+	DeviceID   uuid.UUID          `db:"device_id" json:"device_id"`
+	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+}
+
+func (q *Queries) TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error {
+	_, err := q.db.Exec(ctx, touchSessionAndDevice, arg.ID, arg.DeviceID, arg.LastSeenAt)
+	return err
+}
+
+const updateUserProfile = `-- name: UpdateUserProfile :one
+UPDATE users
+SET
+    nickname = $2,
+    avatar_url = $3,
+    bio = $4,
+    timezone = $5,
+    profile_accent = $6,
+    status_text = $7,
+    birthday = $8,
+    country = $9,
+    city = $10,
+    read_receipts_enabled = $11,
+    presence_enabled = $12,
+    typing_visibility_enabled = $13,
+    key_backup_status = $14,
+    updated_at = $15
+WHERE id = $1
+RETURNING
+    id,
+    login,
+    nickname,
+    avatar_url,
+    bio,
+    timezone,
+    profile_accent,
+    status_text,
+    birthday,
+    country,
+    city,
+    read_receipts_enabled,
+    presence_enabled,
+    typing_visibility_enabled,
+    key_backup_status,
+    created_at,
+    updated_at
+`
+
+type UpdateUserProfileParams struct {
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	Nickname                string             `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                     pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                 pgtype.Text        `db:"country" json:"country"`
+	City                    pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserProfile,
+		arg.ID,
+		arg.Nickname,
+		arg.AvatarUrl,
+		arg.Bio,
+		arg.Timezone,
+		arg.ProfileAccent,
+		arg.StatusText,
+		arg.Birthday,
+		arg.Country,
+		arg.City,
+		arg.ReadReceiptsEnabled,
+		arg.PresenceEnabled,
+		arg.TypingVisibilityEnabled,
+		arg.KeyBackupStatus,
+		arg.UpdatedAt,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Login,
+		&i.Nickname,
+		&i.AvatarUrl,
+		&i.Bio,
+		&i.Timezone,
+		&i.ProfileAccent,
+		&i.StatusText,
+		&i.Birthday,
+		&i.Country,
+		&i.City,
+		&i.ReadReceiptsEnabled,
+		&i.PresenceEnabled,
+		&i.TypingVisibilityEnabled,
+		&i.KeyBackupStatus,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
