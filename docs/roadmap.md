@@ -78,7 +78,8 @@
 - [x] Message model
 - [x] Safe markdown subset
 - [x] Read receipts
-- [ ] Presence / typing
+- [x] Typing foundation
+- [ ] Presence foundation
 - [ ] Privacy toggles
 - [x] Tombstone deletion
 - [ ] Draft recovery

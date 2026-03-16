@@ -21,6 +21,7 @@ type Repository interface {
 	ListDirectChats(context.Context, string) ([]DirectChat, error)
 	GetDirectChat(context.Context, string, string) (*DirectChat, error)
 	ListDirectChatReadStateEntries(context.Context, string, string) ([]DirectChatReadStateEntry, error)
+	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
 	UpsertDirectChatReadReceipt(context.Context, UpsertDirectChatReadReceiptParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
@@ -34,19 +35,39 @@ type FriendshipChecker interface {
 	AreFriends(context.Context, string, string) (bool, error)
 }
 
+type TypingStateStore interface {
+	PutDirectChatTypingIndicator(context.Context, PutDirectChatTypingIndicatorParams) error
+	ClearDirectChatTypingIndicator(context.Context, string, string) error
+	ListDirectChatTypingIndicators(context.Context, string, []string, time.Time) (map[string]DirectChatTypingIndicator, error)
+}
+
 type Service struct {
 	repo         Repository
 	friendships  FriendshipChecker
+	typingStore  TypingStateStore
 	sessionToken *libauth.SessionTokenManager
+	typingTTL    time.Duration
 	now          func() time.Time
 	newID        func() string
 }
 
-func NewService(repo Repository, friendships FriendshipChecker, sessionToken *libauth.SessionTokenManager) *Service {
+func NewService(
+	repo Repository,
+	friendships FriendshipChecker,
+	typingStore TypingStateStore,
+	sessionToken *libauth.SessionTokenManager,
+	typingTTL time.Duration,
+) *Service {
+	if typingTTL <= 0 {
+		typingTTL = 6 * time.Second
+	}
+
 	return &Service{
 		repo:         repo,
 		friendships:  friendships,
+		typingStore:  typingStore,
 		sessionToken: sessionToken,
+		typingTTL:    typingTTL,
 		now: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -97,28 +118,33 @@ func (s *Service) ListDirectChats(ctx context.Context, token string) ([]DirectCh
 	return s.repo.ListDirectChats(ctx, authSession.User.ID)
 }
 
-func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string) (*DirectChat, *DirectChatReadState, error) {
+func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string) (*DirectChat, *DirectChatReadState, *DirectChatTypingState, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	normalizedChatID, err := normalizeID(chatID, "chat_id")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	readState, err := s.getDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return directChat, readState, nil
+	typingState, err := s.getDirectChatTypingState(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return directChat, readState, typingState, nil
 }
 
 func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string) (*DirectChatMessage, error) {
@@ -205,6 +231,62 @@ func (s *Service) MarkDirectChatRead(ctx context.Context, token string, chatID s
 	}
 
 	return s.getDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
+}
+
+func (s *Service) SetDirectChatTyping(ctx context.Context, token string, chatID string) (*DirectChatTypingState, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, err
+	}
+
+	if !authSession.User.TypingVisibilityEnabled {
+		if err := s.typingStore.ClearDirectChatTypingIndicator(ctx, normalizedChatID, authSession.User.ID); err != nil {
+			return nil, err
+		}
+
+		return s.getDirectChatTypingState(ctx, authSession.User.ID, normalizedChatID)
+	}
+
+	now := s.now()
+	if err := s.typingStore.PutDirectChatTypingIndicator(ctx, PutDirectChatTypingIndicatorParams{
+		ChatID:    normalizedChatID,
+		UserID:    authSession.User.ID,
+		UpdatedAt: now,
+		ExpiresAt: now.Add(s.typingTTL),
+	}); err != nil {
+		return nil, err
+	}
+
+	return s.getDirectChatTypingState(ctx, authSession.User.ID, normalizedChatID)
+}
+
+func (s *Service) ClearDirectChatTyping(ctx context.Context, token string, chatID string) (*DirectChatTypingState, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, err
+	}
+
+	if err := s.typingStore.ClearDirectChatTypingIndicator(ctx, normalizedChatID, authSession.User.ID); err != nil {
+		return nil, err
+	}
+
+	return s.getDirectChatTypingState(ctx, authSession.User.ID, normalizedChatID)
 }
 
 func (s *Service) DeleteMessageForEveryone(ctx context.Context, token string, chatID string, messageID string) (*DirectChatMessage, error) {
@@ -398,6 +480,48 @@ func (s *Service) getDirectChatReadState(ctx context.Context, viewerUserID strin
 		}
 
 		state.PeerPosition = &position
+	}
+
+	return state, nil
+}
+
+func (s *Service) getDirectChatTypingState(ctx context.Context, viewerUserID string, chatID string) (*DirectChatTypingState, error) {
+	entries, err := s.repo.ListDirectChatTypingStateEntries(ctx, viewerUserID, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) == 0 {
+		return nil, ErrNotFound
+	}
+
+	userIDs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		userIDs = append(userIDs, entry.UserID)
+	}
+
+	indicators, err := s.typingStore.ListDirectChatTypingIndicators(ctx, chatID, userIDs, s.now())
+	if err != nil {
+		return nil, err
+	}
+
+	state := &DirectChatTypingState{}
+	for _, entry := range entries {
+		if !entry.TypingVisibilityEnabled {
+			continue
+		}
+
+		indicator, ok := indicators[entry.UserID]
+		if !ok {
+			continue
+		}
+
+		copy := indicator
+		if entry.UserID == viewerUserID {
+			state.SelfTyping = &copy
+			continue
+		}
+
+		state.PeerTyping = &copy
 	}
 
 	return state, nil

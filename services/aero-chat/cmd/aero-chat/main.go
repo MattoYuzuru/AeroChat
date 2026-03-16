@@ -14,6 +14,7 @@ import (
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/app"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/domain/chat"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/storage/postgres"
+	redisstate "github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/storage/redis"
 	connecthandler "github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/transport/connect"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -54,7 +55,21 @@ func run() error {
 		return err
 	}
 
-	service := chat.NewService(repository, repository, libauth.NewSessionTokenManager())
+	typingStore := redisstate.NewTypingStore(cfg.RedisAddress)
+	defer func() {
+		_ = typingStore.Close()
+	}()
+	if err := typingStore.Ping(context.Background()); err != nil {
+		return err
+	}
+
+	service := chat.NewService(
+		repository,
+		repository,
+		typingStore,
+		libauth.NewSessionTokenManager(),
+		cfg.DirectChatTypingTTL,
+	)
 	handler := connecthandler.NewHandler(serviceName, version, service)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -66,7 +81,13 @@ func run() error {
 			Version: version,
 		},
 		logger,
-		repository.Ping,
+		func(ctx context.Context) error {
+			if err := repository.Ping(ctx); err != nil {
+				return err
+			}
+
+			return typingStore.Ping(ctx)
+		},
 	)
 	path, connectHTTPHandler := chatv1connect.NewChatServiceHandler(handler)
 	mux.Handle(path, connectHTTPHandler)
