@@ -1,0 +1,79 @@
+version: "3"
+
+env:
+  PATH: "{{.ROOT_DIR}}/bin:{{.PATH}}"
+
+tasks:
+  tools:
+    desc: Устанавливает локальные dev-инструменты в ./bin
+    cmds:
+      - ./infra/scripts/install-dev-tools.sh
+
+  proto:lint:
+    desc: Проверяет protobuf-контракты через Buf
+    cmds:
+      - buf lint
+
+  proto:generate:
+    desc: Генерирует Go и ConnectRPC код из protobuf-контрактов
+    cmds:
+      - buf generate
+
+  sqlc:generate:
+    desc: Генерирует типизированный Go-код из SQL-запросов
+    cmds:
+      - sqlc generate
+
+  go:fmt:
+    desc: Форматирует Go-код во всех workspace-модулях
+    cmds:
+      - gofmt -w $(find . -type f -name '*.go' -not -path './gen/go/*')
+
+  go:test:
+    desc: Запускает Go-тесты через go.work
+    cmds:
+      - go test ./libs/go/... ./services/aero-gateway/... ./services/aero-identity/... ./services/aero-chat/... ./services/aero-rtc-control/... ./services/aero-jobs/... ./gen/go/...
+
+  go:lint:
+    desc: Запускает golangci-lint по всем Go-модулям
+    cmds:
+      - golangci-lint run ./libs/go/... ./services/aero-gateway/... ./services/aero-identity/... ./services/aero-chat/... ./services/aero-rtc-control/... ./services/aero-jobs/... ./gen/go/...
+
+  web:install:
+    desc: Устанавливает frontend-зависимости
+    cmds:
+      - npx pnpm@10.19.0 install
+
+  web:lint:
+    desc: Запускает lint для web-приложения
+    cmds:
+      - npx pnpm@10.19.0 --filter @aerochat/web lint
+
+  web:build:
+    desc: Собирает web-приложение
+    cmds:
+      - npx pnpm@10.19.0 --filter @aerochat/web build
+
+  compose:config:
+    desc: Проверяет docker compose-конфигурацию
+    cmds:
+      - docker compose -f infra/compose/docker-compose.yml config
+
+  compose:up:
+    desc: Поднимает dev-окружение
+    cmds:
+      - docker compose -f infra/compose/docker-compose.yml up --build -d
+
+  check:
+    desc: Выполняет основной набор локальных проверок
+    deps:
+      - tools
+      - proto:lint
+      - proto:generate
+      - sqlc:generate
+      - go:test
+      - go:lint
+      - web:install
+      - web:lint
+      - web:build
+      - compose:config

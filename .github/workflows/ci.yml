@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+      - "infra/**"
+  pull_request:
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+
+      - name: Sync workspace
+        run: go work sync
+
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l $(find . -type f -name '*.go' -not -path './gen/go/*'))" ]; then
+            echo "Найдены неотформатированные Go-файлы"
+            exit 1
+          fi
+
+      - name: Run tests
+        run: go test ./libs/go/... ./services/aero-gateway/... ./services/aero-identity/... ./services/aero-chat/... ./services/aero-rtc-control/... ./services/aero-jobs/... ./gen/go/...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.11.3
+          args: ./libs/go/... ./services/aero-gateway/... ./services/aero-identity/... ./services/aero-chat/... ./services/aero-rtc-control/... ./services/aero-jobs/... ./gen/go/...
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint web
+        run: pnpm --filter @aerochat/web lint
+
+      - name: Build web
+        run: pnpm --filter @aerochat/web build
+
+  proto:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+
+      - name: Setup Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.59.0
+
+      - name: Buf lint
+        run: buf lint
+
+      - name: Buf generate
+        run: buf generate

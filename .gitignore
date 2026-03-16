@@ -1,15 +1,12 @@
-# Test binary, built with `go test -c`
-*.test
-
-# Code coverage profiles and other test artifacts
-*.out
-coverage.*
-*.coverprofile
-profile.cov
-
-# env file
+.DS_Store
 .env
-
-# Editor/IDE
+.env.local
 .idea/
-.vscode/
+bin/
+node_modules/
+apps/web/dist/
+apps/web/vite.config.d.ts
+apps/web/vite.config.js
+*.tsbuildinfo
+coverage/
+tmp/

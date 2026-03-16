@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package aerochat.rtc.v1;
+
+option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1;rtcv1";
+
+import "aerochat/common/v1/common.proto";
+
+service RtcControlService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message PingRequest {}
+
+message PingResponse {
+  aerochat.common.v1.ServiceMeta service = 1;
+}

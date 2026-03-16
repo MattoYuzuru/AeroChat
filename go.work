@@ -1,0 +1,11 @@
+go 1.25.0
+
+use (
+	./gen/go
+	./libs/go
+	./services/aero-chat
+	./services/aero-gateway
+	./services/aero-identity
+	./services/aero-jobs
+	./services/aero-rtc-control
+)
