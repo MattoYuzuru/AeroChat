@@ -1,0 +1,236 @@
+.layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.heroCard,
+.stateCard,
+.sectionCard,
+.metricCard,
+.personCard {
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 1.6rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.45));
+  box-shadow: var(--shadow-shell);
+  backdrop-filter: blur(18px);
+}
+
+.heroCard,
+.stateCard,
+.sectionCard {
+  padding: 1.35rem;
+}
+
+.heroHeader,
+.sectionHeader,
+.personHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cardLabel {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(3, 50, 82, 0.72);
+}
+
+.title,
+.stateTitle,
+.sectionTitle,
+.personTitle {
+  margin: 0.35rem 0 0;
+}
+
+.title {
+  font-size: 2rem;
+}
+
+.subtitle,
+.stateMessage,
+.sectionDescription,
+.personDescription,
+.pendingText,
+.emptyState {
+  margin: 0.8rem 0 0;
+  color: rgba(3, 50, 82, 0.78);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.metricCard {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+}
+
+.metricCard span {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  color: rgba(3, 50, 82, 0.7);
+}
+
+.metricCard strong {
+  font-size: 1.8rem;
+}
+
+.notice,
+.error {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+}
+
+.notice {
+  background: rgba(16, 130, 203, 0.12);
+}
+
+.error {
+  background: rgba(181, 38, 38, 0.1);
+  color: #8e1e1e;
+}
+
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: end;
+  margin-top: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field span {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.field input {
+  min-height: 3rem;
+  padding: 0.75rem 0.95rem;
+  border: 1px solid rgba(3, 50, 82, 0.14);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.sectionCard {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+}
+
+.sectionDescription {
+  max-width: 18rem;
+  text-align: right;
+}
+
+.list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.personCard {
+  padding: 1rem;
+}
+
+.personTitle {
+  font-size: 1.1rem;
+}
+
+.personLogin {
+  margin: 0.3rem 0 0;
+  color: rgba(3, 50, 82, 0.68);
+}
+
+.metaTag {
+  align-self: start;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  font-size: 0.8rem;
+  color: rgba(3, 50, 82, 0.72);
+}
+
+.actions,
+.stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 0.95rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.primaryButton {
+  color: #ffffff;
+  background: linear-gradient(180deg, #1782d1, #0c5d99);
+}
+
+.secondaryButton {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(3, 50, 82, 0.12);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.pendingText {
+  font-size: 0.88rem;
+  color: rgba(12, 93, 153, 0.88);
+}
+
+.stateCard[data-tone="error"] {
+  border-color: rgba(181, 38, 38, 0.24);
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionDescription {
+    max-width: none;
+    text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .heroHeader,
+  .sectionHeader,
+  .personHeader,
+  .form {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+}

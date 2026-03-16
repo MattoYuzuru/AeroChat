@@ -2,15 +2,13 @@ import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { bootstrapAuthSession } from "./bootstrap";
 import { AuthContext, type AuthState } from "./context";
 import { createBrowserSessionStore } from "./session-store";
-import { createGatewayClient } from "../gateway/client";
 import {
   isGatewayErrorCode,
   type LoginInput,
   type RegisterInput,
   type UpdateCurrentProfileInput,
 } from "../gateway/types";
-
-const gatewayClient = createGatewayClient(globalThis.fetch.bind(globalThis));
+import { gatewayClient } from "../gateway/runtime";
 const sessionStore = createBrowserSessionStore();
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -133,6 +131,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     });
   }
 
+  function expireSession(message = "Сессия истекла. Войдите снова.") {
+    sessionStore.clear();
+    setState({
+      status: "anonymous",
+      notice: message,
+    });
+  }
+
   async function refreshProfile() {
     const token = requireAuthToken(state);
 
@@ -180,11 +186,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   function handleProtectedError(error: unknown) {
     if (isGatewayErrorCode(error, "unauthenticated")) {
-      sessionStore.clear();
-      setState({
-        status: "anonymous",
-        notice: "Сессия истекла. Войдите снова.",
-      });
+      expireSession();
     }
   }
 
@@ -196,6 +198,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         register,
         logout,
         discardSession,
+        expireSession,
         retryBootstrap,
         refreshProfile,
         updateProfile,

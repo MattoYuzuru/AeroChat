@@ -131,4 +131,122 @@ describe("createGatewayClient", () => {
       }),
     );
   });
+
+  it("calls social graph mutation endpoints with exact login payload", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    const client = createGatewayClient(fetchMock, "/api");
+
+    await client.sendFriendRequest("token-1", " alice ");
+    await client.cancelOutgoingFriendRequest("token-1", "alice");
+    await client.removeFriend("token-1", "alice");
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/aerochat.identity.v1.IdentityService/SendFriendRequest",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          login: "alice",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/aerochat.identity.v1.IdentityService/CancelOutgoingFriendRequest",
+      expect.objectContaining({
+        body: JSON.stringify({
+          login: "alice",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/aerochat.identity.v1.IdentityService/RemoveFriend",
+      expect.objectContaining({
+        body: JSON.stringify({
+          login: "alice",
+        }),
+      }),
+    );
+  });
+
+  it("normalizes incoming requests and friends from social graph responses", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            friendRequests: [
+              {
+                profile: {
+                  id: "user-2",
+                  login: "bob",
+                  nickname: "Bob",
+                  avatarUrl: "",
+                  createdAt: "2026-03-24T10:00:00Z",
+                  updatedAt: "2026-03-24T10:00:00Z",
+                },
+                requestedAt: "2026-03-24T11:00:00Z",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            friends: [
+              {
+                profile: {
+                  id: "user-3",
+                  login: "charlie",
+                  nickname: "Charlie",
+                  bio: "friend",
+                  createdAt: "2026-03-24T10:00:00Z",
+                  updatedAt: "2026-03-24T10:00:00Z",
+                },
+                friendsSince: "2026-03-24T12:00:00Z",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const incoming = await client.listIncomingFriendRequests("token-1");
+    const friends = await client.listFriends("token-1");
+
+    expect(incoming).toEqual([
+      expect.objectContaining({
+        requestedAt: "2026-03-24T11:00:00Z",
+        profile: expect.objectContaining({
+          login: "bob",
+          avatarUrl: null,
+        }),
+      }),
+    ]);
+    expect(friends).toEqual([
+      expect.objectContaining({
+        friendsSince: "2026-03-24T12:00:00Z",
+        profile: expect.objectContaining({
+          login: "charlie",
+          bio: "friend",
+        }),
+      }),
+    ]);
+  });
 });

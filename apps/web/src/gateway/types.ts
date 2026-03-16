@@ -59,6 +59,16 @@ export interface CurrentAuth {
   sessionToken: string;
 }
 
+export interface FriendRequest {
+  profile: Profile;
+  requestedAt: string;
+}
+
+export interface Friend {
+  profile: Profile;
+  friendsSince: string;
+}
+
 export interface RegisterInput {
   login: string;
   password: string;
@@ -89,6 +99,14 @@ export interface GatewayClient {
   login(input: LoginInput): Promise<CurrentAuth>;
   logoutCurrentSession(token: string): Promise<void>;
   getCurrentProfile(token: string): Promise<Profile>;
+  sendFriendRequest(token: string, login: string): Promise<void>;
+  acceptFriendRequest(token: string, login: string): Promise<void>;
+  declineFriendRequest(token: string, login: string): Promise<void>;
+  cancelOutgoingFriendRequest(token: string, login: string): Promise<void>;
+  listIncomingFriendRequests(token: string): Promise<FriendRequest[]>;
+  listOutgoingFriendRequests(token: string): Promise<FriendRequest[]>;
+  listFriends(token: string): Promise<Friend[]>;
+  removeFriend(token: string, login: string): Promise<void>;
   updateCurrentProfile(
     token: string,
     input: UpdateCurrentProfileInput,
@@ -127,8 +145,14 @@ export function describeGatewayError(
   }
 
   switch (error.code) {
+    case "already_exists":
+      return error.message || "Такое состояние уже существует.";
+    case "failed_precondition":
+      return error.message || "Текущее состояние не позволяет выполнить это действие.";
     case "invalid_argument":
       return error.message || "Проверьте заполнение полей и повторите попытку.";
+    case "not_found":
+      return error.message || "Запрошенный объект не найден.";
     case "unauthenticated":
       return "Сессия недействительна. Войдите снова.";
     case "permission_denied":
