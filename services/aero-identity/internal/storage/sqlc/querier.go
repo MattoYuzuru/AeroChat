@@ -12,17 +12,26 @@ import (
 
 type Querier interface {
 	CreateDevice(ctx context.Context, arg CreateDeviceParams) (UserDevice, error)
+	CreateFriendRequest(ctx context.Context, arg CreateFriendRequestParams) error
+	CreateFriendship(ctx context.Context, arg CreateFriendshipParams) error
 	CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserBlock(ctx context.Context, arg CreateUserBlockParams) error
 	CreateUserPasswordCredential(ctx context.Context, arg CreateUserPasswordCredentialParams) error
+	DeleteFriendRequest(ctx context.Context, arg DeleteFriendRequestParams) (int64, error)
+	DeleteFriendRequestsByPair(ctx context.Context, arg DeleteFriendRequestsByPairParams) error
+	DeleteFriendshipByPair(ctx context.Context, arg DeleteFriendshipByPairParams) (int64, error)
 	DeleteUserBlock(ctx context.Context, arg DeleteUserBlockParams) (int64, error)
 	GetPasswordCredentialByLogin(ctx context.Context, login string) (GetPasswordCredentialByLoginRow, error)
 	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
+	GetSocialGraphState(ctx context.Context, arg GetSocialGraphStateParams) (GetSocialGraphStateRow, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByLogin(ctx context.Context, login string) (User, error)
 	ListBlockedUsersByUserID(ctx context.Context, blockerUserID uuid.UUID) ([]ListBlockedUsersByUserIDRow, error)
 	ListDevicesByUserID(ctx context.Context, userID uuid.UUID) ([]UserDevice, error)
+	ListFriendsByUserID(ctx context.Context, userLowID uuid.UUID) ([]ListFriendsByUserIDRow, error)
+	ListIncomingFriendRequestsByUserID(ctx context.Context, addresseeUserID uuid.UUID) ([]ListIncomingFriendRequestsByUserIDRow, error)
+	ListOutgoingFriendRequestsByUserID(ctx context.Context, requesterUserID uuid.UUID) ([]ListOutgoingFriendRequestsByUserIDRow, error)
 	ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
 	RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (int64, error)
 	RevokeDeviceSessions(ctx context.Context, arg RevokeDeviceSessionsParams) error

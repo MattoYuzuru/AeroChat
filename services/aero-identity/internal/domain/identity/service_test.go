@@ -168,6 +168,202 @@ func TestBlockAndUnblockUser(t *testing.T) {
 	}
 }
 
+func TestFriendRequestAcceptFlow(t *testing.T) {
+	t.Parallel()
+
+	service := newTestService()
+	alice := mustRegister(t, service, "alice-user", "Alice")
+	bob := mustRegister(t, service, "bob-user", "Bob")
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, " BOB-USER "); err != nil {
+		t.Fatalf("send friend request: %v", err)
+	}
+
+	incoming, err := service.ListIncomingFriendRequests(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list incoming friend requests: %v", err)
+	}
+	if len(incoming) != 1 || incoming[0].Profile.ID != alice.User.ID {
+		t.Fatal("ожидался один входящий friend request от Alice")
+	}
+
+	outgoing, err := service.ListOutgoingFriendRequests(context.Background(), alice.Token)
+	if err != nil {
+		t.Fatalf("list outgoing friend requests: %v", err)
+	}
+	if len(outgoing) != 1 || outgoing[0].Profile.ID != bob.User.ID {
+		t.Fatal("ожидался один исходящий friend request к Bob")
+	}
+
+	if err := service.AcceptFriendRequest(context.Background(), bob.Token, "alice-user"); err != nil {
+		t.Fatalf("accept friend request: %v", err)
+	}
+
+	incoming, err = service.ListIncomingFriendRequests(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list incoming after accept: %v", err)
+	}
+	if len(incoming) != 0 {
+		t.Fatal("после accept входящих заявок быть не должно")
+	}
+
+	friends, err := service.ListFriends(context.Background(), alice.Token)
+	if err != nil {
+		t.Fatalf("list friends for alice: %v", err)
+	}
+	if len(friends) != 1 || friends[0].Profile.ID != bob.User.ID {
+		t.Fatal("Alice должна видеть Bob в списке друзей")
+	}
+
+	friends, err = service.ListFriends(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list friends for bob: %v", err)
+	}
+	if len(friends) != 1 || friends[0].Profile.ID != alice.User.ID {
+		t.Fatal("Bob должен видеть Alice в списке друзей")
+	}
+}
+
+func TestDeclineCancelAndRemoveFriend(t *testing.T) {
+	t.Parallel()
+
+	service := newTestService()
+	alice := mustRegister(t, service, "decline-alice", "Alice")
+	bob := mustRegister(t, service, "decline-bob", "Bob")
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, "decline-bob"); err != nil {
+		t.Fatalf("send friend request for decline: %v", err)
+	}
+	if err := service.DeclineFriendRequest(context.Background(), bob.Token, "decline-alice"); err != nil {
+		t.Fatalf("decline friend request: %v", err)
+	}
+
+	incoming, err := service.ListIncomingFriendRequests(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list incoming after decline: %v", err)
+	}
+	if len(incoming) != 0 {
+		t.Fatal("после decline список входящих должен быть пустым")
+	}
+
+	if err := service.SendFriendRequest(context.Background(), bob.Token, "decline-alice"); err != nil {
+		t.Fatalf("send reverse friend request: %v", err)
+	}
+	if err := service.CancelOutgoingFriendRequest(context.Background(), bob.Token, "decline-alice"); err != nil {
+		t.Fatalf("cancel outgoing friend request: %v", err)
+	}
+
+	outgoing, err := service.ListOutgoingFriendRequests(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list outgoing after cancel: %v", err)
+	}
+	if len(outgoing) != 0 {
+		t.Fatal("после cancel список исходящих должен быть пустым")
+	}
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, "decline-bob"); err != nil {
+		t.Fatalf("send friend request before friendship: %v", err)
+	}
+	if err := service.AcceptFriendRequest(context.Background(), bob.Token, "decline-alice"); err != nil {
+		t.Fatalf("accept friend request before remove: %v", err)
+	}
+
+	if err := service.RemoveFriend(context.Background(), alice.Token, "decline-bob"); err != nil {
+		t.Fatalf("remove friend: %v", err)
+	}
+
+	friends, err := service.ListFriends(context.Background(), alice.Token)
+	if err != nil {
+		t.Fatalf("list friends after remove: %v", err)
+	}
+	if len(friends) != 0 {
+		t.Fatal("после remove friend список друзей должен быть пустым")
+	}
+}
+
+func TestSocialGraphRejectsInvalidOperations(t *testing.T) {
+	t.Parallel()
+
+	service := newTestService()
+	alice := mustRegister(t, service, "graph-alice", "Alice")
+	bob := mustRegister(t, service, "graph-bob", "Bob")
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, "graph-alice"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка self-friend operation, получено %v", err)
+	}
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, "graph-bob"); err != nil {
+		t.Fatalf("send friend request: %v", err)
+	}
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, "graph-bob"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка duplicate active request, получено %v", err)
+	}
+
+	if err := service.SendFriendRequest(context.Background(), bob.Token, "graph-alice"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка incoming request already exists, получено %v", err)
+	}
+
+	if err := service.AcceptFriendRequest(context.Background(), bob.Token, "graph-alice"); err != nil {
+		t.Fatalf("accept friend request: %v", err)
+	}
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, "graph-bob"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка already friends, получено %v", err)
+	}
+}
+
+func TestBlockClearsSocialGraphAndPreventsRequests(t *testing.T) {
+	t.Parallel()
+
+	service := newTestService()
+	alice := mustRegister(t, service, "block-alice", "Alice")
+	bob := mustRegister(t, service, "block-bob", "Bob")
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, "block-bob"); err != nil {
+		t.Fatalf("send friend request before block: %v", err)
+	}
+
+	if err := service.BlockUser(context.Background(), bob.Token, "block-alice"); err != nil {
+		t.Fatalf("block user: %v", err)
+	}
+
+	incoming, err := service.ListIncomingFriendRequests(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list incoming after block: %v", err)
+	}
+	if len(incoming) != 0 {
+		t.Fatal("block должен очищать активные friend requests")
+	}
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, "block-bob"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка blocked users cannot send requests, получено %v", err)
+	}
+
+	if err := service.UnblockUser(context.Background(), bob.Token, "block-alice"); err != nil {
+		t.Fatalf("unblock user: %v", err)
+	}
+
+	if err := service.SendFriendRequest(context.Background(), alice.Token, "block-bob"); err != nil {
+		t.Fatalf("send friend request after unblock: %v", err)
+	}
+	if err := service.AcceptFriendRequest(context.Background(), bob.Token, "block-alice"); err != nil {
+		t.Fatalf("accept friend request after unblock: %v", err)
+	}
+
+	if err := service.BlockUser(context.Background(), bob.Token, "block-alice"); err != nil {
+		t.Fatalf("block user after friendship: %v", err)
+	}
+
+	friends, err := service.ListFriends(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list friends after friendship block: %v", err)
+	}
+	if len(friends) != 0 {
+		t.Fatal("block должен разрывать существующую friendship")
+	}
+}
+
 func newTestService() *Service {
 	repo := newFakeRepository()
 	service := NewService(repo, identityauth.NewPasswordHasher(), identityauth.NewSessionTokenManager())
@@ -208,6 +404,8 @@ type fakeRepository struct {
 	devices      map[string]Device
 	sessions     map[string]SessionAuth
 	blocks       map[string]map[string]time.Time
+	friendReqs   map[string]PendingFriendRequest
+	friendships  map[string]time.Time
 }
 
 func newFakeRepository() *fakeRepository {
@@ -218,6 +416,8 @@ func newFakeRepository() *fakeRepository {
 		devices:      make(map[string]Device),
 		sessions:     make(map[string]SessionAuth),
 		blocks:       make(map[string]map[string]time.Time),
+		friendReqs:   make(map[string]PendingFriendRequest),
+		friendships:  make(map[string]time.Time),
 	}
 }
 
@@ -387,11 +587,123 @@ func (r *fakeRepository) ListBlockedUsers(_ context.Context, userID string) ([]B
 	return result, nil
 }
 
+func (r *fakeRepository) GetSocialGraphState(_ context.Context, userID string, targetUserID string) (*SocialGraphState, error) {
+	state := &SocialGraphState{
+		HasBlock:   r.hasBlock(userID, targetUserID),
+		AreFriends: r.areFriends(userID, targetUserID),
+	}
+
+	request, ok := r.friendReqs[pairKey(userID, targetUserID)]
+	if ok {
+		copy := request
+		state.PendingRequest = &copy
+	}
+
+	return state, nil
+}
+
+func (r *fakeRepository) CreateFriendRequest(_ context.Context, requesterUserID string, addresseeUserID string, createdAt time.Time) error {
+	r.friendReqs[pairKey(requesterUserID, addresseeUserID)] = PendingFriendRequest{
+		RequesterUserID: requesterUserID,
+		AddresseeUserID: addresseeUserID,
+		CreatedAt:       createdAt,
+	}
+	return nil
+}
+
+func (r *fakeRepository) AcceptFriendRequest(_ context.Context, requesterUserID string, addresseeUserID string, createdAt time.Time) (bool, error) {
+	key := pairKey(requesterUserID, addresseeUserID)
+	request, ok := r.friendReqs[key]
+	if !ok || request.RequesterUserID != requesterUserID || request.AddresseeUserID != addresseeUserID {
+		return false, nil
+	}
+
+	delete(r.friendReqs, key)
+	r.friendships[key] = createdAt
+	return true, nil
+}
+
+func (r *fakeRepository) DeleteFriendRequest(_ context.Context, requesterUserID string, addresseeUserID string) (bool, error) {
+	key := pairKey(requesterUserID, addresseeUserID)
+	request, ok := r.friendReqs[key]
+	if !ok || request.RequesterUserID != requesterUserID || request.AddresseeUserID != addresseeUserID {
+		return false, nil
+	}
+
+	delete(r.friendReqs, key)
+	return true, nil
+}
+
+func (r *fakeRepository) ListIncomingFriendRequests(_ context.Context, userID string) ([]FriendRequest, error) {
+	result := make([]FriendRequest, 0)
+	for _, request := range r.friendReqs {
+		if request.AddresseeUserID != userID {
+			continue
+		}
+		result = append(result, FriendRequest{
+			Profile:     r.users[request.RequesterUserID],
+			RequestedAt: request.CreatedAt,
+		})
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) ListOutgoingFriendRequests(_ context.Context, userID string) ([]FriendRequest, error) {
+	result := make([]FriendRequest, 0)
+	for _, request := range r.friendReqs {
+		if request.RequesterUserID != userID {
+			continue
+		}
+		result = append(result, FriendRequest{
+			Profile:     r.users[request.AddresseeUserID],
+			RequestedAt: request.CreatedAt,
+		})
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) ListFriends(_ context.Context, userID string) ([]Friend, error) {
+	result := make([]Friend, 0)
+	for key, since := range r.friendships {
+		firstUserID, secondUserID := splitPairKey(key)
+		friendUserID := ""
+		switch userID {
+		case firstUserID:
+			friendUserID = secondUserID
+		case secondUserID:
+			friendUserID = firstUserID
+		default:
+			continue
+		}
+
+		result = append(result, Friend{
+			Profile:      r.users[friendUserID],
+			FriendsSince: since,
+		})
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) DeleteFriendship(_ context.Context, firstUserID string, secondUserID string) (bool, error) {
+	key := pairKey(firstUserID, secondUserID)
+	if _, ok := r.friendships[key]; !ok {
+		return false, nil
+	}
+
+	delete(r.friendships, key)
+	return true, nil
+}
+
 func (r *fakeRepository) BlockUser(_ context.Context, blockerID string, blockedID string, createdAt time.Time) error {
 	if r.blocks[blockerID] == nil {
 		r.blocks[blockerID] = make(map[string]time.Time)
 	}
 	r.blocks[blockerID][blockedID] = createdAt
+	delete(r.friendReqs, pairKey(blockerID, blockedID))
+	delete(r.friendships, pairKey(blockerID, blockedID))
 	return nil
 }
 
@@ -414,6 +726,41 @@ func strPtr(value string) *string {
 
 func boolPtr(value bool) *bool {
 	return &value
+}
+
+func pairKey(firstUserID string, secondUserID string) string {
+	userLowID, userHighID := CanonicalUserPair(firstUserID, secondUserID)
+	return userLowID + ":" + userHighID
+}
+
+func splitPairKey(value string) (string, string) {
+	for index := 0; index < len(value); index++ {
+		if value[index] == ':' {
+			return value[:index], value[index+1:]
+		}
+	}
+
+	return "", ""
+}
+
+func (r *fakeRepository) hasBlock(firstUserID string, secondUserID string) bool {
+	if blockedSet := r.blocks[firstUserID]; blockedSet != nil {
+		if _, ok := blockedSet[secondUserID]; ok {
+			return true
+		}
+	}
+	if blockedSet := r.blocks[secondUserID]; blockedSet != nil {
+		if _, ok := blockedSet[firstUserID]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (r *fakeRepository) areFriends(firstUserID string, secondUserID string) bool {
+	_, ok := r.friendships[pairKey(firstUserID, secondUserID)]
+	return ok
 }
 
 func testUUID(sequence int) string {

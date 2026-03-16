@@ -44,6 +44,20 @@ type UserDevice struct {
 	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
 }
 
+type UserFriendRequest struct {
+	RequesterUserID uuid.UUID          `db:"requester_user_id" json:"requester_user_id"`
+	AddresseeUserID uuid.UUID          `db:"addressee_user_id" json:"addressee_user_id"`
+	UserLowID       uuid.UUID          `db:"user_low_id" json:"user_low_id"`
+	UserHighID      uuid.UUID          `db:"user_high_id" json:"user_high_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type UserFriendship struct {
+	UserLowID  uuid.UUID          `db:"user_low_id" json:"user_low_id"`
+	UserHighID uuid.UUID          `db:"user_high_id" json:"user_high_id"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type UserPasswordCredential struct {
 	UserID       uuid.UUID          `db:"user_id" json:"user_id"`
 	PasswordHash string             `db:"password_hash" json:"password_hash"`

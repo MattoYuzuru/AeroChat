@@ -318,3 +318,139 @@ FROM user_blocks AS b
 JOIN users AS u ON u.id = b.blocked_user_id
 WHERE b.blocker_user_id = $1
 ORDER BY b.created_at DESC;
+
+-- name: GetSocialGraphState :one
+SELECT
+    EXISTS (
+        SELECT 1
+        FROM user_blocks AS b
+        WHERE (b.blocker_user_id = $1 AND b.blocked_user_id = $2)
+           OR (b.blocker_user_id = $2 AND b.blocked_user_id = $1)
+    ) AS has_block,
+    EXISTS (
+        SELECT 1
+        FROM user_friendships AS f
+        WHERE f.user_low_id = $3 AND f.user_high_id = $4
+    ) AS are_friends,
+    (
+        SELECT fr.requester_user_id
+        FROM user_friend_requests AS fr
+        WHERE fr.user_low_id = $3 AND fr.user_high_id = $4
+    ) AS requester_user_id,
+    (
+        SELECT fr.addressee_user_id
+        FROM user_friend_requests AS fr
+        WHERE fr.user_low_id = $3 AND fr.user_high_id = $4
+    ) AS addressee_user_id,
+    (
+        SELECT fr.created_at
+        FROM user_friend_requests AS fr
+        WHERE fr.user_low_id = $3 AND fr.user_high_id = $4
+    ) AS request_created_at;
+
+-- name: CreateFriendRequest :exec
+INSERT INTO user_friend_requests (
+    requester_user_id,
+    addressee_user_id,
+    user_low_id,
+    user_high_id,
+    created_at
+) VALUES ($1, $2, $3, $4, $5);
+
+-- name: DeleteFriendRequest :execrows
+DELETE FROM user_friend_requests
+WHERE requester_user_id = $1 AND addressee_user_id = $2;
+
+-- name: DeleteFriendRequestsByPair :exec
+DELETE FROM user_friend_requests
+WHERE user_low_id = $1 AND user_high_id = $2;
+
+-- name: CreateFriendship :exec
+INSERT INTO user_friendships (
+    user_low_id,
+    user_high_id,
+    created_at
+) VALUES ($1, $2, $3);
+
+-- name: DeleteFriendshipByPair :execrows
+DELETE FROM user_friendships
+WHERE user_low_id = $1 AND user_high_id = $2;
+
+-- name: ListIncomingFriendRequestsByUserID :many
+SELECT
+    fr.created_at AS requested_at,
+    u.id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.bio,
+    u.timezone,
+    u.profile_accent,
+    u.status_text,
+    u.birthday,
+    u.country,
+    u.city,
+    u.read_receipts_enabled,
+    u.presence_enabled,
+    u.typing_visibility_enabled,
+    u.key_backup_status,
+    u.created_at,
+    u.updated_at
+FROM user_friend_requests AS fr
+JOIN users AS u ON u.id = fr.requester_user_id
+WHERE fr.addressee_user_id = $1
+ORDER BY fr.created_at DESC;
+
+-- name: ListOutgoingFriendRequestsByUserID :many
+SELECT
+    fr.created_at AS requested_at,
+    u.id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.bio,
+    u.timezone,
+    u.profile_accent,
+    u.status_text,
+    u.birthday,
+    u.country,
+    u.city,
+    u.read_receipts_enabled,
+    u.presence_enabled,
+    u.typing_visibility_enabled,
+    u.key_backup_status,
+    u.created_at,
+    u.updated_at
+FROM user_friend_requests AS fr
+JOIN users AS u ON u.id = fr.addressee_user_id
+WHERE fr.requester_user_id = $1
+ORDER BY fr.created_at DESC;
+
+-- name: ListFriendsByUserID :many
+SELECT
+    f.created_at AS friends_since,
+    u.id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.bio,
+    u.timezone,
+    u.profile_accent,
+    u.status_text,
+    u.birthday,
+    u.country,
+    u.city,
+    u.read_receipts_enabled,
+    u.presence_enabled,
+    u.typing_visibility_enabled,
+    u.key_backup_status,
+    u.created_at,
+    u.updated_at
+FROM user_friendships AS f
+JOIN users AS u
+    ON u.id = CASE
+        WHEN f.user_low_id = $1 THEN f.user_high_id
+        ELSE f.user_low_id
+    END
+WHERE f.user_low_id = $1 OR f.user_high_id = $1
+ORDER BY f.created_at DESC;

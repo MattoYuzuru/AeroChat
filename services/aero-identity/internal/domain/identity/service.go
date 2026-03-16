@@ -42,6 +42,14 @@ type Repository interface {
 	ListDevices(context.Context, string) ([]DeviceWithSessions, error)
 	GetUserByLogin(context.Context, string) (*User, error)
 	ListBlockedUsers(context.Context, string) ([]BlockedUser, error)
+	GetSocialGraphState(context.Context, string, string) (*SocialGraphState, error)
+	CreateFriendRequest(context.Context, string, string, time.Time) error
+	AcceptFriendRequest(context.Context, string, string, time.Time) (bool, error)
+	DeleteFriendRequest(context.Context, string, string) (bool, error)
+	ListIncomingFriendRequests(context.Context, string) ([]FriendRequest, error)
+	ListOutgoingFriendRequests(context.Context, string) ([]FriendRequest, error)
+	ListFriends(context.Context, string) ([]Friend, error)
+	DeleteFriendship(context.Context, string, string) (bool, error)
 	BlockUser(context.Context, string, string, time.Time) error
 	UnblockUser(context.Context, string, string) (bool, error)
 }

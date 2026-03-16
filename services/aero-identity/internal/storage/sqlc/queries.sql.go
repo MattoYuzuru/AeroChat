@@ -54,6 +54,54 @@ func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) (Use
 	return i, err
 }
 
+const createFriendRequest = `-- name: CreateFriendRequest :exec
+INSERT INTO user_friend_requests (
+    requester_user_id,
+    addressee_user_id,
+    user_low_id,
+    user_high_id,
+    created_at
+) VALUES ($1, $2, $3, $4, $5)
+`
+
+type CreateFriendRequestParams struct {
+	RequesterUserID uuid.UUID          `db:"requester_user_id" json:"requester_user_id"`
+	AddresseeUserID uuid.UUID          `db:"addressee_user_id" json:"addressee_user_id"`
+	UserLowID       uuid.UUID          `db:"user_low_id" json:"user_low_id"`
+	UserHighID      uuid.UUID          `db:"user_high_id" json:"user_high_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateFriendRequest(ctx context.Context, arg CreateFriendRequestParams) error {
+	_, err := q.db.Exec(ctx, createFriendRequest,
+		arg.RequesterUserID,
+		arg.AddresseeUserID,
+		arg.UserLowID,
+		arg.UserHighID,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const createFriendship = `-- name: CreateFriendship :exec
+INSERT INTO user_friendships (
+    user_low_id,
+    user_high_id,
+    created_at
+) VALUES ($1, $2, $3)
+`
+
+type CreateFriendshipParams struct {
+	UserLowID  uuid.UUID          `db:"user_low_id" json:"user_low_id"`
+	UserHighID uuid.UUID          `db:"user_high_id" json:"user_high_id"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateFriendship(ctx context.Context, arg CreateFriendshipParams) error {
+	_, err := q.db.Exec(ctx, createFriendship, arg.UserLowID, arg.UserHighID, arg.CreatedAt)
+	return err
+}
+
 const createSession = `-- name: CreateSession :one
 INSERT INTO user_sessions (
     id,
@@ -267,6 +315,57 @@ func (q *Queries) CreateUserPasswordCredential(ctx context.Context, arg CreateUs
 	return err
 }
 
+const deleteFriendRequest = `-- name: DeleteFriendRequest :execrows
+DELETE FROM user_friend_requests
+WHERE requester_user_id = $1 AND addressee_user_id = $2
+`
+
+type DeleteFriendRequestParams struct {
+	RequesterUserID uuid.UUID `db:"requester_user_id" json:"requester_user_id"`
+	AddresseeUserID uuid.UUID `db:"addressee_user_id" json:"addressee_user_id"`
+}
+
+func (q *Queries) DeleteFriendRequest(ctx context.Context, arg DeleteFriendRequestParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteFriendRequest, arg.RequesterUserID, arg.AddresseeUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteFriendRequestsByPair = `-- name: DeleteFriendRequestsByPair :exec
+DELETE FROM user_friend_requests
+WHERE user_low_id = $1 AND user_high_id = $2
+`
+
+type DeleteFriendRequestsByPairParams struct {
+	UserLowID  uuid.UUID `db:"user_low_id" json:"user_low_id"`
+	UserHighID uuid.UUID `db:"user_high_id" json:"user_high_id"`
+}
+
+func (q *Queries) DeleteFriendRequestsByPair(ctx context.Context, arg DeleteFriendRequestsByPairParams) error {
+	_, err := q.db.Exec(ctx, deleteFriendRequestsByPair, arg.UserLowID, arg.UserHighID)
+	return err
+}
+
+const deleteFriendshipByPair = `-- name: DeleteFriendshipByPair :execrows
+DELETE FROM user_friendships
+WHERE user_low_id = $1 AND user_high_id = $2
+`
+
+type DeleteFriendshipByPairParams struct {
+	UserLowID  uuid.UUID `db:"user_low_id" json:"user_low_id"`
+	UserHighID uuid.UUID `db:"user_high_id" json:"user_high_id"`
+}
+
+func (q *Queries) DeleteFriendshipByPair(ctx context.Context, arg DeleteFriendshipByPairParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteFriendshipByPair, arg.UserLowID, arg.UserHighID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteUserBlock = `-- name: DeleteUserBlock :execrows
 DELETE FROM user_blocks
 WHERE blocker_user_id = $1 AND blocked_user_id = $2
@@ -468,6 +567,69 @@ func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSess
 		&i.KeyBackupStatus,
 		&i.UserCreatedAt,
 		&i.UserUpdatedAt,
+	)
+	return i, err
+}
+
+const getSocialGraphState = `-- name: GetSocialGraphState :one
+SELECT
+    EXISTS (
+        SELECT 1
+        FROM user_blocks AS b
+        WHERE (b.blocker_user_id = $1 AND b.blocked_user_id = $2)
+           OR (b.blocker_user_id = $2 AND b.blocked_user_id = $1)
+    ) AS has_block,
+    EXISTS (
+        SELECT 1
+        FROM user_friendships AS f
+        WHERE f.user_low_id = $3 AND f.user_high_id = $4
+    ) AS are_friends,
+    (
+        SELECT fr.requester_user_id
+        FROM user_friend_requests AS fr
+        WHERE fr.user_low_id = $3 AND fr.user_high_id = $4
+    ) AS requester_user_id,
+    (
+        SELECT fr.addressee_user_id
+        FROM user_friend_requests AS fr
+        WHERE fr.user_low_id = $3 AND fr.user_high_id = $4
+    ) AS addressee_user_id,
+    (
+        SELECT fr.created_at
+        FROM user_friend_requests AS fr
+        WHERE fr.user_low_id = $3 AND fr.user_high_id = $4
+    ) AS request_created_at
+`
+
+type GetSocialGraphStateParams struct {
+	BlockerUserID uuid.UUID `db:"blocker_user_id" json:"blocker_user_id"`
+	BlockedUserID uuid.UUID `db:"blocked_user_id" json:"blocked_user_id"`
+	UserLowID     uuid.UUID `db:"user_low_id" json:"user_low_id"`
+	UserHighID    uuid.UUID `db:"user_high_id" json:"user_high_id"`
+}
+
+type GetSocialGraphStateRow struct {
+	HasBlock         bool               `db:"has_block" json:"has_block"`
+	AreFriends       bool               `db:"are_friends" json:"are_friends"`
+	RequesterUserID  uuid.UUID          `db:"requester_user_id" json:"requester_user_id"`
+	AddresseeUserID  uuid.UUID          `db:"addressee_user_id" json:"addressee_user_id"`
+	RequestCreatedAt pgtype.Timestamptz `db:"request_created_at" json:"request_created_at"`
+}
+
+func (q *Queries) GetSocialGraphState(ctx context.Context, arg GetSocialGraphStateParams) (GetSocialGraphStateRow, error) {
+	row := q.db.QueryRow(ctx, getSocialGraphState,
+		arg.BlockerUserID,
+		arg.BlockedUserID,
+		arg.UserLowID,
+		arg.UserHighID,
+	)
+	var i GetSocialGraphStateRow
+	err := row.Scan(
+		&i.HasBlock,
+		&i.AreFriends,
+		&i.RequesterUserID,
+		&i.AddresseeUserID,
+		&i.RequestCreatedAt,
 	)
 	return i, err
 }
@@ -683,6 +845,268 @@ func (q *Queries) ListDevicesByUserID(ctx context.Context, userID uuid.UUID) ([]
 			&i.CreatedAt,
 			&i.LastSeenAt,
 			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFriendsByUserID = `-- name: ListFriendsByUserID :many
+SELECT
+    f.created_at AS friends_since,
+    u.id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.bio,
+    u.timezone,
+    u.profile_accent,
+    u.status_text,
+    u.birthday,
+    u.country,
+    u.city,
+    u.read_receipts_enabled,
+    u.presence_enabled,
+    u.typing_visibility_enabled,
+    u.key_backup_status,
+    u.created_at,
+    u.updated_at
+FROM user_friendships AS f
+JOIN users AS u
+    ON u.id = CASE
+        WHEN f.user_low_id = $1 THEN f.user_high_id
+        ELSE f.user_low_id
+    END
+WHERE f.user_low_id = $1 OR f.user_high_id = $1
+ORDER BY f.created_at DESC
+`
+
+type ListFriendsByUserIDRow struct {
+	FriendsSince            pgtype.Timestamptz `db:"friends_since" json:"friends_since"`
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	Login                   string             `db:"login" json:"login"`
+	Nickname                string             `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                     pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                 pgtype.Text        `db:"country" json:"country"`
+	City                    pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListFriendsByUserID(ctx context.Context, userLowID uuid.UUID) ([]ListFriendsByUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listFriendsByUserID, userLowID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListFriendsByUserIDRow
+	for rows.Next() {
+		var i ListFriendsByUserIDRow
+		if err := rows.Scan(
+			&i.FriendsSince,
+			&i.ID,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+			&i.Bio,
+			&i.Timezone,
+			&i.ProfileAccent,
+			&i.StatusText,
+			&i.Birthday,
+			&i.Country,
+			&i.City,
+			&i.ReadReceiptsEnabled,
+			&i.PresenceEnabled,
+			&i.TypingVisibilityEnabled,
+			&i.KeyBackupStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listIncomingFriendRequestsByUserID = `-- name: ListIncomingFriendRequestsByUserID :many
+SELECT
+    fr.created_at AS requested_at,
+    u.id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.bio,
+    u.timezone,
+    u.profile_accent,
+    u.status_text,
+    u.birthday,
+    u.country,
+    u.city,
+    u.read_receipts_enabled,
+    u.presence_enabled,
+    u.typing_visibility_enabled,
+    u.key_backup_status,
+    u.created_at,
+    u.updated_at
+FROM user_friend_requests AS fr
+JOIN users AS u ON u.id = fr.requester_user_id
+WHERE fr.addressee_user_id = $1
+ORDER BY fr.created_at DESC
+`
+
+type ListIncomingFriendRequestsByUserIDRow struct {
+	RequestedAt             pgtype.Timestamptz `db:"requested_at" json:"requested_at"`
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	Login                   string             `db:"login" json:"login"`
+	Nickname                string             `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                     pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                 pgtype.Text        `db:"country" json:"country"`
+	City                    pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListIncomingFriendRequestsByUserID(ctx context.Context, addresseeUserID uuid.UUID) ([]ListIncomingFriendRequestsByUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listIncomingFriendRequestsByUserID, addresseeUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListIncomingFriendRequestsByUserIDRow
+	for rows.Next() {
+		var i ListIncomingFriendRequestsByUserIDRow
+		if err := rows.Scan(
+			&i.RequestedAt,
+			&i.ID,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+			&i.Bio,
+			&i.Timezone,
+			&i.ProfileAccent,
+			&i.StatusText,
+			&i.Birthday,
+			&i.Country,
+			&i.City,
+			&i.ReadReceiptsEnabled,
+			&i.PresenceEnabled,
+			&i.TypingVisibilityEnabled,
+			&i.KeyBackupStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOutgoingFriendRequestsByUserID = `-- name: ListOutgoingFriendRequestsByUserID :many
+SELECT
+    fr.created_at AS requested_at,
+    u.id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.bio,
+    u.timezone,
+    u.profile_accent,
+    u.status_text,
+    u.birthday,
+    u.country,
+    u.city,
+    u.read_receipts_enabled,
+    u.presence_enabled,
+    u.typing_visibility_enabled,
+    u.key_backup_status,
+    u.created_at,
+    u.updated_at
+FROM user_friend_requests AS fr
+JOIN users AS u ON u.id = fr.addressee_user_id
+WHERE fr.requester_user_id = $1
+ORDER BY fr.created_at DESC
+`
+
+type ListOutgoingFriendRequestsByUserIDRow struct {
+	RequestedAt             pgtype.Timestamptz `db:"requested_at" json:"requested_at"`
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	Login                   string             `db:"login" json:"login"`
+	Nickname                string             `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                     pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                 pgtype.Text        `db:"country" json:"country"`
+	City                    pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListOutgoingFriendRequestsByUserID(ctx context.Context, requesterUserID uuid.UUID) ([]ListOutgoingFriendRequestsByUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listOutgoingFriendRequestsByUserID, requesterUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOutgoingFriendRequestsByUserIDRow
+	for rows.Next() {
+		var i ListOutgoingFriendRequestsByUserIDRow
+		if err := rows.Scan(
+			&i.RequestedAt,
+			&i.ID,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+			&i.Bio,
+			&i.Timezone,
+			&i.ProfileAccent,
+			&i.StatusText,
+			&i.Birthday,
+			&i.Country,
+			&i.City,
+			&i.ReadReceiptsEnabled,
+			&i.PresenceEnabled,
+			&i.TypingVisibilityEnabled,
+			&i.KeyBackupStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

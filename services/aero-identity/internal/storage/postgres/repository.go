@@ -405,11 +405,44 @@ func (r *Repository) ListBlockedUsers(ctx context.Context, userID string) ([]ide
 }
 
 func (r *Repository) BlockUser(ctx context.Context, blockerUserID string, blockedUserID string, createdAt time.Time) error {
-	return convertError(r.queries.CreateUserBlock(ctx, identitysqlc.CreateUserBlockParams{
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	userLowID, userHighID := identity.CanonicalUserPair(blockerUserID, blockedUserID)
+	q := r.queries.WithTx(tx)
+
+	if err := q.DeleteFriendRequestsByPair(ctx, identitysqlc.DeleteFriendRequestsByPairParams{
+		UserLowID:  mustParseUUID(userLowID),
+		UserHighID: mustParseUUID(userHighID),
+	}); err != nil {
+		return convertError(err)
+	}
+
+	if _, err := q.DeleteFriendshipByPair(ctx, identitysqlc.DeleteFriendshipByPairParams{
+		UserLowID:  mustParseUUID(userLowID),
+		UserHighID: mustParseUUID(userHighID),
+	}); err != nil {
+		return convertError(err)
+	}
+
+	if err := q.CreateUserBlock(ctx, identitysqlc.CreateUserBlockParams{
 		BlockerUserID: mustParseUUID(blockerUserID),
 		BlockedUserID: mustParseUUID(blockedUserID),
 		CreatedAt:     timestampValue(createdAt),
-	}))
+	}); err != nil {
+		return convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Repository) UnblockUser(ctx context.Context, blockerUserID string, blockedUserID string) (bool, error) {
@@ -554,7 +587,10 @@ func convertError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		if pgErr.Code == "23505" {
-			return identity.ErrLoginTaken
+			if pgErr.ConstraintName == "users_login_key" {
+				return identity.ErrLoginTaken
+			}
+			return identity.ErrConflict
 		}
 	}
 
