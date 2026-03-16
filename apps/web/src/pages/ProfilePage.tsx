@@ -79,15 +79,17 @@ export function ProfilePage() {
             <dd>{formatDateTime(state.profile.updatedAt)}</dd>
           </div>
           <div>
-            <dt>Key backup</dt>
+            <dt>Резерв ключей</dt>
             <dd>{state.profile.keyBackupStatus}</dd>
           </div>
         </dl>
 
         <div className={styles.flags}>
-          <span>read receipts: {state.profile.readReceiptsEnabled ? "on" : "off"}</span>
-          <span>presence: {state.profile.presenceEnabled ? "on" : "off"}</span>
-          <span>typing: {state.profile.typingVisibilityEnabled ? "on" : "off"}</span>
+          <span>
+            Чеки чтения: {state.profile.readReceiptsEnabled ? "вкл" : "выкл"}
+          </span>
+          <span>Presence: {state.profile.presenceEnabled ? "вкл" : "выкл"}</span>
+          <span>Typing: {state.profile.typingVisibilityEnabled ? "вкл" : "выкл"}</span>
         </div>
       </section>
 
@@ -118,7 +120,7 @@ export function ProfilePage() {
           </label>
 
           <label className={styles.field}>
-            <span>Avatar URL</span>
+            <span>URL аватара</span>
             <input
               onChange={(event) =>
                 setForm((current) => ({
@@ -132,7 +134,7 @@ export function ProfilePage() {
           </label>
 
           <label className={`${styles.field} ${styles.fullWidth}`}>
-            <span>Bio</span>
+            <span>О себе</span>
             <textarea
               maxLength={500}
               onChange={(event) =>
@@ -147,7 +149,7 @@ export function ProfilePage() {
           </label>
 
           <label className={styles.field}>
-            <span>Timezone</span>
+            <span>Часовой пояс</span>
             <input
               maxLength={64}
               onChange={(event) =>
@@ -162,7 +164,7 @@ export function ProfilePage() {
           </label>
 
           <label className={styles.field}>
-            <span>Profile accent</span>
+            <span>Акцент профиля</span>
             <input
               maxLength={64}
               onChange={(event) =>
@@ -177,7 +179,7 @@ export function ProfilePage() {
           </label>
 
           <label className={styles.field}>
-            <span>Status text</span>
+            <span>Статус</span>
             <input
               maxLength={140}
               onChange={(event) =>
@@ -191,7 +193,7 @@ export function ProfilePage() {
           </label>
 
           <label className={styles.field}>
-            <span>Birthday</span>
+            <span>Дата рождения</span>
             <input
               onChange={(event) =>
                 setForm((current) => ({
@@ -206,7 +208,7 @@ export function ProfilePage() {
           </label>
 
           <label className={styles.field}>
-            <span>Country</span>
+            <span>Страна</span>
             <input
               maxLength={64}
               onChange={(event) =>
@@ -220,7 +222,7 @@ export function ProfilePage() {
           </label>
 
           <label className={styles.field}>
-            <span>City</span>
+            <span>Город</span>
             <input
               maxLength={64}
               onChange={(event) =>

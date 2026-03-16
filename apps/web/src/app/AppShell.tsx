@@ -11,11 +11,11 @@ const navigationItems = [
 ];
 
 const statusItems = [
-  "gateway-only edge",
-  "session bootstrap",
-  "protected shell",
-  "direct chat bootstrap",
-  "people bootstrap",
+  "gateway edge",
+  "light shell",
+  "profile",
+  "people",
+  "direct chats",
 ];
 
 export function AppShell() {
@@ -51,10 +51,9 @@ export function AppShell() {
       <header className={styles.topBar}>
         <div>
           <p className={styles.eyebrow}>AeroChat</p>
-          <h1 className={styles.title}>Gateway-authenticated workspace</h1>
+          <h1 className={styles.title}>Лёгкий glossy workspace</h1>
           <p className={styles.subtitle}>
-            Текущий пользователь: <strong>{state.profile.nickname}</strong> · @
-            {state.profile.login}
+            Текущий пользователь: <strong>{state.profile.nickname}</strong> · @{state.profile.login}
           </p>
         </div>
 
@@ -103,7 +102,7 @@ export function AppShell() {
             <dl className={styles.metaGrid}>
               <div>
                 <dt>Edge</dt>
-                <dd>`/api` → aero-gateway</dd>
+                <dd>`/api` → `aero-gateway`</dd>
               </div>
               <div>
                 <dt>Auth</dt>

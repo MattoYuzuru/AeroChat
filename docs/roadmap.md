@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Web direct chat bootstrap в `apps/web` через `aero-gateway` с protected `/app/chats`, explicit chat creation и minimal direct thread UI
+- [x] Web direct chat polish foundation в `apps/web` с polished `/app/chats`, lightweight safe markdown и cohesive shell surfaces
 
 ---
 
@@ -152,6 +152,7 @@
 
 Задачи:
 
+- [x] Web direct chat polish foundation в `apps/web`
 - [ ] Push notifications
 - [ ] PWA
 - [ ] Desktop shell polish

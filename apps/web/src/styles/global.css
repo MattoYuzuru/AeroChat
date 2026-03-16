@@ -2,8 +2,9 @@ body {
   min-width: 320px;
   color: var(--color-ink);
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.95), transparent 24%),
-    linear-gradient(180deg, #dff7ff, #9fd9f6 42%, #5c99c7);
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.97), transparent 26%),
+    radial-gradient(circle at 85% 12%, rgba(185, 237, 255, 0.62), transparent 24%),
+    linear-gradient(180deg, #e8fbff, #b6e3f4 40%, #6ea6cf);
 }
 
 a {
@@ -15,4 +16,25 @@ input,
 textarea,
 select {
   color: inherit;
+  font: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgba(12, 93, 153, 0.38);
+  outline-offset: 2px;
 }
