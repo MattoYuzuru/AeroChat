@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
 	identityauth "github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/auth"
 	"github.com/google/uuid"
 )
@@ -57,12 +58,12 @@ type Repository interface {
 type Service struct {
 	repo         Repository
 	passwords    *identityauth.PasswordHasher
-	sessionToken *identityauth.SessionTokenManager
+	sessionToken *libauth.SessionTokenManager
 	now          func() time.Time
 	newID        func() string
 }
 
-func NewService(repo Repository, passwords *identityauth.PasswordHasher, sessionToken *identityauth.SessionTokenManager) *Service {
+func NewService(repo Repository, passwords *identityauth.PasswordHasher, sessionToken *libauth.SessionTokenManager) *Service {
 	return &Service{
 		repo:         repo,
 		passwords:    passwords,

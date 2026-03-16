@@ -74,15 +74,15 @@
 
 Задачи:
 
-- [ ] Chat creation
-- [ ] Message model
-- [ ] Safe markdown subset
+- [x] Chat creation
+- [x] Message model
+- [x] Safe markdown subset
 - [ ] Read receipts
 - [ ] Presence / typing
 - [ ] Privacy toggles
-- [ ] Tombstone deletion
+- [x] Tombstone deletion
 - [ ] Draft recovery
-- [ ] Pin / unpin
+- [x] Pin / unpin
 
 ---
 
