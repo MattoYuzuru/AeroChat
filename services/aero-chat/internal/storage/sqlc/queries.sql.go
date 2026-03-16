@@ -323,6 +323,7 @@ SELECT
     u.login,
     u.nickname,
     u.avatar_url,
+    u.read_receipts_enabled,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
 FROM user_sessions AS s
@@ -332,25 +333,26 @@ WHERE s.id = $1
 `
 
 type GetSessionAuthByIDRow struct {
-	SessionID         uuid.UUID          `db:"session_id" json:"session_id"`
-	SessionUserID     uuid.UUID          `db:"session_user_id" json:"session_user_id"`
-	SessionDeviceID   uuid.UUID          `db:"session_device_id" json:"session_device_id"`
-	TokenHash         string             `db:"token_hash" json:"token_hash"`
-	SessionCreatedAt  pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
-	SessionLastSeenAt pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
-	SessionRevokedAt  pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
-	DeviceID          uuid.UUID          `db:"device_id" json:"device_id"`
-	DeviceUserID      uuid.UUID          `db:"device_user_id" json:"device_user_id"`
-	DeviceLabel       string             `db:"device_label" json:"device_label"`
-	DeviceCreatedAt   pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
-	DeviceLastSeenAt  pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
-	DeviceRevokedAt   pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
-	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
-	Login             string             `db:"login" json:"login"`
-	Nickname          string             `db:"nickname" json:"nickname"`
-	AvatarUrl         pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	UserCreatedAt     pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
-	UserUpdatedAt     pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
+	SessionID           uuid.UUID          `db:"session_id" json:"session_id"`
+	SessionUserID       uuid.UUID          `db:"session_user_id" json:"session_user_id"`
+	SessionDeviceID     uuid.UUID          `db:"session_device_id" json:"session_device_id"`
+	TokenHash           string             `db:"token_hash" json:"token_hash"`
+	SessionCreatedAt    pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
+	SessionLastSeenAt   pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
+	SessionRevokedAt    pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
+	DeviceID            uuid.UUID          `db:"device_id" json:"device_id"`
+	DeviceUserID        uuid.UUID          `db:"device_user_id" json:"device_user_id"`
+	DeviceLabel         string             `db:"device_label" json:"device_label"`
+	DeviceCreatedAt     pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
+	DeviceLastSeenAt    pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
+	DeviceRevokedAt     pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
+	UserID              uuid.UUID          `db:"user_id" json:"user_id"`
+	Login               string             `db:"login" json:"login"`
+	Nickname            string             `db:"nickname" json:"nickname"`
+	AvatarUrl           pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	ReadReceiptsEnabled bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	UserCreatedAt       pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
+	UserUpdatedAt       pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
 }
 
 func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error) {
@@ -374,6 +376,7 @@ func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSess
 		&i.Login,
 		&i.Nickname,
 		&i.AvatarUrl,
+		&i.ReadReceiptsEnabled,
 		&i.UserCreatedAt,
 		&i.UserUpdatedAt,
 	)
@@ -446,6 +449,60 @@ func (q *Queries) ListDirectChatMessages(ctx context.Context, arg ListDirectChat
 			&i.DeletedByUserID,
 			&i.DeletedAt,
 			&i.Pinned,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDirectChatReadStateEntries = `-- name: ListDirectChatReadStateEntries :many
+SELECT
+    p.user_id,
+    u.read_receipts_enabled,
+    r.last_read_message_id,
+    r.last_read_message_created_at,
+    r.updated_at
+FROM direct_chat_participants AS self
+JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
+JOIN users AS u ON u.id = p.user_id
+LEFT JOIN direct_chat_read_receipts AS r ON r.chat_id = p.chat_id AND r.user_id = p.user_id
+WHERE self.user_id = $1 AND self.chat_id = $2
+ORDER BY p.joined_at ASC, p.user_id ASC
+`
+
+type ListDirectChatReadStateEntriesParams struct {
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+	ChatID uuid.UUID `db:"chat_id" json:"chat_id"`
+}
+
+type ListDirectChatReadStateEntriesRow struct {
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	LastReadMessageID        pgtype.UUID        `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListDirectChatReadStateEntries(ctx context.Context, arg ListDirectChatReadStateEntriesParams) ([]ListDirectChatReadStateEntriesRow, error) {
+	rows, err := q.db.Query(ctx, listDirectChatReadStateEntries, arg.UserID, arg.ChatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDirectChatReadStateEntriesRow
+	for rows.Next() {
+		var i ListDirectChatReadStateEntriesRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.ReadReceiptsEnabled,
+			&i.LastReadMessageID,
+			&i.LastReadMessageCreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -646,6 +703,48 @@ type UnpinDirectChatMessageParams struct {
 
 func (q *Queries) UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error) {
 	result, err := q.db.Exec(ctx, unpinDirectChatMessage, arg.ChatID, arg.MessageID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const upsertDirectChatReadReceipt = `-- name: UpsertDirectChatReadReceipt :execrows
+INSERT INTO direct_chat_read_receipts (
+    chat_id,
+    user_id,
+    last_read_message_id,
+    last_read_message_created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (chat_id, user_id) DO UPDATE
+SET
+    last_read_message_id = EXCLUDED.last_read_message_id,
+    last_read_message_created_at = EXCLUDED.last_read_message_created_at,
+    updated_at = EXCLUDED.updated_at
+WHERE direct_chat_read_receipts.last_read_message_created_at < EXCLUDED.last_read_message_created_at
+   OR (
+        direct_chat_read_receipts.last_read_message_created_at = EXCLUDED.last_read_message_created_at
+        AND direct_chat_read_receipts.last_read_message_id < EXCLUDED.last_read_message_id
+   )
+`
+
+type UpsertDirectChatReadReceiptParams struct {
+	ChatID                   uuid.UUID          `db:"chat_id" json:"chat_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpsertDirectChatReadReceipt(ctx context.Context, arg UpsertDirectChatReadReceiptParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertDirectChatReadReceipt,
+		arg.ChatID,
+		arg.UserID,
+		arg.LastReadMessageID,
+		arg.LastReadMessageCreatedAt,
+		arg.UpdatedAt,
+	)
 	if err != nil {
 		return 0, err
 	}

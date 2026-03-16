@@ -20,6 +20,8 @@ type Repository interface {
 	CreateDirectChat(context.Context, CreateDirectChatParams) (*DirectChat, error)
 	ListDirectChats(context.Context, string) ([]DirectChat, error)
 	GetDirectChat(context.Context, string, string) (*DirectChat, error)
+	ListDirectChatReadStateEntries(context.Context, string, string) ([]DirectChatReadStateEntry, error)
+	UpsertDirectChatReadReceipt(context.Context, UpsertDirectChatReadReceiptParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
 	GetDirectChatMessage(context.Context, string, string, string) (*DirectChatMessage, error)
@@ -95,18 +97,28 @@ func (s *Service) ListDirectChats(ctx context.Context, token string) ([]DirectCh
 	return s.repo.ListDirectChats(ctx, authSession.User.ID)
 }
 
-func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string) (*DirectChat, error) {
+func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string) (*DirectChat, *DirectChatReadState, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	normalizedChatID, err := normalizeID(chatID, "chat_id")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	readState, err := s.getDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return directChat, readState, nil
 }
 
 func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string) (*DirectChatMessage, error) {
@@ -158,6 +170,41 @@ func (s *Service) ListDirectChatMessages(ctx context.Context, token string, chat
 	}
 
 	return s.repo.ListDirectChatMessages(ctx, authSession.User.ID, normalizedChatID, limit)
+}
+
+func (s *Service) MarkDirectChatRead(ctx context.Context, token string, chatID string, messageID string) (*DirectChatReadState, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+
+	message, err := s.repo.GetDirectChatMessage(ctx, authSession.User.ID, normalizedChatID, normalizedMessageID)
+	if err != nil {
+		return nil, err
+	}
+
+	if authSession.User.ReadReceiptsEnabled {
+		if _, err := s.repo.UpsertDirectChatReadReceipt(ctx, UpsertDirectChatReadReceiptParams{
+			ChatID:            normalizedChatID,
+			UserID:            authSession.User.ID,
+			LastReadMessageID: message.ID,
+			LastReadMessageAt: message.CreatedAt,
+			UpdatedAt:         s.now(),
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	return s.getDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
 }
 
 func (s *Service) DeleteMessageForEveryone(ctx context.Context, token string, chatID string, messageID string) (*DirectChatMessage, error) {
@@ -327,4 +374,31 @@ func CanonicalUserPair(firstUserID string, secondUserID string) (string, string)
 	}
 
 	return secondUserID, firstUserID
+}
+
+func (s *Service) getDirectChatReadState(ctx context.Context, viewerUserID string, chatID string) (*DirectChatReadState, error) {
+	entries, err := s.repo.ListDirectChatReadStateEntries(ctx, viewerUserID, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) == 0 {
+		return nil, ErrNotFound
+	}
+
+	state := &DirectChatReadState{}
+	for _, entry := range entries {
+		if !entry.ReadReceiptsEnabled || entry.LastReadPosition == nil {
+			continue
+		}
+
+		position := *entry.LastReadPosition
+		if entry.UserID == viewerUserID {
+			state.SelfPosition = &position
+			continue
+		}
+
+		state.PeerPosition = &position
+	}
+
+	return state, nil
 }

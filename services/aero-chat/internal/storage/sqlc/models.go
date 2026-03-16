@@ -49,6 +49,14 @@ type DirectChatPin struct {
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type DirectChatReadReceipt struct {
+	ChatID                   uuid.UUID          `db:"chat_id" json:"chat_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type User struct {
 	ID                      uuid.UUID          `db:"id" json:"id"`
 	Login                   string             `db:"login" json:"login"`

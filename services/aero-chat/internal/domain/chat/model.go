@@ -12,10 +12,11 @@ const (
 )
 
 type UserSummary struct {
-	ID        string
-	Login     string
-	Nickname  string
-	AvatarURL *string
+	ID                  string
+	Login               string
+	Nickname            string
+	AvatarURL           *string
+	ReadReceiptsEnabled bool
 }
 
 type Session struct {
@@ -74,6 +75,23 @@ type DirectChatMessage struct {
 	UpdatedAt    time.Time
 }
 
+type DirectChatReadPosition struct {
+	MessageID        string
+	MessageCreatedAt time.Time
+	UpdatedAt        time.Time
+}
+
+type DirectChatReadState struct {
+	SelfPosition *DirectChatReadPosition
+	PeerPosition *DirectChatReadPosition
+}
+
+type DirectChatReadStateEntry struct {
+	UserID              string
+	ReadReceiptsEnabled bool
+	LastReadPosition    *DirectChatReadPosition
+}
+
 type CreateDirectChatParams struct {
 	ChatID          string
 	CreatedByUserID string
@@ -88,4 +106,12 @@ type CreateDirectChatMessageParams struct {
 	SenderUserID string
 	Text         string
 	CreatedAt    time.Time
+}
+
+type UpsertDirectChatReadReceiptParams struct {
+	ChatID            string
+	UserID            string
+	LastReadMessageID string
+	LastReadMessageAt time.Time
+	UpdatedAt         time.Time
 }

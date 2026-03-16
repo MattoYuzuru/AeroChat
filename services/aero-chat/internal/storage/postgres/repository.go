@@ -40,10 +40,11 @@ func (r *Repository) GetSessionAuthByID(ctx context.Context, sessionID string) (
 
 	return &chat.SessionAuth{
 		User: chat.UserSummary{
-			ID:        row.UserID.String(),
-			Login:     row.Login,
-			Nickname:  row.Nickname,
-			AvatarURL: textPointer(row.AvatarUrl),
+			ID:                  row.UserID.String(),
+			Login:               row.Login,
+			Nickname:            row.Nickname,
+			AvatarURL:           textPointer(row.AvatarUrl),
+			ReadReceiptsEnabled: row.ReadReceiptsEnabled,
 		},
 		Device: chat.Device{
 			ID:         row.DeviceID.String(),
@@ -166,6 +167,50 @@ func (r *Repository) GetDirectChat(ctx context.Context, userID string, chatID st
 	return &chats[0], nil
 }
 
+func (r *Repository) ListDirectChatReadStateEntries(ctx context.Context, userID string, chatID string) ([]chat.DirectChatReadStateEntry, error) {
+	rows, err := r.queries.ListDirectChatReadStateEntries(ctx, chatsqlc.ListDirectChatReadStateEntriesParams{
+		UserID: mustParseUUID(userID),
+		ChatID: mustParseUUID(chatID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.DirectChatReadStateEntry, 0, len(rows))
+	for _, row := range rows {
+		entry := chat.DirectChatReadStateEntry{
+			UserID:              row.UserID.String(),
+			ReadReceiptsEnabled: row.ReadReceiptsEnabled,
+		}
+		if row.LastReadMessageID.Valid && row.LastReadMessageCreatedAt.Valid && row.UpdatedAt.Valid {
+			entry.LastReadPosition = &chat.DirectChatReadPosition{
+				MessageID:        row.LastReadMessageID.String(),
+				MessageCreatedAt: timestampValue(row.LastReadMessageCreatedAt),
+				UpdatedAt:        timestampValue(row.UpdatedAt),
+			}
+		}
+
+		result = append(result, entry)
+	}
+
+	return result, nil
+}
+
+func (r *Repository) UpsertDirectChatReadReceipt(ctx context.Context, params chat.UpsertDirectChatReadReceiptParams) (bool, error) {
+	affected, err := r.queries.UpsertDirectChatReadReceipt(ctx, chatsqlc.UpsertDirectChatReadReceiptParams{
+		ChatID:                   mustParseUUID(params.ChatID),
+		UserID:                   mustParseUUID(params.UserID),
+		LastReadMessageID:        mustParseUUID(params.LastReadMessageID),
+		LastReadMessageCreatedAt: timestamptzValue(params.LastReadMessageAt),
+		UpdatedAt:                timestamptzValue(params.UpdatedAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+
+	return affected > 0, nil
+}
+
 func (r *Repository) CreateDirectChatMessage(ctx context.Context, params chat.CreateDirectChatMessageParams) (*chat.DirectChatMessage, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -243,19 +288,7 @@ func (r *Repository) GetDirectChatMessage(ctx context.Context, userID string, ch
 		return nil, convertError(err)
 	}
 
-	message := toDomainMessage(chatsqlc.ListDirectChatMessagesRow{
-		ID:              row.ID,
-		ChatID:          row.ChatID,
-		SenderUserID:    row.SenderUserID,
-		Kind:            row.Kind,
-		TextContent:     row.TextContent,
-		MarkdownPolicy:  row.MarkdownPolicy,
-		CreatedAt:       row.CreatedAt,
-		UpdatedAt:       row.UpdatedAt,
-		DeletedByUserID: row.DeletedByUserID,
-		DeletedAt:       row.DeletedAt,
-		Pinned:          row.Pinned,
-	})
+	message := toDomainMessage(chatsqlc.ListDirectChatMessagesRow(row))
 	return &message, nil
 }
 
