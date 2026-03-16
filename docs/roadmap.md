@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Web direct chat polish foundation в `apps/web` с polished `/app/chats`, lightweight safe markdown и cohesive shell surfaces
+- [x] Web settings and privacy bootstrap в `apps/web` через `aero-gateway`
 
 ---
 
@@ -50,7 +50,7 @@
 - [ ] Password auth foundation
 - [ ] Sessions
 - [ ] Devices & sessions UI/data model
-- [ ] Privacy flags
+- [x] Privacy flags
 - [ ] Block list
 - [ ] Key backup status
 
@@ -85,7 +85,7 @@
 - [x] Read receipts
 - [x] Typing foundation
 - [x] Presence foundation
-- [ ] Privacy toggles
+- [x] Privacy toggles через web settings и `aero-gateway`
 - [x] Tombstone deletion
 - [ ] Draft recovery
 - [x] Pin / unpin
@@ -158,8 +158,7 @@
 - [ ] Desktop shell polish
 - [ ] Mobile shell polish
 - [ ] Explorer
-- [ ] Favorites / self chat
-- [ ] Settings app
+- [x] Settings and privacy bootstrap через `aero-gateway`
 - [ ] Trash model
 
 ---

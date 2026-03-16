@@ -114,20 +114,67 @@ describe("createGatewayClient", () => {
     await expect(
       client.updateCurrentProfile("token-1", {
         nickname: "",
-        avatarUrl: "",
-        bio: "",
-        timezone: "",
-        profileAccent: "",
-        statusText: "",
-        birthday: "",
-        country: "",
-        city: "",
       }),
     ).rejects.toEqual(
       expect.objectContaining<Partial<GatewayError>>({
         name: "GatewayError",
         code: "invalid_argument",
         httpStatus: 400,
+      }),
+    );
+  });
+
+  it("sends partial settings patch through gateway identity endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          profile: {
+            id: "user-1",
+            login: "alice",
+            nickname: "Alice",
+            timezone: "Asia/Tokyo",
+            profileAccent: "silver-sky",
+            statusText: "Вечером на связи",
+            readReceiptsEnabled: false,
+            presenceEnabled: true,
+            typingVisibilityEnabled: false,
+            createdAt: "2026-03-23T10:00:00Z",
+            updatedAt: "2026-03-24T10:00:00Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    await client.updateCurrentProfile("token-1", {
+      timezone: "Asia/Tokyo",
+      profileAccent: "silver-sky",
+      statusText: "Вечером на связи",
+      readReceiptsEnabled: false,
+      presenceEnabled: true,
+      typingVisibilityEnabled: false,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.identity.v1.IdentityService/UpdateCurrentProfile",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          timezone: "Asia/Tokyo",
+          profileAccent: "silver-sky",
+          statusText: "Вечером на связи",
+          readReceiptsEnabled: false,
+          presenceEnabled: true,
+          typingVisibilityEnabled: false,
+        }),
       }),
     );
   });

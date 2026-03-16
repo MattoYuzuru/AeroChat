@@ -167,7 +167,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         status: "authenticated",
         token,
         profile,
-        notice: "Профиль обновлён.",
+        notice: "Изменения сохранены.",
       });
 
       return profile;

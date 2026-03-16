@@ -7,7 +7,7 @@ const navigationItems = [
   { to: "/app/profile", label: "Профиль", meta: "identity" },
   { to: "/app/chats", label: "Чаты", meta: "direct" },
   { to: "/app/people", label: "Люди", meta: "social" },
-  { to: "/app/settings", label: "Настройки", meta: "future" },
+  { to: "/app/settings", label: "Настройки", meta: "privacy" },
 ];
 
 const statusItems = [
@@ -16,6 +16,7 @@ const statusItems = [
   "profile",
   "people",
   "direct chats",
+  "settings",
 ];
 
 export function AppShell() {
@@ -110,7 +111,7 @@ export function AppShell() {
               </div>
               <div>
                 <dt>Scope</dt>
-                <dd>login, register, profile, people, chats</dd>
+                <dd>login, register, profile, people, chats, settings</dd>
               </div>
             </dl>
           </section>

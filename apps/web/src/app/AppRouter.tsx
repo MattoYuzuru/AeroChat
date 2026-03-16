@@ -3,10 +3,10 @@ import { useAuth } from "../auth/useAuth";
 import { AppShell } from "./AppShell";
 import { AuthPage } from "../pages/AuthPage";
 import { ProfilePage } from "../pages/ProfilePage";
-import { SectionPlaceholder } from "../pages/SectionPlaceholder";
 import { PeoplePage } from "../pages/PeoplePage";
 import { ChatsPage } from "../pages/ChatsPage";
 import { StateScreen } from "../ui/StateScreen";
+import { SettingsPage } from "../pages/SettingsPage";
 
 export function AppRouter() {
   return (
@@ -23,16 +23,7 @@ export function AppRouter() {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="chats" element={<ChatsPage />} />
             <Route path="people" element={<PeoplePage />} />
-            <Route
-              path="settings"
-              element={
-                <SectionPlaceholder
-                  title="Настройки"
-                  description="Отдельное settings-приложение и desktop window system остаются за пределами текущего bootstrap."
-                  nextSlice="Следующий PR: settings shell и дополнительные identity/session controls."
-                />
-              }
-            />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Route>
 

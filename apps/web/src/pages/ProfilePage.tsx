@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { getAuthErrorMessage, useAuth } from "../auth/useAuth";
 import styles from "./ProfilePage.module.css";
 
@@ -6,9 +7,6 @@ const emptyForm = {
   nickname: "",
   avatarUrl: "",
   bio: "",
-  timezone: "",
-  profileAccent: "",
-  statusText: "",
   birthday: "",
   country: "",
   city: "",
@@ -29,9 +27,6 @@ export function ProfilePage() {
       nickname: state.profile.nickname,
       avatarUrl: state.profile.avatarUrl ?? "",
       bio: state.profile.bio ?? "",
-      timezone: state.profile.timezone ?? "",
-      profileAccent: state.profile.profileAccent ?? "",
-      statusText: state.profile.statusText ?? "",
       birthday: state.profile.birthday ?? "",
       country: state.profile.country ?? "",
       city: state.profile.city ?? "",
@@ -85,11 +80,20 @@ export function ProfilePage() {
         </dl>
 
         <div className={styles.flags}>
-          <span>
-            Чеки чтения: {state.profile.readReceiptsEnabled ? "вкл" : "выкл"}
-          </span>
-          <span>Presence: {state.profile.presenceEnabled ? "вкл" : "выкл"}</span>
-          <span>Typing: {state.profile.typingVisibilityEnabled ? "вкл" : "выкл"}</span>
+          <span>Timezone: {state.profile.timezone ?? "не задан"}</span>
+          <span>Accent: {state.profile.profileAccent ?? "по умолчанию"}</span>
+          <span>Status: {state.profile.statusText ?? "не задан"}</span>
+        </div>
+
+        <div className={styles.settingsCard}>
+          <p className={styles.settingsLabel}>Настройки вынесены отдельно</p>
+          <p className={styles.settingsDescription}>
+            Приватность, timezone, profile accent и status text теперь редактируются на
+            `/app/settings`, чтобы profile flow оставался про публичную карточку пользователя.
+          </p>
+          <Link className={styles.settingsLink} to="/app/settings">
+            Открыть настройки
+          </Link>
         </div>
       </section>
 
@@ -149,50 +153,6 @@ export function ProfilePage() {
           </label>
 
           <label className={styles.field}>
-            <span>Часовой пояс</span>
-            <input
-              maxLength={64}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  timezone: event.target.value,
-                }))
-              }
-              placeholder="Europe/Berlin"
-              value={form.timezone}
-            />
-          </label>
-
-          <label className={styles.field}>
-            <span>Акцент профиля</span>
-            <input
-              maxLength={64}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  profileAccent: event.target.value,
-                }))
-              }
-              placeholder="ice-blue"
-              value={form.profileAccent}
-            />
-          </label>
-
-          <label className={styles.field}>
-            <span>Статус</span>
-            <input
-              maxLength={140}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  statusText: event.target.value,
-                }))
-              }
-              value={form.statusText}
-            />
-          </label>
-
-          <label className={styles.field}>
             <span>Дата рождения</span>
             <input
               onChange={(event) =>
@@ -246,9 +206,6 @@ export function ProfilePage() {
                   nickname: state.profile.nickname,
                   avatarUrl: state.profile.avatarUrl ?? "",
                   bio: state.profile.bio ?? "",
-                  timezone: state.profile.timezone ?? "",
-                  profileAccent: state.profile.profileAccent ?? "",
-                  statusText: state.profile.statusText ?? "",
                   birthday: state.profile.birthday ?? "",
                   country: state.profile.country ?? "",
                   city: state.profile.city ?? "",

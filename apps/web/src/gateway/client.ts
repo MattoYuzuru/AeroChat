@@ -528,17 +528,7 @@ export function createGatewayClient(
         baseUrl,
         identityServicePath,
         "UpdateCurrentProfile",
-        {
-          nickname: input.nickname.trim(),
-          avatarUrl: input.avatarUrl,
-          bio: input.bio,
-          timezone: input.timezone,
-          profileAccent: input.profileAccent,
-          statusText: input.statusText,
-          birthday: input.birthday,
-          country: input.country,
-          city: input.city,
-        },
+        buildUpdateCurrentProfileBody(input),
         token,
       );
 
@@ -929,4 +919,73 @@ function normalizeNullableString(value: string | undefined): string | null {
 function normalizeOptionalString(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
+}
+
+function buildUpdateCurrentProfileBody(
+  input: Partial<{
+    nickname: string;
+    avatarUrl: string;
+    bio: string;
+    timezone: string;
+    profileAccent: string;
+    statusText: string;
+    birthday: string;
+    country: string;
+    city: string;
+    readReceiptsEnabled: boolean;
+    presenceEnabled: boolean;
+    typingVisibilityEnabled: boolean;
+  }>,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+
+  if (input.nickname !== undefined) {
+    body.nickname = input.nickname.trim();
+  }
+
+  if (input.avatarUrl !== undefined) {
+    body.avatarUrl = input.avatarUrl;
+  }
+
+  if (input.bio !== undefined) {
+    body.bio = input.bio;
+  }
+
+  if (input.timezone !== undefined) {
+    body.timezone = input.timezone;
+  }
+
+  if (input.profileAccent !== undefined) {
+    body.profileAccent = input.profileAccent;
+  }
+
+  if (input.statusText !== undefined) {
+    body.statusText = input.statusText;
+  }
+
+  if (input.birthday !== undefined) {
+    body.birthday = input.birthday;
+  }
+
+  if (input.country !== undefined) {
+    body.country = input.country;
+  }
+
+  if (input.city !== undefined) {
+    body.city = input.city;
+  }
+
+  if (input.readReceiptsEnabled !== undefined) {
+    body.readReceiptsEnabled = input.readReceiptsEnabled;
+  }
+
+  if (input.presenceEnabled !== undefined) {
+    body.presenceEnabled = input.presenceEnabled;
+  }
+
+  if (input.typingVisibilityEnabled !== undefined) {
+    body.typingVisibilityEnabled = input.typingVisibilityEnabled;
+  }
+
+  return body;
 }
