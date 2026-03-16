@@ -189,7 +189,7 @@ AeroChat создаётся как проект с сильным фундаме
 
 - `server/prod-like`:
   - `.env.server.example` служит шаблоном для одного VPS;
-  - `infra/compose/docker-compose.server.yml` даёт production-oriented single-server topology;
+  - `infra/compose/docker-compose.server.yml` даёт production-oriented single-server topology на предсобранных образах;
   - ручной bootstrap описан в `docs/deploy/single-server-bootstrap.md`.
 
 1. Клонируй репозиторий:
@@ -225,10 +225,30 @@ docker compose -f infra/compose/docker-compose.yml up --build -d
 ```bash
 cp .env.server.example .env.server
 docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml config
-docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml up --build -d
+docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml pull
+docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml up -d
 ```
 
 Подробности и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
+
+### Image release model
+
+Для текущего externally usable stack публикуются отдельные GHCR-образы:
+
+- `ghcr.io/<owner>/aerochat-web`
+- `ghcr.io/<owner>/aerochat-aero-gateway`
+- `ghcr.io/<owner>/aerochat-aero-identity`
+- `ghcr.io/<owner>/aerochat-aero-chat`
+
+Теги выбираются так:
+
+- `edge` — moving tag для default branch;
+- `vX.Y.Z`, `vX.Y`, `vX` — release tags для git tags вида `vX.Y.Z`;
+- `sha-<commit>` — точная привязка к конкретной сборке.
+
+Для server compose оператор обычно меняет только `AERO_IMAGE_TAG` в `.env.server`.
+`latest` намеренно не используется.
+На текущем этапе опубликованные application images собираются только для `linux/amd64`.
 
 > На раннем этапе точные команды могут меняться. Актуальный набор команд должен поддерживаться через Taskfile.yml.
 

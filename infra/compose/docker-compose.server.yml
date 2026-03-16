@@ -44,9 +44,7 @@ services:
       start_period: 10s
 
   aero-identity:
-    build:
-      context: ../..
-      dockerfile: services/aero-identity/Dockerfile
+    image: ${AERO_IMAGE_NAMESPACE:-ghcr.io/mattoyuzuru}/aerochat-aero-identity:${AERO_IMAGE_TAG:-edge}
     restart: unless-stopped
     environment:
       AERO_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
@@ -64,9 +62,7 @@ services:
       start_period: 5s
 
   aero-chat:
-    build:
-      context: ../..
-      dockerfile: services/aero-chat/Dockerfile
+    image: ${AERO_IMAGE_NAMESPACE:-ghcr.io/mattoyuzuru}/aerochat-aero-chat:${AERO_IMAGE_TAG:-edge}
     restart: unless-stopped
     environment:
       AERO_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
@@ -89,9 +85,7 @@ services:
       start_period: 5s
 
   aero-gateway:
-    build:
-      context: ../..
-      dockerfile: services/aero-gateway/Dockerfile
+    image: ${AERO_IMAGE_NAMESPACE:-ghcr.io/mattoyuzuru}/aerochat-aero-gateway:${AERO_IMAGE_TAG:-edge}
     restart: unless-stopped
     environment:
       AERO_HTTP_ADDR: ":8080"
@@ -114,11 +108,7 @@ services:
       start_period: 5s
 
   web:
-    build:
-      context: ../..
-      dockerfile: apps/web/Dockerfile
-      args:
-        VITE_GATEWAY_BASE_URL: ${VITE_GATEWAY_BASE_URL}
+    image: ${AERO_IMAGE_NAMESPACE:-ghcr.io/mattoyuzuru}/aerochat-web:${AERO_IMAGE_TAG:-edge}
     restart: unless-stopped
     depends_on:
       aero-gateway:
