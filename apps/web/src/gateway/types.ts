@@ -159,15 +159,18 @@ export interface LoginInput {
 }
 
 export interface UpdateCurrentProfileInput {
-  nickname: string;
-  avatarUrl: string;
-  bio: string;
-  timezone: string;
-  profileAccent: string;
-  statusText: string;
-  birthday: string;
-  country: string;
-  city: string;
+  nickname?: string;
+  avatarUrl?: string;
+  bio?: string;
+  timezone?: string;
+  profileAccent?: string;
+  statusText?: string;
+  birthday?: string;
+  country?: string;
+  city?: string;
+  readReceiptsEnabled?: boolean;
+  presenceEnabled?: boolean;
+  typingVisibilityEnabled?: boolean;
 }
 
 export interface GatewayClient {

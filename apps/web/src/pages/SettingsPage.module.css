@@ -1,0 +1,264 @@
+.layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.heroCard,
+.sectionCard,
+.summaryCard,
+.stateCard,
+.toggleCard {
+  border: 1px solid var(--color-border-soft);
+  border-radius: 1.5rem;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(16px);
+}
+
+.heroCard,
+.sectionCard,
+.summaryCard,
+.stateCard {
+  padding: 1.3rem;
+}
+
+.heroHeader,
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cardLabel {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(3, 50, 82, 0.72);
+}
+
+.title,
+.sectionTitle,
+.summaryTitle,
+.stateTitle {
+  margin: 0.35rem 0 0;
+}
+
+.title {
+  font-size: clamp(1.8rem, 3vw, 2.35rem);
+}
+
+.subtitle,
+.sectionDescription,
+.stateMessage,
+.summarySubtitle,
+.toggleCopy span {
+  margin: 0.75rem 0 0;
+  color: rgba(3, 50, 82, 0.76);
+}
+
+.heroMeta,
+.chipGroup,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.statusBadge,
+.metaChip {
+  align-self: start;
+  padding: 0.45rem 0.72rem;
+  border-radius: 999px;
+  background: var(--color-chip);
+  font-size: 0.8rem;
+  color: rgba(3, 50, 82, 0.74);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.notice,
+.error {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+}
+
+.notice {
+  background: rgba(16, 130, 203, 0.12);
+}
+
+.error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(18rem, 0.95fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.mainColumn,
+.sideColumn,
+.toggleList,
+.metaGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.sectionDescription {
+  max-width: 20rem;
+  text-align: right;
+}
+
+.toggleCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.05rem;
+  background: var(--surface-panel-strong);
+}
+
+.toggleCopy {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.toggleCopy strong {
+  font-size: 1rem;
+}
+
+.toggleCopy span {
+  margin: 0;
+}
+
+.toggleInput {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-primary-bright);
+  flex-shrink: 0;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.95rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field span {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.75rem 0.95rem;
+  border: 1px solid rgba(3, 50, 82, 0.14);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.field textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible {
+  border-color: var(--color-primary-bright);
+  box-shadow:
+    0 0 0 4px rgba(23, 130, 209, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.summaryTitle {
+  font-size: 1.45rem;
+}
+
+.summarySubtitle {
+  margin-top: 0.2rem;
+}
+
+.metaGrid {
+  margin: 1rem 0 0;
+}
+
+.metaGrid div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.48);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.metaGrid dt {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(3, 50, 82, 0.64);
+}
+
+.metaGrid dd {
+  margin: 0;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 2.95rem;
+  padding: 0.74rem 1rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  box-shadow: var(--shadow-button);
+}
+
+.primaryButton {
+  color: #ffffff;
+  background: var(--surface-button-primary);
+}
+
+.secondaryButton {
+  background: var(--surface-button);
+  border-color: rgba(3, 50, 82, 0.12);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
+@media (max-width: 960px) {
+  .workspace,
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .heroHeader,
+  .sectionHeader,
+  .toggleCard {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sectionDescription {
+    max-width: none;
+    text-align: left;
+  }
+}
