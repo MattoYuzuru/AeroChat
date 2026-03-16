@@ -188,7 +188,8 @@ AeroChat создаётся как проект с сильным фундаме
   - `services/*/.env.example` и `apps/web/.env.example` остаются source-mode примерами для запуска сервисов вне compose.
 
 - `server/prod-like`:
-  - `.env.server.example` служит шаблоном для одного VPS;
+  - `.env.server.example` содержит только versioned non-secret runtime config;
+  - `.env.server.secrets.example` описывает обязательные server-only secret keys без реальных значений;
   - `infra/compose/docker-compose.server.yml` даёт production-oriented single-server topology на предсобранных образах;
   - ручной bootstrap описан в `docs/deploy/single-server-bootstrap.md`.
 
@@ -224,9 +225,10 @@ docker compose -f infra/compose/docker-compose.yml up --build -d
 
 ```bash
 cp .env.server.example .env.server
-docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml config
-docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml pull
-docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml up -d
+cp .env.server.secrets.example .env.server.secrets
+docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml config
+docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml pull
+docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml up -d
 ```
 
 Подробности и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
@@ -246,7 +248,8 @@ docker compose --env-file .env.server -f infra/compose/docker-compose.server.yml
 - `vX.Y.Z`, `vX.Y`, `vX` — release tags для git tags вида `vX.Y.Z`;
 - `sha-<commit>` — точная привязка к конкретной сборке.
 
-Для server compose оператор обычно меняет только `AERO_IMAGE_TAG` в `.env.server`.
+Для server compose оператор обычно меняет только `AERO_IMAGE_TAG` в `.env.server`,
+а секретные значения хранит только в `.env.server.secrets`.
 `latest` намеренно не используется.
 На текущем этапе опубликованные application images собираются только для `linux/amd64`.
 

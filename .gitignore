@@ -1,5 +1,7 @@
 .DS_Store
 .env
+.env.server
+.env.server.secrets
 .env.local
 .idea/
 bin/
