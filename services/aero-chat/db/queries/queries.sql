@@ -18,6 +18,7 @@ SELECT
     u.nickname,
     u.avatar_url,
     u.read_receipts_enabled,
+    u.typing_visibility_enabled,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
 FROM user_sessions AS s
@@ -111,6 +112,16 @@ FROM direct_chat_participants AS self
 JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
 JOIN users AS u ON u.id = p.user_id
 LEFT JOIN direct_chat_read_receipts AS r ON r.chat_id = p.chat_id AND r.user_id = p.user_id
+WHERE self.user_id = $1 AND self.chat_id = $2
+ORDER BY p.joined_at ASC, p.user_id ASC;
+
+-- name: ListDirectChatTypingStateEntries :many
+SELECT
+    p.user_id,
+    u.typing_visibility_enabled
+FROM direct_chat_participants AS self
+JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
+JOIN users AS u ON u.id = p.user_id
 WHERE self.user_id = $1 AND self.chat_id = $2
 ORDER BY p.joined_at ASC, p.user_id ASC;
 

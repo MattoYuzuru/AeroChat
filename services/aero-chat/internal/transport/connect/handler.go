@@ -78,14 +78,15 @@ func (h *Handler) GetDirectChat(ctx context.Context, req *connect.Request[chatv1
 		return nil, err
 	}
 
-	directChat, readState, err := h.service.GetDirectChat(ctx, token, req.Msg.ChatId)
+	directChat, readState, typingState, err := h.service.GetDirectChat(ctx, token, req.Msg.ChatId)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
 	return connect.NewResponse(&chatv1.GetDirectChatResponse{
-		Chat:      toProtoDirectChat(*directChat),
-		ReadState: toProtoDirectChatReadState(readState),
+		Chat:        toProtoDirectChat(*directChat),
+		ReadState:   toProtoDirectChatReadState(readState),
+		TypingState: toProtoDirectChatTypingState(typingState),
 	}), nil
 }
 
@@ -102,6 +103,38 @@ func (h *Handler) MarkDirectChatRead(ctx context.Context, req *connect.Request[c
 
 	return connect.NewResponse(&chatv1.MarkDirectChatReadResponse{
 		ReadState: toProtoDirectChatReadState(readState),
+	}), nil
+}
+
+func (h *Handler) SetDirectChatTyping(ctx context.Context, req *connect.Request[chatv1.SetDirectChatTypingRequest]) (*connect.Response[chatv1.SetDirectChatTypingResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	typingState, err := h.service.SetDirectChatTyping(ctx, token, req.Msg.ChatId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.SetDirectChatTypingResponse{
+		TypingState: toProtoDirectChatTypingState(typingState),
+	}), nil
+}
+
+func (h *Handler) ClearDirectChatTyping(ctx context.Context, req *connect.Request[chatv1.ClearDirectChatTypingRequest]) (*connect.Response[chatv1.ClearDirectChatTypingResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	typingState, err := h.service.ClearDirectChatTyping(ctx, token, req.Msg.ChatId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.ClearDirectChatTypingResponse{
+		TypingState: toProtoDirectChatTypingState(typingState),
 	}), nil
 }
 
@@ -298,6 +331,28 @@ func toProtoDirectChatReadPosition(value *chat.DirectChatReadPosition) *chatv1.D
 		MessageId:        value.MessageID,
 		MessageCreatedAt: timestamppb.New(value.MessageCreatedAt),
 		UpdatedAt:        timestamppb.New(value.UpdatedAt),
+	}
+}
+
+func toProtoDirectChatTypingState(value *chat.DirectChatTypingState) *chatv1.DirectChatTypingState {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatTypingState{
+		SelfTyping: toProtoDirectChatTypingIndicator(value.SelfTyping),
+		PeerTyping: toProtoDirectChatTypingIndicator(value.PeerTyping),
+	}
+}
+
+func toProtoDirectChatTypingIndicator(value *chat.DirectChatTypingIndicator) *chatv1.DirectChatTypingIndicator {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatTypingIndicator{
+		UpdatedAt: timestamppb.New(value.UpdatedAt),
+		ExpiresAt: timestamppb.New(value.ExpiresAt),
 	}
 }
 

@@ -324,6 +324,7 @@ SELECT
     u.nickname,
     u.avatar_url,
     u.read_receipts_enabled,
+    u.typing_visibility_enabled,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
 FROM user_sessions AS s
@@ -333,26 +334,27 @@ WHERE s.id = $1
 `
 
 type GetSessionAuthByIDRow struct {
-	SessionID           uuid.UUID          `db:"session_id" json:"session_id"`
-	SessionUserID       uuid.UUID          `db:"session_user_id" json:"session_user_id"`
-	SessionDeviceID     uuid.UUID          `db:"session_device_id" json:"session_device_id"`
-	TokenHash           string             `db:"token_hash" json:"token_hash"`
-	SessionCreatedAt    pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
-	SessionLastSeenAt   pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
-	SessionRevokedAt    pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
-	DeviceID            uuid.UUID          `db:"device_id" json:"device_id"`
-	DeviceUserID        uuid.UUID          `db:"device_user_id" json:"device_user_id"`
-	DeviceLabel         string             `db:"device_label" json:"device_label"`
-	DeviceCreatedAt     pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
-	DeviceLastSeenAt    pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
-	DeviceRevokedAt     pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
-	UserID              uuid.UUID          `db:"user_id" json:"user_id"`
-	Login               string             `db:"login" json:"login"`
-	Nickname            string             `db:"nickname" json:"nickname"`
-	AvatarUrl           pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	ReadReceiptsEnabled bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	UserCreatedAt       pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
-	UserUpdatedAt       pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
+	SessionID               uuid.UUID          `db:"session_id" json:"session_id"`
+	SessionUserID           uuid.UUID          `db:"session_user_id" json:"session_user_id"`
+	SessionDeviceID         uuid.UUID          `db:"session_device_id" json:"session_device_id"`
+	TokenHash               string             `db:"token_hash" json:"token_hash"`
+	SessionCreatedAt        pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
+	SessionLastSeenAt       pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
+	SessionRevokedAt        pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
+	DeviceID                uuid.UUID          `db:"device_id" json:"device_id"`
+	DeviceUserID            uuid.UUID          `db:"device_user_id" json:"device_user_id"`
+	DeviceLabel             string             `db:"device_label" json:"device_label"`
+	DeviceCreatedAt         pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
+	DeviceLastSeenAt        pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
+	DeviceRevokedAt         pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
+	UserID                  uuid.UUID          `db:"user_id" json:"user_id"`
+	Login                   string             `db:"login" json:"login"`
+	Nickname                string             `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	UserCreatedAt           pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
+	UserUpdatedAt           pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
 }
 
 func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error) {
@@ -377,6 +379,7 @@ func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSess
 		&i.Nickname,
 		&i.AvatarUrl,
 		&i.ReadReceiptsEnabled,
+		&i.TypingVisibilityEnabled,
 		&i.UserCreatedAt,
 		&i.UserUpdatedAt,
 	)
@@ -568,6 +571,47 @@ func (q *Queries) ListDirectChatRowsByUserID(ctx context.Context, userID uuid.UU
 			&i.ParticipantNickname,
 			&i.ParticipantAvatarUrl,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDirectChatTypingStateEntries = `-- name: ListDirectChatTypingStateEntries :many
+SELECT
+    p.user_id,
+    u.typing_visibility_enabled
+FROM direct_chat_participants AS self
+JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
+JOIN users AS u ON u.id = p.user_id
+WHERE self.user_id = $1 AND self.chat_id = $2
+ORDER BY p.joined_at ASC, p.user_id ASC
+`
+
+type ListDirectChatTypingStateEntriesParams struct {
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+	ChatID uuid.UUID `db:"chat_id" json:"chat_id"`
+}
+
+type ListDirectChatTypingStateEntriesRow struct {
+	UserID                  uuid.UUID `db:"user_id" json:"user_id"`
+	TypingVisibilityEnabled bool      `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+}
+
+func (q *Queries) ListDirectChatTypingStateEntries(ctx context.Context, arg ListDirectChatTypingStateEntriesParams) ([]ListDirectChatTypingStateEntriesRow, error) {
+	rows, err := q.db.Query(ctx, listDirectChatTypingStateEntries, arg.UserID, arg.ChatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDirectChatTypingStateEntriesRow
+	for rows.Next() {
+		var i ListDirectChatTypingStateEntriesRow
+		if err := rows.Scan(&i.UserID, &i.TypingVisibilityEnabled); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

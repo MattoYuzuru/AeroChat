@@ -8,10 +8,12 @@ import (
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
 type Config struct {
-	DatabaseURL     string
-	HTTPAddress     string
-	LogLevel        string
-	ShutdownTimeout time.Duration
+	DatabaseURL         string
+	RedisAddress        string
+	HTTPAddress         string
+	LogLevel            string
+	ShutdownTimeout     time.Duration
+	DirectChatTypingTTL time.Duration
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -20,12 +22,18 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	typingTTL, err := lookupDuration("AERO_DIRECT_CHAT_TYPING_TTL", 6*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
-		DatabaseURL:     lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
-		HTTPAddress:     lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
-		LogLevel:        lookupString("AERO_LOG_LEVEL", "info"),
-		ShutdownTimeout: shutdownTimeout,
+		DatabaseURL:         lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
+		RedisAddress:        lookupString("AERO_REDIS_ADDR", "localhost:6379"),
+		HTTPAddress:         lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
+		LogLevel:            lookupString("AERO_LOG_LEVEL", "info"),
+		ShutdownTimeout:     shutdownTimeout,
+		DirectChatTypingTTL: typingTTL,
 	}, nil
 }
 

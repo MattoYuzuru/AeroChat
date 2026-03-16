@@ -22,6 +22,7 @@ type Querier interface {
 	ListDirectChatMessages(ctx context.Context, arg ListDirectChatMessagesParams) ([]ListDirectChatMessagesRow, error)
 	ListDirectChatReadStateEntries(ctx context.Context, arg ListDirectChatReadStateEntriesParams) ([]ListDirectChatReadStateEntriesRow, error)
 	ListDirectChatRowsByUserID(ctx context.Context, userID uuid.UUID) ([]ListDirectChatRowsByUserIDRow, error)
+	ListDirectChatTypingStateEntries(ctx context.Context, arg ListDirectChatTypingStateEntriesParams) ([]ListDirectChatTypingStateEntriesRow, error)
 	ListPinnedMessageIDsByChatID(ctx context.Context, chatID uuid.UUID) ([]uuid.UUID, error)
 	PinDirectChatMessage(ctx context.Context, arg PinDirectChatMessageParams) (int64, error)
 	TouchDirectChatMessageUpdatedAt(ctx context.Context, arg TouchDirectChatMessageUpdatedAtParams) error

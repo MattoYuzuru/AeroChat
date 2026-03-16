@@ -70,7 +70,7 @@ func TestListAndGetDirectChatsAreParticipantScoped(t *testing.T) {
 		t.Fatal("ожидался один чат для Bob")
 	}
 
-	if _, _, err := service.GetDirectChat(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
+	if _, _, _, err := service.GetDirectChat(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ожидалась ошибка доступа для неучастника, получено %v", err)
 	}
 }
@@ -95,7 +95,7 @@ func TestGetDirectChatReturnsPrivacyAwareReadState(t *testing.T) {
 		t.Fatal("ожидалась собственная read position Bob на втором сообщении")
 	}
 
-	_, fetchedReadState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, fetchedReadState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat: %v", err)
 	}
@@ -132,12 +132,117 @@ func TestMarkDirectChatReadHonorsPrivacyFlag(t *testing.T) {
 		t.Fatal("собственная read position не должна сохраняться при отключённых read receipts")
 	}
 
-	_, fetchedReadState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, fetchedReadState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat: %v", err)
 	}
 	if fetchedReadState.PeerPosition != nil {
 		t.Fatal("peer read position не должна раскрываться при отключённых read receipts")
+	}
+}
+
+func TestSetAndClearDirectChatTypingUsesTTL(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	currentTime := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
+	service.now = func() time.Time {
+		return currentTime
+	}
+	service.typingTTL = 5 * time.Second
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+
+	typingState, err := service.SetDirectChatTyping(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("set direct chat typing: %v", err)
+	}
+	if typingState.SelfTyping == nil {
+		t.Fatal("ожидался собственный typing state после set")
+	}
+
+	_, _, fetchedTypingState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat with typing state: %v", err)
+	}
+	if fetchedTypingState.PeerTyping == nil {
+		t.Fatal("ожидался peer typing state для Alice")
+	}
+
+	currentTime = currentTime.Add(6 * time.Second)
+
+	_, _, expiredTypingState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat after typing ttl: %v", err)
+	}
+	if expiredTypingState.PeerTyping != nil {
+		t.Fatal("typing state должен исчезать после TTL")
+	}
+
+	if _, err := service.SetDirectChatTyping(context.Background(), bob.Token, directChat.ID); err != nil {
+		t.Fatalf("set direct chat typing before clear: %v", err)
+	}
+	clearedTypingState, err := service.ClearDirectChatTyping(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("clear direct chat typing: %v", err)
+	}
+	if clearedTypingState.SelfTyping != nil {
+		t.Fatal("после clear собственный typing state должен исчезнуть")
+	}
+}
+
+func TestSetDirectChatTypingHonorsPrivacyFlag(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	if _, err := service.SetDirectChatTyping(context.Background(), bob.Token, directChat.ID); err != nil {
+		t.Fatalf("set direct chat typing before privacy change: %v", err)
+	}
+
+	repo.setTypingVisibilityEnabled(bob.User.ID, false)
+
+	typingState, err := service.SetDirectChatTyping(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("set direct chat typing with disabled privacy flag: %v", err)
+	}
+	if typingState.SelfTyping != nil {
+		t.Fatal("собственный typing state не должен раскрываться при отключённой typing visibility")
+	}
+
+	_, _, fetchedTypingState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat after privacy change: %v", err)
+	}
+	if fetchedTypingState.PeerTyping != nil {
+		t.Fatal("peer typing state не должен раскрываться при отключённой typing visibility")
+	}
+}
+
+func TestDirectChatTypingIsParticipantScoped(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	charlie := repo.mustIssueAuth(testUUID(3), "charlie", "Charlie")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+
+	if _, err := service.SetDirectChatTyping(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ожидалась ошибка доступа для неучастника при set typing, получено %v", err)
+	}
+	if _, err := service.ClearDirectChatTyping(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ожидалась ошибка доступа для неучастника при clear typing, получено %v", err)
 	}
 }
 
@@ -254,7 +359,7 @@ func TestPinAndUnpinMessage(t *testing.T) {
 
 func newTestService() (*Service, *fakeRepository) {
 	repo := newFakeRepository()
-	service := NewService(repo, repo, libauth.NewSessionTokenManager())
+	service := NewService(repo, repo, repo.typingStore, libauth.NewSessionTokenManager(), 6*time.Second)
 	now := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
 	service.now = func() time.Time {
 		now = now.Add(time.Second)
@@ -316,6 +421,7 @@ type fakeRepository struct {
 	chats         map[string]DirectChat
 	messages      map[string]DirectChatMessage
 	readPositions map[string]DirectChatReadPosition
+	typingStore   *fakeTypingStore
 }
 
 func newFakeRepository() *fakeRepository {
@@ -327,11 +433,18 @@ func newFakeRepository() *fakeRepository {
 		chats:         make(map[string]DirectChat),
 		messages:      make(map[string]DirectChatMessage),
 		readPositions: make(map[string]DirectChatReadPosition),
+		typingStore:   newFakeTypingStore(),
 	}
 }
 
 func (r *fakeRepository) mustIssueAuth(userID string, login string, nickname string) issuedAuth {
-	user := UserSummary{ID: userID, Login: login, Nickname: nickname, ReadReceiptsEnabled: true}
+	user := UserSummary{
+		ID:                      userID,
+		Login:                   login,
+		Nickname:                nickname,
+		ReadReceiptsEnabled:     true,
+		TypingVisibilityEnabled: true,
+	}
 	r.users[userID] = user
 
 	sessionID := testUUID(len(r.sessions) + 100)
@@ -407,6 +520,23 @@ func (r *fakeRepository) ListDirectChatReadStateEntries(_ context.Context, userI
 			entry.LastReadPosition = &copy
 		}
 		result = append(result, entry)
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) ListDirectChatTypingStateEntries(_ context.Context, userID string, chatID string) ([]DirectChatTypingStateEntry, error) {
+	directChat, ok := r.chats[chatID]
+	if !ok || !isParticipant(directChat, userID) {
+		return nil, ErrNotFound
+	}
+
+	result := make([]DirectChatTypingStateEntry, 0, len(directChat.Participants))
+	for _, participant := range directChat.Participants {
+		result = append(result, DirectChatTypingStateEntry{
+			UserID:                  participant.ID,
+			TypingVisibilityEnabled: participant.TypingVisibilityEnabled,
+		})
 	}
 
 	return result, nil
@@ -654,6 +784,32 @@ func (r *fakeRepository) setReadReceiptsEnabled(userID string, enabled bool) {
 	}
 }
 
+func (r *fakeRepository) setTypingVisibilityEnabled(userID string, enabled bool) {
+	user := r.users[userID]
+	user.TypingVisibilityEnabled = enabled
+	r.users[userID] = user
+
+	for sessionID, authSession := range r.sessions {
+		if authSession.User.ID != userID {
+			continue
+		}
+		authSession.User.TypingVisibilityEnabled = enabled
+		r.sessions[sessionID] = authSession
+	}
+
+	for chatID, directChat := range r.chats {
+		updatedParticipants := make([]UserSummary, 0, len(directChat.Participants))
+		for _, participant := range directChat.Participants {
+			if participant.ID == userID {
+				participant.TypingVisibilityEnabled = enabled
+			}
+			updatedParticipants = append(updatedParticipants, participant)
+		}
+		directChat.Participants = updatedParticipants
+		r.chats[chatID] = directChat
+	}
+}
+
 func pairKey(firstUserID string, secondUserID string) string {
 	userLowID, userHighID := CanonicalUserPair(firstUserID, secondUserID)
 	return userLowID + ":" + userHighID
@@ -661,6 +817,41 @@ func pairKey(firstUserID string, secondUserID string) string {
 
 func readPositionKey(chatID string, userID string) string {
 	return chatID + ":" + userID
+}
+
+type fakeTypingStore struct {
+	entries map[string]DirectChatTypingIndicator
+}
+
+func newFakeTypingStore() *fakeTypingStore {
+	return &fakeTypingStore{
+		entries: make(map[string]DirectChatTypingIndicator),
+	}
+}
+
+func (s *fakeTypingStore) PutDirectChatTypingIndicator(_ context.Context, params PutDirectChatTypingIndicatorParams) error {
+	s.entries[readPositionKey(params.ChatID, params.UserID)] = DirectChatTypingIndicator{
+		UpdatedAt: params.UpdatedAt,
+		ExpiresAt: params.ExpiresAt,
+	}
+	return nil
+}
+
+func (s *fakeTypingStore) ClearDirectChatTypingIndicator(_ context.Context, chatID string, userID string) error {
+	delete(s.entries, readPositionKey(chatID, userID))
+	return nil
+}
+
+func (s *fakeTypingStore) ListDirectChatTypingIndicators(_ context.Context, chatID string, userIDs []string, now time.Time) (map[string]DirectChatTypingIndicator, error) {
+	result := make(map[string]DirectChatTypingIndicator, len(userIDs))
+	for _, userID := range userIDs {
+		indicator, ok := s.entries[readPositionKey(chatID, userID)]
+		if !ok || !indicator.ExpiresAt.After(now) {
+			continue
+		}
+		result[userID] = indicator
+	}
+	return result, nil
 }
 
 func testUUID(sequence int) string {
