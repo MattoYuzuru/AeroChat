@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package aerochat.identity.v1;
+
+option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1;identityv1";
+
+import "aerochat/common/v1/common.proto";
+
+service IdentityService {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+message PingRequest {}
+
+message PingResponse {
+  aerochat.common.v1.ServiceMeta service = 1;
+}

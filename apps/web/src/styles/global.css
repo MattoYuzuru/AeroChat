@@ -1,0 +1,9 @@
+body {
+  min-width: 320px;
+  color: #043252;
+  background: #a9e4ff;
+}
+
+a {
+  color: inherit;
+}
