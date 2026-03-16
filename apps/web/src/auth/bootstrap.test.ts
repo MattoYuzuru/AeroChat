@@ -24,6 +24,8 @@ function createClient(overrides: Partial<GatewayClient>): GatewayClient {
     login: vi.fn(),
     register: vi.fn(),
     logoutCurrentSession: vi.fn(),
+    listDevices: vi.fn(),
+    revokeSessionOrDevice: vi.fn(),
     createDirectChat: vi.fn(),
     listDirectChats: vi.fn(),
     getDirectChat: vi.fn(),

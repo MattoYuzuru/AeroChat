@@ -7,7 +7,9 @@
 .sectionCard,
 .summaryCard,
 .stateCard,
-.toggleCard {
+.inlineStateCard,
+.toggleCard,
+.deviceCard {
   border: 1px solid var(--color-border-soft);
   border-radius: 1.5rem;
   background: var(--surface-panel);
@@ -22,10 +24,34 @@
   padding: 1.3rem;
 }
 
+.inlineStateCard,
+.deviceCard {
+  padding: 1.1rem;
+}
+
 .heroHeader,
-.sectionHeader {
+.sectionHeader,
+.deviceHeader,
+.sessionRow,
+.deviceTitleRow,
+.sessionTitleRow,
+.sessionHeader {
   display: flex;
   justify-content: space-between;
+  gap: 1rem;
+}
+
+.sectionToolbar,
+.mainColumn,
+.sideColumn,
+.toggleList,
+.metaGrid,
+.deviceList,
+.deviceCopy,
+.sessionBlock,
+.sessionList,
+.sessionCopy {
+  display: grid;
   gap: 1rem;
 }
 
@@ -53,7 +79,9 @@
 .sectionDescription,
 .stateMessage,
 .summarySubtitle,
-.toggleCopy span {
+.toggleCopy span,
+.deviceMeta,
+.sessionCopy span {
   margin: 0.75rem 0 0;
   color: rgba(3, 50, 82, 0.76);
 }
@@ -67,7 +95,8 @@
 }
 
 .statusBadge,
-.metaChip {
+.metaChip,
+.statusPill {
   align-self: start;
   padding: 0.45rem 0.72rem;
   border-radius: 999px;
@@ -75,6 +104,11 @@
   font-size: 0.8rem;
   color: rgba(3, 50, 82, 0.74);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.statusPill[data-tone="danger"] {
+  background: rgba(183, 63, 63, 0.12);
+  color: #8b3030;
 }
 
 .notice,
@@ -100,16 +134,12 @@
   align-items: start;
 }
 
-.mainColumn,
-.sideColumn,
-.toggleList,
-.metaGrid {
-  display: grid;
-  gap: 1rem;
+.sectionToolbar {
+  justify-items: end;
 }
 
 .sectionDescription {
-  max-width: 20rem;
+  max-width: 25rem;
   text-align: right;
 }
 
@@ -131,7 +161,9 @@
   font-size: 1rem;
 }
 
-.toggleCopy span {
+.toggleCopy span,
+.deviceMeta,
+.sessionCopy span {
   margin: 0;
 }
 
@@ -142,10 +174,44 @@
   flex-shrink: 0;
 }
 
-.formGrid {
+.formGrid,
+.metrics,
+.deviceFacts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.95rem;
+}
+
+.formGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metrics,
+.deviceFacts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.metricCard,
+.deviceFacts div,
+.sessionEmpty {
+  padding: 0.85rem 0.95rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.metricCard {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.metricCard span,
+.metricCard small {
+  color: rgba(3, 50, 82, 0.72);
+}
+
+.metricCard strong {
+  font-size: 1.5rem;
 }
 
 .field {
@@ -186,40 +252,108 @@
   grid-column: 1 / -1;
 }
 
+.deviceCard {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(229, 242, 255, 0.56)),
+    var(--surface-panel);
+}
+
+.deviceTitle,
 .summaryTitle {
   font-size: 1.45rem;
 }
 
-.summarySubtitle {
-  margin-top: 0.2rem;
+.deviceTitle {
+  margin: 0;
+}
+
+.deviceHeader {
+  align-items: flex-start;
+}
+
+.deviceFacts {
+  margin-bottom: 0;
 }
 
 .metaGrid {
   margin: 1rem 0 0;
 }
 
-.metaGrid div {
+.metaGrid div,
+.deviceFacts div {
   display: grid;
   gap: 0.2rem;
+}
+
+.metaGrid div {
   padding: 0.8rem 0.9rem;
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.48);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
 }
 
-.metaGrid dt {
+.metaGrid dt,
+.deviceFacts dt {
   font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
   color: rgba(3, 50, 82, 0.64);
 }
 
-.metaGrid dd {
+.metaGrid dd,
+.deviceFacts dd {
   margin: 0;
 }
 
+.summarySubtitle {
+  margin-top: 0.2rem;
+}
+
+.sessionBlock {
+  margin-top: 1rem;
+}
+
+.sessionHeader {
+  align-items: center;
+}
+
+.sessionHeader strong {
+  font-size: 1rem;
+}
+
+.sessionHeader span {
+  min-width: 2.1rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(0, 114, 188, 0.1);
+  text-align: center;
+  color: rgba(3, 50, 82, 0.72);
+}
+
+.sessionList {
+  gap: 0.8rem;
+}
+
+.sessionRow {
+  align-items: flex-start;
+  padding: 0.95rem;
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(3, 50, 82, 0.08);
+}
+
+.sessionCopy {
+  gap: 0.24rem;
+}
+
+.sessionTitleRow {
+  align-items: center;
+}
+
 .primaryButton,
-.secondaryButton {
+.secondaryButton,
+.dangerButton,
+.sessionButton {
   min-height: 2.95rem;
   padding: 0.74rem 1rem;
   border-radius: 999px;
@@ -233,28 +367,57 @@
   background: var(--surface-button-primary);
 }
 
-.secondaryButton {
+.secondaryButton,
+.sessionButton {
   background: var(--surface-button);
   border-color: rgba(3, 50, 82, 0.12);
 }
 
+.dangerButton {
+  background: rgba(190, 74, 74, 0.12);
+  border-color: rgba(152, 41, 41, 0.18);
+  color: #812e2e;
+}
+
 .primaryButton:disabled,
-.secondaryButton:disabled {
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.sessionButton:disabled {
   cursor: not-allowed;
   opacity: 0.64;
 }
 
+.inlineStateCard {
+  margin-top: 1rem;
+}
+
+.inlineStateCard[data-tone="error"] {
+  border-color: rgba(152, 41, 41, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 232, 232, 0.72));
+}
+
 @media (max-width: 960px) {
   .workspace,
-  .formGrid {
+  .formGrid,
+  .metrics,
+  .deviceFacts {
     grid-template-columns: 1fr;
   }
 
   .heroHeader,
   .sectionHeader,
-  .toggleCard {
+  .deviceHeader,
+  .toggleCard,
+  .sessionRow,
+  .deviceTitleRow,
+  .sessionTitleRow,
+  .sessionHeader {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .sectionToolbar {
+    justify-items: stretch;
   }
 
   .sectionDescription {

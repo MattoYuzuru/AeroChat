@@ -179,6 +179,122 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("loads devices with nested sessions through gateway identity endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          devices: [
+            {
+              device: {
+                id: "device-1",
+                label: "Web Chrome",
+                createdAt: "2026-03-28T10:00:00Z",
+                lastSeenAt: "2026-03-28T12:00:00Z",
+              },
+              sessions: [
+                {
+                  id: "session-1",
+                  deviceId: "device-1",
+                  createdAt: "2026-03-28T10:00:00Z",
+                  lastSeenAt: "2026-03-28T12:00:00Z",
+                },
+                {
+                  id: "session-2",
+                  deviceId: "device-1",
+                  createdAt: "2026-03-28T11:00:00Z",
+                  lastSeenAt: "2026-03-28T11:30:00Z",
+                  revokedAt: "2026-03-28T11:45:00Z",
+                },
+              ],
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const devices = await client.listDevices("token-1");
+
+    expect(devices).toEqual([
+      {
+        device: {
+          id: "device-1",
+          label: "Web Chrome",
+          createdAt: "2026-03-28T10:00:00Z",
+          lastSeenAt: "2026-03-28T12:00:00Z",
+          revokedAt: null,
+        },
+        sessions: [
+          {
+            id: "session-1",
+            deviceId: "device-1",
+            createdAt: "2026-03-28T10:00:00Z",
+            lastSeenAt: "2026-03-28T12:00:00Z",
+            revokedAt: null,
+          },
+          {
+            id: "session-2",
+            deviceId: "device-1",
+            createdAt: "2026-03-28T11:00:00Z",
+            lastSeenAt: "2026-03-28T11:30:00Z",
+            revokedAt: "2026-03-28T11:45:00Z",
+          },
+        ],
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.identity.v1.IdentityService/ListDevices",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({}),
+      }),
+    );
+  });
+
+  it("sends revoke target through the shared identity endpoint", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    const client = createGatewayClient(fetchMock, "/api");
+
+    await client.revokeSessionOrDevice("token-1", {
+      kind: "session",
+      sessionId: " session-1 ",
+    });
+    await client.revokeSessionOrDevice("token-1", {
+      kind: "device",
+      deviceId: " device-1 ",
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/aerochat.identity.v1.IdentityService/RevokeSessionOrDevice",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          sessionId: "session-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/aerochat.identity.v1.IdentityService/RevokeSessionOrDevice",
+      expect.objectContaining({
+        body: JSON.stringify({
+          deviceId: "device-1",
+        }),
+      }),
+    );
+  });
+
   it("calls social graph mutation endpoints with exact login payload", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     const client = createGatewayClient(fetchMock, "/api");

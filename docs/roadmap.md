@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Web settings and privacy bootstrap в `apps/web` через `aero-gateway`
+- [x] Web devices and sessions bootstrap в `apps/web` через `aero-gateway`
 
 ---
 
@@ -49,7 +49,7 @@
 - [ ] Mutable nickname
 - [ ] Password auth foundation
 - [ ] Sessions
-- [ ] Devices & sessions UI/data model
+- [x] Devices & sessions UI/data model
 - [x] Privacy flags
 - [ ] Block list
 - [ ] Key backup status
