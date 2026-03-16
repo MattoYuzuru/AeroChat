@@ -1,6 +1,8 @@
 import type {
   CurrentAuth,
   Device,
+  Friend,
+  FriendRequest,
   GatewayClient,
   GatewayErrorCode,
   Profile,
@@ -77,6 +79,28 @@ interface UpdateCurrentProfileResponseWire {
   profile?: ProfileWire;
 }
 
+interface FriendRequestWire {
+  profile?: ProfileWire;
+  requestedAt?: string;
+}
+
+interface FriendWire {
+  profile?: ProfileWire;
+  friendsSince?: string;
+}
+
+interface ListIncomingFriendRequestsResponseWire {
+  friendRequests?: FriendRequestWire[];
+}
+
+interface ListOutgoingFriendRequestsResponseWire {
+  friendRequests?: FriendRequestWire[];
+}
+
+interface ListFriendsResponseWire {
+  friends?: FriendWire[];
+}
+
 export function createGatewayClient(
   fetchImpl: FetchLike,
   baseUrl = resolveGatewayBaseUrl(),
@@ -117,6 +141,102 @@ export function createGatewayClient(
       );
 
       return normalizeProfile(response.profile);
+    },
+
+    async sendFriendRequest(token, login) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        "SendFriendRequest",
+        {
+          login: login.trim(),
+        },
+        token,
+      );
+    },
+
+    async acceptFriendRequest(token, login) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        "AcceptFriendRequest",
+        {
+          login: login.trim(),
+        },
+        token,
+      );
+    },
+
+    async declineFriendRequest(token, login) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        "DeclineFriendRequest",
+        {
+          login: login.trim(),
+        },
+        token,
+      );
+    },
+
+    async cancelOutgoingFriendRequest(token, login) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        "CancelOutgoingFriendRequest",
+        {
+          login: login.trim(),
+        },
+        token,
+      );
+    },
+
+    async listIncomingFriendRequests(token) {
+      const response = await unaryCall<ListIncomingFriendRequestsResponseWire>(
+        fetchImpl,
+        baseUrl,
+        "ListIncomingFriendRequests",
+        {},
+        token,
+      );
+
+      return (response.friendRequests ?? []).map(normalizeFriendRequest);
+    },
+
+    async listOutgoingFriendRequests(token) {
+      const response = await unaryCall<ListOutgoingFriendRequestsResponseWire>(
+        fetchImpl,
+        baseUrl,
+        "ListOutgoingFriendRequests",
+        {},
+        token,
+      );
+
+      return (response.friendRequests ?? []).map(normalizeFriendRequest);
+    },
+
+    async listFriends(token) {
+      const response = await unaryCall<ListFriendsResponseWire>(
+        fetchImpl,
+        baseUrl,
+        "ListFriends",
+        {},
+        token,
+      );
+
+      return (response.friends ?? []).map(normalizeFriend);
+    },
+
+    async removeFriend(token, login) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        "RemoveFriend",
+        {
+          login: login.trim(),
+        },
+        token,
+      );
     },
 
     async updateCurrentProfile(token, input) {
@@ -299,6 +419,20 @@ function normalizeSession(input: SessionWire): Session {
     createdAt: input.createdAt ?? "",
     lastSeenAt: input.lastSeenAt ?? "",
     revokedAt: normalizeNullableString(input.revokedAt),
+  };
+}
+
+function normalizeFriendRequest(input: FriendRequestWire): FriendRequest {
+  return {
+    profile: normalizeProfile(input.profile),
+    requestedAt: input.requestedAt ?? "",
+  };
+}
+
+function normalizeFriend(input: FriendWire): Friend {
+  return {
+    profile: normalizeProfile(input.profile),
+    friendsSince: input.friendsSince ?? "",
   };
 }
 

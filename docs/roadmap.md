@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Web gateway auth bootstrap в `apps/web` с protected shell и current profile flow
+- [x] Web social graph bootstrap в `apps/web` через `aero-gateway` с protected `/app/people` и friend request flow
 
 ---
 
@@ -68,6 +68,7 @@
 - [ ] No public user directory
 - [ ] Block interactions policy
 - [ ] Search by exact login rules
+- [x] Web people bootstrap через `aero-gateway`
 
 ---
 

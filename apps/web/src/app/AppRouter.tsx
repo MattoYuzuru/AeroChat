@@ -4,6 +4,7 @@ import { AppShell } from "./AppShell";
 import { AuthPage } from "../pages/AuthPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { SectionPlaceholder } from "../pages/SectionPlaceholder";
+import { PeoplePage } from "../pages/PeoplePage";
 import { StateScreen } from "../ui/StateScreen";
 
 export function AppRouter() {
@@ -29,16 +30,7 @@ export function AppRouter() {
                 />
               }
             />
-            <Route
-              path="people"
-              element={
-                <SectionPlaceholder
-                  title="Люди"
-                  description="Friends UI и social graph actions пока не поднимаются во frontend, чтобы не смешивать auth bootstrap с отдельным social slice."
-                  nextSlice="Следующий PR: gateway-driven social graph read actions и friend requests UI."
-                />
-              }
-            />
+            <Route path="people" element={<PeoplePage />} />
             <Route
               path="settings"
               element={

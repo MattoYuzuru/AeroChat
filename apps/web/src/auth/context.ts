@@ -34,6 +34,7 @@ export interface AuthContextValue {
   register(input: RegisterInput): Promise<void>;
   logout(): Promise<void>;
   discardSession(): void;
+  expireSession(message?: string): void;
   retryBootstrap(): Promise<void>;
   refreshProfile(): Promise<Profile>;
   updateProfile(input: UpdateCurrentProfileInput): Promise<Profile>;
