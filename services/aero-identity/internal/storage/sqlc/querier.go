@@ -6,11 +6,29 @@ package identitysqlc
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type Querier interface {
-	// Foundation phase: sqlc подключён заранее, но доменные запросы появятся только на этапе Identity foundation.
-	FoundationStatus(ctx context.Context) (string, error)
+	CreateDevice(ctx context.Context, arg CreateDeviceParams) (UserDevice, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUserBlock(ctx context.Context, arg CreateUserBlockParams) error
+	CreateUserPasswordCredential(ctx context.Context, arg CreateUserPasswordCredentialParams) error
+	DeleteUserBlock(ctx context.Context, arg DeleteUserBlockParams) (int64, error)
+	GetPasswordCredentialByLogin(ctx context.Context, login string) (GetPasswordCredentialByLoginRow, error)
+	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	GetUserByLogin(ctx context.Context, login string) (User, error)
+	ListBlockedUsersByUserID(ctx context.Context, blockerUserID uuid.UUID) ([]ListBlockedUsersByUserIDRow, error)
+	ListDevicesByUserID(ctx context.Context, userID uuid.UUID) ([]UserDevice, error)
+	ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
+	RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (int64, error)
+	RevokeDeviceSessions(ctx context.Context, arg RevokeDeviceSessionsParams) error
+	RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error)
+	TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error
+	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 }
 
 var _ Querier = (*Queries)(nil)

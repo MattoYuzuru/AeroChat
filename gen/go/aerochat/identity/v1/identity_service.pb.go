@@ -10,6 +10,7 @@ import (
 	v1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -22,6 +23,551 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type KeyBackupStatus int32
+
+const (
+	KeyBackupStatus_KEY_BACKUP_STATUS_UNSPECIFIED    KeyBackupStatus = 0
+	KeyBackupStatus_KEY_BACKUP_STATUS_NOT_CONFIGURED KeyBackupStatus = 1
+	KeyBackupStatus_KEY_BACKUP_STATUS_CONFIGURED     KeyBackupStatus = 2
+)
+
+// Enum value maps for KeyBackupStatus.
+var (
+	KeyBackupStatus_name = map[int32]string{
+		0: "KEY_BACKUP_STATUS_UNSPECIFIED",
+		1: "KEY_BACKUP_STATUS_NOT_CONFIGURED",
+		2: "KEY_BACKUP_STATUS_CONFIGURED",
+	}
+	KeyBackupStatus_value = map[string]int32{
+		"KEY_BACKUP_STATUS_UNSPECIFIED":    0,
+		"KEY_BACKUP_STATUS_NOT_CONFIGURED": 1,
+		"KEY_BACKUP_STATUS_CONFIGURED":     2,
+	}
+)
+
+func (x KeyBackupStatus) Enum() *KeyBackupStatus {
+	p := new(KeyBackupStatus)
+	*p = x
+	return p
+}
+
+func (x KeyBackupStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (KeyBackupStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_aerochat_identity_v1_identity_service_proto_enumTypes[0].Descriptor()
+}
+
+func (KeyBackupStatus) Type() protoreflect.EnumType {
+	return &file_aerochat_identity_v1_identity_service_proto_enumTypes[0]
+}
+
+func (x KeyBackupStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use KeyBackupStatus.Descriptor instead.
+func (KeyBackupStatus) EnumDescriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{0}
+}
+
+type Profile struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Id                      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Login                   string                 `protobuf:"bytes,2,opt,name=login,proto3" json:"login,omitempty"`
+	Nickname                string                 `protobuf:"bytes,3,opt,name=nickname,proto3" json:"nickname,omitempty"`
+	AvatarUrl               *string                `protobuf:"bytes,4,opt,name=avatar_url,json=avatarUrl,proto3,oneof" json:"avatar_url,omitempty"`
+	Bio                     *string                `protobuf:"bytes,5,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
+	Timezone                *string                `protobuf:"bytes,6,opt,name=timezone,proto3,oneof" json:"timezone,omitempty"`
+	ProfileAccent           *string                `protobuf:"bytes,7,opt,name=profile_accent,json=profileAccent,proto3,oneof" json:"profile_accent,omitempty"`
+	StatusText              *string                `protobuf:"bytes,8,opt,name=status_text,json=statusText,proto3,oneof" json:"status_text,omitempty"`
+	Birthday                *string                `protobuf:"bytes,9,opt,name=birthday,proto3,oneof" json:"birthday,omitempty"`
+	Country                 *string                `protobuf:"bytes,10,opt,name=country,proto3,oneof" json:"country,omitempty"`
+	City                    *string                `protobuf:"bytes,11,opt,name=city,proto3,oneof" json:"city,omitempty"`
+	ReadReceiptsEnabled     bool                   `protobuf:"varint,12,opt,name=read_receipts_enabled,json=readReceiptsEnabled,proto3" json:"read_receipts_enabled,omitempty"`
+	PresenceEnabled         bool                   `protobuf:"varint,13,opt,name=presence_enabled,json=presenceEnabled,proto3" json:"presence_enabled,omitempty"`
+	TypingVisibilityEnabled bool                   `protobuf:"varint,14,opt,name=typing_visibility_enabled,json=typingVisibilityEnabled,proto3" json:"typing_visibility_enabled,omitempty"`
+	KeyBackupStatus         KeyBackupStatus        `protobuf:"varint,15,opt,name=key_backup_status,json=keyBackupStatus,proto3,enum=aerochat.identity.v1.KeyBackupStatus" json:"key_backup_status,omitempty"`
+	CreatedAt               *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt               *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *Profile) Reset() {
+	*x = Profile{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Profile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Profile) ProtoMessage() {}
+
+func (x *Profile) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Profile.ProtoReflect.Descriptor instead.
+func (*Profile) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Profile) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Profile) GetLogin() string {
+	if x != nil {
+		return x.Login
+	}
+	return ""
+}
+
+func (x *Profile) GetNickname() string {
+	if x != nil {
+		return x.Nickname
+	}
+	return ""
+}
+
+func (x *Profile) GetAvatarUrl() string {
+	if x != nil && x.AvatarUrl != nil {
+		return *x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *Profile) GetBio() string {
+	if x != nil && x.Bio != nil {
+		return *x.Bio
+	}
+	return ""
+}
+
+func (x *Profile) GetTimezone() string {
+	if x != nil && x.Timezone != nil {
+		return *x.Timezone
+	}
+	return ""
+}
+
+func (x *Profile) GetProfileAccent() string {
+	if x != nil && x.ProfileAccent != nil {
+		return *x.ProfileAccent
+	}
+	return ""
+}
+
+func (x *Profile) GetStatusText() string {
+	if x != nil && x.StatusText != nil {
+		return *x.StatusText
+	}
+	return ""
+}
+
+func (x *Profile) GetBirthday() string {
+	if x != nil && x.Birthday != nil {
+		return *x.Birthday
+	}
+	return ""
+}
+
+func (x *Profile) GetCountry() string {
+	if x != nil && x.Country != nil {
+		return *x.Country
+	}
+	return ""
+}
+
+func (x *Profile) GetCity() string {
+	if x != nil && x.City != nil {
+		return *x.City
+	}
+	return ""
+}
+
+func (x *Profile) GetReadReceiptsEnabled() bool {
+	if x != nil {
+		return x.ReadReceiptsEnabled
+	}
+	return false
+}
+
+func (x *Profile) GetPresenceEnabled() bool {
+	if x != nil {
+		return x.PresenceEnabled
+	}
+	return false
+}
+
+func (x *Profile) GetTypingVisibilityEnabled() bool {
+	if x != nil {
+		return x.TypingVisibilityEnabled
+	}
+	return false
+}
+
+func (x *Profile) GetKeyBackupStatus() KeyBackupStatus {
+	if x != nil {
+		return x.KeyBackupStatus
+	}
+	return KeyBackupStatus_KEY_BACKUP_STATUS_UNSPECIFIED
+}
+
+func (x *Profile) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Profile) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type Device struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	LastSeenAt    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
+	RevokedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=revoked_at,json=revokedAt,proto3,oneof" json:"revoked_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Device) Reset() {
+	*x = Device{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Device) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Device) ProtoMessage() {}
+
+func (x *Device) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Device.ProtoReflect.Descriptor instead.
+func (*Device) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Device) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Device) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *Device) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Device) GetLastSeenAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSeenAt
+	}
+	return nil
+}
+
+func (x *Device) GetRevokedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RevokedAt
+	}
+	return nil
+}
+
+type Session struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	DeviceId      string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	LastSeenAt    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
+	RevokedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=revoked_at,json=revokedAt,proto3,oneof" json:"revoked_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Session) Reset() {
+	*x = Session{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Session) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Session) ProtoMessage() {}
+
+func (x *Session) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Session.ProtoReflect.Descriptor instead.
+func (*Session) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Session) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Session) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *Session) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Session) GetLastSeenAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSeenAt
+	}
+	return nil
+}
+
+func (x *Session) GetRevokedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RevokedAt
+	}
+	return nil
+}
+
+type DeviceWithSessions struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Device        *Device                `protobuf:"bytes,1,opt,name=device,proto3" json:"device,omitempty"`
+	Sessions      []*Session             `protobuf:"bytes,2,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeviceWithSessions) Reset() {
+	*x = DeviceWithSessions{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeviceWithSessions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeviceWithSessions) ProtoMessage() {}
+
+func (x *DeviceWithSessions) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeviceWithSessions.ProtoReflect.Descriptor instead.
+func (*DeviceWithSessions) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DeviceWithSessions) GetDevice() *Device {
+	if x != nil {
+		return x.Device
+	}
+	return nil
+}
+
+func (x *DeviceWithSessions) GetSessions() []*Session {
+	if x != nil {
+		return x.Sessions
+	}
+	return nil
+}
+
+type BlockedUser struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *Profile               `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	BlockedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=blocked_at,json=blockedAt,proto3" json:"blocked_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockedUser) Reset() {
+	*x = BlockedUser{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockedUser) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockedUser) ProtoMessage() {}
+
+func (x *BlockedUser) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockedUser.ProtoReflect.Descriptor instead.
+func (*BlockedUser) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *BlockedUser) GetProfile() *Profile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *BlockedUser) GetBlockedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.BlockedAt
+	}
+	return nil
+}
+
+type CurrentAuth struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *Profile               `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	Device        *Device                `protobuf:"bytes,2,opt,name=device,proto3" json:"device,omitempty"`
+	Session       *Session               `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	SessionToken  string                 `protobuf:"bytes,4,opt,name=session_token,json=sessionToken,proto3" json:"session_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CurrentAuth) Reset() {
+	*x = CurrentAuth{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CurrentAuth) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CurrentAuth) ProtoMessage() {}
+
+func (x *CurrentAuth) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CurrentAuth.ProtoReflect.Descriptor instead.
+func (*CurrentAuth) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CurrentAuth) GetProfile() *Profile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *CurrentAuth) GetDevice() *Device {
+	if x != nil {
+		return x.Device
+	}
+	return nil
+}
+
+func (x *CurrentAuth) GetSession() *Session {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+func (x *CurrentAuth) GetSessionToken() string {
+	if x != nil {
+		return x.SessionToken
+	}
+	return ""
+}
+
 type PingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -30,7 +576,7 @@ type PingRequest struct {
 
 func (x *PingRequest) Reset() {
 	*x = PingRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[0]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +588,7 @@ func (x *PingRequest) String() string {
 func (*PingRequest) ProtoMessage() {}
 
 func (x *PingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[0]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +601,7 @@ func (x *PingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingRequest.ProtoReflect.Descriptor instead.
 func (*PingRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{0}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{6}
 }
 
 type PingResponse struct {
@@ -67,7 +613,7 @@ type PingResponse struct {
 
 func (x *PingResponse) Reset() {
 	*x = PingResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[1]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -79,7 +625,7 @@ func (x *PingResponse) String() string {
 func (*PingResponse) ProtoMessage() {}
 
 func (x *PingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[1]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -92,7 +638,7 @@ func (x *PingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingResponse.ProtoReflect.Descriptor instead.
 func (*PingResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{1}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PingResponse) GetService() *v1.ServiceMeta {
@@ -102,16 +648,1146 @@ func (x *PingResponse) GetService() *v1.ServiceMeta {
 	return nil
 }
 
+type RegisterRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Login         string                 `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	Nickname      string                 `protobuf:"bytes,3,opt,name=nickname,proto3" json:"nickname,omitempty"`
+	DeviceLabel   *string                `protobuf:"bytes,4,opt,name=device_label,json=deviceLabel,proto3,oneof" json:"device_label,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterRequest) Reset() {
+	*x = RegisterRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterRequest) ProtoMessage() {}
+
+func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
+func (*RegisterRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RegisterRequest) GetLogin() string {
+	if x != nil {
+		return x.Login
+	}
+	return ""
+}
+
+func (x *RegisterRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *RegisterRequest) GetNickname() string {
+	if x != nil {
+		return x.Nickname
+	}
+	return ""
+}
+
+func (x *RegisterRequest) GetDeviceLabel() string {
+	if x != nil && x.DeviceLabel != nil {
+		return *x.DeviceLabel
+	}
+	return ""
+}
+
+type RegisterResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Auth          *CurrentAuth           `protobuf:"bytes,1,opt,name=auth,proto3" json:"auth,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterResponse) Reset() {
+	*x = RegisterResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterResponse) ProtoMessage() {}
+
+func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
+func (*RegisterResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RegisterResponse) GetAuth() *CurrentAuth {
+	if x != nil {
+		return x.Auth
+	}
+	return nil
+}
+
+type LoginRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Login         string                 `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	DeviceLabel   *string                `protobuf:"bytes,3,opt,name=device_label,json=deviceLabel,proto3,oneof" json:"device_label,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginRequest) Reset() {
+	*x = LoginRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginRequest) ProtoMessage() {}
+
+func (x *LoginRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginRequest.ProtoReflect.Descriptor instead.
+func (*LoginRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *LoginRequest) GetLogin() string {
+	if x != nil {
+		return x.Login
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetDeviceLabel() string {
+	if x != nil && x.DeviceLabel != nil {
+		return *x.DeviceLabel
+	}
+	return ""
+}
+
+type LoginResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Auth          *CurrentAuth           `protobuf:"bytes,1,opt,name=auth,proto3" json:"auth,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginResponse) Reset() {
+	*x = LoginResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginResponse) ProtoMessage() {}
+
+func (x *LoginResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginResponse.ProtoReflect.Descriptor instead.
+func (*LoginResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *LoginResponse) GetAuth() *CurrentAuth {
+	if x != nil {
+		return x.Auth
+	}
+	return nil
+}
+
+type LogoutCurrentSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutCurrentSessionRequest) Reset() {
+	*x = LogoutCurrentSessionRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutCurrentSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutCurrentSessionRequest) ProtoMessage() {}
+
+func (x *LogoutCurrentSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutCurrentSessionRequest.ProtoReflect.Descriptor instead.
+func (*LogoutCurrentSessionRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{12}
+}
+
+type LogoutCurrentSessionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutCurrentSessionResponse) Reset() {
+	*x = LogoutCurrentSessionResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutCurrentSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutCurrentSessionResponse) ProtoMessage() {}
+
+func (x *LogoutCurrentSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutCurrentSessionResponse.ProtoReflect.Descriptor instead.
+func (*LogoutCurrentSessionResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{13}
+}
+
+type GetCurrentProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCurrentProfileRequest) Reset() {
+	*x = GetCurrentProfileRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCurrentProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCurrentProfileRequest) ProtoMessage() {}
+
+func (x *GetCurrentProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCurrentProfileRequest.ProtoReflect.Descriptor instead.
+func (*GetCurrentProfileRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{14}
+}
+
+type GetCurrentProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *Profile               `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCurrentProfileResponse) Reset() {
+	*x = GetCurrentProfileResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCurrentProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCurrentProfileResponse) ProtoMessage() {}
+
+func (x *GetCurrentProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCurrentProfileResponse.ProtoReflect.Descriptor instead.
+func (*GetCurrentProfileResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetCurrentProfileResponse) GetProfile() *Profile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+type UpdateCurrentProfileRequest struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Nickname                *string                `protobuf:"bytes,1,opt,name=nickname,proto3,oneof" json:"nickname,omitempty"`
+	AvatarUrl               *string                `protobuf:"bytes,2,opt,name=avatar_url,json=avatarUrl,proto3,oneof" json:"avatar_url,omitempty"`
+	Bio                     *string                `protobuf:"bytes,3,opt,name=bio,proto3,oneof" json:"bio,omitempty"`
+	Timezone                *string                `protobuf:"bytes,4,opt,name=timezone,proto3,oneof" json:"timezone,omitempty"`
+	ProfileAccent           *string                `protobuf:"bytes,5,opt,name=profile_accent,json=profileAccent,proto3,oneof" json:"profile_accent,omitempty"`
+	StatusText              *string                `protobuf:"bytes,6,opt,name=status_text,json=statusText,proto3,oneof" json:"status_text,omitempty"`
+	Birthday                *string                `protobuf:"bytes,7,opt,name=birthday,proto3,oneof" json:"birthday,omitempty"`
+	Country                 *string                `protobuf:"bytes,8,opt,name=country,proto3,oneof" json:"country,omitempty"`
+	City                    *string                `protobuf:"bytes,9,opt,name=city,proto3,oneof" json:"city,omitempty"`
+	ReadReceiptsEnabled     *bool                  `protobuf:"varint,10,opt,name=read_receipts_enabled,json=readReceiptsEnabled,proto3,oneof" json:"read_receipts_enabled,omitempty"`
+	PresenceEnabled         *bool                  `protobuf:"varint,11,opt,name=presence_enabled,json=presenceEnabled,proto3,oneof" json:"presence_enabled,omitempty"`
+	TypingVisibilityEnabled *bool                  `protobuf:"varint,12,opt,name=typing_visibility_enabled,json=typingVisibilityEnabled,proto3,oneof" json:"typing_visibility_enabled,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *UpdateCurrentProfileRequest) Reset() {
+	*x = UpdateCurrentProfileRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateCurrentProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateCurrentProfileRequest) ProtoMessage() {}
+
+func (x *UpdateCurrentProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateCurrentProfileRequest.ProtoReflect.Descriptor instead.
+func (*UpdateCurrentProfileRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UpdateCurrentProfileRequest) GetNickname() string {
+	if x != nil && x.Nickname != nil {
+		return *x.Nickname
+	}
+	return ""
+}
+
+func (x *UpdateCurrentProfileRequest) GetAvatarUrl() string {
+	if x != nil && x.AvatarUrl != nil {
+		return *x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *UpdateCurrentProfileRequest) GetBio() string {
+	if x != nil && x.Bio != nil {
+		return *x.Bio
+	}
+	return ""
+}
+
+func (x *UpdateCurrentProfileRequest) GetTimezone() string {
+	if x != nil && x.Timezone != nil {
+		return *x.Timezone
+	}
+	return ""
+}
+
+func (x *UpdateCurrentProfileRequest) GetProfileAccent() string {
+	if x != nil && x.ProfileAccent != nil {
+		return *x.ProfileAccent
+	}
+	return ""
+}
+
+func (x *UpdateCurrentProfileRequest) GetStatusText() string {
+	if x != nil && x.StatusText != nil {
+		return *x.StatusText
+	}
+	return ""
+}
+
+func (x *UpdateCurrentProfileRequest) GetBirthday() string {
+	if x != nil && x.Birthday != nil {
+		return *x.Birthday
+	}
+	return ""
+}
+
+func (x *UpdateCurrentProfileRequest) GetCountry() string {
+	if x != nil && x.Country != nil {
+		return *x.Country
+	}
+	return ""
+}
+
+func (x *UpdateCurrentProfileRequest) GetCity() string {
+	if x != nil && x.City != nil {
+		return *x.City
+	}
+	return ""
+}
+
+func (x *UpdateCurrentProfileRequest) GetReadReceiptsEnabled() bool {
+	if x != nil && x.ReadReceiptsEnabled != nil {
+		return *x.ReadReceiptsEnabled
+	}
+	return false
+}
+
+func (x *UpdateCurrentProfileRequest) GetPresenceEnabled() bool {
+	if x != nil && x.PresenceEnabled != nil {
+		return *x.PresenceEnabled
+	}
+	return false
+}
+
+func (x *UpdateCurrentProfileRequest) GetTypingVisibilityEnabled() bool {
+	if x != nil && x.TypingVisibilityEnabled != nil {
+		return *x.TypingVisibilityEnabled
+	}
+	return false
+}
+
+type UpdateCurrentProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *Profile               `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateCurrentProfileResponse) Reset() {
+	*x = UpdateCurrentProfileResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateCurrentProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateCurrentProfileResponse) ProtoMessage() {}
+
+func (x *UpdateCurrentProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateCurrentProfileResponse.ProtoReflect.Descriptor instead.
+func (*UpdateCurrentProfileResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *UpdateCurrentProfileResponse) GetProfile() *Profile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+type ListDevicesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDevicesRequest) Reset() {
+	*x = ListDevicesRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDevicesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDevicesRequest) ProtoMessage() {}
+
+func (x *ListDevicesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDevicesRequest.ProtoReflect.Descriptor instead.
+func (*ListDevicesRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{18}
+}
+
+type ListDevicesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Devices       []*DeviceWithSessions  `protobuf:"bytes,1,rep,name=devices,proto3" json:"devices,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDevicesResponse) Reset() {
+	*x = ListDevicesResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDevicesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDevicesResponse) ProtoMessage() {}
+
+func (x *ListDevicesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDevicesResponse.ProtoReflect.Descriptor instead.
+func (*ListDevicesResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListDevicesResponse) GetDevices() []*DeviceWithSessions {
+	if x != nil {
+		return x.Devices
+	}
+	return nil
+}
+
+type RevokeSessionOrDeviceRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Target:
+	//
+	//	*RevokeSessionOrDeviceRequest_SessionId
+	//	*RevokeSessionOrDeviceRequest_DeviceId
+	Target        isRevokeSessionOrDeviceRequest_Target `protobuf_oneof:"target"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeSessionOrDeviceRequest) Reset() {
+	*x = RevokeSessionOrDeviceRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeSessionOrDeviceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeSessionOrDeviceRequest) ProtoMessage() {}
+
+func (x *RevokeSessionOrDeviceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeSessionOrDeviceRequest.ProtoReflect.Descriptor instead.
+func (*RevokeSessionOrDeviceRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *RevokeSessionOrDeviceRequest) GetTarget() isRevokeSessionOrDeviceRequest_Target {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *RevokeSessionOrDeviceRequest) GetSessionId() string {
+	if x != nil {
+		if x, ok := x.Target.(*RevokeSessionOrDeviceRequest_SessionId); ok {
+			return x.SessionId
+		}
+	}
+	return ""
+}
+
+func (x *RevokeSessionOrDeviceRequest) GetDeviceId() string {
+	if x != nil {
+		if x, ok := x.Target.(*RevokeSessionOrDeviceRequest_DeviceId); ok {
+			return x.DeviceId
+		}
+	}
+	return ""
+}
+
+type isRevokeSessionOrDeviceRequest_Target interface {
+	isRevokeSessionOrDeviceRequest_Target()
+}
+
+type RevokeSessionOrDeviceRequest_SessionId struct {
+	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3,oneof"`
+}
+
+type RevokeSessionOrDeviceRequest_DeviceId struct {
+	DeviceId string `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3,oneof"`
+}
+
+func (*RevokeSessionOrDeviceRequest_SessionId) isRevokeSessionOrDeviceRequest_Target() {}
+
+func (*RevokeSessionOrDeviceRequest_DeviceId) isRevokeSessionOrDeviceRequest_Target() {}
+
+type RevokeSessionOrDeviceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeSessionOrDeviceResponse) Reset() {
+	*x = RevokeSessionOrDeviceResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeSessionOrDeviceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeSessionOrDeviceResponse) ProtoMessage() {}
+
+func (x *RevokeSessionOrDeviceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeSessionOrDeviceResponse.ProtoReflect.Descriptor instead.
+func (*RevokeSessionOrDeviceResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{21}
+}
+
+type ListBlockedUsersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlockedUsersRequest) Reset() {
+	*x = ListBlockedUsersRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlockedUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlockedUsersRequest) ProtoMessage() {}
+
+func (x *ListBlockedUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlockedUsersRequest.ProtoReflect.Descriptor instead.
+func (*ListBlockedUsersRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{22}
+}
+
+type ListBlockedUsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BlockedUsers  []*BlockedUser         `protobuf:"bytes,1,rep,name=blocked_users,json=blockedUsers,proto3" json:"blocked_users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlockedUsersResponse) Reset() {
+	*x = ListBlockedUsersResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlockedUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlockedUsersResponse) ProtoMessage() {}
+
+func (x *ListBlockedUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlockedUsersResponse.ProtoReflect.Descriptor instead.
+func (*ListBlockedUsersResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ListBlockedUsersResponse) GetBlockedUsers() []*BlockedUser {
+	if x != nil {
+		return x.BlockedUsers
+	}
+	return nil
+}
+
+type BlockUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Login         string                 `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockUserRequest) Reset() {
+	*x = BlockUserRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockUserRequest) ProtoMessage() {}
+
+func (x *BlockUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockUserRequest.ProtoReflect.Descriptor instead.
+func (*BlockUserRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *BlockUserRequest) GetLogin() string {
+	if x != nil {
+		return x.Login
+	}
+	return ""
+}
+
+type BlockUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockUserResponse) Reset() {
+	*x = BlockUserResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockUserResponse) ProtoMessage() {}
+
+func (x *BlockUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockUserResponse.ProtoReflect.Descriptor instead.
+func (*BlockUserResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{25}
+}
+
+type UnblockUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Login         string                 `protobuf:"bytes,1,opt,name=login,proto3" json:"login,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnblockUserRequest) Reset() {
+	*x = UnblockUserRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnblockUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnblockUserRequest) ProtoMessage() {}
+
+func (x *UnblockUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnblockUserRequest.ProtoReflect.Descriptor instead.
+func (*UnblockUserRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *UnblockUserRequest) GetLogin() string {
+	if x != nil {
+		return x.Login
+	}
+	return ""
+}
+
+type UnblockUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnblockUserResponse) Reset() {
+	*x = UnblockUserResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnblockUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnblockUserResponse) ProtoMessage() {}
+
+func (x *UnblockUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnblockUserResponse.ProtoReflect.Descriptor instead.
+func (*UnblockUserResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{27}
+}
+
 var File_aerochat_identity_v1_identity_service_proto protoreflect.FileDescriptor
 
 const file_aerochat_identity_v1_identity_service_proto_rawDesc = "" +
 	"\n" +
-	"+aerochat/identity/v1/identity_service.proto\x12\x14aerochat.identity.v1\x1a\x1faerochat/common/v1/common.proto\"\r\n" +
+	"+aerochat/identity/v1/identity_service.proto\x12\x14aerochat.identity.v1\x1a\x1faerochat/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9f\x06\n" +
+	"\aProfile\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05login\x18\x02 \x01(\tR\x05login\x12\x1a\n" +
+	"\bnickname\x18\x03 \x01(\tR\bnickname\x12\"\n" +
+	"\n" +
+	"avatar_url\x18\x04 \x01(\tH\x00R\tavatarUrl\x88\x01\x01\x12\x15\n" +
+	"\x03bio\x18\x05 \x01(\tH\x01R\x03bio\x88\x01\x01\x12\x1f\n" +
+	"\btimezone\x18\x06 \x01(\tH\x02R\btimezone\x88\x01\x01\x12*\n" +
+	"\x0eprofile_accent\x18\a \x01(\tH\x03R\rprofileAccent\x88\x01\x01\x12$\n" +
+	"\vstatus_text\x18\b \x01(\tH\x04R\n" +
+	"statusText\x88\x01\x01\x12\x1f\n" +
+	"\bbirthday\x18\t \x01(\tH\x05R\bbirthday\x88\x01\x01\x12\x1d\n" +
+	"\acountry\x18\n" +
+	" \x01(\tH\x06R\acountry\x88\x01\x01\x12\x17\n" +
+	"\x04city\x18\v \x01(\tH\aR\x04city\x88\x01\x01\x122\n" +
+	"\x15read_receipts_enabled\x18\f \x01(\bR\x13readReceiptsEnabled\x12)\n" +
+	"\x10presence_enabled\x18\r \x01(\bR\x0fpresenceEnabled\x12:\n" +
+	"\x19typing_visibility_enabled\x18\x0e \x01(\bR\x17typingVisibilityEnabled\x12Q\n" +
+	"\x11key_backup_status\x18\x0f \x01(\x0e2%.aerochat.identity.v1.KeyBackupStatusR\x0fkeyBackupStatus\x129\n" +
+	"\n" +
+	"created_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\r\n" +
+	"\v_avatar_urlB\x06\n" +
+	"\x04_bioB\v\n" +
+	"\t_timezoneB\x11\n" +
+	"\x0f_profile_accentB\x0e\n" +
+	"\f_status_textB\v\n" +
+	"\t_birthdayB\n" +
+	"\n" +
+	"\b_countryB\a\n" +
+	"\x05_city\"\xf6\x01\n" +
+	"\x06Device\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x129\n" +
+	"\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
+	"\flast_seen_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastSeenAt\x12>\n" +
+	"\n" +
+	"revoked_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\trevokedAt\x88\x01\x01B\r\n" +
+	"\v_revoked_at\"\xfe\x01\n" +
+	"\aSession\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x129\n" +
+	"\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
+	"\flast_seen_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastSeenAt\x12>\n" +
+	"\n" +
+	"revoked_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\trevokedAt\x88\x01\x01B\r\n" +
+	"\v_revoked_at\"\x85\x01\n" +
+	"\x12DeviceWithSessions\x124\n" +
+	"\x06device\x18\x01 \x01(\v2\x1c.aerochat.identity.v1.DeviceR\x06device\x129\n" +
+	"\bsessions\x18\x02 \x03(\v2\x1d.aerochat.identity.v1.SessionR\bsessions\"\x81\x01\n" +
+	"\vBlockedUser\x127\n" +
+	"\aprofile\x18\x01 \x01(\v2\x1d.aerochat.identity.v1.ProfileR\aprofile\x129\n" +
+	"\n" +
+	"blocked_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tblockedAt\"\xda\x01\n" +
+	"\vCurrentAuth\x127\n" +
+	"\aprofile\x18\x01 \x01(\v2\x1d.aerochat.identity.v1.ProfileR\aprofile\x124\n" +
+	"\x06device\x18\x02 \x01(\v2\x1c.aerochat.identity.v1.DeviceR\x06device\x127\n" +
+	"\asession\x18\x03 \x01(\v2\x1d.aerochat.identity.v1.SessionR\asession\x12#\n" +
+	"\rsession_token\x18\x04 \x01(\tR\fsessionToken\"\r\n" +
 	"\vPingRequest\"I\n" +
 	"\fPingResponse\x129\n" +
-	"\aservice\x18\x01 \x01(\v2\x1f.aerochat.common.v1.ServiceMetaR\aservice2`\n" +
+	"\aservice\x18\x01 \x01(\v2\x1f.aerochat.common.v1.ServiceMetaR\aservice\"\x98\x01\n" +
+	"\x0fRegisterRequest\x12\x14\n" +
+	"\x05login\x18\x01 \x01(\tR\x05login\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1a\n" +
+	"\bnickname\x18\x03 \x01(\tR\bnickname\x12&\n" +
+	"\fdevice_label\x18\x04 \x01(\tH\x00R\vdeviceLabel\x88\x01\x01B\x0f\n" +
+	"\r_device_label\"I\n" +
+	"\x10RegisterResponse\x125\n" +
+	"\x04auth\x18\x01 \x01(\v2!.aerochat.identity.v1.CurrentAuthR\x04auth\"y\n" +
+	"\fLoginRequest\x12\x14\n" +
+	"\x05login\x18\x01 \x01(\tR\x05login\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x12&\n" +
+	"\fdevice_label\x18\x03 \x01(\tH\x00R\vdeviceLabel\x88\x01\x01B\x0f\n" +
+	"\r_device_label\"F\n" +
+	"\rLoginResponse\x125\n" +
+	"\x04auth\x18\x01 \x01(\v2!.aerochat.identity.v1.CurrentAuthR\x04auth\"\x1d\n" +
+	"\x1bLogoutCurrentSessionRequest\"\x1e\n" +
+	"\x1cLogoutCurrentSessionResponse\"\x1a\n" +
+	"\x18GetCurrentProfileRequest\"T\n" +
+	"\x19GetCurrentProfileResponse\x127\n" +
+	"\aprofile\x18\x01 \x01(\v2\x1d.aerochat.identity.v1.ProfileR\aprofile\"\xb2\x05\n" +
+	"\x1bUpdateCurrentProfileRequest\x12\x1f\n" +
+	"\bnickname\x18\x01 \x01(\tH\x00R\bnickname\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"avatar_url\x18\x02 \x01(\tH\x01R\tavatarUrl\x88\x01\x01\x12\x15\n" +
+	"\x03bio\x18\x03 \x01(\tH\x02R\x03bio\x88\x01\x01\x12\x1f\n" +
+	"\btimezone\x18\x04 \x01(\tH\x03R\btimezone\x88\x01\x01\x12*\n" +
+	"\x0eprofile_accent\x18\x05 \x01(\tH\x04R\rprofileAccent\x88\x01\x01\x12$\n" +
+	"\vstatus_text\x18\x06 \x01(\tH\x05R\n" +
+	"statusText\x88\x01\x01\x12\x1f\n" +
+	"\bbirthday\x18\a \x01(\tH\x06R\bbirthday\x88\x01\x01\x12\x1d\n" +
+	"\acountry\x18\b \x01(\tH\aR\acountry\x88\x01\x01\x12\x17\n" +
+	"\x04city\x18\t \x01(\tH\bR\x04city\x88\x01\x01\x127\n" +
+	"\x15read_receipts_enabled\x18\n" +
+	" \x01(\bH\tR\x13readReceiptsEnabled\x88\x01\x01\x12.\n" +
+	"\x10presence_enabled\x18\v \x01(\bH\n" +
+	"R\x0fpresenceEnabled\x88\x01\x01\x12?\n" +
+	"\x19typing_visibility_enabled\x18\f \x01(\bH\vR\x17typingVisibilityEnabled\x88\x01\x01B\v\n" +
+	"\t_nicknameB\r\n" +
+	"\v_avatar_urlB\x06\n" +
+	"\x04_bioB\v\n" +
+	"\t_timezoneB\x11\n" +
+	"\x0f_profile_accentB\x0e\n" +
+	"\f_status_textB\v\n" +
+	"\t_birthdayB\n" +
+	"\n" +
+	"\b_countryB\a\n" +
+	"\x05_cityB\x18\n" +
+	"\x16_read_receipts_enabledB\x13\n" +
+	"\x11_presence_enabledB\x1c\n" +
+	"\x1a_typing_visibility_enabled\"W\n" +
+	"\x1cUpdateCurrentProfileResponse\x127\n" +
+	"\aprofile\x18\x01 \x01(\v2\x1d.aerochat.identity.v1.ProfileR\aprofile\"\x14\n" +
+	"\x12ListDevicesRequest\"Y\n" +
+	"\x13ListDevicesResponse\x12B\n" +
+	"\adevices\x18\x01 \x03(\v2(.aerochat.identity.v1.DeviceWithSessionsR\adevices\"h\n" +
+	"\x1cRevokeSessionOrDeviceRequest\x12\x1f\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tH\x00R\tsessionId\x12\x1d\n" +
+	"\tdevice_id\x18\x02 \x01(\tH\x00R\bdeviceIdB\b\n" +
+	"\x06target\"\x1f\n" +
+	"\x1dRevokeSessionOrDeviceResponse\"\x19\n" +
+	"\x17ListBlockedUsersRequest\"b\n" +
+	"\x18ListBlockedUsersResponse\x12F\n" +
+	"\rblocked_users\x18\x01 \x03(\v2!.aerochat.identity.v1.BlockedUserR\fblockedUsers\"(\n" +
+	"\x10BlockUserRequest\x12\x14\n" +
+	"\x05login\x18\x01 \x01(\tR\x05login\"\x13\n" +
+	"\x11BlockUserResponse\"*\n" +
+	"\x12UnblockUserRequest\x12\x14\n" +
+	"\x05login\x18\x01 \x01(\tR\x05login\"\x15\n" +
+	"\x13UnblockUserResponse*|\n" +
+	"\x0fKeyBackupStatus\x12!\n" +
+	"\x1dKEY_BACKUP_STATUS_UNSPECIFIED\x10\x00\x12$\n" +
+	" KEY_BACKUP_STATUS_NOT_CONFIGURED\x10\x01\x12 \n" +
+	"\x1cKEY_BACKUP_STATUS_CONFIGURED\x10\x022\x9d\t\n" +
 	"\x0fIdentityService\x12M\n" +
-	"\x04Ping\x12!.aerochat.identity.v1.PingRequest\x1a\".aerochat.identity.v1.PingResponseBHZFgithub.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1;identityv1b\x06proto3"
+	"\x04Ping\x12!.aerochat.identity.v1.PingRequest\x1a\".aerochat.identity.v1.PingResponse\x12Y\n" +
+	"\bRegister\x12%.aerochat.identity.v1.RegisterRequest\x1a&.aerochat.identity.v1.RegisterResponse\x12P\n" +
+	"\x05Login\x12\".aerochat.identity.v1.LoginRequest\x1a#.aerochat.identity.v1.LoginResponse\x12}\n" +
+	"\x14LogoutCurrentSession\x121.aerochat.identity.v1.LogoutCurrentSessionRequest\x1a2.aerochat.identity.v1.LogoutCurrentSessionResponse\x12t\n" +
+	"\x11GetCurrentProfile\x12..aerochat.identity.v1.GetCurrentProfileRequest\x1a/.aerochat.identity.v1.GetCurrentProfileResponse\x12}\n" +
+	"\x14UpdateCurrentProfile\x121.aerochat.identity.v1.UpdateCurrentProfileRequest\x1a2.aerochat.identity.v1.UpdateCurrentProfileResponse\x12b\n" +
+	"\vListDevices\x12(.aerochat.identity.v1.ListDevicesRequest\x1a).aerochat.identity.v1.ListDevicesResponse\x12\x80\x01\n" +
+	"\x15RevokeSessionOrDevice\x122.aerochat.identity.v1.RevokeSessionOrDeviceRequest\x1a3.aerochat.identity.v1.RevokeSessionOrDeviceResponse\x12q\n" +
+	"\x10ListBlockedUsers\x12-.aerochat.identity.v1.ListBlockedUsersRequest\x1a..aerochat.identity.v1.ListBlockedUsersResponse\x12\\\n" +
+	"\tBlockUser\x12&.aerochat.identity.v1.BlockUserRequest\x1a'.aerochat.identity.v1.BlockUserResponse\x12b\n" +
+	"\vUnblockUser\x12(.aerochat.identity.v1.UnblockUserRequest\x1a).aerochat.identity.v1.UnblockUserResponseBHZFgithub.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1;identityv1b\x06proto3"
 
 var (
 	file_aerochat_identity_v1_identity_service_proto_rawDescOnce sync.Once
@@ -125,21 +1801,92 @@ func file_aerochat_identity_v1_identity_service_proto_rawDescGZIP() []byte {
 	return file_aerochat_identity_v1_identity_service_proto_rawDescData
 }
 
-var file_aerochat_identity_v1_identity_service_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_aerochat_identity_v1_identity_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_aerochat_identity_v1_identity_service_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_aerochat_identity_v1_identity_service_proto_goTypes = []any{
-	(*PingRequest)(nil),    // 0: aerochat.identity.v1.PingRequest
-	(*PingResponse)(nil),   // 1: aerochat.identity.v1.PingResponse
-	(*v1.ServiceMeta)(nil), // 2: aerochat.common.v1.ServiceMeta
+	(KeyBackupStatus)(0),                  // 0: aerochat.identity.v1.KeyBackupStatus
+	(*Profile)(nil),                       // 1: aerochat.identity.v1.Profile
+	(*Device)(nil),                        // 2: aerochat.identity.v1.Device
+	(*Session)(nil),                       // 3: aerochat.identity.v1.Session
+	(*DeviceWithSessions)(nil),            // 4: aerochat.identity.v1.DeviceWithSessions
+	(*BlockedUser)(nil),                   // 5: aerochat.identity.v1.BlockedUser
+	(*CurrentAuth)(nil),                   // 6: aerochat.identity.v1.CurrentAuth
+	(*PingRequest)(nil),                   // 7: aerochat.identity.v1.PingRequest
+	(*PingResponse)(nil),                  // 8: aerochat.identity.v1.PingResponse
+	(*RegisterRequest)(nil),               // 9: aerochat.identity.v1.RegisterRequest
+	(*RegisterResponse)(nil),              // 10: aerochat.identity.v1.RegisterResponse
+	(*LoginRequest)(nil),                  // 11: aerochat.identity.v1.LoginRequest
+	(*LoginResponse)(nil),                 // 12: aerochat.identity.v1.LoginResponse
+	(*LogoutCurrentSessionRequest)(nil),   // 13: aerochat.identity.v1.LogoutCurrentSessionRequest
+	(*LogoutCurrentSessionResponse)(nil),  // 14: aerochat.identity.v1.LogoutCurrentSessionResponse
+	(*GetCurrentProfileRequest)(nil),      // 15: aerochat.identity.v1.GetCurrentProfileRequest
+	(*GetCurrentProfileResponse)(nil),     // 16: aerochat.identity.v1.GetCurrentProfileResponse
+	(*UpdateCurrentProfileRequest)(nil),   // 17: aerochat.identity.v1.UpdateCurrentProfileRequest
+	(*UpdateCurrentProfileResponse)(nil),  // 18: aerochat.identity.v1.UpdateCurrentProfileResponse
+	(*ListDevicesRequest)(nil),            // 19: aerochat.identity.v1.ListDevicesRequest
+	(*ListDevicesResponse)(nil),           // 20: aerochat.identity.v1.ListDevicesResponse
+	(*RevokeSessionOrDeviceRequest)(nil),  // 21: aerochat.identity.v1.RevokeSessionOrDeviceRequest
+	(*RevokeSessionOrDeviceResponse)(nil), // 22: aerochat.identity.v1.RevokeSessionOrDeviceResponse
+	(*ListBlockedUsersRequest)(nil),       // 23: aerochat.identity.v1.ListBlockedUsersRequest
+	(*ListBlockedUsersResponse)(nil),      // 24: aerochat.identity.v1.ListBlockedUsersResponse
+	(*BlockUserRequest)(nil),              // 25: aerochat.identity.v1.BlockUserRequest
+	(*BlockUserResponse)(nil),             // 26: aerochat.identity.v1.BlockUserResponse
+	(*UnblockUserRequest)(nil),            // 27: aerochat.identity.v1.UnblockUserRequest
+	(*UnblockUserResponse)(nil),           // 28: aerochat.identity.v1.UnblockUserResponse
+	(*timestamppb.Timestamp)(nil),         // 29: google.protobuf.Timestamp
+	(*v1.ServiceMeta)(nil),                // 30: aerochat.common.v1.ServiceMeta
 }
 var file_aerochat_identity_v1_identity_service_proto_depIdxs = []int32{
-	2, // 0: aerochat.identity.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
-	0, // 1: aerochat.identity.v1.IdentityService.Ping:input_type -> aerochat.identity.v1.PingRequest
-	1, // 2: aerochat.identity.v1.IdentityService.Ping:output_type -> aerochat.identity.v1.PingResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0,  // 0: aerochat.identity.v1.Profile.key_backup_status:type_name -> aerochat.identity.v1.KeyBackupStatus
+	29, // 1: aerochat.identity.v1.Profile.created_at:type_name -> google.protobuf.Timestamp
+	29, // 2: aerochat.identity.v1.Profile.updated_at:type_name -> google.protobuf.Timestamp
+	29, // 3: aerochat.identity.v1.Device.created_at:type_name -> google.protobuf.Timestamp
+	29, // 4: aerochat.identity.v1.Device.last_seen_at:type_name -> google.protobuf.Timestamp
+	29, // 5: aerochat.identity.v1.Device.revoked_at:type_name -> google.protobuf.Timestamp
+	29, // 6: aerochat.identity.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	29, // 7: aerochat.identity.v1.Session.last_seen_at:type_name -> google.protobuf.Timestamp
+	29, // 8: aerochat.identity.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
+	2,  // 9: aerochat.identity.v1.DeviceWithSessions.device:type_name -> aerochat.identity.v1.Device
+	3,  // 10: aerochat.identity.v1.DeviceWithSessions.sessions:type_name -> aerochat.identity.v1.Session
+	1,  // 11: aerochat.identity.v1.BlockedUser.profile:type_name -> aerochat.identity.v1.Profile
+	29, // 12: aerochat.identity.v1.BlockedUser.blocked_at:type_name -> google.protobuf.Timestamp
+	1,  // 13: aerochat.identity.v1.CurrentAuth.profile:type_name -> aerochat.identity.v1.Profile
+	2,  // 14: aerochat.identity.v1.CurrentAuth.device:type_name -> aerochat.identity.v1.Device
+	3,  // 15: aerochat.identity.v1.CurrentAuth.session:type_name -> aerochat.identity.v1.Session
+	30, // 16: aerochat.identity.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
+	6,  // 17: aerochat.identity.v1.RegisterResponse.auth:type_name -> aerochat.identity.v1.CurrentAuth
+	6,  // 18: aerochat.identity.v1.LoginResponse.auth:type_name -> aerochat.identity.v1.CurrentAuth
+	1,  // 19: aerochat.identity.v1.GetCurrentProfileResponse.profile:type_name -> aerochat.identity.v1.Profile
+	1,  // 20: aerochat.identity.v1.UpdateCurrentProfileResponse.profile:type_name -> aerochat.identity.v1.Profile
+	4,  // 21: aerochat.identity.v1.ListDevicesResponse.devices:type_name -> aerochat.identity.v1.DeviceWithSessions
+	5,  // 22: aerochat.identity.v1.ListBlockedUsersResponse.blocked_users:type_name -> aerochat.identity.v1.BlockedUser
+	7,  // 23: aerochat.identity.v1.IdentityService.Ping:input_type -> aerochat.identity.v1.PingRequest
+	9,  // 24: aerochat.identity.v1.IdentityService.Register:input_type -> aerochat.identity.v1.RegisterRequest
+	11, // 25: aerochat.identity.v1.IdentityService.Login:input_type -> aerochat.identity.v1.LoginRequest
+	13, // 26: aerochat.identity.v1.IdentityService.LogoutCurrentSession:input_type -> aerochat.identity.v1.LogoutCurrentSessionRequest
+	15, // 27: aerochat.identity.v1.IdentityService.GetCurrentProfile:input_type -> aerochat.identity.v1.GetCurrentProfileRequest
+	17, // 28: aerochat.identity.v1.IdentityService.UpdateCurrentProfile:input_type -> aerochat.identity.v1.UpdateCurrentProfileRequest
+	19, // 29: aerochat.identity.v1.IdentityService.ListDevices:input_type -> aerochat.identity.v1.ListDevicesRequest
+	21, // 30: aerochat.identity.v1.IdentityService.RevokeSessionOrDevice:input_type -> aerochat.identity.v1.RevokeSessionOrDeviceRequest
+	23, // 31: aerochat.identity.v1.IdentityService.ListBlockedUsers:input_type -> aerochat.identity.v1.ListBlockedUsersRequest
+	25, // 32: aerochat.identity.v1.IdentityService.BlockUser:input_type -> aerochat.identity.v1.BlockUserRequest
+	27, // 33: aerochat.identity.v1.IdentityService.UnblockUser:input_type -> aerochat.identity.v1.UnblockUserRequest
+	8,  // 34: aerochat.identity.v1.IdentityService.Ping:output_type -> aerochat.identity.v1.PingResponse
+	10, // 35: aerochat.identity.v1.IdentityService.Register:output_type -> aerochat.identity.v1.RegisterResponse
+	12, // 36: aerochat.identity.v1.IdentityService.Login:output_type -> aerochat.identity.v1.LoginResponse
+	14, // 37: aerochat.identity.v1.IdentityService.LogoutCurrentSession:output_type -> aerochat.identity.v1.LogoutCurrentSessionResponse
+	16, // 38: aerochat.identity.v1.IdentityService.GetCurrentProfile:output_type -> aerochat.identity.v1.GetCurrentProfileResponse
+	18, // 39: aerochat.identity.v1.IdentityService.UpdateCurrentProfile:output_type -> aerochat.identity.v1.UpdateCurrentProfileResponse
+	20, // 40: aerochat.identity.v1.IdentityService.ListDevices:output_type -> aerochat.identity.v1.ListDevicesResponse
+	22, // 41: aerochat.identity.v1.IdentityService.RevokeSessionOrDevice:output_type -> aerochat.identity.v1.RevokeSessionOrDeviceResponse
+	24, // 42: aerochat.identity.v1.IdentityService.ListBlockedUsers:output_type -> aerochat.identity.v1.ListBlockedUsersResponse
+	26, // 43: aerochat.identity.v1.IdentityService.BlockUser:output_type -> aerochat.identity.v1.BlockUserResponse
+	28, // 44: aerochat.identity.v1.IdentityService.UnblockUser:output_type -> aerochat.identity.v1.UnblockUserResponse
+	34, // [34:45] is the sub-list for method output_type
+	23, // [23:34] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_aerochat_identity_v1_identity_service_proto_init() }
@@ -147,18 +1894,29 @@ func file_aerochat_identity_v1_identity_service_proto_init() {
 	if File_aerochat_identity_v1_identity_service_proto != nil {
 		return
 	}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[0].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[1].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[2].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[8].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[10].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[16].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[20].OneofWrappers = []any{
+		(*RevokeSessionOrDeviceRequest_SessionId)(nil),
+		(*RevokeSessionOrDeviceRequest_DeviceId)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aerochat_identity_v1_identity_service_proto_rawDesc), len(file_aerochat_identity_v1_identity_service_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   2,
+			NumEnums:      1,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_aerochat_identity_v1_identity_service_proto_goTypes,
 		DependencyIndexes: file_aerochat_identity_v1_identity_service_proto_depIdxs,
+		EnumInfos:         file_aerochat_identity_v1_identity_service_proto_enumTypes,
 		MessageInfos:      file_aerochat_identity_v1_identity_service_proto_msgTypes,
 	}.Build()
 	File_aerochat_identity_v1_identity_service_proto = out.File

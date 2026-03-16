@@ -5,9 +5,79 @@ package aerochat.identity.v1;
 option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1;identityv1";
 
 import "aerochat/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
 
 service IdentityService {
   rpc Ping(PingRequest) returns (PingResponse);
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc LogoutCurrentSession(LogoutCurrentSessionRequest) returns (LogoutCurrentSessionResponse);
+  rpc GetCurrentProfile(GetCurrentProfileRequest) returns (GetCurrentProfileResponse);
+  rpc UpdateCurrentProfile(UpdateCurrentProfileRequest) returns (UpdateCurrentProfileResponse);
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc RevokeSessionOrDevice(RevokeSessionOrDeviceRequest) returns (RevokeSessionOrDeviceResponse);
+  rpc ListBlockedUsers(ListBlockedUsersRequest) returns (ListBlockedUsersResponse);
+  rpc BlockUser(BlockUserRequest) returns (BlockUserResponse);
+  rpc UnblockUser(UnblockUserRequest) returns (UnblockUserResponse);
+}
+
+enum KeyBackupStatus {
+  KEY_BACKUP_STATUS_UNSPECIFIED = 0;
+  KEY_BACKUP_STATUS_NOT_CONFIGURED = 1;
+  KEY_BACKUP_STATUS_CONFIGURED = 2;
+}
+
+message Profile {
+  string id = 1;
+  string login = 2;
+  string nickname = 3;
+  optional string avatar_url = 4;
+  optional string bio = 5;
+  optional string timezone = 6;
+  optional string profile_accent = 7;
+  optional string status_text = 8;
+  optional string birthday = 9;
+  optional string country = 10;
+  optional string city = 11;
+  bool read_receipts_enabled = 12;
+  bool presence_enabled = 13;
+  bool typing_visibility_enabled = 14;
+  KeyBackupStatus key_backup_status = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp updated_at = 17;
+}
+
+message Device {
+  string id = 1;
+  string label = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_seen_at = 4;
+  optional google.protobuf.Timestamp revoked_at = 5;
+}
+
+message Session {
+  string id = 1;
+  string device_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_seen_at = 4;
+  optional google.protobuf.Timestamp revoked_at = 5;
+}
+
+message DeviceWithSessions {
+  Device device = 1;
+  repeated Session sessions = 2;
+}
+
+message BlockedUser {
+  Profile profile = 1;
+  google.protobuf.Timestamp blocked_at = 2;
+}
+
+message CurrentAuth {
+  Profile profile = 1;
+  Device device = 2;
+  Session session = 3;
+  string session_token = 4;
 }
 
 message PingRequest {}
@@ -15,3 +85,86 @@ message PingRequest {}
 message PingResponse {
   aerochat.common.v1.ServiceMeta service = 1;
 }
+
+message RegisterRequest {
+  string login = 1;
+  string password = 2;
+  string nickname = 3;
+  optional string device_label = 4;
+}
+
+message RegisterResponse {
+  CurrentAuth auth = 1;
+}
+
+message LoginRequest {
+  string login = 1;
+  string password = 2;
+  optional string device_label = 3;
+}
+
+message LoginResponse {
+  CurrentAuth auth = 1;
+}
+
+message LogoutCurrentSessionRequest {}
+
+message LogoutCurrentSessionResponse {}
+
+message GetCurrentProfileRequest {}
+
+message GetCurrentProfileResponse {
+  Profile profile = 1;
+}
+
+message UpdateCurrentProfileRequest {
+  optional string nickname = 1;
+  optional string avatar_url = 2;
+  optional string bio = 3;
+  optional string timezone = 4;
+  optional string profile_accent = 5;
+  optional string status_text = 6;
+  optional string birthday = 7;
+  optional string country = 8;
+  optional string city = 9;
+  optional bool read_receipts_enabled = 10;
+  optional bool presence_enabled = 11;
+  optional bool typing_visibility_enabled = 12;
+}
+
+message UpdateCurrentProfileResponse {
+  Profile profile = 1;
+}
+
+message ListDevicesRequest {}
+
+message ListDevicesResponse {
+  repeated DeviceWithSessions devices = 1;
+}
+
+message RevokeSessionOrDeviceRequest {
+  oneof target {
+    string session_id = 1;
+    string device_id = 2;
+  }
+}
+
+message RevokeSessionOrDeviceResponse {}
+
+message ListBlockedUsersRequest {}
+
+message ListBlockedUsersResponse {
+  repeated BlockedUser blocked_users = 1;
+}
+
+message BlockUserRequest {
+  string login = 1;
+}
+
+message BlockUserResponse {}
+
+message UnblockUserRequest {
+  string login = 1;
+}
+
+message UnblockUserResponse {}
