@@ -78,13 +78,30 @@ func (h *Handler) GetDirectChat(ctx context.Context, req *connect.Request[chatv1
 		return nil, err
 	}
 
-	directChat, err := h.service.GetDirectChat(ctx, token, req.Msg.ChatId)
+	directChat, readState, err := h.service.GetDirectChat(ctx, token, req.Msg.ChatId)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
 	return connect.NewResponse(&chatv1.GetDirectChatResponse{
-		Chat: toProtoDirectChat(*directChat),
+		Chat:      toProtoDirectChat(*directChat),
+		ReadState: toProtoDirectChatReadState(readState),
+	}), nil
+}
+
+func (h *Handler) MarkDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkDirectChatReadRequest]) (*connect.Response[chatv1.MarkDirectChatReadResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	readState, err := h.service.MarkDirectChatRead(ctx, token, req.Msg.ChatId, req.Msg.MessageId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.MarkDirectChatReadResponse{
+		ReadState: toProtoDirectChatReadState(readState),
 	}), nil
 }
 
@@ -259,6 +276,29 @@ func toProtoDirectChatMessage(value chat.DirectChatMessage) *chatv1.DirectChatMe
 	}
 
 	return result
+}
+
+func toProtoDirectChatReadState(value *chat.DirectChatReadState) *chatv1.DirectChatReadState {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatReadState{
+		SelfPosition: toProtoDirectChatReadPosition(value.SelfPosition),
+		PeerPosition: toProtoDirectChatReadPosition(value.PeerPosition),
+	}
+}
+
+func toProtoDirectChatReadPosition(value *chat.DirectChatReadPosition) *chatv1.DirectChatReadPosition {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatReadPosition{
+		MessageId:        value.MessageID,
+		MessageCreatedAt: timestamppb.New(value.MessageCreatedAt),
+		UpdatedAt:        timestamppb.New(value.UpdatedAt),
+	}
 }
 
 func toProtoMessageKind(value string) chatv1.MessageKind {

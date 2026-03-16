@@ -20,6 +20,7 @@ type Querier interface {
 	GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDirectChatRowsByIDAndUserIDParams) ([]GetDirectChatRowsByIDAndUserIDRow, error)
 	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
 	ListDirectChatMessages(ctx context.Context, arg ListDirectChatMessagesParams) ([]ListDirectChatMessagesRow, error)
+	ListDirectChatReadStateEntries(ctx context.Context, arg ListDirectChatReadStateEntriesParams) ([]ListDirectChatReadStateEntriesRow, error)
 	ListDirectChatRowsByUserID(ctx context.Context, userID uuid.UUID) ([]ListDirectChatRowsByUserIDRow, error)
 	ListPinnedMessageIDsByChatID(ctx context.Context, chatID uuid.UUID) ([]uuid.UUID, error)
 	PinDirectChatMessage(ctx context.Context, arg PinDirectChatMessageParams) (int64, error)
@@ -27,6 +28,7 @@ type Querier interface {
 	TouchDirectChatUpdatedAt(ctx context.Context, arg TouchDirectChatUpdatedAtParams) error
 	TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error
 	UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error)
+	UpsertDirectChatReadReceipt(ctx context.Context, arg UpsertDirectChatReadReceiptParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -44,6 +44,9 @@ const (
 	// ChatServiceGetDirectChatProcedure is the fully-qualified name of the ChatService's GetDirectChat
 	// RPC.
 	ChatServiceGetDirectChatProcedure = "/aerochat.chat.v1.ChatService/GetDirectChat"
+	// ChatServiceMarkDirectChatReadProcedure is the fully-qualified name of the ChatService's
+	// MarkDirectChatRead RPC.
+	ChatServiceMarkDirectChatReadProcedure = "/aerochat.chat.v1.ChatService/MarkDirectChatRead"
 	// ChatServiceSendTextMessageProcedure is the fully-qualified name of the ChatService's
 	// SendTextMessage RPC.
 	ChatServiceSendTextMessageProcedure = "/aerochat.chat.v1.ChatService/SendTextMessage"
@@ -66,6 +69,7 @@ type ChatServiceClient interface {
 	CreateDirectChat(context.Context, *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error)
 	ListDirectChats(context.Context, *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error)
 	GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error)
+	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
 	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
@@ -108,6 +112,12 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("GetDirectChat")),
 			connect.WithClientOptions(opts...),
 		),
+		markDirectChatRead: connect.NewClient[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse](
+			httpClient,
+			baseURL+ChatServiceMarkDirectChatReadProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("MarkDirectChatRead")),
+			connect.WithClientOptions(opts...),
+		),
 		sendTextMessage: connect.NewClient[v1.SendTextMessageRequest, v1.SendTextMessageResponse](
 			httpClient,
 			baseURL+ChatServiceSendTextMessageProcedure,
@@ -147,6 +157,7 @@ type chatServiceClient struct {
 	createDirectChat         *connect.Client[v1.CreateDirectChatRequest, v1.CreateDirectChatResponse]
 	listDirectChats          *connect.Client[v1.ListDirectChatsRequest, v1.ListDirectChatsResponse]
 	getDirectChat            *connect.Client[v1.GetDirectChatRequest, v1.GetDirectChatResponse]
+	markDirectChatRead       *connect.Client[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse]
 	sendTextMessage          *connect.Client[v1.SendTextMessageRequest, v1.SendTextMessageResponse]
 	listDirectChatMessages   *connect.Client[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse]
 	deleteMessageForEveryone *connect.Client[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse]
@@ -172,6 +183,11 @@ func (c *chatServiceClient) ListDirectChats(ctx context.Context, req *connect.Re
 // GetDirectChat calls aerochat.chat.v1.ChatService.GetDirectChat.
 func (c *chatServiceClient) GetDirectChat(ctx context.Context, req *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error) {
 	return c.getDirectChat.CallUnary(ctx, req)
+}
+
+// MarkDirectChatRead calls aerochat.chat.v1.ChatService.MarkDirectChatRead.
+func (c *chatServiceClient) MarkDirectChatRead(ctx context.Context, req *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error) {
+	return c.markDirectChatRead.CallUnary(ctx, req)
 }
 
 // SendTextMessage calls aerochat.chat.v1.ChatService.SendTextMessage.
@@ -205,6 +221,7 @@ type ChatServiceHandler interface {
 	CreateDirectChat(context.Context, *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error)
 	ListDirectChats(context.Context, *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error)
 	GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error)
+	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
 	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
@@ -241,6 +258,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		ChatServiceGetDirectChatProcedure,
 		svc.GetDirectChat,
 		connect.WithSchema(chatServiceMethods.ByName("GetDirectChat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceMarkDirectChatReadHandler := connect.NewUnaryHandler(
+		ChatServiceMarkDirectChatReadProcedure,
+		svc.MarkDirectChatRead,
+		connect.WithSchema(chatServiceMethods.ByName("MarkDirectChatRead")),
 		connect.WithHandlerOptions(opts...),
 	)
 	chatServiceSendTextMessageHandler := connect.NewUnaryHandler(
@@ -283,6 +306,8 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceListDirectChatsHandler.ServeHTTP(w, r)
 		case ChatServiceGetDirectChatProcedure:
 			chatServiceGetDirectChatHandler.ServeHTTP(w, r)
+		case ChatServiceMarkDirectChatReadProcedure:
+			chatServiceMarkDirectChatReadHandler.ServeHTTP(w, r)
 		case ChatServiceSendTextMessageProcedure:
 			chatServiceSendTextMessageHandler.ServeHTTP(w, r)
 		case ChatServiceListDirectChatMessagesProcedure:
@@ -316,6 +341,10 @@ func (UnimplementedChatServiceHandler) ListDirectChats(context.Context, *connect
 
 func (UnimplementedChatServiceHandler) GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetDirectChat is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.MarkDirectChatRead is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error) {

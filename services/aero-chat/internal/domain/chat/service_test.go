@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,8 +70,91 @@ func TestListAndGetDirectChatsAreParticipantScoped(t *testing.T) {
 		t.Fatal("ожидался один чат для Bob")
 	}
 
-	if _, err := service.GetDirectChat(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
+	if _, _, err := service.GetDirectChat(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ожидалась ошибка доступа для неучастника, получено %v", err)
+	}
+}
+
+func TestGetDirectChatReturnsPrivacyAwareReadState(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	first := mustSendMessage(t, service, alice.Token, directChat.ID, "first")
+	second := mustSendMessage(t, service, alice.Token, directChat.ID, "second")
+
+	readState, err := service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, second.ID)
+	if err != nil {
+		t.Fatalf("mark direct chat read: %v", err)
+	}
+	if readState.SelfPosition == nil || readState.SelfPosition.MessageID != second.ID {
+		t.Fatal("ожидалась собственная read position Bob на втором сообщении")
+	}
+
+	_, fetchedReadState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat: %v", err)
+	}
+	if fetchedReadState.PeerPosition == nil || fetchedReadState.PeerPosition.MessageID != second.ID {
+		t.Fatal("ожидалась peer read position Bob для Alice")
+	}
+
+	readState, err = service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, first.ID)
+	if err != nil {
+		t.Fatalf("mark direct chat read backwards: %v", err)
+	}
+	if readState.SelfPosition == nil || readState.SelfPosition.MessageID != second.ID {
+		t.Fatal("read position не должна откатываться назад")
+	}
+}
+
+func TestMarkDirectChatReadHonorsPrivacyFlag(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+	repo.setReadReceiptsEnabled(bob.User.ID, false)
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	message := mustSendMessage(t, service, alice.Token, directChat.ID, "hello")
+
+	readState, err := service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, message.ID)
+	if err != nil {
+		t.Fatalf("mark direct chat read with disabled privacy flag: %v", err)
+	}
+	if readState.SelfPosition != nil {
+		t.Fatal("собственная read position не должна сохраняться при отключённых read receipts")
+	}
+
+	_, fetchedReadState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat: %v", err)
+	}
+	if fetchedReadState.PeerPosition != nil {
+		t.Fatal("peer read position не должна раскрываться при отключённых read receipts")
+	}
+}
+
+func TestMarkDirectChatReadIsParticipantScoped(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	charlie := repo.mustIssueAuth(testUUID(3), "charlie", "Charlie")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	message := mustSendMessage(t, service, alice.Token, directChat.ID, "hello")
+
+	if _, err := service.MarkDirectChatRead(context.Background(), charlie.Token, directChat.ID, message.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ожидалась ошибка доступа для неучастника при mark read, получено %v", err)
 	}
 }
 
@@ -225,27 +309,29 @@ type issuedAuth struct {
 }
 
 type fakeRepository struct {
-	tokenManager *libauth.SessionTokenManager
-	sessions     map[string]SessionAuth
-	users        map[string]UserSummary
-	friendships  map[string]bool
-	chats        map[string]DirectChat
-	messages     map[string]DirectChatMessage
+	tokenManager  *libauth.SessionTokenManager
+	sessions      map[string]SessionAuth
+	users         map[string]UserSummary
+	friendships   map[string]bool
+	chats         map[string]DirectChat
+	messages      map[string]DirectChatMessage
+	readPositions map[string]DirectChatReadPosition
 }
 
 func newFakeRepository() *fakeRepository {
 	return &fakeRepository{
-		tokenManager: libauth.NewSessionTokenManager(),
-		sessions:     make(map[string]SessionAuth),
-		users:        make(map[string]UserSummary),
-		friendships:  make(map[string]bool),
-		chats:        make(map[string]DirectChat),
-		messages:     make(map[string]DirectChatMessage),
+		tokenManager:  libauth.NewSessionTokenManager(),
+		sessions:      make(map[string]SessionAuth),
+		users:         make(map[string]UserSummary),
+		friendships:   make(map[string]bool),
+		chats:         make(map[string]DirectChat),
+		messages:      make(map[string]DirectChatMessage),
+		readPositions: make(map[string]DirectChatReadPosition),
 	}
 }
 
 func (r *fakeRepository) mustIssueAuth(userID string, login string, nickname string) issuedAuth {
-	user := UserSummary{ID: userID, Login: login, Nickname: nickname}
+	user := UserSummary{ID: userID, Login: login, Nickname: nickname, ReadReceiptsEnabled: true}
 	r.users[userID] = user
 
 	sessionID := testUUID(len(r.sessions) + 100)
@@ -302,6 +388,54 @@ func (r *fakeRepository) TouchSession(_ context.Context, sessionID string, devic
 
 func (r *fakeRepository) AreFriends(_ context.Context, firstUserID string, secondUserID string) (bool, error) {
 	return r.friendships[pairKey(firstUserID, secondUserID)], nil
+}
+
+func (r *fakeRepository) ListDirectChatReadStateEntries(_ context.Context, userID string, chatID string) ([]DirectChatReadStateEntry, error) {
+	directChat, ok := r.chats[chatID]
+	if !ok || !isParticipant(directChat, userID) {
+		return nil, ErrNotFound
+	}
+
+	result := make([]DirectChatReadStateEntry, 0, len(directChat.Participants))
+	for _, participant := range directChat.Participants {
+		entry := DirectChatReadStateEntry{
+			UserID:              participant.ID,
+			ReadReceiptsEnabled: participant.ReadReceiptsEnabled,
+		}
+		if position, ok := r.readPositions[readPositionKey(chatID, participant.ID)]; ok {
+			copy := position
+			entry.LastReadPosition = &copy
+		}
+		result = append(result, entry)
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) UpsertDirectChatReadReceipt(_ context.Context, params UpsertDirectChatReadReceiptParams) (bool, error) {
+	directChat, ok := r.chats[params.ChatID]
+	if !ok || !isParticipant(directChat, params.UserID) {
+		return false, ErrNotFound
+	}
+
+	key := readPositionKey(params.ChatID, params.UserID)
+	position := DirectChatReadPosition{
+		MessageID:        params.LastReadMessageID,
+		MessageCreatedAt: params.LastReadMessageAt,
+		UpdatedAt:        params.UpdatedAt,
+	}
+	current, ok := r.readPositions[key]
+	if ok {
+		if current.MessageCreatedAt.After(position.MessageCreatedAt) {
+			return false, nil
+		}
+		if current.MessageCreatedAt.Equal(position.MessageCreatedAt) && strings.Compare(current.MessageID, position.MessageID) >= 0 {
+			return false, nil
+		}
+	}
+
+	r.readPositions[key] = position
+	return true, nil
 }
 
 func (r *fakeRepository) CreateDirectChat(_ context.Context, params CreateDirectChatParams) (*DirectChat, error) {
@@ -494,9 +628,39 @@ func isParticipant(directChat DirectChat, userID string) bool {
 	return false
 }
 
+func (r *fakeRepository) setReadReceiptsEnabled(userID string, enabled bool) {
+	user := r.users[userID]
+	user.ReadReceiptsEnabled = enabled
+	r.users[userID] = user
+
+	for sessionID, authSession := range r.sessions {
+		if authSession.User.ID != userID {
+			continue
+		}
+		authSession.User.ReadReceiptsEnabled = enabled
+		r.sessions[sessionID] = authSession
+	}
+
+	for chatID, directChat := range r.chats {
+		updatedParticipants := make([]UserSummary, 0, len(directChat.Participants))
+		for _, participant := range directChat.Participants {
+			if participant.ID == userID {
+				participant.ReadReceiptsEnabled = enabled
+			}
+			updatedParticipants = append(updatedParticipants, participant)
+		}
+		directChat.Participants = updatedParticipants
+		r.chats[chatID] = directChat
+	}
+}
+
 func pairKey(firstUserID string, secondUserID string) string {
 	userLowID, userHighID := CanonicalUserPair(firstUserID, secondUserID)
 	return userLowID + ":" + userHighID
+}
+
+func readPositionKey(chatID string, userID string) string {
+	return chatID + ":" + userID
 }
 
 func testUUID(sequence int) string {

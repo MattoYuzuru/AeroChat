@@ -17,6 +17,7 @@ SELECT
     u.login,
     u.nickname,
     u.avatar_url,
+    u.read_receipts_enabled,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
 FROM user_sessions AS s
@@ -99,6 +100,20 @@ JOIN users AS u ON u.id = p.user_id
 WHERE self.user_id = $1 AND c.id = $2
 ORDER BY p.joined_at ASC, p.user_id ASC;
 
+-- name: ListDirectChatReadStateEntries :many
+SELECT
+    p.user_id,
+    u.read_receipts_enabled,
+    r.last_read_message_id,
+    r.last_read_message_created_at,
+    r.updated_at
+FROM direct_chat_participants AS self
+JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
+JOIN users AS u ON u.id = p.user_id
+LEFT JOIN direct_chat_read_receipts AS r ON r.chat_id = p.chat_id AND r.user_id = p.user_id
+WHERE self.user_id = $1 AND self.chat_id = $2
+ORDER BY p.joined_at ASC, p.user_id ASC;
+
 -- name: ListPinnedMessageIDsByChatID :many
 SELECT message_id
 FROM direct_chat_pins
@@ -173,6 +188,25 @@ WHERE id = $1;
 UPDATE direct_chat_messages
 SET updated_at = $2
 WHERE id = $1;
+
+-- name: UpsertDirectChatReadReceipt :execrows
+INSERT INTO direct_chat_read_receipts (
+    chat_id,
+    user_id,
+    last_read_message_id,
+    last_read_message_created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (chat_id, user_id) DO UPDATE
+SET
+    last_read_message_id = EXCLUDED.last_read_message_id,
+    last_read_message_created_at = EXCLUDED.last_read_message_created_at,
+    updated_at = EXCLUDED.updated_at
+WHERE direct_chat_read_receipts.last_read_message_created_at < EXCLUDED.last_read_message_created_at
+   OR (
+        direct_chat_read_receipts.last_read_message_created_at = EXCLUDED.last_read_message_created_at
+        AND direct_chat_read_receipts.last_read_message_id < EXCLUDED.last_read_message_id
+   );
 
 -- name: CreateDirectChatMessageTombstone :execrows
 INSERT INTO direct_chat_message_tombstones (

@@ -77,7 +77,7 @@
 - [x] Chat creation
 - [x] Message model
 - [x] Safe markdown subset
-- [ ] Read receipts
+- [x] Read receipts
 - [ ] Presence / typing
 - [ ] Privacy toggles
 - [x] Tombstone deletion
