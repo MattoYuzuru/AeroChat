@@ -1,27 +1,47 @@
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { getAuthErrorMessage, useAuth } from "../auth/useAuth";
 import styles from "./AppShell.module.css";
 
-const desktopCards = [
-  {
-    title: "Чаты",
-    description: "Здесь позже появится список диалогов и групп.",
-  },
-  {
-    title: "Контакты",
-    description: "Здесь позже появится social graph и поиск по логину.",
-  },
-  {
-    title: "Звонки",
-    description: "Здесь позже появится control plane для RTC.",
-  },
+const navigationItems = [
+  { to: "/app/profile", label: "Профиль", meta: "identity" },
+  { to: "/app/chats", label: "Чаты", meta: "future" },
+  { to: "/app/people", label: "Люди", meta: "future" },
+  { to: "/app/settings", label: "Настройки", meta: "future" },
 ];
 
 const statusItems = [
-  "Foundation phase",
-  "PWA-ready shell",
-  "Proto-first contracts",
+  "gateway-only edge",
+  "session bootstrap",
+  "protected shell",
 ];
 
 export function AppShell() {
+  const navigate = useNavigate();
+  const { state, logout } = useAuth();
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  if (state.status !== "authenticated") {
+    return null;
+  }
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+    setLogoutError(null);
+
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } catch (error) {
+      setLogoutError(
+        getAuthErrorMessage(error, "Не удалось завершить текущую сессию."),
+      );
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }
+
   return (
     <div className={styles.shell}>
       <div className={styles.backdrop} aria-hidden="true" />
@@ -29,88 +49,84 @@ export function AppShell() {
       <header className={styles.topBar}>
         <div>
           <p className={styles.eyebrow}>AeroChat</p>
-          <h1 className={styles.title}>Desktop-like shell foundation</h1>
+          <h1 className={styles.title}>Gateway-authenticated workspace</h1>
+          <p className={styles.subtitle}>
+            Текущий пользователь: <strong>{state.profile.nickname}</strong> · @
+            {state.profile.login}
+          </p>
         </div>
-        <div className={styles.statusCluster}>
-          {statusItems.map((item) => (
-            <span key={item} className={styles.statusChip}>
-              {item}
-            </span>
-          ))}
+
+        <div className={styles.topBarAside}>
+          <div className={styles.statusCluster}>
+            {statusItems.map((item) => (
+              <span key={item} className={styles.statusChip}>
+                {item}
+              </span>
+            ))}
+          </div>
+          <button
+            className={styles.logoutButton}
+            disabled={isLoggingOut}
+            onClick={handleLogout}
+            type="button"
+          >
+            {isLoggingOut ? "Выход..." : "Выйти"}
+          </button>
+          {logoutError && <p className={styles.logoutError}>{logoutError}</p>}
         </div>
       </header>
 
       <main className={styles.workspace}>
         <aside className={styles.sidebar}>
-          <div className={styles.sidebarCard}>
+          <section className={styles.sidebarCard}>
             <p className={styles.panelLabel}>Навигация</p>
-            <ul className={styles.iconList}>
-              <li>Почта</li>
-              <li>Контакты</li>
-              <li>Медиа</li>
-              <li>Настройки</li>
-            </ul>
-          </div>
+            <nav className={styles.navList} aria-label="Основные разделы">
+              {navigationItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  className={({ isActive }) =>
+                    isActive ? styles.navItemActive : styles.navItem
+                  }
+                  to={item.to}
+                >
+                  <span>{item.label}</span>
+                  <small>{item.meta}</small>
+                </NavLink>
+              ))}
+            </nav>
+          </section>
 
-          <div className={styles.sidebarCard}>
-            <p className={styles.panelLabel}>Статус окружения</p>
+          <section className={styles.sidebarCard}>
+            <p className={styles.panelLabel}>Контур</p>
             <dl className={styles.metaGrid}>
               <div>
-                <dt>Web</dt>
-                <dd>React + Vite</dd>
+                <dt>Edge</dt>
+                <dd>`/api` → aero-gateway</dd>
               </div>
               <div>
-                <dt>Gateway</dt>
-                <dd>/healthz и /readyz</dd>
+                <dt>Auth</dt>
+                <dd>sessionStorage bootstrap</dd>
               </div>
               <div>
-                <dt>Design</dt>
-                <dd>Frutiger-ready tokens</dd>
+                <dt>Scope</dt>
+                <dd>login, register, profile, shell</dd>
               </div>
             </dl>
-          </div>
+          </section>
         </aside>
 
-        <section className={styles.desktopArea}>
-          <div className={styles.heroWindow}>
+        <section className={styles.contentArea}>
+          <div className={styles.contentWindow}>
             <div className={styles.windowHeader}>
               <span className={styles.windowDot} />
               <span className={styles.windowDot} />
               <span className={styles.windowDot} />
-              <span className={styles.windowTitle}>workspace</span>
+              <span className={styles.windowTitle}>apps/web</span>
             </div>
-            <div className={styles.windowBody}>
-              <div>
-                <p className={styles.panelLabel}>Текущее состояние</p>
-                <p className={styles.heroText}>
-                  Здесь намеренно нет продуктовой логики. Shell служит только
-                  каркасом под будущие приложения AeroChat.
-                </p>
-              </div>
-              <div className={styles.metrics}>
-                <div>
-                  <strong>5</strong>
-                  <span>backend-сервисов</span>
-                </div>
-                <div>
-                  <strong>4</strong>
-                  <span>proto namespace</span>
-                </div>
-                <div>
-                  <strong>0</strong>
-                  <span>фич до Identity phase</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <div className={styles.cardGrid}>
-            {desktopCards.map((card) => (
-              <article key={card.title} className={styles.desktopCard}>
-                <p className={styles.panelLabel}>{card.title}</p>
-                <p>{card.description}</p>
-              </article>
-            ))}
+            <div className={styles.windowBody}>
+              <Outlet />
+            </div>
           </div>
         </section>
       </main>

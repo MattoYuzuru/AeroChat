@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Gateway / BFF foundation как единая edge-точка входа для текущих backend services
+- [x] Web gateway auth bootstrap в `apps/web` с protected shell и current profile flow
 
 ---
 
