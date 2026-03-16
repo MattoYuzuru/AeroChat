@@ -1,12 +1,15 @@
-# Single-server bootstrap и operator update flow
+# Single-server TLS/domain bootstrap и operator update flow
 
-Этот документ описывает ручной operator flow для одного VPS после появления GHCR image delivery и server secret model.
+Этот документ описывает ручной operator flow для одного VPS после появления GHCR image delivery, server secret model и
+domain-ready TLS edge bootstrap.
 
 Цель текущего этапа:
 
 - получить воспроизводимый server/prod-like runtime;
 - получить registry-backed release bootstrap для application images;
 - явно разделить versioned runtime config и server-only secret values;
+- зафиксировать production-like HTTP/HTTPS edge path для одного домена;
+- явно определить файловую модель TLS-сертификатов на VPS;
 - сделать ручной update/rollback flow воспроизводимым;
 - не внедрять CI/CD deploy и SSH automation;
 - не выполнять реальный production rollout из репозитория.
@@ -23,8 +26,10 @@
 - `server/prod-like`
   - `.env.server.example` содержит только versioned non-secret runtime config;
   - `.env.server.secrets.example` содержит только перечень обязательных secret keys с плейсхолдерами;
+  - домен и путь к каталогу TLS-сертификатов задаются оператором в `.env.server`;
+  - каталог с `fullchain.pem` и `privkey.pem` существует только на VPS и монтируется в `nginx` read-only;
   - `infra/compose/docker-compose.server.yml` тянет предсобранные application images из registry;
-  - наружу публикуется только `nginx`.
+  - наружу публикуется только `nginx` на `80/443`.
 
 ## Server env-модель
 
@@ -32,7 +37,8 @@
 
 - `.env.server.example`
   - versioned шаблон для несекретных runtime-настроек;
-  - сюда входят image namespace/tag, порт `nginx`, имена пользователей, log level и timeouts;
+  - сюда входят image namespace/tag, domain, порты `nginx`, путь к TLS-каталогу, имена пользователей, log level и
+    timeouts;
   - этот файл можно безопасно хранить в репозитории как пример.
 
 - `.env.server.secrets.example`
@@ -49,6 +55,9 @@
   - этот файл не коммитится;
   - значения из него должны существовать только на сервере.
 
+TLS-материал в эту env-модель не добавляется.
+Сертификат и приватный ключ живут только как файлы на VPS и не передаются через env.
+
 На текущем этапе к server-only секретам относятся:
 
 - `POSTGRES_PASSWORD`
@@ -57,11 +66,37 @@
 Если позже появятся дополнительные чувствительные значения, они должны попадать в `.env.server.secrets`, а не в
 versioned runtime-шаблон.
 
+## Что версионируется и что создаётся на VPS
+
+В репозитории версионируются:
+
+- `infra/compose/docker-compose.server.yml`;
+- `infra/nginx/server.conf.template`;
+- `.env.server.example`;
+- `.env.server.secrets.example`;
+- этот runbook и ADR.
+
+Только на VPS создаются:
+
+- `.env.server`;
+- `.env.server.secrets`;
+- каталог из `AERO_NGINX_TLS_CERTS_DIR`;
+- файлы `fullchain.pem` и `privkey.pem` внутри этого каталога.
+
+Для следующих этапов сознательно остаются:
+
+- реальное получение сертификата;
+- renewal automation;
+- DNS automation;
+- SSH rollout automation;
+- GitHub Actions deploy;
+- реальный production cutover.
+
 ## Runtime topology
 
 На одном VPS поднимаются:
 
-- `nginx` как единственный внешний HTTP edge;
+- `nginx` как единственный внешний HTTP/HTTPS edge;
 - `web` как контейнер со статически собранным frontend;
 - `aero-gateway` как единственная backend edge-точка;
 - `aero-identity` и `aero-chat` как внутренние сервисы;
@@ -78,6 +113,9 @@ versioned runtime-шаблон.
 - production-oriented compose topology для одного сервера;
 - отдельные versioned шаблоны для runtime config и secret expectations;
 - GHCR-ready модель публикации versioned application images;
+- domain-ready `nginx` path с внешними `80/443`;
+- канонический redirect с HTTP на HTTPS для обычного user traffic;
+- файловая модель TLS-сертификатов, которые монтируются в `nginx` read-only;
 - readiness chain через `identity` → `chat` → `gateway` → `nginx`;
 - manual bootstrap/update/rollback flow без дополнительной deploy automation.
 
@@ -86,10 +124,10 @@ versioned runtime-шаблон.
 - GitHub Actions deploy;
 - SSH automation;
 - реальные production secrets в репозитории;
-- TLS и ACME automation;
+- реальное получение, выпуск и renewal TLS-сертификатов;
 - backup/restore automation;
 - zero-downtime rollout;
-- firewall hardening и OS-level provisioning.
+- firewall hardening, DNS automation и OS-level provisioning.
 
 ## Подготовка VPS
 
@@ -98,7 +136,9 @@ versioned runtime-шаблон.
 - Linux VPS;
 - Docker Engine;
 - Docker Compose plugin;
-- открытый HTTP-порт для `nginx`.
+- открытые `80/tcp` и `443/tcp` для `nginx`;
+- подготовленный домен, который будет указывать на VPS;
+- уже существующие TLS-файлы для этого домена или временный тестовый сертификат для preflight smoke.
 
 ## Первый bootstrap на VPS
 
@@ -113,7 +153,7 @@ cp .env.server.secrets.example .env.server.secrets
 
 3. Заполни файлы по их роли:
 
-- в `.env.server` задай runtime-настройки и желаемый `AERO_IMAGE_TAG`;
+- в `.env.server` задай runtime-настройки, `AERO_EDGE_DOMAIN`, `AERO_NGINX_TLS_CERTS_DIR` и желаемый `AERO_IMAGE_TAG`;
 - в `.env.server.secrets` задай реальные server secrets;
 - не коммить `.env.server` и `.env.server.secrets` обратно в репозиторий.
 
@@ -131,11 +171,39 @@ cp .env.server.secrets.example .env.server.secrets
   - `vX.Y.Z` для фиксированного release;
   - при необходимости можно использовать точный `sha-<commit>`.
 
+- `AERO_EDGE_DOMAIN`:
+  - основной внешний домен single-server deployment;
+  - используется как `server_name` и canonical HTTPS redirect target.
+
+- `AERO_NGINX_TLS_CERTS_DIR`:
+  - каталог на VPS, который монтируется в контейнер `nginx` только для чтения;
+  - внутри него должны существовать `fullchain.pem` и `privkey.pem`.
+
 `latest` намеренно не используется.
 
 На этом этапе опубликованные application images собираются только для `linux/amd64`.
 
-4. Проверь итоговую compose-конфигурацию:
+4. Подготовь файловую TLS-модель на VPS:
+
+Если используется значение по умолчанию из `.env.server.example`, подготовка выглядит так:
+
+```bash
+mkdir -p /opt/aerochat/tls
+chmod 700 /opt/aerochat/tls
+```
+
+Дальше оператор вручную кладёт в каталог из `AERO_NGINX_TLS_CERTS_DIR`:
+
+- `fullchain.pem`
+- `privkey.pem`
+
+Минимальные правила:
+
+- файлы не коммитятся в репозиторий;
+- приватный ключ остаётся только на VPS;
+- compose и `nginx` считают эти файлы уже существующими до `up -d`.
+
+5. Проверь итоговую compose-конфигурацию:
 
 ```bash
 docker compose \
@@ -145,7 +213,7 @@ docker compose \
   config
 ```
 
-5. Загрузи выбранный release tag и подними runtime:
+6. Загрузи выбранный release tag и подними runtime:
 
 ```bash
 docker compose \
@@ -161,7 +229,7 @@ docker compose \
   up -d
 ```
 
-6. Проверь состояние контейнеров и edge health:
+7. Проверь состояние контейнеров и edge health:
 
 ```bash
 docker compose \
@@ -176,13 +244,22 @@ curl -fsS http://127.0.0.1/healthz
 curl -fsS http://127.0.0.1/readyz
 ```
 
-Если проверка выполняется удалённо, используй IP или домен сервера вместо `127.0.0.1`.
+Если DNS уже настроен и сертификат соответствует домену, проверь HTTPS entry.
+Ниже `aero.example.com` нужно заменить на реальный домен из `.env.server`:
+
+```bash
+curl -fsS --resolve "aero.example.com:443:127.0.0.1" https://aero.example.com/healthz
+curl -fsS --resolve "aero.example.com:443:127.0.0.1" https://aero.example.com/readyz
+```
+
+Если проверка выполняется удалённо, используй домен сервера вместо `127.0.0.1`.
 
 ## Ожидаемое поведение
 
 - `/healthz` отвечает сам `nginx` и показывает, что edge-process жив;
 - `/readyz` проходит через `nginx` в `aero-gateway` и отражает доступность downstream chain;
-- web shell открывается через `/`;
+- `http://<domain>/` делает redirect на `https://<domain>/`;
+- `https://<domain>/` открывает web shell;
 - frontend ходит в backend только через `/api`.
 
 Если readiness не проходит, смотри логи проблемного сервиса:
@@ -282,6 +359,8 @@ docker compose \
 - `.env.server`
   - `AERO_IMAGE_TAG` при update/rollback;
   - `AERO_IMAGE_NAMESPACE`, если используется fork, mirror или другой GHCR owner;
+  - `AERO_EDGE_DOMAIN`, если меняется primary domain;
+  - `AERO_NGINX_TLS_CERTS_DIR`, если оператор переносит сертификаты в другой host path;
   - несекретные runtime-параметры по необходимости.
 
 - `.env.server.secrets`
@@ -289,12 +368,17 @@ docker compose \
   - без commit в репозиторий;
   - без передачи в CI на текущем этапе.
 
+- каталог из `AERO_NGINX_TLS_CERTS_DIR`
+  - только certificate files;
+  - без commit в репозиторий;
+  - с ручной ответственностью оператора за наличие и права доступа.
+
 ## Что намеренно не делается в этом PR
 
 - SSH automation и удалённое выполнение команд из GitHub Actions
 - автоматический rollout после publish workflow
 - автоматический выбор последнего release
-- ACME, TLS termination automation и настройка домена
+- ACME issuance/renewal automation и DNS automation
 - внешние secret managers и сложная ops-оркестрация
 - полноценный production change-management вне ручного operator flow
 
@@ -302,6 +386,6 @@ docker compose \
 
 Следующий PR должен добавлять следующий изолированный deploy slice, а не менять topology заново:
 
-- TLS/domain setup для single-server self-host;
-- явную политику внешнего адреса и edge-конфигурации;
-- при необходимости подготовку к следующему уровню deploy automation без SSH rollout в том же PR.
+- финальный single-server rollout PR на реальном домене с внешним smoke и operator verification;
+- отдельный SSH/deploy automation slice только после того, как ручной rollout будет подтверждён;
+- без смены `nginx`/gateway topology и без переноса certificate material в репозиторий.
