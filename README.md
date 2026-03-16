@@ -162,9 +162,11 @@ AeroChat создаётся как проект с сильным фундаме
 /.github
   /workflows
 ```
+
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
 
 ## Getting Started
+
 ### Требования
 
 Перед началом убедись, что у тебя установлены:
@@ -179,18 +181,24 @@ AeroChat создаётся как проект с сильным фундаме
 ### Локальный запуск
 
 1. Клонируй репозиторий:
+
 ```
 git clone https://github.com/MattoYuzuru/AeroChat.git
 cd AeroChat
 ```
+
 2. Скопируй пример переменных окружения:
+
 ```
 cp .env.example .env
 ```
+
 3. Подними локальную инфраструктуру:
+
 ```
 docker compose -f infra/compose/docker-compose.yml up -d
 ```
+
 4. Установи зависимости фронтенда и backend toolchain.
 5. Сгенерируй protobuf / codegen.
 6. Запусти локальные сервисы.
@@ -210,57 +218,58 @@ docker compose -f infra/compose/docker-compose.yml up -d
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
 
 ## Roadmap
+
 ### Foundation
 
--[ ] Bootstrap monorepo
--[ ] Документация архитектуры
--[ ] Proto/tooling foundation
--[ ] Базовый frontend shell
--[ ] Dev infrastructure
--[ ] CI
+- [ ] Bootstrap monorepo
+- [ ] Документация архитектуры
+- [ ] Proto/tooling foundation
+- [ ] Базовый frontend shell
+- [ ] Dev infrastructure
+- [ ] CI
 
 ### Identity
 
--[ ] Регистрация и вход
--[ ] Immutable login / mutable nickname
--[ ] Device sessions
--[ ] Privacy flags
--[ ] Block list
--[ ] Key backup status
+- [ ] Регистрация и вход
+- [ ] Immutable login / mutable nickname
+- [ ] Device sessions
+- [ ] Privacy flags
+- [ ] Block list
+- [ ] Key backup status
 
 ### Chat
 
--[ ] Друзья по логину
--[ ] Личные чаты
--[ ] Группы и роли
--[ ] Markdown messages
--[ ] Pins
--[ ] Draft recovery
--[ ] Tombstone deletion model
+- [ ] Друзья по логину
+- [ ] Личные чаты
+- [ ] Группы и роли
+- [ ] Markdown messages
+- [ ] Pins
+- [ ] Draft recovery
+- [ ] Tombstone deletion model
 
 ## Media
 
--[ ] Voice messages
--[ ] Video messages
--[ ] Attachments
--[ ] Encrypted relay
--[ ] Preview для изображений / аудио / видео
+- [ ] Voice messages
+- [ ] Video messages
+- [ ] Attachments
+- [ ] Encrypted relay
+- [ ] Preview для изображений / аудио / видео
 
 ### RTC
 
--[ ] Signaling
--[ ] 1:1 calls
--[ ] Group calls
--[ ] Screen sharing foundation
--[ ] Recording metadata
+- [ ] Signaling
+- [ ] 1:1 calls
+- [ ] Group calls
+- [ ] Screen sharing foundation
+- [ ] Recording metadata
 
 ### Platform
 
--[ ] Push notifications
--[ ] PWA
--[ ] Desktop shell UX
--[ ] Mobile fullscreen UX
--[ ] Self-host install flow
+- [ ] Push notifications
+- [ ] PWA
+- [ ] Desktop shell UX
+- [ ] Mobile fullscreen UX
+- [ ] Self-host install flow
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
 
@@ -311,7 +320,6 @@ docker compose -f infra/compose/docker-compose.yml up -d
 Репозиторий проекта: [AeroChat](https://github.com/MattoYuzuru/AeroChat)
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
-
 
 ## Источники вдохновения
 
