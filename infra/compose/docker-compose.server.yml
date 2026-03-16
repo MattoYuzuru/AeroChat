@@ -123,6 +123,8 @@ services:
   nginx:
     image: nginx:1.29-alpine
     restart: unless-stopped
+    environment:
+      AERO_EDGE_DOMAIN: ${AERO_EDGE_DOMAIN}
     depends_on:
       web:
         condition: service_healthy
@@ -130,8 +132,10 @@ services:
         condition: service_healthy
     ports:
       - "${AERO_NGINX_HTTP_PORT}:80"
+      - "${AERO_NGINX_HTTPS_PORT}:443"
     volumes:
-      - ../nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../nginx/server.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${AERO_NGINX_TLS_CERTS_DIR}:/etc/nginx/tls:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/readyz"]
       interval: 10s

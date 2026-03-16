@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Server secret model и operator update flow для single-server self-host runtime
+- [x] Single-server TLS / domain / edge bootstrap для single-server self-host runtime
 
 ---
 
@@ -36,6 +36,7 @@
 - [x] Single-server deploy foundation
 - [x] Image delivery и release bootstrap
 - [x] Server secret model и operator update flow
+- [x] Single-server TLS / domain / edge bootstrap
 - [ ] GitHub Actions CI
 
 ---

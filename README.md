@@ -190,6 +190,7 @@ AeroChat создаётся как проект с сильным фундаме
 - `server/prod-like`:
   - `.env.server.example` содержит только versioned non-secret runtime config;
   - `.env.server.secrets.example` описывает обязательные server-only secret keys без реальных значений;
+  - TLS-сертификаты и приватный ключ существуют только на VPS в отдельной директории и не коммитятся;
   - `infra/compose/docker-compose.server.yml` даёт production-oriented single-server topology на предсобранных образах;
   - ручной bootstrap описан в `docs/deploy/single-server-bootstrap.md`.
 
@@ -226,12 +227,16 @@ docker compose -f infra/compose/docker-compose.yml up --build -d
 ```bash
 cp .env.server.example .env.server
 cp .env.server.secrets.example .env.server.secrets
+# Подготовь на VPS каталог с `fullchain.pem` и `privkey.pem` для домена из `.env.server`.
 docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml config
 docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml pull
 docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml up -d
 ```
 
-Подробности и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
+Server runtime использует один внешний `nginx` на `80/443`, делает канонический redirect на HTTPS и держит `aero-gateway`
+единственной backend edge-точкой за reverse proxy.
+
+Подробности, TLS/domain contract и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
 
 ### Image release model
 
