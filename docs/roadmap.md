@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Web social graph bootstrap в `apps/web` через `aero-gateway` с protected `/app/people` и friend request flow
+- [x] Web direct chat bootstrap в `apps/web` через `aero-gateway` с protected `/app/chats`, explicit chat creation и minimal direct thread UI
 
 ---
 
@@ -89,6 +89,7 @@
 - [x] Tombstone deletion
 - [ ] Draft recovery
 - [x] Pin / unpin
+- [x] Web direct chat bootstrap через `aero-gateway`
 
 ---
 

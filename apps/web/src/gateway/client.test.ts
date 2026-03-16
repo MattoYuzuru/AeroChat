@@ -249,4 +249,229 @@ describe("createGatewayClient", () => {
       }),
     ]);
   });
+
+  it("calls gateway chat endpoint for explicit direct chat creation", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          chat: {
+            id: "chat-1",
+            kind: "CHAT_KIND_DIRECT",
+            participants: [
+              {
+                id: "user-1",
+                login: "alice",
+                nickname: "Alice",
+              },
+              {
+                id: "user-2",
+                login: "bob",
+                nickname: "Bob",
+              },
+            ],
+            pinnedMessageIds: [],
+            createdAt: "2026-03-25T10:00:00Z",
+            updatedAt: "2026-03-25T10:00:00Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const chat = await client.createDirectChat("token-1", " user-2 ");
+
+    expect(chat.id).toBe("chat-1");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/CreateDirectChat",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          peerUserId: "user-2",
+        }),
+      }),
+    );
+  });
+
+  it("normalizes direct chat snapshot and message history", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            chat: {
+              id: "chat-1",
+              kind: "CHAT_KIND_DIRECT",
+              participants: [
+                {
+                  id: "user-1",
+                  login: "alice",
+                  nickname: "Alice",
+                },
+                {
+                  id: "user-2",
+                  login: "bob",
+                  nickname: "Bob",
+                  avatarUrl: "",
+                },
+              ],
+              pinnedMessageIds: ["message-1"],
+              createdAt: "2026-03-25T10:00:00Z",
+              updatedAt: "2026-03-25T10:05:00Z",
+            },
+            readState: {
+              peerPosition: {
+                messageId: "message-1",
+                messageCreatedAt: "2026-03-25T10:06:00Z",
+                updatedAt: "2026-03-25T10:07:00Z",
+              },
+            },
+            presenceState: {
+              peerPresence: {
+                heartbeatAt: "2026-03-25T10:08:00Z",
+                expiresAt: "2026-03-25T10:09:00Z",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            messages: [
+              {
+                id: "message-1",
+                chatId: "chat-1",
+                senderUserId: "user-1",
+                kind: "MESSAGE_KIND_TEXT",
+                text: {
+                  text: "hello",
+                  markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+                },
+                pinned: true,
+                createdAt: "2026-03-25T10:06:00Z",
+                updatedAt: "2026-03-25T10:06:00Z",
+              },
+              {
+                id: "message-2",
+                chatId: "chat-1",
+                senderUserId: "user-2",
+                kind: "MESSAGE_KIND_TEXT",
+                tombstone: {
+                  deletedByUserId: "user-2",
+                  deletedAt: "2026-03-25T10:10:00Z",
+                },
+                pinned: false,
+                createdAt: "2026-03-25T10:09:00Z",
+                updatedAt: "2026-03-25T10:10:00Z",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const snapshot = await client.getDirectChat("token-1", "chat-1");
+    const messages = await client.listDirectChatMessages("token-1", "chat-1", 25);
+
+    expect(snapshot.chat.pinnedMessageIds).toEqual(["message-1"]);
+    expect(snapshot.chat.participants[1]?.avatarUrl).toBeNull();
+    expect(snapshot.readState?.peerPosition?.messageId).toBe("message-1");
+    expect(snapshot.presenceState?.peerPresence?.heartbeatAt).toBe(
+      "2026-03-25T10:08:00Z",
+    );
+    expect(messages).toEqual([
+      expect.objectContaining({
+        id: "message-1",
+        pinned: true,
+        text: expect.objectContaining({
+          text: "hello",
+        }),
+      }),
+      expect.objectContaining({
+        id: "message-2",
+        tombstone: expect.objectContaining({
+          deletedByUserId: "user-2",
+        }),
+      }),
+    ]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/aerochat.chat.v1.ChatService/GetDirectChat",
+      expect.objectContaining({
+        body: JSON.stringify({
+          chatId: "chat-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/aerochat.chat.v1.ChatService/ListDirectChatMessages",
+      expect.objectContaining({
+        body: JSON.stringify({
+          chatId: "chat-1",
+          pageSize: 25,
+        }),
+      }),
+    );
+  });
+
+  it("calls message action endpoints with chat and message ids", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    const client = createGatewayClient(fetchMock, "/api");
+
+    await client.pinMessage("token-1", "chat-1", "message-1");
+    await client.unpinMessage("token-1", "chat-1", "message-1");
+    await client.deleteMessageForEveryone("token-1", "chat-1", "message-1");
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/aerochat.chat.v1.ChatService/PinMessage",
+      expect.objectContaining({
+        body: JSON.stringify({
+          chatId: "chat-1",
+          messageId: "message-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/aerochat.chat.v1.ChatService/UnpinMessage",
+      expect.objectContaining({
+        body: JSON.stringify({
+          chatId: "chat-1",
+          messageId: "message-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/aerochat.chat.v1.ChatService/DeleteMessageForEveryone",
+      expect.objectContaining({
+        body: JSON.stringify({
+          chatId: "chat-1",
+          messageId: "message-1",
+        }),
+      }),
+    );
+  });
 });

@@ -1,0 +1,113 @@
+import { describe, expect, it } from "vitest";
+import {
+  chatsReducer,
+  createInitialChatsState,
+  type ChatThreadSnapshot,
+} from "./state";
+
+const directChat = {
+  id: "chat-1",
+  kind: "CHAT_KIND_DIRECT",
+  participants: [
+    {
+      id: "user-1",
+      login: "alice",
+      nickname: "Alice",
+      avatarUrl: null,
+    },
+    {
+      id: "user-2",
+      login: "bob",
+      nickname: "Bob",
+      avatarUrl: null,
+    },
+  ],
+  pinnedMessageIds: [],
+  createdAt: "2026-03-25T10:00:00Z",
+  updatedAt: "2026-03-25T10:10:00Z",
+};
+
+const threadSnapshot: ChatThreadSnapshot = {
+  chat: directChat,
+  messages: [
+    {
+      id: "message-1",
+      chatId: "chat-1",
+      senderUserId: "user-1",
+      kind: "MESSAGE_KIND_TEXT",
+      text: {
+        text: "hello",
+        markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      },
+      tombstone: null,
+      pinned: false,
+      createdAt: "2026-03-25T10:11:00Z",
+      updatedAt: "2026-03-25T10:11:00Z",
+    },
+  ],
+  readState: null,
+  typingState: null,
+  presenceState: null,
+};
+
+describe("chatsReducer", () => {
+  it("preserves thread data when list refresh fails", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const threadState = chatsReducer(readyState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+
+    const nextState = chatsReducer(threadState, {
+      type: "list_refresh_failed",
+      message: "gateway unavailable",
+    });
+
+    expect(nextState.status).toBe("ready");
+    expect(nextState.thread).toEqual(threadSnapshot);
+    expect(nextState.actionErrorMessage).toBe("gateway unavailable");
+  });
+
+  it("tracks message-level pending actions independently", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+
+    const pendingState = chatsReducer(readyState, {
+      type: "message_action_started",
+      messageId: "message-1",
+      label: "Закрепляем...",
+    });
+    const finishedState = chatsReducer(pendingState, {
+      type: "message_action_finished",
+      messageId: "message-1",
+    });
+
+    expect(pendingState.pendingMessageActions).toEqual({
+      "message-1": "Закрепляем...",
+    });
+    expect(finishedState.pendingMessageActions).toEqual({});
+    expect(finishedState.chats).toEqual([directChat]);
+  });
+
+  it("keeps selected chat id when thread load fails", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+
+    const nextState = chatsReducer(readyState, {
+      type: "thread_load_failed",
+      chatId: "chat-1",
+      message: "thread unavailable",
+    });
+
+    expect(nextState.selectedChatId).toBe("chat-1");
+    expect(nextState.threadStatus).toBe("error");
+    expect(nextState.threadErrorMessage).toBe("thread unavailable");
+  });
+});
