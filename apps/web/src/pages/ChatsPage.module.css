@@ -4,29 +4,34 @@
 }
 
 .heroCard,
-.panelCard,
+.sectionCard,
 .stateCard,
 .metricCard,
 .chatItem,
-.messageCard,
-.pinnedCard {
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  border-radius: 1.6rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.45));
-  box-shadow: var(--shadow-shell);
-  backdrop-filter: blur(18px);
+.pinnedCard,
+.messageBubble,
+.composerCard {
+  border: 1px solid var(--color-border-soft);
+  border-radius: 1.45rem;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(16px);
 }
 
 .heroCard,
-.panelCard,
-.stateCard {
-  padding: 1.35rem;
+.sectionCard,
+.stateCard,
+.composerCard {
+  padding: 1.3rem;
 }
 
 .heroHeader,
 .panelHeader,
 .chatItemHeader,
-.messageHeader {
+.messageHeader,
+.blockHeader,
+.pinnedHeader,
+.composerFooter {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
@@ -34,7 +39,7 @@
 
 .cardLabel {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -43,26 +48,31 @@
 
 .title,
 .sectionTitle,
-.stateTitle {
+.stateTitle,
+.blockTitle,
+.threadTitle {
   margin: 0.35rem 0 0;
 }
 
 .title {
-  font-size: 2rem;
+  font-size: clamp(1.8rem, 3vw, 2.35rem);
 }
 
 .subtitle,
 .sectionDescription,
 .stateMessage,
 .chatItemDescription,
+.threadDescription,
+.threadEyebrow,
 .messageMeta,
-.messageText,
-.pendingText,
 .pinnedText,
 .pinnedMeta,
+.pendingText,
+.composerHint,
+.characterCount,
 .tombstoneText {
-  margin: 0.8rem 0 0;
-  color: rgba(3, 50, 82, 0.78);
+  margin: 0.75rem 0 0;
+  color: rgba(3, 50, 82, 0.76);
 }
 
 .metrics {
@@ -75,7 +85,8 @@
 .metricCard {
   display: grid;
   gap: 0.2rem;
-  padding: 0.9rem 1rem;
+  padding: 0.95rem 1rem;
+  background: var(--surface-panel-strong);
 }
 
 .metricCard span {
@@ -85,7 +96,7 @@
 }
 
 .metricCard strong {
-  font-size: 1.8rem;
+  font-size: 1.85rem;
 }
 
 .notice,
@@ -100,24 +111,31 @@
 }
 
 .error {
-  background: rgba(181, 38, 38, 0.1);
-  color: #8e1e1e;
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
 }
 
-.grid {
+.workspace {
   display: grid;
-  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+  grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.listPane,
+.threadPane,
+.threadLayout,
+.messagesPanel {
+  display: grid;
   gap: 1rem;
 }
 
-.panelCard,
-.threadLayout {
-  display: grid;
-  gap: 1rem;
+.sectionCard {
+  min-width: 0;
 }
 
 .sectionDescription {
-  max-width: 16rem;
+  max-width: 18rem;
   text-align: right;
 }
 
@@ -129,32 +147,134 @@
 }
 
 .chatItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85rem;
   width: 100%;
   padding: 1rem;
   text-align: left;
   cursor: pointer;
 }
 
+.chatItem:hover,
+.ghostButton:hover,
+.secondaryButton:hover,
+.linkButton:hover {
+  transform: translateY(-1px);
+}
+
 .chatItem[data-active="true"] {
-  border-color: rgba(12, 93, 153, 0.28);
-  background: linear-gradient(180deg, rgba(23, 130, 209, 0.16), rgba(255, 255, 255, 0.78));
+  border-color: var(--color-border-strong);
+  background: var(--surface-panel-accent);
+}
+
+.chatItemBody {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
 .chatItemTitle,
 .messageAuthor {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.04rem;
 }
 
 .chatItemLogin {
-  margin: 0.3rem 0 0;
-  color: rgba(3, 50, 82, 0.68);
+  margin: 0.28rem 0 0;
+  color: rgba(3, 50, 82, 0.66);
 }
 
-.threadMeta {
+.chatItemFooter,
+.threadStatusRow,
+.messageBadges,
+.headerActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
+  gap: 0.55rem;
+  align-items: flex-start;
+}
+
+.avatarBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(175, 223, 249, 0.56)),
+    rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.avatarBadgeLarge {
+  width: 3.35rem;
+  height: 3.35rem;
+  border-radius: 1.1rem;
+  font-size: 1rem;
+}
+
+.metaTag,
+.statusBadge,
+.composerHint,
+.characterCount {
+  align-self: start;
+  padding: 0.45rem 0.72rem;
+  border-radius: 999px;
+  background: var(--color-chip);
+  font-size: 0.8rem;
+  color: rgba(3, 50, 82, 0.74);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.statusBadge[data-tone="accent"] {
+  background: rgba(23, 130, 209, 0.16);
+}
+
+.statusBadge[data-tone="success"] {
+  background: var(--color-success-soft);
+}
+
+.threadHero,
+.composerCard,
+.messagesPanel {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 1.45rem;
+  background: var(--surface-panel-strong);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(16px);
+}
+
+.threadHero,
+.messagesPanel,
+.composerCard {
+  padding: 1.15rem;
+}
+
+.threadIdentity {
+  display: flex;
+  align-items: center;
+  gap: 0.95rem;
+}
+
+.threadEyebrow {
+  margin-top: 0;
+  font-size: 0.84rem;
+}
+
+.threadTitle {
+  font-size: 1.35rem;
+}
+
+.threadDescription {
+  margin-top: 0.35rem;
 }
 
 .pinnedStrip {
@@ -162,8 +282,15 @@
   gap: 0.8rem;
 }
 
+.pinnedList {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
 .pinnedCard {
-  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.95rem 1rem;
+  background: var(--surface-panel-strong);
 }
 
 .pinnedText,
@@ -172,44 +299,49 @@
 }
 
 .pinnedMeta {
-  font-size: 0.85rem;
-  color: rgba(3, 50, 82, 0.64);
+  font-size: 0.84rem;
 }
 
-.messageCard {
+.messageRow {
+  display: flex;
+}
+
+.messageRow[data-own="true"] {
+  justify-content: flex-end;
+}
+
+.messageBubble {
+  display: grid;
+  gap: 0.85rem;
+  width: min(100%, 42rem);
   padding: 1rem;
+  background: var(--surface-panel);
 }
 
-.messageCard[data-own="true"] {
-  border-color: rgba(12, 93, 153, 0.24);
-  background: linear-gradient(180deg, rgba(207, 239, 255, 0.86), rgba(255, 255, 255, 0.52));
+.messageBubble[data-own="true"] {
+  border-color: var(--color-border-strong);
+  background:
+    linear-gradient(180deg, rgba(215, 240, 255, 0.96), rgba(255, 255, 255, 0.74));
 }
 
 .messageMeta {
-  margin-top: 0.25rem;
-  font-size: 0.88rem;
-  color: rgba(3, 50, 82, 0.64);
+  margin-top: 0.28rem;
+  font-size: 0.86rem;
 }
 
-.messageBody {
-  margin-top: 0.85rem;
-}
-
-.messageText,
-.tombstoneText {
-  margin-top: 0;
-  white-space: pre-wrap;
+.messageText {
+  color: rgba(3, 50, 82, 0.92);
   word-break: break-word;
 }
 
 .tombstoneText {
+  margin-top: 0;
   font-style: italic;
-  color: rgba(3, 50, 82, 0.66);
 }
 
 .composer {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.85rem;
 }
 
 .field {
@@ -223,68 +355,83 @@
 }
 
 .field textarea {
-  min-height: 8rem;
-  padding: 0.85rem 1rem;
+  min-height: 9rem;
+  padding: 0.9rem 1rem;
   border: 1px solid rgba(3, 50, 82, 0.14);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.82);
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.84);
   resize: vertical;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.field textarea:focus-visible {
+  border-color: var(--color-primary-bright);
+  box-shadow:
+    0 0 0 4px rgba(23, 130, 209, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.7rem;
+  gap: 0.65rem;
+}
+
+.composerFooter {
+  align-items: center;
 }
 
 .primaryButton,
 .secondaryButton,
-.linkButton {
-  min-height: 3rem;
-  padding: 0.75rem 1rem;
+.linkButton,
+.ghostButton {
+  min-height: 2.9rem;
+  padding: 0.7rem 1rem;
   border-radius: 999px;
   border: 1px solid transparent;
   cursor: pointer;
   text-decoration: none;
+  box-shadow: var(--shadow-button);
 }
 
 .primaryButton {
   color: #ffffff;
-  background: linear-gradient(180deg, #1782d1, #0c5d99);
+  background: var(--surface-button-primary);
 }
 
 .secondaryButton,
-.linkButton {
-  background: rgba(255, 255, 255, 0.7);
+.linkButton,
+.ghostButton {
+  background: var(--surface-button);
   border-color: rgba(3, 50, 82, 0.12);
 }
 
-.primaryButton:disabled,
-.secondaryButton:disabled {
-  cursor: progress;
-  opacity: 0.72;
+.ghostButton {
+  min-height: 2.5rem;
+  padding: 0.58rem 0.9rem;
+  box-shadow: none;
 }
 
-.metaTag {
-  align-self: start;
-  padding: 0.45rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.68);
-  font-size: 0.8rem;
-  color: rgba(3, 50, 82, 0.72);
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.ghostButton:disabled {
+  cursor: progress;
+  opacity: 0.72;
+  transform: none;
 }
 
 .pendingText {
+  margin-top: 0;
   font-size: 0.88rem;
   color: rgba(12, 93, 153, 0.88);
 }
 
 .stateCard[data-tone="error"] {
-  border-color: rgba(181, 38, 38, 0.24);
+  border-color: rgba(181, 38, 38, 0.22);
 }
 
 @media (max-width: 1100px) {
-  .grid {
+  .workspace {
     grid-template-columns: 1fr;
   }
 
@@ -294,16 +441,38 @@
   }
 }
 
+@media (max-width: 920px) {
+  .listPane[data-mobile-hidden="true"],
+  .threadPane[data-mobile-hidden="true"] {
+    display: none;
+  }
+}
+
 @media (max-width: 720px) {
   .heroHeader,
   .panelHeader,
   .chatItemHeader,
-  .messageHeader {
+  .messageHeader,
+  .blockHeader,
+  .composerFooter {
     display: grid;
     grid-template-columns: 1fr;
   }
 
   .metrics {
     grid-template-columns: 1fr;
+  }
+
+  .threadIdentity,
+  .chatItem {
+    align-items: flex-start;
+  }
+
+  .pinnedList {
+    grid-template-columns: 1fr;
+  }
+
+  .messageBubble {
+    width: 100%;
   }
 }

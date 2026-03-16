@@ -13,9 +13,39 @@
   --color-ink: #043252;
   --color-muted: rgba(4, 50, 82, 0.72);
   --color-surface: rgba(255, 255, 255, 0.76);
+  --color-surface-soft: rgba(255, 255, 255, 0.64);
+  --color-surface-strong: rgba(255, 255, 255, 0.88);
   --color-primary: #0c5d99;
   --color-primary-bright: #1782d1;
+  --color-primary-soft: rgba(23, 130, 209, 0.16);
+  --color-border-soft: rgba(255, 255, 255, 0.58);
+  --color-border-strong: rgba(12, 93, 153, 0.22);
+  --color-danger-soft: rgba(181, 38, 38, 0.1);
+  --color-danger-ink: #8e1e1e;
+  --color-success-soft: rgba(46, 142, 106, 0.13);
+  --color-warn-soft: rgba(230, 161, 57, 0.18);
+  --color-chip: rgba(255, 255, 255, 0.68);
+  --surface-panel:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(229, 245, 255, 0.56));
+  --surface-panel-strong:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(218, 241, 255, 0.72));
+  --surface-panel-accent:
+    linear-gradient(180deg, rgba(217, 241, 255, 0.94), rgba(255, 255, 255, 0.68));
+  --surface-shell:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(223, 241, 253, 0.36));
+  --surface-window:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(216, 235, 248, 0.44));
+  --surface-button:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(224, 243, 255, 0.72));
+  --surface-button-primary:
+    linear-gradient(180deg, #2e98ea, #0c5d99);
   --shadow-shell:
     0 24px 64px rgba(6, 45, 75, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --shadow-panel:
+    0 18px 40px rgba(12, 58, 90, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  --shadow-button:
+    0 10px 24px rgba(12, 93, 153, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
