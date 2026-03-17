@@ -220,6 +220,9 @@ cp .env.example .env
 docker compose -f infra/compose/docker-compose.yml up --build -d
 ```
 
+При первом запуске `aero-identity` и `aero-chat` автоматически применяют свою PostgreSQL-схему.
+Штатный `local/dev` flow не требует отдельного ручного `psql`.
+
 4. Открой приложение через `http://127.0.0.1:${NGINX_PORT}` из `.env`.
 
 5. Если нужен source-mode запуск вне compose, используй:
@@ -239,6 +242,10 @@ docker compose --env-file .env.server --env-file .env.server.secrets -f infra/co
 docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml up -d
 ```
 
+При первом старте на пустой PostgreSQL БД `aero-identity` и `aero-chat` автоматически bootstrap'ят схему до выхода в
+`ready`.
+Нормальный server bootstrap не требует ручного выполнения SQL через `psql`.
+
 Server runtime больше не поднимает отдельный `nginx` контейнер для production VPS.
 Public edge для target VPS принадлежит shared `Traefik` в `k3s`.
 Compose runtime публикует только два host upstream'а на `${AERO_SHARED_EDGE_HOST_IP}`:
@@ -253,6 +260,7 @@ Compose runtime публикует только два host upstream'а на `${
 Подробности, TLS/domain contract и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
 Для финального live rollout используется manual workflow `Deploy Production` c GitHub Environment `production`.
 Полный production runbook описан в `docs/deploy/production-rollout.md`.
+Database bootstrap policy описана в `docs/adr/028-first-launch-database-schema-bootstrap.md`.
 
 ### Image release model
 
