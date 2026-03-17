@@ -122,7 +122,7 @@ describe("chatsReducer", () => {
     });
 
     const nextState = chatsReducer(threadState, {
-      type: "thread_presence_updated",
+      type: "presence_state_replaced",
       chatId: "chat-1",
       presenceState: {
         selfPresence: {
@@ -229,5 +229,63 @@ describe("chatsReducer", () => {
     });
 
     expect(nextState.thread?.readState?.peerPosition?.messageId).toBe("message-1");
+  });
+
+  it("replaces active thread typing state from realtime update", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const threadState = chatsReducer(readyState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+
+    const nextState = chatsReducer(threadState, {
+      type: "typing_state_replaced",
+      chatId: "chat-1",
+      typingState: {
+        selfTyping: null,
+        peerTyping: {
+          updatedAt: "2026-04-07T12:03:00Z",
+          expiresAt: "2026-04-07T12:03:06Z",
+        },
+      },
+    });
+
+    expect(nextState.thread?.typingState?.peerTyping?.updatedAt).toBe(
+      "2026-04-07T12:03:00Z",
+    );
+  });
+
+  it("replaces active thread presence state idempotently", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const threadState = chatsReducer(readyState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+    const presenceState = {
+      selfPresence: null,
+      peerPresence: {
+        heartbeatAt: "2026-04-07T12:04:00Z",
+        expiresAt: "2026-04-07T12:04:30Z",
+      },
+    };
+
+    const firstState = chatsReducer(threadState, {
+      type: "presence_state_replaced",
+      chatId: "chat-1",
+      presenceState,
+    });
+    const secondState = chatsReducer(firstState, {
+      type: "presence_state_replaced",
+      chatId: "chat-1",
+      presenceState,
+    });
+
+    expect(secondState.thread?.presenceState).toEqual(presenceState);
   });
 });

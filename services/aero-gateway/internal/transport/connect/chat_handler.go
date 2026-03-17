@@ -74,19 +74,47 @@ func (h *ChatHandler) MarkDirectChatRead(ctx context.Context, req *connect.Reque
 }
 
 func (h *ChatHandler) SetDirectChatTyping(ctx context.Context, req *connect.Request[chatv1.SetDirectChatTypingRequest]) (*connect.Response[chatv1.SetDirectChatTypingResponse], error) {
-	return forwardUnary(ctx, req, h.client.SetDirectChatTyping)
+	response, err := forwardUnary(ctx, req, h.client.SetDirectChatTyping)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishTypingStateUpdate(ctx, req.Header(), req.Msg.ChatId, response.Msg.TypingState)
+
+	return response, nil
 }
 
 func (h *ChatHandler) ClearDirectChatTyping(ctx context.Context, req *connect.Request[chatv1.ClearDirectChatTypingRequest]) (*connect.Response[chatv1.ClearDirectChatTypingResponse], error) {
-	return forwardUnary(ctx, req, h.client.ClearDirectChatTyping)
+	response, err := forwardUnary(ctx, req, h.client.ClearDirectChatTyping)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishTypingStateUpdate(ctx, req.Header(), req.Msg.ChatId, response.Msg.TypingState)
+
+	return response, nil
 }
 
 func (h *ChatHandler) SetDirectChatPresenceHeartbeat(ctx context.Context, req *connect.Request[chatv1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[chatv1.SetDirectChatPresenceHeartbeatResponse], error) {
-	return forwardUnary(ctx, req, h.client.SetDirectChatPresenceHeartbeat)
+	response, err := forwardUnary(ctx, req, h.client.SetDirectChatPresenceHeartbeat)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishPresenceStateUpdate(ctx, req.Header(), req.Msg.ChatId, response.Msg.PresenceState)
+
+	return response, nil
 }
 
 func (h *ChatHandler) ClearDirectChatPresence(ctx context.Context, req *connect.Request[chatv1.ClearDirectChatPresenceRequest]) (*connect.Response[chatv1.ClearDirectChatPresenceResponse], error) {
-	return forwardUnary(ctx, req, h.client.ClearDirectChatPresence)
+	response, err := forwardUnary(ctx, req, h.client.ClearDirectChatPresence)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishPresenceStateUpdate(ctx, req.Header(), req.Msg.ChatId, response.Msg.PresenceState)
+
+	return response, nil
 }
 
 func (h *ChatHandler) SendTextMessage(ctx context.Context, req *connect.Request[chatv1.SendTextMessageRequest]) (*connect.Response[chatv1.SendTextMessageResponse], error) {
@@ -212,6 +240,99 @@ func (h *ChatHandler) publishReadStateUpdate(
 	}
 }
 
+func (h *ChatHandler) publishTypingStateUpdate(
+	ctx context.Context,
+	headers http.Header,
+	chatID string,
+	typingState *chatv1.DirectChatTypingState,
+) {
+	if h.realtimeHub == nil || chatID == "" {
+		return
+	}
+
+	directChat, actorProfile, ok := h.fetchDirectChatAndActorProfile(ctx, headers, chatID, "typing")
+	if !ok {
+		return
+	}
+
+	for _, participant := range directChat.Participants {
+		participantID := participant.GetId()
+		if participantID == "" {
+			continue
+		}
+
+		h.realtimeHub.PublishToUser(
+			participantID,
+			realtime.NewDirectChatTypingUpdatedEnvelope(
+				chatID,
+				mirrorTypingStateForRecipient(participantID, actorProfile.GetId(), typingState),
+			),
+		)
+	}
+}
+
+func (h *ChatHandler) publishPresenceStateUpdate(
+	ctx context.Context,
+	headers http.Header,
+	chatID string,
+	presenceState *chatv1.DirectChatPresenceState,
+) {
+	if h.realtimeHub == nil || chatID == "" {
+		return
+	}
+
+	directChat, actorProfile, ok := h.fetchDirectChatAndActorProfile(ctx, headers, chatID, "presence")
+	if !ok {
+		return
+	}
+
+	for _, participant := range directChat.Participants {
+		participantID := participant.GetId()
+		if participantID == "" {
+			continue
+		}
+
+		h.realtimeHub.PublishToUser(
+			participantID,
+			realtime.NewDirectChatPresenceUpdatedEnvelope(
+				chatID,
+				mirrorPresenceStateForRecipient(participantID, actorProfile.GetId(), presenceState),
+			),
+		)
+	}
+}
+
+func (h *ChatHandler) fetchDirectChatAndActorProfile(
+	ctx context.Context,
+	headers http.Header,
+	chatID string,
+	kind string,
+) (*chatv1.DirectChat, *identityv1.Profile, bool) {
+	directChat, err := h.fetchDirectChat(ctx, headers, chatID)
+	if err != nil {
+		h.logger.Error(
+			"не удалось дочитать direct chat для realtime update",
+			slog.String("chat_id", chatID),
+			slog.String("kind", kind),
+			slog.String("error", err.Error()),
+		)
+		return nil, nil, false
+	}
+
+	profile, err := h.fetchCurrentProfile(ctx, headers)
+	if err != nil {
+		h.logger.Error(
+			"не удалось получить текущий профиль для realtime update",
+			slog.String("chat_id", chatID),
+			slog.String("kind", kind),
+			slog.String("error", err.Error()),
+		)
+		return nil, nil, false
+	}
+
+	return directChat, profile, true
+}
+
 func (h *ChatHandler) fetchDirectChat(ctx context.Context, headers http.Header, chatID string) (*chatv1.DirectChat, error) {
 	request := connect.NewRequest(&chatv1.GetDirectChatRequest{ChatId: chatID})
 	copyAuthorizationHeader(request.Header(), headers)
@@ -275,5 +396,87 @@ func cloneReadPosition(position *chatv1.DirectChatReadPosition) *chatv1.DirectCh
 		MessageId:        position.GetMessageId(),
 		MessageCreatedAt: position.GetMessageCreatedAt(),
 		UpdatedAt:        position.GetUpdatedAt(),
+	}
+}
+
+func mirrorTypingStateForRecipient(
+	recipientUserID string,
+	actorUserID string,
+	typingState *chatv1.DirectChatTypingState,
+) *chatv1.DirectChatTypingState {
+	if typingState == nil {
+		return nil
+	}
+
+	if recipientUserID == actorUserID {
+		return cloneTypingState(typingState)
+	}
+
+	return &chatv1.DirectChatTypingState{
+		SelfTyping: cloneTypingIndicator(typingState.GetPeerTyping()),
+		PeerTyping: cloneTypingIndicator(typingState.GetSelfTyping()),
+	}
+}
+
+func cloneTypingState(typingState *chatv1.DirectChatTypingState) *chatv1.DirectChatTypingState {
+	if typingState == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatTypingState{
+		SelfTyping: cloneTypingIndicator(typingState.GetSelfTyping()),
+		PeerTyping: cloneTypingIndicator(typingState.GetPeerTyping()),
+	}
+}
+
+func cloneTypingIndicator(indicator *chatv1.DirectChatTypingIndicator) *chatv1.DirectChatTypingIndicator {
+	if indicator == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatTypingIndicator{
+		UpdatedAt: indicator.GetUpdatedAt(),
+		ExpiresAt: indicator.GetExpiresAt(),
+	}
+}
+
+func mirrorPresenceStateForRecipient(
+	recipientUserID string,
+	actorUserID string,
+	presenceState *chatv1.DirectChatPresenceState,
+) *chatv1.DirectChatPresenceState {
+	if presenceState == nil {
+		return nil
+	}
+
+	if recipientUserID == actorUserID {
+		return clonePresenceState(presenceState)
+	}
+
+	return &chatv1.DirectChatPresenceState{
+		SelfPresence: clonePresenceIndicator(presenceState.GetPeerPresence()),
+		PeerPresence: clonePresenceIndicator(presenceState.GetSelfPresence()),
+	}
+}
+
+func clonePresenceState(presenceState *chatv1.DirectChatPresenceState) *chatv1.DirectChatPresenceState {
+	if presenceState == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatPresenceState{
+		SelfPresence: clonePresenceIndicator(presenceState.GetSelfPresence()),
+		PeerPresence: clonePresenceIndicator(presenceState.GetPeerPresence()),
+	}
+}
+
+func clonePresenceIndicator(indicator *chatv1.DirectChatPresenceIndicator) *chatv1.DirectChatPresenceIndicator {
+	if indicator == nil {
+		return nil
+	}
+
+	return &chatv1.DirectChatPresenceIndicator{
+		HeartbeatAt: indicator.GetHeartbeatAt(),
+		ExpiresAt:   indicator.GetExpiresAt(),
 	}
 }

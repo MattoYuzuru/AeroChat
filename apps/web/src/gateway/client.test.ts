@@ -458,6 +458,86 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("sets direct chat typing through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          typingState: {
+            selfTyping: {
+              updatedAt: "2026-04-07T12:00:00Z",
+              expiresAt: "2026-04-07T12:00:06Z",
+            },
+            peerTyping: {
+              updatedAt: "2026-04-07T11:59:59Z",
+              expiresAt: "2026-04-07T12:00:05Z",
+            },
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const typingState = await client.setDirectChatTyping("token-1", "chat-1");
+
+    expect(typingState?.selfTyping?.updatedAt).toBe("2026-04-07T12:00:00Z");
+    expect(typingState?.peerTyping?.updatedAt).toBe("2026-04-07T11:59:59Z");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/SetDirectChatTyping",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          chatId: "chat-1",
+        }),
+      }),
+    );
+  });
+
+  it("clears direct chat typing through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          typingState: {
+            peerTyping: {
+              updatedAt: "2026-04-07T11:59:59Z",
+              expiresAt: "2026-04-07T12:00:05Z",
+            },
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const typingState = await client.clearDirectChatTyping("token-1", "chat-1");
+
+    expect(typingState?.selfTyping).toBeNull();
+    expect(typingState?.peerTyping?.updatedAt).toBe("2026-04-07T11:59:59Z");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/ClearDirectChatTyping",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          chatId: "chat-1",
+        }),
+      }),
+    );
+  });
+
   it("clears direct chat presence through gateway chat endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

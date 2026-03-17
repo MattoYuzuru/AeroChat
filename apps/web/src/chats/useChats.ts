@@ -11,6 +11,11 @@ import {
   DIRECT_CHAT_PRESENCE_HEARTBEAT_INTERVAL_MS,
   resolveDirectChatPresenceHeartbeatChatId,
 } from "./presence";
+import {
+  DIRECT_CHAT_TYPING_IDLE_TIMEOUT_MS,
+  DIRECT_CHAT_TYPING_REFRESH_INTERVAL_MS,
+  resolveDirectChatTypingSessionChatId,
+} from "./typing";
 import { parseDirectChatRealtimeEvent } from "./realtime";
 import {
   chatsReducer,
@@ -22,6 +27,7 @@ interface UseChatsOptions {
   enabled: boolean;
   token: string;
   currentUserId: string;
+  composerText: string;
   onUnauthenticated(): void;
 }
 
@@ -37,6 +43,7 @@ export function useChats({
   enabled,
   token,
   currentUserId,
+  composerText,
   onUnauthenticated,
 }: UseChatsOptions) {
   const [state, dispatch] = useReducer(
@@ -47,6 +54,11 @@ export function useChats({
   const mountedRef = useRef(false);
   const stateRef = useRef(state);
   const onUnauthenticatedRef = useRef(onUnauthenticated);
+  const activePresenceChatIdRef = useRef<string | null>(null);
+  const activeTypingChatIdRef = useRef<string | null>(null);
+  const typingLastSentAtRef = useRef(0);
+  const typingRefreshTimerRef = useRef<number | null>(null);
+  const typingIdleTimerRef = useRef<number | null>(null);
   const isPageVisible = usePageVisibility();
 
   useEffect(() => {
@@ -95,10 +107,28 @@ export function useChats({
         return;
       }
 
+      if (event.type === "direct_chat.read.updated") {
+        dispatch({
+          type: "read_state_replaced",
+          chatId: event.chatId,
+          readState: event.readState,
+        });
+        return;
+      }
+
+      if (event.type === "direct_chat.typing.updated") {
+        dispatch({
+          type: "typing_state_replaced",
+          chatId: event.chatId,
+          typingState: event.typingState,
+        });
+        return;
+      }
+
       dispatch({
-        type: "read_state_replaced",
+        type: "presence_state_replaced",
         chatId: event.chatId,
-        readState: event.readState,
+        presenceState: event.presenceState,
       });
     });
   }, [enabled]);
@@ -109,6 +139,13 @@ export function useChats({
     selectedChatId: state.selectedChatId,
     threadChatId: state.thread?.chat.id ?? null,
   });
+  const activeTypingChatId = resolveDirectChatTypingSessionChatId({
+    enabled,
+    pageVisible: isPageVisible,
+    selectedChatId: state.selectedChatId,
+    threadChatId: state.thread?.chat.id ?? null,
+    composerText,
+  });
 
   useEffect(() => {
     const threadChatID = state.thread?.chat.id ?? null;
@@ -117,11 +154,41 @@ export function useChats({
     }
 
     dispatch({
-      type: "thread_presence_updated",
+      type: "presence_state_replaced",
       chatId: threadChatID,
       presenceState: null,
     });
   }, [activePresenceChatId, state.thread?.chat.id]);
+
+  useEffect(() => {
+    const threadChatID = state.thread?.chat.id ?? null;
+    if (activeTypingChatId !== null || threadChatID === null) {
+      return;
+    }
+
+    dispatch({
+      type: "typing_state_replaced",
+      chatId: threadChatID,
+      typingState: null,
+    });
+  }, [activeTypingChatId, state.thread?.chat.id]);
+
+  useEffect(() => {
+    const previousChatId = activePresenceChatIdRef.current;
+    activePresenceChatIdRef.current = activePresenceChatId;
+
+    if (previousChatId === null || previousChatId === activePresenceChatId) {
+      return;
+    }
+
+    void clearDirectChatPresenceSilently(
+      token,
+      previousChatId,
+      mountedRef,
+      dispatch,
+      onUnauthenticatedRef,
+    );
+  }, [activePresenceChatId, token]);
 
   useEffect(() => {
     if (activePresenceChatId === null) {
@@ -154,7 +221,7 @@ export function useChats({
         }
 
         dispatch({
-          type: "thread_presence_updated",
+          type: "presence_state_replaced",
           chatId: activePresenceChatId,
           presenceState,
         });
@@ -179,6 +246,166 @@ export function useChats({
       }
     };
   }, [activePresenceChatId, token]);
+
+  useEffect(() => {
+    const clearTypingTimers = () => {
+      if (typingRefreshTimerRef.current !== null) {
+        window.clearTimeout(typingRefreshTimerRef.current);
+        typingRefreshTimerRef.current = null;
+      }
+      if (typingIdleTimerRef.current !== null) {
+        window.clearTimeout(typingIdleTimerRef.current);
+        typingIdleTimerRef.current = null;
+      }
+    };
+
+    const previousChatId = activeTypingChatIdRef.current;
+
+    if (activeTypingChatId === null) {
+      clearTypingTimers();
+      typingLastSentAtRef.current = 0;
+      activeTypingChatIdRef.current = null;
+
+      if (previousChatId !== null) {
+        void clearDirectChatTypingSilently(
+          token,
+          previousChatId,
+          mountedRef,
+          dispatch,
+          onUnauthenticatedRef,
+        );
+      }
+
+      return;
+    }
+
+    let cancelled = false;
+    activeTypingChatIdRef.current = activeTypingChatId;
+
+    if (previousChatId !== null && previousChatId !== activeTypingChatId) {
+      typingLastSentAtRef.current = 0;
+      void clearDirectChatTypingSilently(
+        token,
+        previousChatId,
+        mountedRef,
+        dispatch,
+        onUnauthenticatedRef,
+      );
+    }
+
+    const scheduleRefresh = () => {
+      if (cancelled) {
+        return;
+      }
+
+      clearTypingRefreshTimer(typingRefreshTimerRef);
+      typingRefreshTimerRef.current = window.setTimeout(() => {
+        void publishTyping(true);
+      }, DIRECT_CHAT_TYPING_REFRESH_INTERVAL_MS);
+    };
+
+    const scheduleIdleClear = () => {
+      if (cancelled) {
+        return;
+      }
+
+      clearTypingIdleTimer(typingIdleTimerRef);
+      typingIdleTimerRef.current = window.setTimeout(() => {
+        typingLastSentAtRef.current = 0;
+        activeTypingChatIdRef.current = null;
+        clearTypingTimers();
+        void clearDirectChatTypingSilently(
+          token,
+          activeTypingChatId,
+          mountedRef,
+          dispatch,
+          onUnauthenticatedRef,
+        );
+      }, DIRECT_CHAT_TYPING_IDLE_TIMEOUT_MS);
+    };
+
+    const publishTyping = async (force: boolean) => {
+      if (cancelled) {
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        !force &&
+        typingLastSentAtRef.current !== 0 &&
+        now-typingLastSentAtRef.current < DIRECT_CHAT_TYPING_REFRESH_INTERVAL_MS
+      ) {
+        scheduleRefresh();
+        return;
+      }
+
+      try {
+        const typingState = await gatewayClient.setDirectChatTyping(token, activeTypingChatId);
+        if (cancelled || !mountedRef.current) {
+          return;
+        }
+
+        typingLastSentAtRef.current = Date.now();
+        dispatch({
+          type: "typing_state_replaced",
+          chatId: activeTypingChatId,
+          typingState,
+        });
+      } catch (error) {
+        if (handlePresenceError(error, onUnauthenticatedRef)) {
+          clearTypingTimers();
+          return;
+        }
+      } finally {
+        if (!cancelled) {
+          scheduleRefresh();
+        }
+      }
+    };
+
+    scheduleIdleClear();
+    void publishTyping(previousChatId !== activeTypingChatId || typingLastSentAtRef.current === 0);
+
+    return () => {
+      cancelled = true;
+      clearTypingTimers();
+    };
+  }, [activeTypingChatId, composerText, token]);
+
+  useEffect(() => {
+    return () => {
+      const activePresenceChatId = activePresenceChatIdRef.current;
+      activePresenceChatIdRef.current = null;
+      if (activePresenceChatId !== null) {
+        void clearDirectChatPresenceSilently(
+          token,
+          activePresenceChatId,
+          mountedRef,
+          dispatch,
+          onUnauthenticatedRef,
+        );
+      }
+    };
+  }, [token]);
+
+  useEffect(() => {
+    return () => {
+      const activeTypingChatId = activeTypingChatIdRef.current;
+      activeTypingChatIdRef.current = null;
+      typingLastSentAtRef.current = 0;
+      clearTypingRefreshTimer(typingRefreshTimerRef);
+      clearTypingIdleTimer(typingIdleTimerRef);
+      if (activeTypingChatId !== null) {
+        void clearDirectChatTypingSilently(
+          token,
+          activeTypingChatId,
+          mountedRef,
+          dispatch,
+          onUnauthenticatedRef,
+        );
+      }
+    };
+  }, [token]);
 
   const latestThreadMessage = state.thread?.messages.at(-1) ?? null;
   const activeThreadChatId = state.thread?.chat.id ?? null;
@@ -609,6 +836,70 @@ function handlePresenceError(
 
   onUnauthenticatedRef.current();
   return true;
+}
+
+function clearTypingRefreshTimer(ref: { current: number | null }) {
+  if (ref.current === null) {
+    return;
+  }
+
+  window.clearTimeout(ref.current);
+  ref.current = null;
+}
+
+function clearTypingIdleTimer(ref: { current: number | null }) {
+  if (ref.current === null) {
+    return;
+  }
+
+  window.clearTimeout(ref.current);
+  ref.current = null;
+}
+
+async function clearDirectChatTypingSilently(
+  token: string,
+  chatId: string,
+  mountedRef: { current: boolean },
+  dispatch: ChatsDispatch,
+  onUnauthenticatedRef: { current: () => void },
+) {
+  try {
+    const typingState = await gatewayClient.clearDirectChatTyping(token, chatId);
+    if (!mountedRef.current) {
+      return;
+    }
+
+    dispatch({
+      type: "typing_state_replaced",
+      chatId,
+      typingState,
+    });
+  } catch (error) {
+    handlePresenceError(error, onUnauthenticatedRef);
+  }
+}
+
+async function clearDirectChatPresenceSilently(
+  token: string,
+  chatId: string,
+  mountedRef: { current: boolean },
+  dispatch: ChatsDispatch,
+  onUnauthenticatedRef: { current: () => void },
+) {
+  try {
+    const presenceState = await gatewayClient.clearDirectChatPresence(token, chatId);
+    if (!mountedRef.current) {
+      return;
+    }
+
+    dispatch({
+      type: "presence_state_replaced",
+      chatId,
+      presenceState,
+    });
+  } catch (error) {
+    handlePresenceError(error, onUnauthenticatedRef);
+  }
 }
 
 function usePageVisibility(): boolean {

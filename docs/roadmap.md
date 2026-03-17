@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] people realtime bootstrap через `aero-gateway`
+- [x] direct chat typing/presence realtime fan-out через `aero-gateway`
 
 ---
 
@@ -98,6 +98,7 @@
 - [x] Web direct chat bootstrap через `aero-gateway`
 - [x] Gateway realtime transport foundation
 - [x] Direct chat realtime bootstrap через `aero-gateway`
+- [x] Direct chat typing/presence realtime fan-out через `aero-gateway`
 
 ---
 
