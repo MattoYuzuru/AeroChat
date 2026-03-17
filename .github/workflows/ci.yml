@@ -11,6 +11,20 @@ on:
   pull_request:
 
 jobs:
+  workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+
+      - name: Validate workflow files
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.8
+
   infra:
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +53,10 @@ jobs:
 
       - name: Check formatting
         run: |
-          if [ -n "$(gofmt -l $(find . -type f -name '*.go' -not -path './gen/go/*'))" ]; then
+          unformatted_files="$(find . -type f -name '*.go' -not -path './gen/go/*' -exec gofmt -l {} +)"
+
+          if [ -n "$unformatted_files" ]; then
+            printf '%s\n' "$unformatted_files"
             echo "Найдены неотформатированные Go-файлы"
             exit 1
           fi
