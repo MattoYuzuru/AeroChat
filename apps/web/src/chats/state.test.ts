@@ -110,4 +110,34 @@ describe("chatsReducer", () => {
     expect(nextState.threadStatus).toBe("error");
     expect(nextState.threadErrorMessage).toBe("thread unavailable");
   });
+
+  it("updates presence state only for the active loaded thread", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const threadState = chatsReducer(readyState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+
+    const nextState = chatsReducer(threadState, {
+      type: "thread_presence_updated",
+      chatId: "chat-1",
+      presenceState: {
+        selfPresence: {
+          heartbeatAt: "2026-04-06T12:00:00Z",
+          expiresAt: "2026-04-06T12:00:30Z",
+        },
+        peerPresence: {
+          heartbeatAt: "2026-04-06T11:59:58Z",
+          expiresAt: "2026-04-06T12:00:28Z",
+        },
+      },
+    });
+
+    expect(nextState.thread?.presenceState?.peerPresence?.heartbeatAt).toBe(
+      "2026-04-06T11:59:58Z",
+    );
+  });
 });

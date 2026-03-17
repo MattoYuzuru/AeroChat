@@ -1,10 +1,14 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { gatewayClient } from "../gateway/runtime";
 import {
   describeGatewayError,
   isGatewayErrorCode,
   type DirectChat,
 } from "../gateway/types";
+import {
+  DIRECT_CHAT_PRESENCE_HEARTBEAT_INTERVAL_MS,
+  resolveDirectChatPresenceHeartbeatChatId,
+} from "./presence";
 import {
   chatsReducer,
   createInitialChatsState,
@@ -33,6 +37,7 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
   const mountedRef = useRef(false);
   const stateRef = useRef(state);
   const onUnauthenticatedRef = useRef(onUnauthenticated);
+  const isPageVisible = usePageVisibility();
 
   useEffect(() => {
     stateRef.current = state;
@@ -54,6 +59,83 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       mountedRef.current = false;
     };
   }, [enabled, token]);
+
+  const activePresenceChatId = resolveDirectChatPresenceHeartbeatChatId({
+    enabled,
+    pageVisible: isPageVisible,
+    selectedChatId: state.selectedChatId,
+    threadChatId: state.thread?.chat.id ?? null,
+  });
+
+  useEffect(() => {
+    const threadChatID = state.thread?.chat.id ?? null;
+    if (activePresenceChatId !== null || threadChatID === null) {
+      return;
+    }
+
+    dispatch({
+      type: "thread_presence_updated",
+      chatId: threadChatID,
+      presenceState: null,
+    });
+  }, [activePresenceChatId, state.thread?.chat.id]);
+
+  useEffect(() => {
+    if (activePresenceChatId === null) {
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutID: number | null = null;
+
+    const scheduleNextHeartbeat = () => {
+      if (cancelled) {
+        return;
+      }
+
+      timeoutID = window.setTimeout(() => {
+        void runHeartbeat();
+      }, DIRECT_CHAT_PRESENCE_HEARTBEAT_INTERVAL_MS);
+    };
+
+    const runHeartbeat = async () => {
+      let shouldScheduleNext = true;
+
+      try {
+        const presenceState = await gatewayClient.setDirectChatPresenceHeartbeat(
+          token,
+          activePresenceChatId,
+        );
+        if (cancelled || !mountedRef.current) {
+          return;
+        }
+
+        dispatch({
+          type: "thread_presence_updated",
+          chatId: activePresenceChatId,
+          presenceState,
+        });
+      } catch (error) {
+        if (handlePresenceError(error, onUnauthenticatedRef)) {
+          shouldScheduleNext = false;
+          return;
+        }
+      } finally {
+        if (shouldScheduleNext) {
+          scheduleNextHeartbeat();
+        }
+      }
+    };
+
+    void runHeartbeat();
+
+    return () => {
+      cancelled = true;
+      if (timeoutID !== null) {
+        window.clearTimeout(timeoutID);
+      }
+    };
+  }, [activePresenceChatId, token]);
 
   async function reloadChats() {
     if (state.status === "loading") {
@@ -449,4 +531,43 @@ function resolveProtectedError(
   }
 
   return describeGatewayError(error, fallbackMessage);
+}
+
+function handlePresenceError(
+  error: unknown,
+  onUnauthenticatedRef: { current: () => void },
+): boolean {
+  if (!isGatewayErrorCode(error, "unauthenticated")) {
+    return false;
+  }
+
+  onUnauthenticatedRef.current();
+  return true;
+}
+
+function usePageVisibility(): boolean {
+  const [isPageVisible, setIsPageVisible] = useState(() => {
+    if (typeof document === "undefined") {
+      return true;
+    }
+
+    return document.visibilityState !== "hidden";
+  });
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState !== "hidden");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  return isPageVisible;
 }

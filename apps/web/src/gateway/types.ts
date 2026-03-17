@@ -206,6 +206,14 @@ export interface GatewayClient {
     chatId: string,
     messageId: string,
   ): Promise<DirectChatReadState | null>;
+  setDirectChatPresenceHeartbeat(
+    token: string,
+    chatId: string,
+  ): Promise<DirectChatPresenceState | null>;
+  clearDirectChatPresence(
+    token: string,
+    chatId: string,
+  ): Promise<DirectChatPresenceState | null>;
   sendTextMessage(
     token: string,
     chatId: string,
