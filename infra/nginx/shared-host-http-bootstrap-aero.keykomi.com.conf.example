@@ -1,44 +1,19 @@
 upstream aerochat_web {
-  server web:80;
+  server 127.0.0.1:18080;
 }
 
 upstream aerochat_gateway {
-  server aero-gateway:8080;
+  server 127.0.0.1:18081;
 }
 
 server {
   listen 80;
-  server_name ${AERO_EDGE_DOMAIN};
+  listen [::]:80;
+  server_name aero.keykomi.com;
 
-  location = /healthz {
-    access_log off;
-    default_type text/plain;
-    return 200 "healthy\n";
+  location ^~ /.well-known/acme-challenge/ {
+    root /var/www/certbot;
   }
-
-  location = /readyz {
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_pass http://aerochat_gateway/readyz;
-  }
-
-  location / {
-    return 308 https://${AERO_EDGE_DOMAIN}$request_uri;
-  }
-}
-
-server {
-  listen 443 ssl;
-  server_name ${AERO_EDGE_DOMAIN};
-
-  ssl_certificate /etc/nginx/tls/fullchain.pem;
-  ssl_certificate_key /etc/nginx/tls/privkey.pem;
-  ssl_session_cache shared:SSL:10m;
-  ssl_session_timeout 1d;
-  ssl_protocols TLSv1.2 TLSv1.3;
 
   location = /healthz {
     access_log off;
@@ -72,6 +47,6 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-Host $host;
     proxy_set_header X-Real-IP $remote_addr;
-    proxy_pass http://aerochat_web/;
+    proxy_pass http://aerochat_web;
   }
 }

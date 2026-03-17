@@ -1,38 +1,66 @@
-# Single-server bootstrap, server preparation и operator fallback flow
+# Single-server bootstrap, shared-host nginx edge и operator fallback flow
 
-Этот документ описывает базовую подготовку одного VPS после появления GHCR image delivery, server secret model,
-domain-ready TLS edge bootstrap и production rollout automation.
+Этот документ описывает базовую подготовку одного VPS после перехода на shared-host edge модель, где публичные
+`80/443` уже принадлежат существующему host-level `nginx`.
 
 Цель текущего этапа:
 
-- получить воспроизводимый server/prod-like runtime;
-- получить registry-backed release bootstrap для application images;
-- явно разделить versioned runtime config и server-only secret values;
-- зафиксировать production-like HTTP/HTTPS edge path для одного домена;
-- явно определить файловую модель TLS-сертификатов на VPS;
-- подготовить VPS к ручному production rollout через GitHub Actions;
-- сохранить явный fallback flow для ручного update/rollback по SSH;
-- не превращать этот документ в remote provisioning или zero-downtime orchestration runbook.
+- сохранить single-server self-host runtime;
+- убрать конфликт за публичные `80/443`;
+- оставить host `nginx` единственным внешним edge;
+- публиковать AeroChat runtime только на loopback high ports;
+- документировать выпуск сертификата через existing host `nginx` path;
+- сохранить ручной fallback flow для update и rollback;
+- не превращать этот документ в provisioning, ACME automation или zero-downtime runbook.
 
-Основной production rollout теперь описан отдельно в [production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md).
-Этот документ остаётся source of truth для server preparation, env contract и ручного fallback flow.
+Основной production rollout по GitHub Actions описан отдельно в
+[production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md).
+Этот документ остаётся source of truth для server preparation, host `nginx` contract и ручного fallback flow.
 
 ## Модель окружений
 
-В репозитории теперь фиксированы два отдельных режима:
+В репозитории фиксированы два отдельных режима:
 
 - `local/dev`
   - root `.env.example` управляет локальным compose-стеком;
   - `infra/compose/docker-compose.yml` подходит для локального full-stack smoke запуска;
+  - локальный `nginx` контейнер по-прежнему используется только в dev-runtime;
   - `services/*/.env.example` и `apps/web/.env.example` остаются примерами для source-mode запуска вне compose.
 
 - `server/prod-like`
   - `.env.server.example` содержит только versioned non-secret runtime config;
   - `.env.server.secrets.example` содержит только перечень обязательных secret keys с плейсхолдерами;
-  - домен и путь к каталогу TLS-сертификатов задаются оператором в `.env.server`;
-  - каталог с `fullchain.pem` и `privkey.pem` существует только на VPS и монтируется в `nginx` read-only;
   - `infra/compose/docker-compose.server.yml` тянет предсобранные application images из registry;
-  - наружу публикуется только `nginx` на `80/443`.
+  - compose публикует только `web` и `aero-gateway` на `127.0.0.1` high ports;
+  - host-level `nginx` остаётся единственным внешним edge на `80/443`;
+  - сертификаты выпускаются и используются на host-level `nginx`, а не внутри compose stack.
+
+## Runtime topology
+
+На одном VPS поднимаются:
+
+- host-level `nginx` как единственный внешний HTTP/HTTPS edge;
+- `web` как контейнер со статически собранным frontend;
+- `aero-gateway` как единственная backend edge-точка;
+- `aero-identity` и `aero-chat` как внутренние сервисы;
+- `postgres`, `redis`, `minio` как внутренние зависимости.
+
+Внутренние обращения идут так:
+
+- browser → host `nginx`
+- host `nginx` → `web` на `127.0.0.1:${AERO_WEB_HOST_PORT}`
+- host `nginx` → `aero-gateway` на `127.0.0.1:${AERO_GATEWAY_HOST_PORT}`
+- `aero-gateway` → `aero-identity`, `aero-chat` по compose DNS
+- `aero-identity` → `postgres`
+- `aero-chat` → `postgres`, `redis`
+
+Наружу не публикуются:
+
+- `aero-identity`
+- `aero-chat`
+- `postgres`
+- `redis`
+- `minio`
 
 ## Server env-модель
 
@@ -40,26 +68,21 @@ domain-ready TLS edge bootstrap и production rollout automation.
 
 - `.env.server.example`
   - versioned шаблон для несекретных runtime-настроек;
-  - сюда входят image namespace/tag, domain, порты `nginx`, путь к TLS-каталогу, имена пользователей, log level и
-    timeouts;
+  - сюда входят image namespace/tag, primary domain и loopback ports для host `nginx` upstreams;
   - этот файл можно безопасно хранить в репозитории как пример.
 
 - `.env.server.secrets.example`
   - versioned шаблон только для имён обязательных секретных переменных;
-  - реальных значений в репозитории быть не должно;
-  - файл нужен, чтобы оператор видел полный список server-only secret keys.
+  - реальных значений в репозитории быть не должно.
 
 - `.env.server` на VPS
   - реальная рабочая копия non-secret runtime config;
-  - оператор обычно меняет здесь только release-related параметры, в первую очередь `AERO_IMAGE_TAG`.
+  - оператор обычно меняет здесь `AERO_IMAGE_TAG` и при необходимости loopback ports.
 
 - `.env.server.secrets` на VPS
   - реальная рабочая копия секретов;
   - этот файл не коммитится;
-  - значения из него должны существовать только на сервере.
-
-TLS-материал в эту env-модель не добавляется.
-Сертификат и приватный ключ живут только как файлы на VPS и не передаются через env.
+  - значения из него существуют только на сервере.
 
 На текущем этапе к server-only секретам относятся:
 
@@ -74,63 +97,60 @@ versioned runtime-шаблон.
 В репозитории версионируются:
 
 - `infra/compose/docker-compose.server.yml`;
-- `infra/nginx/server.conf.template`;
 - `.env.server.example`;
 - `.env.server.secrets.example`;
+- host `nginx` examples:
+  - `infra/nginx/shared-host-http-bootstrap-aero.keykomi.com.conf.example`;
+  - `infra/nginx/shared-host-aero.keykomi.com.conf.example`;
 - этот runbook и ADR.
 
 Только на VPS создаются:
 
 - `.env.server`;
 - `.env.server.secrets`;
-- каталог из `AERO_NGINX_TLS_CERTS_DIR`;
-- файлы `fullchain.pem` и `privkey.pem` внутри этого каталога.
+- host `nginx` site config для реального домена;
+- ACME webroot directory, например `/var/www/certbot`;
+- host-level сертификаты и приватный ключ.
 
-Для следующих этапов сознательно остаются:
+## Host nginx contract
 
-- реальное получение сертификата;
-- renewal automation;
-- DNS automation;
-- backup/restore automation;
-- zero-downtime orchestration;
-- OS-level provisioning и firewall hardening.
+Host-level `nginx` должен обслуживать:
 
-## Runtime topology
+- `/healthz` самостоятельно;
+- `/readyz` через proxy в `aero-gateway`;
+- `/api/` только в `aero-gateway`;
+- `/` и SPA routes в `web`.
 
-На одном VPS поднимаются:
+Для первой выдачи сертификата в репозитории есть отдельный HTTP bootstrap example:
 
-- `nginx` как единственный внешний HTTP/HTTPS edge;
-- `web` как контейнер со статически собранным frontend;
-- `aero-gateway` как единственная backend edge-точка;
-- `aero-identity` и `aero-chat` как внутренние сервисы;
-- `postgres`, `redis`, `minio` как внутренние зависимости.
+- [shared-host-http-bootstrap-aero.keykomi.com.conf.example](/home/mattoyudzuru/GolandProjects/AeroChat/infra/nginx/shared-host-http-bootstrap-aero.keykomi.com.conf.example)
 
-Внутренние обращения идут по service DNS:
+Для итогового HTTPS runtime есть отдельный final example:
 
-- `aero-gateway` → `aero-identity`, `aero-chat`
-- `aero-identity` → `postgres`
-- `aero-chat` → `postgres`, `redis`
+- [shared-host-aero.keykomi.com.conf.example](/home/mattoyudzuru/GolandProjects/AeroChat/infra/nginx/shared-host-aero.keykomi.com.conf.example)
+
+Оба файла используют домен `aero.keykomi.com` и loopback ports `18080/18081` как явный пример.
+Если домен или порты отличаются, оператор обязан заменить их в host `nginx` config и в `.env.server`.
 
 ## Что готово сейчас
 
-- production-oriented compose topology для одного сервера;
-- отдельные versioned шаблоны для runtime config и secret expectations;
+- production-oriented compose topology без отдельного публичного `nginx` контейнера;
+- loopback-only contract для `web` и `aero-gateway`;
+- host-level reverse proxy contract для shared-host VPS;
 - GHCR-ready модель публикации versioned application images;
-- domain-ready `nginx` path с внешними `80/443`;
-- канонический redirect с HTTP на HTTPS для обычного user traffic;
-- файловая модель TLS-сертификатов, которые монтируются в `nginx` read-only;
-- readiness chain через `identity` → `chat` → `gateway` → `nginx`;
+- `aero-gateway` остаётся единственной backend edge-точкой;
+- documented certificate issuance path через existing host `nginx` + ACME webroot;
 - manual bootstrap/update/rollback flow как fallback;
-- manual GitHub Actions rollout через environment `production`;
-- отдельный runbook для first external launch, verification и rollback.
+- manual GitHub Actions rollout через environment `production`.
 
 ## Что намеренно отложено
 
-- реальные production secrets в репозитории;
-- реальное получение, выпуск и renewal TLS-сертификатов;
+- автоматический выпуск и renewal сертификатов;
+- управление host `nginx` через GitHub Actions;
 - backup/restore automation;
 - zero-downtime rollout;
-- firewall hardening, DNS automation и OS-level provisioning.
+- OS-level provisioning и firewall hardening;
+- multi-host и blue-green topology.
 
 ## Подготовка VPS
 
@@ -139,9 +159,10 @@ versioned runtime-шаблон.
 - Linux VPS;
 - Docker Engine;
 - Docker Compose plugin;
-- открытые `80/tcp` и `443/tcp` для `nginx`;
-- подготовленный домен, который будет указывать на VPS;
-- уже существующие TLS-файлы для этого домена или временный тестовый сертификат для preflight smoke.
+- уже работающий host-level `nginx`, который владеет `80/tcp` и `443/tcp`;
+- домен, который будет указывать на VPS;
+- доступ к `sudo` для обновления host `nginx` config и выдачи сертификата;
+- директория для ACME webroot, например `/var/www/certbot`.
 
 ## Первый bootstrap на VPS
 
@@ -154,59 +175,23 @@ cp .env.server.example .env.server
 cp .env.server.secrets.example .env.server.secrets
 ```
 
-3. Заполни файлы по их роли:
+3. Заполни `.env.server` и `.env.server.secrets`.
 
-- в `.env.server` задай runtime-настройки, `AERO_EDGE_DOMAIN`, `AERO_NGINX_TLS_CERTS_DIR` и желаемый `AERO_IMAGE_TAG`;
-- в `.env.server.secrets` задай реальные server secrets;
-- не коммить `.env.server` и `.env.server.secrets` обратно в репозиторий.
+Минимально важные non-secret переменные в `.env.server`:
 
-Для foundation smoke bootstrap на изолированном тестовом VPS можно начать с template-значений.
-Для любого реального внешнего rollout значения в `.env.server.secrets` нужно заменить до первого запуска.
+- `AERO_IMAGE_NAMESPACE`
+- `AERO_IMAGE_TAG`
+- `AERO_EDGE_DOMAIN`
+- `AERO_WEB_HOST_PORT`
+- `AERO_GATEWAY_HOST_PORT`
 
-Минимально важные release-переменные в `.env.server`:
+Ожидаемая семантика:
 
-- `AERO_IMAGE_NAMESPACE`:
-  - по умолчанию указывает на GHCR namespace проекта;
-  - в fork или mirror может быть заменён на свой namespace.
+- `AERO_WEB_HOST_PORT` используется host `nginx` для upstream `/`;
+- `AERO_GATEWAY_HOST_PORT` используется host `nginx` для upstream `/api/` и `/readyz`;
+- оба порта должны оставаться loopback-only и не конфликтовать с другими сервисами на VPS.
 
-- `AERO_IMAGE_TAG`:
-  - `edge` для latest build из default branch;
-  - `vX.Y.Z` для фиксированного release;
-  - при необходимости можно использовать точный `sha-<commit>`.
-
-- `AERO_EDGE_DOMAIN`:
-  - основной внешний домен single-server deployment;
-  - используется как `server_name` и canonical HTTPS redirect target.
-
-- `AERO_NGINX_TLS_CERTS_DIR`:
-  - каталог на VPS, который монтируется в контейнер `nginx` только для чтения;
-  - внутри него должны существовать `fullchain.pem` и `privkey.pem`.
-
-`latest` намеренно не используется.
-
-На этом этапе опубликованные application images собираются только для `linux/amd64`.
-
-4. Подготовь файловую TLS-модель на VPS:
-
-Если используется значение по умолчанию из `.env.server.example`, подготовка выглядит так:
-
-```bash
-mkdir -p /opt/aerochat/tls
-chmod 700 /opt/aerochat/tls
-```
-
-Дальше оператор вручную кладёт в каталог из `AERO_NGINX_TLS_CERTS_DIR`:
-
-- `fullchain.pem`
-- `privkey.pem`
-
-Минимальные правила:
-
-- файлы не коммитятся в репозиторий;
-- приватный ключ остаётся только на VPS;
-- compose и `nginx` считают эти файлы уже существующими до `up -d`.
-
-5. Проверь итоговую compose-конфигурацию:
+4. Проверь итоговую compose-конфигурацию:
 
 ```bash
 docker compose \
@@ -216,7 +201,7 @@ docker compose \
   config
 ```
 
-6. Загрузи выбранный release tag и подними runtime:
+5. Загрузи выбранный release tag и подними runtime:
 
 ```bash
 docker compose \
@@ -232,7 +217,7 @@ docker compose \
   up -d
 ```
 
-7. Проверь состояние контейнеров и edge health:
+6. Проверь состояние контейнеров и loopback upstreams:
 
 ```bash
 docker compose \
@@ -243,167 +228,141 @@ docker compose \
 ```
 
 ```bash
-curl -fsS http://127.0.0.1/healthz
-curl -fsS http://127.0.0.1/readyz
+curl -fsS http://127.0.0.1:18080/
+curl -fsS http://127.0.0.1:18081/readyz
 ```
 
-Если DNS уже настроен и сертификат соответствует домену, проверь HTTPS entry.
-Ниже `aero.example.com` нужно заменить на реальный домен из `.env.server`:
+Если в `.env.server` выбраны другие loopback ports, замени `18080` и `18081` на актуальные значения.
+
+7. Подготовь ACME webroot и HTTP bootstrap config для host `nginx`.
+
+Пример для домена `aero.keykomi.com`:
 
 ```bash
+sudo mkdir -p /var/www/certbot
+sudo cp infra/nginx/shared-host-http-bootstrap-aero.keykomi.com.conf.example /etc/nginx/sites-available/aerochat.conf
+```
+
+Дальше замени в `/etc/nginx/sites-available/aerochat.conf`:
+
+- `aero.keykomi.com` на реальный домен из `AERO_EDGE_DOMAIN`;
+- `18080` на значение `AERO_WEB_HOST_PORT`;
+- `18081` на значение `AERO_GATEWAY_HOST_PORT`.
+
+После этого включи сайт и перезагрузи host `nginx`:
+
+```bash
+sudo ln -sf /etc/nginx/sites-available/aerochat.conf /etc/nginx/sites-enabled/aerochat.conf
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+8. Выпусти сертификат через existing host `nginx` path.
+
+Основной documented path:
+
+```bash
+sudo certbot certonly --webroot -w /var/www/certbot -d aero.keykomi.com
+```
+
+В команде выше замени `aero.keykomi.com` на реальный домен.
+`certbot --standalone` не является основным сценарием для shared-host VPS.
+
+9. Переключи host `nginx` на финальный HTTPS server block.
+
+Пример:
+
+```bash
+sudo cp infra/nginx/shared-host-aero.keykomi.com.conf.example /etc/nginx/sites-available/aerochat.conf
+```
+
+После копирования замени:
+
+- `aero.keykomi.com` на реальный домен;
+- `18080` на значение `AERO_WEB_HOST_PORT`;
+- `18081` на значение `AERO_GATEWAY_HOST_PORT`;
+- пути `/etc/letsencrypt/live/aero.keykomi.com/...` на актуальные certificate paths, если они отличаются.
+
+Затем снова проверь и перезагрузи host `nginx`:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+10. Проверь итоговый edge path:
+
+```bash
+curl -fsS http://127.0.0.1/healthz
+curl -fsS http://127.0.0.1/readyz
 curl -fsS --resolve "aero.example.com:443:127.0.0.1" https://aero.example.com/healthz
 curl -fsS --resolve "aero.example.com:443:127.0.0.1" https://aero.example.com/readyz
 ```
 
-Если проверка выполняется удалённо, используй домен сервера вместо `127.0.0.1`.
+В командах выше `aero.example.com` замени на `AERO_EDGE_DOMAIN`.
 
 После того как VPS подготовлен и локальные проверки проходят, для production rollout рекомендуется перейти к
 [production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md) и
-использовать manual workflow `Deploy Production`, а не повторять ручные команды без необходимости.
+использовать manual workflow `Deploy Production`.
 
 ## Ожидаемое поведение
 
-- `/healthz` отвечает сам `nginx` и показывает, что edge-process жив;
-- `/readyz` проходит через `nginx` в `aero-gateway` и отражает доступность downstream chain;
+- `/healthz` отвечает host `nginx` и показывает, что edge-process жив;
+- `/readyz` проходит через host `nginx` в `aero-gateway` и отражает доступность downstream chain;
 - `http://<domain>/` делает redirect на `https://<domain>/`;
 - `https://<domain>/` открывает web shell;
-- frontend ходит в backend только через `/api`.
+- frontend ходит в backend только через `/api`;
+- loopback upstream ports не открыты наружу.
 
-Если readiness не проходит, смотри логи проблемного сервиса:
+## Диагностика
 
-```bash
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  logs --tail=100 nginx aero-gateway aero-identity aero-chat postgres redis minio
-```
+Если readiness не проходит:
 
-## Обновление до выбранного release tag
-
-Предпочтительный путь для production update теперь описан в
-[production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md) через
-manual workflow `Deploy Production`.
-
-Ниже остаётся ручной fallback flow для случаев, когда workflow временно недоступен.
-
-1. Открой `.env.server` и измени `AERO_IMAGE_TAG` на нужный GHCR tag:
-
-- `edge` для тестового moving channel;
-- `vX.Y.Z` для фиксированного release;
-- `sha-<commit>` для точной диагностики или адресного отката.
-
-2. Проверь финальную конфигурацию:
+1. Проверь compose runtime:
 
 ```bash
 docker compose \
   --env-file .env.server \
   --env-file .env.server.secrets \
   -f infra/compose/docker-compose.server.yml \
-  config
+  logs --tail=100 web aero-gateway aero-identity aero-chat postgres redis minio
 ```
 
-3. Подтяни выбранные образы и применяй обновление:
+2. Проверь host `nginx`:
 
 ```bash
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  pull
-
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  up -d
+sudo nginx -t
+sudo systemctl status nginx --no-pager
 ```
 
-4. Проверь итог:
+3. Убедись, что в host `nginx` config совпадают:
 
-```bash
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  ps
+- домен;
+- `AERO_WEB_HOST_PORT`;
+- `AERO_GATEWAY_HOST_PORT`;
+- certificate paths.
 
-curl -fsS http://127.0.0.1/healthz
-curl -fsS http://127.0.0.1/readyz
-```
+## Manual update и rollback fallback
 
-## Rollback на предыдущий tag
+Если GitHub Actions недоступен, fallback остаётся простым:
 
-Предпочтительный rollback для production теперь выполняется повторным запуском workflow `Deploy Production` с
-предыдущим известным рабочим tag.
+1. Измени `AERO_IMAGE_TAG` в `.env.server`.
+2. Выполни `docker compose ... config`.
+3. Выполни `docker compose ... pull`.
+4. Выполни `docker compose ... up -d`.
+5. Проверь `docker compose ... ps`, `http://127.0.0.1/readyz` и `https://<domain>/readyz`.
 
-Ниже остаётся ручной fallback flow для аварийного случая или недоступности GitHub Actions.
+Rollback делается тем же flow после возврата `AERO_IMAGE_TAG` на предыдущий known-good tag.
 
-1. Верни в `.env.server` предыдущий стабильный `AERO_IMAGE_TAG`.
+## Границы ответственности
 
-2. Повтори стандартный операторский цикл:
+Compose runtime отвечает только за application stack AeroChat.
 
-```bash
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  pull
+Оператор отвечает за:
 
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  up -d
-```
-
-3. Снова проверь `ps`, `/healthz` и `/readyz`.
-
-Rollback не автоматизируется отдельно: на текущем этапе это сознательно тот же ручной flow, что и update, но с
-предыдущим tag.
-
-## Остановка стека
-
-```bash
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  down
-```
-
-## Что оператор редактирует вручную
-
-- `.env.server`
-  - `AERO_IMAGE_TAG` при update/rollback;
-  - `AERO_IMAGE_NAMESPACE`, если используется fork, mirror или другой GHCR owner;
-  - `AERO_EDGE_DOMAIN`, если меняется primary domain;
-  - `AERO_NGINX_TLS_CERTS_DIR`, если оператор переносит сертификаты в другой host path;
-  - несекретные runtime-параметры по необходимости.
-
-- `.env.server.secrets`
-  - только чувствительные server-only значения;
-  - без commit в репозиторий;
-  - без передачи в CI на текущем этапе.
-
-- каталог из `AERO_NGINX_TLS_CERTS_DIR`
-  - только certificate files;
-  - без commit в репозиторий;
-  - с ручной ответственностью оператора за наличие и права доступа.
-
-## Что намеренно не делается в этом PR
-
-- автоматический rollout после publish workflow
-- автоматический выбор последнего release
-- ACME issuance/renewal automation и DNS automation
-- внешние secret managers и сложная ops-оркестрация
-- полноценный production change-management и zero-downtime orchestration
-
-## Следующий шаг после этого foundation
-
-Следующий PR должен добавлять следующий изолированный operational slice, а не менять topology заново:
-
-- backup/restore и recovery runbooks;
-- database migration discipline, если появятся schema-breaking changes;
-- дальнейшее усиление release governance без смены `nginx`/gateway topology и без переноса certificate material в
-  репозиторий.
+- host `nginx` config;
+- ACME webroot;
+- выпуск и renewal сертификатов;
+- DNS и firewall;
+- синхронность `.env.server` и host `nginx` upstream ports;
+- внешний пользовательский smoke после deploy.

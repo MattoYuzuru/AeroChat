@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Production rollout automation и first external launch foundation для single-server self-host runtime
+- [x] Shared-host nginx edge deployment fix и workflow cleanup для single-server self-host runtime
 
 ---
 

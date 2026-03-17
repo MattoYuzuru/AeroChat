@@ -190,7 +190,8 @@ AeroChat создаётся как проект с сильным фундаме
 - `server/prod-like`:
   - `.env.server.example` содержит только versioned non-secret runtime config;
   - `.env.server.secrets.example` описывает обязательные server-only secret keys без реальных значений;
-  - TLS-сертификаты и приватный ключ существуют только на VPS в отдельной директории и не коммитятся;
+  - host-level `nginx` на VPS остаётся единственным внешним edge на `80/443`;
+  - TLS-сертификаты выпускаются и используются на host-level `nginx`, а не внутри compose stack;
   - `infra/compose/docker-compose.server.yml` даёт production-oriented single-server topology на предсобранных образах;
   - подготовка сервера описана в `docs/deploy/single-server-bootstrap.md`;
   - production rollout и first external launch описаны в `docs/deploy/production-rollout.md`.
@@ -228,14 +229,19 @@ docker compose -f infra/compose/docker-compose.yml up --build -d
 ```bash
 cp .env.server.example .env.server
 cp .env.server.secrets.example .env.server.secrets
-# Подготовь на VPS каталог с `fullchain.pem` и `privkey.pem` для домена из `.env.server`.
 docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml config
 docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml pull
 docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml up -d
 ```
 
-Server runtime использует один внешний `nginx` на `80/443`, делает канонический redirect на HTTPS и держит `aero-gateway`
-единственной backend edge-точкой за reverse proxy.
+Server runtime больше не поднимает отдельный `nginx` контейнер для production VPS.
+Host-level `nginx`, который уже владеет `80/443`, остаётся единственным публичным reverse proxy и проксирует:
+
+- `/` в `web` на `127.0.0.1:${AERO_WEB_HOST_PORT}`;
+- `/api/` в `aero-gateway` на `127.0.0.1:${AERO_GATEWAY_HOST_PORT}`;
+- `/readyz` в `aero-gateway`.
+
+Сертификаты выпускаются через existing host `nginx` path c ACME webroot, без `certbot --standalone` как основного сценария.
 
 Подробности, TLS/domain contract и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
 Для финального live rollout используется manual workflow `Deploy Production` c GitHub Environment `production`.
