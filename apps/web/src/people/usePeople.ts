@@ -28,6 +28,11 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
     createInitialPeopleState,
   );
   const mountedRef = useRef(false);
+  const onUnauthenticatedRef = useRef(onUnauthenticated);
+
+  useEffect(() => {
+    onUnauthenticatedRef.current = onUnauthenticated;
+  }, [onUnauthenticated]);
 
   useEffect(() => {
     if (!enabled) {
@@ -35,12 +40,12 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
     }
 
     mountedRef.current = true;
-    void loadInitialSnapshot(token, onUnauthenticated, mountedRef, dispatch);
+    void loadInitialSnapshot(token, onUnauthenticatedRef, mountedRef, dispatch);
 
     return () => {
       mountedRef.current = false;
     };
-  }, [enabled, token, onUnauthenticated]);
+  }, [enabled, token]);
 
   async function reload() {
     if (state.status === "loading") {
@@ -48,7 +53,7 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
     }
 
     if (state.status === "error") {
-      await loadInitialSnapshot(token, onUnauthenticated, mountedRef, dispatch);
+      await loadInitialSnapshot(token, onUnauthenticatedRef, mountedRef, dispatch);
       return;
     }
 
@@ -69,7 +74,7 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
       const message = resolveProtectedError(
         error,
         "Не удалось обновить people-данные через gateway.",
-        onUnauthenticated,
+        onUnauthenticatedRef,
       );
       if (!mountedRef.current || message === null) {
         return;
@@ -80,7 +85,7 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
   }
 
   async function sendFriendRequest(login: string) {
-    return runMutation(token, onUnauthenticated, mountedRef, dispatch, {
+    return runMutation(token, onUnauthenticatedRef, mountedRef, dispatch, {
       fallbackMessage: "Не удалось отправить заявку в друзья через gateway.",
       successMessage: "Заявка отправлена.",
       perform: () => gatewayClient.sendFriendRequest(token, login),
@@ -88,7 +93,7 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
   }
 
   async function acceptFriendRequest(login: string) {
-    return runMutation(token, onUnauthenticated, mountedRef, dispatch, {
+    return runMutation(token, onUnauthenticatedRef, mountedRef, dispatch, {
       login,
       pendingLabel: "Принимаем...",
       fallbackMessage: "Не удалось принять входящую заявку.",
@@ -98,7 +103,7 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
   }
 
   async function declineFriendRequest(login: string) {
-    return runMutation(token, onUnauthenticated, mountedRef, dispatch, {
+    return runMutation(token, onUnauthenticatedRef, mountedRef, dispatch, {
       login,
       pendingLabel: "Отклоняем...",
       fallbackMessage: "Не удалось отклонить входящую заявку.",
@@ -108,7 +113,7 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
   }
 
   async function cancelOutgoingFriendRequest(login: string) {
-    return runMutation(token, onUnauthenticated, mountedRef, dispatch, {
+    return runMutation(token, onUnauthenticatedRef, mountedRef, dispatch, {
       login,
       pendingLabel: "Отменяем...",
       fallbackMessage: "Не удалось отменить исходящую заявку.",
@@ -118,7 +123,7 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
   }
 
   async function removeFriend(login: string) {
-    return runMutation(token, onUnauthenticated, mountedRef, dispatch, {
+    return runMutation(token, onUnauthenticatedRef, mountedRef, dispatch, {
       login,
       pendingLabel: "Удаляем...",
       fallbackMessage: "Не удалось удалить пользователя из друзей.",
@@ -145,7 +150,7 @@ type PeopleDispatch = (action: Parameters<typeof peopleReducer>[1]) => void;
 
 async function loadInitialSnapshot(
   token: string,
-  onUnauthenticated: () => void,
+  onUnauthenticatedRef: { current: () => void },
   mountedRef: { current: boolean },
   dispatch: PeopleDispatch,
 ) {
@@ -162,7 +167,7 @@ async function loadInitialSnapshot(
     const message = resolveProtectedError(
       error,
       "Не удалось загрузить people-данные через gateway.",
-      onUnauthenticated,
+      onUnauthenticatedRef,
     );
     if (!mountedRef.current || message === null) {
       return;
@@ -174,7 +179,7 @@ async function loadInitialSnapshot(
 
 async function runMutation(
   token: string,
-  onUnauthenticated: () => void,
+  onUnauthenticatedRef: { current: () => void },
   mountedRef: { current: boolean },
   dispatch: PeopleDispatch,
   options: MutationOptions,
@@ -215,7 +220,7 @@ async function runMutation(
     const message = resolveProtectedError(
       error,
       options.fallbackMessage,
-      onUnauthenticated,
+      onUnauthenticatedRef,
     );
     if (!mountedRef.current || message === null) {
       return false;
@@ -251,10 +256,10 @@ async function fetchPeopleSnapshot(token: string): Promise<PeopleSnapshot> {
 function resolveProtectedError(
   error: unknown,
   fallbackMessage: string,
-  onUnauthenticated: () => void,
+  onUnauthenticatedRef: { current: () => void },
 ): string | null {
   if (isGatewayErrorCode(error, "unauthenticated")) {
-    onUnauthenticated();
+    onUnauthenticatedRef.current();
     return null;
   }
 

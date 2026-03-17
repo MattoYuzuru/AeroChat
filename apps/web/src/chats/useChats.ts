@@ -32,10 +32,15 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
   );
   const mountedRef = useRef(false);
   const stateRef = useRef(state);
+  const onUnauthenticatedRef = useRef(onUnauthenticated);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  useEffect(() => {
+    onUnauthenticatedRef.current = onUnauthenticated;
+  }, [onUnauthenticated]);
 
   useEffect(() => {
     if (!enabled) {
@@ -43,12 +48,12 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
     }
 
     mountedRef.current = true;
-    void loadInitialChats(token, onUnauthenticated, mountedRef, dispatch);
+    void loadInitialChats(token, onUnauthenticatedRef, mountedRef, dispatch);
 
     return () => {
       mountedRef.current = false;
     };
-  }, [enabled, token, onUnauthenticated]);
+  }, [enabled, token]);
 
   async function reloadChats() {
     if (state.status === "loading") {
@@ -56,7 +61,7 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
     }
 
     if (state.status === "error") {
-      await loadInitialChats(token, onUnauthenticated, mountedRef, dispatch);
+      await loadInitialChats(token, onUnauthenticatedRef, mountedRef, dispatch);
       return;
     }
 
@@ -77,7 +82,7 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       const message = resolveProtectedError(
         error,
         "Не удалось обновить список direct chats через gateway.",
-        onUnauthenticated,
+        onUnauthenticatedRef,
       );
       if (!mountedRef.current || message === null) {
         return;
@@ -105,7 +110,7 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       const message = resolveProtectedError(
         error,
         "Не удалось загрузить direct chat thread через gateway.",
-        onUnauthenticated,
+        onUnauthenticatedRef,
       );
       if (!mountedRef.current || message === null) {
         return false;
@@ -166,7 +171,7 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       const message = resolveProtectedError(
         error,
         "Не удалось открыть direct chat через gateway.",
-        onUnauthenticated,
+        onUnauthenticatedRef,
       );
       if (!mountedRef.current || message === null) {
         return null;
@@ -197,7 +202,6 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
         chatId,
         mountedRef,
         dispatch,
-        onUnauthenticated,
         null,
       );
       return true;
@@ -205,7 +209,7 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       const message = resolveProtectedError(
         error,
         "Не удалось отправить сообщение через gateway.",
-        onUnauthenticated,
+        onUnauthenticatedRef,
       );
       if (!mountedRef.current || message === null) {
         return false;
@@ -226,7 +230,7 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       mountedRef,
       dispatch,
       stateRef,
-      onUnauthenticated,
+      onUnauthenticatedRef,
       {
         messageId,
         pendingLabel: "Удаляем...",
@@ -243,7 +247,7 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       mountedRef,
       dispatch,
       stateRef,
-      onUnauthenticated,
+      onUnauthenticatedRef,
       {
         messageId,
         pendingLabel: "Закрепляем...",
@@ -260,7 +264,7 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       mountedRef,
       dispatch,
       stateRef,
-      onUnauthenticated,
+      onUnauthenticatedRef,
       {
         messageId,
         pendingLabel: "Открепляем...",
@@ -290,7 +294,7 @@ type ChatsDispatch = (action: Parameters<typeof chatsReducer>[1]) => void;
 
 async function loadInitialChats(
   token: string,
-  onUnauthenticated: () => void,
+  onUnauthenticatedRef: { current: () => void },
   mountedRef: { current: boolean },
   dispatch: ChatsDispatch,
 ) {
@@ -307,7 +311,7 @@ async function loadInitialChats(
     const message = resolveProtectedError(
       error,
       "Не удалось загрузить direct chats через gateway.",
-      onUnauthenticated,
+      onUnauthenticatedRef,
     );
     if (!mountedRef.current || message === null) {
       return;
@@ -322,7 +326,6 @@ async function refreshCurrentSelection(
   chatId: string,
   mountedRef: { current: boolean },
   dispatch: ChatsDispatch,
-  onUnauthenticated: () => void,
   notice: string | null,
 ) {
   const [snapshot, chats] = await Promise.all([
@@ -350,7 +353,7 @@ async function runMessageMutation(
   mountedRef: { current: boolean },
   dispatch: ChatsDispatch,
   stateRef: { current: ReturnType<typeof createInitialChatsState> },
-  onUnauthenticated: () => void,
+  onUnauthenticatedRef: { current: () => void },
   options: MessageMutationOptions,
 ): Promise<boolean> {
   const chatId = stateRef.current.selectedChatId;
@@ -372,7 +375,6 @@ async function runMessageMutation(
       chatId,
       mountedRef,
       dispatch,
-      onUnauthenticated,
       null,
     );
     return true;
@@ -380,7 +382,7 @@ async function runMessageMutation(
     const message = resolveProtectedError(
       error,
       options.fallbackMessage,
-      onUnauthenticated,
+      onUnauthenticatedRef,
     );
     if (!mountedRef.current || message === null) {
       return false;
@@ -439,10 +441,10 @@ function findDirectChatByPeerUserId(
 function resolveProtectedError(
   error: unknown,
   fallbackMessage: string,
-  onUnauthenticated: () => void,
+  onUnauthenticatedRef: { current: () => void },
 ): string | null {
   if (isGatewayErrorCode(error, "unauthenticated")) {
-    onUnauthenticated();
+    onUnauthenticatedRef.current();
     return null;
   }
 
