@@ -32,6 +32,7 @@ export function ChatsPage() {
   const chats = useChats({
     enabled: authState.status === "authenticated",
     token: authState.status === "authenticated" ? authState.token : "",
+    currentUserId: authState.status === "authenticated" ? authState.profile.id : "",
     onUnauthenticated: () => expireSession(),
   });
 

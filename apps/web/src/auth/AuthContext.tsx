@@ -10,6 +10,7 @@ import {
 } from "../gateway/types";
 import { gatewayClient } from "../gateway/runtime";
 import { connectRealtime, type RealtimeConnection } from "../realtime/client";
+import { publishRealtimeEnvelope } from "../realtime/events";
 const sessionStore = createBrowserSessionStore();
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -89,6 +90,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const connection = connectRealtime({
       token: authenticatedToken,
+      onEvent: publishRealtimeEnvelope,
     });
     realtimeRef.current = connection;
 

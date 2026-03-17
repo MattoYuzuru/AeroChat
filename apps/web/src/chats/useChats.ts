@@ -4,11 +4,14 @@ import {
   describeGatewayError,
   isGatewayErrorCode,
   type DirectChat,
+  type DirectChatMessage,
 } from "../gateway/types";
+import { subscribeRealtimeEnvelopes } from "../realtime/events";
 import {
   DIRECT_CHAT_PRESENCE_HEARTBEAT_INTERVAL_MS,
   resolveDirectChatPresenceHeartbeatChatId,
 } from "./presence";
+import { parseDirectChatRealtimeEvent } from "./realtime";
 import {
   chatsReducer,
   createInitialChatsState,
@@ -18,6 +21,7 @@ import {
 interface UseChatsOptions {
   enabled: boolean;
   token: string;
+  currentUserId: string;
   onUnauthenticated(): void;
 }
 
@@ -25,10 +29,16 @@ interface MessageMutationOptions {
   fallbackMessage: string;
   messageId: string;
   pendingLabel: string;
-  perform(chatId: string): Promise<void>;
+  perform(chatId: string): Promise<DirectChatMessage>;
+  reason: string;
 }
 
-export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions) {
+export function useChats({
+  enabled,
+  token,
+  currentUserId,
+  onUnauthenticated,
+}: UseChatsOptions) {
   const [state, dispatch] = useReducer(
     chatsReducer,
     undefined,
@@ -59,6 +69,39 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       mountedRef.current = false;
     };
   }, [enabled, token]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    return subscribeRealtimeEnvelopes((envelope) => {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const event = parseDirectChatRealtimeEvent(envelope);
+      if (!event) {
+        return;
+      }
+
+      if (event.type === "direct_chat.message.updated") {
+        dispatch({
+          type: "message_updated",
+          chat: event.chat,
+          message: event.message,
+          reason: event.reason,
+        });
+        return;
+      }
+
+      dispatch({
+        type: "read_state_replaced",
+        chatId: event.chatId,
+        readState: event.readState,
+      });
+    });
+  }, [enabled]);
 
   const activePresenceChatId = resolveDirectChatPresenceHeartbeatChatId({
     enabled,
@@ -136,6 +179,51 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
       }
     };
   }, [activePresenceChatId, token]);
+
+  const latestThreadMessage = state.thread?.messages.at(-1) ?? null;
+  const activeThreadChatId = state.thread?.chat.id ?? null;
+  const latestThreadMessageId = latestThreadMessage?.id ?? null;
+  const shouldAutoMarkRead =
+    enabled &&
+    isPageVisible &&
+    state.threadStatus === "ready" &&
+    activeThreadChatId !== null &&
+    latestThreadMessage !== null &&
+    latestThreadMessage.senderUserId !== currentUserId &&
+    state.thread?.readState?.selfPosition?.messageId !== latestThreadMessage.id;
+
+  useEffect(() => {
+    if (!shouldAutoMarkRead || activeThreadChatId === null || latestThreadMessageId === null) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void gatewayClient
+      .markDirectChatRead(token, activeThreadChatId, latestThreadMessageId)
+      .then((readState) => {
+        if (cancelled || !mountedRef.current) {
+          return;
+        }
+
+        dispatch({
+          type: "read_state_replaced",
+          chatId: activeThreadChatId,
+          readState,
+        });
+      })
+      .catch((error) => {
+        resolveProtectedError(
+          error,
+          "Не удалось обновить read state через gateway.",
+          onUnauthenticatedRef,
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeThreadChatId, latestThreadMessageId, shouldAutoMarkRead, token]);
 
   async function reloadChats() {
     if (state.status === "loading") {
@@ -278,14 +366,16 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
     dispatch({ type: "send_started" });
 
     try {
-      await gatewayClient.sendTextMessage(token, chatId, text);
-      await refreshCurrentSelection(
-        token,
-        chatId,
-        mountedRef,
-        dispatch,
-        null,
-      );
+      const message = await gatewayClient.sendTextMessage(token, chatId, text);
+      if (!mountedRef.current) {
+        return false;
+      }
+
+      dispatch({
+        type: "message_updated",
+        message,
+        reason: "message_created",
+      });
       return true;
     } catch (error) {
       const message = resolveProtectedError(
@@ -317,8 +407,9 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
         messageId,
         pendingLabel: "Удаляем...",
         fallbackMessage: "Не удалось удалить сообщение для всех.",
+        reason: "message_deleted_for_everyone",
         perform: (chatId) =>
-          gatewayClient.deleteMessageForEveryone(token, chatId, messageId).then(() => {}),
+          gatewayClient.deleteMessageForEveryone(token, chatId, messageId),
       },
     );
   }
@@ -334,8 +425,8 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
         messageId,
         pendingLabel: "Закрепляем...",
         fallbackMessage: "Не удалось закрепить сообщение.",
-        perform: (chatId) =>
-          gatewayClient.pinMessage(token, chatId, messageId).then(() => {}),
+        reason: "message_pinned",
+        perform: (chatId) => gatewayClient.pinMessage(token, chatId, messageId),
       },
     );
   }
@@ -351,8 +442,8 @@ export function useChats({ enabled, token, onUnauthenticated }: UseChatsOptions)
         messageId,
         pendingLabel: "Открепляем...",
         fallbackMessage: "Не удалось открепить сообщение.",
-        perform: (chatId) =>
-          gatewayClient.unpinMessage(token, chatId, messageId).then(() => {}),
+        reason: "message_unpinned",
+        perform: (chatId) => gatewayClient.unpinMessage(token, chatId, messageId),
       },
     );
   }
@@ -403,33 +494,6 @@ async function loadInitialChats(
   }
 }
 
-async function refreshCurrentSelection(
-  token: string,
-  chatId: string,
-  mountedRef: { current: boolean },
-  dispatch: ChatsDispatch,
-  notice: string | null,
-) {
-  const [snapshot, chats] = await Promise.all([
-    fetchThreadSnapshot(token, chatId),
-    gatewayClient.listDirectChats(token),
-  ]);
-
-  if (!mountedRef.current) {
-    return;
-  }
-
-  dispatch({
-    type: "thread_load_succeeded",
-    snapshot,
-  });
-  dispatch({
-    type: "list_refresh_succeeded",
-    chats,
-    notice,
-  });
-}
-
 async function runMessageMutation(
   token: string,
   mountedRef: { current: boolean },
@@ -451,14 +515,16 @@ async function runMessageMutation(
   });
 
   try {
-    await options.perform(chatId);
-    await refreshCurrentSelection(
-      token,
-      chatId,
-      mountedRef,
-      dispatch,
-      null,
-    );
+    const message = await options.perform(chatId);
+    if (!mountedRef.current) {
+      return false;
+    }
+
+    dispatch({
+      type: "message_updated",
+      message,
+      reason: options.reason,
+    });
     return true;
   } catch (error) {
     const message = resolveProtectedError(
