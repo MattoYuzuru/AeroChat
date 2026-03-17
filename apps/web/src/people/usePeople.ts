@@ -1,6 +1,8 @@
 import { useEffect, useReducer, useRef } from "react";
 import { gatewayClient } from "../gateway/runtime";
 import { describeGatewayError, isGatewayErrorCode } from "../gateway/types";
+import { subscribeRealtimeEnvelopes } from "../realtime/events";
+import { parsePeopleRealtimeEvent } from "./realtime";
 import {
   createInitialPeopleState,
   peopleReducer,
@@ -28,7 +30,12 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
     createInitialPeopleState,
   );
   const mountedRef = useRef(false);
+  const stateRef = useRef(state);
   const onUnauthenticatedRef = useRef(onUnauthenticated);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     onUnauthenticatedRef.current = onUnauthenticated;
@@ -46,6 +53,25 @@ export function usePeople({ enabled, token, onUnauthenticated }: UsePeopleOption
       mountedRef.current = false;
     };
   }, [enabled, token]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    return subscribeRealtimeEnvelopes((envelope) => {
+      if (!mountedRef.current || stateRef.current.status !== "ready") {
+        return;
+      }
+
+      const event = parsePeopleRealtimeEvent(envelope);
+      if (!event) {
+        return;
+      }
+
+      dispatch(event);
+    });
+  }, [enabled]);
 
   async function reload() {
     if (state.status === "loading") {
@@ -203,18 +229,11 @@ async function runMutation(
       return false;
     }
 
-    dispatch({ type: "refresh_started" });
-    const snapshot = await fetchPeopleSnapshot(token);
-
-    if (!mountedRef.current) {
-      return false;
+    if (typeof options.login === "string" && typeof options.pendingLabel === "string") {
+      dispatch({ type: "mutation_succeeded", notice: options.successMessage });
+    } else {
+      dispatch({ type: "send_succeeded", notice: options.successMessage });
     }
-
-    dispatch({
-      type: "refresh_succeeded",
-      snapshot,
-      notice: options.successMessage,
-    });
     return true;
   } catch (error) {
     const message = resolveProtectedError(

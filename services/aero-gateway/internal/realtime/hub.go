@@ -17,9 +17,10 @@ type Hub struct {
 	pingInterval time.Duration
 	writeTimeout time.Duration
 
-	mu       sync.RWMutex
-	sessions map[string]map[string]*session
-	closed   bool
+	mu              sync.RWMutex
+	sessions        map[string]map[string]*session
+	sessionsByLogin map[string]map[string]*session
+	closed          bool
 }
 
 type session struct {
@@ -35,10 +36,11 @@ type session struct {
 
 func NewHub(logger *slog.Logger, pingInterval time.Duration, writeTimeout time.Duration) *Hub {
 	return &Hub{
-		logger:       logger,
-		pingInterval: pingInterval,
-		writeTimeout: writeTimeout,
-		sessions:     make(map[string]map[string]*session),
+		logger:          logger,
+		pingInterval:    pingInterval,
+		writeTimeout:    writeTimeout,
+		sessions:        make(map[string]map[string]*session),
+		sessionsByLogin: make(map[string]map[string]*session),
 	}
 }
 
@@ -59,10 +61,18 @@ func (h *Hub) ServeConnection(conn *websocket.Conn, principal Principal) error {
 }
 
 func (h *Hub) PublishToUser(userID string, envelope Envelope) int {
+	return h.publishFromBucket(h.userSessionsByID(userID), envelope)
+}
+
+func (h *Hub) PublishToLogin(login string, envelope Envelope) int {
+	return h.publishFromBucket(h.userSessionsByLogin(login), envelope)
+}
+
+func (h *Hub) userSessionsByID(userID string) []*session {
 	h.mu.RLock()
 	if h.closed {
 		h.mu.RUnlock()
-		return 0
+		return nil
 	}
 
 	userSessions := h.sessions[userID]
@@ -72,6 +82,27 @@ func (h *Hub) PublishToUser(userID string, envelope Envelope) int {
 	}
 	h.mu.RUnlock()
 
+	return targets
+}
+
+func (h *Hub) userSessionsByLogin(login string) []*session {
+	h.mu.RLock()
+	if h.closed {
+		h.mu.RUnlock()
+		return nil
+	}
+
+	userSessions := h.sessionsByLogin[login]
+	targets := make([]*session, 0, len(userSessions))
+	for _, s := range userSessions {
+		targets = append(targets, s)
+	}
+	h.mu.RUnlock()
+
+	return targets
+}
+
+func (h *Hub) publishFromBucket(targets []*session, envelope Envelope) int {
 	delivered := 0
 	for _, s := range targets {
 		if s.enqueue(envelope) {
@@ -130,6 +161,12 @@ func (h *Hub) register(conn *websocket.Conn, principal Principal) (*session, err
 		h.sessions[principal.UserID] = make(map[string]*session)
 	}
 	h.sessions[principal.UserID][s.connectionID] = s
+	if principal.Login != "" {
+		if h.sessionsByLogin[principal.Login] == nil {
+			h.sessionsByLogin[principal.Login] = make(map[string]*session)
+		}
+		h.sessionsByLogin[principal.Login][s.connectionID] = s
+	}
 
 	s.logger.Info(
 		"realtime-сессия подключена",
@@ -152,6 +189,15 @@ func (h *Hub) unregister(s *session) {
 	delete(userSessions, s.connectionID)
 	if len(userSessions) == 0 {
 		delete(h.sessions, s.principal.UserID)
+	}
+	if s.principal.Login != "" {
+		loginSessions, ok := h.sessionsByLogin[s.principal.Login]
+		if ok {
+			delete(loginSessions, s.connectionID)
+			if len(loginSessions) == 0 {
+				delete(h.sessionsByLogin, s.principal.Login)
+			}
+		}
 	}
 
 	s.logger.Info("realtime-сессия отключена", slog.String("connection_id", s.connectionID))

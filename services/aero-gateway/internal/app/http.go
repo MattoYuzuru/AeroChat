@@ -22,7 +22,7 @@ func NewHTTPHandler(logger *slog.Logger, meta observability.ServiceMeta, cfg Con
 	)
 
 	identityPath, identityHandler := identityv1connect.NewIdentityServiceHandler(
-		connecthandler.NewIdentityHandler(meta.Name, meta.Version, clients.Identity),
+		connecthandler.NewIdentityHandler(logger, meta.Name, meta.Version, clients.Identity, realtimeHub),
 	)
 	connectMux.Handle(identityPath, identityHandler)
 

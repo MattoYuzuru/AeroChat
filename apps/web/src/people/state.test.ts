@@ -101,4 +101,93 @@ describe("peopleReducer", () => {
     expect(nextState.snapshot.incoming).toEqual([]);
     expect(nextState.snapshot.friends).toHaveLength(1);
   });
+
+  it("upserts outgoing request idempotently from realtime event", () => {
+    const readyState = peopleReducer(createInitialPeopleState(), {
+      type: "load_succeeded",
+      snapshot: {
+        incoming: [],
+        outgoing: [],
+        friends: [],
+      },
+    });
+
+    const withRequest = peopleReducer(readyState, {
+      type: "outgoing_request_upserted",
+      request: {
+        profile: aliceProfile,
+        requestedAt: "2026-03-24T10:00:00Z",
+      },
+    });
+    const deduplicated = peopleReducer(withRequest, {
+      type: "outgoing_request_upserted",
+      request: {
+        profile: aliceProfile,
+        requestedAt: "2026-03-24T10:00:00Z",
+      },
+    });
+
+    expect(withRequest.snapshot.outgoing).toHaveLength(1);
+    expect(deduplicated.snapshot.outgoing).toHaveLength(1);
+    expect(deduplicated.snapshot.outgoing[0]?.profile.login).toBe("alice");
+  });
+
+  it("moves request into friends when realtime friendship arrives", () => {
+    const readyState = peopleReducer(createInitialPeopleState(), {
+      type: "load_succeeded",
+      snapshot,
+    });
+
+    const nextState = peopleReducer(readyState, {
+      type: "friend_upserted",
+      friend: {
+        profile: aliceProfile,
+        friendsSince: "2026-03-24T11:00:00Z",
+      },
+    });
+
+    expect(nextState.snapshot.incoming).toEqual([]);
+    expect(nextState.snapshot.outgoing).toEqual([]);
+    expect(nextState.snapshot.friends).toEqual([
+      {
+        profile: aliceProfile,
+        friendsSince: "2026-03-24T11:00:00Z",
+      },
+    ]);
+  });
+
+  it("clears all relationship buckets for block-style realtime update", () => {
+    const readyState = peopleReducer(createInitialPeopleState(), {
+      type: "load_succeeded",
+      snapshot: {
+        incoming: [
+          {
+            profile: aliceProfile,
+            requestedAt: "2026-03-24T10:00:00Z",
+          },
+        ],
+        outgoing: [
+          {
+            profile: aliceProfile,
+            requestedAt: "2026-03-24T10:00:00Z",
+          },
+        ],
+        friends: [
+          {
+            profile: aliceProfile,
+            friendsSince: "2026-03-24T11:00:00Z",
+          },
+        ],
+      },
+    });
+
+    const nextState = peopleReducer(readyState, {
+      type: "relationship_cleared",
+      login: "alice",
+    });
+
+    expect(nextState.snapshot.incoming).toEqual([]);
+    expect(nextState.snapshot.outgoing).toEqual([]);
+    expect(nextState.snapshot.friends).toEqual([]);
+  });
 });
