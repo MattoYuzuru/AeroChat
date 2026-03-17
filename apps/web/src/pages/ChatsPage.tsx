@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   type FormEvent,
@@ -9,6 +10,7 @@ import {
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { createMarkdownPreview } from "../chats/createMarkdownPreview";
+import { resolveChatsRouteSyncAction } from "../chats/route-sync";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
 import { useChats } from "../chats/useChats";
 import type {
@@ -36,45 +38,47 @@ export function ChatsPage() {
   const requestedChatId = searchParams.get("chat")?.trim() ?? "";
   const requestedPeerUserId = searchParams.get("peer")?.trim() ?? "";
   const isThreadRouteActive = requestedChatId !== "" || requestedPeerUserId !== "";
+  const syncRouteSelection = useEffectEvent(async () => {
+    const action = resolveChatsRouteSyncAction({
+      requestedChatId,
+      requestedPeerUserId,
+      selectedChatId: chats.state.selectedChatId,
+      pendingPeerUserId: pendingPeerRef.current,
+    });
+
+    pendingPeerRef.current = action.nextPendingPeerUserId;
+
+    if (action.kind === "open_chat") {
+      await chats.openChat(action.chatId);
+      return;
+    }
+
+    if (action.kind !== "ensure_peer_chat") {
+      return;
+    }
+
+    const chatId = await chats.ensureDirectChat(action.peerUserId);
+    if (!chatId) {
+      pendingPeerRef.current = null;
+      setSearchParams({}, { replace: true });
+      return;
+    }
+
+    setSearchParams({ chat: chatId }, { replace: true });
+  });
 
   useEffect(() => {
     if (authState.status !== "authenticated" || chats.state.status !== "ready") {
       return;
     }
 
-    if (requestedChatId !== "") {
-      pendingPeerRef.current = null;
-      if (chats.state.selectedChatId !== requestedChatId) {
-        void chats.openChat(requestedChatId);
-      }
-      return;
-    }
-
-    if (requestedPeerUserId !== "") {
-      if (pendingPeerRef.current === requestedPeerUserId) {
-        return;
-      }
-
-      pendingPeerRef.current = requestedPeerUserId;
-      void chats.ensureDirectChat(requestedPeerUserId).then((chatId) => {
-        if (!chatId) {
-          pendingPeerRef.current = null;
-          setSearchParams({}, { replace: true });
-          return;
-        }
-
-        setSearchParams({ chat: chatId }, { replace: true });
-      });
-      return;
-    }
-
-    pendingPeerRef.current = null;
+    void syncRouteSelection();
   }, [
     authState.status,
-    chats,
+    chats.state.selectedChatId,
+    chats.state.status,
     requestedChatId,
     requestedPeerUserId,
-    setSearchParams,
   ]);
 
   if (authState.status !== "authenticated") {

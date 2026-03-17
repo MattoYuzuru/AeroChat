@@ -35,6 +35,11 @@ export function useDevices({
     createInitialDevicesState,
   );
   const mountedRef = useRef(false);
+  const onUnauthenticatedRef = useRef(onUnauthenticated);
+
+  useEffect(() => {
+    onUnauthenticatedRef.current = onUnauthenticated;
+  }, [onUnauthenticated]);
 
   useEffect(() => {
     if (!enabled) {
@@ -42,12 +47,12 @@ export function useDevices({
     }
 
     mountedRef.current = true;
-    void loadInitialDevices(token, onUnauthenticated, mountedRef, dispatch);
+    void loadInitialDevices(token, onUnauthenticatedRef, mountedRef, dispatch);
 
     return () => {
       mountedRef.current = false;
     };
-  }, [enabled, token, onUnauthenticated]);
+  }, [enabled, token]);
 
   async function reload() {
     if (state.status === "loading") {
@@ -55,7 +60,7 @@ export function useDevices({
     }
 
     if (state.status === "error") {
-      await loadInitialDevices(token, onUnauthenticated, mountedRef, dispatch);
+      await loadInitialDevices(token, onUnauthenticatedRef, mountedRef, dispatch);
       return;
     }
 
@@ -76,7 +81,7 @@ export function useDevices({
       const message = resolveProtectedError(
         error,
         "Не удалось обновить список устройств через gateway.",
-        onUnauthenticated,
+        onUnauthenticatedRef,
       );
       if (!mountedRef.current || message === null) {
         return;
@@ -89,7 +94,7 @@ export function useDevices({
   async function revokeDevice(deviceId: string) {
     return runRevocation(
       token,
-      onUnauthenticated,
+      onUnauthenticatedRef,
       mountedRef,
       dispatch,
       {
@@ -107,7 +112,7 @@ export function useDevices({
   async function revokeSession(sessionId: string) {
     return runRevocation(
       token,
-      onUnauthenticated,
+      onUnauthenticatedRef,
       mountedRef,
       dispatch,
       {
@@ -137,7 +142,7 @@ type DevicesDispatch = (action: Parameters<typeof devicesReducer>[1]) => void;
 
 async function loadInitialDevices(
   token: string,
-  onUnauthenticated: (message?: string) => void,
+  onUnauthenticatedRef: { current: (message?: string) => void },
   mountedRef: { current: boolean },
   dispatch: DevicesDispatch,
 ) {
@@ -154,7 +159,7 @@ async function loadInitialDevices(
     const message = resolveProtectedError(
       error,
       "Не удалось загрузить список устройств через gateway.",
-      onUnauthenticated,
+      onUnauthenticatedRef,
     );
     if (!mountedRef.current || message === null) {
       return;
@@ -166,7 +171,7 @@ async function loadInitialDevices(
 
 async function runRevocation(
   token: string,
-  onUnauthenticated: (message?: string) => void,
+  onUnauthenticatedRef: { current: (message?: string) => void },
   mountedRef: { current: boolean },
   dispatch: DevicesDispatch,
   options: RevocationOptions,
@@ -200,7 +205,7 @@ async function runRevocation(
     const message = resolveProtectedError(
       error,
       options.fallbackMessage,
-      onUnauthenticated,
+      onUnauthenticatedRef,
     );
     if (!mountedRef.current || message === null) {
       return false;
@@ -221,10 +226,10 @@ async function runRevocation(
 function resolveProtectedError(
   error: unknown,
   fallbackMessage: string,
-  onUnauthenticated: (message?: string) => void,
+  onUnauthenticatedRef: { current: (message?: string) => void },
 ): string | null {
   if (isGatewayErrorCode(error, "unauthenticated")) {
-    onUnauthenticated("Текущая сессия больше недействительна. Войдите снова.");
+    onUnauthenticatedRef.current("Текущая сессия больше недействительна. Войдите снова.");
     return null;
   }
 

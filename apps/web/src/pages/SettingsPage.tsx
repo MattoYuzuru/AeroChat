@@ -170,7 +170,7 @@ export function SettingsPage() {
 
   async function handleRevokeDevice(entry: DeviceWithSessions) {
     const confirmed = window.confirm(
-      `Отозвать устройство "${entry.device.label}"? Все его сессии станут недействительными.`,
+      `Отозвать устройство "${entry.device.label}" (${formatShortId(entry.device.id)})? Все его сессии станут недействительными.`,
     );
     if (!confirmed) {
       return;
@@ -348,7 +348,9 @@ export function SettingsPage() {
                   <p className={styles.sectionDescription}>
                     Список загружается только через `IdentityService` на gateway. Текущая сессия
                     не выделяется, потому что web bootstrap хранит только bearer token, а не
-                    hydrated session/device snapshot.
+                    hydrated session/device snapshot. Повторный вход с той же меткой вроде
+                    `Laptop` создаёт новую device record, поэтому ориентируйтесь по `Device ID` и
+                    времени создания, а не только по label.
                   </p>
                   <button
                     className={styles.secondaryButton}
@@ -447,7 +449,8 @@ export function SettingsPage() {
                               />
                             </div>
                             <p className={styles.deviceMeta}>
-                              Device ID: {formatShortId(entry.device.id)}
+                              Device ID: {formatShortId(entry.device.id)} · создано{" "}
+                              {formatDateTime(entry.device.createdAt)}
                             </p>
                           </div>
 
