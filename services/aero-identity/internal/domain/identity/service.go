@@ -17,18 +17,19 @@ import (
 var loginPattern = regexp.MustCompile(`^[a-z0-9._-]{3,32}$`)
 
 const (
-	minPasswordLength = 8
-	maxPasswordLength = 128
-	maxAvatarURLLen   = 2048
-	maxBioLen         = 500
-	maxTimezoneLen    = 64
-	maxAccentLen      = 64
-	maxStatusTextLen  = 140
-	maxCountryLen     = 64
-	maxCityLen        = 64
-	maxDeviceLabelLen = 120
-	maxNicknameLen    = 64
-	defaultDeviceName = "Текущее устройство"
+	minPasswordLength           = 8
+	maxPasswordLength           = 128
+	maxAvatarURLLen             = 2048
+	maxBioLen                   = 500
+	maxTimezoneLen              = 64
+	maxAccentLen                = 64
+	maxStatusTextLen            = 140
+	maxCountryLen               = 64
+	maxCityLen                  = 64
+	maxDeviceLabelLen           = 120
+	maxNicknameLen              = 64
+	defaultDeviceName           = "Текущее устройство"
+	defaultSessionTouchInterval = 15 * time.Second
 )
 
 type Repository interface {
@@ -56,18 +57,20 @@ type Repository interface {
 }
 
 type Service struct {
-	repo         Repository
-	passwords    *identityauth.PasswordHasher
-	sessionToken *libauth.SessionTokenManager
-	now          func() time.Time
-	newID        func() string
+	repo                 Repository
+	passwords            *identityauth.PasswordHasher
+	sessionToken         *libauth.SessionTokenManager
+	sessionTouchInterval time.Duration
+	now                  func() time.Time
+	newID                func() string
 }
 
 func NewService(repo Repository, passwords *identityauth.PasswordHasher, sessionToken *libauth.SessionTokenManager) *Service {
 	return &Service{
-		repo:         repo,
-		passwords:    passwords,
-		sessionToken: sessionToken,
+		repo:                 repo,
+		passwords:            passwords,
+		sessionToken:         sessionToken,
+		sessionTouchInterval: defaultSessionTouchInterval,
 		now: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -367,14 +370,28 @@ func (s *Service) authenticate(ctx context.Context, token string) (*SessionAuth,
 	}
 
 	touchedAt := s.now()
-	if err := s.repo.TouchSession(ctx, authSession.Session.ID, authSession.Device.ID, touchedAt); err != nil {
-		return nil, err
+	if shouldTouchSession(authSession.Session.LastSeenAt, touchedAt, s.sessionTouchInterval) ||
+		shouldTouchSession(authSession.Device.LastSeenAt, touchedAt, s.sessionTouchInterval) {
+		if err := s.repo.TouchSession(ctx, authSession.Session.ID, authSession.Device.ID, touchedAt); err != nil {
+			return nil, err
+		}
+
+		authSession.Session.LastSeenAt = touchedAt
+		authSession.Device.LastSeenAt = touchedAt
 	}
 
-	authSession.Session.LastSeenAt = touchedAt
-	authSession.Device.LastSeenAt = touchedAt
-
 	return authSession, nil
+}
+
+func shouldTouchSession(lastSeenAt time.Time, now time.Time, minInterval time.Duration) bool {
+	if minInterval <= 0 {
+		return true
+	}
+	if lastSeenAt.IsZero() {
+		return true
+	}
+
+	return now.Sub(lastSeenAt) >= minInterval
 }
 
 func applyProfilePatch(user User, patch ProfilePatch) (User, error) {

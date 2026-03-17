@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"time"
 )
 
@@ -27,14 +28,14 @@ type ReadinessCheck func(ctx context.Context) error
 // NewBaseMux создаёт минимальный mux с health/readiness и корневой диагностикой.
 func NewBaseMux(meta ServiceMeta, logger *slog.Logger, check ReadinessCheck) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.Handle("GET /", requestLogger(logger, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	mux.Handle("GET /", WrapHTTPInstrumentation(logger, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"service": meta,
 			"status":  "ok",
 		})
 	})))
-	mux.Handle("GET /healthz", requestLogger(logger, healthHandler(meta)))
-	mux.Handle("GET /readyz", requestLogger(logger, readinessHandler(meta, check)))
+	mux.Handle("GET /healthz", WrapHTTPInstrumentation(logger, healthHandler(meta)))
+	mux.Handle("GET /readyz", WrapHTTPInstrumentation(logger, readinessHandler(meta, check)))
 
 	return mux
 }
@@ -106,24 +107,42 @@ func readinessHandler(meta ServiceMeta, check ReadinessCheck) http.Handler {
 	})
 }
 
-func requestLogger(logger *slog.Logger, next http.Handler) http.Handler {
+// WrapHTTPInstrumentation логирует HTTP-запрос и не даёт panic закрыть соединение без ответа.
+func WrapHTTPInstrumentation(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startedAt := time.Now()
 		recorder := &statusRecorder{
 			ResponseWriter: w,
 			statusCode:     http.StatusOK,
 		}
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				logger.Error(
+					"panic при обработке http-запроса",
+					slog.String("method", r.Method),
+					slog.String("path", r.URL.Path),
+					slog.Any("panic", recovered),
+					slog.String("stack", string(debug.Stack())),
+				)
+				if !recorder.wroteHeader {
+					writeJSON(recorder, http.StatusInternalServerError, map[string]any{
+						"code":    "internal",
+						"message": "Внутренняя ошибка сервиса.",
+					})
+				}
+			}
+
+			logger.Info(
+				"http-запрос обработан",
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.Int("status_code", recorder.statusCode),
+				slog.Duration("duration", time.Since(startedAt)),
+				slog.String("remote_addr", r.RemoteAddr),
+			)
+		}()
 
 		next.ServeHTTP(recorder, r)
-
-		logger.Info(
-			"http-запрос обработан",
-			slog.String("method", r.Method),
-			slog.String("path", r.URL.Path),
-			slog.Int("status_code", recorder.statusCode),
-			slog.Duration("duration", time.Since(startedAt)),
-			slog.String("remote_addr", r.RemoteAddr),
-		)
 	})
 }
 
@@ -136,10 +155,20 @@ func writeJSON(w http.ResponseWriter, statusCode int, payload any) {
 
 type statusRecorder struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
+	wroteHeader bool
+}
+
+func (r *statusRecorder) Write(body []byte) (int, error) {
+	if !r.wroteHeader {
+		r.WriteHeader(r.statusCode)
+	}
+
+	return r.ResponseWriter.Write(body)
 }
 
 func (r *statusRecorder) WriteHeader(statusCode int) {
 	r.statusCode = statusCode
+	r.wroteHeader = true
 	r.ResponseWriter.WriteHeader(statusCode)
 }

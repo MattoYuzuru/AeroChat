@@ -19,6 +19,7 @@ func NewHTTPHandler(
 
 	path, connectHandler := chatv1connect.NewChatServiceHandler(handler)
 	connectMux.Handle(path, connectHandler)
+	loggedConnectMux := observability.WrapHTTPInstrumentation(logger, connectMux)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -29,7 +30,7 @@ func NewHTTPHandler(
 		case r.Method == http.MethodGet && r.URL.Path == "/readyz":
 			diagnosticsMux.ServeHTTP(w, r)
 		default:
-			connectMux.ServeHTTP(w, r)
+			loggedConnectMux.ServeHTTP(w, r)
 		}
 	})
 }

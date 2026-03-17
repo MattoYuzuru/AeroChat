@@ -14,6 +14,8 @@ import (
 
 var rawHTMLTagPattern = regexp.MustCompile(`(?i)</?[a-z][^>]*>`)
 
+const defaultSessionTouchInterval = 15 * time.Second
+
 type Repository interface {
 	GetSessionAuthByID(context.Context, string) (*SessionAuth, error)
 	TouchSession(context.Context, string, string, time.Time) error
@@ -49,15 +51,16 @@ type PresenceStateStore interface {
 }
 
 type Service struct {
-	repo          Repository
-	friendships   FriendshipChecker
-	typingStore   TypingStateStore
-	presenceStore PresenceStateStore
-	sessionToken  *libauth.SessionTokenManager
-	typingTTL     time.Duration
-	presenceTTL   time.Duration
-	now           func() time.Time
-	newID         func() string
+	repo                 Repository
+	friendships          FriendshipChecker
+	typingStore          TypingStateStore
+	presenceStore        PresenceStateStore
+	sessionToken         *libauth.SessionTokenManager
+	sessionTouchInterval time.Duration
+	typingTTL            time.Duration
+	presenceTTL          time.Duration
+	now                  func() time.Time
+	newID                func() string
 }
 
 func NewService(
@@ -77,13 +80,14 @@ func NewService(
 	}
 
 	return &Service{
-		repo:          repo,
-		friendships:   friendships,
-		typingStore:   typingStore,
-		presenceStore: presenceStore,
-		sessionToken:  sessionToken,
-		typingTTL:     typingTTL,
-		presenceTTL:   presenceTTL,
+		repo:                 repo,
+		friendships:          friendships,
+		typingStore:          typingStore,
+		presenceStore:        presenceStore,
+		sessionToken:         sessionToken,
+		sessionTouchInterval: defaultSessionTouchInterval,
+		typingTTL:            typingTTL,
+		presenceTTL:          presenceTTL,
 		now: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -481,13 +485,27 @@ func (s *Service) authenticate(ctx context.Context, token string) (*SessionAuth,
 	}
 
 	touchedAt := s.now()
-	if err := s.repo.TouchSession(ctx, authSession.Session.ID, authSession.Device.ID, touchedAt); err != nil {
-		return nil, err
+	if shouldTouchSession(authSession.Session.LastSeenAt, touchedAt, s.sessionTouchInterval) ||
+		shouldTouchSession(authSession.Device.LastSeenAt, touchedAt, s.sessionTouchInterval) {
+		if err := s.repo.TouchSession(ctx, authSession.Session.ID, authSession.Device.ID, touchedAt); err != nil {
+			return nil, err
+		}
+
+		authSession.Session.LastSeenAt = touchedAt
+		authSession.Device.LastSeenAt = touchedAt
+	}
+	return authSession, nil
+}
+
+func shouldTouchSession(lastSeenAt time.Time, now time.Time, minInterval time.Duration) bool {
+	if minInterval <= 0 {
+		return true
+	}
+	if lastSeenAt.IsZero() {
+		return true
 	}
 
-	authSession.Session.LastSeenAt = touchedAt
-	authSession.Device.LastSeenAt = touchedAt
-	return authSession, nil
+	return now.Sub(lastSeenAt) >= minInterval
 }
 
 func normalizeID(value string, field string) (string, error) {
