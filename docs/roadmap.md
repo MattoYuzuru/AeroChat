@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Shared-host nginx edge deployment fix и workflow cleanup для single-server self-host runtime
+- [x] k3s / Traefik shared edge bootstrap для single-server self-host runtime
 
 ---
 

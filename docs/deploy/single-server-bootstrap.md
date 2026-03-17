@@ -1,21 +1,23 @@
-# Single-server bootstrap, shared-host nginx edge и operator fallback flow
+# Single-server bootstrap, shared k3s / Traefik edge и operator fallback flow
 
-Этот документ описывает базовую подготовку одного VPS после перехода на shared-host edge модель, где публичные
-`80/443` уже принадлежат существующему host-level `nginx`.
+Этот документ описывает базовую подготовку одного VPS для финальной deployment-модели AeroChat, где:
+
+- публичный edge принадлежит shared `Traefik` в `k3s`;
+- TLS выпускается и обновляется через существующий `cert-manager`;
+- AeroChat runtime продолжает жить в `docker-compose`;
+- приложение не мигрирует целиком в Kubernetes.
 
 Цель текущего этапа:
 
 - сохранить single-server self-host runtime;
-- убрать конфликт за публичные `80/443`;
-- оставить host `nginx` единственным внешним edge;
-- публиковать AeroChat runtime только на loopback high ports;
-- документировать выпуск сертификата через existing host `nginx` path;
+- использовать `Traefik` как единственный публичный edge;
+- дать минимальный и воспроизводимый cluster-side contract для `aero.keykomi.com`;
 - сохранить ручной fallback flow для update и rollback;
-- не превращать этот документ в provisioning, ACME automation или zero-downtime runbook.
+- не превращать документ в provisioning кластера, полную Kubernetes-миграцию или zero-downtime orchestration.
 
 Основной production rollout по GitHub Actions описан отдельно в
 [production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md).
-Этот документ остаётся source of truth для server preparation, host `nginx` contract и ручного fallback flow.
+Этот документ остаётся source of truth для server preparation, shared edge contract и ручного fallback flow.
 
 ## Модель окружений
 
@@ -31,25 +33,32 @@
   - `.env.server.example` содержит только versioned non-secret runtime config;
   - `.env.server.secrets.example` содержит только перечень обязательных secret keys с плейсхолдерами;
   - `infra/compose/docker-compose.server.yml` тянет предсобранные application images из registry;
-  - compose публикует только `web` и `aero-gateway` на `127.0.0.1` high ports;
-  - host-level `nginx` остаётся единственным внешним edge на `80/443`;
-  - сертификаты выпускаются и используются на host-level `nginx`, а не внутри compose stack.
+  - compose публикует только `web` и `aero-gateway` на одном host IP, достижимом из pod'ов `Traefik`;
+  - shared `Traefik` остаётся единственным публичным edge на `80/443`;
+  - TLS обслуживается через cluster `cert-manager`, а не через host-level certificate path.
 
 ## Runtime topology
 
-На одном VPS поднимаются:
+На одном VPS одновременно живут два слоя:
 
-- host-level `nginx` как единственный внешний HTTP/HTTPS edge;
-- `web` как контейнер со статически собранным frontend;
-- `aero-gateway` как единственная backend edge-точка;
-- `aero-identity` и `aero-chat` как внутренние сервисы;
-- `postgres`, `redis`, `minio` как внутренние зависимости.
+1. Host runtime
+   - `web` как контейнер со статически собранным frontend;
+   - `aero-gateway` как единственная backend edge-точка;
+   - `aero-identity` и `aero-chat` как внутренние сервисы;
+   - `postgres`, `redis`, `minio` как внутренние зависимости.
 
-Внутренние обращения идут так:
+2. Cluster edge
+   - shared `Traefik` как единственный публичный HTTP/TLS ingress;
+   - `Service` без selector и `EndpointSlice`, указывающие на host upstream'ы AeroChat;
+   - `Ingress` и `Middleware`, которые маршрутизируют `aero.keykomi.com`;
+   - `cert-manager`, который выпускает TLS secret для ingress.
 
-- browser → host `nginx`
-- host `nginx` → `web` на `127.0.0.1:${AERO_WEB_HOST_PORT}`
-- host `nginx` → `aero-gateway` на `127.0.0.1:${AERO_GATEWAY_HOST_PORT}`
+Поток traffic выглядит так:
+
+- browser → `Traefik`
+- `Traefik` → Kubernetes `Ingress`
+- `Ingress` → `Service` / `EndpointSlice`
+- `EndpointSlice` → `${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}` или `${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}`
 - `aero-gateway` → `aero-identity`, `aero-chat` по compose DNS
 - `aero-identity` → `postgres`
 - `aero-chat` → `postgres`, `redis`
@@ -68,7 +77,7 @@
 
 - `.env.server.example`
   - versioned шаблон для несекретных runtime-настроек;
-  - сюда входят image namespace/tag, primary domain и loopback ports для host `nginx` upstreams;
+  - сюда входят image namespace/tag, primary domain, node-reachable host IP и high ports;
   - этот файл можно безопасно хранить в репозитории как пример.
 
 - `.env.server.secrets.example`
@@ -77,7 +86,8 @@
 
 - `.env.server` на VPS
   - реальная рабочая копия non-secret runtime config;
-  - оператор обычно меняет здесь `AERO_IMAGE_TAG` и при необходимости loopback ports.
+  - оператор обычно меняет здесь `AERO_IMAGE_TAG`;
+  - здесь же фиксируются `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT` и `AERO_GATEWAY_HOST_PORT`.
 
 - `.env.server.secrets` на VPS
   - реальная рабочая копия секретов;
@@ -89,80 +99,82 @@
 - `POSTGRES_PASSWORD`
 - `MINIO_ROOT_PASSWORD`
 
-Если позже появятся дополнительные чувствительные значения, они должны попадать в `.env.server.secrets`, а не в
-versioned runtime-шаблон.
-
-## Что версионируется и что создаётся на VPS
+## Что версионируется и что создаётся только в runtime
 
 В репозитории версионируются:
 
 - `infra/compose/docker-compose.server.yml`;
 - `.env.server.example`;
 - `.env.server.secrets.example`;
-- host `nginx` examples:
-  - `infra/nginx/shared-host-http-bootstrap-aero.keykomi.com.conf.example`;
-  - `infra/nginx/shared-host-aero.keykomi.com.conf.example`;
+- `infra/k8s/shared-edge/aero.keykomi.com.example.yaml`;
 - этот runbook и ADR.
 
 Только на VPS создаются:
 
 - `.env.server`;
 - `.env.server.secrets`;
-- host `nginx` site config для реального домена;
-- ACME webroot directory, например `/var/www/certbot`;
-- host-level сертификаты и приватный ключ.
+- реальные volumes Docker Compose;
+- host firewall rules и иные network restrictions для high ports.
 
-## Host nginx contract
+Только в кластере существуют:
 
-Host-level `nginx` должен обслуживать:
+- namespace для AeroChat ingress resources;
+- `Service`, `EndpointSlice`, `Middleware`, `Ingress`;
+- TLS secret, выпущенный `cert-manager`.
 
-- `/healthz` самостоятельно;
-- `/readyz` через proxy в `aero-gateway`;
-- `/api/` только в `aero-gateway`;
-- `/` и SPA routes в `web`.
+## Shared edge contract
 
-Для первой выдачи сертификата в репозитории есть отдельный HTTP bootstrap example:
+`Traefik` должен обслуживать:
 
-- [shared-host-http-bootstrap-aero.keykomi.com.conf.example](/home/mattoyudzuru/GolandProjects/AeroChat/infra/nginx/shared-host-http-bootstrap-aero.keykomi.com.conf.example)
+- `/` и SPA routes через `web`;
+- `/api` через `aero-gateway` со strip-prefix `/api`;
+- `/healthz` через `aero-gateway`;
+- `/readyz` через `aero-gateway`.
 
-Для итогового HTTPS runtime есть отдельный final example:
+Минимальный пример ресурсов лежит в:
 
-- [shared-host-aero.keykomi.com.conf.example](/home/mattoyudzuru/GolandProjects/AeroChat/infra/nginx/shared-host-aero.keykomi.com.conf.example)
+- [aero.keykomi.com.example.yaml](/home/mattoyudzuru/GolandProjects/AeroChat/infra/k8s/shared-edge/aero.keykomi.com.example.yaml)
 
-Оба файла используют домен `aero.keykomi.com` и loopback ports `18080/18081` как явный пример.
-Если домен или порты отличаются, оператор обязан заменить их в host `nginx` config и в `.env.server`.
+Перед применением оператор обязан заменить:
+
+- `192.0.2.10` на фактическое значение `AERO_SHARED_EDGE_HOST_IP` из `.env.server`;
+- `letsencrypt-prod` на реальный `ClusterIssuer`, если в кластере используется другое имя;
+- `ingressClassName`, если shared `Traefik` использует нестандартный ingress class;
+- namespace, если выбран не `aerochat-edge`.
 
 ## Что готово сейчас
 
-- production-oriented compose topology без отдельного публичного `nginx` контейнера;
-- loopback-only contract для `web` и `aero-gateway`;
-- host-level reverse proxy contract для shared-host VPS;
-- GHCR-ready модель публикации versioned application images;
+- production-oriented compose topology без собственного публичного `nginx`;
 - `aero-gateway` остаётся единственной backend edge-точкой;
-- documented certificate issuance path через existing host `nginx` + ACME webroot;
+- explicit host upstream contract через `AERO_SHARED_EDGE_HOST_IP` и high ports;
+- минимальные Kubernetes resources для shared `Traefik`;
+- TLS path через existing `cert-manager`;
 - manual bootstrap/update/rollback flow как fallback;
 - manual GitHub Actions rollout через environment `production`.
 
 ## Что намеренно отложено
 
-- автоматический выпуск и renewal сертификатов;
-- управление host `nginx` через GitHub Actions;
-- backup/restore automation;
+- установка и bootstrap самого `k3s`;
+- установка и bootstrap `Traefik` или `cert-manager`;
+- полная Kubernetes-миграция AeroChat;
+- host firewall automation;
 - zero-downtime rollout;
-- OS-level provisioning и firewall hardening;
+- backup/restore automation;
 - multi-host и blue-green topology.
 
-## Подготовка VPS
+## Подготовка VPS и кластера
 
 Минимально нужны:
 
 - Linux VPS;
 - Docker Engine;
 - Docker Compose plugin;
-- уже работающий host-level `nginx`, который владеет `80/tcp` и `443/tcp`;
-- домен, который будет указывать на VPS;
-- доступ к `sudo` для обновления host `nginx` config и выдачи сертификата;
-- директория для ACME webroot, например `/var/www/certbot`.
+- single-node или shared `k3s`, внутри которого уже работает `Traefik`;
+- уже установленный `cert-manager`;
+- `kubectl` с доступом к целевому кластеру;
+- домен `aero.keykomi.com`, указывающий на текущий edge;
+- host IP VPS, достижимый из pod'ов `Traefik`;
+- возможность ограничить high ports так, чтобы они не стали вторым публичным edge.
 
 ## Первый bootstrap на VPS
 
@@ -182,14 +194,17 @@ cp .env.server.secrets.example .env.server.secrets
 - `AERO_IMAGE_NAMESPACE`
 - `AERO_IMAGE_TAG`
 - `AERO_EDGE_DOMAIN`
+- `AERO_SHARED_EDGE_HOST_IP`
 - `AERO_WEB_HOST_PORT`
 - `AERO_GATEWAY_HOST_PORT`
 
 Ожидаемая семантика:
 
-- `AERO_WEB_HOST_PORT` используется host `nginx` для upstream `/`;
-- `AERO_GATEWAY_HOST_PORT` используется host `nginx` для upstream `/api/` и `/readyz`;
-- оба порта должны оставаться loopback-only и не конфликтовать с другими сервисами на VPS.
+- `AERO_SHARED_EDGE_HOST_IP` должен быть достижим из pod'ов `Traefik`;
+- этот же адрес должен использоваться в Kubernetes `EndpointSlice`;
+- `AERO_WEB_HOST_PORT` обслуживает frontend upstream;
+- `AERO_GATEWAY_HOST_PORT` обслуживает backend upstream для `/api`, `/healthz` и `/readyz`;
+- high ports не должны оставаться бесконтрольно доступными извне.
 
 4. Проверь итоговую compose-конфигурацию:
 
@@ -217,7 +232,7 @@ docker compose \
   up -d
 ```
 
-6. Проверь состояние контейнеров и loopback upstreams:
+6. Проверь состояние контейнеров и прямые host upstream'ы:
 
 ```bash
 docker compose \
@@ -225,144 +240,107 @@ docker compose \
   --env-file .env.server.secrets \
   -f infra/compose/docker-compose.server.yml \
   ps
+
+curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}/"
+curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz"
 ```
+
+7. Подготовь cluster-side manifest example.
+
+Открой `infra/k8s/shared-edge/aero.keykomi.com.example.yaml` и синхронно замени:
+
+- `192.0.2.10` на `AERO_SHARED_EDGE_HOST_IP`;
+- `18080` и `18081`, если в `.env.server` выбраны другие порты;
+- `letsencrypt-prod`, если `ClusterIssuer` называется иначе;
+- namespace, если нужен другой.
+
+8. Примени ресурсы в кластер:
 
 ```bash
-curl -fsS http://127.0.0.1:18080/
-curl -fsS http://127.0.0.1:18081/readyz
+kubectl apply -f infra/k8s/shared-edge/aero.keykomi.com.example.yaml
 ```
 
-Если в `.env.server` выбраны другие loopback ports, замени `18080` и `18081` на актуальные значения.
-
-7. Подготовь ACME webroot и HTTP bootstrap config для host `nginx`.
-
-Пример для домена `aero.keykomi.com`:
+9. Проверь, что shared edge увидел все ресурсы:
 
 ```bash
-sudo mkdir -p /var/www/certbot
-sudo cp infra/nginx/shared-host-http-bootstrap-aero.keykomi.com.conf.example /etc/nginx/sites-available/aerochat.conf
+kubectl -n aerochat-edge get svc
+kubectl -n aerochat-edge get endpointslices
+kubectl -n aerochat-edge get middleware
+kubectl -n aerochat-edge get ingress
+kubectl -n aerochat-edge get certificate
 ```
 
-Дальше замени в `/etc/nginx/sites-available/aerochat.conf`:
+Если namespace изменён, в командах выше подставь своё значение.
 
-- `aero.keykomi.com` на реальный домен из `AERO_EDGE_DOMAIN`;
-- `18080` на значение `AERO_WEB_HOST_PORT`;
-- `18081` на значение `AERO_GATEWAY_HOST_PORT`.
-
-После этого включи сайт и перезагрузи host `nginx`:
+10. Дождись выпуска TLS-сертификата `cert-manager` и проверь публичный путь:
 
 ```bash
-sudo ln -sf /etc/nginx/sites-available/aerochat.conf /etc/nginx/sites-enabled/aerochat.conf
-sudo nginx -t
-sudo systemctl reload nginx
+curl -fsS https://aero.keykomi.com/
+curl -fsS https://aero.keykomi.com/healthz
+curl -fsS https://aero.keykomi.com/readyz
 ```
 
-8. Выпусти сертификат через existing host `nginx` path.
+Если используется другой домен, замени `aero.keykomi.com` на значение `AERO_EDGE_DOMAIN`.
 
-Основной documented path:
+## Что означают проверки
 
-```bash
-sudo certbot certonly --webroot -w /var/www/certbot -d aero.keykomi.com
-```
+- `http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}/`
+  - показывает, что frontend upstream жив на host runtime.
 
-В команде выше замени `aero.keykomi.com` на реальный домен.
-`certbot --standalone` не является основным сценарием для shared-host VPS.
+- `http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz`
+  - показывает, что backend readiness chain доступна напрямую.
 
-9. Переключи host `nginx` на финальный HTTPS server block.
+- `https://<domain>/`
+  - показывает, что `Traefik` действительно отдаёт frontend домена.
 
-Пример:
+- `https://<domain>/healthz`
+  - показывает процесс-level health через публичный edge path.
 
-```bash
-sudo cp infra/nginx/shared-host-aero.keykomi.com.conf.example /etc/nginx/sites-available/aerochat.conf
-```
+- `https://<domain>/readyz`
+  - подтверждает, что `Traefik` и backend readiness chain работают вместе.
 
-После копирования замени:
+## Manual update и rollback flow
 
-- `aero.keykomi.com` на реальный домен;
-- `18080` на значение `AERO_WEB_HOST_PORT`;
-- `18081` на значение `AERO_GATEWAY_HOST_PORT`;
-- пути `/etc/letsencrypt/live/aero.keykomi.com/...` на актуальные certificate paths, если они отличаются.
-
-Затем снова проверь и перезагрузи host `nginx`:
-
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-10. Проверь итоговый edge path:
-
-```bash
-curl -fsS http://127.0.0.1/healthz
-curl -fsS http://127.0.0.1/readyz
-curl -fsS --resolve "aero.example.com:443:127.0.0.1" https://aero.example.com/healthz
-curl -fsS --resolve "aero.example.com:443:127.0.0.1" https://aero.example.com/readyz
-```
-
-В командах выше `aero.example.com` замени на `AERO_EDGE_DOMAIN`.
-
-После того как VPS подготовлен и локальные проверки проходят, для production rollout рекомендуется перейти к
-[production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md) и
-использовать manual workflow `Deploy Production`.
-
-## Ожидаемое поведение
-
-- `/healthz` отвечает host `nginx` и показывает, что edge-process жив;
-- `/readyz` проходит через host `nginx` в `aero-gateway` и отражает доступность downstream chain;
-- `http://<domain>/` делает redirect на `https://<domain>/`;
-- `https://<domain>/` открывает web shell;
-- frontend ходит в backend только через `/api`;
-- loopback upstream ports не открыты наружу.
-
-## Диагностика
-
-Если readiness не проходит:
-
-1. Проверь compose runtime:
-
-```bash
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  logs --tail=100 web aero-gateway aero-identity aero-chat postgres redis minio
-```
-
-2. Проверь host `nginx`:
-
-```bash
-sudo nginx -t
-sudo systemctl status nginx --no-pager
-```
-
-3. Убедись, что в host `nginx` config совпадают:
-
-- домен;
-- `AERO_WEB_HOST_PORT`;
-- `AERO_GATEWAY_HOST_PORT`;
-- certificate paths.
-
-## Manual update и rollback fallback
-
-Если GitHub Actions недоступен, fallback остаётся простым:
+Если GitHub Actions недоступен, fallback остаётся таким:
 
 1. Измени `AERO_IMAGE_TAG` в `.env.server`.
 2. Выполни `docker compose ... config`.
 3. Выполни `docker compose ... pull`.
 4. Выполни `docker compose ... up -d`.
-5. Проверь `docker compose ... ps`, `http://127.0.0.1/readyz` и `https://<domain>/readyz`.
+5. Проверь `docker compose ... ps`.
+6. Снова проверь:
+   - `http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz`
+   - `https://<domain>/readyz`
 
 Rollback делается тем же flow после возврата `AERO_IMAGE_TAG` на предыдущий known-good tag.
 
-## Границы ответственности
+## Если меняются host IP или upstream ports
 
-Compose runtime отвечает только за application stack AeroChat.
+Это отдельный операторский случай.
+
+Нужно синхронно обновить:
+
+- `AERO_SHARED_EDGE_HOST_IP` в `.env.server`;
+- `AERO_WEB_HOST_PORT` и `AERO_GATEWAY_HOST_PORT` в `.env.server`, если менялись порты;
+- оба `EndpointSlice` в Kubernetes manifest;
+- при необходимости ограничения firewall.
+
+Только после этого можно выполнять следующий rollout.
+
+## Типовые границы ответственности
+
+Репозиторий и workflow отвечают за:
+
+- compose runtime contract;
+- Kubernetes example manifests;
+- tag-driven update flow;
+- документацию operator steps.
 
 Оператор отвечает за:
 
-- host `nginx` config;
-- ACME webroot;
-- выпуск и renewal сертификатов;
-- DNS и firewall;
-- синхронность `.env.server` и host `nginx` upstream ports;
-- внешний пользовательский smoke после deploy.
+- фактическое значение `AERO_SHARED_EDGE_HOST_IP`;
+- сетевую доступность этого адреса из `Traefik`;
+- недопущение второго публичного edge через high ports;
+- `kubectl apply` ingress-ресурсов;
+- состояние `cert-manager`, `Traefik`, DNS и firewall;
+- выбор release tag и внешний smoke после deploy.

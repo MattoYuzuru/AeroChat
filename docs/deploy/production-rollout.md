@@ -1,22 +1,26 @@
 # Production rollout automation и first external launch
 
-Этот документ описывает operational slice для production rollout AeroChat на shared-host VPS, где публичные `80/443`
-уже принадлежат существующему host-level `nginx`.
+Этот документ описывает operational slice для production rollout AeroChat на VPS, где:
+
+- публичный edge принадлежит shared `Traefik` в `k3s`;
+- TLS обслуживается existing `cert-manager`;
+- AeroChat runtime живёт в `docker-compose`;
+- production deploy остаётся ручным и tag-driven.
 
 Цель текущего этапа:
 
 - выполнять production rollout только вручную и явно;
 - использовать GitHub Environment `production` как deploy gate;
 - менять на сервере только выбранный `AERO_IMAGE_TAG`;
-- сохранить single-server topology и host `nginx` как единственный внешний edge;
-- не смешивать rollout с управлением host `nginx`, ACME issuance и remote provisioning.
+- проверять и host upstream'ы, и HTTPS path через shared edge;
+- не смешивать rollout с `kubectl apply`, cert-manager management и remote provisioning.
 
 Workflow не занимается:
 
-- подготовкой VPS с нуля;
+- подготовкой VPS или кластера с нуля;
 - `git pull` или sync checkout на сервере;
 - выпуском или renewal сертификатов;
-- изменением host `nginx` config;
+- применением Kubernetes manifests;
 - auto-rollback;
 - zero-downtime orchestration.
 
@@ -28,14 +32,15 @@ Workflow не занимается:
   [single-server bootstrap runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/single-server-bootstrap.md);
 - deploy directory на VPS уже существует и содержит актуальный checkout репозитория;
 - на VPS уже есть `.env.server` и `.env.server.secrets`;
-- compose stack AeroChat уже умеет подниматься локально на `127.0.0.1:${AERO_WEB_HOST_PORT}` и
-  `127.0.0.1:${AERO_GATEWAY_HOST_PORT}`;
-- host-level `nginx` уже настроен как reverse proxy для выбранного домена;
-- сертификат для домена уже выпущен и подключён в host `nginx`;
-- домен уже указывает на VPS, а `80/tcp` и `443/tcp` доступны извне.
+- compose stack AeroChat уже умеет подниматься на
+  `${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}` и `${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}`;
+- Kubernetes resources из `infra/k8s/shared-edge/aero.keykomi.com.example.yaml` уже применены;
+- `EndpointSlice` уже указывают на те же host IP и ports, что и `.env.server`;
+- `cert-manager` уже выпустил сертификат для `AERO_PROD_EDGE_DOMAIN`;
+- `Traefik` уже обслуживает домен и маршруты `/`, `/api`, `/healthz`, `/readyz`.
 
-Если compose topology, env contract или host `nginx` examples менялись в репозитории, оператор обязан отдельно
-обновить checkout на VPS и при необходимости перезагрузить host `nginx` до первого запуска workflow.
+Если compose topology, env contract или shared edge manifests менялись в репозитории, оператор обязан отдельно обновить
+checkout на VPS и при необходимости повторно применить `kubectl apply` до первого запуска workflow.
 
 ## GitHub Environment `production`
 
@@ -71,7 +76,7 @@ Workflow использует только GitHub Environment `production`.
   - для текущего репозитория ожидается `infra/compose/docker-compose.server.yml`.
 
 - `AERO_PROD_EDGE_DOMAIN`
-  - основной внешний домен shared-host deployment;
+  - основной внешний домен shared deployment;
   - используется в HTTPS health/readiness проверках workflow.
 
 ## Server-side prerequisites
@@ -91,12 +96,12 @@ Workflow использует только GitHub Environment `production`.
 - checkout репозитория с файлом `infra/compose/docker-compose.server.yml`;
 - `.env.server`;
 - `.env.server.secrets`;
-- работающий host `nginx`;
-- включённый server block для `AERO_PROD_EDGE_DOMAIN`;
+- корректно заполненные `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT`;
+- уже поднятый shared edge path в Kubernetes;
 - действующий сертификат для `AERO_PROD_EDGE_DOMAIN`.
 
-Workflow гарантирует существование deploy directory через `mkdir -p`, но не подготавливает checkout, env-файлы, host
-`nginx` config и сертификаты за оператора.
+Workflow гарантирует существование deploy directory через `mkdir -p`, но не подготавливает checkout, env-файлы, cluster
+resources и сертификаты за оператора.
 
 ## Что делает workflow
 
@@ -111,13 +116,19 @@ Manual workflow `Deploy Production` выполняет один последов
 7. выполняет `docker compose ... pull`;
 8. выполняет `docker compose ... up -d`;
 9. показывает `docker compose ... ps`;
-10. ждёт успешных HTTP/HTTPS health/readiness checks через уже настроенный host edge.
+10. читает `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT` и `AERO_GATEWAY_HOST_PORT` из `.env.server`;
+11. ждёт успешных проверок:
+    - `http://<shared-edge-host-ip>:<web-port>/`
+    - `http://<shared-edge-host-ip>:<gateway-port>/readyz`
+    - `https://<domain>/`
+    - `https://<domain>/healthz`
+    - `https://<domain>/readyz`
 
 Workflow намеренно не трогает:
 
 - `.env.server.secrets`;
-- host `nginx` config;
-- ACME webroot и сертификаты;
+- Kubernetes manifests;
+- `cert-manager` и TLS secrets;
 - git checkout на VPS;
 - release selection для отдельных сервисов по разным тегам.
 
@@ -125,34 +136,47 @@ Workflow намеренно не трогает:
 
 Рекомендуемый first launch checklist:
 
-1. Подготовить VPS по
+1. Подготовить VPS и cluster edge по
    [single-server bootstrap runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/single-server-bootstrap.md).
 2. Проверить, что deploy directory на VPS содержит актуальный checkout этого operational slice.
-3. Проверить, что host `nginx` уже проксирует:
-   - `/` в `web`;
-   - `/api/` в `aero-gateway`;
-   - `/readyz` в `aero-gateway`.
-4. Создать и заполнить GitHub Environment `production`.
-5. Выбрать первый стабильный `image_tag`.
-   Для первого live run рекомендуется `vX.Y.Z`, а не `edge`.
-6. Открыть GitHub Actions и вручную запустить workflow `Deploy Production`.
-7. Передать выбранный `image_tag` в `workflow_dispatch`.
-8. Дождаться успешного завершения job и встроенных HTTP/HTTPS проверок.
-9. С внешней машины выполнить базовую проверку домена:
+3. Проверить прямые upstream'ы:
 
 ```bash
-curl -fsS https://aero.example.com/healthz
-curl -fsS https://aero.example.com/readyz
-curl -I http://aero.example.com/
+curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}/"
+curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz"
 ```
 
-10. Открыть `https://aero.example.com/` в браузере и проверить:
+4. Проверить cluster resources:
+
+```bash
+kubectl -n aerochat-edge get svc
+kubectl -n aerochat-edge get endpointslices
+kubectl -n aerochat-edge get middleware
+kubectl -n aerochat-edge get ingress
+kubectl -n aerochat-edge get certificate
+```
+
+5. Создать и заполнить GitHub Environment `production`.
+6. Выбрать первый стабильный `image_tag`.
+   Для первого live run рекомендуется `vX.Y.Z`, а не `edge`.
+7. Открыть GitHub Actions и вручную запустить workflow `Deploy Production`.
+8. Передать выбранный `image_tag` в `workflow_dispatch`.
+9. Дождаться успешного завершения job и встроенных upstream/HTTPS проверок.
+10. С внешней машины выполнить базовую проверку домена:
+
+```bash
+curl -fsS https://aero.keykomi.com/
+curl -fsS https://aero.keykomi.com/healthz
+curl -fsS https://aero.keykomi.com/readyz
+```
+
+11. Открыть `https://aero.keykomi.com/` в браузере и проверить:
     - загрузку web shell;
     - успешный login или register;
     - работу `/api` через обычный пользовательский flow.
-11. Зафиксировать предыдущий known-good tag и текущий deployed tag в операторском журнале или release notes.
+12. Зафиксировать предыдущий known-good tag и текущий deployed tag в операторском журнале или release notes.
 
-В командах выше `aero.example.com` нужно заменить на значение из `AERO_PROD_EDGE_DOMAIN`.
+В командах выше `aero.keykomi.com` нужно заменить на значение из `AERO_PROD_EDGE_DOMAIN`, если домен отличается.
 
 ## Verification после rollout
 
@@ -160,23 +184,24 @@ curl -I http://aero.example.com/
 
 Workflow на сервере дожидается успешного ответа для:
 
-- `http://127.0.0.1/healthz`
-- `http://127.0.0.1/readyz`
-- `https://<domain>/healthz` через `--resolve`
-- `https://<domain>/readyz` через `--resolve`
+- `http://<shared-edge-host-ip>:<web-port>/`
+- `http://<shared-edge-host-ip>:<gateway-port>/readyz`
+- `https://<domain>/`
+- `https://<domain>/healthz`
+- `https://<domain>/readyz`
 
 Этого достаточно, чтобы подтвердить:
 
-- живой host `nginx`;
-- рабочую readiness chain;
-- корректный HTTPS path для домена.
+- прямую доступность host runtime;
+- живую readiness chain на gateway;
+- рабочий публичный path через shared `Traefik`;
+- корректный TLS для домена.
 
 ### Что оператору стоит проверить дополнительно
 
 - `docker compose ps` на VPS, если rollout выглядит подозрительно;
 - `docker compose logs --tail=100 web aero-gateway aero-identity aero-chat postgres redis minio`;
-- `sudo nginx -t`;
-- `sudo systemctl status nginx --no-pager`;
+- `kubectl -n aerochat-edge get ingress,endpointslices,certificate`;
 - открытие главной страницы и auth flow через реальный браузер;
 - отсутствие TLS warning при внешнем заходе на домен.
 
@@ -187,7 +212,7 @@ Rollback делается тем же workflow и тем же operator contract:
 1. Определи предыдущий известный рабочий tag.
 2. Запусти workflow `Deploy Production` ещё раз.
 3. Передай предыдущий tag как `image_tag`.
-4. Дождись тех же health/readiness checks.
+4. Дождись тех же upstream и HTTPS checks.
 
 Это сознательно тот же tag-driven flow, а не отдельная rollback automation.
 
@@ -199,7 +224,7 @@ Rollback делается тем же workflow и тем же operator contract:
 2. Верни `AERO_IMAGE_TAG` в `.env.server` на предыдущий known-good tag.
 3. Выполни `docker compose ... pull`.
 4. Выполни `docker compose ... up -d`.
-5. Снова проверь `/healthz` и `/readyz`.
+5. Снова проверь прямой gateway upstream и `https://<domain>/readyz`.
 
 ## Типовые границы ответственности
 
@@ -209,8 +234,8 @@ Workflow отвечает только за rollout already prepared AeroChat ru
 
 - актуальность checkout на VPS;
 - секреты в `.env.server.secrets`;
-- host `nginx` config;
-- выпуск и renewal сертификатов;
-- DNS и firewall;
+- синхронность `.env.server` и Kubernetes `EndpointSlice`;
+- состояние `Traefik`, `cert-manager`, DNS и firewall;
+- `kubectl apply` при изменении edge manifests;
 - выбор release tag;
 - внешний пользовательский smoke после deploy.

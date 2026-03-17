@@ -1,0 +1,148 @@
+# Минимальный пример shared-edge ресурсов для `aero.keykomi.com`.
+# Перед применением замени:
+# - namespace, если нужен другой;
+# - `192.0.2.10` на значение из `.env.server` переменной `AERO_SHARED_EDGE_HOST_IP`;
+# - `letsencrypt-prod` на фактический ClusterIssuer, если в кластере используется другое имя;
+# - `ingressClassName`, если shared Traefik использует нестандартный ingress class.
+#
+# Этот файл не переносит AeroChat в Kubernetes.
+# Он только подключает уже работающий compose runtime к shared `Traefik` через
+# Service без selector + EndpointSlice + Middleware + Ingress.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aerochat-edge
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aerochat-web
+  namespace: aerochat-edge
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 18080
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: aerochat-web-external
+  namespace: aerochat-edge
+  labels:
+    kubernetes.io/service-name: aerochat-web
+addressType: IPv4
+ports:
+  - name: http
+    protocol: TCP
+    port: 18080
+endpoints:
+  - addresses:
+      - 192.0.2.10
+    conditions:
+      ready: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aerochat-gateway
+  namespace: aerochat-edge
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 18081
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: aerochat-gateway-external
+  namespace: aerochat-edge
+  labels:
+    kubernetes.io/service-name: aerochat-gateway
+addressType: IPv4
+ports:
+  - name: http
+    protocol: TCP
+    port: 18081
+endpoints:
+  - addresses:
+      - 192.0.2.10
+    conditions:
+      ready: true
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: aerochat-strip-api-prefix
+  namespace: aerochat-edge
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aerochat-web
+  namespace: aerochat-edge
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - aero.keykomi.com
+      secretName: aero-keykomi-com-tls
+  rules:
+    - host: aero.keykomi.com
+      http:
+        paths:
+          - path: /healthz
+            pathType: Exact
+            backend:
+              service:
+                name: aerochat-gateway
+                port:
+                  name: http
+          - path: /readyz
+            pathType: Exact
+            backend:
+              service:
+                name: aerochat-gateway
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aerochat-web
+                port:
+                  name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aerochat-api
+  namespace: aerochat-edge
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: aerochat-edge-aerochat-strip-api-prefix@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - aero.keykomi.com
+      secretName: aero-keykomi-com-tls
+  rules:
+    - host: aero.keykomi.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: aerochat-gateway
+                port:
+                  name: http

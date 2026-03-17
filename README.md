@@ -78,7 +78,7 @@ AeroChat создаётся как проект с сильным фундаме
 - PostgreSQL
 - Redis
 - MinIO
-- Nginx
+- Nginx (local/dev edge)
 - Docker / Docker Compose
 
 ### Frontend
@@ -92,6 +92,9 @@ AeroChat создаётся как проект с сильным фундаме
 
 ### Infrastructure / DX
 
+- k3s
+- Traefik
+- cert-manager
 - GitHub Actions
 - GHCR
 - golangci-lint
@@ -156,6 +159,7 @@ AeroChat создаётся как проект с сильным фундаме
 
 /infra
   /compose
+  /k8s
   /nginx
   /scripts
 
@@ -190,9 +194,10 @@ AeroChat создаётся как проект с сильным фундаме
 - `server/prod-like`:
   - `.env.server.example` содержит только versioned non-secret runtime config;
   - `.env.server.secrets.example` описывает обязательные server-only secret keys без реальных значений;
-  - host-level `nginx` на VPS остаётся единственным внешним edge на `80/443`;
-  - TLS-сертификаты выпускаются и используются на host-level `nginx`, а не внутри compose stack;
+  - публичный edge принадлежит существующему `k3s + Traefik`;
+  - TLS выпускается и обновляется через существующий `cert-manager`;
   - `infra/compose/docker-compose.server.yml` даёт production-oriented single-server topology на предсобранных образах;
+  - `infra/k8s/shared-edge/aero.keykomi.com.example.yaml` показывает минимальные cluster-side ресурсы для маршрутизации в compose runtime;
   - подготовка сервера описана в `docs/deploy/single-server-bootstrap.md`;
   - production rollout и first external launch описаны в `docs/deploy/production-rollout.md`.
 
@@ -235,13 +240,15 @@ docker compose --env-file .env.server --env-file .env.server.secrets -f infra/co
 ```
 
 Server runtime больше не поднимает отдельный `nginx` контейнер для production VPS.
-Host-level `nginx`, который уже владеет `80/443`, остаётся единственным публичным reverse proxy и проксирует:
+Public edge для target VPS принадлежит shared `Traefik` в `k3s`.
+Compose runtime публикует только два host upstream'а на `${AERO_SHARED_EDGE_HOST_IP}`:
 
-- `/` в `web` на `127.0.0.1:${AERO_WEB_HOST_PORT}`;
-- `/api/` в `aero-gateway` на `127.0.0.1:${AERO_GATEWAY_HOST_PORT}`;
-- `/readyz` в `aero-gateway`.
+- `/` → `web` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}`;
+- `/api`, `/healthz`, `/readyz` → `aero-gateway` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}`.
 
-Сертификаты выпускаются через existing host `nginx` path c ACME webroot, без `certbot --standalone` как основного сценария.
+`Traefik` получает доступ к ним через Kubernetes `Service` без selector и `EndpointSlice`,
+а TLS выпускается через existing `cert-manager`.
+Для `/api` используется ingress-side strip-prefix, потому что web bundle продолжает работать с `VITE_GATEWAY_BASE_URL=/api`.
 
 Подробности, TLS/domain contract и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
 Для финального live rollout используется manual workflow `Deploy Production` c GitHub Environment `production`.

@@ -131,6 +131,20 @@ jobs:
             return 1
           }
 
+          read_env_var() {
+            local file="$1"
+            local key="$2"
+            local line
+
+            line="$(grep -m1 "^${key}=" "$file" || true)"
+            if [ -z "$line" ]; then
+              echo "Переменная ${key} не найдена в ${file}" >&2
+              exit 1
+            fi
+
+            printf '%s\n' "${line#*=}"
+          }
+
           update_env_var() {
             local file="$1"
             local key="$2"
@@ -173,6 +187,15 @@ jobs:
             exit 1
           fi
 
+          shared_edge_host_ip="$(read_env_var .env.server AERO_SHARED_EDGE_HOST_IP)"
+          web_host_port="$(read_env_var .env.server AERO_WEB_HOST_PORT)"
+          gateway_host_port="$(read_env_var .env.server AERO_GATEWAY_HOST_PORT)"
+
+          if [ "$shared_edge_host_ip" = "127.0.0.1" ]; then
+            echo "AERO_SHARED_EDGE_HOST_IP не должен оставаться loopback для shared Traefik edge" >&2
+            exit 1
+          fi
+
           previous_tag="$(grep '^AERO_IMAGE_TAG=' .env.server | head -n1 | cut -d= -f2- || true)"
           echo "Текущий AERO_IMAGE_TAG: ${previous_tag:-<не задан>}"
 
@@ -203,10 +226,11 @@ jobs:
             -f "$COMPOSE_FILE" \
             ps
 
-          wait_for_url "HTTP healthz" "http://127.0.0.1/healthz"
-          wait_for_url "HTTP readyz" "http://127.0.0.1/readyz"
-          wait_for_url "HTTPS healthz" "https://${EDGE_DOMAIN}/healthz" --resolve "${EDGE_DOMAIN}:443:127.0.0.1"
-          wait_for_url "HTTPS readyz" "https://${EDGE_DOMAIN}/readyz" --resolve "${EDGE_DOMAIN}:443:127.0.0.1"
+          wait_for_url "Web upstream" "http://${shared_edge_host_ip}:${web_host_port}/"
+          wait_for_url "Gateway upstream readyz" "http://${shared_edge_host_ip}:${gateway_host_port}/readyz"
+          wait_for_url "HTTPS web root" "https://${EDGE_DOMAIN}/"
+          wait_for_url "HTTPS healthz" "https://${EDGE_DOMAIN}/healthz"
+          wait_for_url "HTTPS readyz" "https://${EDGE_DOMAIN}/readyz"
 
           if [ -n "$previous_tag" ]; then
             echo "Для rollback используй предыдущий tag: $previous_tag"
