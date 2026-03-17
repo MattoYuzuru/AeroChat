@@ -631,6 +631,11 @@ type fakeRepository struct {
 	users         map[string]UserSummary
 	friendships   map[string]bool
 	blocks        map[string]map[string]bool
+	groups        map[string]Group
+	groupMembers  map[string]map[string]GroupMember
+	groupInvites  map[string]GroupInviteLink
+	inviteHashes  map[string]string
+	inviteByHash  map[string]string
 	chats         map[string]DirectChat
 	messages      map[string]DirectChatMessage
 	readPositions map[string]DirectChatReadPosition
@@ -646,6 +651,11 @@ func newFakeRepository() *fakeRepository {
 		users:         make(map[string]UserSummary),
 		friendships:   make(map[string]bool),
 		blocks:        make(map[string]map[string]bool),
+		groups:        make(map[string]Group),
+		groupMembers:  make(map[string]map[string]GroupMember),
+		groupInvites:  make(map[string]GroupInviteLink),
+		inviteHashes:  make(map[string]string),
+		inviteByHash:  make(map[string]string),
 		chats:         make(map[string]DirectChat),
 		messages:      make(map[string]DirectChatMessage),
 		readPositions: make(map[string]DirectChatReadPosition),
@@ -849,6 +859,200 @@ func (r *fakeRepository) GetDirectChat(_ context.Context, userID string, chatID 
 
 	copy := directChat
 	return &copy, nil
+}
+
+func (r *fakeRepository) CreateGroup(_ context.Context, params CreateGroupParams) (*Group, error) {
+	group := Group{
+		ID:              params.GroupID,
+		Name:            params.Name,
+		Kind:            ChatKindGroup,
+		CreatedByUserID: params.CreatedByUserID,
+		SelfRole:        GroupMemberRoleOwner,
+		MemberCount:     1,
+		CreatedAt:       params.CreatedAt,
+		UpdatedAt:       params.CreatedAt,
+	}
+	r.groups[group.ID] = group
+	r.groupMembers[group.ID] = map[string]GroupMember{
+		params.CreatedByUserID: {
+			GroupID:  group.ID,
+			User:     r.users[params.CreatedByUserID],
+			Role:     GroupMemberRoleOwner,
+			JoinedAt: params.CreatedAt,
+		},
+	}
+
+	copy := group
+	return &copy, nil
+}
+
+func (r *fakeRepository) ListGroups(_ context.Context, userID string) ([]Group, error) {
+	result := make([]Group, 0)
+	for groupID, memberships := range r.groupMembers {
+		member, ok := memberships[userID]
+		if !ok {
+			continue
+		}
+
+		group := r.groups[groupID]
+		group.SelfRole = member.Role
+		group.MemberCount = int32(len(memberships))
+		result = append(result, group)
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) GetGroup(_ context.Context, userID string, groupID string) (*Group, error) {
+	group, ok := r.groups[groupID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	member, ok := r.groupMembers[groupID][userID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	group.SelfRole = member.Role
+	group.MemberCount = int32(len(r.groupMembers[groupID]))
+	copy := group
+	return &copy, nil
+}
+
+func (r *fakeRepository) ListGroupMembers(_ context.Context, userID string, groupID string) ([]GroupMember, error) {
+	memberships, ok := r.groupMembers[groupID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if _, ok := memberships[userID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	result := make([]GroupMember, 0, len(memberships))
+	for _, member := range memberships {
+		result = append(result, member)
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) CreateGroupInviteLink(_ context.Context, params CreateGroupInviteLinkParams) (*GroupInviteLink, error) {
+	if _, ok := r.groups[params.GroupID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	inviteLink := GroupInviteLink{
+		ID:              params.InviteLinkID,
+		GroupID:         params.GroupID,
+		CreatedByUserID: params.CreatedByUserID,
+		Role:            params.Role,
+		JoinCount:       0,
+		CreatedAt:       params.CreatedAt,
+		UpdatedAt:       params.CreatedAt,
+	}
+	r.groupInvites[inviteLink.ID] = inviteLink
+	r.inviteHashes[inviteLink.ID] = params.TokenHash
+	r.inviteByHash[params.TokenHash] = inviteLink.ID
+
+	group := r.groups[params.GroupID]
+	group.UpdatedAt = params.CreatedAt
+	r.groups[group.ID] = group
+
+	copy := inviteLink
+	return &copy, nil
+}
+
+func (r *fakeRepository) ListGroupInviteLinks(_ context.Context, groupID string) ([]GroupInviteLink, error) {
+	if _, ok := r.groups[groupID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	result := make([]GroupInviteLink, 0)
+	for _, inviteLink := range r.groupInvites {
+		if inviteLink.GroupID == groupID {
+			result = append(result, inviteLink)
+		}
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) GetGroupInviteLink(_ context.Context, groupID string, inviteLinkID string) (*GroupInviteLink, error) {
+	inviteLink, ok := r.groupInvites[inviteLinkID]
+	if !ok || inviteLink.GroupID != groupID {
+		return nil, ErrNotFound
+	}
+
+	copy := inviteLink
+	return &copy, nil
+}
+
+func (r *fakeRepository) DisableGroupInviteLink(_ context.Context, groupID string, inviteLinkID string, at time.Time) (bool, error) {
+	inviteLink, ok := r.groupInvites[inviteLinkID]
+	if !ok || inviteLink.GroupID != groupID {
+		return false, ErrNotFound
+	}
+	if inviteLink.DisabledAt != nil {
+		return false, nil
+	}
+
+	inviteLink.DisabledAt = &at
+	inviteLink.UpdatedAt = at
+	r.groupInvites[inviteLinkID] = inviteLink
+
+	group := r.groups[groupID]
+	group.UpdatedAt = at
+	r.groups[groupID] = group
+	return true, nil
+}
+
+func (r *fakeRepository) GetGroupInviteLinkForJoin(_ context.Context, tokenHash string) (*GroupInviteLinkJoinTarget, error) {
+	inviteLinkID, ok := r.inviteByHash[tokenHash]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	inviteLink := r.groupInvites[inviteLinkID]
+	group := r.groups[inviteLink.GroupID]
+	return &GroupInviteLinkJoinTarget{
+		Group:      group,
+		InviteLink: inviteLink,
+	}, nil
+}
+
+func (r *fakeRepository) JoinGroupByInviteLink(_ context.Context, groupID string, userID string, role string, inviteLinkID string, joinedAt time.Time) (bool, error) {
+	group, ok := r.groups[groupID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	inviteLink, ok := r.groupInvites[inviteLinkID]
+	if !ok || inviteLink.GroupID != groupID {
+		return false, ErrNotFound
+	}
+	if inviteLink.DisabledAt != nil {
+		return false, ErrNotFound
+	}
+	if r.groupMembers[groupID] == nil {
+		r.groupMembers[groupID] = make(map[string]GroupMember)
+	}
+	if _, ok := r.groupMembers[groupID][userID]; ok {
+		return false, nil
+	}
+
+	r.groupMembers[groupID][userID] = GroupMember{
+		GroupID:  groupID,
+		User:     r.users[userID],
+		Role:     role,
+		JoinedAt: joinedAt,
+	}
+	inviteLink.JoinCount++
+	inviteLink.LastJoinedAt = &joinedAt
+	inviteLink.UpdatedAt = joinedAt
+	r.groupInvites[inviteLinkID] = inviteLink
+
+	group.UpdatedAt = joinedAt
+	r.groups[groupID] = group
+	return true, nil
 }
 
 func (r *fakeRepository) CreateDirectChatMessage(_ context.Context, params CreateDirectChatMessageParams) (*DirectChatMessage, error) {

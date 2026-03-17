@@ -2,8 +2,13 @@ package chat
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -22,6 +27,16 @@ type Repository interface {
 	CreateDirectChat(context.Context, CreateDirectChatParams) (*DirectChat, error)
 	ListDirectChats(context.Context, string) ([]DirectChat, error)
 	GetDirectChat(context.Context, string, string) (*DirectChat, error)
+	CreateGroup(context.Context, CreateGroupParams) (*Group, error)
+	ListGroups(context.Context, string) ([]Group, error)
+	GetGroup(context.Context, string, string) (*Group, error)
+	ListGroupMembers(context.Context, string, string) ([]GroupMember, error)
+	CreateGroupInviteLink(context.Context, CreateGroupInviteLinkParams) (*GroupInviteLink, error)
+	ListGroupInviteLinks(context.Context, string) ([]GroupInviteLink, error)
+	GetGroupInviteLink(context.Context, string, string) (*GroupInviteLink, error)
+	DisableGroupInviteLink(context.Context, string, string, time.Time) (bool, error)
+	GetGroupInviteLinkForJoin(context.Context, string) (*GroupInviteLinkJoinTarget, error)
+	JoinGroupByInviteLink(context.Context, string, string, string, string, time.Time) (bool, error)
 	ListDirectChatReadStateEntries(context.Context, string, string) ([]DirectChatReadStateEntry, error)
 	ListDirectChatPresenceStateEntries(context.Context, string, string) ([]DirectChatPresenceStateEntry, error)
 	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
@@ -59,6 +74,7 @@ type Service struct {
 	sessionTouchInterval time.Duration
 	typingTTL            time.Duration
 	presenceTTL          time.Duration
+	randReader           io.Reader
 	now                  func() time.Time
 	newID                func() string
 }
@@ -88,6 +104,7 @@ func NewService(
 		sessionTouchInterval: defaultSessionTouchInterval,
 		typingTTL:            typingTTL,
 		presenceTTL:          presenceTTL,
+		randReader:           rand.Reader,
 		now: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -170,6 +187,211 @@ func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string
 	}
 
 	return directChat, readState, typingState, presenceState, nil
+}
+
+func (s *Service) CreateGroup(ctx context.Context, token string, name string) (*Group, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedName, err := normalizeGroupName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	return s.repo.CreateGroup(ctx, CreateGroupParams{
+		GroupID:         s.newID(),
+		Name:            normalizedName,
+		CreatedByUserID: authSession.User.ID,
+		CreatedAt:       now,
+	})
+}
+
+func (s *Service) ListGroups(ctx context.Context, token string) ([]Group, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.ListGroups(ctx, authSession.User.ID)
+}
+
+func (s *Service) GetGroup(ctx context.Context, token string, groupID string) (*Group, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+}
+
+func (s *Service) ListGroupMembers(ctx context.Context, token string, groupID string) ([]GroupMember, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.ListGroupMembers(ctx, authSession.User.ID, normalizedGroupID)
+}
+
+func (s *Service) CreateGroupInviteLink(ctx context.Context, token string, groupID string, role string) (*CreatedGroupInviteLink, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+	if !canManageGroupInviteLinks(group.SelfRole) {
+		return nil, fmt.Errorf("%w: invite link management requires admin or owner role", ErrPermissionDenied)
+	}
+
+	targetRole, err := normalizeGroupInviteRole(role)
+	if err != nil {
+		return nil, err
+	}
+	if !canCreateInviteForRole(group.SelfRole, targetRole) {
+		return nil, fmt.Errorf("%w: invite link role is not allowed for current actor", ErrPermissionDenied)
+	}
+
+	inviteToken, tokenHash, err := s.newGroupInviteToken()
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	inviteLink, err := s.repo.CreateGroupInviteLink(ctx, CreateGroupInviteLinkParams{
+		InviteLinkID:    s.newID(),
+		GroupID:         normalizedGroupID,
+		CreatedByUserID: authSession.User.ID,
+		Role:            targetRole,
+		TokenHash:       tokenHash,
+		CreatedAt:       now,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &CreatedGroupInviteLink{
+		InviteLink:  *inviteLink,
+		InviteToken: inviteToken,
+	}, nil
+}
+
+func (s *Service) ListGroupInviteLinks(ctx context.Context, token string, groupID string) ([]GroupInviteLink, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+	if !canManageGroupInviteLinks(group.SelfRole) {
+		return nil, fmt.Errorf("%w: invite link visibility requires admin or owner role", ErrPermissionDenied)
+	}
+
+	return s.repo.ListGroupInviteLinks(ctx, normalizedGroupID)
+}
+
+func (s *Service) DisableGroupInviteLink(ctx context.Context, token string, groupID string, inviteLinkID string) (*GroupInviteLink, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedInviteLinkID, err := normalizeID(inviteLinkID, "invite_link_id")
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+	if !canManageGroupInviteLinks(group.SelfRole) {
+		return nil, fmt.Errorf("%w: invite link management requires admin or owner role", ErrPermissionDenied)
+	}
+
+	inviteLink, err := s.repo.GetGroupInviteLink(ctx, normalizedGroupID, normalizedInviteLinkID)
+	if err != nil {
+		return nil, err
+	}
+	if !canCreateInviteForRole(group.SelfRole, inviteLink.Role) {
+		return nil, fmt.Errorf("%w: current role cannot disable this invite link", ErrPermissionDenied)
+	}
+
+	if inviteLink.DisabledAt != nil {
+		return inviteLink, nil
+	}
+
+	if _, err := s.repo.DisableGroupInviteLink(ctx, normalizedGroupID, normalizedInviteLinkID, s.now()); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetGroupInviteLink(ctx, normalizedGroupID, normalizedInviteLinkID)
+}
+
+func (s *Service) JoinGroupByInviteLink(ctx context.Context, token string, inviteToken string) (*Group, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedInviteToken, err := normalizeInviteToken(inviteToken)
+	if err != nil {
+		return nil, err
+	}
+
+	target, err := s.repo.GetGroupInviteLinkForJoin(ctx, hashInviteToken(normalizedInviteToken))
+	if err != nil {
+		return nil, err
+	}
+	if target.InviteLink.DisabledAt != nil {
+		return nil, ErrNotFound
+	}
+
+	if _, err := s.repo.JoinGroupByInviteLink(
+		ctx,
+		target.Group.ID,
+		authSession.User.ID,
+		target.InviteLink.Role,
+		target.InviteLink.ID,
+		s.now(),
+	); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetGroup(ctx, authSession.User.ID, target.Group.ID)
 }
 
 func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string) (*DirectChatMessage, error) {
@@ -581,6 +803,70 @@ func normalizeMessageText(value string) (string, error) {
 	}
 
 	return normalized, nil
+}
+
+func normalizeGroupName(value string) (string, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return "", fmt.Errorf("%w: group name cannot be empty", ErrInvalidArgument)
+	}
+	if len([]rune(normalized)) > maxGroupNameLength {
+		return "", fmt.Errorf("%w: group name is too long", ErrInvalidArgument)
+	}
+
+	return normalized, nil
+}
+
+func normalizeGroupInviteRole(value string) (string, error) {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case GroupMemberRoleAdmin:
+		return GroupMemberRoleAdmin, nil
+	case GroupMemberRoleMember:
+		return GroupMemberRoleMember, nil
+	case GroupMemberRoleReader:
+		return GroupMemberRoleReader, nil
+	default:
+		return "", fmt.Errorf("%w: invite role must be admin, member or reader", ErrInvalidArgument)
+	}
+}
+
+func normalizeInviteToken(value string) (string, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return "", fmt.Errorf("%w: invite token cannot be empty", ErrInvalidArgument)
+	}
+
+	return normalized, nil
+}
+
+func canManageGroupInviteLinks(role string) bool {
+	return role == GroupMemberRoleOwner || role == GroupMemberRoleAdmin
+}
+
+func canCreateInviteForRole(actorRole string, targetRole string) bool {
+	switch actorRole {
+	case GroupMemberRoleOwner:
+		return targetRole == GroupMemberRoleAdmin || targetRole == GroupMemberRoleMember || targetRole == GroupMemberRoleReader
+	case GroupMemberRoleAdmin:
+		return targetRole == GroupMemberRoleMember || targetRole == GroupMemberRoleReader
+	default:
+		return false
+	}
+}
+
+func (s *Service) newGroupInviteToken() (string, string, error) {
+	secret := make([]byte, 32)
+	if _, err := io.ReadFull(s.randReader, secret); err != nil {
+		return "", "", fmt.Errorf("group invite token generation: %w", err)
+	}
+
+	token := "ginv_" + base64.RawURLEncoding.EncodeToString(secret)
+	return token, hashInviteToken(token), nil
+}
+
+func hashInviteToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func normalizePageSize(value uint32) (int32, error) {

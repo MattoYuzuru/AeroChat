@@ -81,6 +81,41 @@ export interface ChatUser {
   avatarUrl: string | null;
 }
 
+export type GroupMemberRole = "owner" | "admin" | "member" | "reader";
+
+export interface Group {
+  id: string;
+  name: string;
+  kind: string;
+  selfRole: GroupMemberRole;
+  memberCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GroupMember {
+  user: ChatUser;
+  role: GroupMemberRole;
+  joinedAt: string;
+}
+
+export interface GroupInviteLink {
+  id: string;
+  groupId: string;
+  role: GroupMemberRole;
+  createdByUserId: string;
+  joinCount: number;
+  createdAt: string;
+  updatedAt: string;
+  disabledAt: string | null;
+  lastJoinedAt: string | null;
+}
+
+export interface CreatedGroupInviteLink {
+  inviteLink: GroupInviteLink;
+  inviteToken: string;
+}
+
 export interface DirectChat {
   id: string;
   kind: string;
@@ -198,6 +233,22 @@ export interface GatewayClient {
     token: string,
     target: RevokeSessionOrDeviceTarget,
   ): Promise<void>;
+  createGroup(token: string, name: string): Promise<Group>;
+  listGroups(token: string): Promise<Group[]>;
+  getGroup(token: string, groupId: string): Promise<Group>;
+  listGroupMembers(token: string, groupId: string): Promise<GroupMember[]>;
+  createGroupInviteLink(
+    token: string,
+    groupId: string,
+    role: GroupMemberRole,
+  ): Promise<CreatedGroupInviteLink>;
+  listGroupInviteLinks(token: string, groupId: string): Promise<GroupInviteLink[]>;
+  disableGroupInviteLink(
+    token: string,
+    groupId: string,
+    inviteLinkId: string,
+  ): Promise<GroupInviteLink>;
+  joinGroupByInviteLink(token: string, inviteToken: string): Promise<Group>;
   createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
   listDirectChats(token: string): Promise<DirectChat[]>;
   getDirectChat(token: string, chatId: string): Promise<DirectChatSnapshot>;

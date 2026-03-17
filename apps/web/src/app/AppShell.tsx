@@ -6,6 +6,7 @@ import styles from "./AppShell.module.css";
 const navigationItems = [
   { to: "/app/profile", label: "Профиль", meta: "identity" },
   { to: "/app/chats", label: "Чаты", meta: "direct" },
+  { to: "/app/groups", label: "Группы", meta: "group foundation" },
   { to: "/app/people", label: "Люди", meta: "social" },
   { to: "/app/settings", label: "Настройки", meta: "privacy" },
 ];
@@ -16,6 +17,7 @@ const statusItems = [
   "profile",
   "people",
   "direct chats",
+  "groups",
   "settings",
 ];
 
@@ -111,7 +113,7 @@ export function AppShell() {
               </div>
               <div>
                 <dt>Scope</dt>
-                <dd>login, register, profile, people, chats, settings</dd>
+                <dd>login, register, profile, people, chats, groups, settings</dd>
               </div>
             </dl>
           </section>

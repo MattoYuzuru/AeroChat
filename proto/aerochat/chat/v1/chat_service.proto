@@ -12,6 +12,14 @@ service ChatService {
   rpc CreateDirectChat(CreateDirectChatRequest) returns (CreateDirectChatResponse);
   rpc ListDirectChats(ListDirectChatsRequest) returns (ListDirectChatsResponse);
   rpc GetDirectChat(GetDirectChatRequest) returns (GetDirectChatResponse);
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
+  rpc GetGroup(GetGroupRequest) returns (GetGroupResponse);
+  rpc ListGroupMembers(ListGroupMembersRequest) returns (ListGroupMembersResponse);
+  rpc CreateGroupInviteLink(CreateGroupInviteLinkRequest) returns (CreateGroupInviteLinkResponse);
+  rpc ListGroupInviteLinks(ListGroupInviteLinksRequest) returns (ListGroupInviteLinksResponse);
+  rpc DisableGroupInviteLink(DisableGroupInviteLinkRequest) returns (DisableGroupInviteLinkResponse);
+  rpc JoinGroupByInviteLink(JoinGroupByInviteLinkRequest) returns (JoinGroupByInviteLinkResponse);
   rpc MarkDirectChatRead(MarkDirectChatReadRequest) returns (MarkDirectChatReadResponse);
   rpc SetDirectChatTyping(SetDirectChatTypingRequest) returns (SetDirectChatTypingResponse);
   rpc ClearDirectChatTyping(ClearDirectChatTypingRequest) returns (ClearDirectChatTypingResponse);
@@ -27,6 +35,7 @@ service ChatService {
 enum ChatKind {
   CHAT_KIND_UNSPECIFIED = 0;
   CHAT_KIND_DIRECT = 1;
+  CHAT_KIND_GROUP = 2;
 }
 
 enum MessageKind {
@@ -37,6 +46,14 @@ enum MessageKind {
 enum MarkdownPolicy {
   MARKDOWN_POLICY_UNSPECIFIED = 0;
   MARKDOWN_POLICY_SAFE_SUBSET_V1 = 1;
+}
+
+enum GroupMemberRole {
+  GROUP_MEMBER_ROLE_UNSPECIFIED = 0;
+  GROUP_MEMBER_ROLE_OWNER = 1;
+  GROUP_MEMBER_ROLE_ADMIN = 2;
+  GROUP_MEMBER_ROLE_MEMBER = 3;
+  GROUP_MEMBER_ROLE_READER = 4;
 }
 
 message ChatUser {
@@ -53,6 +70,34 @@ message DirectChat {
   repeated string pinned_message_ids = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+}
+
+message Group {
+  string id = 1;
+  string name = 2;
+  ChatKind kind = 3;
+  GroupMemberRole self_role = 4;
+  uint32 member_count = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message GroupMember {
+  ChatUser user = 1;
+  GroupMemberRole role = 2;
+  google.protobuf.Timestamp joined_at = 3;
+}
+
+message GroupInviteLink {
+  string id = 1;
+  string group_id = 2;
+  GroupMemberRole role = 3;
+  string created_by_user_id = 4;
+  uint32 join_count = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp disabled_at = 8;
+  google.protobuf.Timestamp last_joined_at = 9;
 }
 
 message TextMessageContent {
@@ -137,6 +182,71 @@ message GetDirectChatResponse {
   DirectChatReadState read_state = 2;
   DirectChatTypingState typing_state = 3;
   DirectChatPresenceState presence_state = 4;
+}
+
+message CreateGroupRequest {
+  string name = 1;
+}
+
+message CreateGroupResponse {
+  Group group = 1;
+}
+
+message ListGroupsRequest {}
+
+message ListGroupsResponse {
+  repeated Group groups = 1;
+}
+
+message GetGroupRequest {
+  string group_id = 1;
+}
+
+message GetGroupResponse {
+  Group group = 1;
+}
+
+message ListGroupMembersRequest {
+  string group_id = 1;
+}
+
+message ListGroupMembersResponse {
+  repeated GroupMember members = 1;
+}
+
+message CreateGroupInviteLinkRequest {
+  string group_id = 1;
+  GroupMemberRole role = 2;
+}
+
+message CreateGroupInviteLinkResponse {
+  GroupInviteLink invite_link = 1;
+  string invite_token = 2;
+}
+
+message ListGroupInviteLinksRequest {
+  string group_id = 1;
+}
+
+message ListGroupInviteLinksResponse {
+  repeated GroupInviteLink invite_links = 1;
+}
+
+message DisableGroupInviteLinkRequest {
+  string group_id = 1;
+  string invite_link_id = 2;
+}
+
+message DisableGroupInviteLinkResponse {
+  GroupInviteLink invite_link = 1;
+}
+
+message JoinGroupByInviteLinkRequest {
+  string invite_token = 1;
+}
+
+message JoinGroupByInviteLinkResponse {
+  Group group = 1;
 }
 
 message MarkDirectChatReadRequest {

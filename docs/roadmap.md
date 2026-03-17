@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] direct chat typing/presence realtime fan-out через `aero-gateway`
+- [x] groups foundation через `aero-chat`, `aero-gateway` и `apps/web`
 
 ---
 
@@ -109,10 +109,10 @@
 
 Задачи:
 
-- [ ] Group creation
-- [ ] Group roles
-- [ ] Invite links
-- [ ] Admin/member/reader
+- [x] Group creation
+- [x] Group roles
+- [x] Invite links
+- [x] Admin/member/reader
 - [ ] Promote/demote
 - [ ] Group permissions
 - [ ] Max groups per user rules

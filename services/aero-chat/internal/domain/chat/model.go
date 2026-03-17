@@ -4,11 +4,17 @@ import "time"
 
 const (
 	ChatKindDirect                   = "direct"
+	ChatKindGroup                    = "group"
 	MessageKindText                  = "text"
 	MarkdownPolicySafeSubsetV1       = "safe_subset_v1"
+	GroupMemberRoleOwner             = "owner"
+	GroupMemberRoleAdmin             = "admin"
+	GroupMemberRoleMember            = "member"
+	GroupMemberRoleReader            = "reader"
 	defaultMessagePageSize     int32 = 50
 	maxMessagePageSize         int32 = 200
 	maxTextMessageLength             = 4000
+	maxGroupNameLength               = 80
 )
 
 type UserSummary struct {
@@ -53,6 +59,46 @@ type DirectChat struct {
 	PinnedMessageIDs []string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+}
+
+type Group struct {
+	ID              string
+	Name            string
+	Kind            string
+	CreatedByUserID string
+	SelfRole        string
+	MemberCount     int32
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type GroupMember struct {
+	GroupID  string
+	User     UserSummary
+	Role     string
+	JoinedAt time.Time
+}
+
+type GroupInviteLink struct {
+	ID              string
+	GroupID         string
+	CreatedByUserID string
+	Role            string
+	JoinCount       int32
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DisabledAt      *time.Time
+	LastJoinedAt    *time.Time
+}
+
+type CreatedGroupInviteLink struct {
+	InviteLink  GroupInviteLink
+	InviteToken string
+}
+
+type GroupInviteLinkJoinTarget struct {
+	Group      Group
+	InviteLink GroupInviteLink
 }
 
 type TextMessageContent struct {
@@ -134,6 +180,22 @@ type CreateDirectChatParams struct {
 	CreatedByUserID string
 	FirstUserID     string
 	SecondUserID    string
+	CreatedAt       time.Time
+}
+
+type CreateGroupParams struct {
+	GroupID         string
+	Name            string
+	CreatedByUserID string
+	CreatedAt       time.Time
+}
+
+type CreateGroupInviteLinkParams struct {
+	InviteLinkID    string
+	GroupID         string
+	CreatedByUserID string
+	Role            string
+	TokenHash       string
 	CreatedAt       time.Time
 }
 

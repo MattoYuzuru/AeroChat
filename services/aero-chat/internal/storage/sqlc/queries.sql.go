@@ -31,6 +31,32 @@ func (q *Queries) AddDirectChatParticipant(ctx context.Context, arg AddDirectCha
 	return err
 }
 
+const addGroupMembership = `-- name: AddGroupMembership :exec
+INSERT INTO group_memberships (
+    group_id,
+    user_id,
+    role,
+    joined_at
+) VALUES ($1, $2, $3, $4)
+`
+
+type AddGroupMembershipParams struct {
+	GroupID  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID   uuid.UUID          `db:"user_id" json:"user_id"`
+	Role     string             `db:"role" json:"role"`
+	JoinedAt pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+}
+
+func (q *Queries) AddGroupMembership(ctx context.Context, arg AddGroupMembershipParams) error {
+	_, err := q.db.Exec(ctx, addGroupMembership,
+		arg.GroupID,
+		arg.UserID,
+		arg.Role,
+		arg.JoinedAt,
+	)
+	return err
+}
+
 const createDirectChat = `-- name: CreateDirectChat :one
 INSERT INTO direct_chats (
     id,
@@ -147,6 +173,127 @@ func (q *Queries) CreateDirectChatMessageTombstone(ctx context.Context, arg Crea
 		arg.DeletedByUserID,
 		arg.DeletedAt,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const createGroup = `-- name: CreateGroup :one
+INSERT INTO groups (
+    id,
+    name,
+    created_by_user_id,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+RETURNING id, name, created_by_user_id, created_at, updated_at
+`
+
+type CreateGroupParams struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	Name            string             `db:"name" json:"name"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error) {
+	row := q.db.QueryRow(ctx, createGroup,
+		arg.ID,
+		arg.Name,
+		arg.CreatedByUserID,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i Group
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedByUserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createGroupInviteLink = `-- name: CreateGroupInviteLink :one
+INSERT INTO group_invite_links (
+    id,
+    group_id,
+    created_by_user_id,
+    role,
+    token_hash,
+    join_count,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, 0, $6, $7)
+RETURNING id, group_id, created_by_user_id, role, join_count, created_at, updated_at, disabled_at, last_joined_at
+`
+
+type CreateGroupInviteLinkParams struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	GroupID         uuid.UUID          `db:"group_id" json:"group_id"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	Role            string             `db:"role" json:"role"`
+	TokenHash       string             `db:"token_hash" json:"token_hash"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type CreateGroupInviteLinkRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	GroupID         uuid.UUID          `db:"group_id" json:"group_id"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	Role            string             `db:"role" json:"role"`
+	JoinCount       int32              `db:"join_count" json:"join_count"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DisabledAt      pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
+	LastJoinedAt    pgtype.Timestamptz `db:"last_joined_at" json:"last_joined_at"`
+}
+
+func (q *Queries) CreateGroupInviteLink(ctx context.Context, arg CreateGroupInviteLinkParams) (CreateGroupInviteLinkRow, error) {
+	row := q.db.QueryRow(ctx, createGroupInviteLink,
+		arg.ID,
+		arg.GroupID,
+		arg.CreatedByUserID,
+		arg.Role,
+		arg.TokenHash,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i CreateGroupInviteLinkRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.CreatedByUserID,
+		&i.Role,
+		&i.JoinCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DisabledAt,
+		&i.LastJoinedAt,
+	)
+	return i, err
+}
+
+const disableGroupInviteLink = `-- name: DisableGroupInviteLink :execrows
+UPDATE group_invite_links
+SET
+    disabled_at = $3,
+    updated_at = $3
+WHERE group_id = $1 AND id = $2 AND disabled_at IS NULL
+`
+
+type DisableGroupInviteLinkParams struct {
+	GroupID    uuid.UUID          `db:"group_id" json:"group_id"`
+	ID         uuid.UUID          `db:"id" json:"id"`
+	DisabledAt pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
+}
+
+func (q *Queries) DisableGroupInviteLink(ctx context.Context, arg DisableGroupInviteLinkParams) (int64, error) {
+	result, err := q.db.Exec(ctx, disableGroupInviteLink, arg.GroupID, arg.ID, arg.DisabledAt)
 	if err != nil {
 		return 0, err
 	}
@@ -343,6 +490,158 @@ func (q *Queries) GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDir
 	return items, nil
 }
 
+const getGroupInviteLinkByIDAndGroupID = `-- name: GetGroupInviteLinkByIDAndGroupID :one
+SELECT
+    id,
+    group_id,
+    created_by_user_id,
+    role,
+    join_count,
+    created_at,
+    updated_at,
+    disabled_at,
+    last_joined_at
+FROM group_invite_links
+WHERE group_id = $1 AND id = $2
+`
+
+type GetGroupInviteLinkByIDAndGroupIDParams struct {
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+	ID      uuid.UUID `db:"id" json:"id"`
+}
+
+type GetGroupInviteLinkByIDAndGroupIDRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	GroupID         uuid.UUID          `db:"group_id" json:"group_id"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	Role            string             `db:"role" json:"role"`
+	JoinCount       int32              `db:"join_count" json:"join_count"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DisabledAt      pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
+	LastJoinedAt    pgtype.Timestamptz `db:"last_joined_at" json:"last_joined_at"`
+}
+
+func (q *Queries) GetGroupInviteLinkByIDAndGroupID(ctx context.Context, arg GetGroupInviteLinkByIDAndGroupIDParams) (GetGroupInviteLinkByIDAndGroupIDRow, error) {
+	row := q.db.QueryRow(ctx, getGroupInviteLinkByIDAndGroupID, arg.GroupID, arg.ID)
+	var i GetGroupInviteLinkByIDAndGroupIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.CreatedByUserID,
+		&i.Role,
+		&i.JoinCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DisabledAt,
+		&i.LastJoinedAt,
+	)
+	return i, err
+}
+
+const getGroupInviteLinkForJoin = `-- name: GetGroupInviteLinkForJoin :one
+SELECT
+    l.id,
+    l.group_id,
+    l.created_by_user_id,
+    l.role,
+    l.join_count,
+    l.created_at,
+    l.updated_at,
+    l.disabled_at,
+    l.last_joined_at,
+    g.name AS group_name,
+    g.created_by_user_id AS group_created_by_user_id,
+    g.created_at AS group_created_at,
+    g.updated_at AS group_updated_at
+FROM group_invite_links AS l
+JOIN groups AS g ON g.id = l.group_id
+WHERE l.token_hash = $1
+`
+
+type GetGroupInviteLinkForJoinRow struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	GroupID              uuid.UUID          `db:"group_id" json:"group_id"`
+	CreatedByUserID      uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	Role                 string             `db:"role" json:"role"`
+	JoinCount            int32              `db:"join_count" json:"join_count"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DisabledAt           pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
+	LastJoinedAt         pgtype.Timestamptz `db:"last_joined_at" json:"last_joined_at"`
+	GroupName            string             `db:"group_name" json:"group_name"`
+	GroupCreatedByUserID uuid.UUID          `db:"group_created_by_user_id" json:"group_created_by_user_id"`
+	GroupCreatedAt       pgtype.Timestamptz `db:"group_created_at" json:"group_created_at"`
+	GroupUpdatedAt       pgtype.Timestamptz `db:"group_updated_at" json:"group_updated_at"`
+}
+
+func (q *Queries) GetGroupInviteLinkForJoin(ctx context.Context, tokenHash string) (GetGroupInviteLinkForJoinRow, error) {
+	row := q.db.QueryRow(ctx, getGroupInviteLinkForJoin, tokenHash)
+	var i GetGroupInviteLinkForJoinRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.CreatedByUserID,
+		&i.Role,
+		&i.JoinCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DisabledAt,
+		&i.LastJoinedAt,
+		&i.GroupName,
+		&i.GroupCreatedByUserID,
+		&i.GroupCreatedAt,
+		&i.GroupUpdatedAt,
+	)
+	return i, err
+}
+
+const getGroupRowByIDAndUserID = `-- name: GetGroupRowByIDAndUserID :one
+SELECT
+    g.id,
+    g.name,
+    g.created_by_user_id,
+    self.role AS self_role,
+    g.created_at,
+    g.updated_at,
+    COUNT(m.user_id)::INT AS member_count
+FROM group_memberships AS self
+JOIN groups AS g ON g.id = self.group_id
+JOIN group_memberships AS m ON m.group_id = g.id
+WHERE self.user_id = $1 AND g.id = $2
+GROUP BY g.id, g.name, g.created_by_user_id, self.role, g.created_at, g.updated_at
+`
+
+type GetGroupRowByIDAndUserIDParams struct {
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+	ID     uuid.UUID `db:"id" json:"id"`
+}
+
+type GetGroupRowByIDAndUserIDRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	Name            string             `db:"name" json:"name"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	SelfRole        string             `db:"self_role" json:"self_role"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	MemberCount     int32              `db:"member_count" json:"member_count"`
+}
+
+func (q *Queries) GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowByIDAndUserIDParams) (GetGroupRowByIDAndUserIDRow, error) {
+	row := q.db.QueryRow(ctx, getGroupRowByIDAndUserID, arg.UserID, arg.ID)
+	var i GetGroupRowByIDAndUserIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedByUserID,
+		&i.SelfRole,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.MemberCount,
+	)
+	return i, err
+}
+
 const getSessionAuthByID = `-- name: GetSessionAuthByID :one
 SELECT
     s.id AS session_id,
@@ -426,6 +725,36 @@ func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSess
 		&i.UserUpdatedAt,
 	)
 	return i, err
+}
+
+const joinGroupMembership = `-- name: JoinGroupMembership :execrows
+INSERT INTO group_memberships (
+    group_id,
+    user_id,
+    role,
+    joined_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (group_id, user_id) DO NOTHING
+`
+
+type JoinGroupMembershipParams struct {
+	GroupID  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID   uuid.UUID          `db:"user_id" json:"user_id"`
+	Role     string             `db:"role" json:"role"`
+	JoinedAt pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+}
+
+func (q *Queries) JoinGroupMembership(ctx context.Context, arg JoinGroupMembershipParams) (int64, error) {
+	result, err := q.db.Exec(ctx, joinGroupMembership,
+		arg.GroupID,
+		arg.UserID,
+		arg.Role,
+		arg.JoinedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const listDirectChatMessages = `-- name: ListDirectChatMessages :many
@@ -705,6 +1034,187 @@ func (q *Queries) ListDirectChatTypingStateEntries(ctx context.Context, arg List
 	return items, nil
 }
 
+const listGroupInviteLinksByGroupID = `-- name: ListGroupInviteLinksByGroupID :many
+SELECT
+    id,
+    group_id,
+    created_by_user_id,
+    role,
+    join_count,
+    created_at,
+    updated_at,
+    disabled_at,
+    last_joined_at
+FROM group_invite_links
+WHERE group_id = $1
+ORDER BY created_at DESC, id DESC
+`
+
+type ListGroupInviteLinksByGroupIDRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	GroupID         uuid.UUID          `db:"group_id" json:"group_id"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	Role            string             `db:"role" json:"role"`
+	JoinCount       int32              `db:"join_count" json:"join_count"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DisabledAt      pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
+	LastJoinedAt    pgtype.Timestamptz `db:"last_joined_at" json:"last_joined_at"`
+}
+
+func (q *Queries) ListGroupInviteLinksByGroupID(ctx context.Context, groupID uuid.UUID) ([]ListGroupInviteLinksByGroupIDRow, error) {
+	rows, err := q.db.Query(ctx, listGroupInviteLinksByGroupID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGroupInviteLinksByGroupIDRow
+	for rows.Next() {
+		var i ListGroupInviteLinksByGroupIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GroupID,
+			&i.CreatedByUserID,
+			&i.Role,
+			&i.JoinCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DisabledAt,
+			&i.LastJoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupMemberRowsByGroupIDAndUserID = `-- name: ListGroupMemberRowsByGroupIDAndUserID :many
+SELECT
+    m.group_id,
+    m.user_id,
+    m.role,
+    m.joined_at,
+    u.login,
+    u.nickname,
+    u.avatar_url
+FROM group_memberships AS self
+JOIN group_memberships AS m ON m.group_id = self.group_id
+JOIN users AS u ON u.id = m.user_id
+WHERE self.user_id = $1 AND self.group_id = $2
+ORDER BY
+    CASE m.role
+        WHEN 'owner' THEN 0
+        WHEN 'admin' THEN 1
+        WHEN 'member' THEN 2
+        WHEN 'reader' THEN 3
+        ELSE 4
+    END,
+    m.joined_at ASC,
+    m.user_id ASC
+`
+
+type ListGroupMemberRowsByGroupIDAndUserIDParams struct {
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+}
+
+type ListGroupMemberRowsByGroupIDAndUserIDRow struct {
+	GroupID   uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	Role      string             `db:"role" json:"role"`
+	JoinedAt  pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	Login     string             `db:"login" json:"login"`
+	Nickname  string             `db:"nickname" json:"nickname"`
+	AvatarUrl pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+}
+
+func (q *Queries) ListGroupMemberRowsByGroupIDAndUserID(ctx context.Context, arg ListGroupMemberRowsByGroupIDAndUserIDParams) ([]ListGroupMemberRowsByGroupIDAndUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listGroupMemberRowsByGroupIDAndUserID, arg.UserID, arg.GroupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGroupMemberRowsByGroupIDAndUserIDRow
+	for rows.Next() {
+		var i ListGroupMemberRowsByGroupIDAndUserIDRow
+		if err := rows.Scan(
+			&i.GroupID,
+			&i.UserID,
+			&i.Role,
+			&i.JoinedAt,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupRowsByUserID = `-- name: ListGroupRowsByUserID :many
+SELECT
+    g.id,
+    g.name,
+    g.created_by_user_id,
+    self.role AS self_role,
+    g.created_at,
+    g.updated_at,
+    COUNT(m.user_id)::INT AS member_count
+FROM group_memberships AS self
+JOIN groups AS g ON g.id = self.group_id
+JOIN group_memberships AS m ON m.group_id = g.id
+WHERE self.user_id = $1
+GROUP BY g.id, g.name, g.created_by_user_id, self.role, g.created_at, g.updated_at
+ORDER BY g.updated_at DESC, g.id DESC
+`
+
+type ListGroupRowsByUserIDRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	Name            string             `db:"name" json:"name"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	SelfRole        string             `db:"self_role" json:"self_role"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	MemberCount     int32              `db:"member_count" json:"member_count"`
+}
+
+func (q *Queries) ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) ([]ListGroupRowsByUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listGroupRowsByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGroupRowsByUserIDRow
+	for rows.Next() {
+		var i ListGroupRowsByUserIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.CreatedByUserID,
+			&i.SelfRole,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.MemberCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPinnedMessageIDsByChatID = `-- name: ListPinnedMessageIDsByChatID :many
 SELECT message_id
 FROM direct_chat_pins
@@ -791,6 +1301,41 @@ type TouchDirectChatUpdatedAtParams struct {
 
 func (q *Queries) TouchDirectChatUpdatedAt(ctx context.Context, arg TouchDirectChatUpdatedAtParams) error {
 	_, err := q.db.Exec(ctx, touchDirectChatUpdatedAt, arg.ID, arg.UpdatedAt)
+	return err
+}
+
+const touchGroupInviteLinkJoin = `-- name: TouchGroupInviteLinkJoin :exec
+UPDATE group_invite_links
+SET
+    join_count = join_count + 1,
+    last_joined_at = $2,
+    updated_at = $2
+WHERE id = $1
+`
+
+type TouchGroupInviteLinkJoinParams struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	LastJoinedAt pgtype.Timestamptz `db:"last_joined_at" json:"last_joined_at"`
+}
+
+func (q *Queries) TouchGroupInviteLinkJoin(ctx context.Context, arg TouchGroupInviteLinkJoinParams) error {
+	_, err := q.db.Exec(ctx, touchGroupInviteLinkJoin, arg.ID, arg.LastJoinedAt)
+	return err
+}
+
+const touchGroupUpdatedAt = `-- name: TouchGroupUpdatedAt :exec
+UPDATE groups
+SET updated_at = $2
+WHERE id = $1
+`
+
+type TouchGroupUpdatedAtParams struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) TouchGroupUpdatedAt(ctx context.Context, arg TouchGroupUpdatedAtParams) error {
+	_, err := q.db.Exec(ctx, touchGroupUpdatedAt, arg.ID, arg.UpdatedAt)
 	return err
 }
 

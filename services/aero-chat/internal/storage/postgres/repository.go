@@ -184,6 +184,333 @@ func (r *Repository) GetDirectChat(ctx context.Context, userID string, chatID st
 	return &chats[0], nil
 }
 
+func (r *Repository) CreateGroup(ctx context.Context, params chat.CreateGroupParams) (*chat.Group, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	groupID := mustParseUUID(params.GroupID)
+	createdByUserID := mustParseUUID(params.CreatedByUserID)
+	if _, err := q.CreateGroup(ctx, chatsqlc.CreateGroupParams{
+		ID:              groupID,
+		Name:            params.Name,
+		CreatedByUserID: createdByUserID,
+		CreatedAt:       timestamptzValue(params.CreatedAt),
+		UpdatedAt:       timestamptzValue(params.CreatedAt),
+	}); err != nil {
+		return nil, convertError(err)
+	}
+
+	if err := q.AddGroupMembership(ctx, chatsqlc.AddGroupMembershipParams{
+		GroupID:  groupID,
+		UserID:   createdByUserID,
+		Role:     chat.GroupMemberRoleOwner,
+		JoinedAt: timestamptzValue(params.CreatedAt),
+	}); err != nil {
+		return nil, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return r.GetGroup(ctx, params.CreatedByUserID, params.GroupID)
+}
+
+func (r *Repository) ListGroups(ctx context.Context, userID string) ([]chat.Group, error) {
+	rows, err := r.queries.ListGroupRowsByUserID(ctx, mustParseUUID(userID))
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.Group, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, chat.Group{
+			ID:              row.ID.String(),
+			Name:            row.Name,
+			Kind:            chat.ChatKindGroup,
+			CreatedByUserID: row.CreatedByUserID.String(),
+			SelfRole:        row.SelfRole,
+			MemberCount:     row.MemberCount,
+			CreatedAt:       timestampValue(row.CreatedAt),
+			UpdatedAt:       timestampValue(row.UpdatedAt),
+		})
+	}
+
+	return result, nil
+}
+
+func (r *Repository) GetGroup(ctx context.Context, userID string, groupID string) (*chat.Group, error) {
+	row, err := r.queries.GetGroupRowByIDAndUserID(ctx, chatsqlc.GetGroupRowByIDAndUserIDParams{
+		UserID: mustParseUUID(userID),
+		ID:     mustParseUUID(groupID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	group := &chat.Group{
+		ID:              row.ID.String(),
+		Name:            row.Name,
+		Kind:            chat.ChatKindGroup,
+		CreatedByUserID: row.CreatedByUserID.String(),
+		SelfRole:        row.SelfRole,
+		MemberCount:     row.MemberCount,
+		CreatedAt:       timestampValue(row.CreatedAt),
+		UpdatedAt:       timestampValue(row.UpdatedAt),
+	}
+	return group, nil
+}
+
+func (r *Repository) ListGroupMembers(ctx context.Context, userID string, groupID string) ([]chat.GroupMember, error) {
+	rows, err := r.queries.ListGroupMemberRowsByGroupIDAndUserID(ctx, chatsqlc.ListGroupMemberRowsByGroupIDAndUserIDParams{
+		UserID:  mustParseUUID(userID),
+		GroupID: mustParseUUID(groupID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.GroupMember, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, chat.GroupMember{
+			GroupID: row.GroupID.String(),
+			User: chat.UserSummary{
+				ID:        row.UserID.String(),
+				Login:     row.Login,
+				Nickname:  row.Nickname,
+				AvatarURL: textPointer(row.AvatarUrl),
+			},
+			Role:     row.Role,
+			JoinedAt: timestampValue(row.JoinedAt),
+		})
+	}
+
+	return result, nil
+}
+
+func (r *Repository) CreateGroupInviteLink(ctx context.Context, params chat.CreateGroupInviteLinkParams) (*chat.GroupInviteLink, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	row, err := q.CreateGroupInviteLink(ctx, chatsqlc.CreateGroupInviteLinkParams{
+		ID:              mustParseUUID(params.InviteLinkID),
+		GroupID:         mustParseUUID(params.GroupID),
+		CreatedByUserID: mustParseUUID(params.CreatedByUserID),
+		Role:            params.Role,
+		TokenHash:       params.TokenHash,
+		CreatedAt:       timestamptzValue(params.CreatedAt),
+		UpdatedAt:       timestamptzValue(params.CreatedAt),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(params.GroupID),
+		UpdatedAt: timestamptzValue(params.CreatedAt),
+	}); err != nil {
+		return nil, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	inviteLink := chat.GroupInviteLink{
+		ID:              row.ID.String(),
+		GroupID:         row.GroupID.String(),
+		CreatedByUserID: row.CreatedByUserID.String(),
+		Role:            row.Role,
+		JoinCount:       row.JoinCount,
+		CreatedAt:       timestampValue(row.CreatedAt),
+		UpdatedAt:       timestampValue(row.UpdatedAt),
+		DisabledAt:      timestamptzPointer(row.DisabledAt),
+		LastJoinedAt:    timestamptzPointer(row.LastJoinedAt),
+	}
+	return &inviteLink, nil
+}
+
+func (r *Repository) ListGroupInviteLinks(ctx context.Context, groupID string) ([]chat.GroupInviteLink, error) {
+	rows, err := r.queries.ListGroupInviteLinksByGroupID(ctx, mustParseUUID(groupID))
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.GroupInviteLink, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, chat.GroupInviteLink{
+			ID:              row.ID.String(),
+			GroupID:         row.GroupID.String(),
+			CreatedByUserID: row.CreatedByUserID.String(),
+			Role:            row.Role,
+			JoinCount:       row.JoinCount,
+			CreatedAt:       timestampValue(row.CreatedAt),
+			UpdatedAt:       timestampValue(row.UpdatedAt),
+			DisabledAt:      timestamptzPointer(row.DisabledAt),
+			LastJoinedAt:    timestamptzPointer(row.LastJoinedAt),
+		})
+	}
+
+	return result, nil
+}
+
+func (r *Repository) GetGroupInviteLink(ctx context.Context, groupID string, inviteLinkID string) (*chat.GroupInviteLink, error) {
+	row, err := r.queries.GetGroupInviteLinkByIDAndGroupID(ctx, chatsqlc.GetGroupInviteLinkByIDAndGroupIDParams{
+		GroupID: mustParseUUID(groupID),
+		ID:      mustParseUUID(inviteLinkID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	inviteLink := &chat.GroupInviteLink{
+		ID:              row.ID.String(),
+		GroupID:         row.GroupID.String(),
+		CreatedByUserID: row.CreatedByUserID.String(),
+		Role:            row.Role,
+		JoinCount:       row.JoinCount,
+		CreatedAt:       timestampValue(row.CreatedAt),
+		UpdatedAt:       timestampValue(row.UpdatedAt),
+		DisabledAt:      timestamptzPointer(row.DisabledAt),
+		LastJoinedAt:    timestamptzPointer(row.LastJoinedAt),
+	}
+	return inviteLink, nil
+}
+
+func (r *Repository) DisableGroupInviteLink(ctx context.Context, groupID string, inviteLinkID string, at time.Time) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	affected, err := q.DisableGroupInviteLink(ctx, chatsqlc.DisableGroupInviteLinkParams{
+		GroupID:    mustParseUUID(groupID),
+		ID:         mustParseUUID(inviteLinkID),
+		DisabledAt: timestamptzValue(at),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(groupID),
+		UpdatedAt: timestamptzValue(at),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+	return true, nil
+}
+
+func (r *Repository) GetGroupInviteLinkForJoin(ctx context.Context, tokenHash string) (*chat.GroupInviteLinkJoinTarget, error) {
+	row, err := r.queries.GetGroupInviteLinkForJoin(ctx, tokenHash)
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	return &chat.GroupInviteLinkJoinTarget{
+		Group: chat.Group{
+			ID:              row.GroupID.String(),
+			Name:            row.GroupName,
+			Kind:            chat.ChatKindGroup,
+			CreatedByUserID: row.GroupCreatedByUserID.String(),
+			CreatedAt:       timestampValue(row.GroupCreatedAt),
+			UpdatedAt:       timestampValue(row.GroupUpdatedAt),
+		},
+		InviteLink: chat.GroupInviteLink{
+			ID:              row.ID.String(),
+			GroupID:         row.GroupID.String(),
+			CreatedByUserID: row.CreatedByUserID.String(),
+			Role:            row.Role,
+			JoinCount:       row.JoinCount,
+			CreatedAt:       timestampValue(row.CreatedAt),
+			UpdatedAt:       timestampValue(row.UpdatedAt),
+			DisabledAt:      timestamptzPointer(row.DisabledAt),
+			LastJoinedAt:    timestamptzPointer(row.LastJoinedAt),
+		},
+	}, nil
+}
+
+func (r *Repository) JoinGroupByInviteLink(ctx context.Context, groupID string, userID string, role string, inviteLinkID string, joinedAt time.Time) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	link, err := q.GetGroupInviteLinkByIDAndGroupID(ctx, chatsqlc.GetGroupInviteLinkByIDAndGroupIDParams{
+		GroupID: mustParseUUID(groupID),
+		ID:      mustParseUUID(inviteLinkID),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if link.DisabledAt.Valid {
+		return false, chat.ErrNotFound
+	}
+
+	affected, err := q.JoinGroupMembership(ctx, chatsqlc.JoinGroupMembershipParams{
+		GroupID:  mustParseUUID(groupID),
+		UserID:   mustParseUUID(userID),
+		Role:     role,
+		JoinedAt: timestamptzValue(joinedAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchGroupInviteLinkJoin(ctx, chatsqlc.TouchGroupInviteLinkJoinParams{
+		ID:           mustParseUUID(inviteLinkID),
+		LastJoinedAt: timestamptzValue(joinedAt),
+	}); err != nil {
+		return false, convertError(err)
+	}
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(groupID),
+		UpdatedAt: timestamptzValue(joinedAt),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+	return true, nil
+}
+
 func (r *Repository) ListDirectChatReadStateEntries(ctx context.Context, userID string, chatID string) ([]chat.DirectChatReadStateEntry, error) {
 	rows, err := r.queries.ListDirectChatReadStateEntries(ctx, chatsqlc.ListDirectChatReadStateEntriesParams{
 		UserID: mustParseUUID(userID),

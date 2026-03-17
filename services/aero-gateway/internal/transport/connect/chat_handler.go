@@ -62,6 +62,38 @@ func (h *ChatHandler) GetDirectChat(ctx context.Context, req *connect.Request[ch
 	return forwardUnary(ctx, req, h.client.GetDirectChat)
 }
 
+func (h *ChatHandler) CreateGroup(ctx context.Context, req *connect.Request[chatv1.CreateGroupRequest]) (*connect.Response[chatv1.CreateGroupResponse], error) {
+	return forwardUnary(ctx, req, h.client.CreateGroup)
+}
+
+func (h *ChatHandler) ListGroups(ctx context.Context, req *connect.Request[chatv1.ListGroupsRequest]) (*connect.Response[chatv1.ListGroupsResponse], error) {
+	return forwardUnary(ctx, req, h.client.ListGroups)
+}
+
+func (h *ChatHandler) GetGroup(ctx context.Context, req *connect.Request[chatv1.GetGroupRequest]) (*connect.Response[chatv1.GetGroupResponse], error) {
+	return forwardUnary(ctx, req, h.client.GetGroup)
+}
+
+func (h *ChatHandler) ListGroupMembers(ctx context.Context, req *connect.Request[chatv1.ListGroupMembersRequest]) (*connect.Response[chatv1.ListGroupMembersResponse], error) {
+	return forwardUnary(ctx, req, h.client.ListGroupMembers)
+}
+
+func (h *ChatHandler) CreateGroupInviteLink(ctx context.Context, req *connect.Request[chatv1.CreateGroupInviteLinkRequest]) (*connect.Response[chatv1.CreateGroupInviteLinkResponse], error) {
+	return forwardUnary(ctx, req, h.client.CreateGroupInviteLink)
+}
+
+func (h *ChatHandler) ListGroupInviteLinks(ctx context.Context, req *connect.Request[chatv1.ListGroupInviteLinksRequest]) (*connect.Response[chatv1.ListGroupInviteLinksResponse], error) {
+	return forwardUnary(ctx, req, h.client.ListGroupInviteLinks)
+}
+
+func (h *ChatHandler) DisableGroupInviteLink(ctx context.Context, req *connect.Request[chatv1.DisableGroupInviteLinkRequest]) (*connect.Response[chatv1.DisableGroupInviteLinkResponse], error) {
+	return forwardUnary(ctx, req, h.client.DisableGroupInviteLink)
+}
+
+func (h *ChatHandler) JoinGroupByInviteLink(ctx context.Context, req *connect.Request[chatv1.JoinGroupByInviteLinkRequest]) (*connect.Response[chatv1.JoinGroupByInviteLinkResponse], error) {
+	return forwardUnary(ctx, req, h.client.JoinGroupByInviteLink)
+}
+
 func (h *ChatHandler) MarkDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkDirectChatReadRequest]) (*connect.Response[chatv1.MarkDirectChatReadResponse], error) {
 	response, err := forwardUnary(ctx, req, h.client.MarkDirectChatRead)
 	if err != nil {

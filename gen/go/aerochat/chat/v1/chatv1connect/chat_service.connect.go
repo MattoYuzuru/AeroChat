@@ -44,6 +44,27 @@ const (
 	// ChatServiceGetDirectChatProcedure is the fully-qualified name of the ChatService's GetDirectChat
 	// RPC.
 	ChatServiceGetDirectChatProcedure = "/aerochat.chat.v1.ChatService/GetDirectChat"
+	// ChatServiceCreateGroupProcedure is the fully-qualified name of the ChatService's CreateGroup RPC.
+	ChatServiceCreateGroupProcedure = "/aerochat.chat.v1.ChatService/CreateGroup"
+	// ChatServiceListGroupsProcedure is the fully-qualified name of the ChatService's ListGroups RPC.
+	ChatServiceListGroupsProcedure = "/aerochat.chat.v1.ChatService/ListGroups"
+	// ChatServiceGetGroupProcedure is the fully-qualified name of the ChatService's GetGroup RPC.
+	ChatServiceGetGroupProcedure = "/aerochat.chat.v1.ChatService/GetGroup"
+	// ChatServiceListGroupMembersProcedure is the fully-qualified name of the ChatService's
+	// ListGroupMembers RPC.
+	ChatServiceListGroupMembersProcedure = "/aerochat.chat.v1.ChatService/ListGroupMembers"
+	// ChatServiceCreateGroupInviteLinkProcedure is the fully-qualified name of the ChatService's
+	// CreateGroupInviteLink RPC.
+	ChatServiceCreateGroupInviteLinkProcedure = "/aerochat.chat.v1.ChatService/CreateGroupInviteLink"
+	// ChatServiceListGroupInviteLinksProcedure is the fully-qualified name of the ChatService's
+	// ListGroupInviteLinks RPC.
+	ChatServiceListGroupInviteLinksProcedure = "/aerochat.chat.v1.ChatService/ListGroupInviteLinks"
+	// ChatServiceDisableGroupInviteLinkProcedure is the fully-qualified name of the ChatService's
+	// DisableGroupInviteLink RPC.
+	ChatServiceDisableGroupInviteLinkProcedure = "/aerochat.chat.v1.ChatService/DisableGroupInviteLink"
+	// ChatServiceJoinGroupByInviteLinkProcedure is the fully-qualified name of the ChatService's
+	// JoinGroupByInviteLink RPC.
+	ChatServiceJoinGroupByInviteLinkProcedure = "/aerochat.chat.v1.ChatService/JoinGroupByInviteLink"
 	// ChatServiceMarkDirectChatReadProcedure is the fully-qualified name of the ChatService's
 	// MarkDirectChatRead RPC.
 	ChatServiceMarkDirectChatReadProcedure = "/aerochat.chat.v1.ChatService/MarkDirectChatRead"
@@ -81,6 +102,14 @@ type ChatServiceClient interface {
 	CreateDirectChat(context.Context, *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error)
 	ListDirectChats(context.Context, *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error)
 	GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error)
+	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
+	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
+	GetGroup(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GetGroupResponse], error)
+	ListGroupMembers(context.Context, *connect.Request[v1.ListGroupMembersRequest]) (*connect.Response[v1.ListGroupMembersResponse], error)
+	CreateGroupInviteLink(context.Context, *connect.Request[v1.CreateGroupInviteLinkRequest]) (*connect.Response[v1.CreateGroupInviteLinkResponse], error)
+	ListGroupInviteLinks(context.Context, *connect.Request[v1.ListGroupInviteLinksRequest]) (*connect.Response[v1.ListGroupInviteLinksResponse], error)
+	DisableGroupInviteLink(context.Context, *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error)
+	JoinGroupByInviteLink(context.Context, *connect.Request[v1.JoinGroupByInviteLinkRequest]) (*connect.Response[v1.JoinGroupByInviteLinkResponse], error)
 	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
 	SetDirectChatTyping(context.Context, *connect.Request[v1.SetDirectChatTypingRequest]) (*connect.Response[v1.SetDirectChatTypingResponse], error)
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
@@ -126,6 +155,54 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+ChatServiceGetDirectChatProcedure,
 			connect.WithSchema(chatServiceMethods.ByName("GetDirectChat")),
+			connect.WithClientOptions(opts...),
+		),
+		createGroup: connect.NewClient[v1.CreateGroupRequest, v1.CreateGroupResponse](
+			httpClient,
+			baseURL+ChatServiceCreateGroupProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("CreateGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		listGroups: connect.NewClient[v1.ListGroupsRequest, v1.ListGroupsResponse](
+			httpClient,
+			baseURL+ChatServiceListGroupsProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("ListGroups")),
+			connect.WithClientOptions(opts...),
+		),
+		getGroup: connect.NewClient[v1.GetGroupRequest, v1.GetGroupResponse](
+			httpClient,
+			baseURL+ChatServiceGetGroupProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("GetGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		listGroupMembers: connect.NewClient[v1.ListGroupMembersRequest, v1.ListGroupMembersResponse](
+			httpClient,
+			baseURL+ChatServiceListGroupMembersProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("ListGroupMembers")),
+			connect.WithClientOptions(opts...),
+		),
+		createGroupInviteLink: connect.NewClient[v1.CreateGroupInviteLinkRequest, v1.CreateGroupInviteLinkResponse](
+			httpClient,
+			baseURL+ChatServiceCreateGroupInviteLinkProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("CreateGroupInviteLink")),
+			connect.WithClientOptions(opts...),
+		),
+		listGroupInviteLinks: connect.NewClient[v1.ListGroupInviteLinksRequest, v1.ListGroupInviteLinksResponse](
+			httpClient,
+			baseURL+ChatServiceListGroupInviteLinksProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("ListGroupInviteLinks")),
+			connect.WithClientOptions(opts...),
+		),
+		disableGroupInviteLink: connect.NewClient[v1.DisableGroupInviteLinkRequest, v1.DisableGroupInviteLinkResponse](
+			httpClient,
+			baseURL+ChatServiceDisableGroupInviteLinkProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("DisableGroupInviteLink")),
+			connect.WithClientOptions(opts...),
+		),
+		joinGroupByInviteLink: connect.NewClient[v1.JoinGroupByInviteLinkRequest, v1.JoinGroupByInviteLinkResponse](
+			httpClient,
+			baseURL+ChatServiceJoinGroupByInviteLinkProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("JoinGroupByInviteLink")),
 			connect.WithClientOptions(opts...),
 		),
 		markDirectChatRead: connect.NewClient[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse](
@@ -197,6 +274,14 @@ type chatServiceClient struct {
 	createDirectChat               *connect.Client[v1.CreateDirectChatRequest, v1.CreateDirectChatResponse]
 	listDirectChats                *connect.Client[v1.ListDirectChatsRequest, v1.ListDirectChatsResponse]
 	getDirectChat                  *connect.Client[v1.GetDirectChatRequest, v1.GetDirectChatResponse]
+	createGroup                    *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
+	listGroups                     *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
+	getGroup                       *connect.Client[v1.GetGroupRequest, v1.GetGroupResponse]
+	listGroupMembers               *connect.Client[v1.ListGroupMembersRequest, v1.ListGroupMembersResponse]
+	createGroupInviteLink          *connect.Client[v1.CreateGroupInviteLinkRequest, v1.CreateGroupInviteLinkResponse]
+	listGroupInviteLinks           *connect.Client[v1.ListGroupInviteLinksRequest, v1.ListGroupInviteLinksResponse]
+	disableGroupInviteLink         *connect.Client[v1.DisableGroupInviteLinkRequest, v1.DisableGroupInviteLinkResponse]
+	joinGroupByInviteLink          *connect.Client[v1.JoinGroupByInviteLinkRequest, v1.JoinGroupByInviteLinkResponse]
 	markDirectChatRead             *connect.Client[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse]
 	setDirectChatTyping            *connect.Client[v1.SetDirectChatTypingRequest, v1.SetDirectChatTypingResponse]
 	clearDirectChatTyping          *connect.Client[v1.ClearDirectChatTypingRequest, v1.ClearDirectChatTypingResponse]
@@ -227,6 +312,46 @@ func (c *chatServiceClient) ListDirectChats(ctx context.Context, req *connect.Re
 // GetDirectChat calls aerochat.chat.v1.ChatService.GetDirectChat.
 func (c *chatServiceClient) GetDirectChat(ctx context.Context, req *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error) {
 	return c.getDirectChat.CallUnary(ctx, req)
+}
+
+// CreateGroup calls aerochat.chat.v1.ChatService.CreateGroup.
+func (c *chatServiceClient) CreateGroup(ctx context.Context, req *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error) {
+	return c.createGroup.CallUnary(ctx, req)
+}
+
+// ListGroups calls aerochat.chat.v1.ChatService.ListGroups.
+func (c *chatServiceClient) ListGroups(ctx context.Context, req *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error) {
+	return c.listGroups.CallUnary(ctx, req)
+}
+
+// GetGroup calls aerochat.chat.v1.ChatService.GetGroup.
+func (c *chatServiceClient) GetGroup(ctx context.Context, req *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GetGroupResponse], error) {
+	return c.getGroup.CallUnary(ctx, req)
+}
+
+// ListGroupMembers calls aerochat.chat.v1.ChatService.ListGroupMembers.
+func (c *chatServiceClient) ListGroupMembers(ctx context.Context, req *connect.Request[v1.ListGroupMembersRequest]) (*connect.Response[v1.ListGroupMembersResponse], error) {
+	return c.listGroupMembers.CallUnary(ctx, req)
+}
+
+// CreateGroupInviteLink calls aerochat.chat.v1.ChatService.CreateGroupInviteLink.
+func (c *chatServiceClient) CreateGroupInviteLink(ctx context.Context, req *connect.Request[v1.CreateGroupInviteLinkRequest]) (*connect.Response[v1.CreateGroupInviteLinkResponse], error) {
+	return c.createGroupInviteLink.CallUnary(ctx, req)
+}
+
+// ListGroupInviteLinks calls aerochat.chat.v1.ChatService.ListGroupInviteLinks.
+func (c *chatServiceClient) ListGroupInviteLinks(ctx context.Context, req *connect.Request[v1.ListGroupInviteLinksRequest]) (*connect.Response[v1.ListGroupInviteLinksResponse], error) {
+	return c.listGroupInviteLinks.CallUnary(ctx, req)
+}
+
+// DisableGroupInviteLink calls aerochat.chat.v1.ChatService.DisableGroupInviteLink.
+func (c *chatServiceClient) DisableGroupInviteLink(ctx context.Context, req *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error) {
+	return c.disableGroupInviteLink.CallUnary(ctx, req)
+}
+
+// JoinGroupByInviteLink calls aerochat.chat.v1.ChatService.JoinGroupByInviteLink.
+func (c *chatServiceClient) JoinGroupByInviteLink(ctx context.Context, req *connect.Request[v1.JoinGroupByInviteLinkRequest]) (*connect.Response[v1.JoinGroupByInviteLinkResponse], error) {
+	return c.joinGroupByInviteLink.CallUnary(ctx, req)
 }
 
 // MarkDirectChatRead calls aerochat.chat.v1.ChatService.MarkDirectChatRead.
@@ -285,6 +410,14 @@ type ChatServiceHandler interface {
 	CreateDirectChat(context.Context, *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error)
 	ListDirectChats(context.Context, *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error)
 	GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error)
+	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
+	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
+	GetGroup(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GetGroupResponse], error)
+	ListGroupMembers(context.Context, *connect.Request[v1.ListGroupMembersRequest]) (*connect.Response[v1.ListGroupMembersResponse], error)
+	CreateGroupInviteLink(context.Context, *connect.Request[v1.CreateGroupInviteLinkRequest]) (*connect.Response[v1.CreateGroupInviteLinkResponse], error)
+	ListGroupInviteLinks(context.Context, *connect.Request[v1.ListGroupInviteLinksRequest]) (*connect.Response[v1.ListGroupInviteLinksResponse], error)
+	DisableGroupInviteLink(context.Context, *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error)
+	JoinGroupByInviteLink(context.Context, *connect.Request[v1.JoinGroupByInviteLinkRequest]) (*connect.Response[v1.JoinGroupByInviteLinkResponse], error)
 	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
 	SetDirectChatTyping(context.Context, *connect.Request[v1.SetDirectChatTypingRequest]) (*connect.Response[v1.SetDirectChatTypingResponse], error)
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
@@ -326,6 +459,54 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		ChatServiceGetDirectChatProcedure,
 		svc.GetDirectChat,
 		connect.WithSchema(chatServiceMethods.ByName("GetDirectChat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceCreateGroupHandler := connect.NewUnaryHandler(
+		ChatServiceCreateGroupProcedure,
+		svc.CreateGroup,
+		connect.WithSchema(chatServiceMethods.ByName("CreateGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceListGroupsHandler := connect.NewUnaryHandler(
+		ChatServiceListGroupsProcedure,
+		svc.ListGroups,
+		connect.WithSchema(chatServiceMethods.ByName("ListGroups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceGetGroupHandler := connect.NewUnaryHandler(
+		ChatServiceGetGroupProcedure,
+		svc.GetGroup,
+		connect.WithSchema(chatServiceMethods.ByName("GetGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceListGroupMembersHandler := connect.NewUnaryHandler(
+		ChatServiceListGroupMembersProcedure,
+		svc.ListGroupMembers,
+		connect.WithSchema(chatServiceMethods.ByName("ListGroupMembers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceCreateGroupInviteLinkHandler := connect.NewUnaryHandler(
+		ChatServiceCreateGroupInviteLinkProcedure,
+		svc.CreateGroupInviteLink,
+		connect.WithSchema(chatServiceMethods.ByName("CreateGroupInviteLink")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceListGroupInviteLinksHandler := connect.NewUnaryHandler(
+		ChatServiceListGroupInviteLinksProcedure,
+		svc.ListGroupInviteLinks,
+		connect.WithSchema(chatServiceMethods.ByName("ListGroupInviteLinks")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceDisableGroupInviteLinkHandler := connect.NewUnaryHandler(
+		ChatServiceDisableGroupInviteLinkProcedure,
+		svc.DisableGroupInviteLink,
+		connect.WithSchema(chatServiceMethods.ByName("DisableGroupInviteLink")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceJoinGroupByInviteLinkHandler := connect.NewUnaryHandler(
+		ChatServiceJoinGroupByInviteLinkProcedure,
+		svc.JoinGroupByInviteLink,
+		connect.WithSchema(chatServiceMethods.ByName("JoinGroupByInviteLink")),
 		connect.WithHandlerOptions(opts...),
 	)
 	chatServiceMarkDirectChatReadHandler := connect.NewUnaryHandler(
@@ -398,6 +579,22 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceListDirectChatsHandler.ServeHTTP(w, r)
 		case ChatServiceGetDirectChatProcedure:
 			chatServiceGetDirectChatHandler.ServeHTTP(w, r)
+		case ChatServiceCreateGroupProcedure:
+			chatServiceCreateGroupHandler.ServeHTTP(w, r)
+		case ChatServiceListGroupsProcedure:
+			chatServiceListGroupsHandler.ServeHTTP(w, r)
+		case ChatServiceGetGroupProcedure:
+			chatServiceGetGroupHandler.ServeHTTP(w, r)
+		case ChatServiceListGroupMembersProcedure:
+			chatServiceListGroupMembersHandler.ServeHTTP(w, r)
+		case ChatServiceCreateGroupInviteLinkProcedure:
+			chatServiceCreateGroupInviteLinkHandler.ServeHTTP(w, r)
+		case ChatServiceListGroupInviteLinksProcedure:
+			chatServiceListGroupInviteLinksHandler.ServeHTTP(w, r)
+		case ChatServiceDisableGroupInviteLinkProcedure:
+			chatServiceDisableGroupInviteLinkHandler.ServeHTTP(w, r)
+		case ChatServiceJoinGroupByInviteLinkProcedure:
+			chatServiceJoinGroupByInviteLinkHandler.ServeHTTP(w, r)
 		case ChatServiceMarkDirectChatReadProcedure:
 			chatServiceMarkDirectChatReadHandler.ServeHTTP(w, r)
 		case ChatServiceSetDirectChatTypingProcedure:
@@ -441,6 +638,38 @@ func (UnimplementedChatServiceHandler) ListDirectChats(context.Context, *connect
 
 func (UnimplementedChatServiceHandler) GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetDirectChat is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.CreateGroup is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ListGroups is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetGroup(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GetGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetGroup is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ListGroupMembers(context.Context, *connect.Request[v1.ListGroupMembersRequest]) (*connect.Response[v1.ListGroupMembersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ListGroupMembers is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) CreateGroupInviteLink(context.Context, *connect.Request[v1.CreateGroupInviteLinkRequest]) (*connect.Response[v1.CreateGroupInviteLinkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.CreateGroupInviteLink is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ListGroupInviteLinks(context.Context, *connect.Request[v1.ListGroupInviteLinksRequest]) (*connect.Response[v1.ListGroupInviteLinksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ListGroupInviteLinks is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) DisableGroupInviteLink(context.Context, *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.DisableGroupInviteLink is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) JoinGroupByInviteLink(context.Context, *connect.Request[v1.JoinGroupByInviteLinkRequest]) (*connect.Response[v1.JoinGroupByInviteLinkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.JoinGroupByInviteLink is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error) {
