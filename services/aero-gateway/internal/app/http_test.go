@@ -196,7 +196,9 @@ func TestNewHTTPHandlerAcceptsRealtimeConnections(t *testing.T) {
 	if err != nil {
 		t.Fatalf("websocket dial через gateway: %v", err)
 	}
-	defer conn.CloseNow()
+	defer func() {
+		_ = conn.CloseNow()
+	}()
 
 	var message struct {
 		ID       string `json:"id"`

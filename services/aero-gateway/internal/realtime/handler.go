@@ -47,7 +47,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.logger.Warn("websocket upgrade отклонён", slog.String("error", err.Error()))
 		return
 	}
-	defer conn.CloseNow()
+	defer func() {
+		_ = conn.CloseNow()
+	}()
 
 	if conn.Subprotocol() != Protocol {
 		_ = conn.Close(websocket.StatusPolicyViolation, "missing realtime protocol")

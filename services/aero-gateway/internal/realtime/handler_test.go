@@ -38,7 +38,9 @@ func TestHandlerPublishesEventsToAuthenticatedUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial realtime websocket: %v", err)
 	}
-	defer conn.CloseNow()
+	defer func() {
+		_ = conn.CloseNow()
+	}()
 
 	var ready Envelope
 	if err := wsjson.Read(ctx, conn, &ready); err != nil {
@@ -93,7 +95,9 @@ func TestHandlerClosesConnectionsOnHubShutdown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial realtime websocket: %v", err)
 	}
-	defer conn.CloseNow()
+	defer func() {
+		_ = conn.CloseNow()
+	}()
 
 	var ready Envelope
 	if err := wsjson.Read(ctx, conn, &ready); err != nil {
