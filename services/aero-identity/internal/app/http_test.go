@@ -33,7 +33,7 @@ func TestNewHTTPHandlerServesDiagnosticsAndConnectRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("запрос к корню сервиса: %v", err)
 	}
-	defer rootResponse.Body.Close()
+	defer func() { _ = rootResponse.Body.Close() }()
 
 	if rootResponse.StatusCode != http.StatusOK {
 		t.Fatalf("ожидался статус %d для /, получен %d", http.StatusOK, rootResponse.StatusCode)
@@ -43,7 +43,7 @@ func TestNewHTTPHandlerServesDiagnosticsAndConnectRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("запрос к readyz: %v", err)
 	}
-	defer readinessResponse.Body.Close()
+	defer func() { _ = readinessResponse.Body.Close() }()
 
 	if readinessResponse.StatusCode != http.StatusOK {
 		t.Fatalf("ожидался статус %d для /readyz, получен %d", http.StatusOK, readinessResponse.StatusCode)
