@@ -37,6 +37,31 @@ jobs:
       - name: Validate server compose
         run: docker compose --env-file .env.server.example --env-file .env.server.secrets.example -f infra/compose/docker-compose.server.yml config >/dev/null
 
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: web
+            dockerfile: apps/web/Dockerfile
+            build_args: --build-arg VITE_GATEWAY_BASE_URL=/api
+          - service: aero-gateway
+            dockerfile: services/aero-gateway/Dockerfile
+            build_args: ""
+          - service: aero-identity
+            dockerfile: services/aero-identity/Dockerfile
+            build_args: ""
+          - service: aero-chat
+            dockerfile: services/aero-chat/Dockerfile
+            build_args: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Validate release image build
+        run: docker build ${{ matrix.build_args }} -f ${{ matrix.dockerfile }} .
+
   go:
     runs-on: ubuntu-latest
     steps:
