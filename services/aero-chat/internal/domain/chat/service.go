@@ -35,7 +35,7 @@ type Repository interface {
 }
 
 type FriendshipChecker interface {
-	AreFriends(context.Context, string, string) (bool, error)
+	GetDirectChatRelationshipState(context.Context, string, string) (*DirectChatRelationshipState, error)
 }
 
 type TypingStateStore interface {
@@ -111,11 +111,11 @@ func (s *Service) CreateDirectChat(ctx context.Context, token string, peerUserID
 		return nil, fmt.Errorf("%w: self-chat creation is not allowed", ErrConflict)
 	}
 
-	areFriends, err := s.friendships.AreFriends(ctx, authSession.User.ID, targetUserID)
+	relationshipState, err := s.friendships.GetDirectChatRelationshipState(ctx, authSession.User.ID, targetUserID)
 	if err != nil {
 		return nil, err
 	}
-	if !areFriends {
+	if !relationshipState.AreFriends {
 		return nil, fmt.Errorf("%w: direct chat can only be created between friends", ErrConflict)
 	}
 
@@ -182,7 +182,11 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureDirectChatWriteAllowed(ctx, authSession.User.ID, *directChat); err != nil {
 		return nil, err
 	}
 
@@ -199,6 +203,51 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 		Text:         normalizedText,
 		CreatedAt:    now,
 	})
+}
+
+func (s *Service) ensureDirectChatWriteAllowed(ctx context.Context, userID string, directChat DirectChat) error {
+	peerUserID, err := directChatPeerUserID(directChat, userID)
+	if err != nil {
+		return err
+	}
+
+	relationshipState, err := s.friendships.GetDirectChatRelationshipState(ctx, userID, peerUserID)
+	if err != nil {
+		return err
+	}
+	if relationshipState.HasBlock {
+		return fmt.Errorf("%w: blocked users cannot send direct messages", ErrPermissionDenied)
+	}
+	if !relationshipState.AreFriends {
+		return fmt.Errorf("%w: direct chat write requires active friendship", ErrPermissionDenied)
+	}
+
+	return nil
+}
+
+func directChatPeerUserID(directChat DirectChat, userID string) (string, error) {
+	if len(directChat.Participants) != 2 {
+		return "", fmt.Errorf("%w: direct chat write requires exactly two participants", ErrPermissionDenied)
+	}
+
+	var peerUserID string
+	for _, participant := range directChat.Participants {
+		if participant.ID == userID {
+			continue
+		}
+		if participant.ID == "" {
+			return "", fmt.Errorf("%w: direct chat participant id is empty", ErrPermissionDenied)
+		}
+		if peerUserID != "" {
+			return "", fmt.Errorf("%w: direct chat write requires exactly one peer", ErrPermissionDenied)
+		}
+		peerUserID = participant.ID
+	}
+	if peerUserID == "" {
+		return "", fmt.Errorf("%w: direct chat peer is not resolved", ErrPermissionDenied)
+	}
+
+	return peerUserID, nil
 }
 
 func (s *Service) ListDirectChatMessages(ctx context.Context, token string, chatID string, pageSize uint32) ([]DirectChatMessage, error) {

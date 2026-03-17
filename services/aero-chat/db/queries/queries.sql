@@ -46,6 +46,20 @@ SELECT EXISTS (
     WHERE user_low_id = $1 AND user_high_id = $2
 ) AS friendship_exists;
 
+-- name: GetDirectChatRelationshipState :one
+SELECT
+    EXISTS (
+        SELECT 1
+        FROM user_blocks AS b
+        WHERE (b.blocker_user_id = $1 AND b.blocked_user_id = $2)
+           OR (b.blocker_user_id = $2 AND b.blocked_user_id = $1)
+    ) AS has_block,
+    EXISTS (
+        SELECT 1
+        FROM user_friendships AS f
+        WHERE f.user_low_id = $3 AND f.user_high_id = $4
+    ) AS are_friends;
+
 -- name: CreateDirectChat :one
 INSERT INTO direct_chats (
     id,

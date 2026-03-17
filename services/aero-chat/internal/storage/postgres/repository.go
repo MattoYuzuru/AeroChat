@@ -86,18 +86,23 @@ func (r *Repository) TouchSession(ctx context.Context, sessionID string, deviceI
 	return convertError(err)
 }
 
-func (r *Repository) AreFriends(ctx context.Context, firstUserID string, secondUserID string) (bool, error) {
+func (r *Repository) GetDirectChatRelationshipState(ctx context.Context, firstUserID string, secondUserID string) (*chat.DirectChatRelationshipState, error) {
 	userLowID, userHighID := chat.CanonicalUserPair(firstUserID, secondUserID)
 
-	result, err := r.queries.FriendshipExists(ctx, chatsqlc.FriendshipExistsParams{
-		UserLowID:  mustParseUUID(userLowID),
-		UserHighID: mustParseUUID(userHighID),
+	row, err := r.queries.GetDirectChatRelationshipState(ctx, chatsqlc.GetDirectChatRelationshipStateParams{
+		BlockerUserID: mustParseUUID(firstUserID),
+		BlockedUserID: mustParseUUID(secondUserID),
+		UserLowID:     mustParseUUID(userLowID),
+		UserHighID:    mustParseUUID(userHighID),
 	})
 	if err != nil {
-		return false, convertError(err)
+		return nil, convertError(err)
 	}
 
-	return result, nil
+	return &chat.DirectChatRelationshipState{
+		AreFriends: row.AreFriends,
+		HasBlock:   row.HasBlock,
+	}, nil
 }
 
 func (r *Repository) CreateDirectChat(ctx context.Context, params chat.CreateDirectChatParams) (*chat.DirectChat, error) {

@@ -235,6 +235,45 @@ func (q *Queries) GetDirectChatMessageByID(ctx context.Context, arg GetDirectCha
 	return i, err
 }
 
+const getDirectChatRelationshipState = `-- name: GetDirectChatRelationshipState :one
+SELECT
+    EXISTS (
+        SELECT 1
+        FROM user_blocks AS b
+        WHERE (b.blocker_user_id = $1 AND b.blocked_user_id = $2)
+           OR (b.blocker_user_id = $2 AND b.blocked_user_id = $1)
+    ) AS has_block,
+    EXISTS (
+        SELECT 1
+        FROM user_friendships AS f
+        WHERE f.user_low_id = $3 AND f.user_high_id = $4
+    ) AS are_friends
+`
+
+type GetDirectChatRelationshipStateParams struct {
+	BlockerUserID uuid.UUID `db:"blocker_user_id" json:"blocker_user_id"`
+	BlockedUserID uuid.UUID `db:"blocked_user_id" json:"blocked_user_id"`
+	UserLowID     uuid.UUID `db:"user_low_id" json:"user_low_id"`
+	UserHighID    uuid.UUID `db:"user_high_id" json:"user_high_id"`
+}
+
+type GetDirectChatRelationshipStateRow struct {
+	HasBlock   bool `db:"has_block" json:"has_block"`
+	AreFriends bool `db:"are_friends" json:"are_friends"`
+}
+
+func (q *Queries) GetDirectChatRelationshipState(ctx context.Context, arg GetDirectChatRelationshipStateParams) (GetDirectChatRelationshipStateRow, error) {
+	row := q.db.QueryRow(ctx, getDirectChatRelationshipState,
+		arg.BlockerUserID,
+		arg.BlockedUserID,
+		arg.UserLowID,
+		arg.UserHighID,
+	)
+	var i GetDirectChatRelationshipStateRow
+	err := row.Scan(&i.HasBlock, &i.AreFriends)
+	return i, err
+}
+
 const getDirectChatRowsByIDAndUserID = `-- name: GetDirectChatRowsByIDAndUserID :many
 SELECT
     c.id AS chat_id,
