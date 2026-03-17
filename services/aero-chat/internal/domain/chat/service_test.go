@@ -413,6 +413,65 @@ func TestSendAndListMessagesUseMarkdownPolicy(t *testing.T) {
 	}
 }
 
+func TestSendTextMessageRequiresActiveFriendship(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	firstMessage := mustSendMessage(t, service, alice.Token, directChat.ID, "before removal")
+
+	delete(repo.friendships, pairKey(alice.User.ID, bob.User.ID))
+
+	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "after removal"); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("ожидалась ошибка active friendship required, получено %v", err)
+	}
+
+	messages, err := service.ListDirectChatMessages(context.Background(), bob.Token, directChat.ID, 0)
+	if err != nil {
+		t.Fatalf("list messages after friendship removal: %v", err)
+	}
+	if len(messages) != 1 || messages[0].ID != firstMessage.ID {
+		t.Fatal("история чата должна оставаться доступной после удаления friendship")
+	}
+}
+
+func TestSendTextMessageBlockedUsersCannotSend(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	repo.blockUser(bob.User.ID, alice.User.ID)
+
+	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "after block"); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("ожидалась ошибка block policy, получено %v", err)
+	}
+}
+
+func TestSendTextMessageRejectsInconsistentDirectChatParticipants(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	directChat.Participants = []UserSummary{alice.User, alice.User}
+	repo.chats[directChat.ID] = *directChat
+
+	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "unsafe"); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("ожидалась ошибка безопасного deny для неконсистентного чата, получено %v", err)
+	}
+}
+
 func TestDeleteMessageUsesTombstoneAndAuthorRule(t *testing.T) {
 	t.Parallel()
 
@@ -571,6 +630,7 @@ type fakeRepository struct {
 	sessions      map[string]SessionAuth
 	users         map[string]UserSummary
 	friendships   map[string]bool
+	blocks        map[string]map[string]bool
 	chats         map[string]DirectChat
 	messages      map[string]DirectChatMessage
 	readPositions map[string]DirectChatReadPosition
@@ -585,6 +645,7 @@ func newFakeRepository() *fakeRepository {
 		sessions:      make(map[string]SessionAuth),
 		users:         make(map[string]UserSummary),
 		friendships:   make(map[string]bool),
+		blocks:        make(map[string]map[string]bool),
 		chats:         make(map[string]DirectChat),
 		messages:      make(map[string]DirectChatMessage),
 		readPositions: make(map[string]DirectChatReadPosition),
@@ -657,8 +718,11 @@ func (r *fakeRepository) TouchSession(_ context.Context, sessionID string, devic
 	return nil
 }
 
-func (r *fakeRepository) AreFriends(_ context.Context, firstUserID string, secondUserID string) (bool, error) {
-	return r.friendships[pairKey(firstUserID, secondUserID)], nil
+func (r *fakeRepository) GetDirectChatRelationshipState(_ context.Context, firstUserID string, secondUserID string) (*DirectChatRelationshipState, error) {
+	return &DirectChatRelationshipState{
+		AreFriends: r.friendships[pairKey(firstUserID, secondUserID)],
+		HasBlock:   r.hasBlock(firstUserID, secondUserID),
+	}, nil
 }
 
 func (r *fakeRepository) ListDirectChatReadStateEntries(_ context.Context, userID string, chatID string) ([]DirectChatReadStateEntry, error) {
@@ -928,6 +992,25 @@ func isParticipant(directChat DirectChat, userID string) bool {
 		if participant.ID == userID {
 			return true
 		}
+	}
+
+	return false
+}
+
+func (r *fakeRepository) blockUser(blockerUserID string, blockedUserID string) {
+	if r.blocks[blockerUserID] == nil {
+		r.blocks[blockerUserID] = make(map[string]bool)
+	}
+	r.blocks[blockerUserID][blockedUserID] = true
+	delete(r.friendships, pairKey(blockerUserID, blockedUserID))
+}
+
+func (r *fakeRepository) hasBlock(firstUserID string, secondUserID string) bool {
+	if blockedSet := r.blocks[firstUserID]; blockedSet != nil && blockedSet[secondUserID] {
+		return true
+	}
+	if blockedSet := r.blocks[secondUserID]; blockedSet != nil && blockedSet[firstUserID] {
+		return true
 	}
 
 	return false

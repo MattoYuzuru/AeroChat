@@ -17,6 +17,7 @@ type Querier interface {
 	CreateDirectChatMessageTombstone(ctx context.Context, arg CreateDirectChatMessageTombstoneParams) (int64, error)
 	FriendshipExists(ctx context.Context, arg FriendshipExistsParams) (bool, error)
 	GetDirectChatMessageByID(ctx context.Context, arg GetDirectChatMessageByIDParams) (GetDirectChatMessageByIDRow, error)
+	GetDirectChatRelationshipState(ctx context.Context, arg GetDirectChatRelationshipStateParams) (GetDirectChatRelationshipStateRow, error)
 	GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDirectChatRowsByIDAndUserIDParams) ([]GetDirectChatRowsByIDAndUserIDRow, error)
 	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
 	ListDirectChatMessages(ctx context.Context, arg ListDirectChatMessagesParams) ([]ListDirectChatMessagesRow, error)

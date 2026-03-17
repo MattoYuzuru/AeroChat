@@ -124,6 +124,11 @@ type DirectChatTypingStateEntry struct {
 	TypingVisibilityEnabled bool
 }
 
+type DirectChatRelationshipState struct {
+	AreFriends bool
+	HasBlock   bool
+}
+
 type CreateDirectChatParams struct {
 	ChatID          string
 	CreatedByUserID string
