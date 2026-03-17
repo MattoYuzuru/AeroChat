@@ -192,7 +192,8 @@ AeroChat создаётся как проект с сильным фундаме
   - `.env.server.secrets.example` описывает обязательные server-only secret keys без реальных значений;
   - TLS-сертификаты и приватный ключ существуют только на VPS в отдельной директории и не коммитятся;
   - `infra/compose/docker-compose.server.yml` даёт production-oriented single-server topology на предсобранных образах;
-  - ручной bootstrap описан в `docs/deploy/single-server-bootstrap.md`.
+  - подготовка сервера описана в `docs/deploy/single-server-bootstrap.md`;
+  - production rollout и first external launch описаны в `docs/deploy/production-rollout.md`.
 
 1. Клонируй репозиторий:
 
@@ -237,6 +238,8 @@ Server runtime использует один внешний `nginx` на `80/443
 единственной backend edge-точкой за reverse proxy.
 
 Подробности, TLS/domain contract и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
+Для финального live rollout используется manual workflow `Deploy Production` c GitHub Environment `production`.
+Полный production runbook описан в `docs/deploy/production-rollout.md`.
 
 ### Image release model
 
@@ -255,6 +258,7 @@ Server runtime использует один внешний `nginx` на `80/443
 
 Для server compose оператор обычно меняет только `AERO_IMAGE_TAG` в `.env.server`,
 а секретные значения хранит только в `.env.server.secrets`.
+Production rollout и rollback выполняются повторным запуском workflow `Deploy Production` с выбранным tag.
 `latest` намеренно не используется.
 На текущем этапе опубликованные application images собираются только для `linux/amd64`.
 

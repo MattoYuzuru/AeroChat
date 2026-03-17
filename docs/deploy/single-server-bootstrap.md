@@ -1,7 +1,7 @@
-# Single-server TLS/domain bootstrap и operator update flow
+# Single-server bootstrap, server preparation и operator fallback flow
 
-Этот документ описывает ручной operator flow для одного VPS после появления GHCR image delivery, server secret model и
-domain-ready TLS edge bootstrap.
+Этот документ описывает базовую подготовку одного VPS после появления GHCR image delivery, server secret model,
+domain-ready TLS edge bootstrap и production rollout automation.
 
 Цель текущего этапа:
 
@@ -10,9 +10,12 @@ domain-ready TLS edge bootstrap.
 - явно разделить versioned runtime config и server-only secret values;
 - зафиксировать production-like HTTP/HTTPS edge path для одного домена;
 - явно определить файловую модель TLS-сертификатов на VPS;
-- сделать ручной update/rollback flow воспроизводимым;
-- не внедрять CI/CD deploy и SSH automation;
-- не выполнять реальный production rollout из репозитория.
+- подготовить VPS к ручному production rollout через GitHub Actions;
+- сохранить явный fallback flow для ручного update/rollback по SSH;
+- не превращать этот документ в remote provisioning или zero-downtime orchestration runbook.
+
+Основной production rollout теперь описан отдельно в [production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md).
+Этот документ остаётся source of truth для server preparation, env contract и ручного fallback flow.
 
 ## Модель окружений
 
@@ -88,9 +91,9 @@ versioned runtime-шаблон.
 - реальное получение сертификата;
 - renewal automation;
 - DNS automation;
-- SSH rollout automation;
-- GitHub Actions deploy;
-- реальный production cutover.
+- backup/restore automation;
+- zero-downtime orchestration;
+- OS-level provisioning и firewall hardening.
 
 ## Runtime topology
 
@@ -117,12 +120,12 @@ versioned runtime-шаблон.
 - канонический redirect с HTTP на HTTPS для обычного user traffic;
 - файловая модель TLS-сертификатов, которые монтируются в `nginx` read-only;
 - readiness chain через `identity` → `chat` → `gateway` → `nginx`;
-- manual bootstrap/update/rollback flow без дополнительной deploy automation.
+- manual bootstrap/update/rollback flow как fallback;
+- manual GitHub Actions rollout через environment `production`;
+- отдельный runbook для first external launch, verification и rollback.
 
 ## Что намеренно отложено
 
-- GitHub Actions deploy;
-- SSH automation;
 - реальные production secrets в репозитории;
 - реальное получение, выпуск и renewal TLS-сертификатов;
 - backup/restore automation;
@@ -254,6 +257,10 @@ curl -fsS --resolve "aero.example.com:443:127.0.0.1" https://aero.example.com/re
 
 Если проверка выполняется удалённо, используй домен сервера вместо `127.0.0.1`.
 
+После того как VPS подготовлен и локальные проверки проходят, для production rollout рекомендуется перейти к
+[production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md) и
+использовать manual workflow `Deploy Production`, а не повторять ручные команды без необходимости.
+
 ## Ожидаемое поведение
 
 - `/healthz` отвечает сам `nginx` и показывает, что edge-process жив;
@@ -273,6 +280,12 @@ docker compose \
 ```
 
 ## Обновление до выбранного release tag
+
+Предпочтительный путь для production update теперь описан в
+[production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md) через
+manual workflow `Deploy Production`.
+
+Ниже остаётся ручной fallback flow для случаев, когда workflow временно недоступен.
 
 1. Открой `.env.server` и измени `AERO_IMAGE_TAG` на нужный GHCR tag:
 
@@ -320,6 +333,11 @@ curl -fsS http://127.0.0.1/readyz
 ```
 
 ## Rollback на предыдущий tag
+
+Предпочтительный rollback для production теперь выполняется повторным запуском workflow `Deploy Production` с
+предыдущим известным рабочим tag.
+
+Ниже остаётся ручной fallback flow для аварийного случая или недоступности GitHub Actions.
 
 1. Верни в `.env.server` предыдущий стабильный `AERO_IMAGE_TAG`.
 
@@ -375,17 +393,17 @@ docker compose \
 
 ## Что намеренно не делается в этом PR
 
-- SSH automation и удалённое выполнение команд из GitHub Actions
 - автоматический rollout после publish workflow
 - автоматический выбор последнего release
 - ACME issuance/renewal automation и DNS automation
 - внешние secret managers и сложная ops-оркестрация
-- полноценный production change-management вне ручного operator flow
+- полноценный production change-management и zero-downtime orchestration
 
 ## Следующий шаг после этого foundation
 
-Следующий PR должен добавлять следующий изолированный deploy slice, а не менять topology заново:
+Следующий PR должен добавлять следующий изолированный operational slice, а не менять topology заново:
 
-- финальный single-server rollout PR на реальном домене с внешним smoke и operator verification;
-- отдельный SSH/deploy automation slice только после того, как ручной rollout будет подтверждён;
-- без смены `nginx`/gateway topology и без переноса certificate material в репозиторий.
+- backup/restore и recovery runbooks;
+- database migration discipline, если появятся schema-breaking changes;
+- дальнейшее усиление release governance без смены `nginx`/gateway topology и без переноса certificate material в
+  репозиторий.

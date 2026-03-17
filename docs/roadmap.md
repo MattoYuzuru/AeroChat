@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Single-server TLS / domain / edge bootstrap для single-server self-host runtime
+- [x] Production rollout automation и first external launch foundation для single-server self-host runtime
 
 ---
 
@@ -37,6 +37,7 @@
 - [x] Image delivery и release bootstrap
 - [x] Server secret model и operator update flow
 - [x] Single-server TLS / domain / edge bootstrap
+- [x] Production rollout automation и first external launch foundation
 - [ ] GitHub Actions CI
 
 ---
