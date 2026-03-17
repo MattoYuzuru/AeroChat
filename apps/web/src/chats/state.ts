@@ -2,6 +2,7 @@ import type {
   DirectChat,
   DirectChatMessage,
   DirectChatPresenceState,
+  DirectChatReadPosition,
   DirectChatReadState,
   DirectChatTypingState,
 } from "../gateway/types";
@@ -46,6 +47,17 @@ type ChatsAction =
       type: "thread_presence_updated";
       chatId: string;
       presenceState: DirectChatPresenceState | null;
+    }
+  | {
+      type: "message_updated";
+      chat?: DirectChat;
+      message: DirectChatMessage;
+      reason: string;
+    }
+  | {
+      type: "read_state_replaced";
+      chatId: string;
+      readState: DirectChatReadState | null;
     }
   | { type: "send_started" }
   | { type: "send_finished" }
@@ -170,6 +182,20 @@ export function chatsReducer(
           presenceState: action.presenceState,
         },
       };
+    case "message_updated":
+      return applyMessageUpdate(state, action);
+    case "read_state_replaced":
+      if (state.thread?.chat.id !== action.chatId) {
+        return state;
+      }
+
+      return {
+        ...state,
+        thread: {
+          ...state.thread,
+          readState: action.readState,
+        },
+      };
     case "send_started":
       return {
         ...state,
@@ -210,4 +236,146 @@ export function chatsReducer(
     default:
       return state;
   }
+}
+
+function applyMessageUpdate(
+  state: ChatsState,
+  action: Extract<ChatsAction, { type: "message_updated" }>,
+): ChatsState {
+  const nextChats = upsertChatInList(
+    state.chats,
+    action.chat ?? patchChatFromMessage(findChatByID(state.chats, action.message.chatId), action.message, action.reason),
+  );
+
+  if (state.thread?.chat.id !== action.message.chatId) {
+    return {
+      ...state,
+      chats: nextChats,
+    };
+  }
+
+  const nextThreadChat =
+    action.chat ?? patchChatFromMessage(state.thread.chat, action.message, action.reason);
+  if (!nextThreadChat) {
+    return {
+      ...state,
+      chats: nextChats,
+    };
+  }
+
+  return {
+    ...state,
+    chats: nextChats,
+    thread: {
+      ...state.thread,
+      chat: nextThreadChat,
+      messages: upsertMessage(state.thread.messages, action.message),
+    },
+  };
+}
+
+function findChatByID(chats: DirectChat[], chatId: string): DirectChat | null {
+  return chats.find((chat) => chat.id === chatId) ?? null;
+}
+
+function upsertChatInList(chats: DirectChat[], chat: DirectChat | null | undefined): DirectChat[] {
+  if (!chat) {
+    return chats;
+  }
+
+  const nextChats = chats.filter((entry) => entry.id !== chat.id);
+  nextChats.push(chat);
+  nextChats.sort(compareChatsByUpdatedAtDesc);
+
+  return nextChats;
+}
+
+function compareChatsByUpdatedAtDesc(left: DirectChat, right: DirectChat): number {
+  if (left.updatedAt === right.updatedAt) {
+    return left.id.localeCompare(right.id);
+  }
+
+  return right.updatedAt.localeCompare(left.updatedAt);
+}
+
+function patchChatFromMessage(
+  chat: DirectChat | null,
+  message: DirectChatMessage,
+  reason: string,
+): DirectChat | null {
+  if (!chat) {
+    return null;
+  }
+
+  return {
+    ...chat,
+    pinnedMessageIds: patchPinnedMessageIDs(chat.pinnedMessageIds, message, reason),
+    updatedAt: resolveChatUpdatedAt(chat.updatedAt, message),
+  };
+}
+
+function patchPinnedMessageIDs(
+  current: string[],
+  message: DirectChatMessage,
+  reason: string,
+): string[] {
+  if (reason === "message_pinned" || message.pinned) {
+    return appendUniqueID(current, message.id);
+  }
+
+  if (reason === "message_unpinned" || reason === "message_deleted_for_everyone") {
+    return current.filter((value) => value !== message.id);
+  }
+
+  return current;
+}
+
+function appendUniqueID(values: string[], nextValue: string): string[] {
+  if (values.includes(nextValue)) {
+    return values;
+  }
+
+  return [...values, nextValue];
+}
+
+function resolveChatUpdatedAt(currentUpdatedAt: string, message: DirectChatMessage): string {
+  const candidate = message.updatedAt || message.createdAt;
+  if (candidate === "") {
+    return currentUpdatedAt;
+  }
+
+  return candidate;
+}
+
+function upsertMessage(messages: DirectChatMessage[], message: DirectChatMessage): DirectChatMessage[] {
+  const nextMessages = messages.filter((entry) => entry.id !== message.id);
+  nextMessages.push(message);
+  nextMessages.sort(compareMessagesByCreatedAtAsc);
+
+  return nextMessages;
+}
+
+function compareMessagesByCreatedAtAsc(
+  left: DirectChatMessage,
+  right: DirectChatMessage,
+): number {
+  if (left.createdAt === right.createdAt) {
+    return left.id.localeCompare(right.id);
+  }
+
+  return left.createdAt.localeCompare(right.createdAt);
+}
+
+export function createReadState(
+  selfPosition: DirectChatReadPosition | null,
+  peerPosition: DirectChatReadPosition | null,
+): DirectChatReadState | null {
+  if (!selfPosition && !peerPosition) {
+    return null;
+  }
+
+  return {
+    selfPosition,
+    peerPosition,
+  };
 }

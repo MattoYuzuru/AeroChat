@@ -140,4 +140,94 @@ describe("chatsReducer", () => {
       "2026-04-06T11:59:58Z",
     );
   });
+
+  it("upserts message and refreshes chat order from realtime payload", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const threadState = chatsReducer(readyState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+
+    const nextState = chatsReducer(threadState, {
+      type: "message_updated",
+      reason: "message_created",
+      chat: {
+        ...directChat,
+        updatedAt: "2026-04-06T12:01:00Z",
+      },
+      message: {
+        id: "message-2",
+        chatId: "chat-1",
+        senderUserId: "user-2",
+        kind: "MESSAGE_KIND_TEXT",
+        text: {
+          text: "world",
+          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        },
+        tombstone: null,
+        pinned: false,
+        createdAt: "2026-04-06T12:01:00Z",
+        updatedAt: "2026-04-06T12:01:00Z",
+      },
+    });
+
+    expect(nextState.chats[0]?.updatedAt).toBe("2026-04-06T12:01:00Z");
+    expect(nextState.thread?.messages.map((message) => message.id)).toEqual([
+      "message-1",
+      "message-2",
+    ]);
+  });
+
+  it("patches pinned ids from local message mutation without full refresh", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const threadState = chatsReducer(readyState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+
+    const nextState = chatsReducer(threadState, {
+      type: "message_updated",
+      reason: "message_pinned",
+      message: {
+        ...threadSnapshot.messages[0]!,
+        pinned: true,
+        updatedAt: "2026-04-06T12:02:00Z",
+      },
+    });
+
+    expect(nextState.chats[0]?.pinnedMessageIds).toEqual(["message-1"]);
+    expect(nextState.thread?.messages[0]?.pinned).toBe(true);
+  });
+
+  it("replaces active thread read state from realtime update", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const threadState = chatsReducer(readyState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+
+    const nextState = chatsReducer(threadState, {
+      type: "read_state_replaced",
+      chatId: "chat-1",
+      readState: {
+        selfPosition: null,
+        peerPosition: {
+          messageId: "message-1",
+          messageCreatedAt: "2026-03-25T10:11:00Z",
+          updatedAt: "2026-04-06T12:03:00Z",
+        },
+      },
+    });
+
+    expect(nextState.thread?.readState?.peerPosition?.messageId).toBe("message-1");
+  });
 });

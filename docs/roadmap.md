@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] gateway-based realtime transport foundation через WebSocket
+- [x] direct chat realtime bootstrap через `aero-gateway`
 
 ---
 
@@ -96,6 +96,7 @@
 - [x] Pin / unpin
 - [x] Web direct chat bootstrap через `aero-gateway`
 - [x] Gateway realtime transport foundation
+- [x] Direct chat realtime bootstrap через `aero-gateway`
 
 ---
 

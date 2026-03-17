@@ -27,7 +27,7 @@ func NewHTTPHandler(logger *slog.Logger, meta observability.ServiceMeta, cfg Con
 	connectMux.Handle(identityPath, identityHandler)
 
 	chatPath, chatHandler := chatv1connect.NewChatServiceHandler(
-		connecthandler.NewChatHandler(meta.Name, meta.Version, clients.Chat),
+		connecthandler.NewChatHandler(logger, meta.Name, meta.Version, clients.Chat, clients.Identity, realtimeHub),
 	)
 	connectMux.Handle(chatPath, chatHandler)
 	loggedConnectMux := observability.WrapHTTPInstrumentation(logger, connectMux)
