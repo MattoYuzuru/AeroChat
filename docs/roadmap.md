@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] direct chat realtime bootstrap через `aero-gateway`
+- [x] people realtime bootstrap через `aero-gateway`
 
 ---
 
@@ -74,6 +74,7 @@
 - [ ] Block interactions policy
 - [ ] Search by exact login rules
 - [x] Web people bootstrap через `aero-gateway`
+- [x] People realtime bootstrap через `aero-gateway`
 
 ---
 

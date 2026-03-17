@@ -405,6 +405,188 @@ func TestNewHTTPHandlerPublishesViewerRelativeReadUpdates(t *testing.T) {
 	}
 }
 
+func TestNewHTTPHandlerPublishesPeopleFriendRequestUpdates(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	identityClient := identityv1connect.NewIdentityServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&identityv1.SendFriendRequestRequest{
+		Login: "bob",
+	})
+	request.Header().Set("Authorization", "Bearer v1.user-1")
+
+	if _, err := identityClient.SendFriendRequest(ctx, request); err != nil {
+		t.Fatalf("send friend request через gateway: %v", err)
+	}
+
+	userOneEvent := readPeopleEnvelope(t, ctx, connUserOne)
+	userTwoEvent := readPeopleEnvelope(t, ctx, connUserTwo)
+
+	if userOneEvent.Payload.Reason != realtime.PeopleReasonOutgoingRequestUpsert {
+		t.Fatalf("user-1: ожидалась причина %q, получена %q", realtime.PeopleReasonOutgoingRequestUpsert, userOneEvent.Payload.Reason)
+	}
+	if userOneEvent.Payload.Request == nil || userOneEvent.Payload.Request.Profile.Login != "bob" {
+		t.Fatalf("user-1: ожидался outgoing request для bob, получено %+v", userOneEvent.Payload.Request)
+	}
+
+	if userTwoEvent.Payload.Reason != realtime.PeopleReasonIncomingRequestUpsert {
+		t.Fatalf("user-2: ожидалась причина %q, получена %q", realtime.PeopleReasonIncomingRequestUpsert, userTwoEvent.Payload.Reason)
+	}
+	if userTwoEvent.Payload.Request == nil || userTwoEvent.Payload.Request.Profile.Login != "alice" {
+		t.Fatalf("user-2: ожидался incoming request от alice, получено %+v", userTwoEvent.Payload.Request)
+	}
+}
+
+func TestNewHTTPHandlerPublishesPeopleAcceptanceUpdates(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	identityClient := identityv1connect.NewIdentityServiceClient(gatewayServer.Client(), gatewayServer.URL)
+
+	sendRequest := connect.NewRequest(&identityv1.SendFriendRequestRequest{Login: "bob"})
+	sendRequest.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := identityClient.SendFriendRequest(ctx, sendRequest); err != nil {
+		t.Fatalf("prepare send friend request: %v", err)
+	}
+	_ = readPeopleEnvelope(t, ctx, connUserOne)
+	_ = readPeopleEnvelope(t, ctx, connUserTwo)
+
+	acceptRequest := connect.NewRequest(&identityv1.AcceptFriendRequestRequest{Login: "alice"})
+	acceptRequest.Header().Set("Authorization", "Bearer v1.user-2")
+	if _, err := identityClient.AcceptFriendRequest(ctx, acceptRequest); err != nil {
+		t.Fatalf("accept friend request через gateway: %v", err)
+	}
+
+	userTwoRemoval := readPeopleEnvelope(t, ctx, connUserTwo)
+	userTwoFriend := readPeopleEnvelope(t, ctx, connUserTwo)
+	userOneRemoval := readPeopleEnvelope(t, ctx, connUserOne)
+	userOneFriend := readPeopleEnvelope(t, ctx, connUserOne)
+
+	if userTwoRemoval.Payload.Reason != realtime.PeopleReasonIncomingRequestRemove || userTwoRemoval.Payload.Login != "alice" {
+		t.Fatalf("user-2: ожидалось удаление incoming alice, получено %+v", userTwoRemoval.Payload)
+	}
+	if userTwoFriend.Payload.Reason != realtime.PeopleReasonFriendUpsert || userTwoFriend.Payload.Friend == nil || userTwoFriend.Payload.Friend.Profile.Login != "alice" {
+		t.Fatalf("user-2: ожидалось добавление друга alice, получено %+v", userTwoFriend.Payload)
+	}
+	if userOneRemoval.Payload.Reason != realtime.PeopleReasonOutgoingRequestRemove || userOneRemoval.Payload.Login != "bob" {
+		t.Fatalf("user-1: ожидалось удаление outgoing bob, получено %+v", userOneRemoval.Payload)
+	}
+	if userOneFriend.Payload.Reason != realtime.PeopleReasonFriendUpsert || userOneFriend.Payload.Friend == nil || userOneFriend.Payload.Friend.Profile.Login != "bob" {
+		t.Fatalf("user-1: ожидалось добавление друга bob, получено %+v", userOneFriend.Payload)
+	}
+}
+
+func TestNewHTTPHandlerPublishesPeopleRemovalAndBlockUpdates(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	identityClient := identityv1connect.NewIdentityServiceClient(gatewayServer.Client(), gatewayServer.URL)
+
+	sendRequest := connect.NewRequest(&identityv1.SendFriendRequestRequest{Login: "bob"})
+	sendRequest.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := identityClient.SendFriendRequest(ctx, sendRequest); err != nil {
+		t.Fatalf("prepare send friend request: %v", err)
+	}
+	_ = readPeopleEnvelope(t, ctx, connUserOne)
+	_ = readPeopleEnvelope(t, ctx, connUserTwo)
+
+	acceptRequest := connect.NewRequest(&identityv1.AcceptFriendRequestRequest{Login: "alice"})
+	acceptRequest.Header().Set("Authorization", "Bearer v1.user-2")
+	if _, err := identityClient.AcceptFriendRequest(ctx, acceptRequest); err != nil {
+		t.Fatalf("prepare accept friend request: %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		_ = readPeopleEnvelope(t, ctx, connUserOne)
+		_ = readPeopleEnvelope(t, ctx, connUserTwo)
+	}
+
+	removeRequest := connect.NewRequest(&identityv1.RemoveFriendRequest{Login: "bob"})
+	removeRequest.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := identityClient.RemoveFriend(ctx, removeRequest); err != nil {
+		t.Fatalf("remove friend через gateway: %v", err)
+	}
+
+	userOneRemoval := readPeopleEnvelope(t, ctx, connUserOne)
+	userTwoRemoval := readPeopleEnvelope(t, ctx, connUserTwo)
+	if userOneRemoval.Payload.Reason != realtime.PeopleReasonFriendRemove || userOneRemoval.Payload.Login != "bob" {
+		t.Fatalf("user-1: ожидалось friend_remove для bob, получено %+v", userOneRemoval.Payload)
+	}
+	if userTwoRemoval.Payload.Reason != realtime.PeopleReasonFriendRemove || userTwoRemoval.Payload.Login != "alice" {
+		t.Fatalf("user-2: ожидалось friend_remove для alice, получено %+v", userTwoRemoval.Payload)
+	}
+
+	sendAgain := connect.NewRequest(&identityv1.SendFriendRequestRequest{Login: "bob"})
+	sendAgain.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := identityClient.SendFriendRequest(ctx, sendAgain); err != nil {
+		t.Fatalf("prepare second send friend request: %v", err)
+	}
+	_ = readPeopleEnvelope(t, ctx, connUserOne)
+	_ = readPeopleEnvelope(t, ctx, connUserTwo)
+
+	blockRequest := connect.NewRequest(&identityv1.BlockUserRequest{Login: "bob"})
+	blockRequest.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := identityClient.BlockUser(ctx, blockRequest); err != nil {
+		t.Fatalf("block user через gateway: %v", err)
+	}
+
+	userOneCleared := readPeopleEnvelope(t, ctx, connUserOne)
+	userTwoCleared := readPeopleEnvelope(t, ctx, connUserTwo)
+	if userOneCleared.Payload.Reason != realtime.PeopleReasonRelationshipCleared || userOneCleared.Payload.Login != "bob" {
+		t.Fatalf("user-1: ожидалось relationship_cleared для bob, получено %+v", userOneCleared.Payload)
+	}
+	if userTwoCleared.Payload.Reason != realtime.PeopleReasonRelationshipCleared || userTwoCleared.Payload.Login != "alice" {
+		t.Fatalf("user-2: ожидалось relationship_cleared для alice, получено %+v", userTwoCleared.Payload)
+	}
+}
+
 func identityHTTPHandler(handler identityv1connect.IdentityServiceHandler) http.Handler {
 	_, httpHandler := identityv1connect.NewIdentityServiceHandler(handler)
 	return httpHandler
@@ -422,6 +604,15 @@ type testIdentityHandler struct {
 	lastAuthorization string
 	profileErr        error
 	profilesByAuth    map[string]*identityv1.Profile
+	profilesByLogin   map[string]*identityv1.Profile
+	friendRequests    map[string]testFriendRequestRecord
+	friendships       map[string]*timestamppb.Timestamp
+}
+
+type testFriendRequestRecord struct {
+	requesterLogin string
+	addresseeLogin string
+	requestedAt    *timestamppb.Timestamp
 }
 
 func (h *testIdentityHandler) Ping(context.Context, *connect.Request[identityv1.PingRequest]) (*connect.Response[identityv1.PingResponse], error) {
@@ -460,6 +651,189 @@ func (h *testIdentityHandler) GetCurrentProfile(_ context.Context, req *connect.
 	}), nil
 }
 
+func (h *testIdentityHandler) SendFriendRequest(_ context.Context, req *connect.Request[identityv1.SendFriendRequestRequest]) (*connect.Response[identityv1.SendFriendRequestResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	target := h.requireProfileByLogin(req.Msg.Login)
+	now := timestamppb.Now()
+
+	h.mu.Lock()
+	h.ensureSocialStateLocked()
+	h.friendRequests[friendRequestKey(actor.GetLogin(), target.GetLogin())] = testFriendRequestRecord{
+		requesterLogin: actor.GetLogin(),
+		addresseeLogin: target.GetLogin(),
+		requestedAt:    now,
+	}
+	h.mu.Unlock()
+
+	return connect.NewResponse(&identityv1.SendFriendRequestResponse{}), nil
+}
+
+func (h *testIdentityHandler) AcceptFriendRequest(_ context.Context, req *connect.Request[identityv1.AcceptFriendRequestRequest]) (*connect.Response[identityv1.AcceptFriendRequestResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	target := h.requireProfileByLogin(req.Msg.Login)
+	now := timestamppb.Now()
+
+	h.mu.Lock()
+	h.ensureSocialStateLocked()
+	delete(h.friendRequests, friendRequestKey(target.GetLogin(), actor.GetLogin()))
+	h.friendships[friendshipKey(actor.GetLogin(), target.GetLogin())] = now
+	h.mu.Unlock()
+
+	return connect.NewResponse(&identityv1.AcceptFriendRequestResponse{}), nil
+}
+
+func (h *testIdentityHandler) DeclineFriendRequest(_ context.Context, req *connect.Request[identityv1.DeclineFriendRequestRequest]) (*connect.Response[identityv1.DeclineFriendRequestResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	target := h.requireProfileByLogin(req.Msg.Login)
+
+	h.mu.Lock()
+	h.ensureSocialStateLocked()
+	delete(h.friendRequests, friendRequestKey(target.GetLogin(), actor.GetLogin()))
+	h.mu.Unlock()
+
+	return connect.NewResponse(&identityv1.DeclineFriendRequestResponse{}), nil
+}
+
+func (h *testIdentityHandler) CancelOutgoingFriendRequest(_ context.Context, req *connect.Request[identityv1.CancelOutgoingFriendRequestRequest]) (*connect.Response[identityv1.CancelOutgoingFriendRequestResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	target := h.requireProfileByLogin(req.Msg.Login)
+
+	h.mu.Lock()
+	h.ensureSocialStateLocked()
+	delete(h.friendRequests, friendRequestKey(actor.GetLogin(), target.GetLogin()))
+	h.mu.Unlock()
+
+	return connect.NewResponse(&identityv1.CancelOutgoingFriendRequestResponse{}), nil
+}
+
+func (h *testIdentityHandler) RemoveFriend(_ context.Context, req *connect.Request[identityv1.RemoveFriendRequest]) (*connect.Response[identityv1.RemoveFriendResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	target := h.requireProfileByLogin(req.Msg.Login)
+
+	h.mu.Lock()
+	h.ensureSocialStateLocked()
+	delete(h.friendships, friendshipKey(actor.GetLogin(), target.GetLogin()))
+	h.mu.Unlock()
+
+	return connect.NewResponse(&identityv1.RemoveFriendResponse{}), nil
+}
+
+func (h *testIdentityHandler) BlockUser(_ context.Context, req *connect.Request[identityv1.BlockUserRequest]) (*connect.Response[identityv1.BlockUserResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	target := h.requireProfileByLogin(req.Msg.Login)
+
+	h.mu.Lock()
+	h.ensureSocialStateLocked()
+	delete(h.friendRequests, friendRequestKey(actor.GetLogin(), target.GetLogin()))
+	delete(h.friendRequests, friendRequestKey(target.GetLogin(), actor.GetLogin()))
+	delete(h.friendships, friendshipKey(actor.GetLogin(), target.GetLogin()))
+	h.mu.Unlock()
+
+	return connect.NewResponse(&identityv1.BlockUserResponse{}), nil
+}
+
+func (h *testIdentityHandler) UnblockUser(_ context.Context, req *connect.Request[identityv1.UnblockUserRequest]) (*connect.Response[identityv1.UnblockUserResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+	_ = h.requireActorProfile(req.Header().Get("Authorization"))
+	_ = h.requireProfileByLogin(req.Msg.Login)
+
+	return connect.NewResponse(&identityv1.UnblockUserResponse{}), nil
+}
+
+func (h *testIdentityHandler) ListIncomingFriendRequests(_ context.Context, req *connect.Request[identityv1.ListIncomingFriendRequestsRequest]) (*connect.Response[identityv1.ListIncomingFriendRequestsResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	result := make([]*identityv1.FriendRequest, 0)
+
+	h.mu.Lock()
+	h.ensureSocialStateLocked()
+	for _, record := range h.friendRequests {
+		if record.addresseeLogin != actor.GetLogin() {
+			continue
+		}
+
+		requester := cloneProfile(h.profilesByLogin[record.requesterLogin])
+		result = append(result, &identityv1.FriendRequest{
+			Profile:     requester,
+			RequestedAt: record.requestedAt,
+		})
+	}
+	h.mu.Unlock()
+
+	return connect.NewResponse(&identityv1.ListIncomingFriendRequestsResponse{
+		FriendRequests: result,
+	}), nil
+}
+
+func (h *testIdentityHandler) ListOutgoingFriendRequests(_ context.Context, req *connect.Request[identityv1.ListOutgoingFriendRequestsRequest]) (*connect.Response[identityv1.ListOutgoingFriendRequestsResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	result := make([]*identityv1.FriendRequest, 0)
+
+	h.mu.Lock()
+	h.ensureSocialStateLocked()
+	for _, record := range h.friendRequests {
+		if record.requesterLogin != actor.GetLogin() {
+			continue
+		}
+
+		addressee := cloneProfile(h.profilesByLogin[record.addresseeLogin])
+		result = append(result, &identityv1.FriendRequest{
+			Profile:     addressee,
+			RequestedAt: record.requestedAt,
+		})
+	}
+	h.mu.Unlock()
+
+	return connect.NewResponse(&identityv1.ListOutgoingFriendRequestsResponse{
+		FriendRequests: result,
+	}), nil
+}
+
+func (h *testIdentityHandler) ListFriends(_ context.Context, req *connect.Request[identityv1.ListFriendsRequest]) (*connect.Response[identityv1.ListFriendsResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	result := make([]*identityv1.Friend, 0)
+
+	h.mu.Lock()
+	h.ensureSocialStateLocked()
+	for key, friendsSince := range h.friendships {
+		firstLogin, secondLogin := parseFriendshipKey(key)
+		switch actor.GetLogin() {
+		case firstLogin:
+			result = append(result, &identityv1.Friend{
+				Profile:      cloneProfile(h.profilesByLogin[secondLogin]),
+				FriendsSince: friendsSince,
+			})
+		case secondLogin:
+			result = append(result, &identityv1.Friend{
+				Profile:      cloneProfile(h.profilesByLogin[firstLogin]),
+				FriendsSince: friendsSince,
+			})
+		}
+	}
+	h.mu.Unlock()
+
+	return connect.NewResponse(&identityv1.ListFriendsResponse{
+		Friends: result,
+	}), nil
+}
+
 func (h *testIdentityHandler) LastAuthorization() string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -495,7 +869,12 @@ func (h *testIdentityHandler) SetProfileForAuthorization(value string, profile *
 	if h.profilesByAuth == nil {
 		h.profilesByAuth = make(map[string]*identityv1.Profile)
 	}
-	h.profilesByAuth[value] = cloneProfile(profile)
+	if h.profilesByLogin == nil {
+		h.profilesByLogin = make(map[string]*identityv1.Profile)
+	}
+	cloned := cloneProfile(profile)
+	h.profilesByAuth[value] = cloned
+	h.profilesByLogin[cloned.GetLogin()] = cloned
 }
 
 func (h *testIdentityHandler) profileForAuthorization(value string) *identityv1.Profile {
@@ -512,6 +891,46 @@ func (h *testIdentityHandler) profileForAuthorization(value string) *identityv1.
 	}
 
 	return cloneProfile(profile)
+}
+
+func (h *testIdentityHandler) requireActorProfile(authorization string) *identityv1.Profile {
+	if profile := h.profileForAuthorization(authorization); profile != nil {
+		return profile
+	}
+
+	login := loginFromAuthorization(authorization)
+	return newTestProfile(userIDFromAuthorization(authorization), login, login)
+}
+
+func (h *testIdentityHandler) requireProfileByLogin(login string) *identityv1.Profile {
+	normalizedLogin := strings.ToLower(strings.TrimSpace(login))
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.ensureSocialStateLocked()
+	if profile, ok := h.profilesByLogin[normalizedLogin]; ok {
+		return cloneProfile(profile)
+	}
+
+	profile := newTestProfile("user-"+normalizedLogin, normalizedLogin, normalizedLogin)
+	h.profilesByLogin[normalizedLogin] = cloneProfile(profile)
+	return profile
+}
+
+func (h *testIdentityHandler) ensureSocialStateLocked() {
+	if h.profilesByAuth == nil {
+		h.profilesByAuth = make(map[string]*identityv1.Profile)
+	}
+	if h.profilesByLogin == nil {
+		h.profilesByLogin = make(map[string]*identityv1.Profile)
+	}
+	if h.friendRequests == nil {
+		h.friendRequests = make(map[string]testFriendRequestRecord)
+	}
+	if h.friendships == nil {
+		h.friendships = make(map[string]*timestamppb.Timestamp)
+	}
 }
 
 type testChatHandler struct {
@@ -801,6 +1220,40 @@ func readDirectChatReadEnvelope(t *testing.T, ctx context.Context, conn *websock
 	return envelope
 }
 
+type peopleEnvelope struct {
+	Type    string `json:"type"`
+	Payload struct {
+		Reason  string `json:"reason"`
+		Login   string `json:"login"`
+		Request *struct {
+			RequestedAt string `json:"requestedAt"`
+			Profile     struct {
+				Login string `json:"login"`
+			} `json:"profile"`
+		} `json:"request"`
+		Friend *struct {
+			FriendsSince string `json:"friendsSince"`
+			Profile      struct {
+				Login string `json:"login"`
+			} `json:"profile"`
+		} `json:"friend"`
+	} `json:"payload"`
+}
+
+func readPeopleEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) peopleEnvelope {
+	t.Helper()
+
+	var envelope peopleEnvelope
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("чтение people envelope: %v", err)
+	}
+	if envelope.Type != realtime.EventTypePeopleUpdated {
+		t.Fatalf("ожидался тип %q, получен %q", realtime.EventTypePeopleUpdated, envelope.Type)
+	}
+
+	return envelope
+}
+
 func newTestProfile(id string, login string, nickname string) *identityv1.Profile {
 	return &identityv1.Profile{
 		Id:        id,
@@ -832,4 +1285,36 @@ func userIDFromAuthorization(value string) string {
 	default:
 		return "user-1"
 	}
+}
+
+func loginFromAuthorization(value string) string {
+	switch strings.TrimSpace(value) {
+	case "Bearer v1.user-2":
+		return "bob"
+	default:
+		return "alice"
+	}
+}
+
+func friendRequestKey(requesterLogin string, addresseeLogin string) string {
+	return strings.ToLower(strings.TrimSpace(requesterLogin)) + "->" + strings.ToLower(strings.TrimSpace(addresseeLogin))
+}
+
+func friendshipKey(firstLogin string, secondLogin string) string {
+	first := strings.ToLower(strings.TrimSpace(firstLogin))
+	second := strings.ToLower(strings.TrimSpace(secondLogin))
+	if first < second {
+		return first + "|" + second
+	}
+
+	return second + "|" + first
+}
+
+func parseFriendshipKey(value string) (string, string) {
+	parts := strings.SplitN(value, "|", 2)
+	if len(parts) != 2 {
+		return value, ""
+	}
+
+	return parts[0], parts[1]
 }

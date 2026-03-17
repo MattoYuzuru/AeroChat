@@ -2,24 +2,39 @@ package connecthandler
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"strings"
 
 	"connectrpc.com/connect"
 	commonv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/common/v1"
 	identityv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1"
 	identityv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1/identityv1connect"
+	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/realtime"
 )
 
 type IdentityHandler struct {
+	logger      *slog.Logger
 	serviceName string
 	version     string
 	client      identityv1connect.IdentityServiceClient
+	realtimeHub *realtime.Hub
 }
 
-func NewIdentityHandler(serviceName string, version string, client identityv1connect.IdentityServiceClient) *IdentityHandler {
+func NewIdentityHandler(
+	logger *slog.Logger,
+	serviceName string,
+	version string,
+	client identityv1connect.IdentityServiceClient,
+	realtimeHub *realtime.Hub,
+) *IdentityHandler {
 	return &IdentityHandler{
+		logger:      logger,
 		serviceName: serviceName,
 		version:     version,
 		client:      client,
+		realtimeHub: realtimeHub,
 	}
 }
 
@@ -65,27 +80,69 @@ func (h *IdentityHandler) ListBlockedUsers(ctx context.Context, req *connect.Req
 }
 
 func (h *IdentityHandler) BlockUser(ctx context.Context, req *connect.Request[identityv1.BlockUserRequest]) (*connect.Response[identityv1.BlockUserResponse], error) {
-	return forwardUnary(ctx, req, h.client.BlockUser)
+	response, err := forwardUnary(ctx, req, h.client.BlockUser)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishRelationshipCleared(ctx, req.Header(), req.Msg.Login)
+
+	return response, nil
 }
 
 func (h *IdentityHandler) UnblockUser(ctx context.Context, req *connect.Request[identityv1.UnblockUserRequest]) (*connect.Response[identityv1.UnblockUserResponse], error) {
-	return forwardUnary(ctx, req, h.client.UnblockUser)
+	response, err := forwardUnary(ctx, req, h.client.UnblockUser)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishRelationshipCleared(ctx, req.Header(), req.Msg.Login)
+
+	return response, nil
 }
 
 func (h *IdentityHandler) SendFriendRequest(ctx context.Context, req *connect.Request[identityv1.SendFriendRequestRequest]) (*connect.Response[identityv1.SendFriendRequestResponse], error) {
-	return forwardUnary(ctx, req, h.client.SendFriendRequest)
+	response, err := forwardUnary(ctx, req, h.client.SendFriendRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishFriendRequestSent(ctx, req.Header(), req.Msg.Login)
+
+	return response, nil
 }
 
 func (h *IdentityHandler) AcceptFriendRequest(ctx context.Context, req *connect.Request[identityv1.AcceptFriendRequestRequest]) (*connect.Response[identityv1.AcceptFriendRequestResponse], error) {
-	return forwardUnary(ctx, req, h.client.AcceptFriendRequest)
+	response, err := forwardUnary(ctx, req, h.client.AcceptFriendRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishFriendRequestAccepted(ctx, req.Header(), req.Msg.Login)
+
+	return response, nil
 }
 
 func (h *IdentityHandler) DeclineFriendRequest(ctx context.Context, req *connect.Request[identityv1.DeclineFriendRequestRequest]) (*connect.Response[identityv1.DeclineFriendRequestResponse], error) {
-	return forwardUnary(ctx, req, h.client.DeclineFriendRequest)
+	response, err := forwardUnary(ctx, req, h.client.DeclineFriendRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishFriendRequestDeclined(ctx, req.Header(), req.Msg.Login)
+
+	return response, nil
 }
 
 func (h *IdentityHandler) CancelOutgoingFriendRequest(ctx context.Context, req *connect.Request[identityv1.CancelOutgoingFriendRequestRequest]) (*connect.Response[identityv1.CancelOutgoingFriendRequestResponse], error) {
-	return forwardUnary(ctx, req, h.client.CancelOutgoingFriendRequest)
+	response, err := forwardUnary(ctx, req, h.client.CancelOutgoingFriendRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishOutgoingFriendRequestCancelled(ctx, req.Header(), req.Msg.Login)
+
+	return response, nil
 }
 
 func (h *IdentityHandler) ListIncomingFriendRequests(ctx context.Context, req *connect.Request[identityv1.ListIncomingFriendRequestsRequest]) (*connect.Response[identityv1.ListIncomingFriendRequestsResponse], error) {
@@ -101,5 +158,307 @@ func (h *IdentityHandler) ListFriends(ctx context.Context, req *connect.Request[
 }
 
 func (h *IdentityHandler) RemoveFriend(ctx context.Context, req *connect.Request[identityv1.RemoveFriendRequest]) (*connect.Response[identityv1.RemoveFriendResponse], error) {
-	return forwardUnary(ctx, req, h.client.RemoveFriend)
+	response, err := forwardUnary(ctx, req, h.client.RemoveFriend)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishFriendRemoved(ctx, req.Header(), req.Msg.Login)
+
+	return response, nil
+}
+
+func (h *IdentityHandler) publishFriendRequestSent(ctx context.Context, headers http.Header, targetLogin string) {
+	if h.realtimeHub == nil {
+		return
+	}
+
+	actor, err := h.fetchCurrentProfile(ctx, headers)
+	if err != nil {
+		h.logRealtimeFetchError("не удалось получить текущий профиль для realtime friend request", targetLogin, err)
+		return
+	}
+
+	outgoing, err := h.fetchOutgoingFriendRequest(ctx, headers, targetLogin)
+	if err != nil {
+		h.logRealtimeFetchError("не удалось дочитать outgoing friend request для realtime", targetLogin, err)
+		return
+	}
+
+	h.realtimeHub.PublishToUser(
+		actor.GetId(),
+		realtime.NewPeopleRequestUpdatedEnvelope(realtime.PeopleReasonOutgoingRequestUpsert, outgoing),
+	)
+	h.realtimeHub.PublishToLogin(
+		normalizeLogin(targetLogin),
+		realtime.NewPeopleRequestUpdatedEnvelope(
+			realtime.PeopleReasonIncomingRequestUpsert,
+			&identityv1.FriendRequest{
+				Profile:     cloneProfile(actor),
+				RequestedAt: outgoing.GetRequestedAt(),
+			},
+		),
+	)
+}
+
+func (h *IdentityHandler) publishFriendRequestAccepted(ctx context.Context, headers http.Header, targetLogin string) {
+	if h.realtimeHub == nil {
+		return
+	}
+
+	actor, err := h.fetchCurrentProfile(ctx, headers)
+	if err != nil {
+		h.logRealtimeFetchError("не удалось получить текущий профиль для realtime accept", targetLogin, err)
+		return
+	}
+
+	friend, err := h.fetchFriend(ctx, headers, targetLogin)
+	if err != nil {
+		h.logRealtimeFetchError("не удалось дочитать friendship для realtime accept", targetLogin, err)
+		return
+	}
+
+	h.realtimeHub.PublishToUser(
+		actor.GetId(),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonIncomingRequestRemove, normalizeLogin(targetLogin)),
+	)
+	h.realtimeHub.PublishToUser(
+		actor.GetId(),
+		realtime.NewPeopleFriendUpdatedEnvelope(realtime.PeopleReasonFriendUpsert, friend),
+	)
+	h.realtimeHub.PublishToLogin(
+		normalizeLogin(targetLogin),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonOutgoingRequestRemove, actor.GetLogin()),
+	)
+	h.realtimeHub.PublishToLogin(
+		normalizeLogin(targetLogin),
+		realtime.NewPeopleFriendUpdatedEnvelope(realtime.PeopleReasonFriendUpsert, &identityv1.Friend{
+			Profile:      cloneProfile(actor),
+			FriendsSince: friend.GetFriendsSince(),
+		}),
+	)
+}
+
+func (h *IdentityHandler) publishFriendRequestDeclined(ctx context.Context, headers http.Header, targetLogin string) {
+	if h.realtimeHub == nil {
+		return
+	}
+
+	actor, err := h.fetchCurrentProfile(ctx, headers)
+	if err != nil {
+		h.logRealtimeFetchError("не удалось получить текущий профиль для realtime decline", targetLogin, err)
+		return
+	}
+
+	h.realtimeHub.PublishToUser(
+		actor.GetId(),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonIncomingRequestRemove, normalizeLogin(targetLogin)),
+	)
+	h.realtimeHub.PublishToLogin(
+		normalizeLogin(targetLogin),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonOutgoingRequestRemove, actor.GetLogin()),
+	)
+}
+
+func (h *IdentityHandler) publishOutgoingFriendRequestCancelled(ctx context.Context, headers http.Header, targetLogin string) {
+	if h.realtimeHub == nil {
+		return
+	}
+
+	actor, err := h.fetchCurrentProfile(ctx, headers)
+	if err != nil {
+		h.logRealtimeFetchError("не удалось получить текущий профиль для realtime cancel", targetLogin, err)
+		return
+	}
+
+	h.realtimeHub.PublishToUser(
+		actor.GetId(),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonOutgoingRequestRemove, normalizeLogin(targetLogin)),
+	)
+	h.realtimeHub.PublishToLogin(
+		normalizeLogin(targetLogin),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonIncomingRequestRemove, actor.GetLogin()),
+	)
+}
+
+func (h *IdentityHandler) publishFriendRemoved(ctx context.Context, headers http.Header, targetLogin string) {
+	if h.realtimeHub == nil {
+		return
+	}
+
+	actor, err := h.fetchCurrentProfile(ctx, headers)
+	if err != nil {
+		h.logRealtimeFetchError("не удалось получить текущий профиль для realtime remove friend", targetLogin, err)
+		return
+	}
+
+	h.realtimeHub.PublishToUser(
+		actor.GetId(),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonFriendRemove, normalizeLogin(targetLogin)),
+	)
+	h.realtimeHub.PublishToLogin(
+		normalizeLogin(targetLogin),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonFriendRemove, actor.GetLogin()),
+	)
+}
+
+func (h *IdentityHandler) publishRelationshipCleared(ctx context.Context, headers http.Header, targetLogin string) {
+	if h.realtimeHub == nil {
+		return
+	}
+
+	actor, err := h.fetchCurrentProfile(ctx, headers)
+	if err != nil {
+		h.logRealtimeFetchError("не удалось получить текущий профиль для realtime relationship clear", targetLogin, err)
+		return
+	}
+
+	h.realtimeHub.PublishToUser(
+		actor.GetId(),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonRelationshipCleared, normalizeLogin(targetLogin)),
+	)
+	h.realtimeHub.PublishToLogin(
+		normalizeLogin(targetLogin),
+		realtime.NewPeopleLoginEnvelope(realtime.PeopleReasonRelationshipCleared, actor.GetLogin()),
+	)
+}
+
+func (h *IdentityHandler) fetchCurrentProfile(ctx context.Context, headers http.Header) (*identityv1.Profile, error) {
+	request := connect.NewRequest(&identityv1.GetCurrentProfileRequest{})
+	copyAuthorizationHeader(request.Header(), headers)
+
+	response, err := h.client.GetCurrentProfile(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Msg.GetProfile(), nil
+}
+
+func (h *IdentityHandler) fetchOutgoingFriendRequest(
+	ctx context.Context,
+	headers http.Header,
+	login string,
+) (*identityv1.FriendRequest, error) {
+	request := connect.NewRequest(&identityv1.ListOutgoingFriendRequestsRequest{})
+	copyAuthorizationHeader(request.Header(), headers)
+
+	response, err := h.client.ListOutgoingFriendRequests(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	friendRequest := findFriendRequestByLogin(response.Msg.GetFriendRequests(), login)
+	if friendRequest == nil {
+		return nil, fmt.Errorf("friend request for login %q not found", normalizeLogin(login))
+	}
+
+	return friendRequest, nil
+}
+
+func (h *IdentityHandler) fetchFriend(ctx context.Context, headers http.Header, login string) (*identityv1.Friend, error) {
+	request := connect.NewRequest(&identityv1.ListFriendsRequest{})
+	copyAuthorizationHeader(request.Header(), headers)
+
+	response, err := h.client.ListFriends(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	friend := findFriendByLogin(response.Msg.GetFriends(), login)
+	if friend == nil {
+		return nil, fmt.Errorf("friend for login %q not found", normalizeLogin(login))
+	}
+
+	return friend, nil
+}
+
+func (h *IdentityHandler) logRealtimeFetchError(message string, targetLogin string, err error) {
+	if h.logger == nil {
+		return
+	}
+
+	h.logger.Error(
+		message,
+		slog.String("target_login", normalizeLogin(targetLogin)),
+		slog.String("error", err.Error()),
+	)
+}
+
+func findFriendRequestByLogin(requests []*identityv1.FriendRequest, login string) *identityv1.FriendRequest {
+	normalizedLogin := normalizeLogin(login)
+	for _, request := range requests {
+		if normalizeLogin(request.GetProfile().GetLogin()) != normalizedLogin {
+			continue
+		}
+
+		return cloneFriendRequest(request)
+	}
+
+	return nil
+}
+
+func findFriendByLogin(friends []*identityv1.Friend, login string) *identityv1.Friend {
+	normalizedLogin := normalizeLogin(login)
+	for _, friend := range friends {
+		if normalizeLogin(friend.GetProfile().GetLogin()) != normalizedLogin {
+			continue
+		}
+
+		return cloneFriend(friend)
+	}
+
+	return nil
+}
+
+func cloneFriendRequest(value *identityv1.FriendRequest) *identityv1.FriendRequest {
+	if value == nil {
+		return nil
+	}
+
+	return &identityv1.FriendRequest{
+		Profile:     cloneProfile(value.GetProfile()),
+		RequestedAt: value.GetRequestedAt(),
+	}
+}
+
+func cloneFriend(value *identityv1.Friend) *identityv1.Friend {
+	if value == nil {
+		return nil
+	}
+
+	return &identityv1.Friend{
+		Profile:      cloneProfile(value.GetProfile()),
+		FriendsSince: value.GetFriendsSince(),
+	}
+}
+
+func cloneProfile(value *identityv1.Profile) *identityv1.Profile {
+	if value == nil {
+		return nil
+	}
+
+	return &identityv1.Profile{
+		Id:                      value.GetId(),
+		Login:                   value.GetLogin(),
+		Nickname:                value.GetNickname(),
+		AvatarUrl:               value.AvatarUrl,
+		Bio:                     value.Bio,
+		Timezone:                value.Timezone,
+		ProfileAccent:           value.ProfileAccent,
+		StatusText:              value.StatusText,
+		Birthday:                value.Birthday,
+		Country:                 value.Country,
+		City:                    value.City,
+		ReadReceiptsEnabled:     value.GetReadReceiptsEnabled(),
+		PresenceEnabled:         value.GetPresenceEnabled(),
+		TypingVisibilityEnabled: value.GetTypingVisibilityEnabled(),
+		KeyBackupStatus:         value.GetKeyBackupStatus(),
+		CreatedAt:               value.GetCreatedAt(),
+		UpdatedAt:               value.GetUpdatedAt(),
+	}
+}
+
+func normalizeLogin(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
 }
