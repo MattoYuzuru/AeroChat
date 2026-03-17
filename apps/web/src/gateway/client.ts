@@ -208,6 +208,14 @@ interface MarkDirectChatReadResponseWire {
   readState?: DirectChatReadStateWire;
 }
 
+interface SetDirectChatPresenceHeartbeatResponseWire {
+  presenceState?: DirectChatPresenceStateWire;
+}
+
+interface ClearDirectChatPresenceResponseWire {
+  presenceState?: DirectChatPresenceStateWire;
+}
+
 interface SendTextMessageResponseWire {
   message?: DirectChatMessageWire;
 }
@@ -371,6 +379,36 @@ export function createGatewayClient(
       );
 
       return normalizeDirectChatReadState(response.readState);
+    },
+
+    async setDirectChatPresenceHeartbeat(token, chatId) {
+      const response = await unaryCall<SetDirectChatPresenceHeartbeatResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "SetDirectChatPresenceHeartbeat",
+        {
+          chatId: chatId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChatPresenceState(response.presenceState);
+    },
+
+    async clearDirectChatPresence(token, chatId) {
+      const response = await unaryCall<ClearDirectChatPresenceResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ClearDirectChatPresence",
+        {
+          chatId: chatId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChatPresenceState(response.presenceState);
     },
 
     async sendTextMessage(token, chatId, text) {

@@ -42,6 +42,11 @@ type ChatsAction =
   | { type: "thread_load_started"; chatId: string }
   | { type: "thread_load_succeeded"; snapshot: ChatThreadSnapshot }
   | { type: "thread_load_failed"; chatId: string; message: string }
+  | {
+      type: "thread_presence_updated";
+      chatId: string;
+      presenceState: DirectChatPresenceState | null;
+    }
   | { type: "send_started" }
   | { type: "send_finished" }
   | { type: "message_action_started"; messageId: string; label: string }
@@ -152,6 +157,18 @@ export function chatsReducer(
         selectedChatId: action.chatId,
         threadStatus: "error",
         threadErrorMessage: action.message,
+      };
+    case "thread_presence_updated":
+      if (state.thread?.chat.id !== action.chatId) {
+        return state;
+      }
+
+      return {
+        ...state,
+        thread: {
+          ...state.thread,
+          presenceState: action.presenceState,
+        },
       };
     case "send_started":
       return {

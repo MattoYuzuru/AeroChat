@@ -413,6 +413,89 @@ describe("createGatewayClient", () => {
     ]);
   });
 
+  it("sends direct chat presence heartbeat through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          presenceState: {
+            selfPresence: {
+              heartbeatAt: "2026-04-06T12:00:00Z",
+              expiresAt: "2026-04-06T12:00:30Z",
+            },
+            peerPresence: {
+              heartbeatAt: "2026-04-06T11:59:58Z",
+              expiresAt: "2026-04-06T12:00:28Z",
+            },
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const presenceState = await client.setDirectChatPresenceHeartbeat(
+      "token-1",
+      "chat-1",
+    );
+
+    expect(presenceState?.selfPresence?.heartbeatAt).toBe("2026-04-06T12:00:00Z");
+    expect(presenceState?.peerPresence?.heartbeatAt).toBe("2026-04-06T11:59:58Z");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/SetDirectChatPresenceHeartbeat",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          chatId: "chat-1",
+        }),
+      }),
+    );
+  });
+
+  it("clears direct chat presence through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          presenceState: {
+            peerPresence: {
+              heartbeatAt: "2026-04-06T11:59:58Z",
+              expiresAt: "2026-04-06T12:00:28Z",
+            },
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const presenceState = await client.clearDirectChatPresence("token-1", "chat-1");
+
+    expect(presenceState?.selfPresence).toBeNull();
+    expect(presenceState?.peerPresence?.heartbeatAt).toBe("2026-04-06T11:59:58Z");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/ClearDirectChatPresence",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          chatId: "chat-1",
+        }),
+      }),
+    );
+  });
+
   it("calls gateway chat endpoint for explicit direct chat creation", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(
