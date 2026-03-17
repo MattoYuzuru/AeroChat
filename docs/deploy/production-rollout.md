@@ -132,6 +132,12 @@ Workflow намеренно не трогает:
 - git checkout на VPS;
 - release selection для отдельных сервисов по разным тегам.
 
+Важно:
+
+- workflow по-прежнему не выполняет отдельный migration job;
+- schema bootstrap происходит внутри `aero-identity` и `aero-chat` при их старте;
+- normal first launch и обычный rollout не требуют ручного `psql`, если SQL-файлы в образах актуальны.
+
 ## Первый внешний запуск
 
 Рекомендуемый first launch checklist:
@@ -175,6 +181,16 @@ curl -fsS https://aero.keykomi.com/readyz
     - успешный login или register;
     - работу `/api` через обычный пользовательский flow.
 12. Зафиксировать предыдущий known-good tag и текущий deployed tag в операторском журнале или release notes.
+
+Если register/login падают после успешного `upstream`- и `HTTPS`-smoke, отдельно проверь логи bootstrap:
+
+```bash
+docker compose \
+  --env-file .env.server \
+  --env-file .env.server.secrets \
+  -f infra/compose/docker-compose.server.yml \
+  logs --tail=100 aero-identity aero-chat
+```
 
 В командах выше `aero.keykomi.com` нужно заменить на значение из `AERO_PROD_EDGE_DOMAIN`, если домен отличается.
 

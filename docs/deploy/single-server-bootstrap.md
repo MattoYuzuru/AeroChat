@@ -232,6 +232,12 @@ docker compose \
   up -d
 ```
 
+На штатном first launch ручной `psql` не нужен:
+
+- `aero-identity` автоматически применяет свои schema migrations до HTTP startup;
+- `aero-chat` ждёт завершённый identity bootstrap и затем применяет свои migrations;
+- при проблеме bootstrap сервис завершается с явной ошибкой в логах контейнера.
+
 6. Проверь состояние контейнеров и прямые host upstream'ы:
 
 ```bash
@@ -243,6 +249,16 @@ docker compose \
 
 curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}/"
 curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz"
+```
+
+Если один из сервисов не выходит в `ready`, смотри в первую очередь:
+
+```bash
+docker compose \
+  --env-file .env.server \
+  --env-file .env.server.secrets \
+  -f infra/compose/docker-compose.server.yml \
+  logs --tail=100 aero-identity aero-chat
 ```
 
 7. Подготовь cluster-side manifest example.

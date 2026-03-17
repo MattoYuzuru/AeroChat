@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
+	"github.com/MattoYuzuru/AeroChat/libs/go/dbbootstrap"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
+	chatschema "github.com/MattoYuzuru/AeroChat/services/aero-chat/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/app"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/domain/chat"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/storage/postgres"
@@ -52,6 +55,20 @@ func run() error {
 	repository := postgres.NewRepository(db)
 	if err := repository.Ping(context.Background()); err != nil {
 		return err
+	}
+	if err := dbbootstrap.Apply(context.Background(), db, dbbootstrap.Options{
+		ServiceName: "aero-chat",
+		Files:       chatschema.Files,
+		Logger:      logger,
+		WaitTimeout: cfg.DatabaseBootstrapTimeout,
+		Requirements: []dbbootstrap.Requirement{
+			{
+				ServiceName: "aero-identity",
+				Migration:   "000002_social_graph_foundation.sql",
+			},
+		},
+	}); err != nil {
+		return fmt.Errorf("chat database bootstrap: %w", err)
 	}
 
 	typingStore := redisstate.NewTypingStore(cfg.RedisAddress)

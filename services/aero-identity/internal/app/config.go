@@ -8,10 +8,11 @@ import (
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
 type Config struct {
-	DatabaseURL     string
-	HTTPAddress     string
-	LogLevel        string
-	ShutdownTimeout time.Duration
+	DatabaseURL              string
+	HTTPAddress              string
+	LogLevel                 string
+	ShutdownTimeout          time.Duration
+	DatabaseBootstrapTimeout time.Duration
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -20,12 +21,17 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	bootstrapTimeout, err := lookupDuration("AERO_DATABASE_BOOTSTRAP_TIMEOUT", 30*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
-		DatabaseURL:     lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
-		HTTPAddress:     lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
-		LogLevel:        lookupString("AERO_LOG_LEVEL", "info"),
-		ShutdownTimeout: shutdownTimeout,
+		DatabaseURL:              lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
+		HTTPAddress:              lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
+		LogLevel:                 lookupString("AERO_LOG_LEVEL", "info"),
+		ShutdownTimeout:          shutdownTimeout,
+		DatabaseBootstrapTimeout: bootstrapTimeout,
 	}, nil
 }
 

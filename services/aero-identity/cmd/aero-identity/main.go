@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
+	"github.com/MattoYuzuru/AeroChat/libs/go/dbbootstrap"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
+	identityschema "github.com/MattoYuzuru/AeroChat/services/aero-identity/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/app"
 	identityauth "github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/auth"
 	"github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/domain/identity"
@@ -52,6 +55,14 @@ func run() error {
 	repository := postgres.NewRepository(db)
 	if err := repository.Ping(context.Background()); err != nil {
 		return err
+	}
+	if err := dbbootstrap.Apply(context.Background(), db, dbbootstrap.Options{
+		ServiceName: "aero-identity",
+		Files:       identityschema.Files,
+		Logger:      logger,
+		WaitTimeout: cfg.DatabaseBootstrapTimeout,
+	}); err != nil {
+		return fmt.Errorf("identity database bootstrap: %w", err)
 	}
 
 	service := identity.NewService(
