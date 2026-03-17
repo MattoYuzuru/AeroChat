@@ -33,6 +33,7 @@ export function ChatsPage() {
     enabled: authState.status === "authenticated",
     token: authState.status === "authenticated" ? authState.token : "",
     currentUserId: authState.status === "authenticated" ? authState.profile.id : "",
+    composerText,
     onUnauthenticated: () => expireSession(),
   });
 

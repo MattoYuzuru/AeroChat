@@ -1,8 +1,10 @@
 import type {
   DirectChat,
   DirectChatMessage,
+  DirectChatPresenceState,
   DirectChatReadPosition,
   DirectChatReadState,
+  DirectChatTypingState,
 } from "../gateway/types";
 import type { RealtimeEnvelope } from "../realtime/client";
 import { createReadState } from "./state";
@@ -67,6 +69,36 @@ interface DirectChatReadUpdatedPayloadWire {
   readState?: DirectChatReadStateWire;
 }
 
+interface DirectChatTypingIndicatorWire {
+  updatedAt?: string;
+  expiresAt?: string;
+}
+
+interface DirectChatTypingStateWire {
+  selfTyping?: DirectChatTypingIndicatorWire;
+  peerTyping?: DirectChatTypingIndicatorWire;
+}
+
+interface DirectChatTypingUpdatedPayloadWire {
+  chatId?: string;
+  typingState?: DirectChatTypingStateWire;
+}
+
+interface DirectChatPresenceIndicatorWire {
+  heartbeatAt?: string;
+  expiresAt?: string;
+}
+
+interface DirectChatPresenceStateWire {
+  selfPresence?: DirectChatPresenceIndicatorWire;
+  peerPresence?: DirectChatPresenceIndicatorWire;
+}
+
+interface DirectChatPresenceUpdatedPayloadWire {
+  chatId?: string;
+  presenceState?: DirectChatPresenceStateWire;
+}
+
 export type DirectChatRealtimeEvent =
   | {
       type: "direct_chat.message.updated";
@@ -78,6 +110,16 @@ export type DirectChatRealtimeEvent =
       type: "direct_chat.read.updated";
       chatId: string;
       readState: DirectChatReadState | null;
+    }
+  | {
+      type: "direct_chat.typing.updated";
+      chatId: string;
+      typingState: DirectChatTypingState | null;
+    }
+  | {
+      type: "direct_chat.presence.updated";
+      chatId: string;
+      presenceState: DirectChatPresenceState | null;
     };
 
 export function parseDirectChatRealtimeEvent(
@@ -107,6 +149,32 @@ export function parseDirectChatRealtimeEvent(
       type: "direct_chat.read.updated",
       chatId: payload.chatId,
       readState: payload.readState,
+    };
+  }
+
+  if (envelope.type === "direct_chat.typing.updated") {
+    const payload = normalizeTypingUpdatedPayload(envelope.payload);
+    if (!payload) {
+      return null;
+    }
+
+    return {
+      type: "direct_chat.typing.updated",
+      chatId: payload.chatId,
+      typingState: payload.typingState,
+    };
+  }
+
+  if (envelope.type === "direct_chat.presence.updated") {
+    const payload = normalizePresenceUpdatedPayload(envelope.payload);
+    if (!payload) {
+      return null;
+    }
+
+    return {
+      type: "direct_chat.presence.updated",
+      chatId: payload.chatId,
+      presenceState: payload.presenceState,
     };
   }
 
@@ -158,6 +226,50 @@ function normalizeReadUpdatedPayload(
   return {
     chatId,
     readState: normalizeReadState(payload.readState),
+  };
+}
+
+function normalizeTypingUpdatedPayload(
+  input: unknown,
+): {
+  chatId: string;
+  typingState: DirectChatTypingState | null;
+} | null {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const payload = input as DirectChatTypingUpdatedPayloadWire;
+  const chatId = typeof payload.chatId === "string" ? payload.chatId : "";
+  if (chatId === "") {
+    return null;
+  }
+
+  return {
+    chatId,
+    typingState: normalizeTypingState(payload.typingState),
+  };
+}
+
+function normalizePresenceUpdatedPayload(
+  input: unknown,
+): {
+  chatId: string;
+  presenceState: DirectChatPresenceState | null;
+} | null {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const payload = input as DirectChatPresenceUpdatedPayloadWire;
+  const chatId = typeof payload.chatId === "string" ? payload.chatId : "";
+  if (chatId === "") {
+    return null;
+  }
+
+  return {
+    chatId,
+    presenceState: normalizePresenceState(payload.presenceState),
   };
 }
 
@@ -252,6 +364,82 @@ function normalizeReadPosition(
     messageId,
     messageCreatedAt,
     updatedAt,
+  };
+}
+
+function normalizeTypingState(
+  input: DirectChatTypingStateWire | undefined,
+): DirectChatTypingState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfTyping = normalizeTypingIndicator(input.selfTyping);
+  const peerTyping = normalizeTypingIndicator(input.peerTyping);
+  if (!selfTyping && !peerTyping) {
+    return null;
+  }
+
+  return {
+    selfTyping,
+    peerTyping,
+  };
+}
+
+function normalizeTypingIndicator(
+  input: DirectChatTypingIndicatorWire | undefined,
+) {
+  if (!input) {
+    return null;
+  }
+
+  const updatedAt = input.updatedAt ?? "";
+  const expiresAt = input.expiresAt ?? "";
+  if (updatedAt === "" && expiresAt === "") {
+    return null;
+  }
+
+  return {
+    updatedAt,
+    expiresAt,
+  };
+}
+
+function normalizePresenceState(
+  input: DirectChatPresenceStateWire | undefined,
+): DirectChatPresenceState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfPresence = normalizePresenceIndicator(input.selfPresence);
+  const peerPresence = normalizePresenceIndicator(input.peerPresence);
+  if (!selfPresence && !peerPresence) {
+    return null;
+  }
+
+  return {
+    selfPresence,
+    peerPresence,
+  };
+}
+
+function normalizePresenceIndicator(
+  input: DirectChatPresenceIndicatorWire | undefined,
+) {
+  if (!input) {
+    return null;
+  }
+
+  const heartbeatAt = input.heartbeatAt ?? "";
+  const expiresAt = input.expiresAt ?? "";
+  if (heartbeatAt === "" && expiresAt === "") {
+    return null;
+  }
+
+  return {
+    heartbeatAt,
+    expiresAt,
   };
 }
 

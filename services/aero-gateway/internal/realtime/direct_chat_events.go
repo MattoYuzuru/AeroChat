@@ -8,8 +8,10 @@ import (
 )
 
 const (
-	EventTypeDirectChatMessageUpdated = "direct_chat.message.updated"
-	EventTypeDirectChatReadUpdated    = "direct_chat.read.updated"
+	EventTypeDirectChatMessageUpdated  = "direct_chat.message.updated"
+	EventTypeDirectChatReadUpdated     = "direct_chat.read.updated"
+	EventTypeDirectChatTypingUpdated   = "direct_chat.typing.updated"
+	EventTypeDirectChatPresenceUpdated = "direct_chat.presence.updated"
 
 	DirectChatMessageReasonCreated            = "message_created"
 	DirectChatMessageReasonDeletedForEveryone = "message_deleted_for_everyone"
@@ -30,6 +32,18 @@ type DirectChatReadUpdatedPayload struct {
 	ReadState *directChatReadStateWire `json:"readState,omitempty"`
 }
 
+// DirectChatTypingUpdatedPayload доставляет viewer-relative typing state для конкретного пользователя.
+type DirectChatTypingUpdatedPayload struct {
+	ChatID      string                     `json:"chatId"`
+	TypingState *directChatTypingStateWire `json:"typingState,omitempty"`
+}
+
+// DirectChatPresenceUpdatedPayload доставляет viewer-relative presence state для конкретного пользователя.
+type DirectChatPresenceUpdatedPayload struct {
+	ChatID        string                       `json:"chatId"`
+	PresenceState *directChatPresenceStateWire `json:"presenceState,omitempty"`
+}
+
 func NewDirectChatMessageUpdatedEnvelope(reason string, chat *chatv1.DirectChat, message *chatv1.DirectChatMessage) Envelope {
 	return newEnvelope(EventTypeDirectChatMessageUpdated, DirectChatMessageUpdatedPayload{
 		Reason:  reason,
@@ -42,6 +56,20 @@ func NewDirectChatReadUpdatedEnvelope(chatID string, readState *chatv1.DirectCha
 	return newEnvelope(EventTypeDirectChatReadUpdated, DirectChatReadUpdatedPayload{
 		ChatID:    chatID,
 		ReadState: toDirectChatReadStateWire(readState),
+	})
+}
+
+func NewDirectChatTypingUpdatedEnvelope(chatID string, typingState *chatv1.DirectChatTypingState) Envelope {
+	return newEnvelope(EventTypeDirectChatTypingUpdated, DirectChatTypingUpdatedPayload{
+		ChatID:      chatID,
+		TypingState: toDirectChatTypingStateWire(typingState),
+	})
+}
+
+func NewDirectChatPresenceUpdatedEnvelope(chatID string, presenceState *chatv1.DirectChatPresenceState) Envelope {
+	return newEnvelope(EventTypeDirectChatPresenceUpdated, DirectChatPresenceUpdatedPayload{
+		ChatID:        chatID,
+		PresenceState: toDirectChatPresenceStateWire(presenceState),
 	})
 }
 
@@ -92,6 +120,26 @@ type directChatReadPositionWire struct {
 type directChatReadStateWire struct {
 	SelfPosition *directChatReadPositionWire `json:"selfPosition,omitempty"`
 	PeerPosition *directChatReadPositionWire `json:"peerPosition,omitempty"`
+}
+
+type directChatTypingIndicatorWire struct {
+	UpdatedAt string `json:"updatedAt"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
+type directChatTypingStateWire struct {
+	SelfTyping *directChatTypingIndicatorWire `json:"selfTyping,omitempty"`
+	PeerTyping *directChatTypingIndicatorWire `json:"peerTyping,omitempty"`
+}
+
+type directChatPresenceIndicatorWire struct {
+	HeartbeatAt string `json:"heartbeatAt"`
+	ExpiresAt   string `json:"expiresAt"`
+}
+
+type directChatPresenceStateWire struct {
+	SelfPresence *directChatPresenceIndicatorWire `json:"selfPresence,omitempty"`
+	PeerPresence *directChatPresenceIndicatorWire `json:"peerPresence,omitempty"`
 }
 
 func toDirectChatWire(chat *chatv1.DirectChat) *directChatWire {
@@ -179,6 +227,50 @@ func toDirectChatReadPositionWire(position *chatv1.DirectChatReadPosition) *dire
 		MessageID:        position.GetMessageId(),
 		MessageCreatedAt: formatProtoTimestamp(position.GetMessageCreatedAt()),
 		UpdatedAt:        formatProtoTimestamp(position.GetUpdatedAt()),
+	}
+}
+
+func toDirectChatTypingStateWire(typingState *chatv1.DirectChatTypingState) *directChatTypingStateWire {
+	if typingState == nil {
+		return nil
+	}
+
+	return &directChatTypingStateWire{
+		SelfTyping: toDirectChatTypingIndicatorWire(typingState.GetSelfTyping()),
+		PeerTyping: toDirectChatTypingIndicatorWire(typingState.GetPeerTyping()),
+	}
+}
+
+func toDirectChatTypingIndicatorWire(indicator *chatv1.DirectChatTypingIndicator) *directChatTypingIndicatorWire {
+	if indicator == nil {
+		return nil
+	}
+
+	return &directChatTypingIndicatorWire{
+		UpdatedAt: formatProtoTimestamp(indicator.GetUpdatedAt()),
+		ExpiresAt: formatProtoTimestamp(indicator.GetExpiresAt()),
+	}
+}
+
+func toDirectChatPresenceStateWire(presenceState *chatv1.DirectChatPresenceState) *directChatPresenceStateWire {
+	if presenceState == nil {
+		return nil
+	}
+
+	return &directChatPresenceStateWire{
+		SelfPresence: toDirectChatPresenceIndicatorWire(presenceState.GetSelfPresence()),
+		PeerPresence: toDirectChatPresenceIndicatorWire(presenceState.GetPeerPresence()),
+	}
+}
+
+func toDirectChatPresenceIndicatorWire(indicator *chatv1.DirectChatPresenceIndicator) *directChatPresenceIndicatorWire {
+	if indicator == nil {
+		return nil
+	}
+
+	return &directChatPresenceIndicatorWire{
+		HeartbeatAt: formatProtoTimestamp(indicator.GetHeartbeatAt()),
+		ExpiresAt:   formatProtoTimestamp(indicator.GetExpiresAt()),
 	}
 }
 

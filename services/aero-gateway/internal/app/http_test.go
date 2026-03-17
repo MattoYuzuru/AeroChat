@@ -405,6 +405,130 @@ func TestNewHTTPHandlerPublishesViewerRelativeReadUpdates(t *testing.T) {
 	}
 }
 
+func TestNewHTTPHandlerPublishesViewerRelativeTypingUpdates(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&chatv1.SetDirectChatTypingRequest{ChatId: "chat-1"})
+	request.Header().Set("Authorization", "Bearer v1.user-1")
+
+	response, err := chatClient.SetDirectChatTyping(ctx, request)
+	if err != nil {
+		t.Fatalf("set direct chat typing через gateway: %v", err)
+	}
+	if response.Msg.GetTypingState().GetSelfTyping() == nil {
+		t.Fatal("ожидался self typing в ответе mutating call")
+	}
+
+	userOneEvent := readDirectChatTypingEnvelope(t, ctx, connUserOne)
+	userTwoEvent := readDirectChatTypingEnvelope(t, ctx, connUserTwo)
+
+	if userOneEvent.Type != realtime.EventTypeDirectChatTypingUpdated {
+		t.Fatalf("user-1: ожидался тип %q, получен %q", realtime.EventTypeDirectChatTypingUpdated, userOneEvent.Type)
+	}
+	if userOneEvent.Payload.ChatID != "chat-1" {
+		t.Fatalf("user-1: ожидался chat id %q, получен %q", "chat-1", userOneEvent.Payload.ChatID)
+	}
+	if userOneEvent.Payload.TypingState.SelfTyping == nil {
+		t.Fatal("user-1: ожидался self typing indicator")
+	}
+	if userOneEvent.Payload.TypingState.PeerTyping != nil {
+		t.Fatalf("user-1: peer typing должен быть пустым, получено %+v", userOneEvent.Payload.TypingState.PeerTyping)
+	}
+
+	if userTwoEvent.Type != realtime.EventTypeDirectChatTypingUpdated {
+		t.Fatalf("user-2: ожидался тип %q, получен %q", realtime.EventTypeDirectChatTypingUpdated, userTwoEvent.Type)
+	}
+	if userTwoEvent.Payload.ChatID != "chat-1" {
+		t.Fatalf("user-2: ожидался chat id %q, получен %q", "chat-1", userTwoEvent.Payload.ChatID)
+	}
+	if userTwoEvent.Payload.TypingState.SelfTyping != nil {
+		t.Fatalf("user-2: self typing должен быть пустым, получено %+v", userTwoEvent.Payload.TypingState.SelfTyping)
+	}
+	if userTwoEvent.Payload.TypingState.PeerTyping == nil {
+		t.Fatal("user-2: ожидался peer typing indicator")
+	}
+}
+
+func TestNewHTTPHandlerPublishesViewerRelativePresenceUpdates(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&chatv1.SetDirectChatPresenceHeartbeatRequest{ChatId: "chat-1"})
+	request.Header().Set("Authorization", "Bearer v1.user-1")
+
+	response, err := chatClient.SetDirectChatPresenceHeartbeat(ctx, request)
+	if err != nil {
+		t.Fatalf("set direct chat presence heartbeat через gateway: %v", err)
+	}
+	if response.Msg.GetPresenceState().GetSelfPresence() == nil {
+		t.Fatal("ожидался self presence в ответе mutating call")
+	}
+
+	userOneEvent := readDirectChatPresenceEnvelope(t, ctx, connUserOne)
+	userTwoEvent := readDirectChatPresenceEnvelope(t, ctx, connUserTwo)
+
+	if userOneEvent.Type != realtime.EventTypeDirectChatPresenceUpdated {
+		t.Fatalf("user-1: ожидался тип %q, получен %q", realtime.EventTypeDirectChatPresenceUpdated, userOneEvent.Type)
+	}
+	if userOneEvent.Payload.ChatID != "chat-1" {
+		t.Fatalf("user-1: ожидался chat id %q, получен %q", "chat-1", userOneEvent.Payload.ChatID)
+	}
+	if userOneEvent.Payload.PresenceState.SelfPresence == nil {
+		t.Fatal("user-1: ожидался self presence indicator")
+	}
+	if userOneEvent.Payload.PresenceState.PeerPresence != nil {
+		t.Fatalf("user-1: peer presence должен быть пустым, получено %+v", userOneEvent.Payload.PresenceState.PeerPresence)
+	}
+
+	if userTwoEvent.Type != realtime.EventTypeDirectChatPresenceUpdated {
+		t.Fatalf("user-2: ожидался тип %q, получен %q", realtime.EventTypeDirectChatPresenceUpdated, userTwoEvent.Type)
+	}
+	if userTwoEvent.Payload.ChatID != "chat-1" {
+		t.Fatalf("user-2: ожидался chat id %q, получен %q", "chat-1", userTwoEvent.Payload.ChatID)
+	}
+	if userTwoEvent.Payload.PresenceState.SelfPresence != nil {
+		t.Fatalf("user-2: self presence должен быть пустым, получено %+v", userTwoEvent.Payload.PresenceState.SelfPresence)
+	}
+	if userTwoEvent.Payload.PresenceState.PeerPresence == nil {
+		t.Fatal("user-2: ожидался peer presence indicator")
+	}
+}
+
 func TestNewHTTPHandlerPublishesPeopleFriendRequestUpdates(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
@@ -1021,6 +1145,46 @@ func (h *testChatHandler) MarkDirectChatRead(_ context.Context, req *connect.Req
 	}), nil
 }
 
+func (h *testChatHandler) SetDirectChatTyping(_ context.Context, req *connect.Request[chatv1.SetDirectChatTypingRequest]) (*connect.Response[chatv1.SetDirectChatTypingResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+	now := timestamppb.Now()
+
+	return connect.NewResponse(&chatv1.SetDirectChatTypingResponse{
+		TypingState: &chatv1.DirectChatTypingState{
+			SelfTyping: &chatv1.DirectChatTypingIndicator{
+				UpdatedAt: now,
+				ExpiresAt: timestamppb.New(now.AsTime().Add(6 * time.Second)),
+			},
+		},
+	}), nil
+}
+
+func (h *testChatHandler) ClearDirectChatTyping(_ context.Context, req *connect.Request[chatv1.ClearDirectChatTypingRequest]) (*connect.Response[chatv1.ClearDirectChatTypingResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	return connect.NewResponse(&chatv1.ClearDirectChatTypingResponse{}), nil
+}
+
+func (h *testChatHandler) SetDirectChatPresenceHeartbeat(_ context.Context, req *connect.Request[chatv1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[chatv1.SetDirectChatPresenceHeartbeatResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+	now := timestamppb.Now()
+
+	return connect.NewResponse(&chatv1.SetDirectChatPresenceHeartbeatResponse{
+		PresenceState: &chatv1.DirectChatPresenceState{
+			SelfPresence: &chatv1.DirectChatPresenceIndicator{
+				HeartbeatAt: now,
+				ExpiresAt:   timestamppb.New(now.AsTime().Add(30 * time.Second)),
+			},
+		},
+	}), nil
+}
+
+func (h *testChatHandler) ClearDirectChatPresence(_ context.Context, req *connect.Request[chatv1.ClearDirectChatPresenceRequest]) (*connect.Response[chatv1.ClearDirectChatPresenceResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	return connect.NewResponse(&chatv1.ClearDirectChatPresenceResponse{}), nil
+}
+
 func (h *testChatHandler) LastAuthorization() string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -1215,6 +1379,58 @@ func readDirectChatReadEnvelope(t *testing.T, ctx context.Context, conn *websock
 	var envelope directChatReadEnvelope
 	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
 		t.Fatalf("чтение direct chat read envelope: %v", err)
+	}
+
+	return envelope
+}
+
+type directChatTypingEnvelope struct {
+	Type    string `json:"type"`
+	Payload struct {
+		ChatID      string `json:"chatId"`
+		TypingState struct {
+			SelfTyping *struct {
+				UpdatedAt string `json:"updatedAt"`
+			} `json:"selfTyping"`
+			PeerTyping *struct {
+				UpdatedAt string `json:"updatedAt"`
+			} `json:"peerTyping"`
+		} `json:"typingState"`
+	} `json:"payload"`
+}
+
+func readDirectChatTypingEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) directChatTypingEnvelope {
+	t.Helper()
+
+	var envelope directChatTypingEnvelope
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("чтение direct chat typing envelope: %v", err)
+	}
+
+	return envelope
+}
+
+type directChatPresenceEnvelope struct {
+	Type    string `json:"type"`
+	Payload struct {
+		ChatID        string `json:"chatId"`
+		PresenceState struct {
+			SelfPresence *struct {
+				HeartbeatAt string `json:"heartbeatAt"`
+			} `json:"selfPresence"`
+			PeerPresence *struct {
+				HeartbeatAt string `json:"heartbeatAt"`
+			} `json:"peerPresence"`
+		} `json:"presenceState"`
+	} `json:"payload"`
+}
+
+func readDirectChatPresenceEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) directChatPresenceEnvelope {
+	t.Helper()
+
+	var envelope directChatPresenceEnvelope
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("чтение direct chat presence envelope: %v", err)
 	}
 
 	return envelope

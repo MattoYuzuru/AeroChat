@@ -44,11 +44,6 @@ type ChatsAction =
   | { type: "thread_load_succeeded"; snapshot: ChatThreadSnapshot }
   | { type: "thread_load_failed"; chatId: string; message: string }
   | {
-      type: "thread_presence_updated";
-      chatId: string;
-      presenceState: DirectChatPresenceState | null;
-    }
-  | {
       type: "message_updated";
       chat?: DirectChat;
       message: DirectChatMessage;
@@ -58,6 +53,16 @@ type ChatsAction =
       type: "read_state_replaced";
       chatId: string;
       readState: DirectChatReadState | null;
+    }
+  | {
+      type: "typing_state_replaced";
+      chatId: string;
+      typingState: DirectChatTypingState | null;
+    }
+  | {
+      type: "presence_state_replaced";
+      chatId: string;
+      presenceState: DirectChatPresenceState | null;
     }
   | { type: "send_started" }
   | { type: "send_finished" }
@@ -170,7 +175,19 @@ export function chatsReducer(
         threadStatus: "error",
         threadErrorMessage: action.message,
       };
-    case "thread_presence_updated":
+    case "typing_state_replaced":
+      if (state.thread?.chat.id !== action.chatId) {
+        return state;
+      }
+
+      return {
+        ...state,
+        thread: {
+          ...state.thread,
+          typingState: action.typingState,
+        },
+      };
+    case "presence_state_replaced":
       if (state.thread?.chat.id !== action.chatId) {
         return state;
       }

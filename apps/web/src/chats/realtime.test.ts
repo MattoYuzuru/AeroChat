@@ -84,6 +84,66 @@ describe("parseDirectChatRealtimeEvent", () => {
     });
   });
 
+  it("normalizes viewer-relative typing state payload", () => {
+    const event = parseDirectChatRealtimeEvent({
+      id: "evt-typing-1",
+      type: "direct_chat.typing.updated",
+      issuedAt: "2026-04-07T12:01:00Z",
+      payload: {
+        chatId: "chat-1",
+        typingState: {
+          selfTyping: null,
+          peerTyping: {
+            updatedAt: "2026-04-07T12:00:58Z",
+            expiresAt: "2026-04-07T12:01:04Z",
+          },
+        },
+      },
+    });
+
+    expect(event).toEqual({
+      type: "direct_chat.typing.updated",
+      chatId: "chat-1",
+      typingState: {
+        selfTyping: null,
+        peerTyping: {
+          updatedAt: "2026-04-07T12:00:58Z",
+          expiresAt: "2026-04-07T12:01:04Z",
+        },
+      },
+    });
+  });
+
+  it("normalizes viewer-relative presence state payload", () => {
+    const event = parseDirectChatRealtimeEvent({
+      id: "evt-presence-1",
+      type: "direct_chat.presence.updated",
+      issuedAt: "2026-04-07T12:02:00Z",
+      payload: {
+        chatId: "chat-1",
+        presenceState: {
+          selfPresence: {
+            heartbeatAt: "2026-04-07T12:01:59Z",
+            expiresAt: "2026-04-07T12:02:29Z",
+          },
+          peerPresence: null,
+        },
+      },
+    });
+
+    expect(event).toEqual({
+      type: "direct_chat.presence.updated",
+      chatId: "chat-1",
+      presenceState: {
+        selfPresence: {
+          heartbeatAt: "2026-04-07T12:01:59Z",
+          expiresAt: "2026-04-07T12:02:29Z",
+        },
+        peerPresence: null,
+      },
+    });
+  });
+
   it("ignores malformed payloads", () => {
     const event = parseDirectChatRealtimeEvent({
       id: "evt-3",
