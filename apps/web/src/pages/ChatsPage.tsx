@@ -144,8 +144,8 @@ export function ChatsPage() {
             <p className={styles.cardLabel}>Chats</p>
             <h1 className={styles.title}>Личные чаты AeroChat</h1>
             <p className={styles.subtitle}>
-              Лёгкий direct chat shell остаётся gateway-only, без websocket, polling, media и
-              draft recovery, но уже ближе к calm desktop-like UX AeroChat.
+              Лёгкий direct chat shell остаётся gateway-only, уже поднимает bounded realtime
+              transport foundation, но пока без live message fan-out, media и draft recovery.
             </p>
           </div>
 
@@ -687,7 +687,7 @@ function describeChatPreview(chat: DirectChat, peer: ChatUser | null): string {
   }
 
   if (peer) {
-    return `Личный чат с @${peer.login} без realtime-обновлений и без тяжёлого shell-overhead.`;
+    return `Личный чат с @${peer.login} с подключённым realtime transport foundation и без тяжёлого shell-overhead.`;
   }
 
   return "Личный thread готов к открытию.";

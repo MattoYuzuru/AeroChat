@@ -251,11 +251,13 @@ Public edge для target VPS принадлежит shared `Traefik` в `k3s`.
 Compose runtime публикует только два host upstream'а на `${AERO_SHARED_EDGE_HOST_IP}`:
 
 - `/` → `web` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}`;
-- `/api`, `/healthz`, `/readyz` → `aero-gateway` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}`.
+- `/api`, `/api/realtime`, `/healthz`, `/readyz` → `aero-gateway` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}`.
 
 `Traefik` получает доступ к ним через Kubernetes `Service` без selector и `EndpointSlice`,
 а TLS выпускается через existing `cert-manager`.
-Для `/api` используется ingress-side strip-prefix, потому что web bundle продолжает работать с `VITE_GATEWAY_BASE_URL=/api`.
+Для `/api` и `/api/realtime` используется тот же gateway base contract:
+ingress-side strip-prefix остаётся у `/api`, а realtime endpoint публикуется как `/api/realtime`,
+чтобы web bundle продолжал работать с `VITE_GATEWAY_BASE_URL=/api` без второго публичного backend URL.
 
 Подробности, TLS/domain contract и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
 Для финального live rollout используется manual workflow `Deploy Production` c GitHub Environment `production`.

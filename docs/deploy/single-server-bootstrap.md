@@ -128,6 +128,7 @@
 
 - `/` и SPA routes через `web`;
 - `/api` через `aero-gateway` со strip-prefix `/api`;
+- `/api/realtime` через `aero-gateway`;
 - `/healthz` через `aero-gateway`;
 - `/readyz` через `aero-gateway`.
 
@@ -204,6 +205,7 @@ cp .env.server.secrets.example .env.server.secrets
 - этот же адрес должен использоваться в Kubernetes `EndpointSlice`;
 - `AERO_WEB_HOST_PORT` обслуживает frontend upstream;
 - `AERO_GATEWAY_HOST_PORT` обслуживает backend upstream для `/api`, `/healthz` и `/readyz`;
+- тот же `AERO_GATEWAY_HOST_PORT` обслуживает и websocket endpoint `/api/realtime`;
 - high ports не должны оставаться бесконтрольно доступными извне.
 
 4. Проверь итоговую compose-конфигурацию:

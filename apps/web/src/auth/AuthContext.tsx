@@ -9,6 +9,7 @@ import {
   type UpdateCurrentProfileInput,
 } from "../gateway/types";
 import { gatewayClient } from "../gateway/runtime";
+import { connectRealtime, type RealtimeConnection } from "../realtime/client";
 const sessionStore = createBrowserSessionStore();
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -17,6 +18,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     notice: null,
   });
   const bootstrappedRef = useRef(false);
+  const realtimeRef = useRef<RealtimeConnection | null>(null);
+  const authenticatedToken = state.status === "authenticated" ? state.token : null;
 
   async function retryBootstrap() {
     setState((current) => ({
@@ -75,6 +78,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    realtimeRef.current?.close();
+    realtimeRef.current = null;
+
+    if (authenticatedToken === null) {
+      return;
+    }
+
+    const connection = connectRealtime({
+      token: authenticatedToken,
+    });
+    realtimeRef.current = connection;
+
+    return () => {
+      connection.close();
+      if (realtimeRef.current === connection) {
+        realtimeRef.current = null;
+      }
+    };
+  }, [authenticatedToken]);
 
   async function login(input: LoginInput) {
     const auth = await gatewayClient.login(input);

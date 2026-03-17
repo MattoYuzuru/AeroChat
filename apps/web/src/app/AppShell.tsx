@@ -103,7 +103,7 @@ export function AppShell() {
             <dl className={styles.metaGrid}>
               <div>
                 <dt>Edge</dt>
-                <dd>`/api` → `aero-gateway`</dd>
+                <dd>`/api` + `/api/realtime` → `aero-gateway`</dd>
               </div>
               <div>
                 <dt>Auth</dt>

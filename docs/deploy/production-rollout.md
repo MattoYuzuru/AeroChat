@@ -37,7 +37,7 @@ Workflow не занимается:
 - Kubernetes resources из `infra/k8s/shared-edge/aero.keykomi.com.example.yaml` уже применены;
 - `EndpointSlice` уже указывают на те же host IP и ports, что и `.env.server`;
 - `cert-manager` уже выпустил сертификат для `AERO_PROD_EDGE_DOMAIN`;
-- `Traefik` уже обслуживает домен и маршруты `/`, `/api`, `/healthz`, `/readyz`.
+- `Traefik` уже обслуживает домен и маршруты `/`, `/api`, `/api/realtime`, `/healthz`, `/readyz`.
 
 Если compose topology, env contract или shared edge manifests менялись в репозитории, оператор обязан отдельно обновить
 checkout на VPS и при необходимости повторно применить `kubectl apply` до первого запуска workflow.
@@ -179,7 +179,8 @@ curl -fsS https://aero.keykomi.com/readyz
 11. Открыть `https://aero.keykomi.com/` в браузере и проверить:
     - загрузку web shell;
     - успешный login или register;
-    - работу `/api` через обычный пользовательский flow.
+    - работу `/api` через обычный пользовательский flow;
+    - успешный websocket upgrade на `/api/realtime` после login.
 12. Зафиксировать предыдущий known-good tag и текущий deployed tag в операторском журнале или release notes.
 
 Если register/login падают после успешного `upstream`- и `HTTPS`-smoke, отдельно проверь логи bootstrap:

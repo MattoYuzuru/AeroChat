@@ -9,12 +9,17 @@ import (
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/downstream"
 	edgehttp "github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/edgehttp"
+	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/realtime"
 	connecthandler "github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/transport/connect"
 )
 
-func NewHTTPHandler(logger *slog.Logger, meta observability.ServiceMeta, cfg Config, clients *downstream.Clients) http.Handler {
+func NewHTTPHandler(logger *slog.Logger, meta observability.ServiceMeta, cfg Config, clients *downstream.Clients, realtimeHub *realtime.Hub) http.Handler {
 	diagnosticsMux := observability.NewBaseMux(meta, logger, clients.ReadinessCheck)
 	connectMux := http.NewServeMux()
+	realtimeHandler := observability.WrapHTTPInstrumentation(
+		logger,
+		realtime.NewHandler(logger, realtime.NewIdentityAuthenticator(clients.Identity), realtimeHub, cfg.CORSAllowedOrigins),
+	)
 
 	identityPath, identityHandler := identityv1connect.NewIdentityServiceHandler(
 		connecthandler.NewIdentityHandler(meta.Name, meta.Version, clients.Identity),
@@ -35,6 +40,8 @@ func NewHTTPHandler(logger *slog.Logger, meta observability.ServiceMeta, cfg Con
 			diagnosticsMux.ServeHTTP(w, r)
 		case r.Method == http.MethodGet && r.URL.Path == "/readyz":
 			diagnosticsMux.ServeHTTP(w, r)
+		case r.Method == http.MethodGet && r.URL.Path == realtime.Path:
+			realtimeHandler.ServeHTTP(w, r)
 		default:
 			loggedConnectMux.ServeHTTP(w, r)
 		}

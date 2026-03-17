@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] k3s / Traefik shared edge bootstrap для single-server self-host runtime
+- [x] gateway-based realtime transport foundation через WebSocket
 
 ---
 
@@ -95,6 +95,7 @@
 - [ ] Draft recovery
 - [x] Pin / unpin
 - [x] Web direct chat bootstrap через `aero-gateway`
+- [x] Gateway realtime transport foundation
 
 ---
 
