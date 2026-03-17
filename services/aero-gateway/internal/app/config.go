@@ -10,13 +10,15 @@ import (
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
 type Config struct {
-	HTTPAddress        string
-	LogLevel           string
-	ShutdownTimeout    time.Duration
-	DownstreamTimeout  time.Duration
-	IdentityBaseURL    string
-	ChatBaseURL        string
-	CORSAllowedOrigins []string
+	HTTPAddress          string
+	LogLevel             string
+	ShutdownTimeout      time.Duration
+	DownstreamTimeout    time.Duration
+	RealtimePingInterval time.Duration
+	RealtimeWriteTimeout time.Duration
+	IdentityBaseURL      string
+	ChatBaseURL          string
+	CORSAllowedOrigins   []string
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -29,6 +31,20 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	realtimePingInterval, err := lookupDuration("AERO_REALTIME_PING_INTERVAL", 30*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	realtimeWriteTimeout, err := lookupDuration("AERO_REALTIME_WRITE_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	if realtimePingInterval <= 0 {
+		return Config{}, fmt.Errorf("переменная %s: требуется положительная длительность", "AERO_REALTIME_PING_INTERVAL")
+	}
+	if realtimeWriteTimeout <= 0 {
+		return Config{}, fmt.Errorf("переменная %s: требуется положительная длительность", "AERO_REALTIME_WRITE_TIMEOUT")
+	}
 	identityBaseURL, err := lookupURL("AERO_IDENTITY_URL", "http://127.0.0.1:8081")
 	if err != nil {
 		return Config{}, err
@@ -39,13 +55,15 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	}
 
 	return Config{
-		HTTPAddress:        lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
-		LogLevel:           lookupString("AERO_LOG_LEVEL", "info"),
-		ShutdownTimeout:    shutdownTimeout,
-		DownstreamTimeout:  downstreamTimeout,
-		IdentityBaseURL:    identityBaseURL,
-		ChatBaseURL:        chatBaseURL,
-		CORSAllowedOrigins: lookupCSV("AERO_CORS_ALLOWED_ORIGINS"),
+		HTTPAddress:          lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
+		LogLevel:             lookupString("AERO_LOG_LEVEL", "info"),
+		ShutdownTimeout:      shutdownTimeout,
+		DownstreamTimeout:    downstreamTimeout,
+		RealtimePingInterval: realtimePingInterval,
+		RealtimeWriteTimeout: realtimeWriteTimeout,
+		IdentityBaseURL:      identityBaseURL,
+		ChatBaseURL:          chatBaseURL,
+		CORSAllowedOrigins:   lookupCSV("AERO_CORS_ALLOWED_ORIGINS"),
 	}, nil
 }
 

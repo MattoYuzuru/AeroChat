@@ -9,6 +9,8 @@ require (
 	google.golang.org/protobuf v1.36.11
 )
 
+require github.com/coder/websocket v1.8.14 // indirect
+
 replace github.com/MattoYuzuru/AeroChat/gen/go => ../../gen/go
 
 replace github.com/MattoYuzuru/AeroChat/libs/go => ../../libs/go

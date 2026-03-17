@@ -11,6 +11,7 @@ import (
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/app"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/downstream"
+	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/realtime"
 )
 
 const (
@@ -40,9 +41,16 @@ func run() error {
 
 	downstreamClient := downstream.NewHTTPClient(cfg.DownstreamTimeout)
 	clients := downstream.NewClients(downstreamClient, cfg.IdentityBaseURL, cfg.ChatBaseURL)
+	realtimeHub := realtime.NewHub(logger, cfg.RealtimePingInterval, cfg.RealtimeWriteTimeout)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	defer realtimeHub.Close()
+
+	go func() {
+		<-ctx.Done()
+		realtimeHub.Close()
+	}()
 
 	handler := app.NewHTTPHandler(
 		logger,
@@ -52,6 +60,7 @@ func run() error {
 		},
 		cfg,
 		clients,
+		realtimeHub,
 	)
 
 	if err := observability.RunHTTPServer(ctx, logger, observability.HTTPServerConfig{

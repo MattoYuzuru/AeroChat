@@ -7,6 +7,8 @@ func TestLoadConfigDefaults(t *testing.T) {
 	t.Setenv("AERO_LOG_LEVEL", "")
 	t.Setenv("AERO_SHUTDOWN_TIMEOUT", "")
 	t.Setenv("AERO_DOWNSTREAM_TIMEOUT", "")
+	t.Setenv("AERO_REALTIME_PING_INTERVAL", "")
+	t.Setenv("AERO_REALTIME_WRITE_TIMEOUT", "")
 	t.Setenv("AERO_IDENTITY_URL", "")
 	t.Setenv("AERO_CHAT_URL", "")
 	t.Setenv("AERO_CORS_ALLOWED_ORIGINS", "")
@@ -28,6 +30,12 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.DownstreamTimeout.String() != "5s" {
 		t.Fatalf("ожидался downstream timeout 5s, получен %s", cfg.DownstreamTimeout)
 	}
+	if cfg.RealtimePingInterval.String() != "30s" {
+		t.Fatalf("ожидался realtime ping interval 30s, получен %s", cfg.RealtimePingInterval)
+	}
+	if cfg.RealtimeWriteTimeout.String() != "10s" {
+		t.Fatalf("ожидался realtime write timeout 10s, получен %s", cfg.RealtimeWriteTimeout)
+	}
 	if len(cfg.CORSAllowedOrigins) != 0 {
 		t.Fatalf("ожидался пустой список cors origins, получено %v", cfg.CORSAllowedOrigins)
 	}
@@ -38,6 +46,14 @@ func TestLoadConfigRejectsInvalidDuration(t *testing.T) {
 
 	if _, err := LoadConfig(":8080"); err == nil {
 		t.Fatal("ожидалась ошибка для невалидного downstream timeout")
+	}
+}
+
+func TestLoadConfigRejectsNonPositiveRealtimePingInterval(t *testing.T) {
+	t.Setenv("AERO_REALTIME_PING_INTERVAL", "0s")
+
+	if _, err := LoadConfig(":8080"); err == nil {
+		t.Fatal("ожидалась ошибка для нулевого realtime ping interval")
 	}
 }
 

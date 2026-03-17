@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +20,9 @@ import (
 	identityv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1/identityv1connect"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/downstream"
+	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/realtime"
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -35,7 +39,7 @@ func TestNewHTTPHandlerRoutesIdentityAndChatRequests(t *testing.T) {
 
 	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{
 		CORSAllowedOrigins: []string{"http://localhost:5173"},
-	}, downstream.NewClients(&http.Client{Timeout: time.Second}, identityServer.URL, chatServer.URL))
+	}, downstream.NewClients(&http.Client{Timeout: time.Second}, identityServer.URL, chatServer.URL), newTestRealtimeHub(t, logger))
 
 	gatewayServer := httptest.NewServer(handler)
 	defer gatewayServer.Close()
@@ -97,7 +101,7 @@ func TestNewHTTPHandlerReadinessDependsOnDownstreams(t *testing.T) {
 		&http.Client{Timeout: time.Second},
 		identityServer.URL,
 		chatServer.URL,
-	))
+	), newTestRealtimeHub(t, logger))
 
 	healthyRequest := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	healthyRecorder := httptest.NewRecorder()
@@ -137,7 +141,7 @@ func TestNewHTTPHandlerPreservesDownstreamAuthOwnership(t *testing.T) {
 		&http.Client{Timeout: time.Second},
 		identityServer.URL,
 		chatServer.URL,
-	))
+	), newTestRealtimeHub(t, logger))
 
 	gatewayServer := httptest.NewServer(handler)
 	defer gatewayServer.Close()
@@ -155,6 +159,117 @@ func TestNewHTTPHandlerPreservesDownstreamAuthOwnership(t *testing.T) {
 	}
 	if connectErr.Code() != connect.CodeUnauthenticated {
 		t.Fatalf("ожидался код %s, получен %s", connect.CodeUnauthenticated, connectErr.Code())
+	}
+}
+
+func TestNewHTTPHandlerAcceptsRealtimeConnections(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	chatDownstream := &testChatHandler{}
+
+	identityServer := httptest.NewServer(identityHTTPHandler(identityDownstream))
+	defer identityServer.Close()
+
+	chatServer := httptest.NewServer(chatHTTPHandler(chatDownstream))
+	defer chatServer.Close()
+
+	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{
+		CORSAllowedOrigins: []string{"http://app.aerochat.local"},
+	}, downstream.NewClients(
+		&http.Client{Timeout: time.Second},
+		identityServer.URL,
+		chatServer.URL,
+	), newTestRealtimeHub(t, logger))
+
+	gatewayServer := httptest.NewServer(handler)
+	defer gatewayServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	conn, _, err := websocket.Dial(ctx, websocketURL(gatewayServer.URL+realtime.Path), &websocket.DialOptions{
+		HTTPHeader: http.Header{
+			"Origin": []string{"http://app.aerochat.local"},
+		},
+		Subprotocols: []string{realtime.Protocol, "aerochat.auth.v1.session.secret"},
+	})
+	if err != nil {
+		t.Fatalf("websocket dial через gateway: %v", err)
+	}
+	defer func() {
+		_ = conn.CloseNow()
+	}()
+
+	var message struct {
+		ID       string `json:"id"`
+		Type     string `json:"type"`
+		IssuedAt string `json:"issuedAt"`
+		Payload  struct {
+			ConnectionID string   `json:"connectionId"`
+			UserID       string   `json:"userId"`
+			Capabilities []string `json:"capabilities"`
+		} `json:"payload"`
+	}
+	if err := wsjson.Read(ctx, conn, &message); err != nil {
+		t.Fatalf("чтение ready envelope: %v", err)
+	}
+
+	if conn.Subprotocol() != realtime.Protocol {
+		t.Fatalf("ожидался websocket subprotocol %q, получен %q", realtime.Protocol, conn.Subprotocol())
+	}
+	if message.Type != realtime.EventTypeReady {
+		t.Fatalf("ожидался тип события %q, получен %q", realtime.EventTypeReady, message.Type)
+	}
+	if message.Payload.UserID != "user-1" {
+		t.Fatalf("ожидался user id %q, получен %q", "user-1", message.Payload.UserID)
+	}
+	if len(message.Payload.Capabilities) == 0 {
+		t.Fatal("ожидался непустой список realtime capability")
+	}
+	if identityDownstream.LastAuthorization() != "Bearer v1.session.secret" {
+		t.Fatalf("authorization до identity для realtime не был проброшен: %q", identityDownstream.LastAuthorization())
+	}
+}
+
+func TestNewHTTPHandlerRejectsRealtimeConnectionWithoutSessionToken(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	chatDownstream := &testChatHandler{}
+
+	identityServer := httptest.NewServer(identityHTTPHandler(identityDownstream))
+	defer identityServer.Close()
+
+	chatServer := httptest.NewServer(chatHTTPHandler(chatDownstream))
+	defer chatServer.Close()
+
+	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{
+		CORSAllowedOrigins: []string{"http://app.aerochat.local"},
+	}, downstream.NewClients(
+		&http.Client{Timeout: time.Second},
+		identityServer.URL,
+		chatServer.URL,
+	), newTestRealtimeHub(t, logger))
+
+	gatewayServer := httptest.NewServer(handler)
+	defer gatewayServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, resp, err := websocket.Dial(ctx, websocketURL(gatewayServer.URL+realtime.Path), &websocket.DialOptions{
+		HTTPHeader: http.Header{
+			"Origin": []string{"http://app.aerochat.local"},
+		},
+		Subprotocols: []string{realtime.Protocol},
+	})
+	if err == nil {
+		t.Fatal("ожидалась ошибка handshake без websocket session token")
+	}
+	if resp == nil {
+		t.Fatal("ожидался http-ответ handshake при ошибке websocket-аутентификации")
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("ожидался статус %d, получен %d", http.StatusUnauthorized, resp.StatusCode)
 	}
 }
 
@@ -296,4 +411,29 @@ func (h *testChatHandler) setAuthorization(value string) {
 	defer h.mu.Unlock()
 
 	h.lastAuthorization = value
+}
+
+func newTestRealtimeHub(t *testing.T, logger *slog.Logger) *realtime.Hub {
+	t.Helper()
+
+	hub := realtime.NewHub(logger, time.Minute, time.Second)
+	t.Cleanup(hub.Close)
+
+	return hub
+}
+
+func websocketURL(value string) string {
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return value
+	}
+
+	switch parsed.Scheme {
+	case "https":
+		parsed.Scheme = "wss"
+	default:
+		parsed.Scheme = "ws"
+	}
+
+	return parsed.String()
 }
