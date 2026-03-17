@@ -476,6 +476,39 @@ func TestPinAndUnpinMessage(t *testing.T) {
 	}
 }
 
+func TestListDirectChatsSkipsSessionTouchWhenLastSeenIsFresh(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+
+	if _, err := service.ListDirectChats(context.Background(), alice.Token); err != nil {
+		t.Fatalf("list direct chats: %v", err)
+	}
+	if repo.touchCalls != 0 {
+		t.Fatalf("ожидалось 0 session touch для свежей сессии, получено %d", repo.touchCalls)
+	}
+}
+
+func TestListDirectChatsRefreshesSessionTouchWhenLastSeenIsStale(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+
+	authSession := repo.sessions[alice.SessionID]
+	authSession.Session.LastSeenAt = authSession.Session.LastSeenAt.Add(-service.sessionTouchInterval)
+	authSession.Device.LastSeenAt = authSession.Device.LastSeenAt.Add(-service.sessionTouchInterval)
+	repo.sessions[alice.SessionID] = authSession
+
+	if _, err := service.ListDirectChats(context.Background(), alice.Token); err != nil {
+		t.Fatalf("list direct chats with stale session: %v", err)
+	}
+	if repo.touchCalls != 1 {
+		t.Fatalf("ожидался 1 session touch для устаревшей сессии, получено %d", repo.touchCalls)
+	}
+}
+
 func newTestService() (*Service, *fakeRepository) {
 	repo := newFakeRepository()
 	service := NewService(repo, repo, repo.typingStore, repo.presenceStore, libauth.NewSessionTokenManager(), 6*time.Second, 30*time.Second)
@@ -528,8 +561,9 @@ func mustDeleteMessage(t *testing.T, service *Service, token string, chatID stri
 }
 
 type issuedAuth struct {
-	User  UserSummary
-	Token string
+	User      UserSummary
+	Token     string
+	SessionID string
 }
 
 type fakeRepository struct {
@@ -542,6 +576,7 @@ type fakeRepository struct {
 	readPositions map[string]DirectChatReadPosition
 	typingStore   *fakeTypingStore
 	presenceStore *fakePresenceStore
+	touchCalls    int
 }
 
 func newFakeRepository() *fakeRepository {
@@ -595,7 +630,7 @@ func (r *fakeRepository) mustIssueAuth(userID string, login string, nickname str
 		TokenHash: tokenHash,
 	}
 
-	return issuedAuth{User: user, Token: token}
+	return issuedAuth{User: user, Token: token, SessionID: sessionID}
 }
 
 func (r *fakeRepository) GetSessionAuthByID(_ context.Context, sessionID string) (*SessionAuth, error) {
@@ -618,6 +653,7 @@ func (r *fakeRepository) TouchSession(_ context.Context, sessionID string, devic
 	authSession.Device.LastSeenAt = at
 	authSession.Device.ID = deviceID
 	r.sessions[sessionID] = authSession
+	r.touchCalls++
 	return nil
 }
 

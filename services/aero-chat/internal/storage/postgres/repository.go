@@ -21,6 +21,8 @@ type Repository struct {
 	queries *chatsqlc.Queries
 }
 
+const touchSessionTimeout = 100 * time.Millisecond
+
 func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{
 		db:      db,
@@ -69,11 +71,19 @@ func (r *Repository) GetSessionAuthByID(ctx context.Context, sessionID string) (
 }
 
 func (r *Repository) TouchSession(ctx context.Context, sessionID string, deviceID string, at time.Time) error {
-	return convertError(r.queries.TouchSessionAndDevice(ctx, chatsqlc.TouchSessionAndDeviceParams{
+	touchCtx, cancel := context.WithTimeout(ctx, touchSessionTimeout)
+	defer cancel()
+
+	err := r.queries.TouchSessionAndDevice(touchCtx, chatsqlc.TouchSessionAndDeviceParams{
 		ID:         mustParseUUID(sessionID),
 		DeviceID:   mustParseUUID(deviceID),
 		LastSeenAt: timestamptzValue(at),
-	}))
+	})
+	if shouldIgnoreTouchError(err) {
+		return nil
+	}
+
+	return convertError(err)
 }
 
 func (r *Repository) AreFriends(ctx context.Context, firstUserID string, secondUserID string) (bool, error) {
@@ -645,4 +655,12 @@ func convertError(err error) error {
 	}
 
 	return err
+}
+
+func shouldIgnoreTouchError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }

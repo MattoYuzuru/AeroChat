@@ -365,6 +365,42 @@ func TestBlockClearsSocialGraphAndPreventsRequests(t *testing.T) {
 	}
 }
 
+func TestListFriendsSkipsSessionTouchWhenLastSeenIsFresh(t *testing.T) {
+	t.Parallel()
+
+	service := newTestService()
+	authSession := mustRegister(t, service, "touch-fresh", "Fresh")
+	repo := service.repo.(*fakeRepository)
+
+	if _, err := service.ListFriends(context.Background(), authSession.Token); err != nil {
+		t.Fatalf("list friends: %v", err)
+	}
+	if repo.touchCalls != 0 {
+		t.Fatalf("ожидалось 0 session touch для свежей сессии, получено %d", repo.touchCalls)
+	}
+}
+
+func TestListFriendsRefreshesSessionTouchWhenLastSeenIsStale(t *testing.T) {
+	t.Parallel()
+
+	service := newTestService()
+	authSession := mustRegister(t, service, "touch-stale", "Stale")
+	repo := service.repo.(*fakeRepository)
+
+	session := repo.sessions[authSession.Session.ID]
+	session.Session.LastSeenAt = session.Session.LastSeenAt.Add(-service.sessionTouchInterval)
+	session.Device.LastSeenAt = session.Device.LastSeenAt.Add(-service.sessionTouchInterval)
+	repo.sessions[authSession.Session.ID] = session
+	repo.devices[authSession.Device.ID] = session.Device
+
+	if _, err := service.ListFriends(context.Background(), authSession.Token); err != nil {
+		t.Fatalf("list friends with stale session: %v", err)
+	}
+	if repo.touchCalls != 1 {
+		t.Fatalf("ожидался 1 session touch для устаревшей сессии, получено %d", repo.touchCalls)
+	}
+}
+
 func newTestService() *Service {
 	repo := newFakeRepository()
 	service := NewService(repo, identityauth.NewPasswordHasher(), libauth.NewSessionTokenManager())
@@ -407,6 +443,7 @@ type fakeRepository struct {
 	blocks       map[string]map[string]time.Time
 	friendReqs   map[string]PendingFriendRequest
 	friendships  map[string]time.Time
+	touchCalls   int
 }
 
 func newFakeRepository() *fakeRepository {
@@ -495,6 +532,7 @@ func (r *fakeRepository) TouchSession(_ context.Context, sessionID string, devic
 	r.devices[deviceID] = device
 	session.Device = device
 	r.sessions[sessionID] = session
+	r.touchCalls++
 	return nil
 }
 

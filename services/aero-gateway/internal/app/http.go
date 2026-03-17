@@ -25,6 +25,7 @@ func NewHTTPHandler(logger *slog.Logger, meta observability.ServiceMeta, cfg Con
 		connecthandler.NewChatHandler(meta.Name, meta.Version, clients.Chat),
 	)
 	connectMux.Handle(chatPath, chatHandler)
+	loggedConnectMux := observability.WrapHTTPInstrumentation(logger, connectMux)
 
 	return edgehttp.WrapCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -35,7 +36,7 @@ func NewHTTPHandler(logger *slog.Logger, meta observability.ServiceMeta, cfg Con
 		case r.Method == http.MethodGet && r.URL.Path == "/readyz":
 			diagnosticsMux.ServeHTTP(w, r)
 		default:
-			connectMux.ServeHTTP(w, r)
+			loggedConnectMux.ServeHTTP(w, r)
 		}
 	}), cfg.CORSAllowedOrigins)
 }
