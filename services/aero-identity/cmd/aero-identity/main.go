@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	identityv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1/identityv1connect"
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	"github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/app"
@@ -65,21 +64,16 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	mux := observability.NewBaseMux(
-		observability.ServiceMeta{
-			Name:    serviceName,
-			Version: version,
-		},
-		logger,
-		repository.Ping,
-	)
-	path, connectHTTPHandler := identityv1connect.NewIdentityServiceHandler(handler)
-	mux.Handle(path, connectHTTPHandler)
+	meta := observability.ServiceMeta{
+		Name:    serviceName,
+		Version: version,
+	}
+	httpHandler := app.NewHTTPHandler(logger, meta, repository.Ping, handler)
 
 	if err := observability.RunHTTPServer(ctx, logger, observability.HTTPServerConfig{
 		Address:         cfg.HTTPAddress,
 		ShutdownTimeout: cfg.ShutdownTimeout,
-	}, mux); err != nil && !errors.Is(err, context.Canceled) {
+	}, httpHandler); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 

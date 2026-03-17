@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	chatv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/v1/chatv1connect"
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/app"
@@ -84,12 +83,13 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	mux := observability.NewBaseMux(
-		observability.ServiceMeta{
-			Name:    serviceName,
-			Version: version,
-		},
+	meta := observability.ServiceMeta{
+		Name:    serviceName,
+		Version: version,
+	}
+	httpHandler := app.NewHTTPHandler(
 		logger,
+		meta,
 		func(ctx context.Context) error {
 			if err := repository.Ping(ctx); err != nil {
 				return err
@@ -100,14 +100,13 @@ func run() error {
 
 			return typingStore.Ping(ctx)
 		},
+		handler,
 	)
-	path, connectHTTPHandler := chatv1connect.NewChatServiceHandler(handler)
-	mux.Handle(path, connectHTTPHandler)
 
 	if err := observability.RunHTTPServer(ctx, logger, observability.HTTPServerConfig{
 		Address:         cfg.HTTPAddress,
 		ShutdownTimeout: cfg.ShutdownTimeout,
-	}, mux); err != nil && !errors.Is(err, context.Canceled) {
+	}, httpHandler); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 
