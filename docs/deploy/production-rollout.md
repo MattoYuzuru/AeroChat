@@ -84,6 +84,8 @@ Workflow использует только GitHub Environment `production`.
 
 - `AERO_PROD_MEDIA_EDGE_DOMAIN`
   - отдельный browser-visible media домен shared deployment;
+  - для current Cloudflare-compatible contract ожидается sibling-host внутри той же зоны,
+    например `media.keykomi.com` при `AERO_PROD_EDGE_DOMAIN=aero.keykomi.com`;
   - используется в HTTPS media health проверке workflow.
 
 ## Server-side prerequisites
@@ -185,7 +187,7 @@ kubectl -n aerochat-edge get certificate
 curl -fsS https://aero.keykomi.com/
 curl -fsS https://aero.keykomi.com/healthz
 curl -fsS https://aero.keykomi.com/readyz
-curl -fsS https://media.aero.keykomi.com/minio/health/live
+curl -fsS https://media.keykomi.com/minio/health/live
 ```
 
 11. Открыть `https://aero.keykomi.com/` в браузере и проверить:
@@ -193,8 +195,9 @@ curl -fsS https://media.aero.keykomi.com/minio/health/live
     - успешный login или register;
     - работу `/api` через обычный пользовательский flow;
     - успешный websocket upgrade на `/api/realtime` после login.
-12. При ручном API smoke для `CreateAttachmentUploadIntent` проверить, что presigned URL указывает на media subdomain,
-    а не на внутренний `minio:9000` или основной application domain.
+12. При ручном API smoke для `CreateAttachmentUploadIntent` проверить, что presigned URL указывает на
+    `https://media.<zone-domain>`,
+    а не на внутренний `minio:9000`, основной application domain или nested host вида `media.<application-host>`.
 13. Зафиксировать предыдущий known-good tag и текущий deployed tag в операторском журнале или release notes.
 
 Если register/login падают после успешного `upstream`- и `HTTPS`-smoke, отдельно проверь логи bootstrap:
@@ -207,7 +210,7 @@ docker compose \
   logs --tail=100 aero-identity aero-chat
 ```
 
-В командах выше `aero.keykomi.com` и `media.aero.keykomi.com` нужно заменить
+В командах выше `aero.keykomi.com` и `media.keykomi.com` нужно заменить
 на значения `AERO_PROD_EDGE_DOMAIN` и `AERO_PROD_MEDIA_EDGE_DOMAIN`, если домены отличаются.
 
 ## Verification после rollout

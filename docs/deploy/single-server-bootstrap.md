@@ -50,7 +50,7 @@
 2. Cluster edge
    - shared `Traefik` как единственный публичный HTTP/TLS ingress;
    - `Service` без selector и `EndpointSlice`, указывающие на host upstream'ы AeroChat;
-   - `Ingress` и `Middleware`, которые маршрутизируют `aero.keykomi.com` и `media.aero.keykomi.com`;
+   - `Ingress` и `Middleware`, которые маршрутизируют `aero.keykomi.com` и `media.keykomi.com`;
    - `cert-manager`, который выпускает TLS secret для ingress.
 
 Поток traffic выглядит так:
@@ -94,6 +94,7 @@
   - оператор обычно меняет здесь `AERO_IMAGE_TAG`;
   - здесь же фиксируются `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT`, `AERO_MEDIA_HOST_PORT`,
     `AERO_MEDIA_EDGE_DOMAIN`, `MEDIA_S3_PUBLIC_ENDPOINT` и `MEDIA_S3_CORS_ALLOWED_ORIGINS`.
+  - `AERO_MEDIA_EDGE_DOMAIN` должен быть отдельным zone-level sibling-host, а не nested host под `AERO_EDGE_DOMAIN`.
 
 - `.env.server.secrets` на VPS
   - реальная рабочая копия секретов;
@@ -137,7 +138,7 @@
 - `/api/realtime` через `aero-gateway`;
 - `/healthz` через `aero-gateway`;
 - `/readyz` через `aero-gateway`;
-- весь host `media.<primary-domain>` через `minio`.
+- весь host `media.<zone-domain>` через `minio`.
 
 Минимальный пример ресурсов лежит в:
 
@@ -148,7 +149,7 @@
 - `192.0.2.10` на фактическое значение `AERO_SHARED_EDGE_HOST_IP` из `.env.server`;
 - `letsencrypt-prod` на реальный `ClusterIssuer`, если в кластере используется другое имя;
 - `ingressClassName`, если shared `Traefik` использует нестандартный ingress class;
-- `aero.keykomi.com` и `media.aero.keykomi.com`, если используются другие домены;
+- `aero.keykomi.com` и `media.keykomi.com`, если используются другие домены;
 - namespace, если выбран не `aerochat-edge`.
 
 ## Что готово сейчас
@@ -184,9 +185,16 @@
 - уже установленный `cert-manager`;
 - `kubectl` с доступом к целевому кластеру;
 - домен `aero.keykomi.com`, указывающий на текущий edge;
-- media subdomain, например `media.aero.keykomi.com`, указывающий на тот же edge;
+- отдельный media host внутри той же зоны, например `media.keykomi.com`, указывающий на тот же edge;
 - host IP VPS, достижимый из pod'ов `Traefik`;
 - возможность ограничить high ports так, чтобы они не стали вторым публичным edge.
+
+Для current launch-target за Cloudflare это важно отдельно:
+
+- application host может оставаться `aero.<zone-domain>`;
+- media host не должен становиться `media.aero.<zone-domain>`;
+- канонический production contract использует sibling-host вида `media.<zone-domain>`;
+- это соответствует hostname-модели из `ADR-037` и не требует отдельного second-level certificate slice.
 
 ## Первый bootstrap на VPS
 
@@ -221,7 +229,9 @@ cp .env.server.secrets.example .env.server.secrets
 - `AERO_WEB_HOST_PORT` обслуживает frontend upstream;
 - `AERO_GATEWAY_HOST_PORT` обслуживает backend upstream для `/api`, `/healthz` и `/readyz`;
 - тот же `AERO_GATEWAY_HOST_PORT` обслуживает и websocket endpoint `/api/realtime`;
-- `AERO_MEDIA_HOST_PORT` обслуживает MinIO API upstream для `https://media.<domain>`;
+- `AERO_MEDIA_EDGE_DOMAIN` должен быть zone-level sibling-host относительно application host;
+- пример для current topology: `AERO_EDGE_DOMAIN=aero.keykomi.com` и `AERO_MEDIA_EDGE_DOMAIN=media.keykomi.com`;
+- `AERO_MEDIA_HOST_PORT` обслуживает MinIO API upstream для `https://${AERO_MEDIA_EDGE_DOMAIN}`;
 - `MEDIA_S3_PUBLIC_ENDPOINT` должен совпадать с browser-visible media origin, а не с `minio:9000`;
 - `MEDIA_S3_CORS_ALLOWED_ORIGINS` должен перечислять только доверенные application origins;
 - high ports не должны оставаться бесконтрольно доступными извне.
@@ -293,7 +303,7 @@ docker compose \
 - `192.0.2.10` на `AERO_SHARED_EDGE_HOST_IP`;
 - `18080`, `18081` и `19000`, если в `.env.server` выбраны другие порты;
 - `letsencrypt-prod`, если `ClusterIssuer` называется иначе;
-- `aero.keykomi.com` и `media.aero.keykomi.com`, если используются другие домены;
+- `aero.keykomi.com` и `media.keykomi.com`, если используются другие домены;
 - namespace, если нужен другой.
 
 8. Примени ресурсы в кластер:
@@ -320,10 +330,10 @@ kubectl -n aerochat-edge get certificate
 curl -fsS https://aero.keykomi.com/
 curl -fsS https://aero.keykomi.com/healthz
 curl -fsS https://aero.keykomi.com/readyz
-curl -fsS https://media.aero.keykomi.com/minio/health/live
+curl -fsS https://media.keykomi.com/minio/health/live
 ```
 
-Если используются другие домены, замени `aero.keykomi.com` и `media.aero.keykomi.com`
+Если используются другие домены, замени `aero.keykomi.com` и `media.keykomi.com`
 на значения `AERO_EDGE_DOMAIN` и `AERO_MEDIA_EDGE_DOMAIN`.
 
 ## Что означают проверки

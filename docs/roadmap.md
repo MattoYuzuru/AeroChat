@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] media edge / upload runtime bootstrap для shared `Traefik` и `MinIO`
+- [x] media edge hostname normalization для Cloudflare-compatible shared `Traefik` runtime
 
 ---
 
