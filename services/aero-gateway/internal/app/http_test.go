@@ -1845,11 +1845,12 @@ func defaultTestGroupMembers() []*chatv1.GroupMember {
 
 func newTestChatUser(id string, login string) *chatv1.ChatUser {
 	nickname := login
-	if login == "alice" {
+	switch login {
+	case "alice":
 		nickname = "Alice"
-	} else if login == "bob" {
+	case "bob":
 		nickname = "Bob"
-	} else if login == "charlie" {
+	case "charlie":
 		nickname = "Charlie"
 	}
 
