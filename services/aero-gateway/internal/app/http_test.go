@@ -529,6 +529,304 @@ func TestNewHTTPHandlerPublishesViewerRelativePresenceUpdates(t *testing.T) {
 	}
 }
 
+func TestNewHTTPHandlerPublishesGroupMessageUpdatesToCurrentMembers(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-3", newTestProfile("user-3", "charlie", "Charlie"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	connUserThree := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-3")
+	defer func() { _ = connUserThree.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserThree)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&chatv1.SendGroupTextMessageRequest{
+		GroupId: "group-1",
+		Text:    "live group hello",
+	})
+	request.Header().Set("Authorization", "Bearer v1.user-1")
+
+	if _, err := chatClient.SendGroupTextMessage(ctx, request); err != nil {
+		t.Fatalf("send group text message через gateway: %v", err)
+	}
+
+	userOneEvent := readGroupMessageEnvelope(t, ctx, connUserOne)
+	userTwoEvent := readGroupMessageEnvelope(t, ctx, connUserTwo)
+	assertNoRealtimeEvent(t, connUserThree, 250*time.Millisecond)
+
+	if userOneEvent.Payload.Reason != realtime.GroupMessageReasonCreated {
+		t.Fatalf("user-1: ожидалась причина %q, получена %q", realtime.GroupMessageReasonCreated, userOneEvent.Payload.Reason)
+	}
+	if userOneEvent.Payload.Group == nil || userOneEvent.Payload.Group.SelfRole != "GROUP_MEMBER_ROLE_OWNER" {
+		t.Fatalf("user-1: ожидалась owner group snapshot, получено %+v", userOneEvent.Payload.Group)
+	}
+	if userTwoEvent.Payload.Group == nil || userTwoEvent.Payload.Group.SelfRole != "GROUP_MEMBER_ROLE_MEMBER" {
+		t.Fatalf("user-2: ожидалась member group snapshot, получено %+v", userTwoEvent.Payload.Group)
+	}
+	if userTwoEvent.Payload.Message == nil || userTwoEvent.Payload.Message.Text.Text != "live group hello" {
+		t.Fatalf("user-2: ожидался текст %q, получено %+v", "live group hello", userTwoEvent.Payload.Message)
+	}
+}
+
+func TestNewHTTPHandlerPublishesGroupJoinUpdatesToExistingMembersAndJoinedUser(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-3", newTestProfile("user-3", "charlie", "Charlie"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserThree := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-3")
+	defer func() { _ = connUserThree.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserThree)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&chatv1.JoinGroupByInviteLinkRequest{InviteToken: "ginv-member"})
+	request.Header().Set("Authorization", "Bearer v1.user-3")
+
+	if _, err := chatClient.JoinGroupByInviteLink(ctx, request); err != nil {
+		t.Fatalf("join group by invite link через gateway: %v", err)
+	}
+
+	userOneEvent := readGroupMembershipEnvelope(t, ctx, connUserOne)
+	userThreeEvent := readGroupMembershipEnvelope(t, ctx, connUserThree)
+
+	if userOneEvent.Payload.Reason != realtime.GroupMembershipReasonJoined || userOneEvent.Payload.AffectedUserID != "user-3" {
+		t.Fatalf("user-1: ожидался join event для user-3, получено %+v", userOneEvent.Payload)
+	}
+	if userOneEvent.Payload.Member == nil || userOneEvent.Payload.Member.User.ID != "user-3" {
+		t.Fatalf("user-1: ожидался joined member user-3, получено %+v", userOneEvent.Payload.Member)
+	}
+	if userThreeEvent.Payload.Group == nil || userThreeEvent.Payload.Group.SelfRole != "GROUP_MEMBER_ROLE_MEMBER" {
+		t.Fatalf("user-3: ожидалась viewer-relative роль member, получено %+v", userThreeEvent.Payload.Group)
+	}
+	if userThreeEvent.Payload.Thread == nil || !userThreeEvent.Payload.Thread.CanSendMessages {
+		t.Fatalf("user-3: ожидался write-enabled thread, получено %+v", userThreeEvent.Payload.Thread)
+	}
+}
+
+func TestNewHTTPHandlerPublishesGroupRoleUpdatesWithViewerRelativeShellState(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&chatv1.UpdateGroupMemberRoleRequest{
+		GroupId: "group-1",
+		UserId:  "user-2",
+		Role:    chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER,
+	})
+	request.Header().Set("Authorization", "Bearer v1.user-1")
+
+	if _, err := chatClient.UpdateGroupMemberRole(ctx, request); err != nil {
+		t.Fatalf("update group member role через gateway: %v", err)
+	}
+
+	userOneEvent := readGroupRoleEnvelope(t, ctx, connUserOne)
+	userTwoEvent := readGroupRoleEnvelope(t, ctx, connUserTwo)
+
+	if userOneEvent.Payload.PreviousRole != "GROUP_MEMBER_ROLE_MEMBER" {
+		t.Fatalf("user-1: ожидалась previous role %q, получена %q", "GROUP_MEMBER_ROLE_MEMBER", userOneEvent.Payload.PreviousRole)
+	}
+	if userOneEvent.Payload.Member == nil || userOneEvent.Payload.Member.Role != "GROUP_MEMBER_ROLE_READER" {
+		t.Fatalf("user-1: ожидался reader update, получено %+v", userOneEvent.Payload.Member)
+	}
+	if userTwoEvent.Payload.Group == nil || userTwoEvent.Payload.Group.SelfRole != "GROUP_MEMBER_ROLE_READER" {
+		t.Fatalf("user-2: ожидалась viewer-relative роль reader, получено %+v", userTwoEvent.Payload.Group)
+	}
+	if userTwoEvent.Payload.Thread == nil || userTwoEvent.Payload.Thread.CanSendMessages {
+		t.Fatalf("user-2: ожидался read-only thread, получено %+v", userTwoEvent.Payload.Thread)
+	}
+}
+
+func TestNewHTTPHandlerPublishesGroupOwnershipTransferUpdates(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&chatv1.TransferGroupOwnershipRequest{
+		GroupId:      "group-1",
+		TargetUserId: "user-2",
+	})
+	request.Header().Set("Authorization", "Bearer v1.user-1")
+
+	if _, err := chatClient.TransferGroupOwnership(ctx, request); err != nil {
+		t.Fatalf("transfer group ownership через gateway: %v", err)
+	}
+
+	userOneEvent := readGroupOwnershipEnvelope(t, ctx, connUserOne)
+	userTwoEvent := readGroupOwnershipEnvelope(t, ctx, connUserTwo)
+
+	if userOneEvent.Payload.PreviousOwnerMember == nil || userOneEvent.Payload.PreviousOwnerMember.User.ID != "user-1" || userOneEvent.Payload.PreviousOwnerMember.Role != "GROUP_MEMBER_ROLE_ADMIN" {
+		t.Fatalf("user-1: ожидался admin snapshot прежнего owner, получено %+v", userOneEvent.Payload.PreviousOwnerMember)
+	}
+	if userTwoEvent.Payload.OwnerMember == nil || userTwoEvent.Payload.OwnerMember.User.ID != "user-2" || userTwoEvent.Payload.OwnerMember.Role != "GROUP_MEMBER_ROLE_OWNER" {
+		t.Fatalf("user-2: ожидался новый owner user-2, получено %+v", userTwoEvent.Payload.OwnerMember)
+	}
+	if userTwoEvent.Payload.Group == nil || userTwoEvent.Payload.Group.SelfRole != "GROUP_MEMBER_ROLE_OWNER" {
+		t.Fatalf("user-2: ожидалась viewer-relative owner роль, получено %+v", userTwoEvent.Payload.Group)
+	}
+}
+
+func TestNewHTTPHandlerStopsGroupDeliveryAfterMemberRemoval(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+
+	removeRequest := connect.NewRequest(&chatv1.RemoveGroupMemberRequest{
+		GroupId: "group-1",
+		UserId:  "user-2",
+	})
+	removeRequest.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := chatClient.RemoveGroupMember(ctx, removeRequest); err != nil {
+		t.Fatalf("remove group member через gateway: %v", err)
+	}
+
+	userOneRemoval := readGroupMembershipEnvelope(t, ctx, connUserOne)
+	userTwoRemoval := readGroupMembershipEnvelope(t, ctx, connUserTwo)
+
+	if userOneRemoval.Payload.Group == nil || userOneRemoval.Payload.Group.MemberCount != 1 {
+		t.Fatalf("user-1: ожидался post-remove member count 1, получено %+v", userOneRemoval.Payload.Group)
+	}
+	if userTwoRemoval.Payload.Group != nil || userTwoRemoval.Payload.SelfMember != nil {
+		t.Fatalf("user-2: удалённый участник должен получить nil group/self, получено %+v", userTwoRemoval.Payload)
+	}
+
+	sendRequest := connect.NewRequest(&chatv1.SendGroupTextMessageRequest{
+		GroupId: "group-1",
+		Text:    "after removal",
+	})
+	sendRequest.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := chatClient.SendGroupTextMessage(ctx, sendRequest); err != nil {
+		t.Fatalf("send group text message after removal: %v", err)
+	}
+
+	_ = readGroupMessageEnvelope(t, ctx, connUserOne)
+	assertNoRealtimeEvent(t, connUserTwo, 250*time.Millisecond)
+}
+
+func TestNewHTTPHandlerStopsGroupDeliveryAfterLeaveGroup(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+
+	leaveRequest := connect.NewRequest(&chatv1.LeaveGroupRequest{GroupId: "group-1"})
+	leaveRequest.Header().Set("Authorization", "Bearer v1.user-2")
+	if _, err := chatClient.LeaveGroup(ctx, leaveRequest); err != nil {
+		t.Fatalf("leave group через gateway: %v", err)
+	}
+
+	userOneLeave := readGroupMembershipEnvelope(t, ctx, connUserOne)
+	userTwoLeave := readGroupMembershipEnvelope(t, ctx, connUserTwo)
+
+	if userOneLeave.Payload.Reason != realtime.GroupMembershipReasonLeft || userOneLeave.Payload.AffectedUserID != "user-2" {
+		t.Fatalf("user-1: ожидался leave event для user-2, получено %+v", userOneLeave.Payload)
+	}
+	if userTwoLeave.Payload.Group != nil || userTwoLeave.Payload.SelfMember != nil {
+		t.Fatalf("user-2: вышедший участник должен получить nil group/self, получено %+v", userTwoLeave.Payload)
+	}
+
+	sendRequest := connect.NewRequest(&chatv1.SendGroupTextMessageRequest{
+		GroupId: "group-1",
+		Text:    "after leave",
+	})
+	sendRequest.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := chatClient.SendGroupTextMessage(ctx, sendRequest); err != nil {
+		t.Fatalf("send group text message after leave: %v", err)
+	}
+
+	_ = readGroupMessageEnvelope(t, ctx, connUserOne)
+	assertNoRealtimeEvent(t, connUserTwo, 250*time.Millisecond)
+}
+
 func TestNewHTTPHandlerPublishesPeopleFriendRequestUpdates(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
@@ -1065,11 +1363,25 @@ type testChatHandler struct {
 	pingErr           error
 	messageSeq        int
 	chat              *chatv1.DirectChat
+	group             *chatv1.Group
+	groupThread       *chatv1.GroupChatThread
+	groupMessages     []*chatv1.GroupMessage
+	groupMembers      []*chatv1.GroupMember
+	groupInvites      map[string]*testGroupInvite
+}
+
+type testGroupInvite struct {
+	groupID string
+	role    chatv1.GroupMemberRole
 }
 
 func newTestChatHandler() *testChatHandler {
 	return &testChatHandler{
-		chat: defaultTestDirectChat(),
+		chat:         defaultTestDirectChat(),
+		group:        defaultTestGroup(),
+		groupThread:  defaultTestGroupThread(),
+		groupMembers: defaultTestGroupMembers(),
+		groupInvites: map[string]*testGroupInvite{"ginv-member": {groupID: "group-1", role: chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER}},
 	}
 }
 
@@ -1102,6 +1414,165 @@ func (h *testChatHandler) GetDirectChat(_ context.Context, req *connect.Request[
 	}), nil
 }
 
+func (h *testChatHandler) GetGroupChat(_ context.Context, req *connect.Request[chatv1.GetGroupChatRequest]) (*connect.Response[chatv1.GetGroupChatResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	member := h.requireGroupMemberLocked(actorID)
+	if member == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+
+	return connect.NewResponse(&chatv1.GetGroupChatResponse{
+		Group:  h.groupForUserLocked(actorID),
+		Thread: cloneGroupThreadMessage(h.groupThread),
+	}), nil
+}
+
+func (h *testChatHandler) ListGroupMembers(_ context.Context, req *connect.Request[chatv1.ListGroupMembersRequest]) (*connect.Response[chatv1.ListGroupMembersResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	if h.requireGroupMemberLocked(actorID) == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+
+	members := make([]*chatv1.GroupMember, 0, len(h.groupMembers))
+	for _, member := range h.groupMembers {
+		members = append(members, cloneGroupMemberMessage(member))
+	}
+
+	return connect.NewResponse(&chatv1.ListGroupMembersResponse{Members: members}), nil
+}
+
+func (h *testChatHandler) UpdateGroupMemberRole(_ context.Context, req *connect.Request[chatv1.UpdateGroupMemberRoleRequest]) (*connect.Response[chatv1.UpdateGroupMemberRoleResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	actorMember := h.requireGroupMemberLocked(actorID)
+	if actorMember == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+	if actorMember.GetRole() != chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only owner can manage roles"))
+	}
+
+	targetMember := h.requireGroupMemberLocked(req.Msg.UserId)
+	if targetMember == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("member not found"))
+	}
+
+	targetMember.Role = req.Msg.Role
+	h.touchGroupLocked(timestamppb.Now())
+
+	return connect.NewResponse(&chatv1.UpdateGroupMemberRoleResponse{
+		Member: cloneGroupMemberMessage(targetMember),
+	}), nil
+}
+
+func (h *testChatHandler) TransferGroupOwnership(_ context.Context, req *connect.Request[chatv1.TransferGroupOwnershipRequest]) (*connect.Response[chatv1.TransferGroupOwnershipResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	actorMember := h.requireGroupMemberLocked(actorID)
+	if actorMember == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+	if actorMember.GetRole() != chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only owner can transfer ownership"))
+	}
+
+	targetMember := h.requireGroupMemberLocked(req.Msg.TargetUserId)
+	if targetMember == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("member not found"))
+	}
+
+	actorMember.Role = chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN
+	targetMember.Role = chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER
+	h.touchGroupLocked(timestamppb.Now())
+
+	return connect.NewResponse(&chatv1.TransferGroupOwnershipResponse{
+		Group: h.groupForUserLocked(actorID),
+	}), nil
+}
+
+func (h *testChatHandler) RemoveGroupMember(_ context.Context, req *connect.Request[chatv1.RemoveGroupMemberRequest]) (*connect.Response[chatv1.RemoveGroupMemberResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	actorMember := h.requireGroupMemberLocked(actorID)
+	if actorMember == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+	if actorMember.GetRole() != chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only owner can remove members"))
+	}
+
+	if !h.deleteGroupMemberLocked(req.Msg.UserId) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("member not found"))
+	}
+	h.touchGroupLocked(timestamppb.Now())
+
+	return connect.NewResponse(&chatv1.RemoveGroupMemberResponse{}), nil
+}
+
+func (h *testChatHandler) LeaveGroup(_ context.Context, req *connect.Request[chatv1.LeaveGroupRequest]) (*connect.Response[chatv1.LeaveGroupResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	actorMember := h.requireGroupMemberLocked(actorID)
+	if actorMember == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+	if actorMember.GetRole() == chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("owner must transfer ownership before leaving"))
+	}
+
+	if !h.deleteGroupMemberLocked(actorID) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("member not found"))
+	}
+	h.touchGroupLocked(timestamppb.Now())
+
+	return connect.NewResponse(&chatv1.LeaveGroupResponse{}), nil
+}
+
+func (h *testChatHandler) JoinGroupByInviteLink(_ context.Context, req *connect.Request[chatv1.JoinGroupByInviteLinkRequest]) (*connect.Response[chatv1.JoinGroupByInviteLinkResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	invite, ok := h.groupInvites[req.Msg.InviteToken]
+	if !ok {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("invite not found"))
+	}
+
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	if member := h.requireGroupMemberLocked(actorID); member == nil {
+		h.groupMembers = append(h.groupMembers, &chatv1.GroupMember{
+			User:     newTestChatUser(actorID, loginFromAuthorization(req.Header().Get("Authorization"))),
+			Role:     invite.role,
+			JoinedAt: timestamppb.Now(),
+		})
+	}
+	h.touchGroupLocked(timestamppb.Now())
+
+	return connect.NewResponse(&chatv1.JoinGroupByInviteLinkResponse{
+		Group: h.groupForUserLocked(actorID),
+	}), nil
+}
+
 func (h *testChatHandler) SendTextMessage(_ context.Context, req *connect.Request[chatv1.SendTextMessageRequest]) (*connect.Response[chatv1.SendTextMessageResponse], error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -1127,6 +1598,43 @@ func (h *testChatHandler) SendTextMessage(_ context.Context, req *connect.Reques
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
+	}), nil
+}
+
+func (h *testChatHandler) SendGroupTextMessage(_ context.Context, req *connect.Request[chatv1.SendGroupTextMessageRequest]) (*connect.Response[chatv1.SendGroupTextMessageResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	actorMember := h.requireGroupMemberLocked(actorID)
+	if actorMember == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+	if actorMember.GetRole() == chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("reader cannot send group messages"))
+	}
+
+	h.messageSeq++
+	now := timestamppb.Now()
+	message := &chatv1.GroupMessage{
+		Id:           fmt.Sprintf("group-message-%d", h.messageSeq),
+		GroupId:      h.group.GetId(),
+		ThreadId:     h.groupThread.GetId(),
+		SenderUserId: actorID,
+		Kind:         chatv1.MessageKind_MESSAGE_KIND_TEXT,
+		Text: &chatv1.TextMessageContent{
+			Text:           req.Msg.Text,
+			MarkdownPolicy: chatv1.MarkdownPolicy_MARKDOWN_POLICY_SAFE_SUBSET_V1,
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	h.groupMessages = append([]*chatv1.GroupMessage{message}, h.groupMessages...)
+	h.touchGroupMessageLocked(now)
+
+	return connect.NewResponse(&chatv1.SendGroupTextMessageResponse{
+		Message: cloneGroupMessageMessage(message),
 	}), nil
 }
 
@@ -1236,6 +1744,52 @@ func (h *testChatHandler) cloneChat() *chatv1.DirectChat {
 	}
 }
 
+func (h *testChatHandler) groupForUserLocked(userID string) *chatv1.Group {
+	group := cloneGroupMessage(h.group)
+	member := h.requireGroupMemberLocked(userID)
+	if member != nil {
+		group.SelfRole = member.GetRole()
+	}
+	group.MemberCount = uint32(len(h.groupMembers))
+	return group
+}
+
+func (h *testChatHandler) requireGroupMemberLocked(userID string) *chatv1.GroupMember {
+	for _, member := range h.groupMembers {
+		if member.GetUser().GetId() == userID {
+			return member
+		}
+	}
+
+	return nil
+}
+
+func (h *testChatHandler) deleteGroupMemberLocked(userID string) bool {
+	for index, member := range h.groupMembers {
+		if member.GetUser().GetId() != userID {
+			continue
+		}
+
+		h.groupMembers = append(h.groupMembers[:index], h.groupMembers[index+1:]...)
+		return true
+	}
+
+	return false
+}
+
+func (h *testChatHandler) touchGroupLocked(now *timestamppb.Timestamp) {
+	if h.group != nil {
+		h.group.UpdatedAt = now
+	}
+}
+
+func (h *testChatHandler) touchGroupMessageLocked(now *timestamppb.Timestamp) {
+	h.touchGroupLocked(now)
+	if h.groupThread != nil {
+		h.groupThread.UpdatedAt = now
+	}
+}
+
 func defaultTestDirectChat() *chatv1.DirectChat {
 	return &chatv1.DirectChat{
 		Id: "chat-1",
@@ -1245,6 +1799,133 @@ func defaultTestDirectChat() *chatv1.DirectChat {
 		},
 		CreatedAt: timestamppb.Now(),
 		UpdatedAt: timestamppb.Now(),
+	}
+}
+
+func defaultTestGroup() *chatv1.Group {
+	now := timestamppb.Now()
+	return &chatv1.Group{
+		Id:          "group-1",
+		Name:        "Ops Room",
+		Kind:        chatv1.ChatKind_CHAT_KIND_GROUP,
+		SelfRole:    chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER,
+		MemberCount: 2,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+}
+
+func defaultTestGroupThread() *chatv1.GroupChatThread {
+	now := timestamppb.Now()
+	return &chatv1.GroupChatThread{
+		Id:              "group-thread-1",
+		GroupId:         "group-1",
+		ThreadKey:       "primary",
+		CanSendMessages: true,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+}
+
+func defaultTestGroupMembers() []*chatv1.GroupMember {
+	now := timestamppb.Now()
+	return []*chatv1.GroupMember{
+		{
+			User:     newTestChatUser("user-1", "alice"),
+			Role:     chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER,
+			JoinedAt: now,
+		},
+		{
+			User:     newTestChatUser("user-2", "bob"),
+			Role:     chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER,
+			JoinedAt: now,
+		},
+	}
+}
+
+func newTestChatUser(id string, login string) *chatv1.ChatUser {
+	nickname := login
+	switch login {
+	case "alice":
+		nickname = "Alice"
+	case "bob":
+		nickname = "Bob"
+	case "charlie":
+		nickname = "Charlie"
+	}
+
+	return &chatv1.ChatUser{
+		Id:       id,
+		Login:    login,
+		Nickname: nickname,
+	}
+}
+
+func cloneGroupMessage(group *chatv1.Group) *chatv1.Group {
+	if group == nil {
+		return nil
+	}
+
+	return &chatv1.Group{
+		Id:          group.GetId(),
+		Name:        group.GetName(),
+		Kind:        group.GetKind(),
+		SelfRole:    group.GetSelfRole(),
+		MemberCount: group.GetMemberCount(),
+		CreatedAt:   group.GetCreatedAt(),
+		UpdatedAt:   group.GetUpdatedAt(),
+	}
+}
+
+func cloneGroupThreadMessage(thread *chatv1.GroupChatThread) *chatv1.GroupChatThread {
+	if thread == nil {
+		return nil
+	}
+
+	return &chatv1.GroupChatThread{
+		Id:              thread.GetId(),
+		GroupId:         thread.GetGroupId(),
+		ThreadKey:       thread.GetThreadKey(),
+		CanSendMessages: thread.GetCanSendMessages(),
+		CreatedAt:       thread.GetCreatedAt(),
+		UpdatedAt:       thread.GetUpdatedAt(),
+	}
+}
+
+func cloneGroupMemberMessage(member *chatv1.GroupMember) *chatv1.GroupMember {
+	if member == nil {
+		return nil
+	}
+
+	return &chatv1.GroupMember{
+		User: &chatv1.ChatUser{
+			Id:        member.GetUser().GetId(),
+			Login:     member.GetUser().GetLogin(),
+			Nickname:  member.GetUser().GetNickname(),
+			AvatarUrl: member.GetUser().AvatarUrl,
+		},
+		Role:     member.GetRole(),
+		JoinedAt: member.GetJoinedAt(),
+	}
+}
+
+func cloneGroupMessageMessage(message *chatv1.GroupMessage) *chatv1.GroupMessage {
+	if message == nil {
+		return nil
+	}
+
+	return &chatv1.GroupMessage{
+		Id:           message.GetId(),
+		GroupId:      message.GetGroupId(),
+		ThreadId:     message.GetThreadId(),
+		SenderUserId: message.GetSenderUserId(),
+		Kind:         message.GetKind(),
+		Text: &chatv1.TextMessageContent{
+			Text:           message.GetText().GetText(),
+			MarkdownPolicy: message.GetText().GetMarkdownPolicy(),
+		},
+		CreatedAt: message.GetCreatedAt(),
+		UpdatedAt: message.GetUpdatedAt(),
 	}
 }
 
@@ -1436,6 +2117,188 @@ func readDirectChatPresenceEnvelope(t *testing.T, ctx context.Context, conn *web
 	return envelope
 }
 
+type groupMessageEnvelope struct {
+	Type    string `json:"type"`
+	Payload struct {
+		Reason string `json:"reason"`
+		Group  *struct {
+			ID          string `json:"id"`
+			SelfRole    string `json:"selfRole"`
+			MemberCount uint32 `json:"memberCount"`
+		} `json:"group"`
+		Thread *struct {
+			ID              string `json:"id"`
+			CanSendMessages bool   `json:"canSendMessages"`
+		} `json:"thread"`
+		Message *struct {
+			ID           string `json:"id"`
+			GroupID      string `json:"groupId"`
+			ThreadID     string `json:"threadId"`
+			SenderUserID string `json:"senderUserId"`
+			Text         struct {
+				Text string `json:"text"`
+			} `json:"text"`
+		} `json:"message"`
+	} `json:"payload"`
+}
+
+func readGroupMessageEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) groupMessageEnvelope {
+	t.Helper()
+
+	var envelope groupMessageEnvelope
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("чтение group message envelope: %v", err)
+	}
+	if envelope.Type != realtime.EventTypeGroupMessageUpdated {
+		t.Fatalf("ожидался тип %q, получен %q", realtime.EventTypeGroupMessageUpdated, envelope.Type)
+	}
+
+	return envelope
+}
+
+type groupMembershipEnvelope struct {
+	Type    string `json:"type"`
+	Payload struct {
+		Reason         string `json:"reason"`
+		GroupID        string `json:"groupId"`
+		AffectedUserID string `json:"affectedUserId"`
+		Group          *struct {
+			ID          string `json:"id"`
+			SelfRole    string `json:"selfRole"`
+			MemberCount uint32 `json:"memberCount"`
+		} `json:"group"`
+		Thread *struct {
+			ID              string `json:"id"`
+			CanSendMessages bool   `json:"canSendMessages"`
+		} `json:"thread"`
+		Member *struct {
+			Role string `json:"role"`
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+		} `json:"member"`
+		SelfMember *struct {
+			Role string `json:"role"`
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+		} `json:"selfMember"`
+	} `json:"payload"`
+}
+
+func readGroupMembershipEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) groupMembershipEnvelope {
+	t.Helper()
+
+	var envelope groupMembershipEnvelope
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("чтение group membership envelope: %v", err)
+	}
+	if envelope.Type != realtime.EventTypeGroupMembershipUpdated {
+		t.Fatalf("ожидался тип %q, получен %q", realtime.EventTypeGroupMembershipUpdated, envelope.Type)
+	}
+
+	return envelope
+}
+
+type groupRoleEnvelope struct {
+	Type    string `json:"type"`
+	Payload struct {
+		GroupID      string `json:"groupId"`
+		PreviousRole string `json:"previousRole"`
+		Group        *struct {
+			ID       string `json:"id"`
+			SelfRole string `json:"selfRole"`
+		} `json:"group"`
+		Thread *struct {
+			CanSendMessages bool `json:"canSendMessages"`
+		} `json:"thread"`
+		Member *struct {
+			Role string `json:"role"`
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+		} `json:"member"`
+		SelfMember *struct {
+			Role string `json:"role"`
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+		} `json:"selfMember"`
+	} `json:"payload"`
+}
+
+func readGroupRoleEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) groupRoleEnvelope {
+	t.Helper()
+
+	var envelope groupRoleEnvelope
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("чтение group role envelope: %v", err)
+	}
+	if envelope.Type != realtime.EventTypeGroupRoleUpdated {
+		t.Fatalf("ожидался тип %q, получен %q", realtime.EventTypeGroupRoleUpdated, envelope.Type)
+	}
+
+	return envelope
+}
+
+type groupOwnershipEnvelope struct {
+	Type    string `json:"type"`
+	Payload struct {
+		GroupID string `json:"groupId"`
+		Group   *struct {
+			ID       string `json:"id"`
+			SelfRole string `json:"selfRole"`
+		} `json:"group"`
+		OwnerMember *struct {
+			Role string `json:"role"`
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+		} `json:"ownerMember"`
+		PreviousOwnerMember *struct {
+			Role string `json:"role"`
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+		} `json:"previousOwnerMember"`
+		SelfMember *struct {
+			Role string `json:"role"`
+			User struct {
+				ID string `json:"id"`
+			} `json:"user"`
+		} `json:"selfMember"`
+	} `json:"payload"`
+}
+
+func readGroupOwnershipEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) groupOwnershipEnvelope {
+	t.Helper()
+
+	var envelope groupOwnershipEnvelope
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("чтение group ownership envelope: %v", err)
+	}
+	if envelope.Type != realtime.EventTypeGroupOwnershipTransferred {
+		t.Fatalf("ожидался тип %q, получен %q", realtime.EventTypeGroupOwnershipTransferred, envelope.Type)
+	}
+
+	return envelope
+}
+
+func assertNoRealtimeEvent(t *testing.T, conn *websocket.Conn, timeout time.Duration) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	_, _, err := conn.Read(ctx)
+	if err == nil {
+		t.Fatal("не ожидалось realtime-событие, но соединение получило сообщение")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("ожидался timeout без события, получено: %v", err)
+	}
+}
+
 type peopleEnvelope struct {
 	Type    string `json:"type"`
 	Payload struct {
@@ -1496,6 +2359,8 @@ func cloneProfile(profile *identityv1.Profile) *identityv1.Profile {
 
 func userIDFromAuthorization(value string) string {
 	switch strings.TrimSpace(value) {
+	case "Bearer v1.user-3":
+		return "user-3"
 	case "Bearer v1.user-2":
 		return "user-2"
 	default:
@@ -1505,6 +2370,8 @@ func userIDFromAuthorization(value string) string {
 
 func loginFromAuthorization(value string) string {
 	switch strings.TrimSpace(value) {
+	case "Bearer v1.user-3":
+		return "charlie"
 	case "Bearer v1.user-2":
 		return "bob"
 	default:

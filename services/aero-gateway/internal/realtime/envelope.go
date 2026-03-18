@@ -18,6 +18,7 @@ const (
 
 var readyCapabilities = []string{
 	"direct_chats",
+	"groups",
 	"people",
 	"presence",
 }
