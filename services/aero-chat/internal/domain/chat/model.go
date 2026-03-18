@@ -3,19 +3,30 @@ package chat
 import "time"
 
 const (
-	ChatKindDirect                   = "direct"
-	ChatKindGroup                    = "group"
-	GroupThreadKeyPrimary            = "primary"
-	MessageKindText                  = "text"
-	MarkdownPolicySafeSubsetV1       = "safe_subset_v1"
-	GroupMemberRoleOwner             = "owner"
-	GroupMemberRoleAdmin             = "admin"
-	GroupMemberRoleMember            = "member"
-	GroupMemberRoleReader            = "reader"
-	defaultMessagePageSize     int32 = 50
-	maxMessagePageSize         int32 = 200
-	maxTextMessageLength             = 4000
-	maxGroupNameLength               = 80
+	ChatKindDirect                         = "direct"
+	ChatKindGroup                          = "group"
+	GroupThreadKeyPrimary                  = "primary"
+	MessageKindText                        = "text"
+	MarkdownPolicySafeSubsetV1             = "safe_subset_v1"
+	AttachmentScopeDirect                  = "direct"
+	AttachmentScopeGroup                   = "group"
+	AttachmentStatusPending                = "pending"
+	AttachmentStatusUploaded               = "uploaded"
+	AttachmentStatusAttached               = "attached"
+	AttachmentStatusFailed                 = "failed"
+	AttachmentStatusDeleted                = "deleted"
+	AttachmentUploadSessionPending         = "pending"
+	AttachmentUploadSessionCompleted       = "completed"
+	AttachmentUploadSessionFailed          = "failed"
+	AttachmentUploadSessionExpired         = "expired"
+	GroupMemberRoleOwner                   = "owner"
+	GroupMemberRoleAdmin                   = "admin"
+	GroupMemberRoleMember                  = "member"
+	GroupMemberRoleReader                  = "reader"
+	defaultMessagePageSize           int32 = 50
+	maxMessagePageSize               int32 = 200
+	maxTextMessageLength                   = 4000
+	maxGroupNameLength                     = 80
 )
 
 type UserSummary struct {
@@ -127,6 +138,47 @@ type TextMessageContent struct {
 	MarkdownPolicy string
 }
 
+type Attachment struct {
+	ID           string
+	OwnerUserID  string
+	Scope        string
+	DirectChatID *string
+	GroupID      *string
+	MessageID    *string
+	BucketName   string
+	ObjectKey    string
+	FileName     string
+	MimeType     string
+	SizeBytes    int64
+	Status       string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	UploadedAt   *time.Time
+	AttachedAt   *time.Time
+	FailedAt     *time.Time
+	DeletedAt    *time.Time
+}
+
+type AttachmentUploadSession struct {
+	ID           string
+	AttachmentID string
+	OwnerUserID  string
+	Status       string
+	UploadURL    string
+	HTTPMethod   string
+	Headers      map[string]string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	ExpiresAt    time.Time
+	CompletedAt  *time.Time
+	FailedAt     *time.Time
+}
+
+type AttachmentUploadIntent struct {
+	Attachment    Attachment
+	UploadSession AttachmentUploadSession
+}
+
 type MessageTombstone struct {
 	DeletedByUserID string
 	DeletedAt       time.Time
@@ -140,6 +192,7 @@ type DirectChatMessage struct {
 	Text         *TextMessageContent
 	Tombstone    *MessageTombstone
 	Pinned       bool
+	Attachments  []Attachment
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -151,6 +204,7 @@ type GroupMessage struct {
 	SenderUserID string
 	Kind         string
 	Text         *TextMessageContent
+	Attachments  []Attachment
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -252,20 +306,52 @@ type TransferGroupOwnershipParams struct {
 }
 
 type CreateDirectChatMessageParams struct {
-	MessageID    string
-	ChatID       string
-	SenderUserID string
-	Text         string
-	CreatedAt    time.Time
+	MessageID     string
+	ChatID        string
+	SenderUserID  string
+	Text          string
+	AttachmentIDs []string
+	CreatedAt     time.Time
 }
 
 type CreateGroupMessageParams struct {
-	MessageID    string
-	GroupID      string
-	ThreadID     string
-	SenderUserID string
-	Text         string
-	CreatedAt    time.Time
+	MessageID     string
+	GroupID       string
+	ThreadID      string
+	SenderUserID  string
+	Text          string
+	AttachmentIDs []string
+	CreatedAt     time.Time
+}
+
+type CreateAttachmentUploadIntentParams struct {
+	AttachmentID    string
+	UploadSessionID string
+	OwnerUserID     string
+	Scope           string
+	DirectChatID    *string
+	GroupID         *string
+	BucketName      string
+	ObjectKey       string
+	FileName        string
+	MimeType        string
+	SizeBytes       int64
+	ExpiresAt       time.Time
+	CreatedAt       time.Time
+}
+
+type CompleteAttachmentUploadParams struct {
+	AttachmentID    string
+	UploadSessionID string
+	OwnerUserID     string
+	CompletedAt     time.Time
+}
+
+type FailAttachmentUploadParams struct {
+	AttachmentID    string
+	UploadSessionID string
+	OwnerUserID     string
+	FailedAt        time.Time
 }
 
 type UpsertDirectChatReadReceiptParams struct {

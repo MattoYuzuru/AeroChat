@@ -475,6 +475,249 @@ INSERT INTO direct_chat_messages (
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at;
 
+-- name: CreateAttachment :one
+INSERT INTO attachments (
+    id,
+    owner_user_id,
+    scope_kind,
+    direct_chat_id,
+    group_id,
+    bucket_name,
+    object_key,
+    file_name,
+    mime_type,
+    size_bytes,
+    status,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING
+    id,
+    owner_user_id,
+    scope_kind,
+    direct_chat_id,
+    group_id,
+    bucket_name,
+    object_key,
+    file_name,
+    mime_type,
+    size_bytes,
+    status,
+    created_at,
+    updated_at,
+    uploaded_at,
+    attached_at,
+    failed_at,
+    deleted_at;
+
+-- name: CreateAttachmentUploadSession :one
+INSERT INTO attachment_upload_sessions (
+    id,
+    attachment_id,
+    owner_user_id,
+    status,
+    expires_at,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING
+    id,
+    attachment_id,
+    owner_user_id,
+    status,
+    expires_at,
+    created_at,
+    updated_at,
+    completed_at,
+    failed_at;
+
+-- name: GetAttachmentRowByID :one
+SELECT
+    a.id,
+    a.owner_user_id,
+    a.scope_kind,
+    a.direct_chat_id,
+    a.group_id,
+    a.bucket_name,
+    a.object_key,
+    a.file_name,
+    a.mime_type,
+    a.size_bytes,
+    a.status,
+    a.created_at,
+    a.updated_at,
+    a.uploaded_at,
+    a.attached_at,
+    a.failed_at,
+    a.deleted_at,
+    s.id AS upload_session_id,
+    s.owner_user_id AS upload_session_owner_user_id,
+    s.status AS upload_session_status,
+    s.expires_at AS upload_session_expires_at,
+    s.created_at AS upload_session_created_at,
+    s.updated_at AS upload_session_updated_at,
+    s.completed_at AS upload_session_completed_at,
+    s.failed_at AS upload_session_failed_at,
+    ma.direct_chat_message_id,
+    ma.group_message_id
+FROM attachments AS a
+LEFT JOIN attachment_upload_sessions AS s ON s.attachment_id = a.id
+LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
+WHERE a.id = $1;
+
+-- name: ListAttachmentRowsByIDs :many
+SELECT
+    a.id,
+    a.owner_user_id,
+    a.scope_kind,
+    a.direct_chat_id,
+    a.group_id,
+    a.bucket_name,
+    a.object_key,
+    a.file_name,
+    a.mime_type,
+    a.size_bytes,
+    a.status,
+    a.created_at,
+    a.updated_at,
+    a.uploaded_at,
+    a.attached_at,
+    a.failed_at,
+    a.deleted_at,
+    s.id AS upload_session_id,
+    s.owner_user_id AS upload_session_owner_user_id,
+    s.status AS upload_session_status,
+    s.expires_at AS upload_session_expires_at,
+    s.created_at AS upload_session_created_at,
+    s.updated_at AS upload_session_updated_at,
+    s.completed_at AS upload_session_completed_at,
+    s.failed_at AS upload_session_failed_at,
+    ma.direct_chat_message_id,
+    ma.group_message_id
+FROM attachments AS a
+LEFT JOIN attachment_upload_sessions AS s ON s.attachment_id = a.id
+LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
+WHERE a.id = ANY($1::uuid[]);
+
+-- name: CompleteAttachmentUpload :execrows
+WITH updated_attachment AS (
+    UPDATE attachments
+    SET
+        status = 'uploaded',
+        updated_at = $3,
+        uploaded_at = $3,
+        failed_at = NULL
+    WHERE id = $1 AND owner_user_id = $2 AND status = 'pending'
+    RETURNING id
+)
+UPDATE attachment_upload_sessions
+SET
+    status = 'completed',
+    updated_at = $3,
+    completed_at = $3,
+    failed_at = NULL
+WHERE attachment_upload_sessions.id = $4
+  AND attachment_upload_sessions.attachment_id = $1
+  AND attachment_upload_sessions.owner_user_id = $2
+  AND attachment_upload_sessions.status = 'pending'
+  AND attachment_upload_sessions.expires_at > $3
+  AND EXISTS (SELECT 1 FROM updated_attachment);
+
+-- name: FailAttachmentUpload :execrows
+WITH updated_attachment AS (
+    UPDATE attachments
+    SET
+        status = 'failed',
+        updated_at = $3,
+        failed_at = $3
+    WHERE id = $1 AND owner_user_id = $2 AND status = 'pending'
+    RETURNING id
+)
+UPDATE attachment_upload_sessions
+SET
+    status = 'failed',
+    updated_at = $3,
+    failed_at = $3
+WHERE attachment_upload_sessions.id = $4
+  AND attachment_upload_sessions.attachment_id = $1
+  AND attachment_upload_sessions.owner_user_id = $2
+  AND attachment_upload_sessions.status = 'pending'
+  AND EXISTS (SELECT 1 FROM updated_attachment);
+
+-- name: AttachDirectMessageAttachment :exec
+INSERT INTO message_attachments (
+    attachment_id,
+    direct_chat_message_id,
+    attached_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4);
+
+-- name: AttachGroupMessageAttachment :exec
+INSERT INTO message_attachments (
+    attachment_id,
+    group_message_id,
+    attached_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4);
+
+-- name: MarkAttachmentAttached :execrows
+UPDATE attachments
+SET
+    status = 'attached',
+    updated_at = $2,
+    attached_at = $2
+WHERE id = $1 AND status = 'uploaded';
+
+-- name: ListDirectMessageAttachmentRowsByMessageIDs :many
+SELECT
+    ma.direct_chat_message_id,
+    a.id,
+    a.owner_user_id,
+    a.scope_kind,
+    a.direct_chat_id,
+    a.group_id,
+    a.bucket_name,
+    a.object_key,
+    a.file_name,
+    a.mime_type,
+    a.size_bytes,
+    a.status,
+    a.created_at,
+    a.updated_at,
+    a.uploaded_at,
+    a.attached_at,
+    a.failed_at,
+    a.deleted_at
+FROM message_attachments AS ma
+JOIN attachments AS a ON a.id = ma.attachment_id
+WHERE ma.direct_chat_message_id = ANY($1::uuid[])
+ORDER BY ma.created_at ASC, a.id ASC;
+
+-- name: ListGroupMessageAttachmentRowsByMessageIDs :many
+SELECT
+    ma.group_message_id,
+    a.id,
+    a.owner_user_id,
+    a.scope_kind,
+    a.direct_chat_id,
+    a.group_id,
+    a.bucket_name,
+    a.object_key,
+    a.file_name,
+    a.mime_type,
+    a.size_bytes,
+    a.status,
+    a.created_at,
+    a.updated_at,
+    a.uploaded_at,
+    a.attached_at,
+    a.failed_at,
+    a.deleted_at
+FROM message_attachments AS ma
+JOIN attachments AS a ON a.id = ma.attachment_id
+WHERE ma.group_message_id = ANY($1::uuid[])
+ORDER BY ma.created_at ASC, a.id ASC;
+
 -- name: CreateGroupMessage :one
 INSERT INTO group_messages (
     id,

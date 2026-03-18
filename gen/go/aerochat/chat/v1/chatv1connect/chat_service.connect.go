@@ -44,6 +44,15 @@ const (
 	// ChatServiceGetDirectChatProcedure is the fully-qualified name of the ChatService's GetDirectChat
 	// RPC.
 	ChatServiceGetDirectChatProcedure = "/aerochat.chat.v1.ChatService/GetDirectChat"
+	// ChatServiceCreateAttachmentUploadIntentProcedure is the fully-qualified name of the ChatService's
+	// CreateAttachmentUploadIntent RPC.
+	ChatServiceCreateAttachmentUploadIntentProcedure = "/aerochat.chat.v1.ChatService/CreateAttachmentUploadIntent"
+	// ChatServiceCompleteAttachmentUploadProcedure is the fully-qualified name of the ChatService's
+	// CompleteAttachmentUpload RPC.
+	ChatServiceCompleteAttachmentUploadProcedure = "/aerochat.chat.v1.ChatService/CompleteAttachmentUpload"
+	// ChatServiceGetAttachmentProcedure is the fully-qualified name of the ChatService's GetAttachment
+	// RPC.
+	ChatServiceGetAttachmentProcedure = "/aerochat.chat.v1.ChatService/GetAttachment"
 	// ChatServiceCreateGroupProcedure is the fully-qualified name of the ChatService's CreateGroup RPC.
 	ChatServiceCreateGroupProcedure = "/aerochat.chat.v1.ChatService/CreateGroup"
 	// ChatServiceListGroupsProcedure is the fully-qualified name of the ChatService's ListGroups RPC.
@@ -128,6 +137,9 @@ type ChatServiceClient interface {
 	CreateDirectChat(context.Context, *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error)
 	ListDirectChats(context.Context, *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error)
 	GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error)
+	CreateAttachmentUploadIntent(context.Context, *connect.Request[v1.CreateAttachmentUploadIntentRequest]) (*connect.Response[v1.CreateAttachmentUploadIntentResponse], error)
+	CompleteAttachmentUpload(context.Context, *connect.Request[v1.CompleteAttachmentUploadRequest]) (*connect.Response[v1.CompleteAttachmentUploadResponse], error)
+	GetAttachment(context.Context, *connect.Request[v1.GetAttachmentRequest]) (*connect.Response[v1.GetAttachmentResponse], error)
 	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
 	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
 	GetGroup(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GetGroupResponse], error)
@@ -190,6 +202,24 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+ChatServiceGetDirectChatProcedure,
 			connect.WithSchema(chatServiceMethods.ByName("GetDirectChat")),
+			connect.WithClientOptions(opts...),
+		),
+		createAttachmentUploadIntent: connect.NewClient[v1.CreateAttachmentUploadIntentRequest, v1.CreateAttachmentUploadIntentResponse](
+			httpClient,
+			baseURL+ChatServiceCreateAttachmentUploadIntentProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("CreateAttachmentUploadIntent")),
+			connect.WithClientOptions(opts...),
+		),
+		completeAttachmentUpload: connect.NewClient[v1.CompleteAttachmentUploadRequest, v1.CompleteAttachmentUploadResponse](
+			httpClient,
+			baseURL+ChatServiceCompleteAttachmentUploadProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("CompleteAttachmentUpload")),
+			connect.WithClientOptions(opts...),
+		),
+		getAttachment: connect.NewClient[v1.GetAttachmentRequest, v1.GetAttachmentResponse](
+			httpClient,
+			baseURL+ChatServiceGetAttachmentProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("GetAttachment")),
 			connect.WithClientOptions(opts...),
 		),
 		createGroup: connect.NewClient[v1.CreateGroupRequest, v1.CreateGroupResponse](
@@ -363,6 +393,9 @@ type chatServiceClient struct {
 	createDirectChat               *connect.Client[v1.CreateDirectChatRequest, v1.CreateDirectChatResponse]
 	listDirectChats                *connect.Client[v1.ListDirectChatsRequest, v1.ListDirectChatsResponse]
 	getDirectChat                  *connect.Client[v1.GetDirectChatRequest, v1.GetDirectChatResponse]
+	createAttachmentUploadIntent   *connect.Client[v1.CreateAttachmentUploadIntentRequest, v1.CreateAttachmentUploadIntentResponse]
+	completeAttachmentUpload       *connect.Client[v1.CompleteAttachmentUploadRequest, v1.CompleteAttachmentUploadResponse]
+	getAttachment                  *connect.Client[v1.GetAttachmentRequest, v1.GetAttachmentResponse]
 	createGroup                    *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
 	listGroups                     *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
 	getGroup                       *connect.Client[v1.GetGroupRequest, v1.GetGroupResponse]
@@ -410,6 +443,21 @@ func (c *chatServiceClient) ListDirectChats(ctx context.Context, req *connect.Re
 // GetDirectChat calls aerochat.chat.v1.ChatService.GetDirectChat.
 func (c *chatServiceClient) GetDirectChat(ctx context.Context, req *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error) {
 	return c.getDirectChat.CallUnary(ctx, req)
+}
+
+// CreateAttachmentUploadIntent calls aerochat.chat.v1.ChatService.CreateAttachmentUploadIntent.
+func (c *chatServiceClient) CreateAttachmentUploadIntent(ctx context.Context, req *connect.Request[v1.CreateAttachmentUploadIntentRequest]) (*connect.Response[v1.CreateAttachmentUploadIntentResponse], error) {
+	return c.createAttachmentUploadIntent.CallUnary(ctx, req)
+}
+
+// CompleteAttachmentUpload calls aerochat.chat.v1.ChatService.CompleteAttachmentUpload.
+func (c *chatServiceClient) CompleteAttachmentUpload(ctx context.Context, req *connect.Request[v1.CompleteAttachmentUploadRequest]) (*connect.Response[v1.CompleteAttachmentUploadResponse], error) {
+	return c.completeAttachmentUpload.CallUnary(ctx, req)
+}
+
+// GetAttachment calls aerochat.chat.v1.ChatService.GetAttachment.
+func (c *chatServiceClient) GetAttachment(ctx context.Context, req *connect.Request[v1.GetAttachmentRequest]) (*connect.Response[v1.GetAttachmentResponse], error) {
+	return c.getAttachment.CallUnary(ctx, req)
 }
 
 // CreateGroup calls aerochat.chat.v1.ChatService.CreateGroup.
@@ -553,6 +601,9 @@ type ChatServiceHandler interface {
 	CreateDirectChat(context.Context, *connect.Request[v1.CreateDirectChatRequest]) (*connect.Response[v1.CreateDirectChatResponse], error)
 	ListDirectChats(context.Context, *connect.Request[v1.ListDirectChatsRequest]) (*connect.Response[v1.ListDirectChatsResponse], error)
 	GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error)
+	CreateAttachmentUploadIntent(context.Context, *connect.Request[v1.CreateAttachmentUploadIntentRequest]) (*connect.Response[v1.CreateAttachmentUploadIntentResponse], error)
+	CompleteAttachmentUpload(context.Context, *connect.Request[v1.CompleteAttachmentUploadRequest]) (*connect.Response[v1.CompleteAttachmentUploadResponse], error)
+	GetAttachment(context.Context, *connect.Request[v1.GetAttachmentRequest]) (*connect.Response[v1.GetAttachmentResponse], error)
 	CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error)
 	ListGroups(context.Context, *connect.Request[v1.ListGroupsRequest]) (*connect.Response[v1.ListGroupsResponse], error)
 	GetGroup(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GetGroupResponse], error)
@@ -611,6 +662,24 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		ChatServiceGetDirectChatProcedure,
 		svc.GetDirectChat,
 		connect.WithSchema(chatServiceMethods.ByName("GetDirectChat")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceCreateAttachmentUploadIntentHandler := connect.NewUnaryHandler(
+		ChatServiceCreateAttachmentUploadIntentProcedure,
+		svc.CreateAttachmentUploadIntent,
+		connect.WithSchema(chatServiceMethods.ByName("CreateAttachmentUploadIntent")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceCompleteAttachmentUploadHandler := connect.NewUnaryHandler(
+		ChatServiceCompleteAttachmentUploadProcedure,
+		svc.CompleteAttachmentUpload,
+		connect.WithSchema(chatServiceMethods.ByName("CompleteAttachmentUpload")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceGetAttachmentHandler := connect.NewUnaryHandler(
+		ChatServiceGetAttachmentProcedure,
+		svc.GetAttachment,
+		connect.WithSchema(chatServiceMethods.ByName("GetAttachment")),
 		connect.WithHandlerOptions(opts...),
 	)
 	chatServiceCreateGroupHandler := connect.NewUnaryHandler(
@@ -785,6 +854,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceListDirectChatsHandler.ServeHTTP(w, r)
 		case ChatServiceGetDirectChatProcedure:
 			chatServiceGetDirectChatHandler.ServeHTTP(w, r)
+		case ChatServiceCreateAttachmentUploadIntentProcedure:
+			chatServiceCreateAttachmentUploadIntentHandler.ServeHTTP(w, r)
+		case ChatServiceCompleteAttachmentUploadProcedure:
+			chatServiceCompleteAttachmentUploadHandler.ServeHTTP(w, r)
+		case ChatServiceGetAttachmentProcedure:
+			chatServiceGetAttachmentHandler.ServeHTTP(w, r)
 		case ChatServiceCreateGroupProcedure:
 			chatServiceCreateGroupHandler.ServeHTTP(w, r)
 		case ChatServiceListGroupsProcedure:
@@ -862,6 +937,18 @@ func (UnimplementedChatServiceHandler) ListDirectChats(context.Context, *connect
 
 func (UnimplementedChatServiceHandler) GetDirectChat(context.Context, *connect.Request[v1.GetDirectChatRequest]) (*connect.Response[v1.GetDirectChatResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetDirectChat is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) CreateAttachmentUploadIntent(context.Context, *connect.Request[v1.CreateAttachmentUploadIntentRequest]) (*connect.Response[v1.CreateAttachmentUploadIntentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.CreateAttachmentUploadIntent is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) CompleteAttachmentUpload(context.Context, *connect.Request[v1.CompleteAttachmentUploadRequest]) (*connect.Response[v1.CompleteAttachmentUploadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.CompleteAttachmentUpload is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetAttachment(context.Context, *connect.Request[v1.GetAttachmentRequest]) (*connect.Response[v1.GetAttachmentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetAttachment is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) CreateGroup(context.Context, *connect.Request[v1.CreateGroupRequest]) (*connect.Response[v1.CreateGroupResponse], error) {

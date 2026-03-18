@@ -9,6 +9,38 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Attachment struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind    string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID      pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName   string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey    string             `db:"object_key" json:"object_key"`
+	FileName     string             `db:"file_name" json:"file_name"`
+	MimeType     string             `db:"mime_type" json:"mime_type"`
+	SizeBytes    int64              `db:"size_bytes" json:"size_bytes"`
+	Status       string             `db:"status" json:"status"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt   pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt   pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt     pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt    pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type AttachmentUploadSession struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	AttachmentID uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	Status       string             `db:"status" json:"status"`
+	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	CompletedAt  pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
+	FailedAt     pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+}
+
 type DirectChat struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
@@ -102,6 +134,14 @@ type GroupThread struct {
 	ThreadKey string             `db:"thread_key" json:"thread_key"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type MessageAttachment struct {
+	AttachmentID        uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	DirectChatMessageID pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	GroupMessageID      pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	AttachedByUserID    uuid.UUID          `db:"attached_by_user_id" json:"attached_by_user_id"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type User struct {

@@ -393,7 +393,7 @@ func TestSendAndListMessagesUseMarkdownPolicy(t *testing.T) {
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
 
-	message, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "  hello **bob**  ")
+	message, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "  hello **bob**  ", nil)
 	if err != nil {
 		t.Fatalf("send text message: %v", err)
 	}
@@ -401,7 +401,7 @@ func TestSendAndListMessagesUseMarkdownPolicy(t *testing.T) {
 		t.Fatal("ожидалась markdown policy safe_subset_v1")
 	}
 
-	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "<b>unsafe</b>"); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "<b>unsafe</b>", nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("ожидалась ошибка raw HTML, получено %v", err)
 	}
 
@@ -427,7 +427,7 @@ func TestSendTextMessageRequiresActiveFriendship(t *testing.T) {
 
 	delete(repo.friendships, pairKey(alice.User.ID, bob.User.ID))
 
-	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "after removal"); !errors.Is(err, ErrPermissionDenied) {
+	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "after removal", nil); !errors.Is(err, ErrPermissionDenied) {
 		t.Fatalf("ожидалась ошибка active friendship required, получено %v", err)
 	}
 
@@ -451,7 +451,7 @@ func TestSendTextMessageBlockedUsersCannotSend(t *testing.T) {
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
 	repo.blockUser(bob.User.ID, alice.User.ID)
 
-	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "after block"); !errors.Is(err, ErrPermissionDenied) {
+	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "after block", nil); !errors.Is(err, ErrPermissionDenied) {
 		t.Fatalf("ожидалась ошибка block policy, получено %v", err)
 	}
 }
@@ -468,7 +468,7 @@ func TestSendTextMessageRejectsInconsistentDirectChatParticipants(t *testing.T) 
 	directChat.Participants = []UserSummary{alice.User, alice.User}
 	repo.chats[directChat.ID] = *directChat
 
-	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "unsafe"); !errors.Is(err, ErrPermissionDenied) {
+	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "unsafe", nil); !errors.Is(err, ErrPermissionDenied) {
 		t.Fatalf("ожидалась ошибка безопасного deny для неконсистентного чата, получено %v", err)
 	}
 }
@@ -571,7 +571,19 @@ func TestListDirectChatsRefreshesSessionTouchWhenLastSeenIsStale(t *testing.T) {
 
 func newTestService() (*Service, *fakeRepository) {
 	repo := newFakeRepository()
-	service := NewService(repo, repo, repo.typingStore, repo.presenceStore, libauth.NewSessionTokenManager(), 6*time.Second, 30*time.Second)
+	service := NewService(
+		repo,
+		repo,
+		repo.typingStore,
+		repo.presenceStore,
+		repo.objectStorage,
+		libauth.NewSessionTokenManager(),
+		6*time.Second,
+		30*time.Second,
+		15*time.Minute,
+		64*1024*1024,
+		"aerochat-attachments",
+	)
 	now := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
 	service.now = func() time.Time {
 		now = now.Add(time.Second)
@@ -601,7 +613,7 @@ func mustCreateDirectChat(t *testing.T, service *Service, token string, peerUser
 func mustSendMessage(t *testing.T, service *Service, token string, chatID string, text string) *DirectChatMessage {
 	t.Helper()
 
-	message, err := service.SendTextMessage(context.Background(), token, chatID, text)
+	message, err := service.SendTextMessage(context.Background(), token, chatID, text, nil)
 	if err != nil {
 		t.Fatalf("send message: %v", err)
 	}
@@ -612,7 +624,7 @@ func mustSendMessage(t *testing.T, service *Service, token string, chatID string
 func mustSendGroupMessage(t *testing.T, service *Service, token string, groupID string, text string) *GroupMessage {
 	t.Helper()
 
-	message, err := service.SendGroupTextMessage(context.Background(), token, groupID, text)
+	message, err := service.SendGroupTextMessage(context.Background(), token, groupID, text, nil)
 	if err != nil {
 		t.Fatalf("send group message: %v", err)
 	}
@@ -638,45 +650,51 @@ type issuedAuth struct {
 }
 
 type fakeRepository struct {
-	tokenManager  *libauth.SessionTokenManager
-	sessions      map[string]SessionAuth
-	users         map[string]UserSummary
-	friendships   map[string]bool
-	blocks        map[string]map[string]bool
-	groups        map[string]Group
-	groupThreads  map[string]GroupChatThread
-	groupMembers  map[string]map[string]GroupMember
-	groupInvites  map[string]GroupInviteLink
-	inviteHashes  map[string]string
-	inviteByHash  map[string]string
-	chats         map[string]DirectChat
-	groupMessages map[string]GroupMessage
-	messages      map[string]DirectChatMessage
-	readPositions map[string]DirectChatReadPosition
-	typingStore   *fakeTypingStore
-	presenceStore *fakePresenceStore
-	touchCalls    int
+	tokenManager   *libauth.SessionTokenManager
+	sessions       map[string]SessionAuth
+	users          map[string]UserSummary
+	friendships    map[string]bool
+	blocks         map[string]map[string]bool
+	groups         map[string]Group
+	groupThreads   map[string]GroupChatThread
+	groupMembers   map[string]map[string]GroupMember
+	groupInvites   map[string]GroupInviteLink
+	inviteHashes   map[string]string
+	inviteByHash   map[string]string
+	chats          map[string]DirectChat
+	groupMessages  map[string]GroupMessage
+	messages       map[string]DirectChatMessage
+	readPositions  map[string]DirectChatReadPosition
+	typingStore    *fakeTypingStore
+	presenceStore  *fakePresenceStore
+	objectStorage  *fakeObjectStorage
+	attachments    map[string]Attachment
+	uploadSessions map[string]AttachmentUploadSession
+	touchCalls     int
 }
 
 func newFakeRepository() *fakeRepository {
 	return &fakeRepository{
-		tokenManager:  libauth.NewSessionTokenManager(),
-		sessions:      make(map[string]SessionAuth),
-		users:         make(map[string]UserSummary),
-		friendships:   make(map[string]bool),
-		blocks:        make(map[string]map[string]bool),
-		groups:        make(map[string]Group),
-		groupThreads:  make(map[string]GroupChatThread),
-		groupMembers:  make(map[string]map[string]GroupMember),
-		groupInvites:  make(map[string]GroupInviteLink),
-		inviteHashes:  make(map[string]string),
-		inviteByHash:  make(map[string]string),
-		chats:         make(map[string]DirectChat),
-		groupMessages: make(map[string]GroupMessage),
-		messages:      make(map[string]DirectChatMessage),
-		readPositions: make(map[string]DirectChatReadPosition),
-		typingStore:   newFakeTypingStore(),
-		presenceStore: newFakePresenceStore(),
+		tokenManager:   libauth.NewSessionTokenManager(),
+		sessions:       make(map[string]SessionAuth),
+		users:          make(map[string]UserSummary),
+		friendships:    make(map[string]bool),
+		blocks:         make(map[string]map[string]bool),
+		groups:         make(map[string]Group),
+		groupThreads:   make(map[string]GroupChatThread),
+		groupMembers:   make(map[string]map[string]GroupMember),
+		groupInvites:   make(map[string]GroupInviteLink),
+		inviteHashes:   make(map[string]string),
+		inviteByHash:   make(map[string]string),
+		chats:          make(map[string]DirectChat),
+		groupMessages:  make(map[string]GroupMessage),
+		messages:       make(map[string]DirectChatMessage),
+		readPositions:  make(map[string]DirectChatReadPosition),
+		typingStore:    newFakeTypingStore(),
+		presenceStore:  newFakePresenceStore(),
+		objectStorage:  newFakeObjectStorage(),
+		attachments:    make(map[string]Attachment),
+		uploadSessions: make(map[string]AttachmentUploadSession),
 	}
 }
 
@@ -874,6 +892,116 @@ func (r *fakeRepository) GetDirectChat(_ context.Context, userID string, chatID 
 	}
 
 	copy := directChat
+	return &copy, nil
+}
+
+func (r *fakeRepository) CreateAttachmentUploadIntent(_ context.Context, params CreateAttachmentUploadIntentParams) (*AttachmentUploadIntent, error) {
+	attachment := Attachment{
+		ID:           params.AttachmentID,
+		OwnerUserID:  params.OwnerUserID,
+		Scope:        params.Scope,
+		DirectChatID: params.DirectChatID,
+		GroupID:      params.GroupID,
+		BucketName:   params.BucketName,
+		ObjectKey:    params.ObjectKey,
+		FileName:     params.FileName,
+		MimeType:     params.MimeType,
+		SizeBytes:    params.SizeBytes,
+		Status:       AttachmentStatusPending,
+		CreatedAt:    params.CreatedAt,
+		UpdatedAt:    params.CreatedAt,
+	}
+	uploadSession := AttachmentUploadSession{
+		ID:           params.UploadSessionID,
+		AttachmentID: params.AttachmentID,
+		OwnerUserID:  params.OwnerUserID,
+		Status:       AttachmentUploadSessionPending,
+		CreatedAt:    params.CreatedAt,
+		UpdatedAt:    params.CreatedAt,
+		ExpiresAt:    params.ExpiresAt,
+	}
+	r.attachments[attachment.ID] = attachment
+	r.uploadSessions[uploadSession.ID] = uploadSession
+
+	return &AttachmentUploadIntent{
+		Attachment:    attachment,
+		UploadSession: uploadSession,
+	}, nil
+}
+
+func (r *fakeRepository) GetAttachment(_ context.Context, attachmentID string) (*Attachment, *AttachmentUploadSession, error) {
+	attachment, ok := r.attachments[attachmentID]
+	if !ok {
+		return nil, nil, ErrNotFound
+	}
+
+	for _, uploadSession := range r.uploadSessions {
+		if uploadSession.AttachmentID == attachmentID {
+			attachmentCopy := attachment
+			uploadSessionCopy := uploadSession
+			return &attachmentCopy, &uploadSessionCopy, nil
+		}
+	}
+
+	attachmentCopy := attachment
+	return &attachmentCopy, nil, nil
+}
+
+func (r *fakeRepository) ListAttachments(_ context.Context, attachmentIDs []string) ([]Attachment, error) {
+	result := make([]Attachment, 0, len(attachmentIDs))
+	for _, attachmentID := range attachmentIDs {
+		attachment, ok := r.attachments[attachmentID]
+		if !ok {
+			continue
+		}
+		result = append(result, attachment)
+	}
+	return result, nil
+}
+
+func (r *fakeRepository) CompleteAttachmentUpload(_ context.Context, params CompleteAttachmentUploadParams) (*Attachment, error) {
+	attachment, ok := r.attachments[params.AttachmentID]
+	if !ok || attachment.OwnerUserID != params.OwnerUserID {
+		return nil, ErrNotFound
+	}
+	uploadSession, ok := r.uploadSessions[params.UploadSessionID]
+	if !ok || uploadSession.AttachmentID != params.AttachmentID {
+		return nil, ErrNotFound
+	}
+
+	attachment.Status = AttachmentStatusUploaded
+	attachment.UpdatedAt = params.CompletedAt
+	attachment.UploadedAt = &params.CompletedAt
+	uploadSession.Status = AttachmentUploadSessionCompleted
+	uploadSession.UpdatedAt = params.CompletedAt
+	uploadSession.CompletedAt = &params.CompletedAt
+	r.attachments[attachment.ID] = attachment
+	r.uploadSessions[uploadSession.ID] = uploadSession
+
+	copy := attachment
+	return &copy, nil
+}
+
+func (r *fakeRepository) FailAttachmentUpload(_ context.Context, params FailAttachmentUploadParams) (*Attachment, error) {
+	attachment, ok := r.attachments[params.AttachmentID]
+	if !ok || attachment.OwnerUserID != params.OwnerUserID {
+		return nil, ErrNotFound
+	}
+	uploadSession, ok := r.uploadSessions[params.UploadSessionID]
+	if !ok || uploadSession.AttachmentID != params.AttachmentID {
+		return nil, ErrNotFound
+	}
+
+	attachment.Status = AttachmentStatusFailed
+	attachment.UpdatedAt = params.FailedAt
+	attachment.FailedAt = &params.FailedAt
+	uploadSession.Status = AttachmentUploadSessionFailed
+	uploadSession.UpdatedAt = params.FailedAt
+	uploadSession.FailedAt = &params.FailedAt
+	r.attachments[attachment.ID] = attachment
+	r.uploadSessions[uploadSession.ID] = uploadSession
+
+	copy := attachment
 	return &copy, nil
 }
 
@@ -1234,6 +1362,15 @@ func (r *fakeRepository) CreateGroupMessage(_ context.Context, params CreateGrou
 		CreatedAt: params.CreatedAt,
 		UpdatedAt: params.CreatedAt,
 	}
+	for _, attachmentID := range params.AttachmentIDs {
+		attachment := r.attachments[attachmentID]
+		attachment.Status = AttachmentStatusAttached
+		attachment.UpdatedAt = params.CreatedAt
+		attachment.AttachedAt = &params.CreatedAt
+		attachment.MessageID = &message.ID
+		r.attachments[attachmentID] = attachment
+		message.Attachments = append(message.Attachments, attachment)
+	}
 	r.groupMessages[message.ID] = message
 
 	thread.UpdatedAt = params.CreatedAt
@@ -1293,6 +1430,15 @@ func (r *fakeRepository) CreateDirectChatMessage(_ context.Context, params Creat
 		},
 		CreatedAt: params.CreatedAt,
 		UpdatedAt: params.CreatedAt,
+	}
+	for _, attachmentID := range params.AttachmentIDs {
+		attachment := r.attachments[attachmentID]
+		attachment.Status = AttachmentStatusAttached
+		attachment.UpdatedAt = params.CreatedAt
+		attachment.AttachedAt = &params.CreatedAt
+		attachment.MessageID = &message.ID
+		r.attachments[attachmentID] = attachment
+		message.Attachments = append(message.Attachments, attachment)
 	}
 	r.messages[message.ID] = message
 	directChat.UpdatedAt = params.CreatedAt
@@ -1623,6 +1769,35 @@ func (s *fakePresenceStore) ListDirectChatPresenceIndicators(_ context.Context, 
 		result[userID] = indicator
 	}
 	return result, nil
+}
+
+type fakeObjectStorage struct {
+	objects map[string]StoredObjectInfo
+}
+
+func newFakeObjectStorage() *fakeObjectStorage {
+	return &fakeObjectStorage{
+		objects: make(map[string]StoredObjectInfo),
+	}
+}
+
+func (s *fakeObjectStorage) CreateUpload(_ context.Context, objectKey string, mimeType string, expiresAt time.Time) (*PresignedObjectUpload, error) {
+	return &PresignedObjectUpload{
+		URL:        "http://example.invalid/" + objectKey,
+		HTTPMethod: "PUT",
+		Headers: map[string]string{
+			"Content-Type": mimeType,
+		},
+		ExpiresAt: expiresAt,
+	}, nil
+}
+
+func (s *fakeObjectStorage) StatObject(_ context.Context, objectKey string) (*StoredObjectInfo, error) {
+	info, ok := s.objects[objectKey]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	return &info, nil
 }
 
 func testUUID(sequence int) string {

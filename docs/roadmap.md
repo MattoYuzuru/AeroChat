@@ -132,7 +132,8 @@
 
 Задачи:
 
-- [ ] Attachment metadata model
+- [x] Attachment metadata model
+- [x] Upload intent / presigned upload foundation
 - [ ] Voice notes
 - [ ] Video notes
 - [ ] Image/audio/video preview

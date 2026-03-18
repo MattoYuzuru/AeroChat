@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -16,6 +17,15 @@ type Config struct {
 	DatabaseBootstrapTimeout time.Duration
 	DirectChatTypingTTL      time.Duration
 	DirectChatPresenceTTL    time.Duration
+	MediaS3InternalEndpoint  string
+	MediaS3PresignEndpoint   string
+	MediaS3AccessKey         string
+	MediaS3SecretKey         string
+	MediaS3BucketName        string
+	MediaS3InternalSecure    bool
+	MediaS3PresignSecure     bool
+	MediaUploadIntentTTL     time.Duration
+	MediaMaxUploadSizeBytes  int64
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -36,6 +46,14 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	uploadIntentTTL, err := lookupDuration("AERO_MEDIA_UPLOAD_INTENT_TTL", 15*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	maxUploadSizeBytes, err := lookupInt64("AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES", 64*1024*1024)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		DatabaseURL:              lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
@@ -46,6 +64,15 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		DatabaseBootstrapTimeout: bootstrapTimeout,
 		DirectChatTypingTTL:      typingTTL,
 		DirectChatPresenceTTL:    presenceTTL,
+		MediaS3InternalEndpoint:  lookupString("AERO_MEDIA_S3_INTERNAL_ENDPOINT", "localhost:9000"),
+		MediaS3PresignEndpoint:   lookupString("AERO_MEDIA_S3_PRESIGN_ENDPOINT", "127.0.0.1:9000"),
+		MediaS3AccessKey:         lookupString("AERO_MEDIA_S3_ACCESS_KEY", "minioadmin"),
+		MediaS3SecretKey:         lookupString("AERO_MEDIA_S3_SECRET_KEY", "minioadmin"),
+		MediaS3BucketName:        lookupString("AERO_MEDIA_S3_BUCKET", "aerochat-attachments"),
+		MediaS3InternalSecure:    lookupBool("AERO_MEDIA_S3_INTERNAL_SECURE", false),
+		MediaS3PresignSecure:     lookupBool("AERO_MEDIA_S3_PRESIGN_SECURE", false),
+		MediaUploadIntentTTL:     uploadIntentTTL,
+		MediaMaxUploadSizeBytes:  maxUploadSizeBytes,
 	}, nil
 }
 
@@ -65,6 +92,36 @@ func lookupDuration(key string, fallback time.Duration) (time.Duration, error) {
 	}
 
 	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("переменная %s: %w", key, err)
+	}
+
+	return parsed, nil
+}
+
+func lookupBool(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+
+	switch value {
+	case "1", "true", "TRUE", "True", "yes", "YES", "Yes", "on", "ON", "On":
+		return true
+	case "0", "false", "FALSE", "False", "no", "NO", "No", "off", "OFF", "Off":
+		return false
+	default:
+		return fallback
+	}
+}
+
+func lookupInt64(key string, fallback int64) (int64, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("переменная %s: %w", key, err)
 	}

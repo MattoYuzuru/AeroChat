@@ -12,6 +12,9 @@ service ChatService {
   rpc CreateDirectChat(CreateDirectChatRequest) returns (CreateDirectChatResponse);
   rpc ListDirectChats(ListDirectChatsRequest) returns (ListDirectChatsResponse);
   rpc GetDirectChat(GetDirectChatRequest) returns (GetDirectChatResponse);
+  rpc CreateAttachmentUploadIntent(CreateAttachmentUploadIntentRequest) returns (CreateAttachmentUploadIntentResponse);
+  rpc CompleteAttachmentUpload(CompleteAttachmentUploadRequest) returns (CompleteAttachmentUploadResponse);
+  rpc GetAttachment(GetAttachmentRequest) returns (GetAttachmentResponse);
   rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
   rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
   rpc GetGroup(GetGroupRequest) returns (GetGroupResponse);
@@ -55,6 +58,29 @@ enum MessageKind {
 enum MarkdownPolicy {
   MARKDOWN_POLICY_UNSPECIFIED = 0;
   MARKDOWN_POLICY_SAFE_SUBSET_V1 = 1;
+}
+
+enum AttachmentScope {
+  ATTACHMENT_SCOPE_UNSPECIFIED = 0;
+  ATTACHMENT_SCOPE_DIRECT_CHAT = 1;
+  ATTACHMENT_SCOPE_GROUP = 2;
+}
+
+enum AttachmentStatus {
+  ATTACHMENT_STATUS_UNSPECIFIED = 0;
+  ATTACHMENT_STATUS_PENDING = 1;
+  ATTACHMENT_STATUS_UPLOADED = 2;
+  ATTACHMENT_STATUS_ATTACHED = 3;
+  ATTACHMENT_STATUS_FAILED = 4;
+  ATTACHMENT_STATUS_DELETED = 5;
+}
+
+enum AttachmentUploadSessionStatus {
+  ATTACHMENT_UPLOAD_SESSION_STATUS_UNSPECIFIED = 0;
+  ATTACHMENT_UPLOAD_SESSION_STATUS_PENDING = 1;
+  ATTACHMENT_UPLOAD_SESSION_STATUS_COMPLETED = 2;
+  ATTACHMENT_UPLOAD_SESSION_STATUS_FAILED = 3;
+  ATTACHMENT_UPLOAD_SESSION_STATUS_EXPIRED = 4;
 }
 
 enum GroupMemberRole {
@@ -134,6 +160,39 @@ message TextMessageContent {
   MarkdownPolicy markdown_policy = 2;
 }
 
+message Attachment {
+  string id = 1;
+  string owner_user_id = 2;
+  AttachmentScope scope = 3;
+  string direct_chat_id = 4;
+  string group_id = 5;
+  string message_id = 6;
+  string file_name = 7;
+  string mime_type = 8;
+  uint64 size_bytes = 9;
+  AttachmentStatus status = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp uploaded_at = 13;
+  google.protobuf.Timestamp attached_at = 14;
+  google.protobuf.Timestamp failed_at = 15;
+  google.protobuf.Timestamp deleted_at = 16;
+}
+
+message AttachmentUploadSession {
+  string id = 1;
+  string attachment_id = 2;
+  AttachmentUploadSessionStatus status = 3;
+  string upload_url = 4;
+  string http_method = 5;
+  map<string, string> headers = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp expires_at = 9;
+  google.protobuf.Timestamp completed_at = 10;
+  google.protobuf.Timestamp failed_at = 11;
+}
+
 message MessageTombstone {
   string deleted_by_user_id = 1;
   google.protobuf.Timestamp deleted_at = 2;
@@ -147,8 +206,9 @@ message DirectChatMessage {
   optional TextMessageContent text = 5;
   optional MessageTombstone tombstone = 6;
   bool pinned = 7;
-  google.protobuf.Timestamp created_at = 8;
-  google.protobuf.Timestamp updated_at = 9;
+  repeated Attachment attachments = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
 }
 
 message GroupMessage {
@@ -158,8 +218,9 @@ message GroupMessage {
   string sender_user_id = 4;
   MessageKind kind = 5;
   optional TextMessageContent text = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp updated_at = 8;
+  repeated Attachment attachments = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
 }
 
 message DirectChatReadPosition {
@@ -222,6 +283,38 @@ message GetDirectChatResponse {
   DirectChatReadState read_state = 2;
   DirectChatTypingState typing_state = 3;
   DirectChatPresenceState presence_state = 4;
+}
+
+message CreateAttachmentUploadIntentRequest {
+  oneof scope_target {
+    string direct_chat_id = 1;
+    string group_id = 2;
+  }
+  string file_name = 3;
+  string mime_type = 4;
+  uint64 size_bytes = 5;
+}
+
+message CreateAttachmentUploadIntentResponse {
+  Attachment attachment = 1;
+  AttachmentUploadSession upload_session = 2;
+}
+
+message CompleteAttachmentUploadRequest {
+  string attachment_id = 1;
+  string upload_session_id = 2;
+}
+
+message CompleteAttachmentUploadResponse {
+  Attachment attachment = 1;
+}
+
+message GetAttachmentRequest {
+  string attachment_id = 1;
+}
+
+message GetAttachmentResponse {
+  Attachment attachment = 1;
 }
 
 message CreateGroupRequest {
@@ -393,6 +486,7 @@ message ClearDirectChatPresenceResponse {
 message SendTextMessageRequest {
   string chat_id = 1;
   string text = 2;
+  repeated string attachment_ids = 3;
 }
 
 message SendTextMessageResponse {
@@ -420,6 +514,7 @@ message ListGroupMessagesResponse {
 message SendGroupTextMessageRequest {
   string group_id = 1;
   string text = 2;
+  repeated string attachment_ids = 3;
 }
 
 message SendGroupTextMessageResponse {
