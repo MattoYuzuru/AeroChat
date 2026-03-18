@@ -25,6 +25,7 @@ jobs:
       DEPLOY_DIR: ${{ vars.AERO_PROD_DEPLOY_DIR }}
       COMPOSE_FILE: ${{ vars.AERO_PROD_COMPOSE_FILE }}
       EDGE_DOMAIN: ${{ vars.AERO_PROD_EDGE_DOMAIN }}
+      MEDIA_EDGE_DOMAIN: ${{ vars.AERO_PROD_MEDIA_EDGE_DOMAIN }}
       SSH_HOST: ${{ secrets.AERO_PROD_SSH_HOST }}
       SSH_PORT: ${{ secrets.AERO_PROD_SSH_PORT }}
       SSH_USER: ${{ secrets.AERO_PROD_SSH_USER }}
@@ -40,6 +41,7 @@ jobs:
             DEPLOY_DIR
             COMPOSE_FILE
             EDGE_DOMAIN
+            MEDIA_EDGE_DOMAIN
             SSH_HOST
             SSH_PORT
             SSH_USER
@@ -61,6 +63,11 @@ jobs:
 
           if ! printf '%s' "$EDGE_DOMAIN" | grep -Eq '^[A-Za-z0-9.-]+$'; then
             echo "::error::AERO_PROD_EDGE_DOMAIN содержит недопустимые символы"
+            exit 1
+          fi
+
+          if ! printf '%s' "$MEDIA_EDGE_DOMAIN" | grep -Eq '^[A-Za-z0-9.-]+$'; then
+            echo "::error::AERO_PROD_MEDIA_EDGE_DOMAIN содержит недопустимые символы"
             exit 1
           fi
 
@@ -91,6 +98,7 @@ jobs:
             "$COMPOSE_FILE"
             "$IMAGE_TAG"
             "$EDGE_DOMAIN"
+            "$MEDIA_EDGE_DOMAIN"
           )
 
           # shellcheck disable=SC2029
@@ -102,6 +110,7 @@ jobs:
           COMPOSE_FILE=$2
           IMAGE_TAG=$3
           EDGE_DOMAIN=$4
+          MEDIA_EDGE_DOMAIN=$5
 
           require_command() {
             local name="$1"
@@ -190,6 +199,7 @@ jobs:
           shared_edge_host_ip="$(read_env_var .env.server AERO_SHARED_EDGE_HOST_IP)"
           web_host_port="$(read_env_var .env.server AERO_WEB_HOST_PORT)"
           gateway_host_port="$(read_env_var .env.server AERO_GATEWAY_HOST_PORT)"
+          media_host_port="$(read_env_var .env.server AERO_MEDIA_HOST_PORT)"
 
           if [ "$shared_edge_host_ip" = "127.0.0.1" ]; then
             echo "AERO_SHARED_EDGE_HOST_IP не должен оставаться loopback для shared Traefik edge" >&2
@@ -228,9 +238,11 @@ jobs:
 
           wait_for_url "Web upstream" "http://${shared_edge_host_ip}:${web_host_port}/"
           wait_for_url "Gateway upstream readyz" "http://${shared_edge_host_ip}:${gateway_host_port}/readyz"
+          wait_for_url "Media upstream live" "http://${shared_edge_host_ip}:${media_host_port}/minio/health/live"
           wait_for_url "HTTPS web root" "https://${EDGE_DOMAIN}/"
           wait_for_url "HTTPS healthz" "https://${EDGE_DOMAIN}/healthz"
           wait_for_url "HTTPS readyz" "https://${EDGE_DOMAIN}/readyz"
+          wait_for_url "HTTPS media live" "https://${MEDIA_EDGE_DOMAIN}/minio/health/live"
 
           if [ -n "$previous_tag" ]; then
             echo "Для rollback используй предыдущий tag: $previous_tag"
@@ -245,4 +257,5 @@ jobs:
             echo "- image_tag: \`$IMAGE_TAG\`"
             echo "- deploy dir: \`$DEPLOY_DIR\`"
             echo "- domain: \`$EDGE_DOMAIN\`"
+            echo "- media domain: \`$MEDIA_EDGE_DOMAIN\`"
           } >> "$GITHUB_STEP_SUMMARY"

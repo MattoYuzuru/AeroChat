@@ -228,7 +228,9 @@ Media/file foundation использует тот же локальный `minio
 - внутренний endpoint для service-to-storage доступа;
 - browser-visible endpoint для presigned upload URL.
 
-В `local/dev` шаблоне это уже сведено к `minio:9000` и `127.0.0.1:${MINIO_API_PORT}`.
+В `local/dev` шаблоне это уже сведено к `minio:9000` и `MEDIA_S3_PUBLIC_ENDPOINT`.
+Для browser upload compose runtime также автоматически bootstrap'ит bucket privacy и CORS через `mc`,
+используя `MEDIA_S3_CORS_ALLOWED_ORIGINS`.
 
 4. Открой приложение через `http://127.0.0.1:${NGINX_PORT}` из `.env`.
 
@@ -255,10 +257,11 @@ docker compose --env-file .env.server --env-file .env.server.secrets -f infra/co
 
 Server runtime больше не поднимает отдельный `nginx` контейнер для production VPS.
 Public edge для target VPS принадлежит shared `Traefik` в `k3s`.
-Compose runtime публикует только два host upstream'а на `${AERO_SHARED_EDGE_HOST_IP}`:
+Compose runtime публикует три host upstream'а на `${AERO_SHARED_EDGE_HOST_IP}`:
 
 - `/` → `web` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}`;
 - `/api`, `/api/realtime`, `/healthz`, `/readyz` → `aero-gateway` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}`.
+- `https://${AERO_MEDIA_EDGE_DOMAIN}` → `minio` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}`.
 
 `Traefik` получает доступ к ним через Kubernetes `Service` без selector и `EndpointSlice`,
 а TLS выпускается через existing `cert-manager`.
@@ -266,9 +269,15 @@ Compose runtime публикует только два host upstream'а на `${
 ingress-side strip-prefix остаётся у `/api`, а realtime endpoint публикуется как `/api/realtime`,
 чтобы web bundle продолжал работать с `VITE_GATEWAY_BASE_URL=/api` без второго публичного backend URL.
 
-Для media/file foundation server runtime также требует отдельно указанный browser-visible S3 endpoint в
-`MEDIA_S3_PUBLIC_ENDPOINT`, потому что presigned upload URL не может безопасно указывать на внутренний compose-host
-`minio:9000`.
+Для media/file foundation server runtime также требует:
+
+- отдельный media subdomain в `AERO_MEDIA_EDGE_DOMAIN`;
+- browser-visible S3 endpoint в `MEDIA_S3_PUBLIC_ENDPOINT`;
+- отдельный host upstream `AERO_MEDIA_HOST_PORT`;
+- явный bucket CORS contract в `MEDIA_S3_CORS_ALLOWED_ORIGINS`.
+
+Presigned upload URL не может безопасно указывать на внутренний compose-host `minio:9000`,
+поэтому production-credible contract фиксируется как отдельный media origin.
 
 Подробности, TLS/domain contract и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
 Для финального live rollout используется manual workflow `Deploy Production` c GitHub Environment `production`.

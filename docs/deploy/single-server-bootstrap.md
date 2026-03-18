@@ -33,7 +33,7 @@
   - `.env.server.example` содержит только versioned non-secret runtime config;
   - `.env.server.secrets.example` содержит только перечень обязательных secret keys с плейсхолдерами;
   - `infra/compose/docker-compose.server.yml` тянет предсобранные application images из registry;
-  - compose публикует только `web` и `aero-gateway` на одном host IP, достижимом из pod'ов `Traefik`;
+  - compose публикует `web`, `aero-gateway` и `minio` API на одном host IP, достижимом из pod'ов `Traefik`;
   - shared `Traefik` остаётся единственным публичным edge на `80/443`;
   - TLS обслуживается через cluster `cert-manager`, а не через host-level certificate path.
 
@@ -50,7 +50,7 @@
 2. Cluster edge
    - shared `Traefik` как единственный публичный HTTP/TLS ingress;
    - `Service` без selector и `EndpointSlice`, указывающие на host upstream'ы AeroChat;
-   - `Ingress` и `Middleware`, которые маршрутизируют `aero.keykomi.com`;
+   - `Ingress` и `Middleware`, которые маршрутизируют `aero.keykomi.com` и `media.aero.keykomi.com`;
    - `cert-manager`, который выпускает TLS secret для ingress.
 
 Поток traffic выглядит так:
@@ -58,18 +58,23 @@
 - browser → `Traefik`
 - `Traefik` → Kubernetes `Ingress`
 - `Ingress` → `Service` / `EndpointSlice`
-- `EndpointSlice` → `${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}` или `${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}`
+- `EndpointSlice` → `${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}`, `${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}` или `${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}`
 - `aero-gateway` → `aero-identity`, `aero-chat` по compose DNS
 - `aero-identity` → `postgres`
-- `aero-chat` → `postgres`, `redis`
+- `aero-chat` → `postgres`, `redis`, `minio`
 
-Наружу не публикуются:
+Через host upstream не публикуются:
 
 - `aero-identity`
 - `aero-chat`
 - `postgres`
 - `redis`
-- `minio`
+
+Отдельно публикуется только MinIO API upstream для media edge:
+
+- `${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}` → `minio:9000`
+
+При этом `MinIO Console` и public bucket discovery наружу не публикуются.
 
 ## Server env-модель
 
@@ -87,7 +92,8 @@
 - `.env.server` на VPS
   - реальная рабочая копия non-secret runtime config;
   - оператор обычно меняет здесь `AERO_IMAGE_TAG`;
-  - здесь же фиксируются `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT` и `AERO_GATEWAY_HOST_PORT`.
+  - здесь же фиксируются `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT`, `AERO_MEDIA_HOST_PORT`,
+    `AERO_MEDIA_EDGE_DOMAIN`, `MEDIA_S3_PUBLIC_ENDPOINT` и `MEDIA_S3_CORS_ALLOWED_ORIGINS`.
 
 - `.env.server.secrets` на VPS
   - реальная рабочая копия секретов;
@@ -130,7 +136,8 @@
 - `/api` через `aero-gateway` со strip-prefix `/api`;
 - `/api/realtime` через `aero-gateway`;
 - `/healthz` через `aero-gateway`;
-- `/readyz` через `aero-gateway`.
+- `/readyz` через `aero-gateway`;
+- весь host `media.<primary-domain>` через `minio`.
 
 Минимальный пример ресурсов лежит в:
 
@@ -141,6 +148,7 @@
 - `192.0.2.10` на фактическое значение `AERO_SHARED_EDGE_HOST_IP` из `.env.server`;
 - `letsencrypt-prod` на реальный `ClusterIssuer`, если в кластере используется другое имя;
 - `ingressClassName`, если shared `Traefik` использует нестандартный ingress class;
+- `aero.keykomi.com` и `media.aero.keykomi.com`, если используются другие домены;
 - namespace, если выбран не `aerochat-edge`.
 
 ## Что готово сейчас
@@ -148,6 +156,8 @@
 - production-oriented compose topology без собственного публичного `nginx`;
 - `aero-gateway` остаётся единственной backend edge-точкой;
 - explicit host upstream contract через `AERO_SHARED_EDGE_HOST_IP` и high ports;
+- отдельный media edge для browser-visible object storage traffic;
+- автоматический bootstrap bucket privacy и CORS через `mc`;
 - минимальные Kubernetes resources для shared `Traefik`;
 - TLS path через existing `cert-manager`;
 - manual bootstrap/update/rollback flow как fallback;
@@ -174,6 +184,7 @@
 - уже установленный `cert-manager`;
 - `kubectl` с доступом к целевому кластеру;
 - домен `aero.keykomi.com`, указывающий на текущий edge;
+- media subdomain, например `media.aero.keykomi.com`, указывающий на тот же edge;
 - host IP VPS, достижимый из pod'ов `Traefik`;
 - возможность ограничить high ports так, чтобы они не стали вторым публичным edge.
 
@@ -195,9 +206,13 @@ cp .env.server.secrets.example .env.server.secrets
 - `AERO_IMAGE_NAMESPACE`
 - `AERO_IMAGE_TAG`
 - `AERO_EDGE_DOMAIN`
+- `AERO_MEDIA_EDGE_DOMAIN`
 - `AERO_SHARED_EDGE_HOST_IP`
 - `AERO_WEB_HOST_PORT`
 - `AERO_GATEWAY_HOST_PORT`
+- `AERO_MEDIA_HOST_PORT`
+- `MEDIA_S3_PUBLIC_ENDPOINT`
+- `MEDIA_S3_CORS_ALLOWED_ORIGINS`
 
 Ожидаемая семантика:
 
@@ -206,6 +221,9 @@ cp .env.server.secrets.example .env.server.secrets
 - `AERO_WEB_HOST_PORT` обслуживает frontend upstream;
 - `AERO_GATEWAY_HOST_PORT` обслуживает backend upstream для `/api`, `/healthz` и `/readyz`;
 - тот же `AERO_GATEWAY_HOST_PORT` обслуживает и websocket endpoint `/api/realtime`;
+- `AERO_MEDIA_HOST_PORT` обслуживает MinIO API upstream для `https://media.<domain>`;
+- `MEDIA_S3_PUBLIC_ENDPOINT` должен совпадать с browser-visible media origin, а не с `minio:9000`;
+- `MEDIA_S3_CORS_ALLOWED_ORIGINS` должен перечислять только доверенные application origins;
 - high ports не должны оставаться бесконтрольно доступными извне.
 
 4. Проверь итоговую compose-конфигурацию:
@@ -238,6 +256,7 @@ docker compose \
 
 - `aero-identity` автоматически применяет свои schema migrations до HTTP startup;
 - `aero-chat` ждёт завершённый identity bootstrap и затем применяет свои migrations;
+- `minio-bootstrap` один раз создаёт bucket, фиксирует private policy и применяет CORS;
 - при проблеме bootstrap сервис завершается с явной ошибкой в логах контейнера.
 
 6. Проверь состояние контейнеров и прямые host upstream'ы:
@@ -251,7 +270,11 @@ docker compose \
 
 curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}/"
 curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz"
+curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}/minio/health/live"
 ```
+
+Для `minio-bootstrap` статус `Exited (0)` после успешного первого запуска является нормой:
+это одноразовый helper, а не long-running сервис.
 
 Если один из сервисов не выходит в `ready`, смотри в первую очередь:
 
@@ -268,8 +291,9 @@ docker compose \
 Открой `infra/k8s/shared-edge/aero.keykomi.com.example.yaml` и синхронно замени:
 
 - `192.0.2.10` на `AERO_SHARED_EDGE_HOST_IP`;
-- `18080` и `18081`, если в `.env.server` выбраны другие порты;
+- `18080`, `18081` и `19000`, если в `.env.server` выбраны другие порты;
 - `letsencrypt-prod`, если `ClusterIssuer` называется иначе;
+- `aero.keykomi.com` и `media.aero.keykomi.com`, если используются другие домены;
 - namespace, если нужен другой.
 
 8. Примени ресурсы в кластер:
@@ -296,9 +320,11 @@ kubectl -n aerochat-edge get certificate
 curl -fsS https://aero.keykomi.com/
 curl -fsS https://aero.keykomi.com/healthz
 curl -fsS https://aero.keykomi.com/readyz
+curl -fsS https://media.aero.keykomi.com/minio/health/live
 ```
 
-Если используется другой домен, замени `aero.keykomi.com` на значение `AERO_EDGE_DOMAIN`.
+Если используются другие домены, замени `aero.keykomi.com` и `media.aero.keykomi.com`
+на значения `AERO_EDGE_DOMAIN` и `AERO_MEDIA_EDGE_DOMAIN`.
 
 ## Что означают проверки
 
@@ -308,6 +334,9 @@ curl -fsS https://aero.keykomi.com/readyz
 - `http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz`
   - показывает, что backend readiness chain доступна напрямую.
 
+- `http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}/minio/health/live`
+  - показывает, что host upstream object storage жив и готов к media edge.
+
 - `https://<domain>/`
   - показывает, что `Traefik` действительно отдаёт frontend домена.
 
@@ -316,6 +345,9 @@ curl -fsS https://aero.keykomi.com/readyz
 
 - `https://<domain>/readyz`
   - подтверждает, что `Traefik` и backend readiness chain работают вместе.
+
+- `https://<media-domain>/minio/health/live`
+  - подтверждает, что shared `Traefik` корректно маршрутизирует отдельный media origin.
 
 ## Manual update и rollback flow
 
@@ -329,6 +361,7 @@ curl -fsS https://aero.keykomi.com/readyz
 6. Снова проверь:
    - `http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz`
    - `https://<domain>/readyz`
+   - `https://<media-domain>/minio/health/live`
 
 Rollback делается тем же flow после возврата `AERO_IMAGE_TAG` на предыдущий known-good tag.
 
@@ -339,8 +372,9 @@ Rollback делается тем же flow после возврата `AERO_IMA
 Нужно синхронно обновить:
 
 - `AERO_SHARED_EDGE_HOST_IP` в `.env.server`;
-- `AERO_WEB_HOST_PORT` и `AERO_GATEWAY_HOST_PORT` в `.env.server`, если менялись порты;
-- оба `EndpointSlice` в Kubernetes manifest;
+- `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT` и `AERO_MEDIA_HOST_PORT` в `.env.server`, если менялись порты;
+- `AERO_EDGE_DOMAIN`, `AERO_MEDIA_EDGE_DOMAIN`, `MEDIA_S3_PUBLIC_ENDPOINT` и `MEDIA_S3_CORS_ALLOWED_ORIGINS`, если меняются домены/origin;
+- все `EndpointSlice` в Kubernetes manifest;
 - при необходимости ограничения firewall.
 
 Только после этого можно выполнять следующий rollout.
