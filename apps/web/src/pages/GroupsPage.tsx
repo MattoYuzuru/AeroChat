@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
@@ -8,57 +8,20 @@ import {
   isGatewayErrorCode,
   type CreatedGroupInviteLink,
   type Group,
-  type GroupChatSnapshot,
-  type GroupInviteLink,
   type GroupMember,
   type GroupMemberRole,
-  type GroupMessage,
 } from "../gateway/types";
 import { buildGroupInviteUrl, extractGroupInviteToken } from "../groups/invite-token";
+import { parseGroupRealtimeEvent } from "../groups/realtime";
+import {
+  applyGroupRealtimeToGroups,
+  applyGroupRealtimeToSelectedState,
+  createInitialGroupsSelectedState,
+  shouldClearSelectedGroupOnRealtimeEvent,
+  type GroupsSelectedState,
+} from "../groups/state";
+import { subscribeRealtimeEnvelopes } from "../realtime/events";
 import styles from "./GroupsPage.module.css";
-
-type SelectedState =
-  | {
-      status: "idle";
-      snapshot: null;
-      members: GroupMember[];
-      inviteLinks: GroupInviteLink[];
-      messages: GroupMessage[];
-      errorMessage: null;
-    }
-  | {
-      status: "loading";
-      snapshot: null;
-      members: GroupMember[];
-      inviteLinks: GroupInviteLink[];
-      messages: GroupMessage[];
-      errorMessage: null;
-    }
-  | {
-      status: "ready";
-      snapshot: GroupChatSnapshot;
-      members: GroupMember[];
-      inviteLinks: GroupInviteLink[];
-      messages: GroupMessage[];
-      errorMessage: null;
-    }
-  | {
-      status: "error";
-      snapshot: null;
-      members: GroupMember[];
-      inviteLinks: GroupInviteLink[];
-      messages: GroupMessage[];
-      errorMessage: string;
-    };
-
-const initialSelectedState: SelectedState = {
-  status: "idle",
-  snapshot: null,
-  members: [],
-  inviteLinks: [],
-  messages: [],
-  errorMessage: null,
-};
 
 export function GroupsPage() {
   const { state: authState, expireSession } = useAuth();
@@ -66,7 +29,9 @@ export function GroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupsStatus, setGroupsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [groupsError, setGroupsError] = useState<string | null>(null);
-  const [selectedState, setSelectedState] = useState<SelectedState>(initialSelectedState);
+  const [selectedState, setSelectedState] = useState<GroupsSelectedState>(
+    createInitialGroupsSelectedState(),
+  );
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
@@ -85,10 +50,15 @@ export function GroupsPage() {
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, GroupMemberRole>>({});
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
+  const selectedStateRef = useRef(selectedState);
 
   const selectedGroupId = searchParams.get("group")?.trim() ?? "";
   const joinTokenFromRoute = searchParams.get("join")?.trim() ?? "";
   const token = authState.status === "authenticated" ? authState.token : "";
+
+  useEffect(() => {
+    selectedStateRef.current = selectedState;
+  }, [selectedState]);
 
   useEffect(() => {
     if (joinTokenFromRoute !== "") {
@@ -140,7 +110,7 @@ export function GroupsPage() {
       return;
     }
     if (selectedGroupId === "") {
-      setSelectedState(initialSelectedState);
+      setSelectedState(createInitialGroupsSelectedState());
       setComposerText("");
       setMemberRoleDrafts({});
       return;
@@ -208,6 +178,49 @@ export function GroupsPage() {
       active = false;
     };
   }, [authState.status, expireSession, selectedGroupId, token]);
+
+  useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
+    return subscribeRealtimeEnvelopes((envelope) => {
+      const event = parseGroupRealtimeEvent(envelope);
+      if (!event) {
+        return;
+      }
+
+      setGroups((current) => applyGroupRealtimeToGroups(current, event));
+
+      const shouldClearSelection = shouldClearSelectedGroupOnRealtimeEvent(
+        selectedStateRef.current,
+        event,
+      );
+      if (shouldClearSelection) {
+        setSearchParams(new URLSearchParams(), { replace: true });
+        setComposerText("");
+        setNotice("Live state: доступ к группе больше не активен.");
+      }
+
+      const nextSelectedState = applyGroupRealtimeToSelectedState(
+        selectedStateRef.current,
+        event,
+      );
+      selectedStateRef.current = nextSelectedState;
+      setSelectedState(nextSelectedState);
+
+      if (event.type === "group.message.updated") {
+        return;
+      }
+
+      if (nextSelectedState?.status === "ready") {
+        setMemberRoleDrafts(buildMemberRoleDrafts(nextSelectedState.members));
+        return;
+      }
+
+      setMemberRoleDrafts({});
+    });
+  }, [authState.status, setSearchParams]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -305,7 +318,6 @@ export function GroupsPage() {
       setComposerText("");
       setLastCreatedInvite(null);
       setNotice("Вход в группу выполнен.");
-      await reloadGroups();
       openGroup(group.id);
     } catch (error) {
       const message = resolveProtectedError(
@@ -412,8 +424,6 @@ export function GroupsPage() {
       );
       setComposerText("");
       setNotice("Сообщение отправлено.");
-      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
-      await reloadGroups();
     } catch (error) {
       const message = resolveProtectedError(
         error,
@@ -455,8 +465,6 @@ export function GroupsPage() {
         nextRole,
       );
       setNotice(`Роль ${member.user.nickname || `@${member.user.login}`} обновлена.`);
-      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
-      await reloadGroups();
     } catch (error) {
       const message = resolveProtectedError(
         error,
@@ -499,8 +507,6 @@ export function GroupsPage() {
         userId,
       );
       setNotice("Ownership передан. Текущая роль обновлена.");
-      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
-      await reloadGroups();
     } catch (error) {
       const message = resolveProtectedError(
         error,
@@ -539,8 +545,6 @@ export function GroupsPage() {
     try {
       await gatewayClient.removeGroupMember(token, selectedState.snapshot.group.id, userId);
       setNotice(`Участник ${member.user.nickname || `@${member.user.login}`} удалён из группы.`);
-      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
-      await reloadGroups();
     } catch (error) {
       const message = resolveProtectedError(
         error,
@@ -571,7 +575,6 @@ export function GroupsPage() {
       await gatewayClient.leaveGroup(token, selectedState.snapshot.group.id);
       setNotice("Вы вышли из группы.");
       clearGroupSelection();
-      await reloadGroups();
     } catch (error) {
       const message = resolveProtectedError(
         error,
@@ -651,10 +654,10 @@ export function GroupsPage() {
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Groups</p>
-            <h1 className={styles.title}>Group membership management</h1>
+            <h1 className={styles.title}>Group realtime bootstrap</h1>
             <p className={styles.subtitle}>
-              Slice фиксирует canonical membership management: bounded role changes, explicit
-              ownership transfer, remove member и leave group без group realtime, calls и media.
+              Slice делает группы live через bounded realtime fan-out: text messages, membership,
+              role и ownership updates без calls, media и redesign.
             </p>
           </div>
 
@@ -906,7 +909,7 @@ export function GroupsPage() {
                   </div>
                   <p className={styles.panelCopy}>
                     Здесь пока только text-only history. Group realtime, edit/delete и media
-                    намеренно отложены.
+                    уже подключён, а typing/read receipts, edit/delete и media намеренно отложены.
                   </p>
                 </div>
 

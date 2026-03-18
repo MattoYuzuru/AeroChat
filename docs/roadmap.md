@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] group membership management bootstrap через `aero-chat`, `aero-gateway` и `apps/web`
+- [x] group realtime bootstrap через `aero-gateway` и `apps/web`
 
 ---
 
@@ -119,6 +119,7 @@
 - [x] Promote/demote
 - [x] Group permissions
 - [x] Membership remove / leave / ownership transfer bootstrap
+- [x] Group realtime bootstrap через `aero-gateway`
 - [ ] Max groups per user rules
 
 ---
