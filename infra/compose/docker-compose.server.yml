@@ -42,6 +42,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    ports:
+      - "${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}:9000"
+
+  minio-bootstrap:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/bootstrap-media-storage.sh"]
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET}
+      MEDIA_S3_CORS_ALLOWED_ORIGINS: ${MEDIA_S3_CORS_ALLOWED_ORIGINS}
+    volumes:
+      - ../scripts/bootstrap-media-storage.sh:/bootstrap-media-storage.sh:ro
 
   aero-identity:
     image: ${AERO_IMAGE_NAMESPACE:-ghcr.io/mattoyuzuru}/aerochat-aero-identity:${AERO_IMAGE_TAG:-edge}
@@ -76,8 +94,8 @@ services:
       AERO_DIRECT_CHAT_PRESENCE_TTL: ${AERO_DIRECT_CHAT_PRESENCE_TTL}
       AERO_MEDIA_S3_INTERNAL_ENDPOINT: minio:9000
       AERO_MEDIA_S3_PRESIGN_ENDPOINT: ${MEDIA_S3_PUBLIC_ENDPOINT}
-      AERO_MEDIA_S3_ACCESS_KEY: ${MEDIA_S3_ACCESS_KEY}
-      AERO_MEDIA_S3_SECRET_KEY: ${MEDIA_S3_SECRET_KEY}
+      AERO_MEDIA_S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      AERO_MEDIA_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       AERO_MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET}
       AERO_MEDIA_S3_INTERNAL_SECURE: "false"
       AERO_MEDIA_S3_PRESIGN_SECURE: ${MEDIA_S3_PUBLIC_SECURE}
@@ -90,6 +108,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8082/readyz"]
       interval: 10s

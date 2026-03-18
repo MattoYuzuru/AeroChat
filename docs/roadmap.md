@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] group typing bootstrap через `aero-gateway` и `apps/web`
+- [x] media edge / upload runtime bootstrap для shared `Traefik` и `MinIO`
 
 ---
 
@@ -134,6 +134,7 @@
 
 - [x] Attachment metadata model
 - [x] Upload intent / presigned upload foundation
+- [x] Media edge / upload runtime bootstrap
 - [ ] Voice notes
 - [ ] Video notes
 - [ ] Image/audio/video preview
