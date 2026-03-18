@@ -74,6 +74,10 @@ func (h *ChatHandler) GetGroup(ctx context.Context, req *connect.Request[chatv1.
 	return forwardUnary(ctx, req, h.client.GetGroup)
 }
 
+func (h *ChatHandler) GetGroupChat(ctx context.Context, req *connect.Request[chatv1.GetGroupChatRequest]) (*connect.Response[chatv1.GetGroupChatResponse], error) {
+	return forwardUnary(ctx, req, h.client.GetGroupChat)
+}
+
 func (h *ChatHandler) ListGroupMembers(ctx context.Context, req *connect.Request[chatv1.ListGroupMembersRequest]) (*connect.Response[chatv1.ListGroupMembersResponse], error) {
 	return forwardUnary(ctx, req, h.client.ListGroupMembers)
 }
@@ -162,6 +166,14 @@ func (h *ChatHandler) SendTextMessage(ctx context.Context, req *connect.Request[
 
 func (h *ChatHandler) ListDirectChatMessages(ctx context.Context, req *connect.Request[chatv1.ListDirectChatMessagesRequest]) (*connect.Response[chatv1.ListDirectChatMessagesResponse], error) {
 	return forwardUnary(ctx, req, h.client.ListDirectChatMessages)
+}
+
+func (h *ChatHandler) ListGroupMessages(ctx context.Context, req *connect.Request[chatv1.ListGroupMessagesRequest]) (*connect.Response[chatv1.ListGroupMessagesResponse], error) {
+	return forwardUnary(ctx, req, h.client.ListGroupMessages)
+}
+
+func (h *ChatHandler) SendGroupTextMessage(ctx context.Context, req *connect.Request[chatv1.SendGroupTextMessageRequest]) (*connect.Response[chatv1.SendGroupTextMessageResponse], error) {
+	return forwardUnary(ctx, req, h.client.SendGroupTextMessage)
 }
 
 func (h *ChatHandler) DeleteMessageForEveryone(ctx context.Context, req *connect.Request[chatv1.DeleteMessageForEveryoneRequest]) (*connect.Response[chatv1.DeleteMessageForEveryoneResponse], error) {

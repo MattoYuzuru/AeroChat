@@ -18,11 +18,14 @@ type Querier interface {
 	CreateDirectChatMessageTombstone(ctx context.Context, arg CreateDirectChatMessageTombstoneParams) (int64, error)
 	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
 	CreateGroupInviteLink(ctx context.Context, arg CreateGroupInviteLinkParams) (CreateGroupInviteLinkRow, error)
+	CreateGroupMessage(ctx context.Context, arg CreateGroupMessageParams) (GroupMessage, error)
+	CreateGroupThread(ctx context.Context, arg CreateGroupThreadParams) (GroupThread, error)
 	DisableGroupInviteLink(ctx context.Context, arg DisableGroupInviteLinkParams) (int64, error)
 	FriendshipExists(ctx context.Context, arg FriendshipExistsParams) (bool, error)
 	GetDirectChatMessageByID(ctx context.Context, arg GetDirectChatMessageByIDParams) (GetDirectChatMessageByIDRow, error)
 	GetDirectChatRelationshipState(ctx context.Context, arg GetDirectChatRelationshipStateParams) (GetDirectChatRelationshipStateRow, error)
 	GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDirectChatRowsByIDAndUserIDParams) ([]GetDirectChatRowsByIDAndUserIDRow, error)
+	GetGroupChatThreadRowByGroupIDAndUserID(ctx context.Context, arg GetGroupChatThreadRowByGroupIDAndUserIDParams) (GroupThread, error)
 	GetGroupInviteLinkByIDAndGroupID(ctx context.Context, arg GetGroupInviteLinkByIDAndGroupIDParams) (GetGroupInviteLinkByIDAndGroupIDRow, error)
 	GetGroupInviteLinkForJoin(ctx context.Context, tokenHash string) (GetGroupInviteLinkForJoinRow, error)
 	GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowByIDAndUserIDParams) (GetGroupRowByIDAndUserIDRow, error)
@@ -35,12 +38,14 @@ type Querier interface {
 	ListDirectChatTypingStateEntries(ctx context.Context, arg ListDirectChatTypingStateEntriesParams) ([]ListDirectChatTypingStateEntriesRow, error)
 	ListGroupInviteLinksByGroupID(ctx context.Context, groupID uuid.UUID) ([]ListGroupInviteLinksByGroupIDRow, error)
 	ListGroupMemberRowsByGroupIDAndUserID(ctx context.Context, arg ListGroupMemberRowsByGroupIDAndUserIDParams) ([]ListGroupMemberRowsByGroupIDAndUserIDRow, error)
+	ListGroupMessagesByGroupIDAndUserID(ctx context.Context, arg ListGroupMessagesByGroupIDAndUserIDParams) ([]ListGroupMessagesByGroupIDAndUserIDRow, error)
 	ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) ([]ListGroupRowsByUserIDRow, error)
 	ListPinnedMessageIDsByChatID(ctx context.Context, chatID uuid.UUID) ([]uuid.UUID, error)
 	PinDirectChatMessage(ctx context.Context, arg PinDirectChatMessageParams) (int64, error)
 	TouchDirectChatMessageUpdatedAt(ctx context.Context, arg TouchDirectChatMessageUpdatedAtParams) error
 	TouchDirectChatUpdatedAt(ctx context.Context, arg TouchDirectChatUpdatedAtParams) error
 	TouchGroupInviteLinkJoin(ctx context.Context, arg TouchGroupInviteLinkJoinParams) error
+	TouchGroupThreadUpdatedAt(ctx context.Context, arg TouchGroupThreadUpdatedAtParams) error
 	TouchGroupUpdatedAt(ctx context.Context, arg TouchGroupUpdatedAtParams) error
 	TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error
 	UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error)

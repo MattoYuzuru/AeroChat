@@ -15,6 +15,7 @@ service ChatService {
   rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
   rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
   rpc GetGroup(GetGroupRequest) returns (GetGroupResponse);
+  rpc GetGroupChat(GetGroupChatRequest) returns (GetGroupChatResponse);
   rpc ListGroupMembers(ListGroupMembersRequest) returns (ListGroupMembersResponse);
   rpc CreateGroupInviteLink(CreateGroupInviteLinkRequest) returns (CreateGroupInviteLinkResponse);
   rpc ListGroupInviteLinks(ListGroupInviteLinksRequest) returns (ListGroupInviteLinksResponse);
@@ -27,6 +28,8 @@ service ChatService {
   rpc ClearDirectChatPresence(ClearDirectChatPresenceRequest) returns (ClearDirectChatPresenceResponse);
   rpc SendTextMessage(SendTextMessageRequest) returns (SendTextMessageResponse);
   rpc ListDirectChatMessages(ListDirectChatMessagesRequest) returns (ListDirectChatMessagesResponse);
+  rpc ListGroupMessages(ListGroupMessagesRequest) returns (ListGroupMessagesResponse);
+  rpc SendGroupTextMessage(SendGroupTextMessageRequest) returns (SendGroupTextMessageResponse);
   rpc DeleteMessageForEveryone(DeleteMessageForEveryoneRequest) returns (DeleteMessageForEveryoneResponse);
   rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
   rpc UnpinMessage(UnpinMessageRequest) returns (UnpinMessageResponse);
@@ -100,6 +103,15 @@ message GroupInviteLink {
   google.protobuf.Timestamp last_joined_at = 9;
 }
 
+message GroupChatThread {
+  string id = 1;
+  string group_id = 2;
+  string thread_key = 3;
+  bool can_send_messages = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
 message TextMessageContent {
   string text = 1;
   MarkdownPolicy markdown_policy = 2;
@@ -120,6 +132,17 @@ message DirectChatMessage {
   bool pinned = 7;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
+}
+
+message GroupMessage {
+  string id = 1;
+  string group_id = 2;
+  string thread_id = 3;
+  string sender_user_id = 4;
+  MessageKind kind = 5;
+  optional TextMessageContent text = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
 }
 
 message DirectChatReadPosition {
@@ -204,6 +227,15 @@ message GetGroupRequest {
 
 message GetGroupResponse {
   Group group = 1;
+}
+
+message GetGroupChatRequest {
+  string group_id = 1;
+}
+
+message GetGroupChatResponse {
+  Group group = 1;
+  GroupChatThread thread = 2;
 }
 
 message ListGroupMembersRequest {
@@ -306,6 +338,24 @@ message ListDirectChatMessagesRequest {
 
 message ListDirectChatMessagesResponse {
   repeated DirectChatMessage messages = 1;
+}
+
+message ListGroupMessagesRequest {
+  string group_id = 1;
+  uint32 page_size = 2;
+}
+
+message ListGroupMessagesResponse {
+  repeated GroupMessage messages = 1;
+}
+
+message SendGroupTextMessageRequest {
+  string group_id = 1;
+  string text = 2;
+}
+
+message SendGroupTextMessageResponse {
+  GroupMessage message = 1;
 }
 
 message DeleteMessageForEveryoneRequest {

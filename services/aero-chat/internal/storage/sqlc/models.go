@@ -85,6 +85,25 @@ type GroupMembership struct {
 	JoinedAt pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
 }
 
+type GroupMessage struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	ThreadID       uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind           string             `db:"kind" json:"kind"`
+	TextContent    string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type GroupThread struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	GroupID   uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadKey string             `db:"thread_key" json:"thread_key"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type User struct {
 	ID                      uuid.UUID          `db:"id" json:"id"`
 	Login                   string             `db:"login" json:"login"`

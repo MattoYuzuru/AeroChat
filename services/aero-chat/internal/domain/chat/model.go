@@ -5,6 +5,7 @@ import "time"
 const (
 	ChatKindDirect                   = "direct"
 	ChatKindGroup                    = "group"
+	GroupThreadKeyPrimary            = "primary"
 	MessageKindText                  = "text"
 	MarkdownPolicySafeSubsetV1       = "safe_subset_v1"
 	GroupMemberRoleOwner             = "owner"
@@ -72,6 +73,15 @@ type Group struct {
 	UpdatedAt       time.Time
 }
 
+type GroupChatThread struct {
+	ID              string
+	GroupID         string
+	ThreadKey       string
+	CanSendMessages bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 type GroupMember struct {
 	GroupID  string
 	User     UserSummary
@@ -119,6 +129,17 @@ type DirectChatMessage struct {
 	Text         *TextMessageContent
 	Tombstone    *MessageTombstone
 	Pinned       bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type GroupMessage struct {
+	ID           string
+	GroupID      string
+	ThreadID     string
+	SenderUserID string
+	Kind         string
+	Text         *TextMessageContent
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -185,6 +206,7 @@ type CreateDirectChatParams struct {
 
 type CreateGroupParams struct {
 	GroupID         string
+	PrimaryThreadID string
 	Name            string
 	CreatedByUserID string
 	CreatedAt       time.Time
@@ -202,6 +224,15 @@ type CreateGroupInviteLinkParams struct {
 type CreateDirectChatMessageParams struct {
 	MessageID    string
 	ChatID       string
+	SenderUserID string
+	Text         string
+	CreatedAt    time.Time
+}
+
+type CreateGroupMessageParams struct {
+	MessageID    string
+	GroupID      string
+	ThreadID     string
 	SenderUserID string
 	Text         string
 	CreatedAt    time.Time

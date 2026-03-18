@@ -134,6 +134,16 @@ INSERT INTO group_memberships (
     joined_at
 ) VALUES ($1, $2, $3, $4);
 
+-- name: CreateGroupThread :one
+INSERT INTO group_threads (
+    id,
+    group_id,
+    thread_key,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+RETURNING id, group_id, thread_key, created_at, updated_at;
+
 -- name: JoinGroupMembership :execrows
 INSERT INTO group_memberships (
     group_id,
@@ -173,6 +183,19 @@ JOIN groups AS g ON g.id = self.group_id
 JOIN group_memberships AS m ON m.group_id = g.id
 WHERE self.user_id = $1 AND g.id = $2
 GROUP BY g.id, g.name, g.created_by_user_id, self.role, g.created_at, g.updated_at;
+
+-- name: GetGroupChatThreadRowByGroupIDAndUserID :one
+SELECT
+    t.id,
+    t.group_id,
+    t.thread_key,
+    t.created_at,
+    t.updated_at
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+WHERE self.user_id = $1
+  AND self.group_id = $2
+  AND t.thread_key = 'primary';
 
 -- name: ListGroupMemberRowsByGroupIDAndUserID :many
 SELECT
@@ -279,6 +302,26 @@ UPDATE groups
 SET updated_at = $2
 WHERE id = $1;
 
+-- name: ListGroupMessagesByGroupIDAndUserID :many
+SELECT
+    m.id,
+    t.group_id,
+    m.thread_id,
+    m.sender_user_id,
+    m.kind,
+    m.text_content,
+    m.markdown_policy,
+    m.created_at,
+    m.updated_at
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+JOIN group_messages AS m ON m.thread_id = t.id
+WHERE self.user_id = $1
+  AND self.group_id = $2
+  AND t.thread_key = 'primary'
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $3;
+
 -- name: ListDirectChatReadStateEntries :many
 SELECT
     p.user_id,
@@ -378,8 +421,26 @@ INSERT INTO direct_chat_messages (
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at;
 
+-- name: CreateGroupMessage :one
+INSERT INTO group_messages (
+    id,
+    thread_id,
+    sender_user_id,
+    kind,
+    text_content,
+    markdown_policy,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at;
+
 -- name: TouchDirectChatUpdatedAt :exec
 UPDATE direct_chats
+SET updated_at = $2
+WHERE id = $1;
+
+-- name: TouchGroupThreadUpdatedAt :exec
+UPDATE group_threads
 SET updated_at = $2
 WHERE id = $1;
 

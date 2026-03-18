@@ -113,6 +113,9 @@
 - [x] Group roles
 - [x] Invite links
 - [x] Admin/member/reader
+- [x] Canonical primary group thread
+- [x] Group text messaging bootstrap
+- [x] Web group chat bootstrap через `aero-gateway`
 - [ ] Promote/demote
 - [ ] Group permissions
 - [ ] Max groups per user rules

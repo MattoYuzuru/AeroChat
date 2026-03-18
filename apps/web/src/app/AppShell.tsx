@@ -6,7 +6,7 @@ import styles from "./AppShell.module.css";
 const navigationItems = [
   { to: "/app/profile", label: "Профиль", meta: "identity" },
   { to: "/app/chats", label: "Чаты", meta: "direct" },
-  { to: "/app/groups", label: "Группы", meta: "group foundation" },
+  { to: "/app/groups", label: "Группы", meta: "group chat bootstrap" },
   { to: "/app/people", label: "Люди", meta: "social" },
   { to: "/app/settings", label: "Настройки", meta: "privacy" },
 ];

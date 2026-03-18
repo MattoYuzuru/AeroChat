@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -608,6 +609,17 @@ func mustSendMessage(t *testing.T, service *Service, token string, chatID string
 	return message
 }
 
+func mustSendGroupMessage(t *testing.T, service *Service, token string, groupID string, text string) *GroupMessage {
+	t.Helper()
+
+	message, err := service.SendGroupTextMessage(context.Background(), token, groupID, text)
+	if err != nil {
+		t.Fatalf("send group message: %v", err)
+	}
+
+	return message
+}
+
 func mustDeleteMessage(t *testing.T, service *Service, token string, chatID string, messageID string) *DirectChatMessage {
 	t.Helper()
 
@@ -632,11 +644,13 @@ type fakeRepository struct {
 	friendships   map[string]bool
 	blocks        map[string]map[string]bool
 	groups        map[string]Group
+	groupThreads  map[string]GroupChatThread
 	groupMembers  map[string]map[string]GroupMember
 	groupInvites  map[string]GroupInviteLink
 	inviteHashes  map[string]string
 	inviteByHash  map[string]string
 	chats         map[string]DirectChat
+	groupMessages map[string]GroupMessage
 	messages      map[string]DirectChatMessage
 	readPositions map[string]DirectChatReadPosition
 	typingStore   *fakeTypingStore
@@ -652,11 +666,13 @@ func newFakeRepository() *fakeRepository {
 		friendships:   make(map[string]bool),
 		blocks:        make(map[string]map[string]bool),
 		groups:        make(map[string]Group),
+		groupThreads:  make(map[string]GroupChatThread),
 		groupMembers:  make(map[string]map[string]GroupMember),
 		groupInvites:  make(map[string]GroupInviteLink),
 		inviteHashes:  make(map[string]string),
 		inviteByHash:  make(map[string]string),
 		chats:         make(map[string]DirectChat),
+		groupMessages: make(map[string]GroupMessage),
 		messages:      make(map[string]DirectChatMessage),
 		readPositions: make(map[string]DirectChatReadPosition),
 		typingStore:   newFakeTypingStore(),
@@ -881,6 +897,13 @@ func (r *fakeRepository) CreateGroup(_ context.Context, params CreateGroupParams
 			JoinedAt: params.CreatedAt,
 		},
 	}
+	r.groupThreads[group.ID] = GroupChatThread{
+		ID:        params.PrimaryThreadID,
+		GroupID:   group.ID,
+		ThreadKey: GroupThreadKeyPrimary,
+		CreatedAt: params.CreatedAt,
+		UpdatedAt: params.CreatedAt,
+	}
 
 	copy := group
 	return &copy, nil
@@ -916,6 +939,20 @@ func (r *fakeRepository) GetGroup(_ context.Context, userID string, groupID stri
 	group.SelfRole = member.Role
 	group.MemberCount = int32(len(r.groupMembers[groupID]))
 	copy := group
+	return &copy, nil
+}
+
+func (r *fakeRepository) GetGroupChatThread(_ context.Context, userID string, groupID string) (*GroupChatThread, error) {
+	if _, ok := r.groupMembers[groupID][userID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	thread, ok := r.groupThreads[groupID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	copy := thread
 	return &copy, nil
 }
 
@@ -1053,6 +1090,75 @@ func (r *fakeRepository) JoinGroupByInviteLink(_ context.Context, groupID string
 	group.UpdatedAt = joinedAt
 	r.groups[groupID] = group
 	return true, nil
+}
+
+func (r *fakeRepository) CreateGroupMessage(_ context.Context, params CreateGroupMessageParams) (*GroupMessage, error) {
+	memberships, ok := r.groupMembers[params.GroupID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if _, ok := memberships[params.SenderUserID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	thread, ok := r.groupThreads[params.GroupID]
+	if !ok || thread.ID != params.ThreadID {
+		return nil, ErrNotFound
+	}
+
+	message := GroupMessage{
+		ID:           params.MessageID,
+		GroupID:      params.GroupID,
+		ThreadID:     params.ThreadID,
+		SenderUserID: params.SenderUserID,
+		Kind:         MessageKindText,
+		Text: &TextMessageContent{
+			Text:           params.Text,
+			MarkdownPolicy: MarkdownPolicySafeSubsetV1,
+		},
+		CreatedAt: params.CreatedAt,
+		UpdatedAt: params.CreatedAt,
+	}
+	r.groupMessages[message.ID] = message
+
+	thread.UpdatedAt = params.CreatedAt
+	r.groupThreads[params.GroupID] = thread
+
+	group := r.groups[params.GroupID]
+	group.UpdatedAt = params.CreatedAt
+	r.groups[params.GroupID] = group
+
+	copy := message
+	return &copy, nil
+}
+
+func (r *fakeRepository) ListGroupMessages(_ context.Context, userID string, groupID string, limit int32) ([]GroupMessage, error) {
+	memberships, ok := r.groupMembers[groupID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if _, ok := memberships[userID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	result := make([]GroupMessage, 0)
+	for _, message := range r.groupMessages {
+		if message.GroupID == groupID {
+			result = append(result, message)
+		}
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].CreatedAt.Equal(result[j].CreatedAt) {
+			return result[i].ID > result[j].ID
+		}
+		return result[i].CreatedAt.After(result[j].CreatedAt)
+	})
+	if len(result) > int(limit) {
+		result = result[:limit]
+	}
+
+	return result, nil
 }
 
 func (r *fakeRepository) CreateDirectChatMessage(_ context.Context, params CreateDirectChatMessageParams) (*DirectChatMessage, error) {

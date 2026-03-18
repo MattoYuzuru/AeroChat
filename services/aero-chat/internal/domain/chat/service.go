@@ -30,6 +30,7 @@ type Repository interface {
 	CreateGroup(context.Context, CreateGroupParams) (*Group, error)
 	ListGroups(context.Context, string) ([]Group, error)
 	GetGroup(context.Context, string, string) (*Group, error)
+	GetGroupChatThread(context.Context, string, string) (*GroupChatThread, error)
 	ListGroupMembers(context.Context, string, string) ([]GroupMember, error)
 	CreateGroupInviteLink(context.Context, CreateGroupInviteLinkParams) (*GroupInviteLink, error)
 	ListGroupInviteLinks(context.Context, string) ([]GroupInviteLink, error)
@@ -42,7 +43,9 @@ type Repository interface {
 	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
 	UpsertDirectChatReadReceipt(context.Context, UpsertDirectChatReadReceiptParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
+	CreateGroupMessage(context.Context, CreateGroupMessageParams) (*GroupMessage, error)
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
+	ListGroupMessages(context.Context, string, string, int32) ([]GroupMessage, error)
 	GetDirectChatMessage(context.Context, string, string, string) (*DirectChatMessage, error)
 	DeleteDirectChatMessageForEveryone(context.Context, string, string, string, time.Time) (bool, error)
 	PinDirectChatMessage(context.Context, string, string, string, time.Time) (bool, error)
@@ -203,6 +206,7 @@ func (s *Service) CreateGroup(ctx context.Context, token string, name string) (*
 	now := s.now()
 	return s.repo.CreateGroup(ctx, CreateGroupParams{
 		GroupID:         s.newID(),
+		PrimaryThreadID: s.newID(),
 		Name:            normalizedName,
 		CreatedByUserID: authSession.User.ID,
 		CreatedAt:       now,
@@ -230,6 +234,15 @@ func (s *Service) GetGroup(ctx context.Context, token string, groupID string) (*
 	}
 
 	return s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+}
+
+func (s *Service) GetGroupChat(ctx context.Context, token string, groupID string) (*Group, *GroupChatThread, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return s.resolveGroupChat(ctx, authSession.User.ID, groupID)
 }
 
 func (s *Service) ListGroupMembers(ctx context.Context, token string, groupID string) ([]GroupMember, error) {
@@ -394,6 +407,36 @@ func (s *Service) JoinGroupByInviteLink(ctx context.Context, token string, invit
 	return s.repo.GetGroup(ctx, authSession.User.ID, target.Group.ID)
 }
 
+func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupID string, text string) (*GroupMessage, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	group, thread, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if !canSendGroupMessages(group.SelfRole) {
+		return nil, fmt.Errorf("%w: current group role is read-only for sending messages", ErrPermissionDenied)
+	}
+
+	normalizedText, err := normalizeMessageText(text)
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	return s.repo.CreateGroupMessage(ctx, CreateGroupMessageParams{
+		MessageID:    s.newID(),
+		GroupID:      group.ID,
+		ThreadID:     thread.ID,
+		SenderUserID: authSession.User.ID,
+		Text:         normalizedText,
+		CreatedAt:    now,
+	})
+}
+
 func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string) (*DirectChatMessage, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
@@ -492,6 +535,25 @@ func (s *Service) ListDirectChatMessages(ctx context.Context, token string, chat
 	}
 
 	return s.repo.ListDirectChatMessages(ctx, authSession.User.ID, normalizedChatID, limit)
+}
+
+func (s *Service) ListGroupMessages(ctx context.Context, token string, groupID string, pageSize uint32) ([]GroupMessage, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	group, _, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	limit, err := normalizePageSize(pageSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.ListGroupMessages(ctx, authSession.User.ID, group.ID, limit)
 }
 
 func (s *Service) MarkDirectChatRead(ctx context.Context, token string, chatID string, messageID string) (*DirectChatReadState, error) {
@@ -843,6 +905,10 @@ func canManageGroupInviteLinks(role string) bool {
 	return role == GroupMemberRoleOwner || role == GroupMemberRoleAdmin
 }
 
+func canSendGroupMessages(role string) bool {
+	return role == GroupMemberRoleOwner || role == GroupMemberRoleAdmin || role == GroupMemberRoleMember
+}
+
 func canCreateInviteForRole(actorRole string, targetRole string) bool {
 	switch actorRole {
 	case GroupMemberRoleOwner:
@@ -886,6 +952,26 @@ func CanonicalUserPair(firstUserID string, secondUserID string) (string, string)
 	}
 
 	return secondUserID, firstUserID
+}
+
+func (s *Service) resolveGroupChat(ctx context.Context, userID string, groupID string) (*Group, *GroupChatThread, error) {
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	group, err := s.repo.GetGroup(ctx, userID, normalizedGroupID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	thread, err := s.repo.GetGroupChatThread(ctx, userID, normalizedGroupID)
+	if err != nil {
+		return nil, nil, err
+	}
+	thread.CanSendMessages = canSendGroupMessages(group.SelfRole)
+
+	return group, thread, nil
 }
 
 func (s *Service) getDirectChatReadState(ctx context.Context, viewerUserID string, chatID string) (*DirectChatReadState, error) {
