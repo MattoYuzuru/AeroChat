@@ -973,6 +973,31 @@ func (r *fakeRepository) ListGroupMembers(_ context.Context, userID string, grou
 	return result, nil
 }
 
+func (r *fakeRepository) ListGroupTypingStateEntries(_ context.Context, userID string, groupID string) ([]GroupTypingStateEntry, error) {
+	memberships, ok := r.groupMembers[groupID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if _, ok := memberships[userID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	result := make([]GroupTypingStateEntry, 0, len(memberships))
+	for _, member := range sortGroupMembersForTest(memberships) {
+		result = append(result, GroupTypingStateEntry{
+			User: UserSummary{
+				ID:        member.User.ID,
+				Login:     member.User.Login,
+				Nickname:  member.User.Nickname,
+				AvatarURL: member.User.AvatarURL,
+			},
+			TypingVisibilityEnabled: r.users[member.User.ID].TypingVisibilityEnabled,
+		})
+	}
+
+	return result, nil
+}
+
 func (r *fakeRepository) GetGroupMember(_ context.Context, groupID string, userID string) (*GroupMember, error) {
 	memberships, ok := r.groupMembers[groupID]
 	if !ok {
@@ -1504,17 +1529,19 @@ func readPositionKey(chatID string, userID string) string {
 }
 
 type fakeTypingStore struct {
-	entries map[string]DirectChatTypingIndicator
+	directEntries map[string]DirectChatTypingIndicator
+	groupEntries  map[string]DirectChatTypingIndicator
 }
 
 func newFakeTypingStore() *fakeTypingStore {
 	return &fakeTypingStore{
-		entries: make(map[string]DirectChatTypingIndicator),
+		directEntries: make(map[string]DirectChatTypingIndicator),
+		groupEntries:  make(map[string]DirectChatTypingIndicator),
 	}
 }
 
 func (s *fakeTypingStore) PutDirectChatTypingIndicator(_ context.Context, params PutDirectChatTypingIndicatorParams) error {
-	s.entries[readPositionKey(params.ChatID, params.UserID)] = DirectChatTypingIndicator{
+	s.directEntries[readPositionKey(params.ChatID, params.UserID)] = DirectChatTypingIndicator{
 		UpdatedAt: params.UpdatedAt,
 		ExpiresAt: params.ExpiresAt,
 	}
@@ -1522,14 +1549,39 @@ func (s *fakeTypingStore) PutDirectChatTypingIndicator(_ context.Context, params
 }
 
 func (s *fakeTypingStore) ClearDirectChatTypingIndicator(_ context.Context, chatID string, userID string) error {
-	delete(s.entries, readPositionKey(chatID, userID))
+	delete(s.directEntries, readPositionKey(chatID, userID))
 	return nil
 }
 
 func (s *fakeTypingStore) ListDirectChatTypingIndicators(_ context.Context, chatID string, userIDs []string, now time.Time) (map[string]DirectChatTypingIndicator, error) {
 	result := make(map[string]DirectChatTypingIndicator, len(userIDs))
 	for _, userID := range userIDs {
-		indicator, ok := s.entries[readPositionKey(chatID, userID)]
+		indicator, ok := s.directEntries[readPositionKey(chatID, userID)]
+		if !ok || !indicator.ExpiresAt.After(now) {
+			continue
+		}
+		result[userID] = indicator
+	}
+	return result, nil
+}
+
+func (s *fakeTypingStore) PutGroupTypingIndicator(_ context.Context, params PutGroupTypingIndicatorParams) error {
+	s.groupEntries[groupTypingTestKey(params.GroupID, params.ThreadID, params.UserID)] = DirectChatTypingIndicator{
+		UpdatedAt: params.UpdatedAt,
+		ExpiresAt: params.ExpiresAt,
+	}
+	return nil
+}
+
+func (s *fakeTypingStore) ClearGroupTypingIndicator(_ context.Context, groupID string, threadID string, userID string) error {
+	delete(s.groupEntries, groupTypingTestKey(groupID, threadID, userID))
+	return nil
+}
+
+func (s *fakeTypingStore) ListGroupTypingIndicators(_ context.Context, groupID string, threadID string, userIDs []string, now time.Time) (map[string]DirectChatTypingIndicator, error) {
+	result := make(map[string]DirectChatTypingIndicator, len(userIDs))
+	for _, userID := range userIDs {
+		indicator, ok := s.groupEntries[groupTypingTestKey(groupID, threadID, userID)]
 		if !ok || !indicator.ExpiresAt.After(now) {
 			continue
 		}
@@ -1575,4 +1627,44 @@ func (s *fakePresenceStore) ListDirectChatPresenceIndicators(_ context.Context, 
 
 func testUUID(sequence int) string {
 	return fmt.Sprintf("00000000-0000-4000-8000-%012d", sequence)
+}
+
+func groupTypingTestKey(groupID string, threadID string, userID string) string {
+	return groupID + ":" + threadID + ":" + userID
+}
+
+func sortGroupMembersForTest(memberships map[string]GroupMember) []GroupMember {
+	result := make([]GroupMember, 0, len(memberships))
+	for _, member := range memberships {
+		result = append(result, member)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		leftRank := groupRoleRank(result[i].Role)
+		rightRank := groupRoleRank(result[j].Role)
+		if leftRank != rightRank {
+			return leftRank < rightRank
+		}
+		if !result[i].JoinedAt.Equal(result[j].JoinedAt) {
+			return result[i].JoinedAt.Before(result[j].JoinedAt)
+		}
+		return result[i].User.ID < result[j].User.ID
+	})
+
+	return result
+}
+
+func groupRoleRank(role string) int {
+	switch role {
+	case GroupMemberRoleOwner:
+		return 0
+	case GroupMemberRoleAdmin:
+		return 1
+	case GroupMemberRoleMember:
+		return 2
+	case GroupMemberRoleReader:
+		return 3
+	default:
+		return 4
+	}
 }

@@ -568,6 +568,145 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("normalizes group chat snapshot with typing state", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          group: {
+            id: "group-1",
+            name: "Ops Room",
+            kind: "CHAT_KIND_GROUP",
+            selfRole: "GROUP_MEMBER_ROLE_MEMBER",
+            memberCount: 3,
+            createdAt: "2026-04-10T10:00:00Z",
+            updatedAt: "2026-04-11T10:00:00Z",
+          },
+          thread: {
+            id: "thread-1",
+            groupId: "group-1",
+            threadKey: "primary",
+            canSendMessages: true,
+            createdAt: "2026-04-10T10:00:00Z",
+            updatedAt: "2026-04-11T10:00:00Z",
+          },
+          typingState: {
+            threadId: "thread-1",
+            typers: [
+              {
+                user: {
+                  id: "user-2",
+                  login: "bob",
+                  nickname: "Bob",
+                },
+                updatedAt: "2026-04-11T10:00:00Z",
+                expiresAt: "2026-04-11T10:00:06Z",
+              },
+            ],
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const snapshot = await client.getGroupChat("token-1", "group-1");
+
+    expect(snapshot.group.selfRole).toBe("member");
+    expect(snapshot.thread.id).toBe("thread-1");
+    expect(snapshot.typingState?.threadId).toBe("thread-1");
+    expect(snapshot.typingState?.typers[0]?.user.id).toBe("user-2");
+  });
+
+  it("sets and clears group typing through gateway chat endpoint", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            typingState: {
+              threadId: "thread-1",
+              typers: [
+                {
+                  user: {
+                    id: "user-1",
+                    login: "alice",
+                    nickname: "Alice",
+                  },
+                  updatedAt: "2026-04-11T10:00:00Z",
+                  expiresAt: "2026-04-11T10:00:06Z",
+                },
+              ],
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            typingState: {
+              threadId: "thread-1",
+              typers: [],
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const typingState = await client.setGroupTyping("token-1", "group-1", "thread-1");
+    const clearedTypingState = await client.clearGroupTyping(
+      "token-1",
+      "group-1",
+      "thread-1",
+    );
+
+    expect(typingState?.threadId).toBe("thread-1");
+    expect(typingState?.typers[0]?.user.id).toBe("user-1");
+    expect(clearedTypingState?.typers).toEqual([]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/aerochat.chat.v1.ChatService/SetGroupTyping",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          groupId: "group-1",
+          threadId: "thread-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/aerochat.chat.v1.ChatService/ClearGroupTyping",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          groupId: "group-1",
+          threadId: "thread-1",
+        }),
+      }),
+    );
+  });
+
   it("sets direct chat typing through gateway chat endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

@@ -85,6 +85,7 @@ export function applyGroupRealtimeToSelectedState(
   }
 
   const selectedGroupId = state.snapshot.group.id;
+  const selectedThreadId = state.snapshot.thread.id;
 
   if (event.type === "group.message.updated") {
     if (event.group.id !== selectedGroupId) {
@@ -96,10 +97,30 @@ export function applyGroupRealtimeToSelectedState(
       snapshot: {
         group: event.group,
         thread: event.thread,
+        typingState: state.snapshot.typingState,
       },
       members: state.members,
       inviteLinks: filterInviteLinks(state.inviteLinks, event.group.selfRole),
       messages: sortMessages(upsertMessage(state.messages, event.message)),
+      errorMessage: null,
+    };
+  }
+
+  if (event.type === "group.typing.updated") {
+    if (event.groupId !== selectedGroupId || event.threadId !== selectedThreadId) {
+      return state;
+    }
+
+    return {
+      status: "ready",
+      snapshot: {
+        group: state.snapshot.group,
+        thread: state.snapshot.thread,
+        typingState: event.typingState,
+      },
+      members: state.members,
+      inviteLinks: state.inviteLinks,
+      messages: state.messages,
       errorMessage: null,
     };
   }
@@ -126,6 +147,7 @@ export function applyGroupRealtimeToSelectedState(
       snapshot: {
         group: event.group,
         thread: event.thread,
+        typingState: state.snapshot.typingState,
       },
       members: sortMembers(members),
       inviteLinks: filterInviteLinks(state.inviteLinks, event.group.selfRole),
@@ -140,6 +162,7 @@ export function applyGroupRealtimeToSelectedState(
       snapshot: {
         group: event.group,
         thread: event.thread,
+        typingState: state.snapshot.typingState,
       },
       members: sortMembers(
         upsertMember(
@@ -158,6 +181,7 @@ export function applyGroupRealtimeToSelectedState(
     snapshot: {
       group: event.group,
       thread: event.thread,
+      typingState: state.snapshot.typingState,
     },
     members: sortMembers(
       upsertOptionalMember(
@@ -182,7 +206,7 @@ export function shouldClearSelectedGroupOnRealtimeEvent(
     return false;
   }
 
-  if (event.type === "group.message.updated") {
+  if (event.type === "group.message.updated" || event.type === "group.typing.updated") {
     return false;
   }
 

@@ -29,6 +29,10 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
         createdAt: "2026-04-09T09:00:00Z",
         updatedAt: "2026-04-10T12:00:00Z",
       },
+      typingState: {
+        threadId: "thread-1",
+        typers: [],
+      },
     },
     members: [
       {
@@ -175,5 +179,35 @@ describe("group realtime state helpers", () => {
     expect(nextState.inviteLinks).toEqual([]);
     expect(nextState.members[0]?.role).toBe("member");
     expect(nextState.members[1]?.role).toBe("reader");
+  });
+
+  it("replaces typing state idempotently for the active thread", () => {
+    const state = createReadyState();
+    const event: GroupRealtimeEvent = {
+      type: "group.typing.updated",
+      groupId: "group-1",
+      threadId: "thread-1",
+      typingState: {
+        threadId: "thread-1",
+        typers: [
+          {
+            user: { id: "user-2", login: "bob", nickname: "Bob", avatarUrl: null },
+            updatedAt: "2026-04-10T12:06:00Z",
+            expiresAt: "2026-04-10T12:06:06Z",
+          },
+        ],
+      },
+    };
+
+    const nextState = applyGroupRealtimeToSelectedState(state, event);
+    const duplicatedState = applyGroupRealtimeToSelectedState(nextState, event);
+
+    expect(duplicatedState.status).toBe("ready");
+    if (duplicatedState.status !== "ready") {
+      throw new Error("expected ready state");
+    }
+
+    expect(duplicatedState.snapshot.typingState?.typers).toHaveLength(1);
+    expect(duplicatedState.snapshot.typingState?.typers[0]?.user.id).toBe("user-2");
   });
 });

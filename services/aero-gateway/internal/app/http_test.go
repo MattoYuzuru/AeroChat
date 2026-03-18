@@ -583,6 +583,61 @@ func TestNewHTTPHandlerPublishesGroupMessageUpdatesToCurrentMembers(t *testing.T
 	}
 }
 
+func TestNewHTTPHandlerPublishesGroupTypingUpdatesToCurrentMembersOnly(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-3", newTestProfile("user-3", "charlie", "Charlie"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	connUserThree := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-3")
+	defer func() { _ = connUserThree.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserThree)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&chatv1.SetGroupTypingRequest{
+		GroupId:  "group-1",
+		ThreadId: "group-thread-1",
+	})
+	request.Header().Set("Authorization", "Bearer v1.user-1")
+
+	response, err := chatClient.SetGroupTyping(ctx, request)
+	if err != nil {
+		t.Fatalf("set group typing через gateway: %v", err)
+	}
+	if len(response.Msg.GetTypingState().GetTypers()) != 1 {
+		t.Fatalf("ожидался один visible typer в ответе mutating call, получено %d", len(response.Msg.GetTypingState().GetTypers()))
+	}
+
+	userOneEvent := readGroupTypingEnvelope(t, ctx, connUserOne)
+	userTwoEvent := readGroupTypingEnvelope(t, ctx, connUserTwo)
+	assertNoRealtimeEvent(t, connUserThree, 250*time.Millisecond)
+
+	if userOneEvent.Payload.GroupID != "group-1" || userOneEvent.Payload.ThreadID != "group-thread-1" {
+		t.Fatalf("user-1: ожидался typing scope group-1/group-thread-1, получено %+v", userOneEvent.Payload)
+	}
+	if len(userOneEvent.Payload.TypingState.Typers) != 1 || userOneEvent.Payload.TypingState.Typers[0].User.ID != "user-1" {
+		t.Fatalf("user-1: ожидался typing snapshot для user-1, получено %+v", userOneEvent.Payload.TypingState)
+	}
+	if len(userTwoEvent.Payload.TypingState.Typers) != 1 || userTwoEvent.Payload.TypingState.Typers[0].User.ID != "user-1" {
+		t.Fatalf("user-2: ожидался тот же typing snapshot, получено %+v", userTwoEvent.Payload.TypingState)
+	}
+}
+
 func TestNewHTTPHandlerPublishesGroupJoinUpdatesToExistingMembersAndJoinedUser(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
@@ -762,6 +817,7 @@ func TestNewHTTPHandlerStopsGroupDeliveryAfterMemberRemoval(t *testing.T) {
 	if userTwoRemoval.Payload.Group != nil || userTwoRemoval.Payload.SelfMember != nil {
 		t.Fatalf("user-2: удалённый участник должен получить nil group/self, получено %+v", userTwoRemoval.Payload)
 	}
+	_ = readGroupTypingEnvelope(t, ctx, connUserOne)
 
 	sendRequest := connect.NewRequest(&chatv1.SendGroupTextMessageRequest{
 		GroupId: "group-1",
@@ -773,6 +829,65 @@ func TestNewHTTPHandlerStopsGroupDeliveryAfterMemberRemoval(t *testing.T) {
 	}
 
 	_ = readGroupMessageEnvelope(t, ctx, connUserOne)
+	assertNoRealtimeEvent(t, connUserTwo, 250*time.Millisecond)
+}
+
+func TestNewHTTPHandlerStopsGroupTypingDeliveryAfterMemberRemoval(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connUserOne := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connUserOne.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserOne)
+
+	connUserTwo := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connUserTwo.CloseNow() }()
+	readReadyEnvelope(t, ctx, connUserTwo)
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+
+	setTypingRequest := connect.NewRequest(&chatv1.SetGroupTypingRequest{
+		GroupId:  "group-1",
+		ThreadId: "group-thread-1",
+	})
+	setTypingRequest.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := chatClient.SetGroupTyping(ctx, setTypingRequest); err != nil {
+		t.Fatalf("prepare set group typing: %v", err)
+	}
+	_ = readGroupTypingEnvelope(t, ctx, connUserOne)
+	_ = readGroupTypingEnvelope(t, ctx, connUserTwo)
+
+	removeRequest := connect.NewRequest(&chatv1.RemoveGroupMemberRequest{
+		GroupId: "group-1",
+		UserId:  "user-2",
+	})
+	removeRequest.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := chatClient.RemoveGroupMember(ctx, removeRequest); err != nil {
+		t.Fatalf("remove group member через gateway: %v", err)
+	}
+
+	_ = readGroupMembershipEnvelope(t, ctx, connUserOne)
+	_ = readGroupMembershipEnvelope(t, ctx, connUserTwo)
+	_ = readGroupTypingEnvelope(t, ctx, connUserOne)
+
+	setTypingAgain := connect.NewRequest(&chatv1.SetGroupTypingRequest{
+		GroupId:  "group-1",
+		ThreadId: "group-thread-1",
+	})
+	setTypingAgain.Header().Set("Authorization", "Bearer v1.user-1")
+	if _, err := chatClient.SetGroupTyping(ctx, setTypingAgain); err != nil {
+		t.Fatalf("set group typing after removal: %v", err)
+	}
+
+	_ = readGroupTypingEnvelope(t, ctx, connUserOne)
 	assertNoRealtimeEvent(t, connUserTwo, 250*time.Millisecond)
 }
 
@@ -813,6 +928,7 @@ func TestNewHTTPHandlerStopsGroupDeliveryAfterLeaveGroup(t *testing.T) {
 	if userTwoLeave.Payload.Group != nil || userTwoLeave.Payload.SelfMember != nil {
 		t.Fatalf("user-2: вышедший участник должен получить nil group/self, получено %+v", userTwoLeave.Payload)
 	}
+	_ = readGroupTypingEnvelope(t, ctx, connUserOne)
 
 	sendRequest := connect.NewRequest(&chatv1.SendGroupTextMessageRequest{
 		GroupId: "group-1",
@@ -1365,6 +1481,7 @@ type testChatHandler struct {
 	chat              *chatv1.DirectChat
 	group             *chatv1.Group
 	groupThread       *chatv1.GroupChatThread
+	groupTypingState  *chatv1.GroupTypingState
 	groupMessages     []*chatv1.GroupMessage
 	groupMembers      []*chatv1.GroupMember
 	groupInvites      map[string]*testGroupInvite
@@ -1377,9 +1494,13 @@ type testGroupInvite struct {
 
 func newTestChatHandler() *testChatHandler {
 	return &testChatHandler{
-		chat:         defaultTestDirectChat(),
-		group:        defaultTestGroup(),
-		groupThread:  defaultTestGroupThread(),
+		chat:        defaultTestDirectChat(),
+		group:       defaultTestGroup(),
+		groupThread: defaultTestGroupThread(),
+		groupTypingState: &chatv1.GroupTypingState{
+			ThreadId: "group-thread-1",
+			Typers:   []*chatv1.GroupTypingIndicator{},
+		},
 		groupMembers: defaultTestGroupMembers(),
 		groupInvites: map[string]*testGroupInvite{"ginv-member": {groupID: "group-1", role: chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER}},
 	}
@@ -1426,8 +1547,9 @@ func (h *testChatHandler) GetGroupChat(_ context.Context, req *connect.Request[c
 	}
 
 	return connect.NewResponse(&chatv1.GetGroupChatResponse{
-		Group:  h.groupForUserLocked(actorID),
-		Thread: cloneGroupThreadMessage(h.groupThread),
+		Group:       h.groupForUserLocked(actorID),
+		Thread:      cloneGroupThreadMessage(h.groupThread),
+		TypingState: cloneGroupTypingStateMessage(h.groupTypingState),
 	}), nil
 }
 
@@ -1469,6 +1591,9 @@ func (h *testChatHandler) UpdateGroupMemberRole(_ context.Context, req *connect.
 	}
 
 	targetMember.Role = req.Msg.Role
+	if targetMember.GetRole() == chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER {
+		h.clearGroupTypingLocked(req.Msg.UserId)
+	}
 	h.touchGroupLocked(timestamppb.Now())
 
 	return connect.NewResponse(&chatv1.UpdateGroupMemberRoleResponse{
@@ -1673,6 +1798,56 @@ func (h *testChatHandler) ClearDirectChatTyping(_ context.Context, req *connect.
 	return connect.NewResponse(&chatv1.ClearDirectChatTypingResponse{}), nil
 }
 
+func (h *testChatHandler) SetGroupTyping(_ context.Context, req *connect.Request[chatv1.SetGroupTypingRequest]) (*connect.Response[chatv1.SetGroupTypingResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	actorMember := h.requireGroupMemberLocked(actorID)
+	if actorMember == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+	if actorMember.GetRole() == chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("reader cannot emit group typing"))
+	}
+	if h.groupThread == nil || req.Msg.ThreadId != h.groupThread.GetId() {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("thread not found"))
+	}
+
+	now := timestamppb.Now()
+	h.clearGroupTypingLocked(actorID)
+	h.groupTypingState.Typers = append(h.groupTypingState.Typers, &chatv1.GroupTypingIndicator{
+		User:      cloneChatUserMessage(actorMember.GetUser()),
+		UpdatedAt: now,
+		ExpiresAt: timestamppb.New(now.AsTime().Add(6 * time.Second)),
+	})
+
+	return connect.NewResponse(&chatv1.SetGroupTypingResponse{
+		TypingState: cloneGroupTypingStateMessage(h.groupTypingState),
+	}), nil
+}
+
+func (h *testChatHandler) ClearGroupTyping(_ context.Context, req *connect.Request[chatv1.ClearGroupTypingRequest]) (*connect.Response[chatv1.ClearGroupTypingResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	if h.requireGroupMemberLocked(actorID) == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+	if h.groupThread == nil || req.Msg.ThreadId != h.groupThread.GetId() {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("thread not found"))
+	}
+
+	h.clearGroupTypingLocked(actorID)
+
+	return connect.NewResponse(&chatv1.ClearGroupTypingResponse{
+		TypingState: cloneGroupTypingStateMessage(h.groupTypingState),
+	}), nil
+}
+
 func (h *testChatHandler) SetDirectChatPresenceHeartbeat(_ context.Context, req *connect.Request[chatv1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[chatv1.SetDirectChatPresenceHeartbeatResponse], error) {
 	h.setAuthorization(req.Header().Get("Authorization"))
 	now := timestamppb.Now()
@@ -1771,6 +1946,7 @@ func (h *testChatHandler) deleteGroupMemberLocked(userID string) bool {
 		}
 
 		h.groupMembers = append(h.groupMembers[:index], h.groupMembers[index+1:]...)
+		h.clearGroupTypingLocked(userID)
 		return true
 	}
 
@@ -1788,6 +1964,21 @@ func (h *testChatHandler) touchGroupMessageLocked(now *timestamppb.Timestamp) {
 	if h.groupThread != nil {
 		h.groupThread.UpdatedAt = now
 	}
+}
+
+func (h *testChatHandler) clearGroupTypingLocked(userID string) {
+	if h.groupTypingState == nil {
+		return
+	}
+
+	filtered := make([]*chatv1.GroupTypingIndicator, 0, len(h.groupTypingState.GetTypers()))
+	for _, typer := range h.groupTypingState.GetTypers() {
+		if typer.GetUser().GetId() == userID {
+			continue
+		}
+		filtered = append(filtered, cloneGroupTypingIndicatorMessage(typer))
+	}
+	h.groupTypingState.Typers = filtered
 }
 
 func defaultTestDirectChat() *chatv1.DirectChat {
@@ -1889,6 +2080,47 @@ func cloneGroupThreadMessage(thread *chatv1.GroupChatThread) *chatv1.GroupChatTh
 		CanSendMessages: thread.GetCanSendMessages(),
 		CreatedAt:       thread.GetCreatedAt(),
 		UpdatedAt:       thread.GetUpdatedAt(),
+	}
+}
+
+func cloneGroupTypingStateMessage(typingState *chatv1.GroupTypingState) *chatv1.GroupTypingState {
+	if typingState == nil {
+		return nil
+	}
+
+	cloned := &chatv1.GroupTypingState{
+		ThreadId: typingState.GetThreadId(),
+		Typers:   make([]*chatv1.GroupTypingIndicator, 0, len(typingState.GetTypers())),
+	}
+	for _, typer := range typingState.GetTypers() {
+		cloned.Typers = append(cloned.Typers, cloneGroupTypingIndicatorMessage(typer))
+	}
+
+	return cloned
+}
+
+func cloneGroupTypingIndicatorMessage(indicator *chatv1.GroupTypingIndicator) *chatv1.GroupTypingIndicator {
+	if indicator == nil {
+		return nil
+	}
+
+	return &chatv1.GroupTypingIndicator{
+		User:      cloneChatUserMessage(indicator.GetUser()),
+		UpdatedAt: indicator.GetUpdatedAt(),
+		ExpiresAt: indicator.GetExpiresAt(),
+	}
+}
+
+func cloneChatUserMessage(user *chatv1.ChatUser) *chatv1.ChatUser {
+	if user == nil {
+		return nil
+	}
+
+	return &chatv1.ChatUser{
+		Id:        user.GetId(),
+		Login:     user.GetLogin(),
+		Nickname:  user.GetNickname(),
+		AvatarUrl: user.AvatarUrl,
 	}
 }
 
@@ -2151,6 +2383,38 @@ func readGroupMessageEnvelope(t *testing.T, ctx context.Context, conn *websocket
 	}
 	if envelope.Type != realtime.EventTypeGroupMessageUpdated {
 		t.Fatalf("ожидался тип %q, получен %q", realtime.EventTypeGroupMessageUpdated, envelope.Type)
+	}
+
+	return envelope
+}
+
+type groupTypingEnvelope struct {
+	Type    string `json:"type"`
+	Payload struct {
+		GroupID     string `json:"groupId"`
+		ThreadID    string `json:"threadId"`
+		TypingState struct {
+			ThreadID string `json:"threadId"`
+			Typers   []struct {
+				User struct {
+					ID string `json:"id"`
+				} `json:"user"`
+				UpdatedAt string `json:"updatedAt"`
+				ExpiresAt string `json:"expiresAt"`
+			} `json:"typers"`
+		} `json:"typingState"`
+	} `json:"payload"`
+}
+
+func readGroupTypingEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) groupTypingEnvelope {
+	t.Helper()
+
+	var envelope groupTypingEnvelope
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("чтение group typing envelope: %v", err)
+	}
+	if envelope.Type != realtime.EventTypeGroupTypingUpdated {
+		t.Fatalf("ожидался тип %q, получен %q", realtime.EventTypeGroupTypingUpdated, envelope.Type)
 	}
 
 	return envelope

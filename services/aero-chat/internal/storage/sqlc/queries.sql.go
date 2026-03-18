@@ -1466,6 +1466,68 @@ func (q *Queries) ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) (
 	return items, nil
 }
 
+const listGroupTypingStateEntries = `-- name: ListGroupTypingStateEntries :many
+SELECT
+    m.user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.typing_visibility_enabled
+FROM group_memberships AS self
+JOIN group_memberships AS m ON m.group_id = self.group_id
+JOIN users AS u ON u.id = m.user_id
+WHERE self.user_id = $1 AND self.group_id = $2
+ORDER BY
+    CASE m.role
+        WHEN 'owner' THEN 0
+        WHEN 'admin' THEN 1
+        WHEN 'member' THEN 2
+        WHEN 'reader' THEN 3
+        ELSE 4
+    END,
+    m.joined_at ASC,
+    m.user_id ASC
+`
+
+type ListGroupTypingStateEntriesParams struct {
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+}
+
+type ListGroupTypingStateEntriesRow struct {
+	UserID                  uuid.UUID   `db:"user_id" json:"user_id"`
+	Login                   string      `db:"login" json:"login"`
+	Nickname                string      `db:"nickname" json:"nickname"`
+	AvatarUrl               pgtype.Text `db:"avatar_url" json:"avatar_url"`
+	TypingVisibilityEnabled bool        `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+}
+
+func (q *Queries) ListGroupTypingStateEntries(ctx context.Context, arg ListGroupTypingStateEntriesParams) ([]ListGroupTypingStateEntriesRow, error) {
+	rows, err := q.db.Query(ctx, listGroupTypingStateEntries, arg.UserID, arg.GroupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGroupTypingStateEntriesRow
+	for rows.Next() {
+		var i ListGroupTypingStateEntriesRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+			&i.TypingVisibilityEnabled,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPinnedMessageIDsByChatID = `-- name: ListPinnedMessageIDsByChatID :many
 SELECT message_id
 FROM direct_chat_pins

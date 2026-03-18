@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
@@ -10,6 +18,7 @@ import {
   type Group,
   type GroupMember,
   type GroupMemberRole,
+  type GroupTypingState,
 } from "../gateway/types";
 import { buildGroupInviteUrl, extractGroupInviteToken } from "../groups/invite-token";
 import { parseGroupRealtimeEvent } from "../groups/realtime";
@@ -20,6 +29,13 @@ import {
   shouldClearSelectedGroupOnRealtimeEvent,
   type GroupsSelectedState,
 } from "../groups/state";
+import {
+  describeGroupTypingLabel,
+  GROUP_TYPING_IDLE_TIMEOUT_MS,
+  GROUP_TYPING_REFRESH_INTERVAL_MS,
+  resolveGroupTypingSessionTarget,
+  type GroupTypingSessionTarget,
+} from "../groups/typing";
 import { subscribeRealtimeEnvelopes } from "../realtime/events";
 import styles from "./GroupsPage.module.css";
 
@@ -51,10 +67,25 @@ export function GroupsPage() {
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, GroupMemberRole>>({});
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
   const selectedStateRef = useRef(selectedState);
+  const activeTypingTargetRef = useRef<GroupTypingSessionTarget | null>(null);
+  const typingLastSentAtRef = useRef(0);
+  const typingRefreshTimerRef = useRef<number | null>(null);
+  const typingIdleTimerRef = useRef<number | null>(null);
+  const isPageVisible = usePageVisibility();
 
   const selectedGroupId = searchParams.get("group")?.trim() ?? "";
   const joinTokenFromRoute = searchParams.get("join")?.trim() ?? "";
   const token = authState.status === "authenticated" ? authState.token : "";
+  const activeTypingTarget = resolveGroupTypingSessionTarget({
+    enabled: authState.status === "authenticated",
+    pageVisible: isPageVisible,
+    selectedGroupId,
+    snapshotGroupId: selectedState.status === "ready" ? selectedState.snapshot.group.id : null,
+    threadId: selectedState.status === "ready" ? selectedState.snapshot.thread.id : null,
+    canSendMessages:
+      selectedState.status === "ready" ? selectedState.snapshot.thread.canSendMessages : false,
+    composerText,
+  });
 
   useEffect(() => {
     selectedStateRef.current = selectedState;
@@ -222,6 +253,154 @@ export function GroupsPage() {
     });
   }, [authState.status, setSearchParams]);
 
+  useEffect(() => {
+    const clearTypingTimers = () => {
+      clearGroupTypingRefreshTimer(typingRefreshTimerRef);
+      clearGroupTypingIdleTimer(typingIdleTimerRef);
+    };
+
+    const previousTarget = activeTypingTargetRef.current;
+
+    if (activeTypingTarget === null) {
+      clearTypingTimers();
+      typingLastSentAtRef.current = 0;
+      activeTypingTargetRef.current = null;
+
+      if (previousTarget !== null) {
+        void clearGroupTypingSilently(
+          token,
+          previousTarget,
+          setSelectedState,
+          expireSession,
+        );
+      }
+
+      return;
+    }
+
+    let cancelled = false;
+    activeTypingTargetRef.current = activeTypingTarget;
+
+    if (
+      previousTarget !== null &&
+      (previousTarget.groupId !== activeTypingTarget.groupId ||
+        previousTarget.threadId !== activeTypingTarget.threadId)
+    ) {
+      typingLastSentAtRef.current = 0;
+      void clearGroupTypingSilently(
+        token,
+        previousTarget,
+        setSelectedState,
+        expireSession,
+      );
+    }
+
+    const scheduleRefresh = () => {
+      if (cancelled) {
+        return;
+      }
+
+      clearGroupTypingRefreshTimer(typingRefreshTimerRef);
+      typingRefreshTimerRef.current = window.setTimeout(() => {
+        void publishTyping(true);
+      }, GROUP_TYPING_REFRESH_INTERVAL_MS);
+    };
+
+    const scheduleIdleClear = () => {
+      if (cancelled) {
+        return;
+      }
+
+      clearGroupTypingIdleTimer(typingIdleTimerRef);
+      typingIdleTimerRef.current = window.setTimeout(() => {
+        typingLastSentAtRef.current = 0;
+        activeTypingTargetRef.current = null;
+        clearTypingTimers();
+        void clearGroupTypingSilently(
+          token,
+          activeTypingTarget,
+          setSelectedState,
+          expireSession,
+        );
+      }, GROUP_TYPING_IDLE_TIMEOUT_MS);
+    };
+
+    const publishTyping = async (force: boolean) => {
+      if (cancelled) {
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        !force &&
+        typingLastSentAtRef.current !== 0 &&
+        now - typingLastSentAtRef.current < GROUP_TYPING_REFRESH_INTERVAL_MS
+      ) {
+        scheduleRefresh();
+        return;
+      }
+
+      try {
+        const typingState = await gatewayClient.setGroupTyping(
+          token,
+          activeTypingTarget.groupId,
+          activeTypingTarget.threadId,
+        );
+        if (cancelled) {
+          return;
+        }
+
+        typingLastSentAtRef.current = Date.now();
+        replaceSelectedGroupTypingState(
+          setSelectedState,
+          activeTypingTarget.groupId,
+          activeTypingTarget.threadId,
+          typingState,
+        );
+      } catch (error) {
+        if (handleGroupTypingAuthError(error, expireSession)) {
+          clearTypingTimers();
+          return;
+        }
+      } finally {
+        if (!cancelled) {
+          scheduleRefresh();
+        }
+      }
+    };
+
+    scheduleIdleClear();
+    void publishTyping(
+      previousTarget === null ||
+        previousTarget.groupId !== activeTypingTarget.groupId ||
+        previousTarget.threadId !== activeTypingTarget.threadId ||
+        typingLastSentAtRef.current === 0,
+    );
+
+    return () => {
+      cancelled = true;
+      clearTypingTimers();
+    };
+  }, [activeTypingTarget, expireSession, token]);
+
+  useEffect(() => {
+    return () => {
+      const activeTypingTarget = activeTypingTargetRef.current;
+      activeTypingTargetRef.current = null;
+      typingLastSentAtRef.current = 0;
+      clearGroupTypingRefreshTimer(typingRefreshTimerRef);
+      clearGroupTypingIdleTimer(typingIdleTimerRef);
+      if (activeTypingTarget !== null) {
+        void clearGroupTypingSilently(
+          token,
+          activeTypingTarget,
+          setSelectedState,
+          expireSession,
+        );
+      }
+    };
+  }, [expireSession, token]);
+
   if (authState.status !== "authenticated") {
     return null;
   }
@@ -233,6 +412,10 @@ export function GroupsPage() {
   const requestedJoinToken = extractGroupInviteToken(joinInput || joinTokenFromRoute);
   const threadMessages =
     selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
+  const typingLabel =
+    selectedState.status === "ready"
+      ? describeGroupTypingLabel(selectedState.snapshot.typingState, authState.profile.id)
+      : null;
   const canManageMembership =
     selectedState.status === "ready" &&
     selectedState.snapshot.group.selfRole === "owner";
@@ -654,10 +837,10 @@ export function GroupsPage() {
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Groups</p>
-            <h1 className={styles.title}>Group realtime bootstrap</h1>
+            <h1 className={styles.title}>Group typing bootstrap</h1>
             <p className={styles.subtitle}>
-              Slice делает группы live через bounded realtime fan-out: text messages, membership,
-              role и ownership updates без calls, media и redesign.
+              Slice делает группы live через bounded realtime fan-out: text messages, typing,
+              membership, role и ownership updates без calls, media и redesign.
             </p>
           </div>
 
@@ -908,8 +1091,8 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Primary group thread</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Здесь пока только text-only history. Group realtime, edit/delete и media
-                    уже подключён, а typing/read receipts, edit/delete и media намеренно отложены.
+                    Здесь остаётся text-only history, но текущая thread уже показывает bounded
+                    group typing без polling и без расширения scope в read receipts или presence.
                   </p>
                 </div>
 
@@ -918,6 +1101,7 @@ export function GroupsPage() {
                   <span className={styles.statusPill}>
                     updated {formatDateTime(selectedState.snapshot.thread.updatedAt)}
                   </span>
+                  {typingLabel && <span className={styles.statusPill}>{typingLabel}</span>}
                 </div>
 
                 <div className={styles.messagesList}>
@@ -1290,6 +1474,117 @@ export function GroupsPage() {
 interface MetricProps {
   label: string;
   value: number;
+}
+
+function replaceSelectedGroupTypingState(
+  setSelectedState: Dispatch<SetStateAction<GroupsSelectedState>>,
+  groupId: string,
+  threadId: string,
+  typingState: GroupTypingState | null,
+) {
+  setSelectedState((current) => {
+    if (current.status !== "ready") {
+      return current;
+    }
+    if (
+      current.snapshot.group.id !== groupId ||
+      current.snapshot.thread.id !== threadId
+    ) {
+      return current;
+    }
+
+    return {
+      status: "ready",
+      snapshot: {
+        ...current.snapshot,
+        typingState,
+      },
+      members: current.members,
+      inviteLinks: current.inviteLinks,
+      messages: current.messages,
+      errorMessage: null,
+    };
+  });
+}
+
+async function clearGroupTypingSilently(
+  token: string,
+  target: GroupTypingSessionTarget,
+  setSelectedState: Dispatch<SetStateAction<GroupsSelectedState>>,
+  onUnauthenticated: () => void,
+) {
+  try {
+    const typingState = await gatewayClient.clearGroupTyping(
+      token,
+      target.groupId,
+      target.threadId,
+    );
+    replaceSelectedGroupTypingState(
+      setSelectedState,
+      target.groupId,
+      target.threadId,
+      typingState,
+    );
+  } catch (error) {
+    handleGroupTypingAuthError(error, onUnauthenticated);
+  }
+}
+
+function handleGroupTypingAuthError(
+  error: unknown,
+  onUnauthenticated: () => void,
+): boolean {
+  if (isGatewayErrorCode(error, "unauthenticated")) {
+    onUnauthenticated();
+    return true;
+  }
+
+  return false;
+}
+
+function clearGroupTypingRefreshTimer(ref: { current: number | null }) {
+  if (ref.current === null) {
+    return;
+  }
+
+  window.clearTimeout(ref.current);
+  ref.current = null;
+}
+
+function clearGroupTypingIdleTimer(ref: { current: number | null }) {
+  if (ref.current === null) {
+    return;
+  }
+
+  window.clearTimeout(ref.current);
+  ref.current = null;
+}
+
+function usePageVisibility(): boolean {
+  const [isPageVisible, setIsPageVisible] = useState(() => {
+    if (typeof document === "undefined") {
+      return true;
+    }
+
+    return document.visibilityState !== "hidden";
+  });
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState !== "hidden");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  return isPageVisible;
 }
 
 function Metric({ label, value }: MetricProps) {

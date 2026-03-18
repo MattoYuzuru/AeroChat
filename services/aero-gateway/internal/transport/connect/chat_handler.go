@@ -195,6 +195,28 @@ func (h *ChatHandler) JoinGroupByInviteLink(ctx context.Context, req *connect.Re
 	return response, nil
 }
 
+func (h *ChatHandler) SetGroupTyping(ctx context.Context, req *connect.Request[chatv1.SetGroupTypingRequest]) (*connect.Response[chatv1.SetGroupTypingResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.SetGroupTyping)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishGroupTypingUpdate(ctx, req.Header(), req.Msg.GroupId, req.Msg.ThreadId, response.Msg.TypingState)
+
+	return response, nil
+}
+
+func (h *ChatHandler) ClearGroupTyping(ctx context.Context, req *connect.Request[chatv1.ClearGroupTypingRequest]) (*connect.Response[chatv1.ClearGroupTypingResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.ClearGroupTyping)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishGroupTypingUpdate(ctx, req.Header(), req.Msg.GroupId, req.Msg.ThreadId, response.Msg.TypingState)
+
+	return response, nil
+}
+
 func (h *ChatHandler) MarkDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkDirectChatReadRequest]) (*connect.Response[chatv1.MarkDirectChatReadResponse], error) {
 	response, err := forwardUnary(ctx, req, h.client.MarkDirectChatRead)
 	if err != nil {
@@ -630,9 +652,10 @@ func clonePresenceIndicator(indicator *chatv1.DirectChatPresenceIndicator) *chat
 }
 
 type groupRealtimeState struct {
-	group   *chatv1.Group
-	thread  *chatv1.GroupChatThread
-	members []*chatv1.GroupMember
+	group       *chatv1.Group
+	thread      *chatv1.GroupChatThread
+	members     []*chatv1.GroupMember
+	typingState *chatv1.GroupTypingState
 }
 
 func (h *ChatHandler) publishGroupMessageUpdate(
@@ -696,6 +719,33 @@ func (h *ChatHandler) publishGroupMembershipJoin(ctx context.Context, headers ht
 	h.publishGroupMembershipUpdated(state, realtime.GroupMembershipReasonJoined, actorProfile.GetId(), joinedMember, actorProfile.GetId())
 }
 
+func (h *ChatHandler) publishGroupTypingUpdate(
+	ctx context.Context,
+	headers http.Header,
+	groupID string,
+	threadID string,
+	typingState *chatv1.GroupTypingState,
+) {
+	if h.realtimeHub == nil || groupID == "" || threadID == "" {
+		return
+	}
+
+	state, err := h.fetchGroupRealtimeState(ctx, headers, groupID)
+	if err != nil {
+		h.logger.Error(
+			"не удалось дочитать group chat для realtime typing update",
+			slog.String("group_id", groupID),
+			slog.String("thread_id", threadID),
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	snapshot := ensureGroupTypingState(typingState, state.thread.GetId())
+	state.typingState = snapshot
+	h.publishGroupTypingSnapshot(state)
+}
+
 func (h *ChatHandler) publishGroupRoleUpdate(
 	ctx context.Context,
 	headers http.Header,
@@ -743,6 +793,11 @@ func (h *ChatHandler) publishGroupRoleUpdate(
 				previousRole,
 			),
 		)
+	}
+
+	if member.GetRole() == chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER ||
+		previousRole == chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER.String() {
+		h.publishGroupTypingSnapshot(state)
 	}
 }
 
@@ -821,6 +876,7 @@ func (h *ChatHandler) publishGroupMembershipRemoval(
 	}
 
 	h.publishGroupMembershipUpdated(state, realtime.GroupMembershipReasonRemoved, removedUserID, nil, removedUserID)
+	h.publishGroupTypingSnapshot(state)
 }
 
 func (h *ChatHandler) publishGroupMembershipLeave(
@@ -835,6 +891,8 @@ func (h *ChatHandler) publishGroupMembershipLeave(
 	postMembers := withoutGroupMember(preState.members, actorProfile.GetId())
 	postState := synthesizeGroupMembershipState(preState, postMembers, time.Now().UTC())
 	h.publishGroupMembershipUpdated(postState, realtime.GroupMembershipReasonLeft, actorProfile.GetId(), nil, actorProfile.GetId())
+	postState.typingState = synthesizeGroupTypingState(preState.typingState, preState.thread.GetId(), actorProfile.GetId())
+	h.publishGroupTypingSnapshot(postState)
 }
 
 func (h *ChatHandler) publishGroupMembershipUpdated(
@@ -886,6 +944,25 @@ func (h *ChatHandler) publishGroupMembershipUpdated(
 	)
 }
 
+func (h *ChatHandler) publishGroupTypingSnapshot(state *groupRealtimeState) {
+	if state == nil || state.thread == nil {
+		return
+	}
+
+	snapshot := ensureGroupTypingState(state.typingState, state.thread.GetId())
+	for _, recipient := range state.members {
+		recipientID := recipient.GetUser().GetId()
+		if recipientID == "" {
+			continue
+		}
+
+		h.realtimeHub.PublishToUser(
+			recipientID,
+			realtime.NewGroupTypingUpdatedEnvelope(state.group.GetId(), state.thread.GetId(), snapshot),
+		)
+	}
+}
+
 func (h *ChatHandler) fetchGroupStateAndActorProfile(
 	ctx context.Context,
 	headers http.Header,
@@ -918,7 +995,7 @@ func (h *ChatHandler) fetchGroupStateAndActorProfile(
 }
 
 func (h *ChatHandler) fetchGroupRealtimeState(ctx context.Context, headers http.Header, groupID string) (*groupRealtimeState, error) {
-	group, thread, err := h.fetchGroupChat(ctx, headers, groupID)
+	group, thread, typingState, err := h.fetchGroupChat(ctx, headers, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -929,22 +1006,23 @@ func (h *ChatHandler) fetchGroupRealtimeState(ctx context.Context, headers http.
 	}
 
 	return &groupRealtimeState{
-		group:   group,
-		thread:  thread,
-		members: members,
+		group:       group,
+		thread:      thread,
+		members:     members,
+		typingState: ensureGroupTypingState(typingState, thread.GetId()),
 	}, nil
 }
 
-func (h *ChatHandler) fetchGroupChat(ctx context.Context, headers http.Header, groupID string) (*chatv1.Group, *chatv1.GroupChatThread, error) {
+func (h *ChatHandler) fetchGroupChat(ctx context.Context, headers http.Header, groupID string) (*chatv1.Group, *chatv1.GroupChatThread, *chatv1.GroupTypingState, error) {
 	request := connect.NewRequest(&chatv1.GetGroupChatRequest{GroupId: groupID})
 	copyAuthorizationHeader(request.Header(), headers)
 
 	response, err := h.client.GetGroupChat(ctx, request)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return response.Msg.Group, response.Msg.Thread, nil
+	return response.Msg.Group, response.Msg.Thread, response.Msg.TypingState, nil
 }
 
 func (h *ChatHandler) fetchGroupMembers(ctx context.Context, headers http.Header, groupID string) ([]*chatv1.GroupMember, error) {
@@ -1009,9 +1087,10 @@ func synthesizeGroupMembershipState(
 	group.UpdatedAt = timestamppb.New(updatedAt)
 
 	return &groupRealtimeState{
-		group:   group,
-		thread:  cloneGroupThread(base.thread),
-		members: cloneGroupMembers(members),
+		group:       group,
+		thread:      cloneGroupThread(base.thread),
+		members:     cloneGroupMembers(members),
+		typingState: cloneGroupTypingState(base.typingState),
 	}
 }
 
@@ -1091,5 +1170,75 @@ func cloneGroupMember(member *chatv1.GroupMember) *chatv1.GroupMember {
 		},
 		Role:     member.GetRole(),
 		JoinedAt: member.GetJoinedAt(),
+	}
+}
+
+func ensureGroupTypingState(typingState *chatv1.GroupTypingState, threadID string) *chatv1.GroupTypingState {
+	if typingState == nil {
+		return &chatv1.GroupTypingState{
+			ThreadId: threadID,
+			Typers:   []*chatv1.GroupTypingIndicator{},
+		}
+	}
+
+	cloned := cloneGroupTypingState(typingState)
+	if cloned.GetThreadId() == "" {
+		cloned.ThreadId = threadID
+	}
+	if cloned.Typers == nil {
+		cloned.Typers = []*chatv1.GroupTypingIndicator{}
+	}
+
+	return cloned
+}
+
+func synthesizeGroupTypingState(base *chatv1.GroupTypingState, threadID string, removedUserID string) *chatv1.GroupTypingState {
+	snapshot := ensureGroupTypingState(base, threadID)
+	if removedUserID == "" {
+		return snapshot
+	}
+
+	filtered := make([]*chatv1.GroupTypingIndicator, 0, len(snapshot.GetTypers()))
+	for _, typer := range snapshot.GetTypers() {
+		if typer.GetUser().GetId() == removedUserID {
+			continue
+		}
+		filtered = append(filtered, cloneGroupTypingIndicator(typer))
+	}
+	snapshot.Typers = filtered
+
+	return snapshot
+}
+
+func cloneGroupTypingState(typingState *chatv1.GroupTypingState) *chatv1.GroupTypingState {
+	if typingState == nil {
+		return nil
+	}
+
+	cloned := &chatv1.GroupTypingState{
+		ThreadId: typingState.GetThreadId(),
+		Typers:   make([]*chatv1.GroupTypingIndicator, 0, len(typingState.GetTypers())),
+	}
+	for _, typer := range typingState.GetTypers() {
+		cloned.Typers = append(cloned.Typers, cloneGroupTypingIndicator(typer))
+	}
+
+	return cloned
+}
+
+func cloneGroupTypingIndicator(indicator *chatv1.GroupTypingIndicator) *chatv1.GroupTypingIndicator {
+	if indicator == nil {
+		return nil
+	}
+
+	return &chatv1.GroupTypingIndicator{
+		User: &chatv1.ChatUser{
+			Id:        indicator.GetUser().GetId(),
+			Login:     indicator.GetUser().GetLogin(),
+			Nickname:  indicator.GetUser().GetNickname(),
+			AvatarUrl: indicator.GetUser().AvatarUrl,
+		},
+		UpdatedAt: indicator.GetUpdatedAt(),
+		ExpiresAt: indicator.GetExpiresAt(),
 	}
 }

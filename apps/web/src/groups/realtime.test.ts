@@ -148,4 +148,51 @@ describe("parseGroupRealtimeEvent", () => {
       previousRole: "member",
     });
   });
+
+  it("normalizes group typing payload into a thread-scoped snapshot", () => {
+    const event = parseGroupRealtimeEvent({
+      id: "evt-group-typing-1",
+      type: "group.typing.updated",
+      issuedAt: "2026-04-11T12:00:00Z",
+      payload: {
+        groupId: "group-1",
+        threadId: "thread-1",
+        typingState: {
+          threadId: "thread-1",
+          typers: [
+            {
+              user: {
+                id: "user-2",
+                login: "bob",
+                nickname: "Bob",
+              },
+              updatedAt: "2026-04-11T12:00:00Z",
+              expiresAt: "2026-04-11T12:00:06Z",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(event).toEqual({
+      type: "group.typing.updated",
+      groupId: "group-1",
+      threadId: "thread-1",
+      typingState: {
+        threadId: "thread-1",
+        typers: [
+          {
+            user: {
+              id: "user-2",
+              login: "bob",
+              nickname: "Bob",
+              avatarUrl: null,
+            },
+            updatedAt: "2026-04-11T12:00:00Z",
+            expiresAt: "2026-04-11T12:00:06Z",
+          },
+        ],
+      },
+    });
+  });
 });

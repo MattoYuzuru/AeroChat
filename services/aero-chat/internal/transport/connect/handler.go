@@ -150,14 +150,15 @@ func (h *Handler) GetGroupChat(ctx context.Context, req *connect.Request[chatv1.
 		return nil, err
 	}
 
-	group, thread, err := h.service.GetGroupChat(ctx, token, req.Msg.GroupId)
+	group, thread, typingState, err := h.service.GetGroupChat(ctx, token, req.Msg.GroupId)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
 	return connect.NewResponse(&chatv1.GetGroupChatResponse{
-		Group:  toProtoGroup(*group),
-		Thread: toProtoGroupChatThread(*thread),
+		Group:       toProtoGroup(*group),
+		Thread:      toProtoGroupChatThread(*thread),
+		TypingState: toProtoGroupTypingState(typingState),
 	}), nil
 }
 
@@ -318,6 +319,38 @@ func (h *Handler) JoinGroupByInviteLink(ctx context.Context, req *connect.Reques
 
 	return connect.NewResponse(&chatv1.JoinGroupByInviteLinkResponse{
 		Group: toProtoGroup(*group),
+	}), nil
+}
+
+func (h *Handler) SetGroupTyping(ctx context.Context, req *connect.Request[chatv1.SetGroupTypingRequest]) (*connect.Response[chatv1.SetGroupTypingResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	typingState, err := h.service.SetGroupTyping(ctx, token, req.Msg.GroupId, req.Msg.ThreadId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.SetGroupTypingResponse{
+		TypingState: toProtoGroupTypingState(typingState),
+	}), nil
+}
+
+func (h *Handler) ClearGroupTyping(ctx context.Context, req *connect.Request[chatv1.ClearGroupTypingRequest]) (*connect.Response[chatv1.ClearGroupTypingResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	typingState, err := h.service.ClearGroupTyping(ctx, token, req.Msg.GroupId, req.Msg.ThreadId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.ClearGroupTypingResponse{
+		TypingState: toProtoGroupTypingState(typingState),
 	}), nil
 }
 
@@ -593,6 +626,26 @@ func toProtoGroupChatThread(value chat.GroupChatThread) *chatv1.GroupChatThread 
 		CreatedAt:       timestamppb.New(value.CreatedAt),
 		UpdatedAt:       timestamppb.New(value.UpdatedAt),
 	}
+}
+
+func toProtoGroupTypingState(value *chat.GroupTypingState) *chatv1.GroupTypingState {
+	if value == nil {
+		return nil
+	}
+
+	result := &chatv1.GroupTypingState{
+		ThreadId: value.ThreadID,
+		Typers:   make([]*chatv1.GroupTypingIndicator, 0, len(value.Typers)),
+	}
+	for _, typer := range value.Typers {
+		result.Typers = append(result.Typers, &chatv1.GroupTypingIndicator{
+			User:      toProtoChatUser(typer.User),
+			UpdatedAt: timestamppb.New(typer.UpdatedAt),
+			ExpiresAt: timestamppb.New(typer.ExpiresAt),
+		})
+	}
+
+	return result
 }
 
 func toProtoGroupMember(value chat.GroupMember) *chatv1.GroupMember {

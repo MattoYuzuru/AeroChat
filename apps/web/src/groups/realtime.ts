@@ -4,6 +4,8 @@ import type {
   GroupMember,
   GroupMemberRole,
   GroupMessage,
+  GroupTypingIndicator,
+  GroupTypingState,
   TextMessageContent,
 } from "../gateway/types";
 import type { RealtimeEnvelope } from "../realtime/client";
@@ -91,6 +93,23 @@ interface GroupOwnershipTransferredPayloadWire {
   selfMember?: GroupMemberWire;
 }
 
+interface GroupTypingIndicatorWire {
+  user?: ChatUserWire;
+  updatedAt?: string;
+  expiresAt?: string;
+}
+
+interface GroupTypingStateWire {
+  threadId?: string;
+  typers?: GroupTypingIndicatorWire[];
+}
+
+interface GroupTypingUpdatedPayloadWire {
+  groupId?: string;
+  threadId?: string;
+  typingState?: GroupTypingStateWire;
+}
+
 export type GroupMembershipReason =
   | "member_joined"
   | "member_removed"
@@ -131,6 +150,12 @@ export type GroupRealtimeEvent =
       ownerMember: GroupMember;
       previousOwnerMember: GroupMember;
       selfMember: GroupMember | null;
+    }
+  | {
+      type: "group.typing.updated";
+      groupId: string;
+      threadId: string;
+      typingState: GroupTypingState;
     };
 
 export function parseGroupRealtimeEvent(
@@ -200,6 +225,20 @@ export function parseGroupRealtimeEvent(
       ownerMember: payload.ownerMember,
       previousOwnerMember: payload.previousOwnerMember,
       selfMember: payload.selfMember,
+    };
+  }
+
+  if (envelope.type === "group.typing.updated") {
+    const payload = normalizeTypingUpdatedPayload(envelope.payload);
+    if (!payload) {
+      return null;
+    }
+
+    return {
+      type: "group.typing.updated",
+      groupId: payload.groupId,
+      threadId: payload.threadId,
+      typingState: payload.typingState,
     };
   }
 
@@ -335,6 +374,32 @@ function normalizeOwnershipTransferredPayload(
   };
 }
 
+function normalizeTypingUpdatedPayload(
+  input: unknown,
+): {
+  groupId: string;
+  threadId: string;
+  typingState: GroupTypingState;
+} | null {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const payload = input as GroupTypingUpdatedPayloadWire;
+  const groupId = typeof payload.groupId === "string" ? payload.groupId : "";
+  const threadId = typeof payload.threadId === "string" ? payload.threadId : "";
+  const typingState = normalizeGroupTypingState(payload.typingState);
+  if (groupId === "" || threadId === "" || typingState === null || typingState.threadId === "") {
+    return null;
+  }
+
+  return {
+    groupId,
+    threadId,
+    typingState,
+  };
+}
+
 function normalizeOptionalGroup(input: GroupWire | undefined): Group | null {
   const group = normalizeGroup(input);
   return group.id === "" ? null : group;
@@ -404,6 +469,50 @@ function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessag
     text: normalizeTextMessageContent(input?.text),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeGroupTypingIndicator(
+  input: GroupTypingIndicatorWire | undefined,
+): GroupTypingIndicator | null {
+  if (!input) {
+    return null;
+  }
+
+  const user = input.user;
+  if (!user || typeof user.id !== "string" || user.id === "") {
+    return null;
+  }
+
+  return {
+    user: {
+      id: user.id,
+      login: normalizeLogin(user.login),
+      nickname: user.nickname ?? "",
+      avatarUrl: normalizeNullableString(user.avatarUrl),
+    },
+    updatedAt: input.updatedAt ?? "",
+    expiresAt: input.expiresAt ?? "",
+  };
+}
+
+function normalizeGroupTypingState(
+  input: GroupTypingStateWire | undefined,
+): GroupTypingState | null {
+  if (!input) {
+    return null;
+  }
+
+  const threadId = input.threadId ?? "";
+  if (threadId === "") {
+    return null;
+  }
+
+  return {
+    threadId,
+    typers: (input.typers ?? [])
+      .map(normalizeGroupTypingIndicator)
+      .filter((indicator): indicator is GroupTypingIndicator => indicator !== null),
   };
 }
 

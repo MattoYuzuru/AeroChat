@@ -354,6 +354,28 @@ WHERE self.user_id = $1
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT $3;
 
+-- name: ListGroupTypingStateEntries :many
+SELECT
+    m.user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    u.typing_visibility_enabled
+FROM group_memberships AS self
+JOIN group_memberships AS m ON m.group_id = self.group_id
+JOIN users AS u ON u.id = m.user_id
+WHERE self.user_id = $1 AND self.group_id = $2
+ORDER BY
+    CASE m.role
+        WHEN 'owner' THEN 0
+        WHEN 'admin' THEN 1
+        WHEN 'member' THEN 2
+        WHEN 'reader' THEN 3
+        ELSE 4
+    END,
+    m.joined_at ASC,
+    m.user_id ASC;
+
 -- name: ListDirectChatReadStateEntries :many
 SELECT
     p.user_id,

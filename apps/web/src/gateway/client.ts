@@ -23,6 +23,8 @@ import type {
   GroupMessage,
   GroupMember,
   GroupMemberRole,
+  GroupTypingIndicator,
+  GroupTypingState,
   MessageTombstone,
   Profile,
   RevokeSessionOrDeviceTarget,
@@ -161,6 +163,17 @@ interface GroupChatThreadWire extends TimestampedWire {
   canSendMessages?: boolean;
 }
 
+interface GroupTypingIndicatorWire {
+  user?: ChatUserWire;
+  updatedAt?: string;
+  expiresAt?: string;
+}
+
+interface GroupTypingStateWire {
+  threadId?: string;
+  typers?: GroupTypingIndicatorWire[];
+}
+
 interface GroupMemberWire {
   user?: ChatUserWire;
   role?: string;
@@ -266,6 +279,15 @@ interface GetGroupResponseWire {
 interface GetGroupChatResponseWire {
   group?: GroupWire;
   thread?: GroupChatThreadWire;
+  typingState?: GroupTypingStateWire;
+}
+
+interface SetGroupTypingResponseWire {
+  typingState?: GroupTypingStateWire;
+}
+
+interface ClearGroupTypingResponseWire {
+  typingState?: GroupTypingStateWire;
 }
 
 interface ListGroupMembersResponseWire {
@@ -487,6 +509,38 @@ export function createGatewayClient(
       );
 
       return normalizeGroupChatSnapshot(response);
+    },
+
+    async setGroupTyping(token, groupId, threadId) {
+      const response = await unaryCall<SetGroupTypingResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "SetGroupTyping",
+        {
+          groupId: groupId.trim(),
+          threadId: threadId.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroupTypingState(response.typingState);
+    },
+
+    async clearGroupTyping(token, groupId, threadId) {
+      const response = await unaryCall<ClearGroupTypingResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ClearGroupTyping",
+        {
+          groupId: groupId.trim(),
+          threadId: threadId.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroupTypingState(response.typingState);
     },
 
     async listGroupMembers(token, groupId) {
@@ -1226,10 +1280,52 @@ function normalizeGroupChatThread(input: GroupChatThreadWire | undefined): Group
   };
 }
 
+function normalizeGroupTypingIndicator(
+  input: GroupTypingIndicatorWire | undefined,
+): GroupTypingIndicator | null {
+  if (!input) {
+    return null;
+  }
+
+  const user = normalizeChatUser(input.user);
+  const updatedAt = input.updatedAt ?? "";
+  const expiresAt = input.expiresAt ?? "";
+  if (user.id === "" || (updatedAt === "" && expiresAt === "")) {
+    return null;
+  }
+
+  return {
+    user,
+    updatedAt,
+    expiresAt,
+  };
+}
+
+function normalizeGroupTypingState(
+  input: GroupTypingStateWire | undefined,
+): GroupTypingState | null {
+  if (!input) {
+    return null;
+  }
+
+  const threadId = input.threadId ?? "";
+  if (threadId === "") {
+    return null;
+  }
+
+  return {
+    threadId,
+    typers: (input.typers ?? [])
+      .map(normalizeGroupTypingIndicator)
+      .filter((indicator): indicator is GroupTypingIndicator => indicator !== null),
+  };
+}
+
 function normalizeGroupChatSnapshot(input: GetGroupChatResponseWire): GroupChatSnapshot {
   return {
     group: normalizeGroup(input.group),
     thread: normalizeGroupChatThread(input.thread),
+    typingState: normalizeGroupTypingState(input.typingState),
   };
 }
 

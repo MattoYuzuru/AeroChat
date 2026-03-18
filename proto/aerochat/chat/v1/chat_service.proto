@@ -25,6 +25,8 @@ service ChatService {
   rpc ListGroupInviteLinks(ListGroupInviteLinksRequest) returns (ListGroupInviteLinksResponse);
   rpc DisableGroupInviteLink(DisableGroupInviteLinkRequest) returns (DisableGroupInviteLinkResponse);
   rpc JoinGroupByInviteLink(JoinGroupByInviteLinkRequest) returns (JoinGroupByInviteLinkResponse);
+  rpc SetGroupTyping(SetGroupTypingRequest) returns (SetGroupTypingResponse);
+  rpc ClearGroupTyping(ClearGroupTypingRequest) returns (ClearGroupTypingResponse);
   rpc MarkDirectChatRead(MarkDirectChatReadRequest) returns (MarkDirectChatReadResponse);
   rpc SetDirectChatTyping(SetDirectChatTypingRequest) returns (SetDirectChatTypingResponse);
   rpc ClearDirectChatTyping(ClearDirectChatTypingRequest) returns (ClearDirectChatTypingResponse);
@@ -114,6 +116,17 @@ message GroupChatThread {
   bool can_send_messages = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+}
+
+message GroupTypingIndicator {
+  ChatUser user = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message GroupTypingState {
+  string thread_id = 1;
+  repeated GroupTypingIndicator typers = 2;
 }
 
 message TextMessageContent {
@@ -240,6 +253,7 @@ message GetGroupChatRequest {
 message GetGroupChatResponse {
   Group group = 1;
   GroupChatThread thread = 2;
+  GroupTypingState typing_state = 3;
 }
 
 message ListGroupMembersRequest {
@@ -315,6 +329,24 @@ message JoinGroupByInviteLinkRequest {
 
 message JoinGroupByInviteLinkResponse {
   Group group = 1;
+}
+
+message SetGroupTypingRequest {
+  string group_id = 1;
+  string thread_id = 2;
+}
+
+message SetGroupTypingResponse {
+  GroupTypingState typing_state = 1;
+}
+
+message ClearGroupTypingRequest {
+  string group_id = 1;
+  string thread_id = 2;
+}
+
+message ClearGroupTypingResponse {
+  GroupTypingState typing_state = 1;
 }
 
 message MarkDirectChatReadRequest {
