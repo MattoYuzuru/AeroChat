@@ -16,6 +16,10 @@ import type {
   FriendRequest,
   GatewayClient,
   GatewayErrorCode,
+  Group,
+  GroupInviteLink,
+  GroupMember,
+  GroupMemberRole,
   MessageTombstone,
   Profile,
   RevokeSessionOrDeviceTarget,
@@ -139,6 +143,30 @@ interface DirectChatWire extends TimestampedWire {
   pinnedMessageIds?: string[];
 }
 
+interface GroupWire extends TimestampedWire {
+  id?: string;
+  name?: string;
+  kind?: string;
+  selfRole?: string;
+  memberCount?: number;
+}
+
+interface GroupMemberWire {
+  user?: ChatUserWire;
+  role?: string;
+  joinedAt?: string;
+}
+
+interface GroupInviteLinkWire extends TimestampedWire {
+  id?: string;
+  groupId?: string;
+  role?: string;
+  createdByUserId?: string;
+  joinCount?: number;
+  disabledAt?: string;
+  lastJoinedAt?: string;
+}
+
 interface TextMessageContentWire {
   text?: string;
   markdownPolicy?: string;
@@ -202,6 +230,39 @@ interface GetDirectChatResponseWire {
   readState?: DirectChatReadStateWire;
   typingState?: DirectChatTypingStateWire;
   presenceState?: DirectChatPresenceStateWire;
+}
+
+interface CreateGroupResponseWire {
+  group?: GroupWire;
+}
+
+interface ListGroupsResponseWire {
+  groups?: GroupWire[];
+}
+
+interface GetGroupResponseWire {
+  group?: GroupWire;
+}
+
+interface ListGroupMembersResponseWire {
+  members?: GroupMemberWire[];
+}
+
+interface CreateGroupInviteLinkResponseWire {
+  inviteLink?: GroupInviteLinkWire;
+  inviteToken?: string;
+}
+
+interface ListGroupInviteLinksResponseWire {
+  inviteLinks?: GroupInviteLinkWire[];
+}
+
+interface DisableGroupInviteLinkResponseWire {
+  inviteLink?: GroupInviteLinkWire;
+}
+
+interface JoinGroupByInviteLinkResponseWire {
+  group?: GroupWire;
 }
 
 interface MarkDirectChatReadResponseWire {
@@ -328,6 +389,129 @@ export function createGatewayClient(
         buildRevocationPayload(target),
         token,
       );
+    },
+
+    async createGroup(token, name) {
+      const response = await unaryCall<CreateGroupResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "CreateGroup",
+        {
+          name: name.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroup(response.group);
+    },
+
+    async listGroups(token) {
+      const response = await unaryCall<ListGroupsResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ListGroups",
+        {},
+        token,
+      );
+
+      return (response.groups ?? []).map(normalizeGroup);
+    },
+
+    async getGroup(token, groupId) {
+      const response = await unaryCall<GetGroupResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "GetGroup",
+        {
+          groupId: groupId.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroup(response.group);
+    },
+
+    async listGroupMembers(token, groupId) {
+      const response = await unaryCall<ListGroupMembersResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ListGroupMembers",
+        {
+          groupId: groupId.trim(),
+        },
+        token,
+      );
+
+      return (response.members ?? []).map(normalizeGroupMember);
+    },
+
+    async createGroupInviteLink(token, groupId, role) {
+      const response = await unaryCall<CreateGroupInviteLinkResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "CreateGroupInviteLink",
+        {
+          groupId: groupId.trim(),
+          role: normalizeGroupMemberRoleForWire(role),
+        },
+        token,
+      );
+
+      return {
+        inviteLink: normalizeGroupInviteLink(response.inviteLink),
+        inviteToken: response.inviteToken ?? "",
+      };
+    },
+
+    async listGroupInviteLinks(token, groupId) {
+      const response = await unaryCall<ListGroupInviteLinksResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ListGroupInviteLinks",
+        {
+          groupId: groupId.trim(),
+        },
+        token,
+      );
+
+      return (response.inviteLinks ?? []).map(normalizeGroupInviteLink);
+    },
+
+    async disableGroupInviteLink(token, groupId, inviteLinkId) {
+      const response = await unaryCall<DisableGroupInviteLinkResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "DisableGroupInviteLink",
+        {
+          groupId: groupId.trim(),
+          inviteLinkId: inviteLinkId.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroupInviteLink(response.inviteLink);
+    },
+
+    async joinGroupByInviteLink(token, inviteToken) {
+      const response = await unaryCall<JoinGroupByInviteLinkResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "JoinGroupByInviteLink",
+        {
+          inviteToken: inviteToken.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroup(response.group);
     },
 
     async createDirectChat(token, peerUserId) {
@@ -837,6 +1021,74 @@ function normalizeChatUser(input: ChatUserWire | undefined): ChatUser {
     login: input?.login ?? "",
     nickname: input?.nickname ?? "",
     avatarUrl: normalizeNullableString(input?.avatarUrl),
+  };
+}
+
+function normalizeGroupMemberRole(value: string | undefined): GroupMemberRole {
+  switch (value) {
+    case "GROUP_MEMBER_ROLE_OWNER":
+    case "owner":
+      return "owner";
+    case "GROUP_MEMBER_ROLE_ADMIN":
+    case "admin":
+      return "admin";
+    case "GROUP_MEMBER_ROLE_MEMBER":
+    case "member":
+      return "member";
+    case "GROUP_MEMBER_ROLE_READER":
+    case "reader":
+      return "reader";
+    default:
+      return "member";
+  }
+}
+
+function normalizeGroupMemberRoleForWire(value: GroupMemberRole): string {
+  switch (value) {
+    case "owner":
+      return "GROUP_MEMBER_ROLE_OWNER";
+    case "admin":
+      return "GROUP_MEMBER_ROLE_ADMIN";
+    case "member":
+      return "GROUP_MEMBER_ROLE_MEMBER";
+    case "reader":
+      return "GROUP_MEMBER_ROLE_READER";
+  }
+}
+
+function normalizeGroup(input: GroupWire | undefined): Group {
+  return {
+    id: input?.id ?? "",
+    name: input?.name ?? "",
+    kind: input?.kind ?? "CHAT_KIND_UNSPECIFIED",
+    selfRole: normalizeGroupMemberRole(input?.selfRole),
+    memberCount: input?.memberCount ?? 0,
+    createdAt: input?.createdAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeGroupMember(input: GroupMemberWire): GroupMember {
+  return {
+    user: normalizeChatUser(input.user),
+    role: normalizeGroupMemberRole(input.role),
+    joinedAt: input.joinedAt ?? "",
+  };
+}
+
+function normalizeGroupInviteLink(
+  input: GroupInviteLinkWire | undefined,
+): GroupInviteLink {
+  return {
+    id: input?.id ?? "",
+    groupId: input?.groupId ?? "",
+    role: normalizeGroupMemberRole(input?.role),
+    createdByUserId: input?.createdByUserId ?? "",
+    joinCount: input?.joinCount ?? 0,
+    createdAt: input?.createdAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
+    disabledAt: normalizeNullableString(input?.disabledAt),
+    lastJoinedAt: normalizeNullableString(input?.lastJoinedAt),
   };
 }
 

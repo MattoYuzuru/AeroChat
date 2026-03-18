@@ -91,6 +91,155 @@ func (h *Handler) GetDirectChat(ctx context.Context, req *connect.Request[chatv1
 	}), nil
 }
 
+func (h *Handler) CreateGroup(ctx context.Context, req *connect.Request[chatv1.CreateGroupRequest]) (*connect.Response[chatv1.CreateGroupResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := h.service.CreateGroup(ctx, token, req.Msg.Name)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.CreateGroupResponse{
+		Group: toProtoGroup(*group),
+	}), nil
+}
+
+func (h *Handler) ListGroups(ctx context.Context, req *connect.Request[chatv1.ListGroupsRequest]) (*connect.Response[chatv1.ListGroupsResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	groups, err := h.service.ListGroups(ctx, token)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &chatv1.ListGroupsResponse{
+		Groups: make([]*chatv1.Group, 0, len(groups)),
+	}
+	for _, group := range groups {
+		response.Groups = append(response.Groups, toProtoGroup(group))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) GetGroup(ctx context.Context, req *connect.Request[chatv1.GetGroupRequest]) (*connect.Response[chatv1.GetGroupResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := h.service.GetGroup(ctx, token, req.Msg.GroupId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.GetGroupResponse{
+		Group: toProtoGroup(*group),
+	}), nil
+}
+
+func (h *Handler) ListGroupMembers(ctx context.Context, req *connect.Request[chatv1.ListGroupMembersRequest]) (*connect.Response[chatv1.ListGroupMembersResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	members, err := h.service.ListGroupMembers(ctx, token, req.Msg.GroupId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &chatv1.ListGroupMembersResponse{
+		Members: make([]*chatv1.GroupMember, 0, len(members)),
+	}
+	for _, member := range members {
+		response.Members = append(response.Members, toProtoGroupMember(member))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) CreateGroupInviteLink(ctx context.Context, req *connect.Request[chatv1.CreateGroupInviteLinkRequest]) (*connect.Response[chatv1.CreateGroupInviteLinkResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	createdInviteLink, err := h.service.CreateGroupInviteLink(
+		ctx,
+		token,
+		req.Msg.GroupId,
+		fromProtoGroupMemberRole(req.Msg.Role),
+	)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.CreateGroupInviteLinkResponse{
+		InviteLink:  toProtoGroupInviteLink(createdInviteLink.InviteLink),
+		InviteToken: createdInviteLink.InviteToken,
+	}), nil
+}
+
+func (h *Handler) ListGroupInviteLinks(ctx context.Context, req *connect.Request[chatv1.ListGroupInviteLinksRequest]) (*connect.Response[chatv1.ListGroupInviteLinksResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	inviteLinks, err := h.service.ListGroupInviteLinks(ctx, token, req.Msg.GroupId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &chatv1.ListGroupInviteLinksResponse{
+		InviteLinks: make([]*chatv1.GroupInviteLink, 0, len(inviteLinks)),
+	}
+	for _, inviteLink := range inviteLinks {
+		response.InviteLinks = append(response.InviteLinks, toProtoGroupInviteLink(inviteLink))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) DisableGroupInviteLink(ctx context.Context, req *connect.Request[chatv1.DisableGroupInviteLinkRequest]) (*connect.Response[chatv1.DisableGroupInviteLinkResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	inviteLink, err := h.service.DisableGroupInviteLink(ctx, token, req.Msg.GroupId, req.Msg.InviteLinkId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.DisableGroupInviteLinkResponse{
+		InviteLink: toProtoGroupInviteLink(*inviteLink),
+	}), nil
+}
+
+func (h *Handler) JoinGroupByInviteLink(ctx context.Context, req *connect.Request[chatv1.JoinGroupByInviteLinkRequest]) (*connect.Response[chatv1.JoinGroupByInviteLinkResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := h.service.JoinGroupByInviteLink(ctx, token, req.Msg.InviteToken)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.JoinGroupByInviteLinkResponse{
+		Group: toProtoGroup(*group),
+	}), nil
+}
+
 func (h *Handler) MarkDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkDirectChatReadRequest]) (*connect.Response[chatv1.MarkDirectChatReadResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -292,7 +441,7 @@ func mapError(err error) error {
 func toProtoDirectChat(value chat.DirectChat) *chatv1.DirectChat {
 	result := &chatv1.DirectChat{
 		Id:               value.ID,
-		Kind:             chatv1.ChatKind_CHAT_KIND_DIRECT,
+		Kind:             toProtoChatKind(value.Kind),
 		Participants:     make([]*chatv1.ChatUser, 0, len(value.Participants)),
 		PinnedMessageIds: append([]string(nil), value.PinnedMessageIDs...),
 		CreatedAt:        timestamppb.New(value.CreatedAt),
@@ -300,6 +449,46 @@ func toProtoDirectChat(value chat.DirectChat) *chatv1.DirectChat {
 	}
 	for _, participant := range value.Participants {
 		result.Participants = append(result.Participants, toProtoChatUser(participant))
+	}
+
+	return result
+}
+
+func toProtoGroup(value chat.Group) *chatv1.Group {
+	return &chatv1.Group{
+		Id:          value.ID,
+		Name:        value.Name,
+		Kind:        toProtoChatKind(value.Kind),
+		SelfRole:    toProtoGroupMemberRole(value.SelfRole),
+		MemberCount: uint32(value.MemberCount),
+		CreatedAt:   timestamppb.New(value.CreatedAt),
+		UpdatedAt:   timestamppb.New(value.UpdatedAt),
+	}
+}
+
+func toProtoGroupMember(value chat.GroupMember) *chatv1.GroupMember {
+	return &chatv1.GroupMember{
+		User:     toProtoChatUser(value.User),
+		Role:     toProtoGroupMemberRole(value.Role),
+		JoinedAt: timestamppb.New(value.JoinedAt),
+	}
+}
+
+func toProtoGroupInviteLink(value chat.GroupInviteLink) *chatv1.GroupInviteLink {
+	result := &chatv1.GroupInviteLink{
+		Id:              value.ID,
+		GroupId:         value.GroupID,
+		Role:            toProtoGroupMemberRole(value.Role),
+		CreatedByUserId: value.CreatedByUserID,
+		JoinCount:       uint32(value.JoinCount),
+		CreatedAt:       timestamppb.New(value.CreatedAt),
+		UpdatedAt:       timestamppb.New(value.UpdatedAt),
+	}
+	if value.DisabledAt != nil {
+		result.DisabledAt = timestamppb.New(*value.DisabledAt)
+	}
+	if value.LastJoinedAt != nil {
+		result.LastJoinedAt = timestamppb.New(*value.LastJoinedAt)
 	}
 
 	return result
@@ -408,6 +597,47 @@ func toProtoDirectChatPresenceIndicator(value *chat.DirectChatPresenceIndicator)
 	return &chatv1.DirectChatPresenceIndicator{
 		HeartbeatAt: timestamppb.New(value.HeartbeatAt),
 		ExpiresAt:   timestamppb.New(value.ExpiresAt),
+	}
+}
+
+func toProtoChatKind(value string) chatv1.ChatKind {
+	switch value {
+	case chat.ChatKindDirect:
+		return chatv1.ChatKind_CHAT_KIND_DIRECT
+	case chat.ChatKindGroup:
+		return chatv1.ChatKind_CHAT_KIND_GROUP
+	default:
+		return chatv1.ChatKind_CHAT_KIND_UNSPECIFIED
+	}
+}
+
+func toProtoGroupMemberRole(value string) chatv1.GroupMemberRole {
+	switch value {
+	case chat.GroupMemberRoleOwner:
+		return chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER
+	case chat.GroupMemberRoleAdmin:
+		return chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN
+	case chat.GroupMemberRoleMember:
+		return chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER
+	case chat.GroupMemberRoleReader:
+		return chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER
+	default:
+		return chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_UNSPECIFIED
+	}
+}
+
+func fromProtoGroupMemberRole(value chatv1.GroupMemberRole) string {
+	switch value {
+	case chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER:
+		return chat.GroupMemberRoleOwner
+	case chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN:
+		return chat.GroupMemberRoleAdmin
+	case chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER:
+		return chat.GroupMemberRoleMember
+	case chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER:
+		return chat.GroupMemberRoleReader
+	default:
+		return ""
 	}
 }
 

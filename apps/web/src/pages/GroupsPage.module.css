@@ -1,0 +1,315 @@
+.layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.heroCard,
+.panelCard,
+.stateCard,
+.metricCard,
+.groupCard,
+.memberCard,
+.inviteCard,
+.joinCard {
+  border: 1px solid var(--color-border-soft);
+  border-radius: 1.55rem;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(16px);
+}
+
+.heroCard,
+.panelCard,
+.stateCard,
+.joinCard {
+  padding: 1.35rem;
+}
+
+.heroHeader,
+.panelHeader,
+.splitHeader,
+.form,
+.inviteActions,
+.groupHeader,
+.memberHeader,
+.inviteHeader,
+.joinHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cardLabel {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(3, 50, 82, 0.72);
+}
+
+.title,
+.panelTitle,
+.stateTitle {
+  margin: 0.35rem 0 0;
+}
+
+.title {
+  font-size: clamp(1.8rem, 3vw, 2.2rem);
+}
+
+.subtitle,
+.description,
+.stateMessage,
+.emptyState,
+.helperText,
+.inviteValue,
+.groupMeta {
+  margin: 0.8rem 0 0;
+  color: rgba(3, 50, 82, 0.78);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.metricCard {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-panel-strong);
+}
+
+.metricCard span {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  color: rgba(3, 50, 82, 0.7);
+}
+
+.metricCard strong {
+  font-size: 1.8rem;
+}
+
+.notice,
+.error {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+}
+
+.notice {
+  background: rgba(16, 130, 203, 0.12);
+}
+
+.error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
+}
+
+.heroForms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.form {
+  align-items: end;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+  flex: 1 1 auto;
+}
+
+.field span {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.field input,
+.field select,
+.field textarea {
+  min-height: 3rem;
+  padding: 0.75rem 0.95rem;
+  border: 1px solid rgba(3, 50, 82, 0.14);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.field textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible {
+  border-color: var(--color-primary-bright);
+  box-shadow:
+    0 0 0 4px rgba(23, 130, 209, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton,
+.ghostButton,
+.linkButton {
+  min-height: 2.95rem;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  box-shadow: var(--shadow-button);
+}
+
+.primaryButton {
+  color: #ffffff;
+  background: var(--surface-button-primary);
+}
+
+.secondaryButton,
+.ghostButton,
+.linkButton {
+  background: var(--surface-button);
+  border-color: rgba(3, 50, 82, 0.12);
+}
+
+.dangerButton {
+  background: rgba(181, 38, 38, 0.08);
+  border-color: rgba(181, 38, 38, 0.18);
+  color: var(--color-danger-ink);
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: inherit;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.ghostButton:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.sideColumn,
+.mainColumn {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.list,
+.memberList,
+.inviteList {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.groupCard,
+.memberCard,
+.inviteCard {
+  padding: 1rem;
+}
+
+.groupButton {
+  width: 100%;
+  border: none;
+  text-align: left;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.groupCard[data-active="true"] {
+  border-color: rgba(17, 117, 191, 0.26);
+  box-shadow:
+    0 18px 36px rgba(10, 74, 121, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.rolePill,
+.statusPill {
+  align-self: start;
+  padding: 0.45rem 0.72rem;
+  border-radius: 999px;
+  background: var(--color-chip);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  font-size: 0.8rem;
+  color: rgba(3, 50, 82, 0.72);
+}
+
+.statusPill[data-tone="danger"] {
+  background: rgba(181, 38, 38, 0.12);
+  color: var(--color-danger-ink);
+}
+
+.panelCopy {
+  max-width: 24rem;
+}
+
+.inviteValue {
+  word-break: break-all;
+}
+
+.emptyState {
+  padding: 1rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.joinCard {
+  border-style: dashed;
+}
+
+.stateCard[data-tone="error"] {
+  border-color: rgba(181, 38, 38, 0.24);
+}
+
+@media (max-width: 1100px) {
+  .workspace,
+  .heroForms {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .heroHeader,
+  .panelHeader,
+  .splitHeader,
+  .form,
+  .inviteActions,
+  .groupHeader,
+  .memberHeader,
+  .inviteHeader,
+  .joinHeader {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+}

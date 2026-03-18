@@ -57,6 +57,34 @@ type DirectChatReadReceipt struct {
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type Group struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	Name            string             `db:"name" json:"name"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type GroupInviteLink struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	GroupID         uuid.UUID          `db:"group_id" json:"group_id"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	Role            string             `db:"role" json:"role"`
+	TokenHash       string             `db:"token_hash" json:"token_hash"`
+	JoinCount       int32              `db:"join_count" json:"join_count"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DisabledAt      pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
+	LastJoinedAt    pgtype.Timestamptz `db:"last_joined_at" json:"last_joined_at"`
+}
+
+type GroupMembership struct {
+	GroupID  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID   uuid.UUID          `db:"user_id" json:"user_id"`
+	Role     string             `db:"role" json:"role"`
+	JoinedAt pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+}
+
 type User struct {
 	ID                      uuid.UUID          `db:"id" json:"id"`
 	Login                   string             `db:"login" json:"login"`

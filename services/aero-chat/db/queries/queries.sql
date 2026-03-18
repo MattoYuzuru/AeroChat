@@ -116,6 +116,169 @@ JOIN users AS u ON u.id = p.user_id
 WHERE self.user_id = $1 AND c.id = $2
 ORDER BY p.joined_at ASC, p.user_id ASC;
 
+-- name: CreateGroup :one
+INSERT INTO groups (
+    id,
+    name,
+    created_by_user_id,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+RETURNING id, name, created_by_user_id, created_at, updated_at;
+
+-- name: AddGroupMembership :exec
+INSERT INTO group_memberships (
+    group_id,
+    user_id,
+    role,
+    joined_at
+) VALUES ($1, $2, $3, $4);
+
+-- name: JoinGroupMembership :execrows
+INSERT INTO group_memberships (
+    group_id,
+    user_id,
+    role,
+    joined_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (group_id, user_id) DO NOTHING;
+
+-- name: ListGroupRowsByUserID :many
+SELECT
+    g.id,
+    g.name,
+    g.created_by_user_id,
+    self.role AS self_role,
+    g.created_at,
+    g.updated_at,
+    COUNT(m.user_id)::INT AS member_count
+FROM group_memberships AS self
+JOIN groups AS g ON g.id = self.group_id
+JOIN group_memberships AS m ON m.group_id = g.id
+WHERE self.user_id = $1
+GROUP BY g.id, g.name, g.created_by_user_id, self.role, g.created_at, g.updated_at
+ORDER BY g.updated_at DESC, g.id DESC;
+
+-- name: GetGroupRowByIDAndUserID :one
+SELECT
+    g.id,
+    g.name,
+    g.created_by_user_id,
+    self.role AS self_role,
+    g.created_at,
+    g.updated_at,
+    COUNT(m.user_id)::INT AS member_count
+FROM group_memberships AS self
+JOIN groups AS g ON g.id = self.group_id
+JOIN group_memberships AS m ON m.group_id = g.id
+WHERE self.user_id = $1 AND g.id = $2
+GROUP BY g.id, g.name, g.created_by_user_id, self.role, g.created_at, g.updated_at;
+
+-- name: ListGroupMemberRowsByGroupIDAndUserID :many
+SELECT
+    m.group_id,
+    m.user_id,
+    m.role,
+    m.joined_at,
+    u.login,
+    u.nickname,
+    u.avatar_url
+FROM group_memberships AS self
+JOIN group_memberships AS m ON m.group_id = self.group_id
+JOIN users AS u ON u.id = m.user_id
+WHERE self.user_id = $1 AND self.group_id = $2
+ORDER BY
+    CASE m.role
+        WHEN 'owner' THEN 0
+        WHEN 'admin' THEN 1
+        WHEN 'member' THEN 2
+        WHEN 'reader' THEN 3
+        ELSE 4
+    END,
+    m.joined_at ASC,
+    m.user_id ASC;
+
+-- name: CreateGroupInviteLink :one
+INSERT INTO group_invite_links (
+    id,
+    group_id,
+    created_by_user_id,
+    role,
+    token_hash,
+    join_count,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, 0, $6, $7)
+RETURNING id, group_id, created_by_user_id, role, join_count, created_at, updated_at, disabled_at, last_joined_at;
+
+-- name: ListGroupInviteLinksByGroupID :many
+SELECT
+    id,
+    group_id,
+    created_by_user_id,
+    role,
+    join_count,
+    created_at,
+    updated_at,
+    disabled_at,
+    last_joined_at
+FROM group_invite_links
+WHERE group_id = $1
+ORDER BY created_at DESC, id DESC;
+
+-- name: GetGroupInviteLinkByIDAndGroupID :one
+SELECT
+    id,
+    group_id,
+    created_by_user_id,
+    role,
+    join_count,
+    created_at,
+    updated_at,
+    disabled_at,
+    last_joined_at
+FROM group_invite_links
+WHERE group_id = $1 AND id = $2;
+
+-- name: DisableGroupInviteLink :execrows
+UPDATE group_invite_links
+SET
+    disabled_at = $3,
+    updated_at = $3
+WHERE group_id = $1 AND id = $2 AND disabled_at IS NULL;
+
+-- name: GetGroupInviteLinkForJoin :one
+SELECT
+    l.id,
+    l.group_id,
+    l.created_by_user_id,
+    l.role,
+    l.join_count,
+    l.created_at,
+    l.updated_at,
+    l.disabled_at,
+    l.last_joined_at,
+    g.name AS group_name,
+    g.created_by_user_id AS group_created_by_user_id,
+    g.created_at AS group_created_at,
+    g.updated_at AS group_updated_at
+FROM group_invite_links AS l
+JOIN groups AS g ON g.id = l.group_id
+WHERE l.token_hash = $1;
+
+-- name: TouchGroupInviteLinkJoin :exec
+UPDATE group_invite_links
+SET
+    join_count = join_count + 1,
+    last_joined_at = $2,
+    updated_at = $2
+WHERE id = $1;
+
+-- name: TouchGroupUpdatedAt :exec
+UPDATE groups
+SET updated_at = $2
+WHERE id = $1;
+
 -- name: ListDirectChatReadStateEntries :many
 SELECT
     p.user_id,

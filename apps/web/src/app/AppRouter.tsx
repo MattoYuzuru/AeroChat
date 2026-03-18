@@ -5,6 +5,7 @@ import { AuthPage } from "../pages/AuthPage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { PeoplePage } from "../pages/PeoplePage";
 import { ChatsPage } from "../pages/ChatsPage";
+import { GroupsPage } from "../pages/GroupsPage";
 import { StateScreen } from "../ui/StateScreen";
 import { SettingsPage } from "../pages/SettingsPage";
 
@@ -22,6 +23,7 @@ export function AppRouter() {
             <Route index element={<Navigate replace to="profile" />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="chats" element={<ChatsPage />} />
+            <Route path="groups" element={<GroupsPage />} />
             <Route path="people" element={<PeoplePage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
