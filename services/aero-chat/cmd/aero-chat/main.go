@@ -15,6 +15,7 @@ import (
 	chatschema "github.com/MattoYuzuru/AeroChat/services/aero-chat/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/app"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/domain/chat"
+	miniostorage "github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/storage/minio"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/storage/postgres"
 	redisstate "github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/storage/redis"
 	connecthandler "github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/transport/connect"
@@ -85,15 +86,34 @@ func run() error {
 	if err := presenceStore.Ping(context.Background()); err != nil {
 		return err
 	}
+	objectStorage, err := miniostorage.NewClient(
+		cfg.MediaS3InternalEndpoint,
+		cfg.MediaS3InternalSecure,
+		cfg.MediaS3PresignEndpoint,
+		cfg.MediaS3PresignSecure,
+		cfg.MediaS3AccessKey,
+		cfg.MediaS3SecretKey,
+		cfg.MediaS3BucketName,
+	)
+	if err != nil {
+		return err
+	}
+	if err := objectStorage.EnsureBucket(context.Background()); err != nil {
+		return err
+	}
 
 	service := chat.NewService(
 		repository,
 		repository,
 		typingStore,
 		presenceStore,
+		objectStorage,
 		libauth.NewSessionTokenManager(),
 		cfg.DirectChatTypingTTL,
 		cfg.DirectChatPresenceTTL,
+		cfg.MediaUploadIntentTTL,
+		cfg.MediaMaxUploadSizeBytes,
+		cfg.MediaS3BucketName,
 	)
 	handler := connecthandler.NewHandler(serviceName, version, service)
 

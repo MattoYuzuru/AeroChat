@@ -708,6 +708,14 @@ func (r *Repository) ListGroupMessages(ctx context.Context, userID string, group
 	if err != nil {
 		return nil, convertError(err)
 	}
+	messageIDs := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		messageIDs = append(messageIDs, row.ID)
+	}
+	attachmentsByMessageID, err := r.listGroupAttachmentsByMessageIDs(ctx, messageIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	result := make([]chat.GroupMessage, 0, len(rows))
 	for _, row := range rows {
@@ -721,8 +729,9 @@ func (r *Repository) ListGroupMessages(ctx context.Context, userID string, group
 				Text:           row.TextContent,
 				MarkdownPolicy: row.MarkdownPolicy,
 			},
-			CreatedAt: timestampValue(row.CreatedAt),
-			UpdatedAt: timestampValue(row.UpdatedAt),
+			Attachments: attachmentsByMessageID[row.ID.String()],
+			CreatedAt:   timestampValue(row.CreatedAt),
+			UpdatedAt:   timestampValue(row.UpdatedAt),
 		})
 	}
 
@@ -843,6 +852,9 @@ func (r *Repository) CreateDirectChatMessage(ctx context.Context, params chat.Cr
 	}); err != nil {
 		return nil, convertError(err)
 	}
+	if err := attachUploadedDirectMessageAttachments(ctx, q, params); err != nil {
+		return nil, err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit tx: %w", err)
@@ -859,6 +871,11 @@ func (r *Repository) CreateDirectChatMessage(ctx context.Context, params chat.Cr
 		UpdatedAt:      row.UpdatedAt,
 		Pinned:         false,
 	})
+	attachmentsByMessageID, err := r.listDirectAttachmentsByMessageIDs(ctx, []uuid.UUID{row.ID})
+	if err != nil {
+		return nil, err
+	}
+	message.Attachments = attachmentsByMessageID[message.ID]
 	return &message, nil
 }
 
@@ -898,9 +915,17 @@ func (r *Repository) CreateGroupMessage(ctx context.Context, params chat.CreateG
 	}); err != nil {
 		return nil, convertError(err)
 	}
+	if err := attachUploadedGroupMessageAttachments(ctx, q, params); err != nil {
+		return nil, err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	attachmentsByMessageID, err := r.listGroupAttachmentsByMessageIDs(ctx, []uuid.UUID{row.ID})
+	if err != nil {
+		return nil, err
 	}
 
 	return &chat.GroupMessage{
@@ -913,8 +938,9 @@ func (r *Repository) CreateGroupMessage(ctx context.Context, params chat.CreateG
 			Text:           row.TextContent,
 			MarkdownPolicy: row.MarkdownPolicy,
 		},
-		CreatedAt: timestampValue(row.CreatedAt),
-		UpdatedAt: timestampValue(row.UpdatedAt),
+		Attachments: attachmentsByMessageID[row.ID.String()],
+		CreatedAt:   timestampValue(row.CreatedAt),
+		UpdatedAt:   timestampValue(row.UpdatedAt),
 	}, nil
 }
 
@@ -927,10 +953,20 @@ func (r *Repository) ListDirectChatMessages(ctx context.Context, userID string, 
 	if err != nil {
 		return nil, convertError(err)
 	}
+	messageIDs := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		messageIDs = append(messageIDs, row.ID)
+	}
+	attachmentsByMessageID, err := r.listDirectAttachmentsByMessageIDs(ctx, messageIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	result := make([]chat.DirectChatMessage, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, toDomainMessage(row))
+		message := toDomainMessage(row)
+		message.Attachments = attachmentsByMessageID[row.ID.String()]
+		result = append(result, message)
 	}
 
 	return result, nil
@@ -947,6 +983,11 @@ func (r *Repository) GetDirectChatMessage(ctx context.Context, userID string, ch
 	}
 
 	message := toDomainMessage(chatsqlc.ListDirectChatMessagesRow(row))
+	attachmentsByMessageID, err := r.listDirectAttachmentsByMessageIDs(ctx, []uuid.UUID{row.ID})
+	if err != nil {
+		return nil, err
+	}
+	message.Attachments = attachmentsByMessageID[message.ID]
 	return &message, nil
 }
 

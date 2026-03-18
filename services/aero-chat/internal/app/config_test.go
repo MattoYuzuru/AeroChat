@@ -14,6 +14,15 @@ func TestLoadConfigDefaults(t *testing.T) {
 	t.Setenv("AERO_DATABASE_BOOTSTRAP_TIMEOUT", "")
 	t.Setenv("AERO_DIRECT_CHAT_TYPING_TTL", "")
 	t.Setenv("AERO_DIRECT_CHAT_PRESENCE_TTL", "")
+	t.Setenv("AERO_MEDIA_S3_INTERNAL_ENDPOINT", "")
+	t.Setenv("AERO_MEDIA_S3_PRESIGN_ENDPOINT", "")
+	t.Setenv("AERO_MEDIA_S3_ACCESS_KEY", "")
+	t.Setenv("AERO_MEDIA_S3_SECRET_KEY", "")
+	t.Setenv("AERO_MEDIA_S3_BUCKET", "")
+	t.Setenv("AERO_MEDIA_S3_INTERNAL_SECURE", "")
+	t.Setenv("AERO_MEDIA_S3_PRESIGN_SECURE", "")
+	t.Setenv("AERO_MEDIA_UPLOAD_INTENT_TTL", "")
+	t.Setenv("AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES", "")
 
 	cfg, err := LoadConfig(":8082")
 	if err != nil {
@@ -28,6 +37,18 @@ func TestLoadConfigDefaults(t *testing.T) {
 	}
 	if cfg.DatabaseBootstrapTimeout != 30*time.Second {
 		t.Fatalf("ожидался database bootstrap timeout по умолчанию, получен %s", cfg.DatabaseBootstrapTimeout)
+	}
+	if cfg.MediaS3InternalEndpoint != "localhost:9000" {
+		t.Fatalf("ожидался media internal endpoint по умолчанию, получен %q", cfg.MediaS3InternalEndpoint)
+	}
+	if cfg.MediaS3PresignEndpoint != "127.0.0.1:9000" {
+		t.Fatalf("ожидался media presign endpoint по умолчанию, получен %q", cfg.MediaS3PresignEndpoint)
+	}
+	if cfg.MediaUploadIntentTTL != 15*time.Minute {
+		t.Fatalf("ожидался media upload intent ttl по умолчанию, получен %s", cfg.MediaUploadIntentTTL)
+	}
+	if cfg.MediaMaxUploadSizeBytes != 64*1024*1024 {
+		t.Fatalf("ожидался media max upload size по умолчанию, получен %d", cfg.MediaMaxUploadSizeBytes)
 	}
 }
 

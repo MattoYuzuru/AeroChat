@@ -57,6 +57,251 @@ func (q *Queries) AddGroupMembership(ctx context.Context, arg AddGroupMembership
 	return err
 }
 
+const attachDirectMessageAttachment = `-- name: AttachDirectMessageAttachment :exec
+INSERT INTO message_attachments (
+    attachment_id,
+    direct_chat_message_id,
+    attached_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4)
+`
+
+type AttachDirectMessageAttachmentParams struct {
+	AttachmentID        uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	DirectChatMessageID pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	AttachedByUserID    uuid.UUID          `db:"attached_by_user_id" json:"attached_by_user_id"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) AttachDirectMessageAttachment(ctx context.Context, arg AttachDirectMessageAttachmentParams) error {
+	_, err := q.db.Exec(ctx, attachDirectMessageAttachment,
+		arg.AttachmentID,
+		arg.DirectChatMessageID,
+		arg.AttachedByUserID,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const attachGroupMessageAttachment = `-- name: AttachGroupMessageAttachment :exec
+INSERT INTO message_attachments (
+    attachment_id,
+    group_message_id,
+    attached_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4)
+`
+
+type AttachGroupMessageAttachmentParams struct {
+	AttachmentID     uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	GroupMessageID   pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	AttachedByUserID uuid.UUID          `db:"attached_by_user_id" json:"attached_by_user_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) AttachGroupMessageAttachment(ctx context.Context, arg AttachGroupMessageAttachmentParams) error {
+	_, err := q.db.Exec(ctx, attachGroupMessageAttachment,
+		arg.AttachmentID,
+		arg.GroupMessageID,
+		arg.AttachedByUserID,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const completeAttachmentUpload = `-- name: CompleteAttachmentUpload :execrows
+WITH updated_attachment AS (
+    UPDATE attachments
+    SET
+        status = 'uploaded',
+        updated_at = $3,
+        uploaded_at = $3,
+        failed_at = NULL
+    WHERE id = $1 AND owner_user_id = $2 AND status = 'pending'
+    RETURNING id
+)
+UPDATE attachment_upload_sessions
+SET
+    status = 'completed',
+    updated_at = $3,
+    completed_at = $3,
+    failed_at = NULL
+WHERE attachment_upload_sessions.id = $4
+  AND attachment_upload_sessions.attachment_id = $1
+  AND attachment_upload_sessions.owner_user_id = $2
+  AND attachment_upload_sessions.status = 'pending'
+  AND attachment_upload_sessions.expires_at > $3
+  AND EXISTS (SELECT 1 FROM updated_attachment)
+`
+
+type CompleteAttachmentUploadParams struct {
+	AttachmentID uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID           uuid.UUID          `db:"id" json:"id"`
+}
+
+func (q *Queries) CompleteAttachmentUpload(ctx context.Context, arg CompleteAttachmentUploadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeAttachmentUpload,
+		arg.AttachmentID,
+		arg.OwnerUserID,
+		arg.UpdatedAt,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const createAttachment = `-- name: CreateAttachment :one
+INSERT INTO attachments (
+    id,
+    owner_user_id,
+    scope_kind,
+    direct_chat_id,
+    group_id,
+    bucket_name,
+    object_key,
+    file_name,
+    mime_type,
+    size_bytes,
+    status,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING
+    id,
+    owner_user_id,
+    scope_kind,
+    direct_chat_id,
+    group_id,
+    bucket_name,
+    object_key,
+    file_name,
+    mime_type,
+    size_bytes,
+    status,
+    created_at,
+    updated_at,
+    uploaded_at,
+    attached_at,
+    failed_at,
+    deleted_at
+`
+
+type CreateAttachmentParams struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind    string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID      pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName   string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey    string             `db:"object_key" json:"object_key"`
+	FileName     string             `db:"file_name" json:"file_name"`
+	MimeType     string             `db:"mime_type" json:"mime_type"`
+	SizeBytes    int64              `db:"size_bytes" json:"size_bytes"`
+	Status       string             `db:"status" json:"status"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error) {
+	row := q.db.QueryRow(ctx, createAttachment,
+		arg.ID,
+		arg.OwnerUserID,
+		arg.ScopeKind,
+		arg.DirectChatID,
+		arg.GroupID,
+		arg.BucketName,
+		arg.ObjectKey,
+		arg.FileName,
+		arg.MimeType,
+		arg.SizeBytes,
+		arg.Status,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i Attachment
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerUserID,
+		&i.ScopeKind,
+		&i.DirectChatID,
+		&i.GroupID,
+		&i.BucketName,
+		&i.ObjectKey,
+		&i.FileName,
+		&i.MimeType,
+		&i.SizeBytes,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.UploadedAt,
+		&i.AttachedAt,
+		&i.FailedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const createAttachmentUploadSession = `-- name: CreateAttachmentUploadSession :one
+INSERT INTO attachment_upload_sessions (
+    id,
+    attachment_id,
+    owner_user_id,
+    status,
+    expires_at,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING
+    id,
+    attachment_id,
+    owner_user_id,
+    status,
+    expires_at,
+    created_at,
+    updated_at,
+    completed_at,
+    failed_at
+`
+
+type CreateAttachmentUploadSessionParams struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	AttachmentID uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	Status       string             `db:"status" json:"status"`
+	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateAttachmentUploadSession(ctx context.Context, arg CreateAttachmentUploadSessionParams) (AttachmentUploadSession, error) {
+	row := q.db.QueryRow(ctx, createAttachmentUploadSession,
+		arg.ID,
+		arg.AttachmentID,
+		arg.OwnerUserID,
+		arg.Status,
+		arg.ExpiresAt,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i AttachmentUploadSession
+	err := row.Scan(
+		&i.ID,
+		&i.AttachmentID,
+		&i.OwnerUserID,
+		&i.Status,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+	)
+	return i, err
+}
+
 const createDirectChat = `-- name: CreateDirectChat :one
 INSERT INTO direct_chats (
     id,
@@ -406,6 +651,48 @@ func (q *Queries) DisableGroupInviteLink(ctx context.Context, arg DisableGroupIn
 	return result.RowsAffected(), nil
 }
 
+const failAttachmentUpload = `-- name: FailAttachmentUpload :execrows
+WITH updated_attachment AS (
+    UPDATE attachments
+    SET
+        status = 'failed',
+        updated_at = $3,
+        failed_at = $3
+    WHERE id = $1 AND owner_user_id = $2 AND status = 'pending'
+    RETURNING id
+)
+UPDATE attachment_upload_sessions
+SET
+    status = 'failed',
+    updated_at = $3,
+    failed_at = $3
+WHERE attachment_upload_sessions.id = $4
+  AND attachment_upload_sessions.attachment_id = $1
+  AND attachment_upload_sessions.owner_user_id = $2
+  AND attachment_upload_sessions.status = 'pending'
+  AND EXISTS (SELECT 1 FROM updated_attachment)
+`
+
+type FailAttachmentUploadParams struct {
+	AttachmentID uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID           uuid.UUID          `db:"id" json:"id"`
+}
+
+func (q *Queries) FailAttachmentUpload(ctx context.Context, arg FailAttachmentUploadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, failAttachmentUpload,
+		arg.AttachmentID,
+		arg.OwnerUserID,
+		arg.UpdatedAt,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const friendshipExists = `-- name: FriendshipExists :one
 SELECT EXISTS (
     SELECT 1
@@ -424,6 +711,106 @@ func (q *Queries) FriendshipExists(ctx context.Context, arg FriendshipExistsPara
 	var friendship_exists bool
 	err := row.Scan(&friendship_exists)
 	return friendship_exists, err
+}
+
+const getAttachmentRowByID = `-- name: GetAttachmentRowByID :one
+SELECT
+    a.id,
+    a.owner_user_id,
+    a.scope_kind,
+    a.direct_chat_id,
+    a.group_id,
+    a.bucket_name,
+    a.object_key,
+    a.file_name,
+    a.mime_type,
+    a.size_bytes,
+    a.status,
+    a.created_at,
+    a.updated_at,
+    a.uploaded_at,
+    a.attached_at,
+    a.failed_at,
+    a.deleted_at,
+    s.id AS upload_session_id,
+    s.owner_user_id AS upload_session_owner_user_id,
+    s.status AS upload_session_status,
+    s.expires_at AS upload_session_expires_at,
+    s.created_at AS upload_session_created_at,
+    s.updated_at AS upload_session_updated_at,
+    s.completed_at AS upload_session_completed_at,
+    s.failed_at AS upload_session_failed_at,
+    ma.direct_chat_message_id,
+    ma.group_message_id
+FROM attachments AS a
+LEFT JOIN attachment_upload_sessions AS s ON s.attachment_id = a.id
+LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
+WHERE a.id = $1
+`
+
+type GetAttachmentRowByIDRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID              uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind                string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID             pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID                  pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName               string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey                string             `db:"object_key" json:"object_key"`
+	FileName                 string             `db:"file_name" json:"file_name"`
+	MimeType                 string             `db:"mime_type" json:"mime_type"`
+	SizeBytes                int64              `db:"size_bytes" json:"size_bytes"`
+	Status                   string             `db:"status" json:"status"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt               pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt               pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt                 pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt                pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	UploadSessionID          pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
+	UploadSessionOwnerUserID pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
+	UploadSessionStatus      pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
+	UploadSessionExpiresAt   pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
+	UploadSessionCreatedAt   pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
+	UploadSessionUpdatedAt   pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
+	UploadSessionCompletedAt pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
+	UploadSessionFailedAt    pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
+	DirectChatMessageID      pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	GroupMessageID           pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+}
+
+func (q *Queries) GetAttachmentRowByID(ctx context.Context, id uuid.UUID) (GetAttachmentRowByIDRow, error) {
+	row := q.db.QueryRow(ctx, getAttachmentRowByID, id)
+	var i GetAttachmentRowByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerUserID,
+		&i.ScopeKind,
+		&i.DirectChatID,
+		&i.GroupID,
+		&i.BucketName,
+		&i.ObjectKey,
+		&i.FileName,
+		&i.MimeType,
+		&i.SizeBytes,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.UploadedAt,
+		&i.AttachedAt,
+		&i.FailedAt,
+		&i.DeletedAt,
+		&i.UploadSessionID,
+		&i.UploadSessionOwnerUserID,
+		&i.UploadSessionStatus,
+		&i.UploadSessionExpiresAt,
+		&i.UploadSessionCreatedAt,
+		&i.UploadSessionUpdatedAt,
+		&i.UploadSessionCompletedAt,
+		&i.UploadSessionFailedAt,
+		&i.DirectChatMessageID,
+		&i.GroupMessageID,
+	)
+	return i, err
 }
 
 const getDirectChatMessageByID = `-- name: GetDirectChatMessageByID :one
@@ -939,6 +1326,119 @@ func (q *Queries) JoinGroupMembership(ctx context.Context, arg JoinGroupMembersh
 	return result.RowsAffected(), nil
 }
 
+const listAttachmentRowsByIDs = `-- name: ListAttachmentRowsByIDs :many
+SELECT
+    a.id,
+    a.owner_user_id,
+    a.scope_kind,
+    a.direct_chat_id,
+    a.group_id,
+    a.bucket_name,
+    a.object_key,
+    a.file_name,
+    a.mime_type,
+    a.size_bytes,
+    a.status,
+    a.created_at,
+    a.updated_at,
+    a.uploaded_at,
+    a.attached_at,
+    a.failed_at,
+    a.deleted_at,
+    s.id AS upload_session_id,
+    s.owner_user_id AS upload_session_owner_user_id,
+    s.status AS upload_session_status,
+    s.expires_at AS upload_session_expires_at,
+    s.created_at AS upload_session_created_at,
+    s.updated_at AS upload_session_updated_at,
+    s.completed_at AS upload_session_completed_at,
+    s.failed_at AS upload_session_failed_at,
+    ma.direct_chat_message_id,
+    ma.group_message_id
+FROM attachments AS a
+LEFT JOIN attachment_upload_sessions AS s ON s.attachment_id = a.id
+LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
+WHERE a.id = ANY($1::uuid[])
+`
+
+type ListAttachmentRowsByIDsRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID              uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind                string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID             pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID                  pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName               string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey                string             `db:"object_key" json:"object_key"`
+	FileName                 string             `db:"file_name" json:"file_name"`
+	MimeType                 string             `db:"mime_type" json:"mime_type"`
+	SizeBytes                int64              `db:"size_bytes" json:"size_bytes"`
+	Status                   string             `db:"status" json:"status"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt               pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt               pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt                 pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt                pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	UploadSessionID          pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
+	UploadSessionOwnerUserID pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
+	UploadSessionStatus      pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
+	UploadSessionExpiresAt   pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
+	UploadSessionCreatedAt   pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
+	UploadSessionUpdatedAt   pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
+	UploadSessionCompletedAt pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
+	UploadSessionFailedAt    pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
+	DirectChatMessageID      pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	GroupMessageID           pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+}
+
+func (q *Queries) ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListAttachmentRowsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, listAttachmentRowsByIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAttachmentRowsByIDsRow
+	for rows.Next() {
+		var i ListAttachmentRowsByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerUserID,
+			&i.ScopeKind,
+			&i.DirectChatID,
+			&i.GroupID,
+			&i.BucketName,
+			&i.ObjectKey,
+			&i.FileName,
+			&i.MimeType,
+			&i.SizeBytes,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UploadedAt,
+			&i.AttachedAt,
+			&i.FailedAt,
+			&i.DeletedAt,
+			&i.UploadSessionID,
+			&i.UploadSessionOwnerUserID,
+			&i.UploadSessionStatus,
+			&i.UploadSessionExpiresAt,
+			&i.UploadSessionCreatedAt,
+			&i.UploadSessionUpdatedAt,
+			&i.UploadSessionCompletedAt,
+			&i.UploadSessionFailedAt,
+			&i.DirectChatMessageID,
+			&i.GroupMessageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDirectChatMessages = `-- name: ListDirectChatMessages :many
 SELECT
     m.id,
@@ -1216,6 +1716,92 @@ func (q *Queries) ListDirectChatTypingStateEntries(ctx context.Context, arg List
 	return items, nil
 }
 
+const listDirectMessageAttachmentRowsByMessageIDs = `-- name: ListDirectMessageAttachmentRowsByMessageIDs :many
+SELECT
+    ma.direct_chat_message_id,
+    a.id,
+    a.owner_user_id,
+    a.scope_kind,
+    a.direct_chat_id,
+    a.group_id,
+    a.bucket_name,
+    a.object_key,
+    a.file_name,
+    a.mime_type,
+    a.size_bytes,
+    a.status,
+    a.created_at,
+    a.updated_at,
+    a.uploaded_at,
+    a.attached_at,
+    a.failed_at,
+    a.deleted_at
+FROM message_attachments AS ma
+JOIN attachments AS a ON a.id = ma.attachment_id
+WHERE ma.direct_chat_message_id = ANY($1::uuid[])
+ORDER BY ma.created_at ASC, a.id ASC
+`
+
+type ListDirectMessageAttachmentRowsByMessageIDsRow struct {
+	DirectChatMessageID pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID         uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind           string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID        pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID             pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName          string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey           string             `db:"object_key" json:"object_key"`
+	FileName            string             `db:"file_name" json:"file_name"`
+	MimeType            string             `db:"mime_type" json:"mime_type"`
+	SizeBytes           int64              `db:"size_bytes" json:"size_bytes"`
+	Status              string             `db:"status" json:"status"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt          pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt          pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt            pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt           pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+func (q *Queries) ListDirectMessageAttachmentRowsByMessageIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListDirectMessageAttachmentRowsByMessageIDsRow, error) {
+	rows, err := q.db.Query(ctx, listDirectMessageAttachmentRowsByMessageIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDirectMessageAttachmentRowsByMessageIDsRow
+	for rows.Next() {
+		var i ListDirectMessageAttachmentRowsByMessageIDsRow
+		if err := rows.Scan(
+			&i.DirectChatMessageID,
+			&i.ID,
+			&i.OwnerUserID,
+			&i.ScopeKind,
+			&i.DirectChatID,
+			&i.GroupID,
+			&i.BucketName,
+			&i.ObjectKey,
+			&i.FileName,
+			&i.MimeType,
+			&i.SizeBytes,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UploadedAt,
+			&i.AttachedAt,
+			&i.FailedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGroupInviteLinksByGroupID = `-- name: ListGroupInviteLinksByGroupID :many
 SELECT
     id,
@@ -1331,6 +1917,92 @@ func (q *Queries) ListGroupMemberRowsByGroupIDAndUserID(ctx context.Context, arg
 			&i.Login,
 			&i.Nickname,
 			&i.AvatarUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupMessageAttachmentRowsByMessageIDs = `-- name: ListGroupMessageAttachmentRowsByMessageIDs :many
+SELECT
+    ma.group_message_id,
+    a.id,
+    a.owner_user_id,
+    a.scope_kind,
+    a.direct_chat_id,
+    a.group_id,
+    a.bucket_name,
+    a.object_key,
+    a.file_name,
+    a.mime_type,
+    a.size_bytes,
+    a.status,
+    a.created_at,
+    a.updated_at,
+    a.uploaded_at,
+    a.attached_at,
+    a.failed_at,
+    a.deleted_at
+FROM message_attachments AS ma
+JOIN attachments AS a ON a.id = ma.attachment_id
+WHERE ma.group_message_id = ANY($1::uuid[])
+ORDER BY ma.created_at ASC, a.id ASC
+`
+
+type ListGroupMessageAttachmentRowsByMessageIDsRow struct {
+	GroupMessageID pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID    uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind      string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID   pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID        pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName     string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey      string             `db:"object_key" json:"object_key"`
+	FileName       string             `db:"file_name" json:"file_name"`
+	MimeType       string             `db:"mime_type" json:"mime_type"`
+	SizeBytes      int64              `db:"size_bytes" json:"size_bytes"`
+	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt     pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt     pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt       pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt      pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+func (q *Queries) ListGroupMessageAttachmentRowsByMessageIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListGroupMessageAttachmentRowsByMessageIDsRow, error) {
+	rows, err := q.db.Query(ctx, listGroupMessageAttachmentRowsByMessageIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGroupMessageAttachmentRowsByMessageIDsRow
+	for rows.Next() {
+		var i ListGroupMessageAttachmentRowsByMessageIDsRow
+		if err := rows.Scan(
+			&i.GroupMessageID,
+			&i.ID,
+			&i.OwnerUserID,
+			&i.ScopeKind,
+			&i.DirectChatID,
+			&i.GroupID,
+			&i.BucketName,
+			&i.ObjectKey,
+			&i.FileName,
+			&i.MimeType,
+			&i.SizeBytes,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UploadedAt,
+			&i.AttachedAt,
+			&i.FailedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1553,6 +2225,28 @@ func (q *Queries) ListPinnedMessageIDsByChatID(ctx context.Context, chatID uuid.
 		return nil, err
 	}
 	return items, nil
+}
+
+const markAttachmentAttached = `-- name: MarkAttachmentAttached :execrows
+UPDATE attachments
+SET
+    status = 'attached',
+    updated_at = $2,
+    attached_at = $2
+WHERE id = $1 AND status = 'uploaded'
+`
+
+type MarkAttachmentAttachedParams struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) MarkAttachmentAttached(ctx context.Context, arg MarkAttachmentAttachedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markAttachmentAttached, arg.ID, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const pinDirectChatMessage = `-- name: PinDirectChatMessage :execrows

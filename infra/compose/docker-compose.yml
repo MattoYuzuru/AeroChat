@@ -82,10 +82,21 @@ services:
       AERO_DATABASE_BOOTSTRAP_TIMEOUT: ${AERO_DATABASE_BOOTSTRAP_TIMEOUT:-30s}
       AERO_DIRECT_CHAT_TYPING_TTL: ${AERO_DIRECT_CHAT_TYPING_TTL:-6s}
       AERO_DIRECT_CHAT_PRESENCE_TTL: ${AERO_DIRECT_CHAT_PRESENCE_TTL:-30s}
+      AERO_MEDIA_S3_INTERNAL_ENDPOINT: minio:9000
+      AERO_MEDIA_S3_PRESIGN_ENDPOINT: 127.0.0.1:${MINIO_API_PORT:-9000}
+      AERO_MEDIA_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      AERO_MEDIA_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AERO_MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET:-aerochat-attachments}
+      AERO_MEDIA_S3_INTERNAL_SECURE: "false"
+      AERO_MEDIA_S3_PRESIGN_SECURE: "false"
+      AERO_MEDIA_UPLOAD_INTENT_TTL: ${AERO_MEDIA_UPLOAD_INTENT_TTL:-15m}
+      AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES: ${AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES:-67108864}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     ports:
       - "127.0.0.1:${CHAT_PORT:-8092}:8082"

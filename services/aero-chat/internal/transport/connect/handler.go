@@ -91,6 +91,63 @@ func (h *Handler) GetDirectChat(ctx context.Context, req *connect.Request[chatv1
 	}), nil
 }
 
+func (h *Handler) CreateAttachmentUploadIntent(ctx context.Context, req *connect.Request[chatv1.CreateAttachmentUploadIntentRequest]) (*connect.Response[chatv1.CreateAttachmentUploadIntentResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	intent, err := h.service.CreateAttachmentUploadIntent(
+		ctx,
+		token,
+		req.Msg.GetDirectChatId(),
+		req.Msg.GetGroupId(),
+		req.Msg.FileName,
+		req.Msg.MimeType,
+		req.Msg.SizeBytes,
+	)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.CreateAttachmentUploadIntentResponse{
+		Attachment:    toProtoAttachment(intent.Attachment),
+		UploadSession: toProtoAttachmentUploadSession(intent.UploadSession),
+	}), nil
+}
+
+func (h *Handler) CompleteAttachmentUpload(ctx context.Context, req *connect.Request[chatv1.CompleteAttachmentUploadRequest]) (*connect.Response[chatv1.CompleteAttachmentUploadResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	attachment, err := h.service.CompleteAttachmentUpload(ctx, token, req.Msg.AttachmentId, req.Msg.UploadSessionId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.CompleteAttachmentUploadResponse{
+		Attachment: toProtoAttachment(*attachment),
+	}), nil
+}
+
+func (h *Handler) GetAttachment(ctx context.Context, req *connect.Request[chatv1.GetAttachmentRequest]) (*connect.Response[chatv1.GetAttachmentResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	attachment, err := h.service.GetAttachment(ctx, token, req.Msg.AttachmentId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.GetAttachmentResponse{
+		Attachment: toProtoAttachment(*attachment),
+	}), nil
+}
+
 func (h *Handler) CreateGroup(ctx context.Context, req *connect.Request[chatv1.CreateGroupRequest]) (*connect.Response[chatv1.CreateGroupResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -440,7 +497,7 @@ func (h *Handler) SendTextMessage(ctx context.Context, req *connect.Request[chat
 		return nil, err
 	}
 
-	message, err := h.service.SendTextMessage(ctx, token, req.Msg.ChatId, req.Msg.Text)
+	message, err := h.service.SendTextMessage(ctx, token, req.Msg.ChatId, req.Msg.Text, req.Msg.AttachmentIds)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -498,7 +555,7 @@ func (h *Handler) SendGroupTextMessage(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 
-	message, err := h.service.SendGroupTextMessage(ctx, token, req.Msg.GroupId, req.Msg.Text)
+	message, err := h.service.SendGroupTextMessage(ctx, token, req.Msg.GroupId, req.Msg.Text, req.Msg.AttachmentIds)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -696,6 +753,7 @@ func toProtoDirectChatMessage(value chat.DirectChatMessage) *chatv1.DirectChatMe
 		SenderUserId: value.SenderUserID,
 		Kind:         toProtoMessageKind(value.Kind),
 		Pinned:       value.Pinned,
+		Attachments:  toProtoAttachments(value.Attachments),
 		CreatedAt:    timestamppb.New(value.CreatedAt),
 		UpdatedAt:    timestamppb.New(value.UpdatedAt),
 	}
@@ -722,6 +780,7 @@ func toProtoGroupMessage(value chat.GroupMessage) *chatv1.GroupMessage {
 		ThreadId:     value.ThreadID,
 		SenderUserId: value.SenderUserID,
 		Kind:         toProtoMessageKind(value.Kind),
+		Attachments:  toProtoAttachments(value.Attachments),
 		CreatedAt:    timestamppb.New(value.CreatedAt),
 		UpdatedAt:    timestamppb.New(value.UpdatedAt),
 	}
@@ -858,5 +917,116 @@ func toProtoMarkdownPolicy(value string) chatv1.MarkdownPolicy {
 		return chatv1.MarkdownPolicy_MARKDOWN_POLICY_SAFE_SUBSET_V1
 	default:
 		return chatv1.MarkdownPolicy_MARKDOWN_POLICY_UNSPECIFIED
+	}
+}
+
+func toProtoAttachments(values []chat.Attachment) []*chatv1.Attachment {
+	result := make([]*chatv1.Attachment, 0, len(values))
+	for _, value := range values {
+		result = append(result, toProtoAttachment(value))
+	}
+
+	return result
+}
+
+func toProtoAttachment(value chat.Attachment) *chatv1.Attachment {
+	result := &chatv1.Attachment{
+		Id:          value.ID,
+		OwnerUserId: value.OwnerUserID,
+		Scope:       toProtoAttachmentScope(value.Scope),
+		FileName:    value.FileName,
+		MimeType:    value.MimeType,
+		SizeBytes:   uint64(value.SizeBytes),
+		Status:      toProtoAttachmentStatus(value.Status),
+		CreatedAt:   timestamppb.New(value.CreatedAt),
+		UpdatedAt:   timestamppb.New(value.UpdatedAt),
+	}
+	if value.DirectChatID != nil {
+		result.DirectChatId = *value.DirectChatID
+	}
+	if value.GroupID != nil {
+		result.GroupId = *value.GroupID
+	}
+	if value.MessageID != nil {
+		result.MessageId = *value.MessageID
+	}
+	if value.UploadedAt != nil {
+		result.UploadedAt = timestamppb.New(*value.UploadedAt)
+	}
+	if value.AttachedAt != nil {
+		result.AttachedAt = timestamppb.New(*value.AttachedAt)
+	}
+	if value.FailedAt != nil {
+		result.FailedAt = timestamppb.New(*value.FailedAt)
+	}
+	if value.DeletedAt != nil {
+		result.DeletedAt = timestamppb.New(*value.DeletedAt)
+	}
+
+	return result
+}
+
+func toProtoAttachmentUploadSession(value chat.AttachmentUploadSession) *chatv1.AttachmentUploadSession {
+	result := &chatv1.AttachmentUploadSession{
+		Id:           value.ID,
+		AttachmentId: value.AttachmentID,
+		Status:       toProtoAttachmentUploadSessionStatus(value.Status),
+		UploadUrl:    value.UploadURL,
+		HttpMethod:   value.HTTPMethod,
+		Headers:      value.Headers,
+		CreatedAt:    timestamppb.New(value.CreatedAt),
+		UpdatedAt:    timestamppb.New(value.UpdatedAt),
+		ExpiresAt:    timestamppb.New(value.ExpiresAt),
+	}
+	if value.CompletedAt != nil {
+		result.CompletedAt = timestamppb.New(*value.CompletedAt)
+	}
+	if value.FailedAt != nil {
+		result.FailedAt = timestamppb.New(*value.FailedAt)
+	}
+
+	return result
+}
+
+func toProtoAttachmentScope(value string) chatv1.AttachmentScope {
+	switch value {
+	case chat.AttachmentScopeDirect:
+		return chatv1.AttachmentScope_ATTACHMENT_SCOPE_DIRECT_CHAT
+	case chat.AttachmentScopeGroup:
+		return chatv1.AttachmentScope_ATTACHMENT_SCOPE_GROUP
+	default:
+		return chatv1.AttachmentScope_ATTACHMENT_SCOPE_UNSPECIFIED
+	}
+}
+
+func toProtoAttachmentStatus(value string) chatv1.AttachmentStatus {
+	switch value {
+	case chat.AttachmentStatusPending:
+		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_PENDING
+	case chat.AttachmentStatusUploaded:
+		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_UPLOADED
+	case chat.AttachmentStatusAttached:
+		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_ATTACHED
+	case chat.AttachmentStatusFailed:
+		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_FAILED
+	case chat.AttachmentStatusDeleted:
+		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_DELETED
+	default:
+		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_UNSPECIFIED
+	}
+}
+
+func toProtoAttachmentUploadSessionStatus(value string) chatv1.AttachmentUploadSessionStatus {
+	switch value {
+	case chat.AttachmentUploadSessionPending:
+		return chatv1.AttachmentUploadSessionStatus_ATTACHMENT_UPLOAD_SESSION_STATUS_PENDING
+	case chat.AttachmentUploadSessionCompleted:
+		return chatv1.AttachmentUploadSessionStatus_ATTACHMENT_UPLOAD_SESSION_STATUS_COMPLETED
+	case chat.AttachmentUploadSessionFailed:
+		return chatv1.AttachmentUploadSessionStatus_ATTACHMENT_UPLOAD_SESSION_STATUS_FAILED
+	case chat.AttachmentUploadSessionExpired:
+		return chatv1.AttachmentUploadSessionStatus_ATTACHMENT_UPLOAD_SESSION_STATUS_EXPIRED
+	default:
+		return chatv1.AttachmentUploadSessionStatus_ATTACHMENT_UPLOAD_SESSION_STATUS_UNSPECIFIED
 	}
 }

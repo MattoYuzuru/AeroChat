@@ -27,6 +27,11 @@ type Repository interface {
 	CreateDirectChat(context.Context, CreateDirectChatParams) (*DirectChat, error)
 	ListDirectChats(context.Context, string) ([]DirectChat, error)
 	GetDirectChat(context.Context, string, string) (*DirectChat, error)
+	CreateAttachmentUploadIntent(context.Context, CreateAttachmentUploadIntentParams) (*AttachmentUploadIntent, error)
+	GetAttachment(context.Context, string) (*Attachment, *AttachmentUploadSession, error)
+	ListAttachments(context.Context, []string) ([]Attachment, error)
+	CompleteAttachmentUpload(context.Context, CompleteAttachmentUploadParams) (*Attachment, error)
+	FailAttachmentUpload(context.Context, FailAttachmentUploadParams) (*Attachment, error)
 	CreateGroup(context.Context, CreateGroupParams) (*Group, error)
 	ListGroups(context.Context, string) ([]Group, error)
 	GetGroup(context.Context, string, string) (*Group, error)
@@ -76,15 +81,37 @@ type PresenceStateStore interface {
 	ListDirectChatPresenceIndicators(context.Context, string, []string, time.Time) (map[string]DirectChatPresenceIndicator, error)
 }
 
+type ObjectStorage interface {
+	CreateUpload(context.Context, string, string, time.Time) (*PresignedObjectUpload, error)
+	StatObject(context.Context, string) (*StoredObjectInfo, error)
+}
+
+type PresignedObjectUpload struct {
+	URL        string
+	HTTPMethod string
+	Headers    map[string]string
+	ExpiresAt  time.Time
+}
+
+type StoredObjectInfo struct {
+	Size        int64
+	ETag        string
+	ContentType string
+}
+
 type Service struct {
 	repo                 Repository
 	friendships          FriendshipChecker
 	typingStore          TypingStateStore
 	presenceStore        PresenceStateStore
+	objectStorage        ObjectStorage
 	sessionToken         *libauth.SessionTokenManager
 	sessionTouchInterval time.Duration
 	typingTTL            time.Duration
 	presenceTTL          time.Duration
+	uploadIntentTTL      time.Duration
+	maxUploadSizeBytes   int64
+	storageBucketName    string
 	randReader           io.Reader
 	now                  func() time.Time
 	newID                func() string
@@ -95,9 +122,13 @@ func NewService(
 	friendships FriendshipChecker,
 	typingStore TypingStateStore,
 	presenceStore PresenceStateStore,
+	objectStorage ObjectStorage,
 	sessionToken *libauth.SessionTokenManager,
 	typingTTL time.Duration,
 	presenceTTL time.Duration,
+	uploadIntentTTL time.Duration,
+	maxUploadSizeBytes int64,
+	storageBucketName string,
 ) *Service {
 	if typingTTL <= 0 {
 		typingTTL = 6 * time.Second
@@ -105,16 +136,26 @@ func NewService(
 	if presenceTTL <= 0 {
 		presenceTTL = 30 * time.Second
 	}
+	if uploadIntentTTL <= 0 {
+		uploadIntentTTL = 15 * time.Minute
+	}
+	if maxUploadSizeBytes <= 0 {
+		maxUploadSizeBytes = 64 * 1024 * 1024
+	}
 
 	return &Service{
 		repo:                 repo,
 		friendships:          friendships,
 		typingStore:          typingStore,
 		presenceStore:        presenceStore,
+		objectStorage:        objectStorage,
 		sessionToken:         sessionToken,
 		sessionTouchInterval: defaultSessionTouchInterval,
 		typingTTL:            typingTTL,
 		presenceTTL:          presenceTTL,
+		uploadIntentTTL:      uploadIntentTTL,
+		maxUploadSizeBytes:   maxUploadSizeBytes,
+		storageBucketName:    storageBucketName,
 		randReader:           rand.Reader,
 		now: func() time.Time {
 			return time.Now().UTC()
@@ -631,7 +672,7 @@ func (s *Service) JoinGroupByInviteLink(ctx context.Context, token string, invit
 	return s.repo.GetGroup(ctx, authSession.User.ID, target.Group.ID)
 }
 
-func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupID string, text string) (*GroupMessage, error) {
+func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupID string, text string, attachmentIDs []string) (*GroupMessage, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
 		return nil, err
@@ -649,19 +690,27 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 	if err != nil {
 		return nil, err
 	}
+	normalizedAttachmentIDs, err := normalizeAttachmentIDs(attachmentIDs)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureGroupMessageAttachments(ctx, authSession.User.ID, group.ID, normalizedAttachmentIDs); err != nil {
+		return nil, err
+	}
 
 	now := s.now()
 	return s.repo.CreateGroupMessage(ctx, CreateGroupMessageParams{
-		MessageID:    s.newID(),
-		GroupID:      group.ID,
-		ThreadID:     thread.ID,
-		SenderUserID: authSession.User.ID,
-		Text:         normalizedText,
-		CreatedAt:    now,
+		MessageID:     s.newID(),
+		GroupID:       group.ID,
+		ThreadID:      thread.ID,
+		SenderUserID:  authSession.User.ID,
+		Text:          normalizedText,
+		AttachmentIDs: normalizedAttachmentIDs,
+		CreatedAt:     now,
 	})
 }
 
-func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string) (*DirectChatMessage, error) {
+func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string, attachmentIDs []string) (*DirectChatMessage, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
 		return nil, err
@@ -683,14 +732,22 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 	if err != nil {
 		return nil, err
 	}
+	normalizedAttachmentIDs, err := normalizeAttachmentIDs(attachmentIDs)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureDirectMessageAttachments(ctx, authSession.User.ID, directChat.ID, normalizedAttachmentIDs); err != nil {
+		return nil, err
+	}
 
 	now := s.now()
 	return s.repo.CreateDirectChatMessage(ctx, CreateDirectChatMessageParams{
-		MessageID:    s.newID(),
-		ChatID:       normalizedChatID,
-		SenderUserID: authSession.User.ID,
-		Text:         normalizedText,
-		CreatedAt:    now,
+		MessageID:     s.newID(),
+		ChatID:        normalizedChatID,
+		SenderUserID:  authSession.User.ID,
+		Text:          normalizedText,
+		AttachmentIDs: normalizedAttachmentIDs,
+		CreatedAt:     now,
 	})
 }
 

@@ -223,6 +223,13 @@ docker compose -f infra/compose/docker-compose.yml up --build -d
 При первом запуске `aero-identity` и `aero-chat` автоматически применяют свою PostgreSQL-схему.
 Штатный `local/dev` flow не требует отдельного ручного `psql`.
 
+Media/file foundation использует тот же локальный `minio`, но для `aero-chat` теперь настраиваются два разных адреса:
+
+- внутренний endpoint для service-to-storage доступа;
+- browser-visible endpoint для presigned upload URL.
+
+В `local/dev` шаблоне это уже сведено к `minio:9000` и `127.0.0.1:${MINIO_API_PORT}`.
+
 4. Открой приложение через `http://127.0.0.1:${NGINX_PORT}` из `.env`.
 
 5. Если нужен source-mode запуск вне compose, используй:
@@ -258,6 +265,10 @@ Compose runtime публикует только два host upstream'а на `${
 Для `/api` и `/api/realtime` используется тот же gateway base contract:
 ingress-side strip-prefix остаётся у `/api`, а realtime endpoint публикуется как `/api/realtime`,
 чтобы web bundle продолжал работать с `VITE_GATEWAY_BASE_URL=/api` без второго публичного backend URL.
+
+Для media/file foundation server runtime также требует отдельно указанный browser-visible S3 endpoint в
+`MEDIA_S3_PUBLIC_ENDPOINT`, потому что presigned upload URL не может безопасно указывать на внутренний compose-host
+`minio:9000`.
 
 Подробности, TLS/domain contract и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
 Для финального live rollout используется manual workflow `Deploy Production` c GitHub Environment `production`.

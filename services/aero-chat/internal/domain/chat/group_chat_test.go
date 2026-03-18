@@ -124,7 +124,7 @@ func TestReaderGroupRoleIsReadOnlyInMessageFlow(t *testing.T) {
 		t.Fatal("reader должен видеть существующую историю группы")
 	}
 
-	if _, err := service.SendGroupTextMessage(context.Background(), bob.Token, group.ID, "reader write"); !errors.Is(err, ErrPermissionDenied) {
+	if _, err := service.SendGroupTextMessage(context.Background(), bob.Token, group.ID, "reader write", nil); !errors.Is(err, ErrPermissionDenied) {
 		t.Fatalf("ожидалась ошибка read-only роли, получено %v", err)
 	}
 }
@@ -138,7 +138,7 @@ func TestGroupMessagesRejectRawHTMLAndRequireMembership(t *testing.T) {
 
 	group := mustCreateGroup(t, service, alice.Token, "Secure")
 
-	if _, err := service.SendGroupTextMessage(context.Background(), alice.Token, group.ID, "<b>unsafe</b>"); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := service.SendGroupTextMessage(context.Background(), alice.Token, group.ID, "<b>unsafe</b>", nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("ожидалась ошибка raw HTML для group message, получено %v", err)
 	}
 

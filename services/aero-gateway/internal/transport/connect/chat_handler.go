@@ -64,6 +64,18 @@ func (h *ChatHandler) GetDirectChat(ctx context.Context, req *connect.Request[ch
 	return forwardUnary(ctx, req, h.client.GetDirectChat)
 }
 
+func (h *ChatHandler) CreateAttachmentUploadIntent(ctx context.Context, req *connect.Request[chatv1.CreateAttachmentUploadIntentRequest]) (*connect.Response[chatv1.CreateAttachmentUploadIntentResponse], error) {
+	return forwardUnary(ctx, req, h.client.CreateAttachmentUploadIntent)
+}
+
+func (h *ChatHandler) CompleteAttachmentUpload(ctx context.Context, req *connect.Request[chatv1.CompleteAttachmentUploadRequest]) (*connect.Response[chatv1.CompleteAttachmentUploadResponse], error) {
+	return forwardUnary(ctx, req, h.client.CompleteAttachmentUpload)
+}
+
+func (h *ChatHandler) GetAttachment(ctx context.Context, req *connect.Request[chatv1.GetAttachmentRequest]) (*connect.Response[chatv1.GetAttachmentResponse], error) {
+	return forwardUnary(ctx, req, h.client.GetAttachment)
+}
+
 func (h *ChatHandler) CreateGroup(ctx context.Context, req *connect.Request[chatv1.CreateGroupRequest]) (*connect.Response[chatv1.CreateGroupResponse], error) {
 	return forwardUnary(ctx, req, h.client.CreateGroup)
 }
