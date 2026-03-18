@@ -321,6 +321,31 @@ func (r *Repository) ListGroupMembers(ctx context.Context, userID string, groupI
 	return result, nil
 }
 
+func (r *Repository) ListGroupTypingStateEntries(ctx context.Context, userID string, groupID string) ([]chat.GroupTypingStateEntry, error) {
+	rows, err := r.queries.ListGroupTypingStateEntries(ctx, chatsqlc.ListGroupTypingStateEntriesParams{
+		UserID:  mustParseUUID(userID),
+		GroupID: mustParseUUID(groupID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.GroupTypingStateEntry, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, chat.GroupTypingStateEntry{
+			User: chat.UserSummary{
+				ID:        row.UserID.String(),
+				Login:     row.Login,
+				Nickname:  row.Nickname,
+				AvatarURL: textPointer(row.AvatarUrl),
+			},
+			TypingVisibilityEnabled: row.TypingVisibilityEnabled,
+		})
+	}
+
+	return result, nil
+}
+
 func (r *Repository) GetGroupMember(ctx context.Context, groupID string, userID string) (*chat.GroupMember, error) {
 	row, err := r.queries.GetGroupMemberRowByGroupIDAndUserID(ctx, chatsqlc.GetGroupMemberRowByGroupIDAndUserIDParams{
 		GroupID: mustParseUUID(groupID),

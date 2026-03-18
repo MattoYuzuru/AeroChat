@@ -102,6 +102,17 @@ export interface GroupChatThread {
   updatedAt: string;
 }
 
+export interface GroupTypingIndicator {
+  user: ChatUser;
+  updatedAt: string;
+  expiresAt: string;
+}
+
+export interface GroupTypingState {
+  threadId: string;
+  typers: GroupTypingIndicator[];
+}
+
 export interface GroupMember {
   user: ChatUser;
   role: GroupMemberRole;
@@ -208,6 +219,7 @@ export interface DirectChatSnapshot {
 export interface GroupChatSnapshot {
   group: Group;
   thread: GroupChatThread;
+  typingState: GroupTypingState | null;
 }
 
 export interface RegisterInput {
@@ -262,6 +274,16 @@ export interface GatewayClient {
   listGroups(token: string): Promise<Group[]>;
   getGroup(token: string, groupId: string): Promise<Group>;
   getGroupChat(token: string, groupId: string): Promise<GroupChatSnapshot>;
+  setGroupTyping(
+    token: string,
+    groupId: string,
+    threadId: string,
+  ): Promise<GroupTypingState | null>;
+  clearGroupTyping(
+    token: string,
+    groupId: string,
+    threadId: string,
+  ): Promise<GroupTypingState | null>;
   listGroupMembers(token: string, groupId: string): Promise<GroupMember[]>;
   updateGroupMemberRole(
     token: string,

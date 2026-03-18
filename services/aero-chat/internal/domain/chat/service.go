@@ -32,6 +32,7 @@ type Repository interface {
 	GetGroup(context.Context, string, string) (*Group, error)
 	GetGroupChatThread(context.Context, string, string) (*GroupChatThread, error)
 	ListGroupMembers(context.Context, string, string) ([]GroupMember, error)
+	ListGroupTypingStateEntries(context.Context, string, string) ([]GroupTypingStateEntry, error)
 	GetGroupMember(context.Context, string, string) (*GroupMember, error)
 	UpdateGroupMemberRole(context.Context, UpdateGroupMemberRoleParams) (bool, error)
 	TransferGroupOwnership(context.Context, TransferGroupOwnershipParams) (bool, error)
@@ -64,6 +65,9 @@ type TypingStateStore interface {
 	PutDirectChatTypingIndicator(context.Context, PutDirectChatTypingIndicatorParams) error
 	ClearDirectChatTypingIndicator(context.Context, string, string) error
 	ListDirectChatTypingIndicators(context.Context, string, []string, time.Time) (map[string]DirectChatTypingIndicator, error)
+	PutGroupTypingIndicator(context.Context, PutGroupTypingIndicatorParams) error
+	ClearGroupTypingIndicator(context.Context, string, string, string) error
+	ListGroupTypingIndicators(context.Context, string, string, []string, time.Time) (map[string]DirectChatTypingIndicator, error)
 }
 
 type PresenceStateStore interface {
@@ -240,13 +244,23 @@ func (s *Service) GetGroup(ctx context.Context, token string, groupID string) (*
 	return s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
 }
 
-func (s *Service) GetGroupChat(ctx context.Context, token string, groupID string) (*Group, *GroupChatThread, error) {
+func (s *Service) GetGroupChat(ctx context.Context, token string, groupID string) (*Group, *GroupChatThread, *GroupTypingState, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return s.resolveGroupChat(ctx, authSession.User.ID, groupID)
+	group, thread, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	typingState, err := s.getGroupTypingState(ctx, authSession.User.ID, group.ID, thread.ID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return group, thread, typingState, nil
 }
 
 func (s *Service) ListGroupMembers(ctx context.Context, token string, groupID string) ([]GroupMember, error) {
@@ -316,6 +330,15 @@ func (s *Service) UpdateGroupMemberRole(ctx context.Context, token string, group
 	}
 	if !updated {
 		return s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+	}
+	if targetRole == GroupMemberRoleReader {
+		thread, threadErr := s.repo.GetGroupChatThread(ctx, authSession.User.ID, normalizedGroupID)
+		if threadErr != nil {
+			return nil, threadErr
+		}
+		if err := s.typingStore.ClearGroupTypingIndicator(ctx, normalizedGroupID, thread.ID, normalizedTargetUserID); err != nil {
+			return nil, err
+		}
 	}
 
 	return s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
@@ -404,6 +427,13 @@ func (s *Service) RemoveGroupMember(ctx context.Context, token string, groupID s
 	if targetMember.Role == GroupMemberRoleOwner {
 		return fmt.Errorf("%w: owner cannot be removed from the group", ErrConflict)
 	}
+	thread, err := s.repo.GetGroupChatThread(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return err
+	}
+	if err := s.typingStore.ClearGroupTypingIndicator(ctx, normalizedGroupID, thread.ID, normalizedTargetUserID); err != nil {
+		return err
+	}
 
 	deleted, err := s.repo.DeleteGroupMembership(ctx, normalizedGroupID, normalizedTargetUserID, s.now())
 	if err != nil {
@@ -433,6 +463,13 @@ func (s *Service) LeaveGroup(ctx context.Context, token string, groupID string) 
 	}
 	if group.SelfRole == GroupMemberRoleOwner {
 		return fmt.Errorf("%w: owner must transfer ownership before leaving the group", ErrConflict)
+	}
+	thread, err := s.repo.GetGroupChatThread(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return err
+	}
+	if err := s.typingStore.ClearGroupTypingIndicator(ctx, normalizedGroupID, thread.ID, authSession.User.ID); err != nil {
+		return err
 	}
 
 	deleted, err := s.repo.DeleteGroupMembership(ctx, normalizedGroupID, authSession.User.ID, s.now())
@@ -776,6 +813,60 @@ func (s *Service) MarkDirectChatRead(ctx context.Context, token string, chatID s
 	}
 
 	return s.getDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
+}
+
+func (s *Service) SetGroupTyping(ctx context.Context, token string, groupID string, threadID string) (*GroupTypingState, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	group, thread, err := s.resolveGroupTypingTarget(ctx, authSession.User.ID, groupID, threadID)
+	if err != nil {
+		return nil, err
+	}
+	if !canSendGroupMessages(group.SelfRole) {
+		return nil, fmt.Errorf("%w: current group role is read-only for typing", ErrPermissionDenied)
+	}
+
+	if !authSession.User.TypingVisibilityEnabled {
+		if err := s.typingStore.ClearGroupTypingIndicator(ctx, group.ID, thread.ID, authSession.User.ID); err != nil {
+			return nil, err
+		}
+
+		return s.getGroupTypingState(ctx, authSession.User.ID, group.ID, thread.ID)
+	}
+
+	now := s.now()
+	if err := s.typingStore.PutGroupTypingIndicator(ctx, PutGroupTypingIndicatorParams{
+		GroupID:   group.ID,
+		ThreadID:  thread.ID,
+		UserID:    authSession.User.ID,
+		UpdatedAt: now,
+		ExpiresAt: now.Add(s.typingTTL),
+	}); err != nil {
+		return nil, err
+	}
+
+	return s.getGroupTypingState(ctx, authSession.User.ID, group.ID, thread.ID)
+}
+
+func (s *Service) ClearGroupTyping(ctx context.Context, token string, groupID string, threadID string) (*GroupTypingState, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	group, thread, err := s.resolveGroupTypingTarget(ctx, authSession.User.ID, groupID, threadID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.typingStore.ClearGroupTypingIndicator(ctx, group.ID, thread.ID, authSession.User.ID); err != nil {
+		return nil, err
+	}
+
+	return s.getGroupTypingState(ctx, authSession.User.ID, group.ID, thread.ID)
 }
 
 func (s *Service) SetDirectChatTyping(ctx context.Context, token string, chatID string) (*DirectChatTypingState, error) {
@@ -1178,6 +1269,23 @@ func (s *Service) resolveGroupChat(ctx context.Context, userID string, groupID s
 	return group, thread, nil
 }
 
+func (s *Service) resolveGroupTypingTarget(ctx context.Context, userID string, groupID string, threadID string) (*Group, *GroupChatThread, error) {
+	group, thread, err := s.resolveGroupChat(ctx, userID, groupID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	normalizedThreadID, err := normalizeID(threadID, "thread_id")
+	if err != nil {
+		return nil, nil, err
+	}
+	if thread.ID != normalizedThreadID {
+		return nil, nil, fmt.Errorf("%w: group thread is not available in current scope", ErrNotFound)
+	}
+
+	return group, thread, nil
+}
+
 func (s *Service) getDirectChatReadState(ctx context.Context, viewerUserID string, chatID string) (*DirectChatReadState, error) {
 	entries, err := s.repo.ListDirectChatReadStateEntries(ctx, viewerUserID, chatID)
 	if err != nil {
@@ -1200,6 +1308,46 @@ func (s *Service) getDirectChatReadState(ctx context.Context, viewerUserID strin
 		}
 
 		state.PeerPosition = &position
+	}
+
+	return state, nil
+}
+
+func (s *Service) getGroupTypingState(ctx context.Context, viewerUserID string, groupID string, threadID string) (*GroupTypingState, error) {
+	entries, err := s.repo.ListGroupTypingStateEntries(ctx, viewerUserID, groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	userIDs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		userIDs = append(userIDs, entry.User.ID)
+	}
+
+	indicators, err := s.typingStore.ListGroupTypingIndicators(ctx, groupID, threadID, userIDs, s.now())
+	if err != nil {
+		return nil, err
+	}
+
+	state := &GroupTypingState{
+		ThreadID: threadID,
+		Typers:   make([]GroupTypingIndicator, 0, len(indicators)),
+	}
+	for _, entry := range entries {
+		if !entry.TypingVisibilityEnabled {
+			continue
+		}
+
+		indicator, ok := indicators[entry.User.ID]
+		if !ok {
+			continue
+		}
+
+		state.Typers = append(state.Typers, GroupTypingIndicator{
+			User:      entry.User,
+			UpdatedAt: indicator.UpdatedAt,
+			ExpiresAt: indicator.ExpiresAt,
+		})
 	}
 
 	return state, nil

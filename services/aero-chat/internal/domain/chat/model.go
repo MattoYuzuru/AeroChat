@@ -82,6 +82,17 @@ type GroupChatThread struct {
 	UpdatedAt       time.Time
 }
 
+type GroupTypingIndicator struct {
+	User      UserSummary
+	UpdatedAt time.Time
+	ExpiresAt time.Time
+}
+
+type GroupTypingState struct {
+	ThreadID string
+	Typers   []GroupTypingIndicator
+}
+
 type GroupMember struct {
 	GroupID  string
 	User     UserSummary
@@ -191,6 +202,11 @@ type DirectChatTypingStateEntry struct {
 	TypingVisibilityEnabled bool
 }
 
+type GroupTypingStateEntry struct {
+	User                    UserSummary
+	TypingVisibilityEnabled bool
+}
+
 type DirectChatRelationshipState struct {
 	AreFriends bool
 	HasBlock   bool
@@ -262,6 +278,14 @@ type UpsertDirectChatReadReceiptParams struct {
 
 type PutDirectChatTypingIndicatorParams struct {
 	ChatID    string
+	UserID    string
+	UpdatedAt time.Time
+	ExpiresAt time.Time
+}
+
+type PutGroupTypingIndicatorParams struct {
+	GroupID   string
+	ThreadID  string
 	UserID    string
 	UpdatedAt time.Time
 	ExpiresAt time.Time

@@ -44,6 +44,24 @@ func (s *TypingStore) ClearDirectChatTypingIndicator(ctx context.Context, chatID
 	return s.client.Del(ctx, typingKey(chatID, userID)).Err()
 }
 
+func (s *TypingStore) PutGroupTypingIndicator(ctx context.Context, params chat.PutGroupTypingIndicatorParams) error {
+	ttl := time.Until(params.ExpiresAt)
+	if ttl <= 0 {
+		return s.ClearGroupTypingIndicator(ctx, params.GroupID, params.ThreadID, params.UserID)
+	}
+
+	return s.client.Set(
+		ctx,
+		groupTypingKey(params.GroupID, params.ThreadID, params.UserID),
+		formatTypingValue(params.UpdatedAt, params.ExpiresAt),
+		ttl,
+	).Err()
+}
+
+func (s *TypingStore) ClearGroupTypingIndicator(ctx context.Context, groupID string, threadID string, userID string) error {
+	return s.client.Del(ctx, groupTypingKey(groupID, threadID, userID)).Err()
+}
+
 func (s *TypingStore) ListDirectChatTypingIndicators(
 	ctx context.Context,
 	chatID string,
@@ -89,8 +107,58 @@ func (s *TypingStore) ListDirectChatTypingIndicators(
 	return result, nil
 }
 
+func (s *TypingStore) ListGroupTypingIndicators(
+	ctx context.Context,
+	groupID string,
+	threadID string,
+	userIDs []string,
+	now time.Time,
+) (map[string]chat.DirectChatTypingIndicator, error) {
+	result := make(map[string]chat.DirectChatTypingIndicator, len(userIDs))
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+
+	keys := make([]string, 0, len(userIDs))
+	for _, userID := range userIDs {
+		keys = append(keys, groupTypingKey(groupID, threadID, userID))
+	}
+
+	values, err := s.client.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	for index, value := range values {
+		if value == nil {
+			continue
+		}
+
+		raw, ok := value.(string)
+		if !ok {
+			continue
+		}
+
+		indicator, err := parseTypingValue(raw)
+		if err != nil {
+			continue
+		}
+		if !indicator.ExpiresAt.After(now) {
+			continue
+		}
+
+		result[userIDs[index]] = indicator
+	}
+
+	return result, nil
+}
+
 func typingKey(chatID string, userID string) string {
 	return "aerochat:direct_chat_typing:" + chatID + ":" + userID
+}
+
+func groupTypingKey(groupID string, threadID string, userID string) string {
+	return "aerochat:group_typing:" + groupID + ":" + threadID + ":" + userID
 }
 
 func formatTypingValue(updatedAt time.Time, expiresAt time.Time) string {

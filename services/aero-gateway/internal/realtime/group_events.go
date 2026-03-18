@@ -9,6 +9,7 @@ const (
 	EventTypeGroupMembershipUpdated    = "group.membership.updated"
 	EventTypeGroupRoleUpdated          = "group.role.updated"
 	EventTypeGroupOwnershipTransferred = "group.ownership.transferred"
+	EventTypeGroupTypingUpdated        = "group.typing.updated"
 	GroupMessageReasonCreated          = "message_created"
 	GroupMembershipReasonJoined        = "member_joined"
 	GroupMembershipReasonRemoved       = "member_removed"
@@ -54,6 +55,13 @@ type GroupOwnershipTransferredPayload struct {
 	SelfMember          *groupMemberWire `json:"selfMember,omitempty"`
 }
 
+// GroupTypingUpdatedPayload доставляет thread-scoped snapshot видимых typers для группы.
+type GroupTypingUpdatedPayload struct {
+	GroupID     string                `json:"groupId"`
+	ThreadID    string                `json:"threadId"`
+	TypingState *groupTypingStateWire `json:"typingState,omitempty"`
+}
+
 type groupWire struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -88,6 +96,17 @@ type groupMessageWire struct {
 	Text         *textMessageContentWire `json:"text,omitempty"`
 	CreatedAt    string                  `json:"createdAt"`
 	UpdatedAt    string                  `json:"updatedAt"`
+}
+
+type groupTypingIndicatorWire struct {
+	User      *chatUserWire `json:"user,omitempty"`
+	UpdatedAt string        `json:"updatedAt"`
+	ExpiresAt string        `json:"expiresAt"`
+}
+
+type groupTypingStateWire struct {
+	ThreadID string                     `json:"threadId"`
+	Typers   []groupTypingIndicatorWire `json:"typers"`
 }
 
 func NewGroupMessageUpdatedEnvelope(
@@ -160,6 +179,14 @@ func NewGroupOwnershipTransferredEnvelope(
 	})
 }
 
+func NewGroupTypingUpdatedEnvelope(groupID string, threadID string, typingState *chatv1.GroupTypingState) Envelope {
+	return newEnvelope(EventTypeGroupTypingUpdated, GroupTypingUpdatedPayload{
+		GroupID:     groupID,
+		ThreadID:    threadID,
+		TypingState: toGroupTypingStateWire(typingState),
+	})
+}
+
 func toGroupWire(group *chatv1.Group) *groupWire {
 	if group == nil {
 		return nil
@@ -222,5 +249,30 @@ func toGroupMessageWire(message *chatv1.GroupMessage) *groupMessageWire {
 		Text:         toTextMessageContentWire(message.GetText()),
 		CreatedAt:    formatProtoTimestamp(message.GetCreatedAt()),
 		UpdatedAt:    formatProtoTimestamp(message.GetUpdatedAt()),
+	}
+}
+
+func toGroupTypingStateWire(typingState *chatv1.GroupTypingState) *groupTypingStateWire {
+	if typingState == nil {
+		return nil
+	}
+
+	typers := make([]groupTypingIndicatorWire, 0, len(typingState.GetTypers()))
+	for _, typer := range typingState.GetTypers() {
+		typers = append(typers, groupTypingIndicatorWire{
+			User: &chatUserWire{
+				ID:        typer.GetUser().GetId(),
+				Login:     typer.GetUser().GetLogin(),
+				Nickname:  typer.GetUser().GetNickname(),
+				AvatarURL: typer.GetUser().AvatarUrl,
+			},
+			UpdatedAt: formatProtoTimestamp(typer.GetUpdatedAt()),
+			ExpiresAt: formatProtoTimestamp(typer.GetExpiresAt()),
+		})
+	}
+
+	return &groupTypingStateWire{
+		ThreadID: typingState.GetThreadId(),
+		Typers:   typers,
 	}
 }
