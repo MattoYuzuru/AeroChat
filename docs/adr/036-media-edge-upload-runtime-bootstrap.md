@@ -1,7 +1,11 @@
 # ADR-036: Media edge и upload runtime bootstrap для direct-to-object-storage media foundation
 
-- Статус: Accepted
+- Статус: Accepted, частично заменён `ADR-037`
 - Дата: 2026-04-13
+
+> Примечание: текущий канонический media hostname contract для production уточнён в
+> [ADR-037](/home/mattoyudzuru/GolandProjects/AeroChat/docs/adr/037-media-edge-hostname-normalization.md).
+> Остальные runtime-решения этого ADR остаются в силе.
 
 ## Контекст
 

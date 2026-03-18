@@ -4,7 +4,7 @@
 # - `192.0.2.10` на значение из `.env.server` переменной `AERO_SHARED_EDGE_HOST_IP`;
 # - `letsencrypt-prod` на фактический ClusterIssuer, если в кластере используется другое имя;
 # - `ingressClassName`, если shared Traefik использует нестандартный ingress class;
-# - `aero.keykomi.com` и `media.aero.keykomi.com`, если используются другие домены.
+# - `aero.keykomi.com` и `media.keykomi.com`, если используются другие домены.
 #
 # Этот файл не переносит AeroChat в Kubernetes.
 # Он только подключает уже работающий compose runtime к shared `Traefik` через
@@ -164,10 +164,10 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - media.aero.keykomi.com
-      secretName: media-aero-keykomi-com-tls
+        - media.keykomi.com
+      secretName: media-keykomi-com-tls
   rules:
-    - host: media.aero.keykomi.com
+    - host: media.keykomi.com
       http:
         paths:
           - path: /
