@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] groups foundation через `aero-chat`, `aero-gateway` и `apps/web`
+- [x] group membership management bootstrap через `aero-chat`, `aero-gateway` и `apps/web`
 
 ---
 
@@ -116,8 +116,9 @@
 - [x] Canonical primary group thread
 - [x] Group text messaging bootstrap
 - [x] Web group chat bootstrap через `aero-gateway`
-- [ ] Promote/demote
-- [ ] Group permissions
+- [x] Promote/demote
+- [x] Group permissions
+- [x] Membership remove / leave / ownership transfer bootstrap
 - [ ] Max groups per user rules
 
 ---

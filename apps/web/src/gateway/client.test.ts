@@ -295,6 +295,116 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("calls group membership management endpoints through gateway chat service", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(async () =>
+        new Response(
+          JSON.stringify({
+            member: {
+              user: {
+                id: "user-2",
+                login: "bob",
+                nickname: "Bob",
+              },
+              role: "GROUP_MEMBER_ROLE_ADMIN",
+              joinedAt: "2026-04-09T10:00:00Z",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      )
+      .mockImplementationOnce(async () =>
+        new Response(
+          JSON.stringify({
+            group: {
+              id: "group-1",
+              name: "Ops",
+              kind: "CHAT_KIND_GROUP",
+              selfRole: "GROUP_MEMBER_ROLE_ADMIN",
+              memberCount: 2,
+              createdAt: "2026-04-09T09:00:00Z",
+              updatedAt: "2026-04-09T11:00:00Z",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      )
+      .mockImplementationOnce(async () => new Response("{}", { status: 200 }))
+      .mockImplementationOnce(async () => new Response("{}", { status: 200 }));
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const updatedMember = await client.updateGroupMemberRole(
+      "token-1",
+      " group-1 ",
+      " user-2 ",
+      "admin",
+    );
+    const transferredGroup = await client.transferGroupOwnership(
+      "token-1",
+      " group-1 ",
+      " user-2 ",
+    );
+    await client.removeGroupMember("token-1", " group-1 ", " user-3 ");
+    await client.leaveGroup("token-1", " group-1 ");
+
+    expect(updatedMember.role).toBe("admin");
+    expect(transferredGroup.selfRole).toBe("admin");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/aerochat.chat.v1.ChatService/UpdateGroupMemberRole",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          groupId: "group-1",
+          userId: "user-2",
+          role: "GROUP_MEMBER_ROLE_ADMIN",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/aerochat.chat.v1.ChatService/TransferGroupOwnership",
+      expect.objectContaining({
+        body: JSON.stringify({
+          groupId: "group-1",
+          targetUserId: "user-2",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/aerochat.chat.v1.ChatService/RemoveGroupMember",
+      expect.objectContaining({
+        body: JSON.stringify({
+          groupId: "group-1",
+          userId: "user-3",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/aerochat.chat.v1.ChatService/LeaveGroup",
+      expect.objectContaining({
+        body: JSON.stringify({
+          groupId: "group-1",
+        }),
+      }),
+    );
+  });
+
   it("calls social graph mutation endpoints with exact login payload", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     const client = createGatewayClient(fetchMock, "/api");

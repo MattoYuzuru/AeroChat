@@ -366,6 +366,24 @@ func (q *Queries) CreateGroupThread(ctx context.Context, arg CreateGroupThreadPa
 	return i, err
 }
 
+const deleteGroupMembership = `-- name: DeleteGroupMembership :execrows
+DELETE FROM group_memberships
+WHERE group_id = $1 AND user_id = $2
+`
+
+type DeleteGroupMembershipParams struct {
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) DeleteGroupMembership(ctx context.Context, arg DeleteGroupMembershipParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteGroupMembership, arg.GroupID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const disableGroupInviteLink = `-- name: DisableGroupInviteLink :execrows
 UPDATE group_invite_links
 SET
@@ -712,6 +730,50 @@ func (q *Queries) GetGroupInviteLinkForJoin(ctx context.Context, tokenHash strin
 		&i.GroupCreatedByUserID,
 		&i.GroupCreatedAt,
 		&i.GroupUpdatedAt,
+	)
+	return i, err
+}
+
+const getGroupMemberRowByGroupIDAndUserID = `-- name: GetGroupMemberRowByGroupIDAndUserID :one
+SELECT
+    m.group_id,
+    m.user_id,
+    m.role,
+    m.joined_at,
+    u.login,
+    u.nickname,
+    u.avatar_url
+FROM group_memberships AS m
+JOIN users AS u ON u.id = m.user_id
+WHERE m.group_id = $1 AND m.user_id = $2
+`
+
+type GetGroupMemberRowByGroupIDAndUserIDParams struct {
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+}
+
+type GetGroupMemberRowByGroupIDAndUserIDRow struct {
+	GroupID   uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	Role      string             `db:"role" json:"role"`
+	JoinedAt  pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	Login     string             `db:"login" json:"login"`
+	Nickname  string             `db:"nickname" json:"nickname"`
+	AvatarUrl pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+}
+
+func (q *Queries) GetGroupMemberRowByGroupIDAndUserID(ctx context.Context, arg GetGroupMemberRowByGroupIDAndUserIDParams) (GetGroupMemberRowByGroupIDAndUserIDRow, error) {
+	row := q.db.QueryRow(ctx, getGroupMemberRowByGroupIDAndUserID, arg.GroupID, arg.UserID)
+	var i GetGroupMemberRowByGroupIDAndUserIDRow
+	err := row.Scan(
+		&i.GroupID,
+		&i.UserID,
+		&i.Role,
+		&i.JoinedAt,
+		&i.Login,
+		&i.Nickname,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
@@ -1568,6 +1630,31 @@ func (q *Queries) TouchSessionAndDevice(ctx context.Context, arg TouchSessionAnd
 	return err
 }
 
+const transferGroupOwnership = `-- name: TransferGroupOwnership :execrows
+UPDATE group_memberships
+SET role = CASE
+    WHEN user_id = $2 THEN 'admin'
+    WHEN user_id = $3 THEN 'owner'
+    ELSE role
+END
+WHERE group_id = $1
+  AND user_id IN ($2, $3)
+`
+
+type TransferGroupOwnershipParams struct {
+	GroupID  uuid.UUID `db:"group_id" json:"group_id"`
+	UserID   uuid.UUID `db:"user_id" json:"user_id"`
+	UserID_2 uuid.UUID `db:"user_id_2" json:"user_id_2"`
+}
+
+func (q *Queries) TransferGroupOwnership(ctx context.Context, arg TransferGroupOwnershipParams) (int64, error) {
+	result, err := q.db.Exec(ctx, transferGroupOwnership, arg.GroupID, arg.UserID, arg.UserID_2)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const unpinDirectChatMessage = `-- name: UnpinDirectChatMessage :execrows
 DELETE FROM direct_chat_pins
 WHERE chat_id = $1 AND message_id = $2
@@ -1580,6 +1667,26 @@ type UnpinDirectChatMessageParams struct {
 
 func (q *Queries) UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error) {
 	result, err := q.db.Exec(ctx, unpinDirectChatMessage, arg.ChatID, arg.MessageID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateGroupMembershipRole = `-- name: UpdateGroupMembershipRole :execrows
+UPDATE group_memberships
+SET role = $3
+WHERE group_id = $1 AND user_id = $2 AND role <> $3
+`
+
+type UpdateGroupMembershipRoleParams struct {
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+	Role    string    `db:"role" json:"role"`
+}
+
+func (q *Queries) UpdateGroupMembershipRole(ctx context.Context, arg UpdateGroupMembershipRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateGroupMembershipRole, arg.GroupID, arg.UserID, arg.Role)
 	if err != nil {
 		return 0, err
 	}

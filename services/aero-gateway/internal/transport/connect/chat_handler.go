@@ -82,6 +82,22 @@ func (h *ChatHandler) ListGroupMembers(ctx context.Context, req *connect.Request
 	return forwardUnary(ctx, req, h.client.ListGroupMembers)
 }
 
+func (h *ChatHandler) UpdateGroupMemberRole(ctx context.Context, req *connect.Request[chatv1.UpdateGroupMemberRoleRequest]) (*connect.Response[chatv1.UpdateGroupMemberRoleResponse], error) {
+	return forwardUnary(ctx, req, h.client.UpdateGroupMemberRole)
+}
+
+func (h *ChatHandler) TransferGroupOwnership(ctx context.Context, req *connect.Request[chatv1.TransferGroupOwnershipRequest]) (*connect.Response[chatv1.TransferGroupOwnershipResponse], error) {
+	return forwardUnary(ctx, req, h.client.TransferGroupOwnership)
+}
+
+func (h *ChatHandler) RemoveGroupMember(ctx context.Context, req *connect.Request[chatv1.RemoveGroupMemberRequest]) (*connect.Response[chatv1.RemoveGroupMemberResponse], error) {
+	return forwardUnary(ctx, req, h.client.RemoveGroupMember)
+}
+
+func (h *ChatHandler) LeaveGroup(ctx context.Context, req *connect.Request[chatv1.LeaveGroupRequest]) (*connect.Response[chatv1.LeaveGroupResponse], error) {
+	return forwardUnary(ctx, req, h.client.LeaveGroup)
+}
+
 func (h *ChatHandler) CreateGroupInviteLink(ctx context.Context, req *connect.Request[chatv1.CreateGroupInviteLinkRequest]) (*connect.Response[chatv1.CreateGroupInviteLinkResponse], error) {
 	return forwardUnary(ctx, req, h.client.CreateGroupInviteLink)
 }

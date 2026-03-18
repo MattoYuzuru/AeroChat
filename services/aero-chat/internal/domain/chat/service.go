@@ -32,6 +32,10 @@ type Repository interface {
 	GetGroup(context.Context, string, string) (*Group, error)
 	GetGroupChatThread(context.Context, string, string) (*GroupChatThread, error)
 	ListGroupMembers(context.Context, string, string) ([]GroupMember, error)
+	GetGroupMember(context.Context, string, string) (*GroupMember, error)
+	UpdateGroupMemberRole(context.Context, UpdateGroupMemberRoleParams) (bool, error)
+	TransferGroupOwnership(context.Context, TransferGroupOwnershipParams) (bool, error)
+	DeleteGroupMembership(context.Context, string, string, time.Time) (bool, error)
 	CreateGroupInviteLink(context.Context, CreateGroupInviteLinkParams) (*GroupInviteLink, error)
 	ListGroupInviteLinks(context.Context, string) ([]GroupInviteLink, error)
 	GetGroupInviteLink(context.Context, string, string) (*GroupInviteLink, error)
@@ -257,6 +261,189 @@ func (s *Service) ListGroupMembers(ctx context.Context, token string, groupID st
 	}
 
 	return s.repo.ListGroupMembers(ctx, authSession.User.ID, normalizedGroupID)
+}
+
+func (s *Service) UpdateGroupMemberRole(ctx context.Context, token string, groupID string, targetUserID string, role string) (*GroupMember, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedTargetUserID, err := normalizeID(targetUserID, "user_id")
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+	if !canManageGroupMembers(group.SelfRole) {
+		return nil, fmt.Errorf("%w: only the owner can manage group member roles", ErrPermissionDenied)
+	}
+
+	targetMember, err := s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+	if err != nil {
+		return nil, err
+	}
+	if targetMember.Role == GroupMemberRoleOwner {
+		return nil, fmt.Errorf("%w: owner role is changed only via explicit ownership transfer", ErrConflict)
+	}
+	if normalizedTargetUserID == authSession.User.ID {
+		return nil, fmt.Errorf("%w: owner cannot change own role without ownership transfer", ErrConflict)
+	}
+
+	targetRole, err := normalizeManagedGroupRole(role)
+	if err != nil {
+		return nil, err
+	}
+	if targetMember.Role == targetRole {
+		return targetMember, nil
+	}
+
+	updated, err := s.repo.UpdateGroupMemberRole(ctx, UpdateGroupMemberRoleParams{
+		GroupID:   normalizedGroupID,
+		UserID:    normalizedTargetUserID,
+		Role:      targetRole,
+		UpdatedAt: s.now(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !updated {
+		return s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+	}
+
+	return s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+}
+
+func (s *Service) TransferGroupOwnership(ctx context.Context, token string, groupID string, targetUserID string) (*Group, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedTargetUserID, err := normalizeID(targetUserID, "target_user_id")
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+	if !canManageGroupMembers(group.SelfRole) {
+		return nil, fmt.Errorf("%w: only the owner can transfer ownership", ErrPermissionDenied)
+	}
+	if normalizedTargetUserID == authSession.User.ID {
+		return nil, fmt.Errorf("%w: ownership transfer target must differ from current owner", ErrConflict)
+	}
+
+	targetMember, err := s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+	if err != nil {
+		return nil, err
+	}
+	if targetMember.Role == GroupMemberRoleOwner {
+		return nil, fmt.Errorf("%w: target user already owns the group", ErrConflict)
+	}
+
+	transferred, err := s.repo.TransferGroupOwnership(ctx, TransferGroupOwnershipParams{
+		GroupID:            normalizedGroupID,
+		CurrentOwnerUserID: authSession.User.ID,
+		NewOwnerUserID:     normalizedTargetUserID,
+		UpdatedAt:          s.now(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !transferred {
+		return nil, fmt.Errorf("%w: ownership transfer was not applied", ErrConflict)
+	}
+
+	return s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+}
+
+func (s *Service) RemoveGroupMember(ctx context.Context, token string, groupID string, targetUserID string) error {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return err
+	}
+	normalizedTargetUserID, err := normalizeID(targetUserID, "user_id")
+	if err != nil {
+		return err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return err
+	}
+	if !canManageGroupMembers(group.SelfRole) {
+		return fmt.Errorf("%w: only the owner can remove group members", ErrPermissionDenied)
+	}
+	if normalizedTargetUserID == authSession.User.ID {
+		return fmt.Errorf("%w: owner must use leave group flow for self-removal", ErrConflict)
+	}
+
+	targetMember, err := s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+	if err != nil {
+		return err
+	}
+	if targetMember.Role == GroupMemberRoleOwner {
+		return fmt.Errorf("%w: owner cannot be removed from the group", ErrConflict)
+	}
+
+	deleted, err := s.repo.DeleteGroupMembership(ctx, normalizedGroupID, normalizedTargetUserID, s.now())
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *Service) LeaveGroup(ctx context.Context, token string, groupID string) error {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return err
+	}
+	if group.SelfRole == GroupMemberRoleOwner {
+		return fmt.Errorf("%w: owner must transfer ownership before leaving the group", ErrConflict)
+	}
+
+	deleted, err := s.repo.DeleteGroupMembership(ctx, normalizedGroupID, authSession.User.ID, s.now())
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return ErrNotFound
+	}
+
+	return nil
 }
 
 func (s *Service) CreateGroupInviteLink(ctx context.Context, token string, groupID string, role string) (*CreatedGroupInviteLink, error) {
@@ -892,6 +1079,19 @@ func normalizeGroupInviteRole(value string) (string, error) {
 	}
 }
 
+func normalizeManagedGroupRole(value string) (string, error) {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case GroupMemberRoleAdmin:
+		return GroupMemberRoleAdmin, nil
+	case GroupMemberRoleMember:
+		return GroupMemberRoleMember, nil
+	case GroupMemberRoleReader:
+		return GroupMemberRoleReader, nil
+	default:
+		return "", fmt.Errorf("%w: managed role must be admin, member or reader", ErrInvalidArgument)
+	}
+}
+
 func normalizeInviteToken(value string) (string, error) {
 	normalized := strings.TrimSpace(value)
 	if normalized == "" {
@@ -903,6 +1103,10 @@ func normalizeInviteToken(value string) (string, error) {
 
 func canManageGroupInviteLinks(role string) bool {
 	return role == GroupMemberRoleOwner || role == GroupMemberRoleAdmin
+}
+
+func canManageGroupMembers(role string) bool {
+	return role == GroupMemberRoleOwner
 }
 
 func canSendGroupMessages(role string) bool {

@@ -263,6 +263,15 @@ export interface GatewayClient {
   getGroup(token: string, groupId: string): Promise<Group>;
   getGroupChat(token: string, groupId: string): Promise<GroupChatSnapshot>;
   listGroupMembers(token: string, groupId: string): Promise<GroupMember[]>;
+  updateGroupMemberRole(
+    token: string,
+    groupId: string,
+    userId: string,
+    role: GroupMemberRole,
+  ): Promise<GroupMember>;
+  transferGroupOwnership(token: string, groupId: string, targetUserId: string): Promise<Group>;
+  removeGroupMember(token: string, groupId: string, userId: string): Promise<void>;
+  leaveGroup(token: string, groupId: string): Promise<void>;
   createGroupInviteLink(
     token: string,
     groupId: string,

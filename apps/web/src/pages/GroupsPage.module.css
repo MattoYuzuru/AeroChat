@@ -307,6 +307,18 @@
   margin-top: 1rem;
 }
 
+.memberActions {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.memberButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .characterCount {
   align-self: center;
   color: rgba(3, 50, 82, 0.68);
@@ -341,6 +353,11 @@
   .joinHeader,
   .composerFooter,
   .messageHeader {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .memberButtons {
     display: grid;
     grid-template-columns: 1fr;
   }

@@ -56,6 +56,17 @@ const (
 	// ChatServiceListGroupMembersProcedure is the fully-qualified name of the ChatService's
 	// ListGroupMembers RPC.
 	ChatServiceListGroupMembersProcedure = "/aerochat.chat.v1.ChatService/ListGroupMembers"
+	// ChatServiceUpdateGroupMemberRoleProcedure is the fully-qualified name of the ChatService's
+	// UpdateGroupMemberRole RPC.
+	ChatServiceUpdateGroupMemberRoleProcedure = "/aerochat.chat.v1.ChatService/UpdateGroupMemberRole"
+	// ChatServiceTransferGroupOwnershipProcedure is the fully-qualified name of the ChatService's
+	// TransferGroupOwnership RPC.
+	ChatServiceTransferGroupOwnershipProcedure = "/aerochat.chat.v1.ChatService/TransferGroupOwnership"
+	// ChatServiceRemoveGroupMemberProcedure is the fully-qualified name of the ChatService's
+	// RemoveGroupMember RPC.
+	ChatServiceRemoveGroupMemberProcedure = "/aerochat.chat.v1.ChatService/RemoveGroupMember"
+	// ChatServiceLeaveGroupProcedure is the fully-qualified name of the ChatService's LeaveGroup RPC.
+	ChatServiceLeaveGroupProcedure = "/aerochat.chat.v1.ChatService/LeaveGroup"
 	// ChatServiceCreateGroupInviteLinkProcedure is the fully-qualified name of the ChatService's
 	// CreateGroupInviteLink RPC.
 	ChatServiceCreateGroupInviteLinkProcedure = "/aerochat.chat.v1.ChatService/CreateGroupInviteLink"
@@ -116,6 +127,10 @@ type ChatServiceClient interface {
 	GetGroup(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GetGroupResponse], error)
 	GetGroupChat(context.Context, *connect.Request[v1.GetGroupChatRequest]) (*connect.Response[v1.GetGroupChatResponse], error)
 	ListGroupMembers(context.Context, *connect.Request[v1.ListGroupMembersRequest]) (*connect.Response[v1.ListGroupMembersResponse], error)
+	UpdateGroupMemberRole(context.Context, *connect.Request[v1.UpdateGroupMemberRoleRequest]) (*connect.Response[v1.UpdateGroupMemberRoleResponse], error)
+	TransferGroupOwnership(context.Context, *connect.Request[v1.TransferGroupOwnershipRequest]) (*connect.Response[v1.TransferGroupOwnershipResponse], error)
+	RemoveGroupMember(context.Context, *connect.Request[v1.RemoveGroupMemberRequest]) (*connect.Response[v1.RemoveGroupMemberResponse], error)
+	LeaveGroup(context.Context, *connect.Request[v1.LeaveGroupRequest]) (*connect.Response[v1.LeaveGroupResponse], error)
 	CreateGroupInviteLink(context.Context, *connect.Request[v1.CreateGroupInviteLinkRequest]) (*connect.Response[v1.CreateGroupInviteLinkResponse], error)
 	ListGroupInviteLinks(context.Context, *connect.Request[v1.ListGroupInviteLinksRequest]) (*connect.Response[v1.ListGroupInviteLinksResponse], error)
 	DisableGroupInviteLink(context.Context, *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error)
@@ -197,6 +212,30 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+ChatServiceListGroupMembersProcedure,
 			connect.WithSchema(chatServiceMethods.ByName("ListGroupMembers")),
+			connect.WithClientOptions(opts...),
+		),
+		updateGroupMemberRole: connect.NewClient[v1.UpdateGroupMemberRoleRequest, v1.UpdateGroupMemberRoleResponse](
+			httpClient,
+			baseURL+ChatServiceUpdateGroupMemberRoleProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("UpdateGroupMemberRole")),
+			connect.WithClientOptions(opts...),
+		),
+		transferGroupOwnership: connect.NewClient[v1.TransferGroupOwnershipRequest, v1.TransferGroupOwnershipResponse](
+			httpClient,
+			baseURL+ChatServiceTransferGroupOwnershipProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("TransferGroupOwnership")),
+			connect.WithClientOptions(opts...),
+		),
+		removeGroupMember: connect.NewClient[v1.RemoveGroupMemberRequest, v1.RemoveGroupMemberResponse](
+			httpClient,
+			baseURL+ChatServiceRemoveGroupMemberProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("RemoveGroupMember")),
+			connect.WithClientOptions(opts...),
+		),
+		leaveGroup: connect.NewClient[v1.LeaveGroupRequest, v1.LeaveGroupResponse](
+			httpClient,
+			baseURL+ChatServiceLeaveGroupProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("LeaveGroup")),
 			connect.WithClientOptions(opts...),
 		),
 		createGroupInviteLink: connect.NewClient[v1.CreateGroupInviteLinkRequest, v1.CreateGroupInviteLinkResponse](
@@ -309,6 +348,10 @@ type chatServiceClient struct {
 	getGroup                       *connect.Client[v1.GetGroupRequest, v1.GetGroupResponse]
 	getGroupChat                   *connect.Client[v1.GetGroupChatRequest, v1.GetGroupChatResponse]
 	listGroupMembers               *connect.Client[v1.ListGroupMembersRequest, v1.ListGroupMembersResponse]
+	updateGroupMemberRole          *connect.Client[v1.UpdateGroupMemberRoleRequest, v1.UpdateGroupMemberRoleResponse]
+	transferGroupOwnership         *connect.Client[v1.TransferGroupOwnershipRequest, v1.TransferGroupOwnershipResponse]
+	removeGroupMember              *connect.Client[v1.RemoveGroupMemberRequest, v1.RemoveGroupMemberResponse]
+	leaveGroup                     *connect.Client[v1.LeaveGroupRequest, v1.LeaveGroupResponse]
 	createGroupInviteLink          *connect.Client[v1.CreateGroupInviteLinkRequest, v1.CreateGroupInviteLinkResponse]
 	listGroupInviteLinks           *connect.Client[v1.ListGroupInviteLinksRequest, v1.ListGroupInviteLinksResponse]
 	disableGroupInviteLink         *connect.Client[v1.DisableGroupInviteLinkRequest, v1.DisableGroupInviteLinkResponse]
@@ -370,6 +413,26 @@ func (c *chatServiceClient) GetGroupChat(ctx context.Context, req *connect.Reque
 // ListGroupMembers calls aerochat.chat.v1.ChatService.ListGroupMembers.
 func (c *chatServiceClient) ListGroupMembers(ctx context.Context, req *connect.Request[v1.ListGroupMembersRequest]) (*connect.Response[v1.ListGroupMembersResponse], error) {
 	return c.listGroupMembers.CallUnary(ctx, req)
+}
+
+// UpdateGroupMemberRole calls aerochat.chat.v1.ChatService.UpdateGroupMemberRole.
+func (c *chatServiceClient) UpdateGroupMemberRole(ctx context.Context, req *connect.Request[v1.UpdateGroupMemberRoleRequest]) (*connect.Response[v1.UpdateGroupMemberRoleResponse], error) {
+	return c.updateGroupMemberRole.CallUnary(ctx, req)
+}
+
+// TransferGroupOwnership calls aerochat.chat.v1.ChatService.TransferGroupOwnership.
+func (c *chatServiceClient) TransferGroupOwnership(ctx context.Context, req *connect.Request[v1.TransferGroupOwnershipRequest]) (*connect.Response[v1.TransferGroupOwnershipResponse], error) {
+	return c.transferGroupOwnership.CallUnary(ctx, req)
+}
+
+// RemoveGroupMember calls aerochat.chat.v1.ChatService.RemoveGroupMember.
+func (c *chatServiceClient) RemoveGroupMember(ctx context.Context, req *connect.Request[v1.RemoveGroupMemberRequest]) (*connect.Response[v1.RemoveGroupMemberResponse], error) {
+	return c.removeGroupMember.CallUnary(ctx, req)
+}
+
+// LeaveGroup calls aerochat.chat.v1.ChatService.LeaveGroup.
+func (c *chatServiceClient) LeaveGroup(ctx context.Context, req *connect.Request[v1.LeaveGroupRequest]) (*connect.Response[v1.LeaveGroupResponse], error) {
+	return c.leaveGroup.CallUnary(ctx, req)
 }
 
 // CreateGroupInviteLink calls aerochat.chat.v1.ChatService.CreateGroupInviteLink.
@@ -463,6 +526,10 @@ type ChatServiceHandler interface {
 	GetGroup(context.Context, *connect.Request[v1.GetGroupRequest]) (*connect.Response[v1.GetGroupResponse], error)
 	GetGroupChat(context.Context, *connect.Request[v1.GetGroupChatRequest]) (*connect.Response[v1.GetGroupChatResponse], error)
 	ListGroupMembers(context.Context, *connect.Request[v1.ListGroupMembersRequest]) (*connect.Response[v1.ListGroupMembersResponse], error)
+	UpdateGroupMemberRole(context.Context, *connect.Request[v1.UpdateGroupMemberRoleRequest]) (*connect.Response[v1.UpdateGroupMemberRoleResponse], error)
+	TransferGroupOwnership(context.Context, *connect.Request[v1.TransferGroupOwnershipRequest]) (*connect.Response[v1.TransferGroupOwnershipResponse], error)
+	RemoveGroupMember(context.Context, *connect.Request[v1.RemoveGroupMemberRequest]) (*connect.Response[v1.RemoveGroupMemberResponse], error)
+	LeaveGroup(context.Context, *connect.Request[v1.LeaveGroupRequest]) (*connect.Response[v1.LeaveGroupResponse], error)
 	CreateGroupInviteLink(context.Context, *connect.Request[v1.CreateGroupInviteLinkRequest]) (*connect.Response[v1.CreateGroupInviteLinkResponse], error)
 	ListGroupInviteLinks(context.Context, *connect.Request[v1.ListGroupInviteLinksRequest]) (*connect.Response[v1.ListGroupInviteLinksResponse], error)
 	DisableGroupInviteLink(context.Context, *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error)
@@ -540,6 +607,30 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		ChatServiceListGroupMembersProcedure,
 		svc.ListGroupMembers,
 		connect.WithSchema(chatServiceMethods.ByName("ListGroupMembers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceUpdateGroupMemberRoleHandler := connect.NewUnaryHandler(
+		ChatServiceUpdateGroupMemberRoleProcedure,
+		svc.UpdateGroupMemberRole,
+		connect.WithSchema(chatServiceMethods.ByName("UpdateGroupMemberRole")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceTransferGroupOwnershipHandler := connect.NewUnaryHandler(
+		ChatServiceTransferGroupOwnershipProcedure,
+		svc.TransferGroupOwnership,
+		connect.WithSchema(chatServiceMethods.ByName("TransferGroupOwnership")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceRemoveGroupMemberHandler := connect.NewUnaryHandler(
+		ChatServiceRemoveGroupMemberProcedure,
+		svc.RemoveGroupMember,
+		connect.WithSchema(chatServiceMethods.ByName("RemoveGroupMember")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceLeaveGroupHandler := connect.NewUnaryHandler(
+		ChatServiceLeaveGroupProcedure,
+		svc.LeaveGroup,
+		connect.WithSchema(chatServiceMethods.ByName("LeaveGroup")),
 		connect.WithHandlerOptions(opts...),
 	)
 	chatServiceCreateGroupInviteLinkHandler := connect.NewUnaryHandler(
@@ -658,6 +749,14 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceGetGroupChatHandler.ServeHTTP(w, r)
 		case ChatServiceListGroupMembersProcedure:
 			chatServiceListGroupMembersHandler.ServeHTTP(w, r)
+		case ChatServiceUpdateGroupMemberRoleProcedure:
+			chatServiceUpdateGroupMemberRoleHandler.ServeHTTP(w, r)
+		case ChatServiceTransferGroupOwnershipProcedure:
+			chatServiceTransferGroupOwnershipHandler.ServeHTTP(w, r)
+		case ChatServiceRemoveGroupMemberProcedure:
+			chatServiceRemoveGroupMemberHandler.ServeHTTP(w, r)
+		case ChatServiceLeaveGroupProcedure:
+			chatServiceLeaveGroupHandler.ServeHTTP(w, r)
 		case ChatServiceCreateGroupInviteLinkProcedure:
 			chatServiceCreateGroupInviteLinkHandler.ServeHTTP(w, r)
 		case ChatServiceListGroupInviteLinksProcedure:
@@ -733,6 +832,22 @@ func (UnimplementedChatServiceHandler) GetGroupChat(context.Context, *connect.Re
 
 func (UnimplementedChatServiceHandler) ListGroupMembers(context.Context, *connect.Request[v1.ListGroupMembersRequest]) (*connect.Response[v1.ListGroupMembersResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ListGroupMembers is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) UpdateGroupMemberRole(context.Context, *connect.Request[v1.UpdateGroupMemberRoleRequest]) (*connect.Response[v1.UpdateGroupMemberRoleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.UpdateGroupMemberRole is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) TransferGroupOwnership(context.Context, *connect.Request[v1.TransferGroupOwnershipRequest]) (*connect.Response[v1.TransferGroupOwnershipResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.TransferGroupOwnership is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) RemoveGroupMember(context.Context, *connect.Request[v1.RemoveGroupMemberRequest]) (*connect.Response[v1.RemoveGroupMemberResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.RemoveGroupMember is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) LeaveGroup(context.Context, *connect.Request[v1.LeaveGroupRequest]) (*connect.Response[v1.LeaveGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.LeaveGroup is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) CreateGroupInviteLink(context.Context, *connect.Request[v1.CreateGroupInviteLinkRequest]) (*connect.Response[v1.CreateGroupInviteLinkResponse], error) {

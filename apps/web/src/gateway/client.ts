@@ -272,6 +272,14 @@ interface ListGroupMembersResponseWire {
   members?: GroupMemberWire[];
 }
 
+interface UpdateGroupMemberRoleResponseWire {
+  member?: GroupMemberWire;
+}
+
+interface TransferGroupOwnershipResponseWire {
+  group?: GroupWire;
+}
+
 interface CreateGroupInviteLinkResponseWire {
   inviteLink?: GroupInviteLinkWire;
   inviteToken?: string;
@@ -494,6 +502,66 @@ export function createGatewayClient(
       );
 
       return (response.members ?? []).map(normalizeGroupMember);
+    },
+
+    async updateGroupMemberRole(token, groupId, userId, role) {
+      const response = await unaryCall<UpdateGroupMemberRoleResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "UpdateGroupMemberRole",
+        {
+          groupId: groupId.trim(),
+          userId: userId.trim(),
+          role: normalizeGroupMemberRoleForWire(role),
+        },
+        token,
+      );
+
+      return normalizeGroupMember(response.member ?? {});
+    },
+
+    async transferGroupOwnership(token, groupId, targetUserId) {
+      const response = await unaryCall<TransferGroupOwnershipResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "TransferGroupOwnership",
+        {
+          groupId: groupId.trim(),
+          targetUserId: targetUserId.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroup(response.group);
+    },
+
+    async removeGroupMember(token, groupId, userId) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "RemoveGroupMember",
+        {
+          groupId: groupId.trim(),
+          userId: userId.trim(),
+        },
+        token,
+      );
+    },
+
+    async leaveGroup(token, groupId) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "LeaveGroup",
+        {
+          groupId: groupId.trim(),
+        },
+        token,
+      );
     },
 
     async createGroupInviteLink(token, groupId, role) {

@@ -182,6 +182,70 @@ func (h *Handler) ListGroupMembers(ctx context.Context, req *connect.Request[cha
 	return connect.NewResponse(response), nil
 }
 
+func (h *Handler) UpdateGroupMemberRole(ctx context.Context, req *connect.Request[chatv1.UpdateGroupMemberRoleRequest]) (*connect.Response[chatv1.UpdateGroupMemberRoleResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	member, err := h.service.UpdateGroupMemberRole(
+		ctx,
+		token,
+		req.Msg.GroupId,
+		req.Msg.UserId,
+		fromProtoGroupMemberRole(req.Msg.Role),
+	)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.UpdateGroupMemberRoleResponse{
+		Member: toProtoGroupMember(*member),
+	}), nil
+}
+
+func (h *Handler) TransferGroupOwnership(ctx context.Context, req *connect.Request[chatv1.TransferGroupOwnershipRequest]) (*connect.Response[chatv1.TransferGroupOwnershipResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := h.service.TransferGroupOwnership(ctx, token, req.Msg.GroupId, req.Msg.TargetUserId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.TransferGroupOwnershipResponse{
+		Group: toProtoGroup(*group),
+	}), nil
+}
+
+func (h *Handler) RemoveGroupMember(ctx context.Context, req *connect.Request[chatv1.RemoveGroupMemberRequest]) (*connect.Response[chatv1.RemoveGroupMemberResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.RemoveGroupMember(ctx, token, req.Msg.GroupId, req.Msg.UserId); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.RemoveGroupMemberResponse{}), nil
+}
+
+func (h *Handler) LeaveGroup(ctx context.Context, req *connect.Request[chatv1.LeaveGroupRequest]) (*connect.Response[chatv1.LeaveGroupResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.LeaveGroup(ctx, token, req.Msg.GroupId); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.LeaveGroupResponse{}), nil
+}
+
 func (h *Handler) CreateGroupInviteLink(ctx context.Context, req *connect.Request[chatv1.CreateGroupInviteLinkRequest]) (*connect.Response[chatv1.CreateGroupInviteLinkResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
