@@ -221,6 +221,38 @@ ORDER BY
     m.joined_at ASC,
     m.user_id ASC;
 
+-- name: GetGroupMemberRowByGroupIDAndUserID :one
+SELECT
+    m.group_id,
+    m.user_id,
+    m.role,
+    m.joined_at,
+    u.login,
+    u.nickname,
+    u.avatar_url
+FROM group_memberships AS m
+JOIN users AS u ON u.id = m.user_id
+WHERE m.group_id = $1 AND m.user_id = $2;
+
+-- name: UpdateGroupMembershipRole :execrows
+UPDATE group_memberships
+SET role = $3
+WHERE group_id = $1 AND user_id = $2 AND role <> $3;
+
+-- name: TransferGroupOwnership :execrows
+UPDATE group_memberships
+SET role = CASE
+    WHEN user_id = $2 THEN 'admin'
+    WHEN user_id = $3 THEN 'owner'
+    ELSE role
+END
+WHERE group_id = $1
+  AND user_id IN ($2, $3);
+
+-- name: DeleteGroupMembership :execrows
+DELETE FROM group_memberships
+WHERE group_id = $1 AND user_id = $2;
+
 -- name: CreateGroupInviteLink :one
 INSERT INTO group_invite_links (
     id,

@@ -79,6 +79,11 @@ export function GroupsPage() {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isCreatingInviteLink, setIsCreatingInviteLink] = useState(false);
   const [pendingDisableInviteId, setPendingDisableInviteId] = useState<string | null>(null);
+  const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
+  const [pendingRemoveUserId, setPendingRemoveUserId] = useState<string | null>(null);
+  const [pendingTransferUserId, setPendingTransferUserId] = useState<string | null>(null);
+  const [isLeavingGroup, setIsLeavingGroup] = useState(false);
+  const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, GroupMemberRole>>({});
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
 
   const selectedGroupId = searchParams.get("group")?.trim() ?? "";
@@ -137,6 +142,7 @@ export function GroupsPage() {
     if (selectedGroupId === "") {
       setSelectedState(initialSelectedState);
       setComposerText("");
+      setMemberRoleDrafts({});
       return;
     }
 
@@ -175,6 +181,7 @@ export function GroupsPage() {
           messages,
           errorMessage: null,
         });
+        setMemberRoleDrafts(buildMemberRoleDrafts(members));
       } catch (error) {
         const message = resolveProtectedError(
           error,
@@ -193,6 +200,7 @@ export function GroupsPage() {
           messages: [],
           errorMessage: message,
         });
+        setMemberRoleDrafts({});
       }
     })();
 
@@ -212,6 +220,9 @@ export function GroupsPage() {
   const requestedJoinToken = extractGroupInviteToken(joinInput || joinTokenFromRoute);
   const threadMessages =
     selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
+  const canManageMembership =
+    selectedState.status === "ready" &&
+    selectedState.snapshot.group.selfRole === "owner";
 
   async function reloadGroups() {
     if (groupsStatus === "loading") {
@@ -417,6 +428,164 @@ export function GroupsPage() {
     }
   }
 
+  async function handleUpdateGroupMemberRole(userId: string) {
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    const member = selectedState.members.find((candidate) => candidate.user.id === userId);
+    if (!member) {
+      return;
+    }
+
+    const nextRole = memberRoleDrafts[userId] ?? member.role;
+    if (nextRole === member.role) {
+      return;
+    }
+
+    setPendingRoleUserId(userId);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      await gatewayClient.updateGroupMemberRole(
+        token,
+        selectedState.snapshot.group.id,
+        userId,
+        nextRole,
+      );
+      setNotice(`Роль ${member.user.nickname || `@${member.user.login}`} обновлена.`);
+      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
+      await reloadGroups();
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось обновить роль участника.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
+    } finally {
+      setPendingRoleUserId(null);
+    }
+  }
+
+  async function handleTransferOwnership(userId: string) {
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    const member = selectedState.members.find((candidate) => candidate.user.id === userId);
+    if (!member) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Передать ownership участнику ${member.user.nickname || `@${member.user.login}`}? После этого ваша роль станет admin.`,
+      )
+    ) {
+      return;
+    }
+
+    setPendingTransferUserId(userId);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      await gatewayClient.transferGroupOwnership(
+        token,
+        selectedState.snapshot.group.id,
+        userId,
+      );
+      setNotice("Ownership передан. Текущая роль обновлена.");
+      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
+      await reloadGroups();
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось передать ownership.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
+    } finally {
+      setPendingTransferUserId(null);
+    }
+  }
+
+  async function handleRemoveGroupMember(userId: string) {
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    const member = selectedState.members.find((candidate) => candidate.user.id === userId);
+    if (!member) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Удалить участника ${member.user.nickname || `@${member.user.login}`} из группы?`,
+      )
+    ) {
+      return;
+    }
+
+    setPendingRemoveUserId(userId);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      await gatewayClient.removeGroupMember(token, selectedState.snapshot.group.id, userId);
+      setNotice(`Участник ${member.user.nickname || `@${member.user.login}`} удалён из группы.`);
+      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
+      await reloadGroups();
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось удалить участника.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
+    } finally {
+      setPendingRemoveUserId(null);
+    }
+  }
+
+  async function handleLeaveGroup() {
+    if (selectedState.status !== "ready") {
+      return;
+    }
+    if (!window.confirm("Покинуть текущую группу?")) {
+      return;
+    }
+
+    setIsLeavingGroup(true);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      await gatewayClient.leaveGroup(token, selectedState.snapshot.group.id);
+      setNotice("Вы вышли из группы.");
+      clearGroupSelection();
+      await reloadGroups();
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось покинуть группу.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
+    } finally {
+      setIsLeavingGroup(false);
+    }
+  }
+
   async function reloadSelectedGroup(groupId: string, active: boolean) {
     try {
       const snapshot = await gatewayClient.getGroupChat(token, groupId);
@@ -442,6 +611,7 @@ export function GroupsPage() {
         messages,
         errorMessage: null,
       });
+      setMemberRoleDrafts(buildMemberRoleDrafts(members));
     } catch (error) {
       const message = resolveProtectedError(
         error,
@@ -460,6 +630,7 @@ export function GroupsPage() {
         messages: [],
         errorMessage: message,
       });
+      setMemberRoleDrafts({});
     }
   }
 
@@ -480,10 +651,10 @@ export function GroupsPage() {
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Groups</p>
-            <h1 className={styles.title}>Group chat bootstrap</h1>
+            <h1 className={styles.title}>Group membership management</h1>
             <p className={styles.subtitle}>
-              Slice фиксирует одну canonical primary thread на группу, text-only timeline и
-              read-only роль `reader` без group realtime, calls и media.
+              Slice фиксирует canonical membership management: bounded role changes, explicit
+              ownership transfer, remove member и leave group без group realtime, calls и media.
             </p>
           </div>
 
@@ -704,6 +875,18 @@ export function GroupsPage() {
                         ? "write allowed"
                         : "read only"}
                     </span>
+                    {selectedState.snapshot.group.selfRole !== "owner" && (
+                      <button
+                        className={styles.dangerButton}
+                        disabled={isLeavingGroup}
+                        onClick={() => {
+                          void handleLeaveGroup();
+                        }}
+                        type="button"
+                      >
+                        {isLeavingGroup ? "Выходим..." : "Покинуть группу"}
+                      </button>
+                    )}
                     <button
                       className={styles.secondaryButton}
                       onClick={clearGroupSelection}
@@ -831,25 +1014,128 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Участники группы</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Список участников доступен всем membership roles, включая `reader`.
+                    Список участников доступен всем membership roles, включая `reader`. Управление
+                    ролями и удаление участников в этом PR остаются owner-only.
                   </p>
                 </div>
+
+                {selectedState.snapshot.group.selfRole === "owner" ? (
+                  <div className={styles.notice}>
+                    Ownership нельзя потерять неявно. Чтобы owner вышел из группы, сначала нужен
+                    явный `TransferGroupOwnership`, затем обычный `LeaveGroup`.
+                  </div>
+                ) : (
+                  <p className={styles.helperText}>
+                    Текущая роль может только просматривать roster и при необходимости выполнить
+                    self-leave.
+                  </p>
+                )}
 
                 {selectedState.members.length === 0 ? (
                   <p className={styles.emptyState}>Backend пока не вернул участников группы.</p>
                 ) : (
                   <div className={styles.memberList}>
-                    {selectedState.members.map((member) => (
-                      <article className={styles.memberCard} key={member.user.id}>
-                        <div className={styles.memberHeader}>
-                          <div>
-                            <strong>{member.user.nickname}</strong>
-                            <p className={styles.groupMeta}>@{member.user.login}</p>
+                    {selectedState.members.map((member) => {
+                      const isCurrentUser = member.user.id === authState.profile.id;
+                      const draftRole = memberRoleDrafts[member.user.id] ?? member.role;
+                      const canAdjustRole =
+                        canManageMembership && !isCurrentUser && member.role !== "owner";
+                      const canTransferOwnership =
+                        canManageMembership && !isCurrentUser && member.role !== "owner";
+                      const canRemoveMember =
+                        canManageMembership && !isCurrentUser && member.role !== "owner";
+
+                      return (
+                        <article className={styles.memberCard} key={member.user.id}>
+                          <div className={styles.memberHeader}>
+                            <div>
+                              <strong>{member.user.nickname}</strong>
+                              <p className={styles.groupMeta}>@{member.user.login}</p>
+                              <p className={styles.helperText}>
+                                В группе с {formatDateTime(member.joinedAt)}
+                                {isCurrentUser ? " • это вы" : ""}
+                              </p>
+                            </div>
+                            <span className={styles.rolePill}>{roleLabel(member.role)}</span>
                           </div>
-                          <span className={styles.rolePill}>{roleLabel(member.role)}</span>
-                        </div>
-                      </article>
-                    ))}
+
+                          {canAdjustRole && (
+                            <div className={styles.memberActions}>
+                              <label className={styles.field}>
+                                <span>Новая роль</span>
+                                <select
+                                  onChange={(event) =>
+                                    setMemberRoleDrafts((current) => ({
+                                      ...current,
+                                      [member.user.id]: event.target.value as GroupMemberRole,
+                                    }))
+                                  }
+                                  value={draftRole}
+                                >
+                                  <option value="admin">admin</option>
+                                  <option value="member">member</option>
+                                  <option value="reader">reader</option>
+                                </select>
+                              </label>
+
+                              <div className={styles.memberButtons}>
+                                <button
+                                  className={styles.secondaryButton}
+                                  disabled={
+                                    pendingRoleUserId === member.user.id || draftRole === member.role
+                                  }
+                                  onClick={() => {
+                                    void handleUpdateGroupMemberRole(member.user.id);
+                                  }}
+                                  type="button"
+                                >
+                                  {pendingRoleUserId === member.user.id
+                                    ? "Сохраняем..."
+                                    : "Обновить роль"}
+                                </button>
+
+                                <button
+                                  className={styles.secondaryButton}
+                                  disabled={pendingTransferUserId === member.user.id}
+                                  onClick={() => {
+                                    void handleTransferOwnership(member.user.id);
+                                  }}
+                                  type="button"
+                                >
+                                  {pendingTransferUserId === member.user.id
+                                    ? "Передаём..."
+                                    : "Передать ownership"}
+                                </button>
+
+                                <button
+                                  className={styles.dangerButton}
+                                  disabled={pendingRemoveUserId === member.user.id}
+                                  onClick={() => {
+                                    void handleRemoveGroupMember(member.user.id);
+                                  }}
+                                  type="button"
+                                >
+                                  {pendingRemoveUserId === member.user.id
+                                    ? "Удаляем..."
+                                    : "Удалить"}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {!canAdjustRole &&
+                            !canTransferOwnership &&
+                            !canRemoveMember &&
+                            isCurrentUser && (
+                              <p className={styles.helperText}>
+                                {selectedState.snapshot.group.selfRole === "owner"
+                                  ? "Owner не может покинуть группу без явной передачи ownership."
+                                  : "Для self-leave используйте кнопку в верхней панели группы."}
+                              </p>
+                            )}
+                        </article>
+                      );
+                    })}
                   </div>
                 )}
               </section>
@@ -1037,6 +1323,13 @@ function InlineState({
 
 function canManageInviteLinks(role: GroupMemberRole): boolean {
   return role === "owner" || role === "admin";
+}
+
+function buildMemberRoleDrafts(members: GroupMember[]): Record<string, GroupMemberRole> {
+  return members.reduce<Record<string, GroupMemberRole>>((acc, member) => {
+    acc[member.user.id] = member.role;
+    return acc;
+  }, {});
 }
 
 function roleLabel(role: GroupMemberRole): string {

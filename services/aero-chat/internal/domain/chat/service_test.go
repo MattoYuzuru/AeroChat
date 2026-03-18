@@ -973,6 +973,96 @@ func (r *fakeRepository) ListGroupMembers(_ context.Context, userID string, grou
 	return result, nil
 }
 
+func (r *fakeRepository) GetGroupMember(_ context.Context, groupID string, userID string) (*GroupMember, error) {
+	memberships, ok := r.groupMembers[groupID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	member, ok := memberships[userID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	copy := member
+	return &copy, nil
+}
+
+func (r *fakeRepository) UpdateGroupMemberRole(_ context.Context, params UpdateGroupMemberRoleParams) (bool, error) {
+	memberships, ok := r.groupMembers[params.GroupID]
+	if !ok {
+		return false, ErrNotFound
+	}
+
+	member, ok := memberships[params.UserID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	if member.Role == params.Role {
+		return false, nil
+	}
+
+	member.Role = params.Role
+	memberships[params.UserID] = member
+	r.groupMembers[params.GroupID] = memberships
+
+	group := r.groups[params.GroupID]
+	group.UpdatedAt = params.UpdatedAt
+	r.groups[params.GroupID] = group
+	return true, nil
+}
+
+func (r *fakeRepository) TransferGroupOwnership(_ context.Context, params TransferGroupOwnershipParams) (bool, error) {
+	memberships, ok := r.groupMembers[params.GroupID]
+	if !ok {
+		return false, ErrNotFound
+	}
+
+	currentOwner, ok := memberships[params.CurrentOwnerUserID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	newOwner, ok := memberships[params.NewOwnerUserID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	if currentOwner.Role != GroupMemberRoleOwner {
+		return false, nil
+	}
+	if newOwner.Role == GroupMemberRoleOwner {
+		return false, nil
+	}
+
+	currentOwner.Role = GroupMemberRoleAdmin
+	newOwner.Role = GroupMemberRoleOwner
+	memberships[params.CurrentOwnerUserID] = currentOwner
+	memberships[params.NewOwnerUserID] = newOwner
+	r.groupMembers[params.GroupID] = memberships
+
+	group := r.groups[params.GroupID]
+	group.UpdatedAt = params.UpdatedAt
+	r.groups[params.GroupID] = group
+	return true, nil
+}
+
+func (r *fakeRepository) DeleteGroupMembership(_ context.Context, groupID string, userID string, updatedAt time.Time) (bool, error) {
+	memberships, ok := r.groupMembers[groupID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	if _, ok := memberships[userID]; !ok {
+		return false, ErrNotFound
+	}
+
+	delete(memberships, userID)
+	r.groupMembers[groupID] = memberships
+
+	group := r.groups[groupID]
+	group.UpdatedAt = updatedAt
+	r.groups[groupID] = group
+	return true, nil
+}
+
 func (r *fakeRepository) CreateGroupInviteLink(_ context.Context, params CreateGroupInviteLinkParams) (*GroupInviteLink, error) {
 	if _, ok := r.groups[params.GroupID]; !ok {
 		return nil, ErrNotFound

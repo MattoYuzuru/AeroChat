@@ -321,6 +321,142 @@ func (r *Repository) ListGroupMembers(ctx context.Context, userID string, groupI
 	return result, nil
 }
 
+func (r *Repository) GetGroupMember(ctx context.Context, groupID string, userID string) (*chat.GroupMember, error) {
+	row, err := r.queries.GetGroupMemberRowByGroupIDAndUserID(ctx, chatsqlc.GetGroupMemberRowByGroupIDAndUserIDParams{
+		GroupID: mustParseUUID(groupID),
+		UserID:  mustParseUUID(userID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	member := &chat.GroupMember{
+		GroupID: row.GroupID.String(),
+		User: chat.UserSummary{
+			ID:        row.UserID.String(),
+			Login:     row.Login,
+			Nickname:  row.Nickname,
+			AvatarURL: textPointer(row.AvatarUrl),
+		},
+		Role:     row.Role,
+		JoinedAt: timestampValue(row.JoinedAt),
+	}
+	return member, nil
+}
+
+func (r *Repository) UpdateGroupMemberRole(ctx context.Context, params chat.UpdateGroupMemberRoleParams) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	affected, err := q.UpdateGroupMembershipRole(ctx, chatsqlc.UpdateGroupMembershipRoleParams{
+		GroupID: mustParseUUID(params.GroupID),
+		UserID:  mustParseUUID(params.UserID),
+		Role:    params.Role,
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(params.GroupID),
+		UpdatedAt: timestamptzValue(params.UpdatedAt),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+	return true, nil
+}
+
+func (r *Repository) TransferGroupOwnership(ctx context.Context, params chat.TransferGroupOwnershipParams) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	affected, err := q.TransferGroupOwnership(ctx, chatsqlc.TransferGroupOwnershipParams{
+		GroupID:  mustParseUUID(params.GroupID),
+		UserID:   mustParseUUID(params.CurrentOwnerUserID),
+		UserID_2: mustParseUUID(params.NewOwnerUserID),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected != 2 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(params.GroupID),
+		UpdatedAt: timestamptzValue(params.UpdatedAt),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+	return true, nil
+}
+
+func (r *Repository) DeleteGroupMembership(ctx context.Context, groupID string, userID string, updatedAt time.Time) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	affected, err := q.DeleteGroupMembership(ctx, chatsqlc.DeleteGroupMembershipParams{
+		GroupID: mustParseUUID(groupID),
+		UserID:  mustParseUUID(userID),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(groupID),
+		UpdatedAt: timestamptzValue(updatedAt),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+	return true, nil
+}
+
 func (r *Repository) CreateGroupInviteLink(ctx context.Context, params chat.CreateGroupInviteLinkParams) (*chat.GroupInviteLink, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

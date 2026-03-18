@@ -17,6 +17,10 @@ service ChatService {
   rpc GetGroup(GetGroupRequest) returns (GetGroupResponse);
   rpc GetGroupChat(GetGroupChatRequest) returns (GetGroupChatResponse);
   rpc ListGroupMembers(ListGroupMembersRequest) returns (ListGroupMembersResponse);
+  rpc UpdateGroupMemberRole(UpdateGroupMemberRoleRequest) returns (UpdateGroupMemberRoleResponse);
+  rpc TransferGroupOwnership(TransferGroupOwnershipRequest) returns (TransferGroupOwnershipResponse);
+  rpc RemoveGroupMember(RemoveGroupMemberRequest) returns (RemoveGroupMemberResponse);
+  rpc LeaveGroup(LeaveGroupRequest) returns (LeaveGroupResponse);
   rpc CreateGroupInviteLink(CreateGroupInviteLinkRequest) returns (CreateGroupInviteLinkResponse);
   rpc ListGroupInviteLinks(ListGroupInviteLinksRequest) returns (ListGroupInviteLinksResponse);
   rpc DisableGroupInviteLink(DisableGroupInviteLinkRequest) returns (DisableGroupInviteLinkResponse);
@@ -245,6 +249,38 @@ message ListGroupMembersRequest {
 message ListGroupMembersResponse {
   repeated GroupMember members = 1;
 }
+
+message UpdateGroupMemberRoleRequest {
+  string group_id = 1;
+  string user_id = 2;
+  GroupMemberRole role = 3;
+}
+
+message UpdateGroupMemberRoleResponse {
+  GroupMember member = 1;
+}
+
+message TransferGroupOwnershipRequest {
+  string group_id = 1;
+  string target_user_id = 2;
+}
+
+message TransferGroupOwnershipResponse {
+  Group group = 1;
+}
+
+message RemoveGroupMemberRequest {
+  string group_id = 1;
+  string user_id = 2;
+}
+
+message RemoveGroupMemberResponse {}
+
+message LeaveGroupRequest {
+  string group_id = 1;
+}
+
+message LeaveGroupResponse {}
 
 message CreateGroupInviteLinkRequest {
   string group_id = 1;

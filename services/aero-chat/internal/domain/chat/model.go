@@ -221,6 +221,20 @@ type CreateGroupInviteLinkParams struct {
 	CreatedAt       time.Time
 }
 
+type UpdateGroupMemberRoleParams struct {
+	GroupID   string
+	UserID    string
+	Role      string
+	UpdatedAt time.Time
+}
+
+type TransferGroupOwnershipParams struct {
+	GroupID            string
+	CurrentOwnerUserID string
+	NewOwnerUserID     string
+	UpdatedAt          time.Time
+}
+
 type CreateDirectChatMessageParams struct {
 	MessageID    string
 	ChatID       string

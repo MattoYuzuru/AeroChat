@@ -20,6 +20,7 @@ type Querier interface {
 	CreateGroupInviteLink(ctx context.Context, arg CreateGroupInviteLinkParams) (CreateGroupInviteLinkRow, error)
 	CreateGroupMessage(ctx context.Context, arg CreateGroupMessageParams) (GroupMessage, error)
 	CreateGroupThread(ctx context.Context, arg CreateGroupThreadParams) (GroupThread, error)
+	DeleteGroupMembership(ctx context.Context, arg DeleteGroupMembershipParams) (int64, error)
 	DisableGroupInviteLink(ctx context.Context, arg DisableGroupInviteLinkParams) (int64, error)
 	FriendshipExists(ctx context.Context, arg FriendshipExistsParams) (bool, error)
 	GetDirectChatMessageByID(ctx context.Context, arg GetDirectChatMessageByIDParams) (GetDirectChatMessageByIDRow, error)
@@ -28,6 +29,7 @@ type Querier interface {
 	GetGroupChatThreadRowByGroupIDAndUserID(ctx context.Context, arg GetGroupChatThreadRowByGroupIDAndUserIDParams) (GroupThread, error)
 	GetGroupInviteLinkByIDAndGroupID(ctx context.Context, arg GetGroupInviteLinkByIDAndGroupIDParams) (GetGroupInviteLinkByIDAndGroupIDRow, error)
 	GetGroupInviteLinkForJoin(ctx context.Context, tokenHash string) (GetGroupInviteLinkForJoinRow, error)
+	GetGroupMemberRowByGroupIDAndUserID(ctx context.Context, arg GetGroupMemberRowByGroupIDAndUserIDParams) (GetGroupMemberRowByGroupIDAndUserIDRow, error)
 	GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowByIDAndUserIDParams) (GetGroupRowByIDAndUserIDRow, error)
 	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
 	JoinGroupMembership(ctx context.Context, arg JoinGroupMembershipParams) (int64, error)
@@ -48,7 +50,9 @@ type Querier interface {
 	TouchGroupThreadUpdatedAt(ctx context.Context, arg TouchGroupThreadUpdatedAtParams) error
 	TouchGroupUpdatedAt(ctx context.Context, arg TouchGroupUpdatedAtParams) error
 	TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error
+	TransferGroupOwnership(ctx context.Context, arg TransferGroupOwnershipParams) (int64, error)
 	UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error)
+	UpdateGroupMembershipRole(ctx context.Context, arg UpdateGroupMembershipRoleParams) (int64, error)
 	UpsertDirectChatReadReceipt(ctx context.Context, arg UpsertDirectChatReadReceiptParams) (int64, error)
 }
 
