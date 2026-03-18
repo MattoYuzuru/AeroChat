@@ -214,6 +214,15 @@ func (r *Repository) CreateGroup(ctx context.Context, params chat.CreateGroupPar
 	}); err != nil {
 		return nil, convertError(err)
 	}
+	if _, err := q.CreateGroupThread(ctx, chatsqlc.CreateGroupThreadParams{
+		ID:        mustParseUUID(params.PrimaryThreadID),
+		GroupID:   groupID,
+		ThreadKey: chat.GroupThreadKeyPrimary,
+		CreatedAt: timestamptzValue(params.CreatedAt),
+		UpdatedAt: timestamptzValue(params.CreatedAt),
+	}); err != nil {
+		return nil, convertError(err)
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit tx: %w", err)
@@ -265,6 +274,24 @@ func (r *Repository) GetGroup(ctx context.Context, userID string, groupID string
 		UpdatedAt:       timestampValue(row.UpdatedAt),
 	}
 	return group, nil
+}
+
+func (r *Repository) GetGroupChatThread(ctx context.Context, userID string, groupID string) (*chat.GroupChatThread, error) {
+	row, err := r.queries.GetGroupChatThreadRowByGroupIDAndUserID(ctx, chatsqlc.GetGroupChatThreadRowByGroupIDAndUserIDParams{
+		UserID:  mustParseUUID(userID),
+		GroupID: mustParseUUID(groupID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	return &chat.GroupChatThread{
+		ID:        row.ID.String(),
+		GroupID:   row.GroupID.String(),
+		ThreadKey: row.ThreadKey,
+		CreatedAt: timestampValue(row.CreatedAt),
+		UpdatedAt: timestampValue(row.UpdatedAt),
+	}, nil
 }
 
 func (r *Repository) ListGroupMembers(ctx context.Context, userID string, groupID string) ([]chat.GroupMember, error) {
@@ -511,6 +538,36 @@ func (r *Repository) JoinGroupByInviteLink(ctx context.Context, groupID string, 
 	return true, nil
 }
 
+func (r *Repository) ListGroupMessages(ctx context.Context, userID string, groupID string, limit int32) ([]chat.GroupMessage, error) {
+	rows, err := r.queries.ListGroupMessagesByGroupIDAndUserID(ctx, chatsqlc.ListGroupMessagesByGroupIDAndUserIDParams{
+		UserID:  mustParseUUID(userID),
+		GroupID: mustParseUUID(groupID),
+		Limit:   limit,
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.GroupMessage, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, chat.GroupMessage{
+			ID:           row.ID.String(),
+			GroupID:      row.GroupID.String(),
+			ThreadID:     row.ThreadID.String(),
+			SenderUserID: row.SenderUserID.String(),
+			Kind:         row.Kind,
+			Text: &chat.TextMessageContent{
+				Text:           row.TextContent,
+				MarkdownPolicy: row.MarkdownPolicy,
+			},
+			CreatedAt: timestampValue(row.CreatedAt),
+			UpdatedAt: timestampValue(row.UpdatedAt),
+		})
+	}
+
+	return result, nil
+}
+
 func (r *Repository) ListDirectChatReadStateEntries(ctx context.Context, userID string, chatID string) ([]chat.DirectChatReadStateEntry, error) {
 	rows, err := r.queries.ListDirectChatReadStateEntries(ctx, chatsqlc.ListDirectChatReadStateEntriesParams{
 		UserID: mustParseUUID(userID),
@@ -642,6 +699,62 @@ func (r *Repository) CreateDirectChatMessage(ctx context.Context, params chat.Cr
 		Pinned:         false,
 	})
 	return &message, nil
+}
+
+func (r *Repository) CreateGroupMessage(ctx context.Context, params chat.CreateGroupMessageParams) (*chat.GroupMessage, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	row, err := q.CreateGroupMessage(ctx, chatsqlc.CreateGroupMessageParams{
+		ID:             mustParseUUID(params.MessageID),
+		ThreadID:       mustParseUUID(params.ThreadID),
+		SenderUserID:   mustParseUUID(params.SenderUserID),
+		Kind:           chat.MessageKindText,
+		TextContent:    params.Text,
+		MarkdownPolicy: chat.MarkdownPolicySafeSubsetV1,
+		CreatedAt:      timestamptzValue(params.CreatedAt),
+		UpdatedAt:      timestamptzValue(params.CreatedAt),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	if err := q.TouchGroupThreadUpdatedAt(ctx, chatsqlc.TouchGroupThreadUpdatedAtParams{
+		ID:        mustParseUUID(params.ThreadID),
+		UpdatedAt: timestamptzValue(params.CreatedAt),
+	}); err != nil {
+		return nil, convertError(err)
+	}
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(params.GroupID),
+		UpdatedAt: timestamptzValue(params.CreatedAt),
+	}); err != nil {
+		return nil, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return &chat.GroupMessage{
+		ID:           row.ID.String(),
+		GroupID:      params.GroupID,
+		ThreadID:     row.ThreadID.String(),
+		SenderUserID: row.SenderUserID.String(),
+		Kind:         row.Kind,
+		Text: &chat.TextMessageContent{
+			Text:           row.TextContent,
+			MarkdownPolicy: row.MarkdownPolicy,
+		},
+		CreatedAt: timestampValue(row.CreatedAt),
+		UpdatedAt: timestampValue(row.UpdatedAt),
+	}, nil
 }
 
 func (r *Repository) ListDirectChatMessages(ctx context.Context, userID string, chatID string, limit int32) ([]chat.DirectChatMessage, error) {

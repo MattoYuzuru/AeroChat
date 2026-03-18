@@ -93,6 +93,15 @@ export interface Group {
   updatedAt: string;
 }
 
+export interface GroupChatThread {
+  id: string;
+  groupId: string;
+  threadKey: string;
+  canSendMessages: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface GroupMember {
   user: ChatUser;
   role: GroupMemberRole;
@@ -147,6 +156,17 @@ export interface DirectChatMessage {
   updatedAt: string;
 }
 
+export interface GroupMessage {
+  id: string;
+  groupId: string;
+  threadId: string;
+  senderUserId: string;
+  kind: string;
+  text: TextMessageContent | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DirectChatReadPosition {
   messageId: string;
   messageCreatedAt: string;
@@ -183,6 +203,11 @@ export interface DirectChatSnapshot {
   readState: DirectChatReadState | null;
   typingState: DirectChatTypingState | null;
   presenceState: DirectChatPresenceState | null;
+}
+
+export interface GroupChatSnapshot {
+  group: Group;
+  thread: GroupChatThread;
 }
 
 export interface RegisterInput {
@@ -236,6 +261,7 @@ export interface GatewayClient {
   createGroup(token: string, name: string): Promise<Group>;
   listGroups(token: string): Promise<Group[]>;
   getGroup(token: string, groupId: string): Promise<Group>;
+  getGroupChat(token: string, groupId: string): Promise<GroupChatSnapshot>;
   listGroupMembers(token: string, groupId: string): Promise<GroupMember[]>;
   createGroupInviteLink(
     token: string,
@@ -249,6 +275,16 @@ export interface GatewayClient {
     inviteLinkId: string,
   ): Promise<GroupInviteLink>;
   joinGroupByInviteLink(token: string, inviteToken: string): Promise<Group>;
+  listGroupMessages(
+    token: string,
+    groupId: string,
+    pageSize?: number,
+  ): Promise<GroupMessage[]>;
+  sendGroupTextMessage(
+    token: string,
+    groupId: string,
+    text: string,
+  ): Promise<GroupMessage>;
   createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
   listDirectChats(token: string): Promise<DirectChat[]>;
   getDirectChat(token: string, chatId: string): Promise<DirectChatSnapshot>;

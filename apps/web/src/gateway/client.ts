@@ -17,7 +17,10 @@ import type {
   GatewayClient,
   GatewayErrorCode,
   Group,
+  GroupChatSnapshot,
+  GroupChatThread,
   GroupInviteLink,
+  GroupMessage,
   GroupMember,
   GroupMemberRole,
   MessageTombstone,
@@ -151,6 +154,13 @@ interface GroupWire extends TimestampedWire {
   memberCount?: number;
 }
 
+interface GroupChatThreadWire extends TimestampedWire {
+  id?: string;
+  groupId?: string;
+  threadKey?: string;
+  canSendMessages?: boolean;
+}
+
 interface GroupMemberWire {
   user?: ChatUserWire;
   role?: string;
@@ -185,6 +195,15 @@ interface DirectChatMessageWire extends TimestampedWire {
   text?: TextMessageContentWire;
   tombstone?: MessageTombstoneWire;
   pinned?: boolean;
+}
+
+interface GroupMessageWire extends TimestampedWire {
+  id?: string;
+  groupId?: string;
+  threadId?: string;
+  senderUserId?: string;
+  kind?: string;
+  text?: TextMessageContentWire;
 }
 
 interface DirectChatReadPositionWire extends TimestampedWire {
@@ -244,6 +263,11 @@ interface GetGroupResponseWire {
   group?: GroupWire;
 }
 
+interface GetGroupChatResponseWire {
+  group?: GroupWire;
+  thread?: GroupChatThreadWire;
+}
+
 interface ListGroupMembersResponseWire {
   members?: GroupMemberWire[];
 }
@@ -263,6 +287,14 @@ interface DisableGroupInviteLinkResponseWire {
 
 interface JoinGroupByInviteLinkResponseWire {
   group?: GroupWire;
+}
+
+interface ListGroupMessagesResponseWire {
+  messages?: GroupMessageWire[];
+}
+
+interface SendGroupTextMessageResponseWire {
+  message?: GroupMessageWire;
 }
 
 interface MarkDirectChatReadResponseWire {
@@ -434,6 +466,21 @@ export function createGatewayClient(
       return normalizeGroup(response.group);
     },
 
+    async getGroupChat(token, groupId) {
+      const response = await unaryCall<GetGroupChatResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "GetGroupChat",
+        {
+          groupId: groupId.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroupChatSnapshot(response);
+    },
+
     async listGroupMembers(token, groupId) {
       const response = await unaryCall<ListGroupMembersResponseWire>(
         fetchImpl,
@@ -512,6 +559,38 @@ export function createGatewayClient(
       );
 
       return normalizeGroup(response.group);
+    },
+
+    async listGroupMessages(token, groupId, pageSize) {
+      const response = await unaryCall<ListGroupMessagesResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ListGroupMessages",
+        {
+          groupId: groupId.trim(),
+          pageSize,
+        },
+        token,
+      );
+
+      return (response.messages ?? []).map(normalizeGroupMessage);
+    },
+
+    async sendGroupTextMessage(token, groupId, text) {
+      const response = await unaryCall<SendGroupTextMessageResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "SendGroupTextMessage",
+        {
+          groupId: groupId.trim(),
+          text,
+        },
+        token,
+      );
+
+      return normalizeGroupMessage(response.message);
     },
 
     async createDirectChat(token, peerUserId) {
@@ -1068,6 +1147,24 @@ function normalizeGroup(input: GroupWire | undefined): Group {
   };
 }
 
+function normalizeGroupChatThread(input: GroupChatThreadWire | undefined): GroupChatThread {
+  return {
+    id: input?.id ?? "",
+    groupId: input?.groupId ?? "",
+    threadKey: input?.threadKey ?? "",
+    canSendMessages: input?.canSendMessages ?? false,
+    createdAt: input?.createdAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeGroupChatSnapshot(input: GetGroupChatResponseWire): GroupChatSnapshot {
+  return {
+    group: normalizeGroup(input.group),
+    thread: normalizeGroupChatThread(input.thread),
+  };
+}
+
 function normalizeGroupMember(input: GroupMemberWire): GroupMember {
   return {
     user: normalizeChatUser(input.user),
@@ -1089,6 +1186,19 @@ function normalizeGroupInviteLink(
     updatedAt: input?.updatedAt ?? "",
     disabledAt: normalizeNullableString(input?.disabledAt),
     lastJoinedAt: normalizeNullableString(input?.lastJoinedAt),
+  };
+}
+
+function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessage {
+  return {
+    id: input?.id ?? "",
+    groupId: input?.groupId ?? "",
+    threadId: input?.threadId ?? "",
+    senderUserId: input?.senderUserId ?? "",
+    kind: input?.kind ?? "",
+    text: input?.text ? normalizeTextMessageContent(input.text) : null,
+    createdAt: input?.createdAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
   };
 }
 

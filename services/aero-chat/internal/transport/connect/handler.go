@@ -144,6 +144,23 @@ func (h *Handler) GetGroup(ctx context.Context, req *connect.Request[chatv1.GetG
 	}), nil
 }
 
+func (h *Handler) GetGroupChat(ctx context.Context, req *connect.Request[chatv1.GetGroupChatRequest]) (*connect.Response[chatv1.GetGroupChatResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	group, thread, err := h.service.GetGroupChat(ctx, token, req.Msg.GroupId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.GetGroupChatResponse{
+		Group:  toProtoGroup(*group),
+		Thread: toProtoGroupChatThread(*thread),
+	}), nil
+}
+
 func (h *Handler) ListGroupMembers(ctx context.Context, req *connect.Request[chatv1.ListGroupMembersRequest]) (*connect.Response[chatv1.ListGroupMembersResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -357,6 +374,43 @@ func (h *Handler) ListDirectChatMessages(ctx context.Context, req *connect.Reque
 	return connect.NewResponse(response), nil
 }
 
+func (h *Handler) ListGroupMessages(ctx context.Context, req *connect.Request[chatv1.ListGroupMessagesRequest]) (*connect.Response[chatv1.ListGroupMessagesResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	messages, err := h.service.ListGroupMessages(ctx, token, req.Msg.GroupId, req.Msg.PageSize)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &chatv1.ListGroupMessagesResponse{
+		Messages: make([]*chatv1.GroupMessage, 0, len(messages)),
+	}
+	for _, message := range messages {
+		response.Messages = append(response.Messages, toProtoGroupMessage(message))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) SendGroupTextMessage(ctx context.Context, req *connect.Request[chatv1.SendGroupTextMessageRequest]) (*connect.Response[chatv1.SendGroupTextMessageResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	message, err := h.service.SendGroupTextMessage(ctx, token, req.Msg.GroupId, req.Msg.Text)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.SendGroupTextMessageResponse{
+		Message: toProtoGroupMessage(*message),
+	}), nil
+}
+
 func (h *Handler) DeleteMessageForEveryone(ctx context.Context, req *connect.Request[chatv1.DeleteMessageForEveryoneRequest]) (*connect.Response[chatv1.DeleteMessageForEveryoneResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -466,6 +520,17 @@ func toProtoGroup(value chat.Group) *chatv1.Group {
 	}
 }
 
+func toProtoGroupChatThread(value chat.GroupChatThread) *chatv1.GroupChatThread {
+	return &chatv1.GroupChatThread{
+		Id:              value.ID,
+		GroupId:         value.GroupID,
+		ThreadKey:       value.ThreadKey,
+		CanSendMessages: value.CanSendMessages,
+		CreatedAt:       timestamppb.New(value.CreatedAt),
+		UpdatedAt:       timestamppb.New(value.UpdatedAt),
+	}
+}
+
 func toProtoGroupMember(value chat.GroupMember) *chatv1.GroupMember {
 	return &chatv1.GroupMember{
 		User:     toProtoChatUser(value.User),
@@ -527,6 +592,26 @@ func toProtoDirectChatMessage(value chat.DirectChatMessage) *chatv1.DirectChatMe
 		result.Tombstone = &chatv1.MessageTombstone{
 			DeletedByUserId: value.Tombstone.DeletedByUserID,
 			DeletedAt:       timestamppb.New(value.Tombstone.DeletedAt),
+		}
+	}
+
+	return result
+}
+
+func toProtoGroupMessage(value chat.GroupMessage) *chatv1.GroupMessage {
+	result := &chatv1.GroupMessage{
+		Id:           value.ID,
+		GroupId:      value.GroupID,
+		ThreadId:     value.ThreadID,
+		SenderUserId: value.SenderUserID,
+		Kind:         toProtoMessageKind(value.Kind),
+		CreatedAt:    timestamppb.New(value.CreatedAt),
+		UpdatedAt:    timestamppb.New(value.UpdatedAt),
+	}
+	if value.Text != nil {
+		result.Text = &chatv1.TextMessageContent{
+			Text:           value.Text.Text,
+			MarkdownPolicy: toProtoMarkdownPolicy(value.Text.MarkdownPolicy),
 		}
 	}
 

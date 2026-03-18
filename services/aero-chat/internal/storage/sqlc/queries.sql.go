@@ -278,6 +278,94 @@ func (q *Queries) CreateGroupInviteLink(ctx context.Context, arg CreateGroupInvi
 	return i, err
 }
 
+const createGroupMessage = `-- name: CreateGroupMessage :one
+INSERT INTO group_messages (
+    id,
+    thread_id,
+    sender_user_id,
+    kind,
+    text_content,
+    markdown_policy,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at
+`
+
+type CreateGroupMessageParams struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	ThreadID       uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind           string             `db:"kind" json:"kind"`
+	TextContent    string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateGroupMessage(ctx context.Context, arg CreateGroupMessageParams) (GroupMessage, error) {
+	row := q.db.QueryRow(ctx, createGroupMessage,
+		arg.ID,
+		arg.ThreadID,
+		arg.SenderUserID,
+		arg.Kind,
+		arg.TextContent,
+		arg.MarkdownPolicy,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i GroupMessage
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.SenderUserID,
+		&i.Kind,
+		&i.TextContent,
+		&i.MarkdownPolicy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createGroupThread = `-- name: CreateGroupThread :one
+INSERT INTO group_threads (
+    id,
+    group_id,
+    thread_key,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+RETURNING id, group_id, thread_key, created_at, updated_at
+`
+
+type CreateGroupThreadParams struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	GroupID   uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadKey string             `db:"thread_key" json:"thread_key"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateGroupThread(ctx context.Context, arg CreateGroupThreadParams) (GroupThread, error) {
+	row := q.db.QueryRow(ctx, createGroupThread,
+		arg.ID,
+		arg.GroupID,
+		arg.ThreadKey,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i GroupThread
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.ThreadKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const disableGroupInviteLink = `-- name: DisableGroupInviteLink :execrows
 UPDATE group_invite_links
 SET
@@ -488,6 +576,38 @@ func (q *Queries) GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDir
 		return nil, err
 	}
 	return items, nil
+}
+
+const getGroupChatThreadRowByGroupIDAndUserID = `-- name: GetGroupChatThreadRowByGroupIDAndUserID :one
+SELECT
+    t.id,
+    t.group_id,
+    t.thread_key,
+    t.created_at,
+    t.updated_at
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+WHERE self.user_id = $1
+  AND self.group_id = $2
+  AND t.thread_key = 'primary'
+`
+
+type GetGroupChatThreadRowByGroupIDAndUserIDParams struct {
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+}
+
+func (q *Queries) GetGroupChatThreadRowByGroupIDAndUserID(ctx context.Context, arg GetGroupChatThreadRowByGroupIDAndUserIDParams) (GroupThread, error) {
+	row := q.db.QueryRow(ctx, getGroupChatThreadRowByGroupIDAndUserID, arg.UserID, arg.GroupID)
+	var i GroupThread
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.ThreadKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getGroupInviteLinkByIDAndGroupID = `-- name: GetGroupInviteLinkByIDAndGroupID :one
@@ -1160,6 +1280,75 @@ func (q *Queries) ListGroupMemberRowsByGroupIDAndUserID(ctx context.Context, arg
 	return items, nil
 }
 
+const listGroupMessagesByGroupIDAndUserID = `-- name: ListGroupMessagesByGroupIDAndUserID :many
+SELECT
+    m.id,
+    t.group_id,
+    m.thread_id,
+    m.sender_user_id,
+    m.kind,
+    m.text_content,
+    m.markdown_policy,
+    m.created_at,
+    m.updated_at
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+JOIN group_messages AS m ON m.thread_id = t.id
+WHERE self.user_id = $1
+  AND self.group_id = $2
+  AND t.thread_key = 'primary'
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $3
+`
+
+type ListGroupMessagesByGroupIDAndUserIDParams struct {
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+	Limit   int32     `db:"limit" json:"limit"`
+}
+
+type ListGroupMessagesByGroupIDAndUserIDRow struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID       uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind           string             `db:"kind" json:"kind"`
+	TextContent    string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListGroupMessagesByGroupIDAndUserID(ctx context.Context, arg ListGroupMessagesByGroupIDAndUserIDParams) ([]ListGroupMessagesByGroupIDAndUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listGroupMessagesByGroupIDAndUserID, arg.UserID, arg.GroupID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGroupMessagesByGroupIDAndUserIDRow
+	for rows.Next() {
+		var i ListGroupMessagesByGroupIDAndUserIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GroupID,
+			&i.ThreadID,
+			&i.SenderUserID,
+			&i.Kind,
+			&i.TextContent,
+			&i.MarkdownPolicy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGroupRowsByUserID = `-- name: ListGroupRowsByUserID :many
 SELECT
     g.id,
@@ -1320,6 +1509,22 @@ type TouchGroupInviteLinkJoinParams struct {
 
 func (q *Queries) TouchGroupInviteLinkJoin(ctx context.Context, arg TouchGroupInviteLinkJoinParams) error {
 	_, err := q.db.Exec(ctx, touchGroupInviteLinkJoin, arg.ID, arg.LastJoinedAt)
+	return err
+}
+
+const touchGroupThreadUpdatedAt = `-- name: TouchGroupThreadUpdatedAt :exec
+UPDATE group_threads
+SET updated_at = $2
+WHERE id = $1
+`
+
+type TouchGroupThreadUpdatedAtParams struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) TouchGroupThreadUpdatedAt(ctx context.Context, arg TouchGroupThreadUpdatedAtParams) error {
+	_, err := q.db.Exec(ctx, touchGroupThreadUpdatedAt, arg.ID, arg.UpdatedAt)
 	return err
 }
 

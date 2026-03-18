@@ -1,15 +1,18 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
 import { gatewayClient } from "../gateway/runtime";
 import {
   describeGatewayError,
   isGatewayErrorCode,
   type CreatedGroupInviteLink,
   type Group,
+  type GroupChatSnapshot,
   type GroupInviteLink,
   type GroupMember,
   type GroupMemberRole,
+  type GroupMessage,
 } from "../gateway/types";
 import { buildGroupInviteUrl, extractGroupInviteToken } from "../groups/invite-token";
 import styles from "./GroupsPage.module.css";
@@ -17,38 +20,43 @@ import styles from "./GroupsPage.module.css";
 type SelectedState =
   | {
       status: "idle";
-      group: null;
+      snapshot: null;
       members: GroupMember[];
       inviteLinks: GroupInviteLink[];
+      messages: GroupMessage[];
       errorMessage: null;
     }
   | {
       status: "loading";
-      group: null;
+      snapshot: null;
       members: GroupMember[];
       inviteLinks: GroupInviteLink[];
+      messages: GroupMessage[];
       errorMessage: null;
     }
   | {
       status: "ready";
-      group: Group;
+      snapshot: GroupChatSnapshot;
       members: GroupMember[];
       inviteLinks: GroupInviteLink[];
+      messages: GroupMessage[];
       errorMessage: null;
     }
   | {
       status: "error";
-      group: null;
+      snapshot: null;
       members: GroupMember[];
       inviteLinks: GroupInviteLink[];
+      messages: GroupMessage[];
       errorMessage: string;
     };
 
 const initialSelectedState: SelectedState = {
   status: "idle",
-  group: null,
+  snapshot: null,
   members: [],
   inviteLinks: [],
+  messages: [],
   errorMessage: null,
 };
 
@@ -63,10 +71,12 @@ export function GroupsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
   const [joinInput, setJoinInput] = useState("");
+  const [composerText, setComposerText] = useState("");
   const [inviteRole, setInviteRole] = useState<GroupMemberRole>("member");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isCreatingInviteLink, setIsCreatingInviteLink] = useState(false);
   const [pendingDisableInviteId, setPendingDisableInviteId] = useState<string | null>(null);
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
@@ -126,41 +136,49 @@ export function GroupsPage() {
     }
     if (selectedGroupId === "") {
       setSelectedState(initialSelectedState);
+      setComposerText("");
       return;
     }
 
     let active = true;
     setSelectedState({
       status: "loading",
-      group: null,
+      snapshot: null,
       members: [],
       inviteLinks: [],
+      messages: [],
       errorMessage: null,
     });
 
     void (async () => {
       try {
-        const group = await gatewayClient.getGroup(token, selectedGroupId);
+        const snapshot = await gatewayClient.getGroupChat(token, selectedGroupId);
         const membersPromise = gatewayClient.listGroupMembers(token, selectedGroupId);
-        const inviteLinksPromise = canManageInviteLinks(group.selfRole)
+        const messagesPromise = gatewayClient.listGroupMessages(token, selectedGroupId);
+        const inviteLinksPromise = canManageInviteLinks(snapshot.group.selfRole)
           ? gatewayClient.listGroupInviteLinks(token, selectedGroupId)
           : Promise.resolve([]);
-        const [members, inviteLinks] = await Promise.all([membersPromise, inviteLinksPromise]);
+        const [members, messages, inviteLinks] = await Promise.all([
+          membersPromise,
+          messagesPromise,
+          inviteLinksPromise,
+        ]);
         if (!active) {
           return;
         }
 
         setSelectedState({
           status: "ready",
-          group,
+          snapshot,
           members,
           inviteLinks,
+          messages,
           errorMessage: null,
         });
       } catch (error) {
         const message = resolveProtectedError(
           error,
-          "Не удалось открыть группу через gateway.",
+          "Не удалось открыть group chat через gateway.",
           expireSession,
         );
         if (!active || message === null) {
@@ -169,9 +187,10 @@ export function GroupsPage() {
 
         setSelectedState({
           status: "error",
-          group: null,
+          snapshot: null,
           members: [],
           inviteLinks: [],
+          messages: [],
           errorMessage: message,
         });
       }
@@ -180,12 +199,7 @@ export function GroupsPage() {
     return () => {
       active = false;
     };
-  }, [
-    authState.status,
-    token,
-    expireSession,
-    selectedGroupId,
-  ]);
+  }, [authState.status, expireSession, selectedGroupId, token]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -196,6 +210,8 @@ export function GroupsPage() {
       ? selectedState.inviteLinks.filter((inviteLink) => inviteLink.disabledAt === null).length
       : 0;
   const requestedJoinToken = extractGroupInviteToken(joinInput || joinTokenFromRoute);
+  const threadMessages =
+    selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
 
   async function reloadGroups() {
     if (groupsStatus === "loading") {
@@ -241,6 +257,7 @@ export function GroupsPage() {
     try {
       const group = await gatewayClient.createGroup(token, normalizedName);
       setGroupName("");
+      setComposerText("");
       setLastCreatedInvite(null);
       setNotice("Группа создана.");
       await reloadGroups();
@@ -274,6 +291,7 @@ export function GroupsPage() {
     try {
       const group = await gatewayClient.joinGroupByInviteLink(token, requestedJoinToken);
       setJoinInput(requestedJoinToken);
+      setComposerText("");
       setLastCreatedInvite(null);
       setNotice("Вход в группу выполнен.");
       await reloadGroups();
@@ -305,12 +323,12 @@ export function GroupsPage() {
     try {
       const createdInviteLink = await gatewayClient.createGroupInviteLink(
         token,
-        selectedState.group.id,
+        selectedState.snapshot.group.id,
         inviteRole,
       );
       setLastCreatedInvite(createdInviteLink);
       setNotice("Invite link создан.");
-      await reloadSelectedGroup(selectedState.group.id);
+      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
       await reloadGroups();
     } catch (error) {
       const message = resolveProtectedError(
@@ -338,11 +356,11 @@ export function GroupsPage() {
     try {
       await gatewayClient.disableGroupInviteLink(
         token,
-        selectedState.group.id,
+        selectedState.snapshot.group.id,
         inviteLinkId,
       );
       setNotice("Invite link отозван.");
-      await reloadSelectedGroup(selectedState.group.id);
+      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
       await reloadGroups();
     } catch (error) {
       const message = resolveProtectedError(
@@ -358,38 +376,90 @@ export function GroupsPage() {
     }
   }
 
-  async function reloadSelectedGroup(groupId: string) {
+  async function handleSendGroupMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    const normalizedText = composerText.trim();
+    if (normalizedText === "") {
+      setActionError("Введите текст сообщения, прежде чем отправлять его.");
+      setNotice(null);
+      return;
+    }
+
+    setIsSendingMessage(true);
+    setActionError(null);
+    setNotice(null);
+
     try {
-      const group = await gatewayClient.getGroup(token, groupId);
-      const [members, inviteLinks] = await Promise.all([
-        gatewayClient.listGroupMembers(token, groupId),
-        canManageInviteLinks(group.selfRole)
-          ? gatewayClient.listGroupInviteLinks(token, groupId)
-          : Promise.resolve([]),
+      await gatewayClient.sendGroupTextMessage(
+        token,
+        selectedState.snapshot.group.id,
+        normalizedText,
+      );
+      setComposerText("");
+      setNotice("Сообщение отправлено.");
+      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
+      await reloadGroups();
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось отправить сообщение в группу.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }
+
+  async function reloadSelectedGroup(groupId: string, active: boolean) {
+    try {
+      const snapshot = await gatewayClient.getGroupChat(token, groupId);
+      const membersPromise = gatewayClient.listGroupMembers(token, groupId);
+      const messagesPromise = gatewayClient.listGroupMessages(token, groupId);
+      const inviteLinksPromise = canManageInviteLinks(snapshot.group.selfRole)
+        ? gatewayClient.listGroupInviteLinks(token, groupId)
+        : Promise.resolve([]);
+      const [members, messages, inviteLinks] = await Promise.all([
+        membersPromise,
+        messagesPromise,
+        inviteLinksPromise,
       ]);
+      if (!active) {
+        return;
+      }
 
       setSelectedState({
         status: "ready",
-        group,
+        snapshot,
         members,
         inviteLinks,
+        messages,
         errorMessage: null,
       });
     } catch (error) {
       const message = resolveProtectedError(
         error,
-        "Не удалось обновить открытую группу.",
+        "Не удалось открыть group chat через gateway.",
         expireSession,
       );
-      if (message !== null) {
-        setSelectedState({
-          status: "error",
-          group: null,
-          members: [],
-          inviteLinks: [],
-          errorMessage: message,
-        });
+      if (!active || message === null) {
+        return;
       }
+
+      setSelectedState({
+        status: "error",
+        snapshot: null,
+        members: [],
+        inviteLinks: [],
+        messages: [],
+        errorMessage: message,
+      });
     }
   }
 
@@ -401,6 +471,7 @@ export function GroupsPage() {
 
   function clearGroupSelection() {
     setSearchParams(new URLSearchParams(), { replace: true });
+    setComposerText("");
   }
 
   return (
@@ -409,11 +480,10 @@ export function GroupsPage() {
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Groups</p>
-            <h1 className={styles.title}>Foundation для групп</h1>
+            <h1 className={styles.title}>Group chat bootstrap</h1>
             <p className={styles.subtitle}>
-              Этот slice добавляет canonical group entity, membership roles, invite links и
-              explicit join flow через существующий gateway-only web shell. Group messaging и calls
-              здесь ещё не реализуются.
+              Slice фиксирует одну canonical primary thread на группу, text-only timeline и
+              read-only роль `reader` без group realtime, calls и media.
             </p>
           </div>
 
@@ -432,8 +502,8 @@ export function GroupsPage() {
         <div className={styles.metrics}>
           <Metric label="Группы" value={groups.length} />
           <Metric
-            label="Участники"
-            value={selectedState.status === "ready" ? selectedState.members.length : 0}
+            label="В thread"
+            value={selectedState.status === "ready" ? selectedState.messages.length : 0}
           />
           <Metric label="Активные invite links" value={activeInviteCount} />
         </div>
@@ -452,8 +522,7 @@ export function GroupsPage() {
             </div>
 
             <p className={styles.description}>
-              Создание группы сразу добавляет единственного `owner` и открывает базовый shell для
-              участников.
+              Создание группы сразу bootstrap'ит owner membership и primary message thread.
             </p>
 
             <div className={styles.form}>
@@ -487,8 +556,7 @@ export function GroupsPage() {
             </div>
 
             <p className={styles.description}>
-              Вставьте полную ссылку или raw token. Join остаётся явным действием, публичного
-              discovery здесь нет.
+              Вставьте полную ссылку или raw token. Публичного discovery по-прежнему нет.
             </p>
 
             <div className={styles.form}>
@@ -518,8 +586,7 @@ export function GroupsPage() {
                 <h2 className={styles.panelTitle}>Ваши группы</h2>
               </div>
               <p className={styles.panelCopy}>
-                Groups list идёт только через `ChatService` на gateway и показывает только группы,
-                где текущий пользователь уже состоит.
+                List view остаётся membership-scoped и идёт только через `ChatService` на gateway.
               </p>
             </div>
 
@@ -597,7 +664,7 @@ export function GroupsPage() {
           {selectedState.status === "loading" && (
             <InlineState
               title="Открываем группу"
-              message="Загружаем group shell, участников и invite links по текущей роли."
+              message="Загружаем metadata, primary thread, участников и историю сообщений."
             />
           )}
 
@@ -624,21 +691,137 @@ export function GroupsPage() {
                 <div className={styles.splitHeader}>
                   <div>
                     <p className={styles.cardLabel}>Group shell</p>
-                    <h2 className={styles.panelTitle}>{selectedState.group.name}</h2>
+                    <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
                     <p className={styles.description}>
-                      Роль текущего пользователя: {roleLabel(selectedState.group.selfRole)}.
-                      Здесь пока только foundation shell без group messages и realtime fan-out.
+                      Текущая роль: {roleLabel(selectedState.snapshot.group.selfRole)}. Thread key:{" "}
+                      `{selectedState.snapshot.thread.threadKey}`.
                     </p>
                   </div>
 
-                  <button
-                    className={styles.secondaryButton}
-                    onClick={clearGroupSelection}
-                    type="button"
-                  >
-                    Закрыть
-                  </button>
+                  <div className={styles.badgeColumn}>
+                    <span className={styles.statusPill}>
+                      {selectedState.snapshot.thread.canSendMessages
+                        ? "write allowed"
+                        : "read only"}
+                    </span>
+                    <button
+                      className={styles.secondaryButton}
+                      onClick={clearGroupSelection}
+                      type="button"
+                    >
+                      Закрыть
+                    </button>
+                  </div>
                 </div>
+              </section>
+
+              <section className={styles.panelCard}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.cardLabel}>Timeline</p>
+                    <h2 className={styles.panelTitle}>Primary group thread</h2>
+                  </div>
+                  <p className={styles.panelCopy}>
+                    Здесь пока только text-only history. Group realtime, edit/delete и media
+                    намеренно отложены.
+                  </p>
+                </div>
+
+                <div className={styles.timelineMeta}>
+                  <span className={styles.statusPill}>{threadMessages.length} сообщений</span>
+                  <span className={styles.statusPill}>
+                    updated {formatDateTime(selectedState.snapshot.thread.updatedAt)}
+                  </span>
+                </div>
+
+                <div className={styles.messagesList}>
+                  {threadMessages.length === 0 ? (
+                    <InlineState
+                      title="Сообщений пока нет"
+                      message="Primary thread уже создан, но текстовый timeline ещё пуст."
+                    />
+                  ) : (
+                    threadMessages.map((message) => (
+                      <article className={styles.messageCard} key={message.id}>
+                        <div className={styles.messageHeader}>
+                          <div>
+                            <p className={styles.messageAuthor}>
+                              {describeMessageAuthor(
+                                message.senderUserId,
+                                authState.profile.id,
+                                selectedState.members,
+                              )}
+                            </p>
+                            <p className={styles.messageMeta}>
+                              {formatDateTime(message.createdAt)}
+                            </p>
+                          </div>
+                          <span className={styles.statusPill}>text</span>
+                        </div>
+
+                        <div className={styles.messageBody}>
+                          <SafeMessageMarkdown text={message.text?.text ?? ""} />
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <section className={styles.panelCard}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.cardLabel}>Composer</p>
+                    <h2 className={styles.panelTitle}>Новое сообщение</h2>
+                  </div>
+                  <p className={styles.panelCopy}>
+                    Raw HTML запрещён. Rendering остаётся в текущем safe markdown subset.
+                  </p>
+                </div>
+
+                {!selectedState.snapshot.thread.canSendMessages && (
+                  <div className={styles.readOnlyNotice}>
+                    Роль `reader` видит историю группы, но не может отправлять сообщения.
+                  </div>
+                )}
+
+                <form className={styles.composer} onSubmit={handleSendGroupMessage}>
+                  <label className={styles.field}>
+                    <span>Текст сообщения</span>
+                    <textarea
+                      disabled={
+                        isSendingMessage || !selectedState.snapshot.thread.canSendMessages
+                      }
+                      maxLength={4000}
+                      onChange={(event) => {
+                        setComposerText(event.target.value);
+                        setActionError(null);
+                      }}
+                      placeholder={
+                        selectedState.snapshot.thread.canSendMessages
+                          ? "Напишите текстовое сообщение в primary thread"
+                          : "Эта роль читает историю без отправки"
+                      }
+                      rows={5}
+                      value={composerText}
+                    />
+                  </label>
+
+                  <div className={styles.composerFooter}>
+                    <span className={styles.characterCount}>{composerText.trim().length}/4000</span>
+                    <button
+                      className={styles.primaryButton}
+                      disabled={
+                        isSendingMessage ||
+                        !selectedState.snapshot.thread.canSendMessages ||
+                        composerText.trim() === ""
+                      }
+                      type="submit"
+                    >
+                      {isSendingMessage ? "Отправляем..." : "Отправить"}
+                    </button>
+                  </div>
+                </form>
               </section>
 
               <section className={styles.panelCard}>
@@ -678,19 +861,18 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Role-scoped invite links</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Invite links видны и управляются только `owner`/`admin`. `reader` уже считается
-                    реальной ролью, но full role management отложен.
+                    Invite links по-прежнему управляются только `owner`/`admin`.
                   </p>
                 </div>
 
-                {!canManageInviteLinks(selectedState.group.selfRole) && (
+                {!canManageInviteLinks(selectedState.snapshot.group.selfRole) && (
                   <p className={styles.emptyState}>
                     Текущая роль не управляет invite links. Для этого требуется `owner` или
                     `admin`.
                   </p>
                 )}
 
-                {canManageInviteLinks(selectedState.group.selfRole) && (
+                {canManageInviteLinks(selectedState.snapshot.group.selfRole) && (
                   <>
                     <form className={styles.form} onSubmit={handleCreateInviteLink}>
                       <label className={styles.field}>
@@ -701,7 +883,7 @@ export function GroupsPage() {
                           }
                           value={inviteRole}
                         >
-                          {selectedState.group.selfRole === "owner" && (
+                          {selectedState.snapshot.group.selfRole === "owner" && (
                             <option value="admin">admin</option>
                           )}
                           <option value="member">member</option>
@@ -764,8 +946,8 @@ export function GroupsPage() {
                             <div className={styles.inviteActions}>
                               <p className={styles.helperText}>
                                 {inviteLink.disabledAt
-                                  ? `Отозвано ${formatDateTime(inviteLink.disabledAt)}`
-                                  : `Invite ID: ${shortID(inviteLink.id)}`}
+                                  ? `Отключён ${formatDateTime(inviteLink.disabledAt)}`
+                                  : "Ссылка активна и готова к explicit join."}
                               </p>
 
                               <button
@@ -797,6 +979,23 @@ export function GroupsPage() {
       </div>
     </div>
   );
+
+  function describeMessageAuthor(
+    senderUserId: string,
+    currentUserId: string,
+    members: GroupMember[],
+  ): string {
+    if (senderUserId === currentUserId) {
+      return "Вы";
+    }
+
+    const member = members.find((candidate) => candidate.user.id === senderUserId);
+    if (!member) {
+      return "Участник группы";
+    }
+
+    return member.user.nickname || `@${member.user.login}`;
+  }
 }
 
 interface MetricProps {
@@ -829,55 +1028,55 @@ function InlineState({
   return (
     <section className={styles.stateCard} data-tone={tone}>
       <p className={styles.cardLabel}>Groups state</p>
-      <h2 className={styles.stateTitle}>{title}</h2>
+      <h3 className={styles.stateTitle}>{title}</h3>
       <p className={styles.stateMessage}>{message}</p>
-      {action}
+      {action && <div className={styles.actions}>{action}</div>}
     </section>
   );
 }
 
-function canManageInviteLinks(role: GroupMemberRole) {
+function canManageInviteLinks(role: GroupMemberRole): boolean {
   return role === "owner" || role === "admin";
 }
 
-function roleLabel(role: GroupMemberRole) {
-  return role;
+function roleLabel(role: GroupMemberRole): string {
+  switch (role) {
+    case "owner":
+      return "owner";
+    case "admin":
+      return "admin";
+    case "member":
+      return "member";
+    case "reader":
+      return "reader";
+    default:
+      return role;
+  }
 }
 
-function shortID(value: string) {
+function formatDateTime(value: string): string {
   if (value.trim() === "") {
     return "неизвестно";
   }
-  if (value.length <= 12) {
-    return value;
-  }
 
-  return `${value.slice(0, 8)}...${value.slice(-4)}`;
-}
-
-function formatDateTime(value: string | null) {
-  if (value === null || value.trim() === "") {
-    return "неизвестно";
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
     return value;
   }
 
   return new Intl.DateTimeFormat("ru-RU", {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(parsed);
+  }).format(date);
 }
 
 function resolveProtectedError(
   error: unknown,
   fallbackMessage: string,
-  expireSession: (message?: string) => void,
-) {
+  onUnauthenticated: () => void,
+): string | null {
   if (isGatewayErrorCode(error, "unauthenticated")) {
-    expireSession();
+    onUnauthenticated();
     return null;
   }
 
