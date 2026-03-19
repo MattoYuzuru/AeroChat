@@ -183,6 +183,11 @@ export function describeAttachmentMimeType(mimeType: string): string {
   return normalized;
 }
 
+export function canRenderInlineImagePreview(mimeType: string): boolean {
+  const normalized = normalizeMimeType(mimeType);
+  return normalized.startsWith("image/") && normalized !== "image/svg+xml";
+}
+
 export function classifyAttachmentForDisplay(input: {
   fileName: string;
   mimeType: string;

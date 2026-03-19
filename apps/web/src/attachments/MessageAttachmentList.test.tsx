@@ -29,6 +29,7 @@ describe("MessageAttachmentList", () => {
   it("renders polished attachment cards with explicit actions", () => {
     const markup = renderToStaticMarkup(
       <MessageAttachmentList
+        accessToken="token-1"
         attachments={[createAttachment()]}
         onDownloadAttachment={vi.fn()}
         onOpenAttachment={vi.fn()}
@@ -53,6 +54,7 @@ describe("MessageAttachmentList", () => {
 
     const markup = renderToStaticMarkup(
       <MessageAttachmentList
+        accessToken="token-1"
         attachments={[attachment]}
         onDownloadAttachment={vi.fn()}
         onOpenAttachment={vi.fn()}
@@ -63,5 +65,48 @@ describe("MessageAttachmentList", () => {
     expect(markup).toContain("Готовим ссылку...");
     expect(markup).toContain("Архив / binary");
     expect(markup).toContain("disabled");
+  });
+
+  it("renders a lazy inline preview block only for MIME-confirmed images", () => {
+    const markup = renderToStaticMarkup(
+      <MessageAttachmentList
+        accessToken="token-1"
+        attachments={[
+          createAttachment({
+            id: "attachment-3",
+            fileName: "hero-shot.jpg",
+            mimeType: "image/jpeg",
+          }),
+        ]}
+        onDownloadAttachment={vi.fn()}
+        onOpenAttachment={vi.fn()}
+        pendingAttachmentId={null}
+      />,
+    );
+
+    expect(markup).toContain("Inline preview");
+    expect(markup).toContain("Preview загрузится, когда карточка появится в ленте.");
+    expect(markup).toContain("Открыть изображение hero-shot.jpg");
+  });
+
+  it("keeps filename-only image guesses on the safe file-card fallback path", () => {
+    const markup = renderToStaticMarkup(
+      <MessageAttachmentList
+        accessToken="token-1"
+        attachments={[
+          createAttachment({
+            id: "attachment-4",
+            fileName: "looks-like-image.jpg",
+            mimeType: "",
+          }),
+        ]}
+        onDownloadAttachment={vi.fn()}
+        onOpenAttachment={vi.fn()}
+        pendingAttachmentId={null}
+      />,
+    );
+
+    expect(markup).not.toContain("Inline preview");
+    expect(markup).toContain("looks-like-image.jpg");
   });
 });
