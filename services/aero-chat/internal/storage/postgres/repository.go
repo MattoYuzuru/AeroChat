@@ -725,13 +725,10 @@ func (r *Repository) ListGroupMessages(ctx context.Context, userID string, group
 			ThreadID:     row.ThreadID.String(),
 			SenderUserID: row.SenderUserID.String(),
 			Kind:         row.Kind,
-			Text: &chat.TextMessageContent{
-				Text:           row.TextContent,
-				MarkdownPolicy: row.MarkdownPolicy,
-			},
-			Attachments: attachmentsByMessageID[row.ID.String()],
-			CreatedAt:   timestampValue(row.CreatedAt),
-			UpdatedAt:   timestampValue(row.UpdatedAt),
+			Text:         messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy),
+			Attachments:  attachmentsByMessageID[row.ID.String()],
+			CreatedAt:    timestampValue(row.CreatedAt),
+			UpdatedAt:    timestampValue(row.UpdatedAt),
 		})
 	}
 
@@ -934,13 +931,10 @@ func (r *Repository) CreateGroupMessage(ctx context.Context, params chat.CreateG
 		ThreadID:     row.ThreadID.String(),
 		SenderUserID: row.SenderUserID.String(),
 		Kind:         row.Kind,
-		Text: &chat.TextMessageContent{
-			Text:           row.TextContent,
-			MarkdownPolicy: row.MarkdownPolicy,
-		},
-		Attachments: attachmentsByMessageID[row.ID.String()],
-		CreatedAt:   timestampValue(row.CreatedAt),
-		UpdatedAt:   timestampValue(row.UpdatedAt),
+		Text:         messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy),
+		Attachments:  attachmentsByMessageID[row.ID.String()],
+		CreatedAt:    timestampValue(row.CreatedAt),
+		UpdatedAt:    timestampValue(row.UpdatedAt),
 	}, nil
 }
 
@@ -1233,11 +1227,19 @@ func toDomainMessage(row chatsqlc.ListDirectChatMessagesRow) chat.DirectChatMess
 		return message
 	}
 
-	message.Text = &chat.TextMessageContent{
-		Text:           row.TextContent,
-		MarkdownPolicy: row.MarkdownPolicy,
-	}
+	message.Text = messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy)
 	return message
+}
+
+func messageTextContentFromStorage(text string, markdownPolicy string) *chat.TextMessageContent {
+	if text == "" {
+		return nil
+	}
+
+	return &chat.TextMessageContent{
+		Text:           text,
+		MarkdownPolicy: markdownPolicy,
+	}
 }
 
 func mustParseUUID(value string) uuid.UUID {

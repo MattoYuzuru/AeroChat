@@ -9,6 +9,11 @@ import {
 } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MessageAttachmentList } from "../attachments/MessageAttachmentList";
+import {
+  canSubmitMessageComposer,
+  hasRenderableMessageText,
+  normalizeComposerMessageText,
+} from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
 import { openAttachmentInNewTab } from "../attachments/open";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
@@ -104,6 +109,14 @@ export function GroupsPage() {
         : null,
     onUnauthenticated: expireSession,
   });
+  const canSubmitGroupComposer =
+    selectedState.status === "ready" &&
+    canSubmitMessageComposer({
+      text: composerText,
+      uploadedAttachmentId: attachmentComposer.uploadedAttachmentId,
+      isUploading: attachmentComposer.isUploading,
+      canSendMessages: selectedState.snapshot.thread.canSendMessages,
+    });
 
   useEffect(() => {
     selectedStateRef.current = selectedState;
@@ -606,12 +619,12 @@ export function GroupsPage() {
       return;
     }
 
-    const normalizedText = composerText.trim();
-    if (normalizedText === "") {
+    const normalizedText = normalizeComposerMessageText(composerText);
+    if (!canSubmitGroupComposer) {
       setActionError(
-        attachmentComposer.uploadedAttachmentId === null
-          ? "Введите текст сообщения, прежде чем отправлять его."
-          : "Текущий backend требует текст сообщения даже при наличии вложения.",
+        attachmentComposer.isUploading
+          ? "Дождитесь завершения загрузки файла, прежде чем отправлять сообщение."
+          : "Добавьте текст сообщения или готовое вложение.",
       );
       setNotice(null);
       return;
@@ -631,10 +644,14 @@ export function GroupsPage() {
           : [attachmentComposer.uploadedAttachmentId],
       );
       setComposerText("");
-      attachmentComposer.markSendSucceeded();
+      if (attachmentComposer.uploadedAttachmentId !== null) {
+        attachmentComposer.markSendSucceeded();
+      }
       setNotice("Сообщение отправлено.");
     } catch (error) {
-      attachmentComposer.markSendFailed();
+      if (attachmentComposer.uploadedAttachmentId !== null) {
+        attachmentComposer.markSendFailed();
+      }
       const message = resolveProtectedError(
         error,
         "Не удалось отправить сообщение в группу.",
@@ -1145,8 +1162,8 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Primary group thread</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Thread теперь показывает текст и минимальные file attachments без preview,
-                    player и attachment-only semantics.
+                    Thread показывает текст и минимальные file attachments без preview и player, но
+                    уже поддерживает attachment-only message semantics.
                   </p>
                 </div>
 
@@ -1180,12 +1197,16 @@ export function GroupsPage() {
                               {formatDateTime(message.createdAt)}
                             </p>
                           </div>
-                          <span className={styles.statusPill}>text</span>
+                          <span className={styles.statusPill}>
+                            {describeGroupMessageKind(message)}
+                          </span>
                         </div>
 
-                        <div className={styles.messageBody}>
-                          <SafeMessageMarkdown text={message.text?.text ?? ""} />
-                        </div>
+                        {hasRenderableMessageText(message.text) && (
+                          <div className={styles.messageBody}>
+                            <SafeMessageMarkdown text={message.text?.text ?? ""} />
+                          </div>
+                        )}
 
                         <MessageAttachmentList
                           attachments={message.attachments}
@@ -1207,8 +1228,8 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Новое сообщение</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Raw HTML запрещён. Файл загружается отдельно, а сообщение по-прежнему требует
-                    явный текст.
+                    Raw HTML запрещён. Файл загружается отдельно, а single-file composer допускает
+                    text-only, text + attachment и attachment-only сообщения.
                   </p>
                 </div>
 
@@ -1248,7 +1269,7 @@ export function GroupsPage() {
                         : "Заменить файл"}
                     </button>
                     <span className={styles.attachmentHint}>
-                      Attachment-only messages пока не поддерживаются.
+                      Single-file composer: файл можно отправить и без текста после upload.
                     </span>
                   </div>
 
@@ -1339,9 +1360,7 @@ export function GroupsPage() {
                       className={styles.primaryButton}
                       disabled={
                         isSendingMessage ||
-                        attachmentComposer.isUploading ||
-                        !selectedState.snapshot.thread.canSendMessages ||
-                        composerText.trim() === ""
+                        !canSubmitGroupComposer
                       }
                       type="submit"
                     >
@@ -1800,6 +1819,16 @@ function roleLabel(role: GroupMemberRole): string {
     default:
       return role;
   }
+}
+
+function describeGroupMessageKind(message: { text: { text: string } | null; attachments: { id: string }[] }): string {
+  if (hasRenderableMessageText(message.text) && message.attachments.length > 0) {
+    return "text + file";
+  }
+  if (message.attachments.length > 0) {
+    return "attachment";
+  }
+  return "text";
 }
 
 function formatDateTime(value: string): string {

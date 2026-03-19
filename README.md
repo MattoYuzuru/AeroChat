@@ -58,6 +58,7 @@ AeroChat должен поддерживать:
   - file picker;
   - presigned upload;
   - send text + attachment;
+  - send attachment-only message;
   - minimal file rendering и безопасное открытие без preview.
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>

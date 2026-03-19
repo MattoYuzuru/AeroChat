@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] web attachment composer bootstrap для direct chats и groups через существующий media foundation
+- [x] attachment-only message semantics bootstrap поверх существующего media foundation
 
 ---
 
@@ -136,6 +136,7 @@
 - [x] Upload intent / presigned upload foundation
 - [x] Media edge / upload runtime bootstrap
 - [x] Web attachment composer bootstrap через `aero-gateway`
+- [x] Attachment-only messages для direct chats и groups
 - [ ] Voice notes
 - [ ] Video notes
 - [ ] Image/audio/video preview
