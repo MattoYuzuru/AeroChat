@@ -73,7 +73,7 @@ application domain.
 Для `local/dev` сохраняется текущая упрощённая модель:
 
 - `MEDIA_S3_PUBLIC_ENDPOINT` может указывать на локальный MinIO API endpoint;
-- CORS bootstrap по-прежнему настраивается через `mc`;
+- allowed origins для browser upload задаются через `MEDIA_S3_CORS_ALLOWED_ORIGINS` и применяются самим MinIO;
 - browser upload flow остаётся direct-to-object-storage и использует тот endpoint, который виден браузеру локально.
 
 Это dev-упрощение не меняет production contract и не должно использоваться как аргумент в пользу nested production host.

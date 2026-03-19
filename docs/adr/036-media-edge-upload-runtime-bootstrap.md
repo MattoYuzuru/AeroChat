@@ -6,6 +6,10 @@
 > Примечание: текущий канонический media hostname contract для production уточнён в
 > [ADR-037](/home/mattoyudzuru/GolandProjects/AeroChat/docs/adr/037-media-edge-hostname-normalization.md).
 > Остальные runtime-решения этого ADR остаются в силе.
+>
+> Runtime note: на актуальных community-релизах MinIO явный browser CORS применяется через
+> server-level `MINIO_API_CORS_ALLOW_ORIGIN`. One-shot helper сохраняется для bucket bootstrap,
+> private policy и валидации env, а не для `mc cors set`.
 
 ## Контекст
 
@@ -128,21 +132,21 @@ Presigned URL не должен указывать на:
 - browser может загрузить или скачать объект только при наличии валидной presigned ссылки;
 - storage edge не становится публичным файловым каталогом.
 
-### 6. CORS настраивается на object storage bucket как часть runtime bootstrap
+### 6. CORS задаётся явно как часть runtime bootstrap
 
 Browser upload/download against отдельный media origin требует CORS именно на storage edge.
 
-Для bucket применяется явная CORS-конфигурация:
+Для storage runtime применяется явная CORS-конфигурация:
 
 - `AllowedOrigin` содержит только явно заданные application origins;
 - wildcard origin по умолчанию не допускается;
 - разрешаются только методы:
-  - `PUT`
-  - `GET`
-  - `HEAD`
+- `PUT`
+- `GET`
+- `HEAD`
 - `AllowedHeader` остаётся широким, чтобы не ломать presigned/browser headers;
 - `ExposeHeader` включает минимум `ETag`;
-- CORS bootstrap выполняется автоматически в compose runtime через `mc`.
+- explicit origins применяются самим MinIO через server-level config.
 
 Source of truth для allowed origins задаётся отдельной runtime-переменной и не должен вычисляться “по памяти”.
 
@@ -153,7 +157,7 @@ Source of truth для allowed origins задаётся отдельной runti
 - ждёт доступный MinIO API;
 - создаёт bucket, если он ещё отсутствует;
 - фиксирует bucket как private/non-anonymous;
-- применяет required CORS policy.
+- валидирует required CORS env.
 
 Это делается вне `aero-gateway` и вне web-клиента, потому что это storage/runtime concern.
 
@@ -177,7 +181,7 @@ Source of truth для allowed origins задаётся отдельной runti
 - web открывается через локальный `nginx`;
 - upload intent запрашивается через `aero-gateway`;
 - browser получает presigned URL на локальный MinIO API origin;
-- тот же compose bootstrap применяет bucket CORS для локальных app origins.
+- MinIO применяет allowed origins из локального `MEDIA_S3_CORS_ALLOWED_ORIGINS`.
 
 #### Production
 
@@ -209,7 +213,7 @@ Source of truth для allowed origins задаётся отдельной runti
 - Media foundation получает production-credible runtime contract для браузера.
 - Upload path остаётся direct-to-object-storage и не превращает gateway в binary relay.
 - Shared `Traefik` topology становится достаточной не только для web/api, но и для media edge.
-- CORS перестаёт быть скрытым ручным шагом и входит в воспроизводимый runtime bootstrap.
+- CORS остаётся воспроизводимой частью runtime и больше не зависит от ручной bucket-настройки.
 - Bucket privacy остаётся консервативной и согласованной с `ADR-035`.
 
 ### Отрицательные

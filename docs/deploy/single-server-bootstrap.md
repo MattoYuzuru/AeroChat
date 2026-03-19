@@ -266,7 +266,8 @@ docker compose \
 
 - `aero-identity` автоматически применяет свои schema migrations до HTTP startup;
 - `aero-chat` ждёт завершённый identity bootstrap и затем применяет свои migrations;
-- `minio-bootstrap` один раз создаёт bucket, фиксирует private policy и применяет CORS;
+- `minio-bootstrap` один раз создаёт bucket, фиксирует private policy и валидирует media CORS env;
+- `minio` применяет allowed origins из `MEDIA_S3_CORS_ALLOWED_ORIGINS`;
 - при проблеме bootstrap сервис завершается с явной ошибкой в логах контейнера.
 
 6. Проверь состояние контейнеров и прямые host upstream'ы:
