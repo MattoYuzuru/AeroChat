@@ -36,6 +36,20 @@ describe("parseGroupRealtimeEvent", () => {
             text: "hello group",
             markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
           },
+          attachments: [
+            {
+              id: "attachment-1",
+              ownerUserId: "user-1",
+              scope: "ATTACHMENT_SCOPE_GROUP",
+              groupId: "group-1",
+              fileName: "report.pdf",
+              mimeType: "application/pdf",
+              sizeBytes: 4096,
+              status: "ATTACHMENT_STATUS_ATTACHED",
+              createdAt: "2026-04-10T12:00:00Z",
+              updatedAt: "2026-04-10T12:00:00Z",
+            },
+          ],
           createdAt: "2026-04-10T12:00:00Z",
           updatedAt: "2026-04-10T12:00:00Z",
         },
@@ -56,6 +70,12 @@ describe("parseGroupRealtimeEvent", () => {
       message: expect.objectContaining({
         id: "message-1",
         groupId: "group-1",
+        attachments: [
+          expect.objectContaining({
+            id: "attachment-1",
+            fileName: "report.pdf",
+          }),
+        ],
       }),
     });
   });

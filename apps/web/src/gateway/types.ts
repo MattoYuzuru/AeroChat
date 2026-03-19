@@ -150,6 +150,50 @@ export interface TextMessageContent {
   markdownPolicy: string;
 }
 
+export interface Attachment {
+  id: string;
+  ownerUserId: string;
+  scope: string;
+  directChatId: string | null;
+  groupId: string | null;
+  messageId: string | null;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  uploadedAt: string | null;
+  attachedAt: string | null;
+  failedAt: string | null;
+  deletedAt: string | null;
+}
+
+export interface AttachmentUploadSession {
+  id: string;
+  attachmentId: string;
+  status: string;
+  uploadUrl: string;
+  httpMethod: string;
+  headers: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  completedAt: string | null;
+  failedAt: string | null;
+}
+
+export interface AttachmentUploadIntent {
+  attachment: Attachment;
+  uploadSession: AttachmentUploadSession;
+}
+
+export interface AttachmentAccess {
+  attachment: Attachment;
+  downloadUrl: string | null;
+  downloadExpiresAt: string | null;
+}
+
 export interface MessageTombstone {
   deletedByUserId: string;
   deletedAt: string;
@@ -163,6 +207,7 @@ export interface DirectChatMessage {
   text: TextMessageContent | null;
   tombstone: MessageTombstone | null;
   pinned: boolean;
+  attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -174,6 +219,7 @@ export interface GroupMessage {
   senderUserId: string;
   kind: string;
   text: TextMessageContent | null;
+  attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -274,6 +320,30 @@ export interface GatewayClient {
   listGroups(token: string): Promise<Group[]>;
   getGroup(token: string, groupId: string): Promise<Group>;
   getGroupChat(token: string, groupId: string): Promise<GroupChatSnapshot>;
+  createAttachmentUploadIntent(
+    token: string,
+    input:
+      | {
+          directChatId: string;
+          groupId?: never;
+          fileName: string;
+          mimeType: string;
+          sizeBytes: number;
+        }
+      | {
+          directChatId?: never;
+          groupId: string;
+          fileName: string;
+          mimeType: string;
+          sizeBytes: number;
+        },
+  ): Promise<AttachmentUploadIntent>;
+  completeAttachmentUpload(
+    token: string,
+    attachmentId: string,
+    uploadSessionId: string,
+  ): Promise<Attachment>;
+  getAttachment(token: string, attachmentId: string): Promise<AttachmentAccess>;
   setGroupTyping(
     token: string,
     groupId: string,
@@ -315,6 +385,7 @@ export interface GatewayClient {
     token: string,
     groupId: string,
     text: string,
+    attachmentIds?: string[],
   ): Promise<GroupMessage>;
   createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
   listDirectChats(token: string): Promise<DirectChat[]>;
@@ -344,6 +415,7 @@ export interface GatewayClient {
     token: string,
     chatId: string,
     text: string,
+    attachmentIds?: string[],
   ): Promise<DirectChatMessage>;
   listDirectChatMessages(
     token: string,

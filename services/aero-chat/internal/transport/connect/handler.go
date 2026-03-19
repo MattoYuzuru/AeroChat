@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	chatv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/v1"
@@ -138,13 +139,15 @@ func (h *Handler) GetAttachment(ctx context.Context, req *connect.Request[chatv1
 		return nil, err
 	}
 
-	attachment, err := h.service.GetAttachment(ctx, token, req.Msg.AttachmentId)
+	access, err := h.service.GetAttachment(ctx, token, req.Msg.AttachmentId)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
 	return connect.NewResponse(&chatv1.GetAttachmentResponse{
-		Attachment: toProtoAttachment(*attachment),
+		Attachment:        toProtoAttachment(access.Attachment),
+		DownloadUrl:       access.DownloadURL,
+		DownloadExpiresAt: timestampPointer(access.DownloadExpiresAt),
 	}), nil
 }
 
@@ -1029,4 +1032,12 @@ func toProtoAttachmentUploadSessionStatus(value string) chatv1.AttachmentUploadS
 	default:
 		return chatv1.AttachmentUploadSessionStatus_ATTACHMENT_UPLOAD_SESSION_STATUS_UNSPECIFIED
 	}
+}
+
+func timestampPointer(value *time.Time) *timestamppb.Timestamp {
+	if value == nil {
+		return nil
+	}
+
+	return timestamppb.New(*value)
 }

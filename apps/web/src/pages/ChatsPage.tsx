@@ -8,6 +8,10 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { MessageAttachmentList } from "../attachments/MessageAttachmentList";
+import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
+import { openAttachmentInNewTab } from "../attachments/open";
+import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
 import { useAuth } from "../auth/useAuth";
 import { createMarkdownPreview } from "../chats/createMarkdownPreview";
 import { resolveChatsRouteSyncAction } from "../chats/route-sync";
@@ -28,12 +32,28 @@ export function ChatsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [composerText, setComposerText] = useState("");
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
   const pendingPeerRef = useRef<string | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const sessionToken =
+    authState.status === "authenticated" ? authState.token : "";
   const chats = useChats({
     enabled: authState.status === "authenticated",
-    token: authState.status === "authenticated" ? authState.token : "",
+    token: sessionToken,
     currentUserId: authState.status === "authenticated" ? authState.profile.id : "",
     composerText,
+    onUnauthenticated: () => expireSession(),
+  });
+  const attachmentComposer = useAttachmentComposer({
+    enabled: authState.status === "authenticated",
+    token: sessionToken,
+    scope:
+      chats.state.thread?.chat.id
+        ? {
+            kind: "direct",
+            id: chats.state.thread.chat.id,
+          }
+        : null,
     onUnauthenticated: () => expireSession(),
   });
 
@@ -102,20 +122,33 @@ export function ChatsPage() {
       : selectedThread.messages.filter((message) =>
           selectedThread.chat.pinnedMessageIds.includes(message.id) || message.pinned,
         );
+  const uploadedAttachmentId = attachmentComposer.uploadedAttachmentId;
+  const attachmentDraft = attachmentComposer.state.draft;
 
   async function submitComposer() {
     const normalizedText = composerText.trim();
     if (normalizedText === "") {
-      setComposerError("Введите текст сообщения, прежде чем отправлять его.");
+      setComposerError(
+        uploadedAttachmentId === null
+          ? "Введите текст сообщения, прежде чем отправлять его."
+          : "Текущий backend требует текст сообщения даже при наличии вложения.",
+      );
       chats.clearFeedback();
       return;
     }
 
     setComposerError(null);
-    const success = await chats.sendMessage(normalizedText);
+    const success = await chats.sendMessage(
+      normalizedText,
+      uploadedAttachmentId === null ? [] : [uploadedAttachmentId],
+    );
     if (success) {
       setComposerText("");
+      attachmentComposer.markSendSucceeded();
+      return;
     }
+
+    attachmentComposer.markSendFailed();
   }
 
   async function handleComposerSubmit(event: FormEvent<HTMLFormElement>) {
@@ -138,6 +171,33 @@ export function ChatsPage() {
     chats.clearFeedback();
   }
 
+  async function handleAttachmentSelection(file: File | null) {
+    if (file === null) {
+      return;
+    }
+
+    setComposerError(null);
+    chats.clearFeedback();
+    await attachmentComposer.selectFile(file);
+  }
+
+  async function handleOpenAttachment(attachmentId: string) {
+    setPendingOpenAttachmentId(attachmentId);
+    setComposerError(null);
+
+    try {
+      await openAttachmentInNewTab(sessionToken, attachmentId);
+    } catch (error) {
+      setComposerError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось открыть вложение.",
+      );
+    } finally {
+      setPendingOpenAttachmentId(null);
+    }
+  }
+
   return (
     <div className={styles.layout}>
       <section className={styles.heroCard}>
@@ -147,7 +207,8 @@ export function ChatsPage() {
             <h1 className={styles.title}>Личные чаты AeroChat</h1>
             <p className={styles.subtitle}>
               Лёгкий direct chat shell остаётся gateway-only, уже поднимает bounded realtime
-              transport foundation, но пока без live message fan-out, media и draft recovery.
+              transport foundation и первый attachment upload flow, но пока без preview и draft
+              recovery.
             </p>
           </div>
 
@@ -466,7 +527,7 @@ export function ChatsPage() {
                     {selectedThread.messages.length === 0 ? (
                       <StateCard
                         title="Сообщений пока нет"
-                        message="Отправьте первое текстовое сообщение. Media, drafts и groups добавятся отдельными slice позже."
+                        message="Отправьте первое текстовое сообщение или текст с файлом. Preview и richer media rendering добавятся отдельными slice позже."
                       />
                     ) : (
                       selectedThread.messages.map((message) => {
@@ -513,6 +574,16 @@ export function ChatsPage() {
                                   <div className={styles.messageText}>
                                     <SafeMessageMarkdown text={message.text?.text ?? ""} />
                                   </div>
+                                )}
+
+                                {!message.tombstone && (
+                                  <MessageAttachmentList
+                                    attachments={message.attachments}
+                                    onOpenAttachment={(attachmentId) => {
+                                      void handleOpenAttachment(attachmentId);
+                                    }}
+                                    pendingAttachmentId={pendingOpenAttachmentId}
+                                  />
                                 )}
                               </div>
 
@@ -561,14 +632,98 @@ export function ChatsPage() {
                       <p className={styles.cardLabel}>Composer</p>
                       <h3 className={styles.blockTitle}>Новое сообщение</h3>
                     </div>
-                    <span className={styles.composerHint}>Enter отправляет, Shift+Enter переносит строку</span>
+                    <span className={styles.composerHint}>
+                      Enter отправляет, Shift+Enter переносит строку
+                    </span>
                   </div>
 
                   <form className={styles.composer} onSubmit={handleComposerSubmit}>
+                    <div className={styles.attachmentActions}>
+                      <input
+                        accept="*/*"
+                        className={styles.attachmentInput}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          void handleAttachmentSelection(file);
+                          event.target.value = "";
+                        }}
+                        ref={attachmentInputRef}
+                        type="file"
+                      />
+                      <button
+                        className={styles.secondaryButton}
+                        disabled={chats.state.isSendingMessage || attachmentComposer.isUploading}
+                        onClick={() => {
+                          attachmentInputRef.current?.click();
+                        }}
+                        type="button"
+                      >
+                        {attachmentDraft === null ? "Выбрать файл" : "Заменить файл"}
+                      </button>
+                      <span className={styles.attachmentHint}>
+                        Attachment-only messages пока не поддерживаются.
+                      </span>
+                    </div>
+
+                    {attachmentDraft && (
+                      <div className={styles.attachmentDraftCard}>
+                        <div>
+                          <p className={styles.attachmentDraftTitle}>{attachmentDraft.fileName}</p>
+                          <p className={styles.attachmentDraftMeta}>
+                            {formatAttachmentSize(attachmentDraft.sizeBytes)} •{" "}
+                            {describeAttachmentMimeType(attachmentDraft.mimeType)}
+                          </p>
+                          {attachmentDraft.status === "uploading" && (
+                            <p className={styles.attachmentDraftStatus}>
+                              Загружаем: {attachmentDraft.progress}%
+                            </p>
+                          )}
+                          {attachmentDraft.status === "preparing" && (
+                            <p className={styles.attachmentDraftStatus}>
+                              Подготавливаем upload intent...
+                            </p>
+                          )}
+                          {attachmentDraft.status === "uploaded" && (
+                            <p className={styles.attachmentDraftStatus}>
+                              Файл загружен и будет прикреплён к следующему сообщению.
+                            </p>
+                          )}
+                          {attachmentDraft.status === "error" && (
+                            <p className={styles.attachmentDraftError}>
+                              {attachmentDraft.errorMessage ?? "Не удалось загрузить файл."}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className={styles.attachmentDraftActions}>
+                          {attachmentDraft.status === "error" && (
+                            <button
+                              className={styles.ghostButton}
+                              onClick={() => {
+                                void attachmentComposer.retryUpload();
+                              }}
+                              type="button"
+                            >
+                              Повторить upload
+                            </button>
+                          )}
+                          <button
+                            className={styles.ghostButton}
+                            onClick={() => {
+                              attachmentComposer.removeDraft();
+                            }}
+                            type="button"
+                          >
+                            Убрать
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <label className={styles.field}>
                       <span>Текст сообщения</span>
                       <textarea
-                        disabled={chats.state.isSendingMessage}
+                        disabled={chats.state.isSendingMessage || attachmentComposer.isUploading}
                         maxLength={4000}
                         onChange={(event) => {
                           setComposerText(event.target.value);
@@ -590,7 +745,11 @@ export function ChatsPage() {
                       <div className={styles.actions}>
                         <button
                           className={styles.primaryButton}
-                          disabled={chats.state.isSendingMessage || composerText.trim() === ""}
+                          disabled={
+                            chats.state.isSendingMessage ||
+                            attachmentComposer.isUploading ||
+                            composerText.trim() === ""
+                          }
                           type="submit"
                         >
                           {chats.state.isSendingMessage ? "Отправляем..." : "Отправить"}

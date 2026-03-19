@@ -344,6 +344,71 @@
   gap: 0.85rem;
 }
 
+.attachmentInput {
+  display: none;
+}
+
+.attachmentActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.attachmentHint {
+  font-size: 0.82rem;
+  color: rgba(52, 74, 102, 0.82);
+}
+
+.attachmentDraftCard {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(108, 142, 196, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(228, 239, 255, 0.86));
+}
+
+.attachmentDraftTitle,
+.attachmentDraftMeta,
+.attachmentDraftStatus,
+.attachmentDraftError {
+  margin: 0;
+}
+
+.attachmentDraftTitle {
+  font-weight: 700;
+  color: rgba(22, 46, 76, 0.94);
+}
+
+.attachmentDraftMeta {
+  margin-top: 0.22rem;
+  font-size: 0.84rem;
+  color: rgba(63, 87, 116, 0.82);
+}
+
+.attachmentDraftStatus {
+  margin-top: 0.38rem;
+  font-size: 0.84rem;
+  color: rgba(14, 91, 150, 0.88);
+}
+
+.attachmentDraftError {
+  margin-top: 0.38rem;
+  font-size: 0.84rem;
+  color: rgba(160, 40, 40, 0.92);
+}
+
+.attachmentDraftActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .field {
   display: grid;
   gap: 0.45rem;

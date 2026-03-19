@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] media edge hostname normalization для Cloudflare-compatible shared `Traefik` runtime
+- [x] web attachment composer bootstrap для direct chats и groups через существующий media foundation
 
 ---
 
@@ -135,6 +135,7 @@
 - [x] Attachment metadata model
 - [x] Upload intent / presigned upload foundation
 - [x] Media edge / upload runtime bootstrap
+- [x] Web attachment composer bootstrap через `aero-gateway`
 - [ ] Voice notes
 - [ ] Video notes
 - [ ] Image/audio/video preview

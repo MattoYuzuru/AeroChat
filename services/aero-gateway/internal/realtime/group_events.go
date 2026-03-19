@@ -94,6 +94,7 @@ type groupMessageWire struct {
 	SenderUserID string                  `json:"senderUserId"`
 	Kind         string                  `json:"kind"`
 	Text         *textMessageContentWire `json:"text,omitempty"`
+	Attachments  []attachmentWire        `json:"attachments"`
 	CreatedAt    string                  `json:"createdAt"`
 	UpdatedAt    string                  `json:"updatedAt"`
 }
@@ -247,6 +248,7 @@ func toGroupMessageWire(message *chatv1.GroupMessage) *groupMessageWire {
 		SenderUserID: message.GetSenderUserId(),
 		Kind:         message.GetKind().String(),
 		Text:         toTextMessageContentWire(message.GetText()),
+		Attachments:  toAttachmentWires(message.GetAttachments()),
 		CreatedAt:    formatProtoTimestamp(message.GetCreatedAt()),
 		UpdatedAt:    formatProtoTimestamp(message.GetUpdatedAt()),
 	}

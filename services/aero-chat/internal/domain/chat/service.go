@@ -83,6 +83,7 @@ type PresenceStateStore interface {
 
 type ObjectStorage interface {
 	CreateUpload(context.Context, string, string, time.Time) (*PresignedObjectUpload, error)
+	CreateDownload(context.Context, string, time.Time) (*PresignedObjectDownload, error)
 	StatObject(context.Context, string) (*StoredObjectInfo, error)
 }
 
@@ -91,6 +92,11 @@ type PresignedObjectUpload struct {
 	HTTPMethod string
 	Headers    map[string]string
 	ExpiresAt  time.Time
+}
+
+type PresignedObjectDownload struct {
+	URL       string
+	ExpiresAt time.Time
 }
 
 type StoredObjectInfo struct {

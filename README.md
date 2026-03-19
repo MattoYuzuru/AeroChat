@@ -48,6 +48,18 @@ AeroChat должен поддерживать:
 - desktop shell на ПК;
 - PWA на мобильных устройствах.
 
+### Текущий alpha snapshot
+
+На текущем этапе web-клиент уже поддерживает:
+
+- личные чаты и группы через `aero-gateway`;
+- bounded realtime для chat/group foundation;
+- первый attachment upload flow в direct chats и groups:
+  - file picker;
+  - presigned upload;
+  - send text + attachment;
+  - minimal file rendering и безопасное открытие без preview.
+
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
 
 ---

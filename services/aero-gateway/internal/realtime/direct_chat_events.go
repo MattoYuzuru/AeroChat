@@ -107,8 +107,28 @@ type directChatMessageWire struct {
 	Text         *textMessageContentWire `json:"text,omitempty"`
 	Tombstone    *messageTombstoneWire   `json:"tombstone,omitempty"`
 	Pinned       bool                    `json:"pinned"`
+	Attachments  []attachmentWire        `json:"attachments"`
 	CreatedAt    string                  `json:"createdAt"`
 	UpdatedAt    string                  `json:"updatedAt"`
+}
+
+type attachmentWire struct {
+	ID           string `json:"id"`
+	OwnerUserID  string `json:"ownerUserId"`
+	Scope        string `json:"scope"`
+	DirectChatID string `json:"directChatId,omitempty"`
+	GroupID      string `json:"groupId,omitempty"`
+	MessageID    string `json:"messageId,omitempty"`
+	FileName     string `json:"fileName"`
+	MimeType     string `json:"mimeType"`
+	SizeBytes    uint64 `json:"sizeBytes"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
+	UploadedAt   string `json:"uploadedAt,omitempty"`
+	AttachedAt   string `json:"attachedAt,omitempty"`
+	FailedAt     string `json:"failedAt,omitempty"`
+	DeletedAt    string `json:"deletedAt,omitempty"`
 }
 
 type directChatReadPositionWire struct {
@@ -180,9 +200,40 @@ func toDirectChatMessageWire(message *chatv1.DirectChatMessage) *directChatMessa
 		Text:         toTextMessageContentWire(message.GetText()),
 		Tombstone:    toMessageTombstoneWire(message.GetTombstone()),
 		Pinned:       message.GetPinned(),
+		Attachments:  toAttachmentWires(message.GetAttachments()),
 		CreatedAt:    formatProtoTimestamp(message.GetCreatedAt()),
 		UpdatedAt:    formatProtoTimestamp(message.GetUpdatedAt()),
 	}
+}
+
+func toAttachmentWires(values []*chatv1.Attachment) []attachmentWire {
+	result := make([]attachmentWire, 0, len(values))
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+
+		result = append(result, attachmentWire{
+			ID:           value.GetId(),
+			OwnerUserID:  value.GetOwnerUserId(),
+			Scope:        value.GetScope().String(),
+			DirectChatID: value.GetDirectChatId(),
+			GroupID:      value.GetGroupId(),
+			MessageID:    value.GetMessageId(),
+			FileName:     value.GetFileName(),
+			MimeType:     value.GetMimeType(),
+			SizeBytes:    value.GetSizeBytes(),
+			Status:       value.GetStatus().String(),
+			CreatedAt:    formatProtoTimestamp(value.GetCreatedAt()),
+			UpdatedAt:    formatProtoTimestamp(value.GetUpdatedAt()),
+			UploadedAt:   formatProtoTimestamp(value.GetUploadedAt()),
+			AttachedAt:   formatProtoTimestamp(value.GetAttachedAt()),
+			FailedAt:     formatProtoTimestamp(value.GetFailedAt()),
+			DeletedAt:    formatProtoTimestamp(value.GetDeletedAt()),
+		})
+	}
+
+	return result
 }
 
 func toTextMessageContentWire(content *chatv1.TextMessageContent) *textMessageContentWire {

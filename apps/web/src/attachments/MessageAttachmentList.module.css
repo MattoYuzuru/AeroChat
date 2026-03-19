@@ -1,0 +1,46 @@
+.list {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid rgba(112, 145, 196, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(233, 242, 255, 0.8)),
+    rgba(255, 255, 255, 0.82);
+}
+
+.title {
+  margin: 0;
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: rgba(25, 47, 77, 0.96);
+  word-break: break-word;
+}
+
+.meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(65, 88, 116, 0.88);
+}
+
+.action {
+  justify-self: start;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(95, 132, 189, 0.34);
+  background: rgba(255, 255, 255, 0.9);
+  color: rgba(31, 56, 93, 0.96);
+  font: inherit;
+  cursor: pointer;
+}
+
+.action:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}

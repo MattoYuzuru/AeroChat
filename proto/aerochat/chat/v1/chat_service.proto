@@ -315,6 +315,8 @@ message GetAttachmentRequest {
 
 message GetAttachmentResponse {
   Attachment attachment = 1;
+  string download_url = 2;
+  google.protobuf.Timestamp download_expires_at = 3;
 }
 
 message CreateGroupRequest {

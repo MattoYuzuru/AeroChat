@@ -1,4 +1,5 @@
 import type {
+  Attachment,
   DirectChat,
   DirectChatMessage,
   DirectChatPresenceState,
@@ -30,6 +31,25 @@ interface TextMessageContentWire {
   markdownPolicy?: string;
 }
 
+interface AttachmentWire {
+  id?: string;
+  ownerUserId?: string;
+  scope?: string;
+  directChatId?: string;
+  groupId?: string;
+  messageId?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number | string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  uploadedAt?: string;
+  attachedAt?: string;
+  failedAt?: string;
+  deletedAt?: string;
+}
+
 interface MessageTombstoneWire {
   deletedByUserId?: string;
   deletedAt?: string;
@@ -43,6 +63,7 @@ interface DirectChatMessageWire {
   text?: TextMessageContentWire;
   tombstone?: MessageTombstoneWire;
   pinned?: boolean;
+  attachments?: AttachmentWire[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -302,8 +323,30 @@ function normalizeDirectChatMessage(
     text: normalizeTextMessageContent(input?.text),
     tombstone: normalizeMessageTombstone(input?.tombstone),
     pinned: input?.pinned ?? false,
+    attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeAttachment(input: AttachmentWire): Attachment {
+  return {
+    id: input.id ?? "",
+    ownerUserId: input.ownerUserId ?? "",
+    scope: input.scope ?? "ATTACHMENT_SCOPE_UNSPECIFIED",
+    directChatId: normalizeNullableString(input.directChatId),
+    groupId: normalizeNullableString(input.groupId),
+    messageId: normalizeNullableString(input.messageId),
+    fileName: input.fileName ?? "",
+    mimeType: input.mimeType ?? "",
+    sizeBytes: normalizeCount(input.sizeBytes),
+    status: input.status ?? "ATTACHMENT_STATUS_UNSPECIFIED",
+    createdAt: input.createdAt ?? "",
+    updatedAt: input.updatedAt ?? "",
+    uploadedAt: normalizeNullableString(input.uploadedAt),
+    attachedAt: normalizeNullableString(input.attachedAt),
+    failedAt: normalizeNullableString(input.failedAt),
+    deletedAt: normalizeNullableString(input.deletedAt),
   };
 }
 
@@ -449,4 +492,19 @@ function normalizeNullableString(value: string | undefined): string | null {
   }
 
   return value === "" ? null : value;
+}
+
+function normalizeCount(value: number | string | undefined): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
 }

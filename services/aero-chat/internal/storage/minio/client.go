@@ -99,6 +99,23 @@ func (c *Client) CreateUpload(ctx context.Context, objectKey string, mimeType st
 	}, nil
 }
 
+func (c *Client) CreateDownload(ctx context.Context, objectKey string, expiresAt time.Time) (*chat.PresignedObjectDownload, error) {
+	expiry := time.Until(expiresAt)
+	if expiry <= 0 {
+		return nil, fmt.Errorf("download session already expired")
+	}
+
+	presignedURL, err := c.presign.PresignedGetObject(ctx, c.bucket, objectKey, expiry, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &chat.PresignedObjectDownload{
+		URL:       presignedURL.String(),
+		ExpiresAt: expiresAt,
+	}, nil
+}
+
 func (c *Client) StatObject(ctx context.Context, objectKey string) (*chat.StoredObjectInfo, error) {
 	info, err := c.bootstrap.StatObject(ctx, c.bucket, objectKey, minio.StatObjectOptions{})
 	if err != nil {

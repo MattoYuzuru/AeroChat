@@ -139,7 +139,7 @@ func (s *Service) CompleteAttachmentUpload(ctx context.Context, token string, at
 	})
 }
 
-func (s *Service) GetAttachment(ctx context.Context, token string, attachmentID string) (*Attachment, error) {
+func (s *Service) GetAttachment(ctx context.Context, token string, attachmentID string) (*AttachmentAccess, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
 		return nil, err
@@ -158,7 +158,7 @@ func (s *Service) GetAttachment(ctx context.Context, token string, attachmentID 
 		if attachment.OwnerUserID != authSession.User.ID {
 			return nil, ErrNotFound
 		}
-		return attachment, nil
+		return s.buildAttachmentAccess(ctx, *attachment)
 	}
 
 	switch attachment.Scope {
@@ -170,7 +170,7 @@ func (s *Service) GetAttachment(ctx context.Context, token string, attachmentID 
 		if err != nil {
 			return nil, err
 		}
-		return attachment, nil
+		return s.buildAttachmentAccess(ctx, *attachment)
 	case AttachmentScopeGroup:
 		if attachment.GroupID == nil {
 			return nil, ErrNotFound
@@ -179,10 +179,29 @@ func (s *Service) GetAttachment(ctx context.Context, token string, attachmentID 
 		if err != nil {
 			return nil, err
 		}
-		return attachment, nil
+		return s.buildAttachmentAccess(ctx, *attachment)
 	default:
 		return nil, ErrNotFound
 	}
+}
+
+func (s *Service) buildAttachmentAccess(ctx context.Context, attachment Attachment) (*AttachmentAccess, error) {
+	access := &AttachmentAccess{
+		Attachment: attachment,
+	}
+	if attachment.Status != AttachmentStatusUploaded && attachment.Status != AttachmentStatusAttached {
+		return access, nil
+	}
+
+	expiresAt := s.now().Add(s.uploadIntentTTL)
+	download, err := s.objectStorage.CreateDownload(ctx, attachment.ObjectKey, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	access.DownloadURL = download.URL
+	access.DownloadExpiresAt = &download.ExpiresAt
+	return access, nil
 }
 
 func (s *Service) resolveAttachmentScope(ctx context.Context, userID string, directChatID string, groupID string) (string, *string, *string, error) {
