@@ -15,7 +15,7 @@ import {
   normalizeComposerMessageText,
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
-import { openAttachmentInNewTab } from "../attachments/open";
+import { downloadAttachment, openAttachmentInNewTab } from "../attachments/open";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
 import { useAuth } from "../auth/useAuth";
 import { createMarkdownPreview } from "../chats/createMarkdownPreview";
@@ -206,6 +206,23 @@ export function ChatsPage() {
         error instanceof Error && error.message.trim() !== ""
           ? error.message
           : "Не удалось открыть вложение.",
+      );
+    } finally {
+      setPendingOpenAttachmentId(null);
+    }
+  }
+
+  async function handleDownloadAttachment(attachmentId: string, fileName: string) {
+    setPendingOpenAttachmentId(attachmentId);
+    setComposerError(null);
+
+    try {
+      await downloadAttachment(sessionToken, attachmentId, fileName);
+    } catch (error) {
+      setComposerError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось скачать вложение.",
       );
     } finally {
       setPendingOpenAttachmentId(null);
@@ -546,6 +563,8 @@ export function ChatsPage() {
                     ) : (
                       selectedThread.messages.map((message) => {
                         const isOwn = message.senderUserId === authState.profile.id;
+                        const hasMessageText = hasRenderableMessageText(message.text);
+                        const hasAttachments = message.attachments.length > 0;
                         const pendingLabel = chats.state.pendingMessageActions[message.id] ?? null;
                         const readLabel =
                           message.id === latestOwnMessageId
@@ -585,21 +604,30 @@ export function ChatsPage() {
                                 {message.tombstone ? (
                                   <p className={styles.tombstoneText}>Сообщение удалено для всех.</p>
                                 ) : (
-                                  hasRenderableMessageText(message.text) && (
-                                    <div className={styles.messageText}>
-                                      <SafeMessageMarkdown text={message.text?.text ?? ""} />
-                                    </div>
-                                  )
-                                )}
+                                  <>
+                                    {hasMessageText && (
+                                      <div className={styles.messageText}>
+                                        <SafeMessageMarkdown text={message.text?.text ?? ""} />
+                                      </div>
+                                    )}
 
-                                {!message.tombstone && (
-                                  <MessageAttachmentList
-                                    attachments={message.attachments}
-                                    onOpenAttachment={(attachmentId) => {
-                                      void handleOpenAttachment(attachmentId);
-                                    }}
-                                    pendingAttachmentId={pendingOpenAttachmentId}
-                                  />
+                                    {hasAttachments && (
+                                      <MessageAttachmentList
+                                        attachments={message.attachments}
+                                        onDownloadAttachment={(attachment) => {
+                                          void handleDownloadAttachment(
+                                            attachment.id,
+                                            attachment.fileName,
+                                          );
+                                        }}
+                                        onOpenAttachment={(attachmentId) => {
+                                          void handleOpenAttachment(attachmentId);
+                                        }}
+                                        pendingAttachmentId={pendingOpenAttachmentId}
+                                        tone={isOwn ? "own" : "other"}
+                                      />
+                                    )}
+                                  </>
                                 )}
                               </div>
 

@@ -137,6 +137,7 @@
 - [x] Media edge / upload runtime bootstrap
 - [x] Web attachment composer bootstrap через `aero-gateway`
 - [x] Attachment-only messages для direct chats и groups
+- [x] Web media message rendering polish для direct chats и groups
 - [ ] Voice notes
 - [ ] Video notes
 - [ ] Image/audio/video preview

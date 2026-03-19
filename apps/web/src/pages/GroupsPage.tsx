@@ -15,7 +15,7 @@ import {
   normalizeComposerMessageText,
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
-import { openAttachmentInNewTab } from "../attachments/open";
+import { downloadAttachment, openAttachmentInNewTab } from "../attachments/open";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
 import { useAuth } from "../auth/useAuth";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
@@ -692,6 +692,23 @@ export function GroupsPage() {
     }
   }
 
+  async function handleDownloadAttachment(attachmentId: string, fileName: string) {
+    setPendingOpenAttachmentId(attachmentId);
+    setActionError(null);
+
+    try {
+      await downloadAttachment(token, attachmentId, fileName);
+    } catch (error) {
+      setActionError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось скачать вложение.",
+      );
+    } finally {
+      setPendingOpenAttachmentId(null);
+    }
+  }
+
   async function handleUpdateGroupMemberRole(userId: string) {
     if (selectedState.status !== "ready") {
       return;
@@ -1179,44 +1196,63 @@ export function GroupsPage() {
                   {threadMessages.length === 0 ? (
                     <InlineState
                       title="Сообщений пока нет"
-                      message="Primary thread уже создан, но текстовый timeline ещё пуст."
+                      message="Primary thread уже создан, но ни text-only, ни attachment-only сообщений пока нет."
                     />
                   ) : (
-                    threadMessages.map((message) => (
-                      <article className={styles.messageCard} key={message.id}>
-                        <div className={styles.messageHeader}>
-                          <div>
-                            <p className={styles.messageAuthor}>
-                              {describeMessageAuthor(
-                                message.senderUserId,
-                                authState.profile.id,
-                                selectedState.members,
+                    threadMessages.map((message) => {
+                      const isOwn = message.senderUserId === authState.profile.id;
+                      const hasMessageText = hasRenderableMessageText(message.text);
+                      const hasAttachments = message.attachments.length > 0;
+
+                      return (
+                        <article className={styles.messageCard} data-own={isOwn} key={message.id}>
+                          <div className={styles.messageHeader}>
+                            <div>
+                              <p className={styles.messageAuthor}>
+                                {describeMessageAuthor(
+                                  message.senderUserId,
+                                  authState.profile.id,
+                                  selectedState.members,
+                                )}
+                              </p>
+                              <p className={styles.messageMeta}>
+                                {formatDateTime(message.createdAt)}
+                              </p>
+                            </div>
+                            <span className={styles.statusPill}>
+                              {describeGroupMessageKind(message)}
+                            </span>
+                          </div>
+
+                          {(hasMessageText || hasAttachments) && (
+                            <div className={styles.messageBody}>
+                              {hasMessageText && (
+                                <div className={styles.messageText}>
+                                  <SafeMessageMarkdown text={message.text?.text ?? ""} />
+                                </div>
                               )}
-                            </p>
-                            <p className={styles.messageMeta}>
-                              {formatDateTime(message.createdAt)}
-                            </p>
-                          </div>
-                          <span className={styles.statusPill}>
-                            {describeGroupMessageKind(message)}
-                          </span>
-                        </div>
 
-                        {hasRenderableMessageText(message.text) && (
-                          <div className={styles.messageBody}>
-                            <SafeMessageMarkdown text={message.text?.text ?? ""} />
-                          </div>
-                        )}
-
-                        <MessageAttachmentList
-                          attachments={message.attachments}
-                          onOpenAttachment={(attachmentId) => {
-                            void handleOpenAttachment(attachmentId);
-                          }}
-                          pendingAttachmentId={pendingOpenAttachmentId}
-                        />
-                      </article>
-                    ))
+                              {hasAttachments && (
+                                <MessageAttachmentList
+                                  attachments={message.attachments}
+                                  onDownloadAttachment={(attachment) => {
+                                    void handleDownloadAttachment(
+                                      attachment.id,
+                                      attachment.fileName,
+                                    );
+                                  }}
+                                  onOpenAttachment={(attachmentId) => {
+                                    void handleOpenAttachment(attachmentId);
+                                  }}
+                                  pendingAttachmentId={pendingOpenAttachmentId}
+                                  tone={isOwn ? "own" : "other"}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })
                   )}
                 </div>
               </section>
@@ -1823,12 +1859,12 @@ function roleLabel(role: GroupMemberRole): string {
 
 function describeGroupMessageKind(message: { text: { text: string } | null; attachments: { id: string }[] }): string {
   if (hasRenderableMessageText(message.text) && message.attachments.length > 0) {
-    return "text + file";
+    return "Текст + файл";
   }
   if (message.attachments.length > 0) {
-    return "attachment";
+    return "Только файл";
   }
-  return "text";
+  return "Текст";
 }
 
 function formatDateTime(value: string): string {

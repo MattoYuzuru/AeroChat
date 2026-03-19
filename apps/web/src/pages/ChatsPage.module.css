@@ -313,6 +313,7 @@
 .messageBubble {
   display: grid;
   gap: 0.85rem;
+  min-width: 0;
   width: min(100%, 42rem);
   padding: 1rem;
   background: var(--surface-panel);
@@ -329,9 +330,15 @@
   font-size: 0.86rem;
 }
 
+.messageBody {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
 .messageText {
   color: rgba(3, 50, 82, 0.92);
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .tombstoneText {

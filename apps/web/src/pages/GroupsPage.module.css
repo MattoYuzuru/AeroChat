@@ -225,7 +225,18 @@
 .memberCard,
 .inviteCard,
 .messageCard {
+  display: grid;
+  gap: 0.85rem;
+  max-width: min(100%, 46rem);
   padding: 1rem;
+}
+
+.messageCard[data-own="true"] {
+  margin-left: auto;
+  border-color: rgba(72, 137, 190, 0.24);
+  background:
+    linear-gradient(180deg, rgba(224, 242, 255, 0.94), rgba(255, 255, 255, 0.8)),
+    rgba(255, 255, 255, 0.88);
 }
 
 .groupButton {
@@ -295,10 +306,16 @@
 }
 
 .messageBody {
-  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
   padding: 0.95rem 1rem;
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.56);
+}
+
+.messageText {
+  overflow-wrap: anywhere;
 }
 
 .composer {
