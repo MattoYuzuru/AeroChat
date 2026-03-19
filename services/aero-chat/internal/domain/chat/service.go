@@ -700,6 +700,9 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 	if err != nil {
 		return nil, err
 	}
+	if normalizedText == "" && len(normalizedAttachmentIDs) == 0 {
+		return nil, fmt.Errorf("%w: message cannot be empty", ErrInvalidArgument)
+	}
 	if err := s.ensureGroupMessageAttachments(ctx, authSession.User.ID, group.ID, normalizedAttachmentIDs); err != nil {
 		return nil, err
 	}
@@ -741,6 +744,9 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 	normalizedAttachmentIDs, err := normalizeAttachmentIDs(attachmentIDs)
 	if err != nil {
 		return nil, err
+	}
+	if normalizedText == "" && len(normalizedAttachmentIDs) == 0 {
+		return nil, fmt.Errorf("%w: message cannot be empty", ErrInvalidArgument)
 	}
 	if err := s.ensureDirectMessageAttachments(ctx, authSession.User.ID, directChat.ID, normalizedAttachmentIDs); err != nil {
 		return nil, err
@@ -1196,7 +1202,7 @@ func normalizeMessageText(value string) (string, error) {
 	normalized = strings.ReplaceAll(normalized, "\r", "\n")
 	normalized = strings.TrimSpace(normalized)
 	if normalized == "" {
-		return "", fmt.Errorf("%w: text message cannot be empty", ErrInvalidArgument)
+		return "", nil
 	}
 	if len([]rune(normalized)) > maxTextMessageLength {
 		return "", fmt.Errorf("%w: text message is too long", ErrInvalidArgument)

@@ -141,6 +141,9 @@ func TestGroupMessagesRejectRawHTMLAndRequireMembership(t *testing.T) {
 	if _, err := service.SendGroupTextMessage(context.Background(), alice.Token, group.ID, "<b>unsafe</b>", nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("ожидалась ошибка raw HTML для group message, получено %v", err)
 	}
+	if _, err := service.SendGroupTextMessage(context.Background(), alice.Token, group.ID, "   ", nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ожидалась ошибка пустого group message, получено %v", err)
+	}
 
 	if _, _, _, err := service.GetGroupChat(context.Background(), bob.Token, group.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ожидалась ошибка доступа к group chat для неучастника, получено %v", err)

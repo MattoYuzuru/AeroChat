@@ -414,6 +414,21 @@ func TestSendAndListMessagesUseMarkdownPolicy(t *testing.T) {
 	}
 }
 
+func TestSendTextMessageRejectsEmptyMessageWithoutTextOrAttachments(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+
+	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "   ", nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ожидалась ошибка пустого сообщения, получено %v", err)
+	}
+}
+
 func TestSendTextMessageRequiresActiveFriendship(t *testing.T) {
 	t.Parallel()
 
@@ -1355,12 +1370,9 @@ func (r *fakeRepository) CreateGroupMessage(_ context.Context, params CreateGrou
 		ThreadID:     params.ThreadID,
 		SenderUserID: params.SenderUserID,
 		Kind:         MessageKindText,
-		Text: &TextMessageContent{
-			Text:           params.Text,
-			MarkdownPolicy: MarkdownPolicySafeSubsetV1,
-		},
-		CreatedAt: params.CreatedAt,
-		UpdatedAt: params.CreatedAt,
+		Text:         messageTextContentForTest(params.Text),
+		CreatedAt:    params.CreatedAt,
+		UpdatedAt:    params.CreatedAt,
 	}
 	for _, attachmentID := range params.AttachmentIDs {
 		attachment := r.attachments[attachmentID]
@@ -1424,12 +1436,9 @@ func (r *fakeRepository) CreateDirectChatMessage(_ context.Context, params Creat
 		ChatID:       params.ChatID,
 		SenderUserID: params.SenderUserID,
 		Kind:         MessageKindText,
-		Text: &TextMessageContent{
-			Text:           params.Text,
-			MarkdownPolicy: MarkdownPolicySafeSubsetV1,
-		},
-		CreatedAt: params.CreatedAt,
-		UpdatedAt: params.CreatedAt,
+		Text:         messageTextContentForTest(params.Text),
+		CreatedAt:    params.CreatedAt,
+		UpdatedAt:    params.CreatedAt,
 	}
 	for _, attachmentID := range params.AttachmentIDs {
 		attachment := r.attachments[attachmentID]
@@ -1566,6 +1575,17 @@ func isParticipant(directChat DirectChat, userID string) bool {
 	}
 
 	return false
+}
+
+func messageTextContentForTest(text string) *TextMessageContent {
+	if text == "" {
+		return nil
+	}
+
+	return &TextMessageContent{
+		Text:           text,
+		MarkdownPolicy: MarkdownPolicySafeSubsetV1,
+	}
 }
 
 func (r *fakeRepository) blockUser(blockerUserID string, blockedUserID string) {

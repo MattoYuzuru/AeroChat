@@ -4478,10 +4478,12 @@ func (x *ClearDirectChatPresenceResponse) GetPresenceState() *DirectChatPresence
 }
 
 type SendTextMessageRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ChatId        string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
-	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
-	AttachmentIds []string               `protobuf:"bytes,3,rep,name=attachment_ids,json=attachmentIds,proto3" json:"attachment_ids,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ChatId string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	// text остаётся optional-by-semantics: attachment-only сообщение передаёт пустую строку.
+	// Полностью пустое сообщение без text и attachment_ids запрещено доменно.
+	Text          string   `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	AttachmentIds []string `protobuf:"bytes,3,rep,name=attachment_ids,json=attachmentIds,proto3" json:"attachment_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4774,10 +4776,12 @@ func (x *ListGroupMessagesResponse) GetMessages() []*GroupMessage {
 }
 
 type SendGroupTextMessageRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	GroupId       string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
-	AttachmentIds []string               `protobuf:"bytes,3,rep,name=attachment_ids,json=attachmentIds,proto3" json:"attachment_ids,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	GroupId string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	// text остаётся optional-by-semantics: attachment-only сообщение передаёт пустую строку.
+	// Полностью пустое сообщение без text и attachment_ids запрещено доменно.
+	Text          string   `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	AttachmentIds []string `protobuf:"bytes,3,rep,name=attachment_ids,json=attachmentIds,proto3" json:"attachment_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

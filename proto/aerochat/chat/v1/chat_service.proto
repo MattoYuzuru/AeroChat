@@ -487,6 +487,8 @@ message ClearDirectChatPresenceResponse {
 
 message SendTextMessageRequest {
   string chat_id = 1;
+  // text остаётся optional-by-semantics: attachment-only сообщение передаёт пустую строку.
+  // Полностью пустое сообщение без text и attachment_ids запрещено доменно.
   string text = 2;
   repeated string attachment_ids = 3;
 }
@@ -515,6 +517,8 @@ message ListGroupMessagesResponse {
 
 message SendGroupTextMessageRequest {
   string group_id = 1;
+  // text остаётся optional-by-semantics: attachment-only сообщение передаёт пустую строку.
+  // Полностью пустое сообщение без text и attachment_ids запрещено доменно.
   string text = 2;
   repeated string attachment_ids = 3;
 }

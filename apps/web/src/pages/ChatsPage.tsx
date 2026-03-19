@@ -9,6 +9,11 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { MessageAttachmentList } from "../attachments/MessageAttachmentList";
+import {
+  canSubmitMessageComposer,
+  hasRenderableMessageText,
+  normalizeComposerMessageText,
+} from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
 import { openAttachmentInNewTab } from "../attachments/open";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
@@ -124,14 +129,19 @@ export function ChatsPage() {
         );
   const uploadedAttachmentId = attachmentComposer.uploadedAttachmentId;
   const attachmentDraft = attachmentComposer.state.draft;
+  const canSubmitComposer = canSubmitMessageComposer({
+    text: composerText,
+    uploadedAttachmentId,
+    isUploading: attachmentComposer.isUploading,
+  });
 
   async function submitComposer() {
-    const normalizedText = composerText.trim();
-    if (normalizedText === "") {
+    const normalizedText = normalizeComposerMessageText(composerText);
+    if (!canSubmitComposer) {
       setComposerError(
-        uploadedAttachmentId === null
-          ? "Введите текст сообщения, прежде чем отправлять его."
-          : "Текущий backend требует текст сообщения даже при наличии вложения.",
+        attachmentComposer.isUploading
+          ? "Дождитесь завершения загрузки файла, прежде чем отправлять сообщение."
+          : "Добавьте текст сообщения или готовое вложение.",
       );
       chats.clearFeedback();
       return;
@@ -144,11 +154,15 @@ export function ChatsPage() {
     );
     if (success) {
       setComposerText("");
-      attachmentComposer.markSendSucceeded();
+      if (uploadedAttachmentId !== null) {
+        attachmentComposer.markSendSucceeded();
+      }
       return;
     }
 
-    attachmentComposer.markSendFailed();
+    if (uploadedAttachmentId !== null) {
+      attachmentComposer.markSendFailed();
+    }
   }
 
   async function handleComposerSubmit(event: FormEvent<HTMLFormElement>) {
@@ -207,8 +221,8 @@ export function ChatsPage() {
             <h1 className={styles.title}>Личные чаты AeroChat</h1>
             <p className={styles.subtitle}>
               Лёгкий direct chat shell остаётся gateway-only, уже поднимает bounded realtime
-              transport foundation и первый attachment upload flow, но пока без preview и draft
-              recovery.
+              transport foundation и single-file attachment flow с text-only, text + file и
+              attachment-only сообщениями, но пока без preview и полноценного draft recovery.
             </p>
           </div>
 
@@ -527,7 +541,7 @@ export function ChatsPage() {
                     {selectedThread.messages.length === 0 ? (
                       <StateCard
                         title="Сообщений пока нет"
-                        message="Отправьте первое текстовое сообщение или текст с файлом. Preview и richer media rendering добавятся отдельными slice позже."
+                        message="Отправьте первое сообщение: текст, текст с файлом или attachment-only. Preview и richer media rendering добавятся отдельными slice позже."
                       />
                     ) : (
                       selectedThread.messages.map((message) => {
@@ -571,9 +585,11 @@ export function ChatsPage() {
                                 {message.tombstone ? (
                                   <p className={styles.tombstoneText}>Сообщение удалено для всех.</p>
                                 ) : (
-                                  <div className={styles.messageText}>
-                                    <SafeMessageMarkdown text={message.text?.text ?? ""} />
-                                  </div>
+                                  hasRenderableMessageText(message.text) && (
+                                    <div className={styles.messageText}>
+                                      <SafeMessageMarkdown text={message.text?.text ?? ""} />
+                                    </div>
+                                  )
                                 )}
 
                                 {!message.tombstone && (
@@ -661,7 +677,7 @@ export function ChatsPage() {
                         {attachmentDraft === null ? "Выбрать файл" : "Заменить файл"}
                       </button>
                       <span className={styles.attachmentHint}>
-                        Attachment-only messages пока не поддерживаются.
+                        Single-file composer: можно отправить текст, текст + файл или только файл.
                       </span>
                     </div>
 
@@ -745,13 +761,12 @@ export function ChatsPage() {
                       <div className={styles.actions}>
                         <button
                           className={styles.primaryButton}
-                          disabled={
-                            chats.state.isSendingMessage ||
-                            attachmentComposer.isUploading ||
-                            composerText.trim() === ""
-                          }
-                          type="submit"
-                        >
+                        disabled={
+                          chats.state.isSendingMessage ||
+                          !canSubmitComposer
+                        }
+                        type="submit"
+                      >
                           {chats.state.isSendingMessage ? "Отправляем..." : "Отправить"}
                         </button>
                       </div>
@@ -861,6 +876,12 @@ function describeMessagePreview(message: DirectChatMessage): string {
 
   const text = createMarkdownPreview(message.text?.text ?? "");
   if (text === "") {
+    if (message.attachments.length === 1) {
+      return "Вложение без текста";
+    }
+    if (message.attachments.length > 1) {
+      return `Вложения без текста: ${message.attachments.length}`;
+    }
     return "Текст недоступен";
   }
 
