@@ -1,48 +1,86 @@
-# Минимальный пример shared-edge ресурсов для `aero.keykomi.com`.
-# Для реального apply предпочитай `infra/scripts/render-shared-edge-manifest.sh`,
-# чтобы `EndpointSlice` не расходился с `.env.server`.
-# Перед применением замени:
-# - namespace, если нужен другой;
-# - `192.0.2.10` на значение из `.env.server` переменной `AERO_SHARED_EDGE_HOST_IP`;
-# - `letsencrypt-prod` на фактический ClusterIssuer, если в кластере используется другое имя;
-# - `ingressClassName`, если shared Traefik использует нестандартный ingress class;
-# - `aero.keykomi.com` и `media.keykomi.com`, если используются другие домены.
-#
-# Этот файл не переносит AeroChat в Kubernetes.
-# Он только подключает уже работающий compose runtime к shared `Traefik` через
-# Service без selector + EndpointSlice + Middleware + Ingress.
+#!/bin/sh
+
+set -eu
+
+env_file="${1:-.env.server}"
+
+if [ ! -f "$env_file" ]; then
+  echo "Файл $env_file не найден" >&2
+  exit 1
+fi
+
+env_file_path="$env_file"
+case "$env_file_path" in
+  */*) ;;
+  *) env_file_path="./$env_file_path" ;;
+esac
+
+set -a
+. "$env_file_path"
+set +a
+
+require_env() {
+  name="$1"
+  eval "value=\${$name:-}"
+
+  if [ -z "$value" ]; then
+    echo "Переменная $name обязательна для render shared edge manifest" >&2
+    exit 1
+  fi
+}
+
+require_env AERO_SHARED_EDGE_HOST_IP
+require_env AERO_WEB_HOST_PORT
+require_env AERO_GATEWAY_HOST_PORT
+require_env AERO_MEDIA_HOST_PORT
+require_env AERO_EDGE_DOMAIN
+require_env AERO_MEDIA_EDGE_DOMAIN
+
+namespace="${AERO_K8S_EDGE_NAMESPACE:-aerochat-edge}"
+ingress_class="${AERO_K8S_INGRESS_CLASS:-traefik}"
+cluster_issuer="${AERO_K8S_CLUSTER_ISSUER:-letsencrypt-prod}"
+
+edge_tls_secret="$(printf '%s' "$AERO_EDGE_DOMAIN" | tr '.' '-')-tls"
+media_tls_secret="$(printf '%s' "$AERO_MEDIA_EDGE_DOMAIN" | tr '.' '-')-tls"
+
+cat <<EOF
+# Сгенерировано из $env_file.
+# Перед apply при необходимости переопредели:
+# - AERO_K8S_EDGE_NAMESPACE
+# - AERO_K8S_INGRESS_CLASS
+# - AERO_K8S_CLUSTER_ISSUER
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: aerochat-edge
+  name: $namespace
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: aerochat-web
-  namespace: aerochat-edge
+  namespace: $namespace
 spec:
   ports:
     - name: http
       port: 80
       protocol: TCP
-      targetPort: 18080
+      targetPort: $AERO_WEB_HOST_PORT
 ---
 apiVersion: discovery.k8s.io/v1
 kind: EndpointSlice
 metadata:
   name: aerochat-web-external
-  namespace: aerochat-edge
+  namespace: $namespace
   labels:
     kubernetes.io/service-name: aerochat-web
 addressType: IPv4
 ports:
   - name: http
     protocol: TCP
-    port: 18080
+    port: $AERO_WEB_HOST_PORT
 endpoints:
   - addresses:
-      - 192.0.2.10
+      - $AERO_SHARED_EDGE_HOST_IP
     conditions:
       ready: true
 ---
@@ -50,29 +88,29 @@ apiVersion: v1
 kind: Service
 metadata:
   name: aerochat-media
-  namespace: aerochat-edge
+  namespace: $namespace
 spec:
   ports:
     - name: http
       port: 80
       protocol: TCP
-      targetPort: 19000
+      targetPort: $AERO_MEDIA_HOST_PORT
 ---
 apiVersion: discovery.k8s.io/v1
 kind: EndpointSlice
 metadata:
   name: aerochat-media-external
-  namespace: aerochat-edge
+  namespace: $namespace
   labels:
     kubernetes.io/service-name: aerochat-media
 addressType: IPv4
 ports:
   - name: http
     protocol: TCP
-    port: 19000
+    port: $AERO_MEDIA_HOST_PORT
 endpoints:
   - addresses:
-      - 192.0.2.10
+      - $AERO_SHARED_EDGE_HOST_IP
     conditions:
       ready: true
 ---
@@ -80,29 +118,29 @@ apiVersion: v1
 kind: Service
 metadata:
   name: aerochat-gateway
-  namespace: aerochat-edge
+  namespace: $namespace
 spec:
   ports:
     - name: http
       port: 80
       protocol: TCP
-      targetPort: 18081
+      targetPort: $AERO_GATEWAY_HOST_PORT
 ---
 apiVersion: discovery.k8s.io/v1
 kind: EndpointSlice
 metadata:
   name: aerochat-gateway-external
-  namespace: aerochat-edge
+  namespace: $namespace
   labels:
     kubernetes.io/service-name: aerochat-gateway
 addressType: IPv4
 ports:
   - name: http
     protocol: TCP
-    port: 18081
+    port: $AERO_GATEWAY_HOST_PORT
 endpoints:
   - addresses:
-      - 192.0.2.10
+      - $AERO_SHARED_EDGE_HOST_IP
     conditions:
       ready: true
 ---
@@ -110,7 +148,7 @@ apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: aerochat-strip-api-prefix
-  namespace: aerochat-edge
+  namespace: $namespace
 spec:
   stripPrefix:
     prefixes:
@@ -120,17 +158,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: aerochat-web
-  namespace: aerochat-edge
+  namespace: $namespace
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: $cluster_issuer
 spec:
-  ingressClassName: traefik
+  ingressClassName: $ingress_class
   tls:
     - hosts:
-        - aero.keykomi.com
-      secretName: aero-keykomi-com-tls
+        - $AERO_EDGE_DOMAIN
+      secretName: $edge_tls_secret
   rules:
-    - host: aero.keykomi.com
+    - host: $AERO_EDGE_DOMAIN
       http:
         paths:
           - path: /healthz
@@ -159,17 +197,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: aerochat-media
-  namespace: aerochat-edge
+  namespace: $namespace
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: $cluster_issuer
 spec:
-  ingressClassName: traefik
+  ingressClassName: $ingress_class
   tls:
     - hosts:
-        - media.keykomi.com
-      secretName: media-keykomi-com-tls
+        - $AERO_MEDIA_EDGE_DOMAIN
+      secretName: $media_tls_secret
   rules:
-    - host: media.keykomi.com
+    - host: $AERO_MEDIA_EDGE_DOMAIN
       http:
         paths:
           - path: /
@@ -184,17 +222,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: aerochat-api
-  namespace: aerochat-edge
+  namespace: $namespace
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: aerochat-edge-aerochat-strip-api-prefix@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: ${namespace}-aerochat-strip-api-prefix@kubernetescrd
 spec:
-  ingressClassName: traefik
+  ingressClassName: $ingress_class
   tls:
     - hosts:
-        - aero.keykomi.com
-      secretName: aero-keykomi-com-tls
+        - $AERO_EDGE_DOMAIN
+      secretName: $edge_tls_secret
   rules:
-    - host: aero.keykomi.com
+    - host: $AERO_EDGE_DOMAIN
       http:
         paths:
           - path: /api
@@ -204,3 +242,4 @@ spec:
                 name: aerochat-gateway
                 port:
                   name: http
+EOF

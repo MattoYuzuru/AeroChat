@@ -297,20 +297,28 @@ docker compose \
   logs --tail=100 aero-identity aero-chat
 ```
 
-7. Подготовь cluster-side manifest example.
+7. Сгенерируй cluster-side manifest из `.env.server`.
 
-Открой `infra/k8s/shared-edge/aero.keykomi.com.example.yaml` и синхронно замени:
+Для реального apply не редактируй versioned example вручную.
+Гораздо безопаснее отрендерить manifest прямо из `.env.server`, чтобы host IP и upstream ports
+всегда совпадали с compose runtime:
 
-- `192.0.2.10` на `AERO_SHARED_EDGE_HOST_IP`;
-- `18080`, `18081` и `19000`, если в `.env.server` выбраны другие порты;
-- `letsencrypt-prod`, если `ClusterIssuer` называется иначе;
-- `aero.keykomi.com` и `media.keykomi.com`, если используются другие домены;
-- namespace, если нужен другой.
+```bash
+infra/scripts/render-shared-edge-manifest.sh .env.server > /tmp/aerochat-shared-edge.yaml
+```
+
+Если нужно переопределить cluster-side defaults, задай перед рендером:
+
+- `AERO_K8S_EDGE_NAMESPACE`
+- `AERO_K8S_INGRESS_CLASS`
+- `AERO_K8S_CLUSTER_ISSUER`
+
+Versioned файл `infra/k8s/shared-edge/aero.keykomi.com.example.yaml` остаётся только иллюстративным примером.
 
 8. Примени ресурсы в кластер:
 
 ```bash
-kubectl apply -f infra/k8s/shared-edge/aero.keykomi.com.example.yaml
+kubectl apply -f /tmp/aerochat-shared-edge.yaml
 ```
 
 9. Проверь, что shared edge увидел все ресурсы:
@@ -385,7 +393,7 @@ Rollback делается тем же flow после возврата `AERO_IMA
 - `AERO_SHARED_EDGE_HOST_IP` в `.env.server`;
 - `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT` и `AERO_MEDIA_HOST_PORT` в `.env.server`, если менялись порты;
 - `AERO_EDGE_DOMAIN`, `AERO_MEDIA_EDGE_DOMAIN`, `MEDIA_S3_PUBLIC_ENDPOINT` и `MEDIA_S3_CORS_ALLOWED_ORIGINS`, если меняются домены/origin;
-- все `EndpointSlice` в Kubernetes manifest;
+- заново сгенерированный Kubernetes manifest и все `EndpointSlice` внутри него;
 - при необходимости ограничения firewall.
 
 Только после этого можно выполнять следующий rollout.

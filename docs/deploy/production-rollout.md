@@ -44,6 +44,8 @@ Workflow не занимается:
 
 Если compose topology, env contract или shared edge manifests менялись в репозитории, оператор обязан отдельно обновить
 checkout на VPS и при необходимости повторно применить `kubectl apply` до первого запуска workflow.
+Для этого рекомендуется рендерить manifest через `infra/scripts/render-shared-edge-manifest.sh .env.server`,
+а не править versioned example вручную.
 
 ## GitHub Environment `production`
 
