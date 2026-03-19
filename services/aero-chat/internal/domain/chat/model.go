@@ -179,6 +179,12 @@ type AttachmentUploadIntent struct {
 	UploadSession AttachmentUploadSession
 }
 
+type AttachmentAccess struct {
+	Attachment        Attachment
+	DownloadURL       string
+	DownloadExpiresAt *time.Time
+}
+
 type MessageTombstone struct {
 	DeletedByUserID string
 	DeletedAt       time.Time

@@ -1792,6 +1792,17 @@ func (s *fakeObjectStorage) CreateUpload(_ context.Context, objectKey string, mi
 	}, nil
 }
 
+func (s *fakeObjectStorage) CreateDownload(_ context.Context, objectKey string, expiresAt time.Time) (*PresignedObjectDownload, error) {
+	if _, ok := s.objects[objectKey]; !ok {
+		return nil, ErrNotFound
+	}
+
+	return &PresignedObjectDownload{
+		URL:       "http://example.invalid/download/" + objectKey,
+		ExpiresAt: expiresAt,
+	}, nil
+}
+
 func (s *fakeObjectStorage) StatObject(_ context.Context, objectKey string) (*StoredObjectInfo, error) {
 	info, ok := s.objects[objectKey]
 	if !ok {

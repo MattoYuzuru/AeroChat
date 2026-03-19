@@ -8,6 +8,10 @@ import {
   type SetStateAction,
 } from "react";
 import { useSearchParams } from "react-router-dom";
+import { MessageAttachmentList } from "../attachments/MessageAttachmentList";
+import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
+import { openAttachmentInNewTab } from "../attachments/open";
+import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
 import { useAuth } from "../auth/useAuth";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
 import { gatewayClient } from "../gateway/runtime";
@@ -63,10 +67,12 @@ export function GroupsPage() {
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
   const [pendingRemoveUserId, setPendingRemoveUserId] = useState<string | null>(null);
   const [pendingTransferUserId, setPendingTransferUserId] = useState<string | null>(null);
+  const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, GroupMemberRole>>({});
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
   const selectedStateRef = useRef(selectedState);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const activeTypingTargetRef = useRef<GroupTypingSessionTarget | null>(null);
   const typingLastSentAtRef = useRef(0);
   const typingRefreshTimerRef = useRef<number | null>(null);
@@ -85,6 +91,18 @@ export function GroupsPage() {
     canSendMessages:
       selectedState.status === "ready" ? selectedState.snapshot.thread.canSendMessages : false,
     composerText,
+  });
+  const attachmentComposer = useAttachmentComposer({
+    enabled: authState.status === "authenticated",
+    token,
+    scope:
+      selectedState.status === "ready"
+        ? {
+            kind: "group",
+            id: selectedState.snapshot.group.id,
+          }
+        : null,
+    onUnauthenticated: expireSession,
   });
 
   useEffect(() => {
@@ -590,7 +608,11 @@ export function GroupsPage() {
 
     const normalizedText = composerText.trim();
     if (normalizedText === "") {
-      setActionError("Введите текст сообщения, прежде чем отправлять его.");
+      setActionError(
+        attachmentComposer.uploadedAttachmentId === null
+          ? "Введите текст сообщения, прежде чем отправлять его."
+          : "Текущий backend требует текст сообщения даже при наличии вложения.",
+      );
       setNotice(null);
       return;
     }
@@ -604,10 +626,15 @@ export function GroupsPage() {
         token,
         selectedState.snapshot.group.id,
         normalizedText,
+        attachmentComposer.uploadedAttachmentId === null
+          ? []
+          : [attachmentComposer.uploadedAttachmentId],
       );
       setComposerText("");
+      attachmentComposer.markSendSucceeded();
       setNotice("Сообщение отправлено.");
     } catch (error) {
+      attachmentComposer.markSendFailed();
       const message = resolveProtectedError(
         error,
         "Не удалось отправить сообщение в группу.",
@@ -618,6 +645,33 @@ export function GroupsPage() {
       }
     } finally {
       setIsSendingMessage(false);
+    }
+  }
+
+  async function handleAttachmentSelection(file: File | null) {
+    if (file === null) {
+      return;
+    }
+
+    setActionError(null);
+    setNotice(null);
+    await attachmentComposer.selectFile(file);
+  }
+
+  async function handleOpenAttachment(attachmentId: string) {
+    setPendingOpenAttachmentId(attachmentId);
+    setActionError(null);
+
+    try {
+      await openAttachmentInNewTab(token, attachmentId);
+    } catch (error) {
+      setActionError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось открыть вложение.",
+      );
+    } finally {
+      setPendingOpenAttachmentId(null);
     }
   }
 
@@ -837,10 +891,10 @@ export function GroupsPage() {
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Groups</p>
-            <h1 className={styles.title}>Group typing bootstrap</h1>
+            <h1 className={styles.title}>Group attachment composer bootstrap</h1>
             <p className={styles.subtitle}>
-              Slice делает группы live через bounded realtime fan-out: text messages, typing,
-              membership, role и ownership updates без calls, media и redesign.
+              Slice делает group chat usable для реальных файлов: upload intent, presigned upload,
+              minimal attachment rendering и send через существующий gateway-only flow.
             </p>
           </div>
 
@@ -1091,8 +1145,8 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Primary group thread</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Здесь остаётся text-only history, но текущая thread уже показывает bounded
-                    group typing без polling и без расширения scope в read receipts или presence.
+                    Thread теперь показывает текст и минимальные file attachments без preview,
+                    player и attachment-only semantics.
                   </p>
                 </div>
 
@@ -1132,6 +1186,14 @@ export function GroupsPage() {
                         <div className={styles.messageBody}>
                           <SafeMessageMarkdown text={message.text?.text ?? ""} />
                         </div>
+
+                        <MessageAttachmentList
+                          attachments={message.attachments}
+                          onOpenAttachment={(attachmentId) => {
+                            void handleOpenAttachment(attachmentId);
+                          }}
+                          pendingAttachmentId={pendingOpenAttachmentId}
+                        />
                       </article>
                     ))
                   )}
@@ -1145,7 +1207,8 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Новое сообщение</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Raw HTML запрещён. Rendering остаётся в текущем safe markdown subset.
+                    Raw HTML запрещён. Файл загружается отдельно, а сообщение по-прежнему требует
+                    явный текст.
                   </p>
                 </div>
 
@@ -1156,11 +1219,104 @@ export function GroupsPage() {
                 )}
 
                 <form className={styles.composer} onSubmit={handleSendGroupMessage}>
+                  <div className={styles.attachmentActions}>
+                    <input
+                      accept="*/*"
+                      className={styles.attachmentInput}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        void handleAttachmentSelection(file);
+                        event.target.value = "";
+                      }}
+                      ref={attachmentInputRef}
+                      type="file"
+                    />
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={
+                        isSendingMessage ||
+                        attachmentComposer.isUploading ||
+                        !selectedState.snapshot.thread.canSendMessages
+                      }
+                      onClick={() => {
+                        attachmentInputRef.current?.click();
+                      }}
+                      type="button"
+                    >
+                      {attachmentComposer.state.draft === null
+                        ? "Выбрать файл"
+                        : "Заменить файл"}
+                    </button>
+                    <span className={styles.attachmentHint}>
+                      Attachment-only messages пока не поддерживаются.
+                    </span>
+                  </div>
+
+                  {attachmentComposer.state.draft && (
+                    <div className={styles.attachmentDraftCard}>
+                      <div>
+                        <p className={styles.attachmentDraftTitle}>
+                          {attachmentComposer.state.draft.fileName}
+                        </p>
+                        <p className={styles.attachmentDraftMeta}>
+                          {formatAttachmentSize(attachmentComposer.state.draft.sizeBytes)} •{" "}
+                          {describeAttachmentMimeType(attachmentComposer.state.draft.mimeType)}
+                        </p>
+                        {attachmentComposer.state.draft.status === "preparing" && (
+                          <p className={styles.attachmentDraftStatus}>
+                            Подготавливаем upload intent...
+                          </p>
+                        )}
+                        {attachmentComposer.state.draft.status === "uploading" && (
+                          <p className={styles.attachmentDraftStatus}>
+                            Загружаем: {attachmentComposer.state.draft.progress}%
+                          </p>
+                        )}
+                        {attachmentComposer.state.draft.status === "uploaded" && (
+                          <p className={styles.attachmentDraftStatus}>
+                            Файл загружен и будет прикреплён к следующему сообщению.
+                          </p>
+                        )}
+                        {attachmentComposer.state.draft.status === "error" && (
+                          <p className={styles.attachmentDraftError}>
+                            {attachmentComposer.state.draft.errorMessage ??
+                              "Не удалось загрузить файл."}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className={styles.attachmentDraftActions}>
+                        {attachmentComposer.state.draft.status === "error" && (
+                          <button
+                            className={styles.ghostButton}
+                            onClick={() => {
+                              void attachmentComposer.retryUpload();
+                            }}
+                            type="button"
+                          >
+                            Повторить upload
+                          </button>
+                        )}
+                        <button
+                          className={styles.ghostButton}
+                          onClick={() => {
+                            attachmentComposer.removeDraft();
+                          }}
+                          type="button"
+                        >
+                          Убрать
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <label className={styles.field}>
                     <span>Текст сообщения</span>
                     <textarea
                       disabled={
-                        isSendingMessage || !selectedState.snapshot.thread.canSendMessages
+                        isSendingMessage ||
+                        attachmentComposer.isUploading ||
+                        !selectedState.snapshot.thread.canSendMessages
                       }
                       maxLength={4000}
                       onChange={(event) => {
@@ -1183,6 +1339,7 @@ export function GroupsPage() {
                       className={styles.primaryButton}
                       disabled={
                         isSendingMessage ||
+                        attachmentComposer.isUploading ||
                         !selectedState.snapshot.thread.canSendMessages ||
                         composerText.trim() === ""
                       }

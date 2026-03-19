@@ -1,4 +1,6 @@
 import type {
+  Attachment,
+  AttachmentUploadSession,
   CurrentAuth,
   DirectChat,
   DirectChatMessage,
@@ -195,6 +197,35 @@ interface TextMessageContentWire {
   markdownPolicy?: string;
 }
 
+interface AttachmentWire extends TimestampedWire {
+  id?: string;
+  ownerUserId?: string;
+  scope?: string;
+  directChatId?: string;
+  groupId?: string;
+  messageId?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number | string;
+  status?: string;
+  uploadedAt?: string;
+  attachedAt?: string;
+  failedAt?: string;
+  deletedAt?: string;
+}
+
+interface AttachmentUploadSessionWire extends TimestampedWire {
+  id?: string;
+  attachmentId?: string;
+  status?: string;
+  uploadUrl?: string;
+  httpMethod?: string;
+  headers?: Record<string, string>;
+  expiresAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+}
+
 interface MessageTombstoneWire {
   deletedByUserId?: string;
   deletedAt?: string;
@@ -208,6 +239,7 @@ interface DirectChatMessageWire extends TimestampedWire {
   text?: TextMessageContentWire;
   tombstone?: MessageTombstoneWire;
   pinned?: boolean;
+  attachments?: AttachmentWire[];
 }
 
 interface GroupMessageWire extends TimestampedWire {
@@ -217,6 +249,7 @@ interface GroupMessageWire extends TimestampedWire {
   senderUserId?: string;
   kind?: string;
   text?: TextMessageContentWire;
+  attachments?: AttachmentWire[];
 }
 
 interface DirectChatReadPositionWire extends TimestampedWire {
@@ -280,6 +313,21 @@ interface GetGroupChatResponseWire {
   group?: GroupWire;
   thread?: GroupChatThreadWire;
   typingState?: GroupTypingStateWire;
+}
+
+interface CreateAttachmentUploadIntentResponseWire {
+  attachment?: AttachmentWire;
+  uploadSession?: AttachmentUploadSessionWire;
+}
+
+interface CompleteAttachmentUploadResponseWire {
+  attachment?: AttachmentWire;
+}
+
+interface GetAttachmentResponseWire {
+  attachment?: AttachmentWire;
+  downloadUrl?: string;
+  downloadExpiresAt?: string;
 }
 
 interface SetGroupTypingResponseWire {
@@ -511,6 +559,64 @@ export function createGatewayClient(
       return normalizeGroupChatSnapshot(response);
     },
 
+    async createAttachmentUploadIntent(token, input) {
+      const response = await unaryCall<CreateAttachmentUploadIntentResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "CreateAttachmentUploadIntent",
+        {
+          ...(typeof input.directChatId === "string"
+            ? { directChatId: input.directChatId.trim() }
+            : { groupId: input.groupId.trim() }),
+          fileName: input.fileName.trim(),
+          mimeType: input.mimeType.trim(),
+          sizeBytes: String(Math.max(0, Math.trunc(input.sizeBytes))),
+        },
+        token,
+      );
+
+      return {
+        attachment: normalizeAttachment(response.attachment),
+        uploadSession: normalizeAttachmentUploadSession(response.uploadSession),
+      };
+    },
+
+    async completeAttachmentUpload(token, attachmentId, uploadSessionId) {
+      const response = await unaryCall<CompleteAttachmentUploadResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "CompleteAttachmentUpload",
+        {
+          attachmentId: attachmentId.trim(),
+          uploadSessionId: uploadSessionId.trim(),
+        },
+        token,
+      );
+
+      return normalizeAttachment(response.attachment);
+    },
+
+    async getAttachment(token, attachmentId) {
+      const response = await unaryCall<GetAttachmentResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "GetAttachment",
+        {
+          attachmentId: attachmentId.trim(),
+        },
+        token,
+      );
+
+      return {
+        attachment: normalizeAttachment(response.attachment),
+        downloadUrl: normalizeNullableString(response.downloadUrl),
+        downloadExpiresAt: normalizeNullableString(response.downloadExpiresAt),
+      };
+    },
+
     async setGroupTyping(token, groupId, threadId) {
       const response = await unaryCall<SetGroupTypingResponseWire>(
         fetchImpl,
@@ -699,7 +805,7 @@ export function createGatewayClient(
       return (response.messages ?? []).map(normalizeGroupMessage);
     },
 
-    async sendGroupTextMessage(token, groupId, text) {
+    async sendGroupTextMessage(token, groupId, text, attachmentIds = []) {
       const response = await unaryCall<SendGroupTextMessageResponseWire>(
         fetchImpl,
         baseUrl,
@@ -708,6 +814,7 @@ export function createGatewayClient(
         {
           groupId: groupId.trim(),
           text,
+          attachmentIds: normalizeIDs(attachmentIds),
         },
         token,
       );
@@ -834,7 +941,7 @@ export function createGatewayClient(
       return normalizeDirectChatPresenceState(response.presenceState);
     },
 
-    async sendTextMessage(token, chatId, text) {
+    async sendTextMessage(token, chatId, text, attachmentIds = []) {
       const response = await unaryCall<SendTextMessageResponseWire>(
         fetchImpl,
         baseUrl,
@@ -843,6 +950,7 @@ export function createGatewayClient(
         {
           chatId: chatId.trim(),
           text,
+          attachmentIds: normalizeIDs(attachmentIds),
         },
         token,
       );
@@ -1353,6 +1461,45 @@ function normalizeGroupInviteLink(
   };
 }
 
+function normalizeAttachment(input: AttachmentWire | undefined): Attachment {
+  return {
+    id: input?.id ?? "",
+    ownerUserId: input?.ownerUserId ?? "",
+    scope: input?.scope ?? "ATTACHMENT_SCOPE_UNSPECIFIED",
+    directChatId: normalizeNullableString(input?.directChatId),
+    groupId: normalizeNullableString(input?.groupId),
+    messageId: normalizeNullableString(input?.messageId),
+    fileName: input?.fileName ?? "",
+    mimeType: input?.mimeType ?? "",
+    sizeBytes: normalizeCount(input?.sizeBytes),
+    status: input?.status ?? "ATTACHMENT_STATUS_UNSPECIFIED",
+    createdAt: input?.createdAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
+    uploadedAt: normalizeNullableString(input?.uploadedAt),
+    attachedAt: normalizeNullableString(input?.attachedAt),
+    failedAt: normalizeNullableString(input?.failedAt),
+    deletedAt: normalizeNullableString(input?.deletedAt),
+  };
+}
+
+function normalizeAttachmentUploadSession(
+  input: AttachmentUploadSessionWire | undefined,
+): AttachmentUploadSession {
+  return {
+    id: input?.id ?? "",
+    attachmentId: input?.attachmentId ?? "",
+    status: input?.status ?? "ATTACHMENT_UPLOAD_SESSION_STATUS_UNSPECIFIED",
+    uploadUrl: input?.uploadUrl ?? "",
+    httpMethod: input?.httpMethod ?? "",
+    headers: input?.headers ?? {},
+    createdAt: input?.createdAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
+    expiresAt: input?.expiresAt ?? "",
+    completedAt: normalizeNullableString(input?.completedAt),
+    failedAt: normalizeNullableString(input?.failedAt),
+  };
+}
+
 function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessage {
   return {
     id: input?.id ?? "",
@@ -1361,6 +1508,7 @@ function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessag
     senderUserId: input?.senderUserId ?? "",
     kind: input?.kind ?? "",
     text: input?.text ? normalizeTextMessageContent(input.text) : null,
+    attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
   };
@@ -1422,6 +1570,7 @@ function normalizeDirectChatMessage(
     text: normalizeTextMessageContent(input?.text),
     tombstone: normalizeMessageTombstone(input?.tombstone),
     pinned: input?.pinned ?? false,
+    attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
   };
@@ -1565,6 +1714,27 @@ function normalizeNullableString(value: string | undefined): string | null {
 function normalizeOptionalString(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
+}
+
+function normalizeIDs(values: string[]): string[] {
+  return values
+    .map((value) => value.trim())
+    .filter((value) => value !== "");
+}
+
+function normalizeCount(value: number | string | undefined): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
 }
 
 function buildRevocationPayload(

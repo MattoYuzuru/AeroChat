@@ -622,6 +622,154 @@ describe("createGatewayClient", () => {
     expect(snapshot.typingState?.typers[0]?.user.id).toBe("user-2");
   });
 
+  it("calls attachment upload and access endpoints through gateway chat service", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            attachment: {
+              id: "attachment-1",
+              ownerUserId: "user-1",
+              scope: "ATTACHMENT_SCOPE_DIRECT_CHAT",
+              directChatId: "chat-1",
+              fileName: "report.pdf",
+              mimeType: "application/pdf",
+              sizeBytes: 4096,
+              status: "ATTACHMENT_STATUS_PENDING",
+              createdAt: "2026-04-14T10:00:00Z",
+              updatedAt: "2026-04-14T10:00:00Z",
+            },
+            uploadSession: {
+              id: "upload-1",
+              attachmentId: "attachment-1",
+              status: "ATTACHMENT_UPLOAD_SESSION_STATUS_PENDING",
+              uploadUrl: "https://media.example.invalid/put",
+              httpMethod: "PUT",
+              headers: {
+                "Content-Type": "application/pdf",
+              },
+              createdAt: "2026-04-14T10:00:00Z",
+              updatedAt: "2026-04-14T10:00:00Z",
+              expiresAt: "2026-04-14T10:15:00Z",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            attachment: {
+              id: "attachment-1",
+              ownerUserId: "user-1",
+              scope: "ATTACHMENT_SCOPE_DIRECT_CHAT",
+              directChatId: "chat-1",
+              fileName: "report.pdf",
+              mimeType: "application/pdf",
+              sizeBytes: 4096,
+              status: "ATTACHMENT_STATUS_UPLOADED",
+              createdAt: "2026-04-14T10:00:00Z",
+              updatedAt: "2026-04-14T10:01:00Z",
+              uploadedAt: "2026-04-14T10:01:00Z",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            attachment: {
+              id: "attachment-1",
+              ownerUserId: "user-1",
+              scope: "ATTACHMENT_SCOPE_DIRECT_CHAT",
+              directChatId: "chat-1",
+              messageId: "message-1",
+              fileName: "report.pdf",
+              mimeType: "application/pdf",
+              sizeBytes: 4096,
+              status: "ATTACHMENT_STATUS_ATTACHED",
+              createdAt: "2026-04-14T10:00:00Z",
+              updatedAt: "2026-04-14T10:02:00Z",
+              uploadedAt: "2026-04-14T10:01:00Z",
+              attachedAt: "2026-04-14T10:02:00Z",
+            },
+            downloadUrl: "https://media.example.invalid/get",
+            downloadExpiresAt: "2026-04-14T10:17:00Z",
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const intent = await client.createAttachmentUploadIntent("token-1", {
+      directChatId: " chat-1 ",
+      fileName: " report.pdf ",
+      mimeType: " application/pdf ",
+      sizeBytes: 4096,
+    });
+    const uploadedAttachment = await client.completeAttachmentUpload(
+      "token-1",
+      " attachment-1 ",
+      " upload-1 ",
+    );
+    const access = await client.getAttachment("token-1", " attachment-1 ");
+
+    expect(intent.uploadSession.uploadUrl).toBe("https://media.example.invalid/put");
+    expect(uploadedAttachment.status).toBe("ATTACHMENT_STATUS_UPLOADED");
+    expect(access.downloadUrl).toBe("https://media.example.invalid/get");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/aerochat.chat.v1.ChatService/CreateAttachmentUploadIntent",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          directChatId: "chat-1",
+          fileName: "report.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: "4096",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/aerochat.chat.v1.ChatService/CompleteAttachmentUpload",
+      expect.objectContaining({
+        body: JSON.stringify({
+          attachmentId: "attachment-1",
+          uploadSessionId: "upload-1",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/aerochat.chat.v1.ChatService/GetAttachment",
+      expect.objectContaining({
+        body: JSON.stringify({
+          attachmentId: "attachment-1",
+        }),
+      }),
+    );
+  });
+
   it("sets and clears group typing through gateway chat endpoint", async () => {
     const fetchMock = vi
       .fn()
@@ -936,6 +1084,20 @@ describe("createGatewayClient", () => {
                   text: "hello",
                   markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
                 },
+                attachments: [
+                  {
+                    id: "attachment-1",
+                    ownerUserId: "user-1",
+                    scope: "ATTACHMENT_SCOPE_DIRECT_CHAT",
+                    directChatId: "chat-1",
+                    fileName: "report.pdf",
+                    mimeType: "application/pdf",
+                    sizeBytes: 2048,
+                    status: "ATTACHMENT_STATUS_ATTACHED",
+                    createdAt: "2026-03-25T10:06:00Z",
+                    updatedAt: "2026-03-25T10:06:00Z",
+                  },
+                ],
                 pinned: true,
                 createdAt: "2026-03-25T10:06:00Z",
                 updatedAt: "2026-03-25T10:06:00Z",
@@ -949,6 +1111,7 @@ describe("createGatewayClient", () => {
                   deletedByUserId: "user-2",
                   deletedAt: "2026-03-25T10:10:00Z",
                 },
+                attachments: [],
                 pinned: false,
                 createdAt: "2026-03-25T10:09:00Z",
                 updatedAt: "2026-03-25T10:10:00Z",
@@ -981,6 +1144,12 @@ describe("createGatewayClient", () => {
         text: expect.objectContaining({
           text: "hello",
         }),
+        attachments: [
+          expect.objectContaining({
+            id: "attachment-1",
+            fileName: "report.pdf",
+          }),
+        ],
       }),
       expect.objectContaining({
         id: "message-2",

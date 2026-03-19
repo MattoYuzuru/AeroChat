@@ -583,7 +583,7 @@ export function useChats({
     }
   }
 
-  async function sendMessage(text: string): Promise<boolean> {
+  async function sendMessage(text: string, attachmentIds: string[] = []): Promise<boolean> {
     const chatId = stateRef.current.selectedChatId;
     if (!chatId) {
       return false;
@@ -593,7 +593,7 @@ export function useChats({
     dispatch({ type: "send_started" });
 
     try {
-      const message = await gatewayClient.sendTextMessage(token, chatId, text);
+      const message = await gatewayClient.sendTextMessage(token, chatId, text, attachmentIds);
       if (!mountedRef.current) {
         return false;
       }

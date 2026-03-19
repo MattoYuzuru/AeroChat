@@ -84,8 +84,14 @@ func TestCompleteAttachmentUploadAndAttachToDirectMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("peer get attachment after attach: %v", err)
 	}
-	if peerAttachment.Status != AttachmentStatusAttached {
-		t.Fatalf("ожидался attached attachment для peer, получено %q", peerAttachment.Status)
+	if peerAttachment.Attachment.Status != AttachmentStatusAttached {
+		t.Fatalf("ожидался attached attachment для peer, получено %q", peerAttachment.Attachment.Status)
+	}
+	if peerAttachment.DownloadURL == "" {
+		t.Fatal("ожидался presigned download url для attached attachment")
+	}
+	if peerAttachment.DownloadExpiresAt == nil {
+		t.Fatal("ожидался expires_at для presigned download url")
 	}
 }
 

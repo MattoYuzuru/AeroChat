@@ -30,6 +30,20 @@ describe("parseDirectChatRealtimeEvent", () => {
             markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
           },
           pinned: false,
+          attachments: [
+            {
+              id: "attachment-1",
+              ownerUserId: "user-1",
+              scope: "ATTACHMENT_SCOPE_DIRECT_CHAT",
+              directChatId: "chat-1",
+              fileName: "report.pdf",
+              mimeType: "application/pdf",
+              sizeBytes: 2048,
+              status: "ATTACHMENT_STATUS_ATTACHED",
+              createdAt: "2026-04-06T12:00:00Z",
+              updatedAt: "2026-04-06T12:00:00Z",
+            },
+          ],
           createdAt: "2026-04-06T12:00:00Z",
           updatedAt: "2026-04-06T12:00:00Z",
         },
@@ -48,6 +62,12 @@ describe("parseDirectChatRealtimeEvent", () => {
       message: expect.objectContaining({
         id: "message-1",
         chatId: "chat-1",
+        attachments: [
+          expect.objectContaining({
+            id: "attachment-1",
+            fileName: "report.pdf",
+          }),
+        ],
       }),
     });
   });

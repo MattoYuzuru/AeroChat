@@ -1,4 +1,5 @@
 import type {
+  Attachment,
   Group,
   GroupChatThread,
   GroupMember,
@@ -47,6 +48,25 @@ interface TextMessageContentWire {
   markdownPolicy?: string;
 }
 
+interface AttachmentWire {
+  id?: string;
+  ownerUserId?: string;
+  scope?: string;
+  directChatId?: string;
+  groupId?: string;
+  messageId?: string;
+  fileName?: string;
+  mimeType?: string;
+  sizeBytes?: number | string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  uploadedAt?: string;
+  attachedAt?: string;
+  failedAt?: string;
+  deletedAt?: string;
+}
+
 interface GroupMessageWire {
   id?: string;
   groupId?: string;
@@ -54,6 +74,7 @@ interface GroupMessageWire {
   senderUserId?: string;
   kind?: string;
   text?: TextMessageContentWire;
+  attachments?: AttachmentWire[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -467,8 +488,30 @@ function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessag
     senderUserId: input?.senderUserId ?? "",
     kind: input?.kind ?? "MESSAGE_KIND_TEXT",
     text: normalizeTextMessageContent(input?.text),
+    attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeAttachment(input: AttachmentWire): Attachment {
+  return {
+    id: input.id ?? "",
+    ownerUserId: input.ownerUserId ?? "",
+    scope: input.scope ?? "ATTACHMENT_SCOPE_UNSPECIFIED",
+    directChatId: normalizeNullableString(input.directChatId),
+    groupId: normalizeNullableString(input.groupId),
+    messageId: normalizeNullableString(input.messageId),
+    fileName: input.fileName ?? "",
+    mimeType: input.mimeType ?? "",
+    sizeBytes: normalizeCount(input.sizeBytes),
+    status: input.status ?? "ATTACHMENT_STATUS_UNSPECIFIED",
+    createdAt: input.createdAt ?? "",
+    updatedAt: input.updatedAt ?? "",
+    uploadedAt: normalizeNullableString(input.uploadedAt),
+    attachedAt: normalizeNullableString(input.attachedAt),
+    failedAt: normalizeNullableString(input.failedAt),
+    deletedAt: normalizeNullableString(input.deletedAt),
   };
 }
 
@@ -572,4 +615,19 @@ function normalizeLogin(value: string | undefined): string {
   }
 
   return value.trim().toLowerCase();
+}
+
+function normalizeCount(value: number | string | undefined): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
 }
