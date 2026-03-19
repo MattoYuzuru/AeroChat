@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canRenderInlineImagePreview,
   classifyAttachmentForDisplay,
   describeAttachmentMimeType,
   formatAttachmentSize,
@@ -68,5 +69,13 @@ describe("attachment metadata helpers", () => {
       categoryLabel: "Документ",
       mimeLabel: "XLSX",
     });
+  });
+
+  it("allows inline preview only for MIME-confirmed raster images", () => {
+    expect(canRenderInlineImagePreview("image/jpeg")).toBe(true);
+    expect(canRenderInlineImagePreview(" image/webp ")).toBe(true);
+    expect(canRenderInlineImagePreview("image/svg+xml")).toBe(false);
+    expect(canRenderInlineImagePreview("")).toBe(false);
+    expect(canRenderInlineImagePreview("application/octet-stream")).toBe(false);
   });
 });

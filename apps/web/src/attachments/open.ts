@@ -1,6 +1,6 @@
 import { gatewayClient } from "../gateway/runtime";
 
-async function resolveAttachmentDownloadUrl(
+export async function resolveAttachmentDownloadUrl(
   token: string,
   attachmentId: string,
 ): Promise<string> {
