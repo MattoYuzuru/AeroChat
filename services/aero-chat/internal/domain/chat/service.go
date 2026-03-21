@@ -688,7 +688,7 @@ func (s *Service) JoinGroupByInviteLink(ctx context.Context, token string, invit
 	return s.repo.GetGroup(ctx, authSession.User.ID, target.Group.ID)
 }
 
-func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupID string, text string, attachmentIDs []string) (*GroupMessage, error) {
+func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupID string, text string, attachmentIDs []string, replyToMessageIDInput ...string) (*GroupMessage, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
 		return nil, err
@@ -710,6 +710,14 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 	if err != nil {
 		return nil, err
 	}
+	rawReplyToMessageID, err := singleOptionalString(replyToMessageIDInput, "reply_to_message_id")
+	if err != nil {
+		return nil, err
+	}
+	replyToMessageID, err := normalizeOptionalID(rawReplyToMessageID, "reply_to_message_id")
+	if err != nil {
+		return nil, err
+	}
 	if normalizedText == "" && len(normalizedAttachmentIDs) == 0 {
 		return nil, fmt.Errorf("%w: message cannot be empty", ErrInvalidArgument)
 	}
@@ -717,19 +725,34 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 		return nil, err
 	}
 
+	var replyPreview *ReplyPreview
+	if replyToMessageID != nil {
+		replyTarget, err := s.repo.GetGroupMessage(ctx, authSession.User.ID, group.ID, *replyToMessageID)
+		if err != nil {
+			return nil, err
+		}
+		members, err := s.repo.ListGroupMembers(ctx, authSession.User.ID, group.ID)
+		if err != nil {
+			return nil, err
+		}
+		replyPreview = buildGroupReplyPreview(*replyTarget, members)
+	}
+
 	now := s.now()
 	return s.repo.CreateGroupMessage(ctx, CreateGroupMessageParams{
-		MessageID:     s.newID(),
-		GroupID:       group.ID,
-		ThreadID:      thread.ID,
-		SenderUserID:  authSession.User.ID,
-		Text:          normalizedText,
-		AttachmentIDs: normalizedAttachmentIDs,
-		CreatedAt:     now,
+		MessageID:        s.newID(),
+		GroupID:          group.ID,
+		ThreadID:         thread.ID,
+		SenderUserID:     authSession.User.ID,
+		Text:             normalizedText,
+		AttachmentIDs:    normalizedAttachmentIDs,
+		ReplyToMessageID: replyToMessageID,
+		ReplyPreview:     replyPreview,
+		CreatedAt:        now,
 	})
 }
 
-func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string, attachmentIDs []string) (*DirectChatMessage, error) {
+func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string, attachmentIDs []string, replyToMessageIDInput ...string) (*DirectChatMessage, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
 		return nil, err
@@ -755,6 +778,14 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 	if err != nil {
 		return nil, err
 	}
+	rawReplyToMessageID, err := singleOptionalString(replyToMessageIDInput, "reply_to_message_id")
+	if err != nil {
+		return nil, err
+	}
+	replyToMessageID, err := normalizeOptionalID(rawReplyToMessageID, "reply_to_message_id")
+	if err != nil {
+		return nil, err
+	}
 	if normalizedText == "" && len(normalizedAttachmentIDs) == 0 {
 		return nil, fmt.Errorf("%w: message cannot be empty", ErrInvalidArgument)
 	}
@@ -762,14 +793,28 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 		return nil, err
 	}
 
+	var replyPreview *ReplyPreview
+	if replyToMessageID != nil {
+		replyTarget, err := s.repo.GetDirectChatMessage(ctx, authSession.User.ID, normalizedChatID, *replyToMessageID)
+		if err != nil {
+			return nil, err
+		}
+		if replyTarget.Tombstone != nil {
+			return nil, fmt.Errorf("%w: reply target is deleted", ErrConflict)
+		}
+		replyPreview = buildDirectReplyPreview(*replyTarget, directChat.Participants)
+	}
+
 	now := s.now()
 	return s.repo.CreateDirectChatMessage(ctx, CreateDirectChatMessageParams{
-		MessageID:     s.newID(),
-		ChatID:        normalizedChatID,
-		SenderUserID:  authSession.User.ID,
-		Text:          normalizedText,
-		AttachmentIDs: normalizedAttachmentIDs,
-		CreatedAt:     now,
+		MessageID:        s.newID(),
+		ChatID:           normalizedChatID,
+		SenderUserID:     authSession.User.ID,
+		Text:             normalizedText,
+		AttachmentIDs:    normalizedAttachmentIDs,
+		ReplyToMessageID: replyToMessageID,
+		ReplyPreview:     replyPreview,
+		CreatedAt:        now,
 	})
 }
 
@@ -1371,6 +1416,31 @@ func normalizeID(value string, field string) (string, error) {
 	return parsed.String(), nil
 }
 
+func normalizeOptionalID(value string, field string) (*string, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return nil, nil
+	}
+
+	parsed, err := normalizeID(normalized, field)
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsed, nil
+}
+
+func singleOptionalString(values []string, field string) (string, error) {
+	switch len(values) {
+	case 0:
+		return "", nil
+	case 1:
+		return values[0], nil
+	default:
+		return "", fmt.Errorf("%w: %s accepts at most one value", ErrInvalidArgument, field)
+	}
+}
+
 func normalizeMessageText(value string) (string, error) {
 	normalized := strings.ReplaceAll(value, "\r\n", "\n")
 	normalized = strings.ReplaceAll(normalized, "\r", "\n")
@@ -1386,6 +1456,99 @@ func normalizeMessageText(value string) (string, error) {
 	}
 
 	return normalized, nil
+}
+
+func buildDirectReplyPreview(message DirectChatMessage, participants []UserSummary) *ReplyPreview {
+	return buildReplyPreview(
+		message.ID,
+		findUserSummaryByID(participants, message.SenderUserID),
+		message.Text,
+		len(message.Attachments),
+		message.Tombstone != nil,
+		false,
+	)
+}
+
+func buildGroupReplyPreview(message GroupMessage, members []GroupMember) *ReplyPreview {
+	return buildReplyPreview(
+		message.ID,
+		findGroupMemberUserByID(members, message.SenderUserID),
+		message.Text,
+		len(message.Attachments),
+		false,
+		false,
+	)
+}
+
+func buildReplyPreview(
+	messageID string,
+	author *UserSummary,
+	text *TextMessageContent,
+	attachmentCount int,
+	isDeleted bool,
+	isUnavailable bool,
+) *ReplyPreview {
+	preview := &ReplyPreview{
+		MessageID:       messageID,
+		AttachmentCount: int32(max(attachmentCount, 0)),
+		IsDeleted:       isDeleted,
+		IsUnavailable:   isUnavailable,
+	}
+	if author != nil {
+		authorCopy := *author
+		preview.Author = &authorCopy
+	}
+	if isDeleted || isUnavailable {
+		return preview
+	}
+	if text != nil && text.Text != "" {
+		preview.HasText = true
+		preview.TextPreview = buildReplyTextPreview(text.Text)
+	}
+
+	return preview
+}
+
+func buildReplyTextPreview(value string) string {
+	const maxPreviewRunes = 140
+
+	normalized := strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if normalized == "" {
+		return ""
+	}
+
+	runes := []rune(normalized)
+	if len(runes) <= maxPreviewRunes {
+		return normalized
+	}
+
+	return string(runes[:maxPreviewRunes]) + "..."
+}
+
+func findUserSummaryByID(users []UserSummary, userID string) *UserSummary {
+	for _, user := range users {
+		if user.ID != userID {
+			continue
+		}
+
+		userCopy := user
+		return &userCopy
+	}
+
+	return nil
+}
+
+func findGroupMemberUserByID(members []GroupMember, userID string) *UserSummary {
+	for _, member := range members {
+		if member.User.ID != userID {
+			continue
+		}
+
+		userCopy := member.User
+		return &userCopy
+	}
+
+	return nil
 }
 
 func normalizeGroupName(value string) (string, error) {

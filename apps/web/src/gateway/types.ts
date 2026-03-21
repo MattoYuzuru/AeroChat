@@ -152,6 +152,16 @@ export interface TextMessageContent {
   markdownPolicy: string;
 }
 
+export interface ReplyPreview {
+  messageId: string;
+  author: ChatUser | null;
+  hasText: boolean;
+  textPreview: string;
+  attachmentCount: number;
+  isDeleted: boolean;
+  isUnavailable: boolean;
+}
+
 export interface Attachment {
   id: string;
   ownerUserId: string;
@@ -209,6 +219,8 @@ export interface DirectChatMessage {
   text: TextMessageContent | null;
   tombstone: MessageTombstone | null;
   pinned: boolean;
+  replyToMessageId?: string | null;
+  replyPreview?: ReplyPreview | null;
   attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
@@ -222,6 +234,8 @@ export interface GroupMessage {
   senderUserId: string;
   kind: string;
   text: TextMessageContent | null;
+  replyToMessageId?: string | null;
+  replyPreview?: ReplyPreview | null;
   attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
@@ -416,6 +430,7 @@ export interface GatewayClient {
     groupId: string,
     text: string,
     attachmentIds?: string[],
+    replyToMessageId?: string | null,
   ): Promise<GroupMessage>;
   editGroupMessage(
     token: string,
@@ -452,6 +467,7 @@ export interface GatewayClient {
     chatId: string,
     text: string,
     attachmentIds?: string[],
+    replyToMessageId?: string | null,
   ): Promise<DirectChatMessage>;
   editDirectChatMessage(
     token: string,

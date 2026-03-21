@@ -50,6 +50,16 @@ interface TextMessageContentWire {
   markdownPolicy?: string;
 }
 
+interface ReplyPreviewWire {
+  messageId?: string;
+  author?: ChatUserWire;
+  hasText?: boolean;
+  textPreview?: string;
+  attachmentCount?: number | string;
+  isDeleted?: boolean;
+  isUnavailable?: boolean;
+}
+
 interface AttachmentWire {
   id?: string;
   ownerUserId?: string;
@@ -76,6 +86,8 @@ interface GroupMessageWire {
   senderUserId?: string;
   kind?: string;
   text?: TextMessageContentWire;
+  replyToMessageId?: string;
+  replyPreview?: ReplyPreviewWire;
   attachments?: AttachmentWire[];
   createdAt?: string;
   updatedAt?: string;
@@ -556,10 +568,40 @@ function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessag
     senderUserId: input?.senderUserId ?? "",
     kind: input?.kind ?? "MESSAGE_KIND_TEXT",
     text: normalizeTextMessageContent(input?.text),
+    replyToMessageId: normalizeNullableString(input?.replyToMessageId),
+    replyPreview: normalizeReplyPreview(input?.replyPreview),
     attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
     editedAt: normalizeNullableString(input?.editedAt),
+  };
+}
+
+function normalizeReplyPreview(input: ReplyPreviewWire | undefined) {
+  if (!input) {
+    return null;
+  }
+
+  const messageId = input.messageId ?? "";
+  if (messageId === "") {
+    return null;
+  }
+
+  return {
+    messageId,
+    author: input.author
+      ? {
+          id: input.author.id ?? "",
+          login: normalizeLogin(input.author.login),
+          nickname: input.author.nickname ?? "",
+          avatarUrl: normalizeNullableString(input.author.avatarUrl),
+        }
+      : null,
+    hasText: input.hasText ?? false,
+    textPreview: input.textPreview ?? "",
+    attachmentCount: normalizeCount(input.attachmentCount),
+    isDeleted: input.isDeleted ?? false,
+    isUnavailable: input.isUnavailable ?? false,
   };
 }
 

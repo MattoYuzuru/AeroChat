@@ -165,6 +165,16 @@ message TextMessageContent {
   MarkdownPolicy markdown_policy = 2;
 }
 
+message ReplyPreview {
+  string message_id = 1;
+  ChatUser author = 2;
+  bool has_text = 3;
+  string text_preview = 4;
+  uint32 attachment_count = 5;
+  bool is_deleted = 6;
+  bool is_unavailable = 7;
+}
+
 message Attachment {
   string id = 1;
   string owner_user_id = 2;
@@ -215,6 +225,8 @@ message DirectChatMessage {
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
   google.protobuf.Timestamp edited_at = 11;
+  optional string reply_to_message_id = 12;
+  ReplyPreview reply_preview = 13;
 }
 
 message GroupMessage {
@@ -228,6 +240,8 @@ message GroupMessage {
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
   google.protobuf.Timestamp edited_at = 10;
+  optional string reply_to_message_id = 11;
+  ReplyPreview reply_preview = 12;
 }
 
 message DirectChatReadPosition {
@@ -528,6 +542,7 @@ message SendTextMessageRequest {
   // Полностью пустое сообщение без text и attachment_ids запрещено доменно.
   string text = 2;
   repeated string attachment_ids = 3;
+  optional string reply_to_message_id = 4;
 }
 
 message SendTextMessageResponse {
@@ -569,6 +584,7 @@ message SendGroupTextMessageRequest {
   // Полностью пустое сообщение без text и attachment_ids запрещено доменно.
   string text = 2;
   repeated string attachment_ids = 3;
+  optional string reply_to_message_id = 4;
 }
 
 message SendGroupTextMessageResponse {

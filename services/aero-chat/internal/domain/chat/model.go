@@ -140,6 +140,16 @@ type TextMessageContent struct {
 	MarkdownPolicy string
 }
 
+type ReplyPreview struct {
+	MessageID       string
+	Author          *UserSummary
+	HasText         bool
+	TextPreview     string
+	AttachmentCount int32
+	IsDeleted       bool
+	IsUnavailable   bool
+}
+
 type Attachment struct {
 	ID           string
 	OwnerUserID  string
@@ -193,30 +203,34 @@ type MessageTombstone struct {
 }
 
 type DirectChatMessage struct {
-	ID           string
-	ChatID       string
-	SenderUserID string
-	Kind         string
-	Text         *TextMessageContent
-	Tombstone    *MessageTombstone
-	Pinned       bool
-	Attachments  []Attachment
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	EditedAt     *time.Time
+	ID               string
+	ChatID           string
+	SenderUserID     string
+	Kind             string
+	Text             *TextMessageContent
+	Tombstone        *MessageTombstone
+	Pinned           bool
+	ReplyToMessageID *string
+	ReplyPreview     *ReplyPreview
+	Attachments      []Attachment
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	EditedAt         *time.Time
 }
 
 type GroupMessage struct {
-	ID           string
-	GroupID      string
-	ThreadID     string
-	SenderUserID string
-	Kind         string
-	Text         *TextMessageContent
-	Attachments  []Attachment
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	EditedAt     *time.Time
+	ID               string
+	GroupID          string
+	ThreadID         string
+	SenderUserID     string
+	Kind             string
+	Text             *TextMessageContent
+	ReplyToMessageID *string
+	ReplyPreview     *ReplyPreview
+	Attachments      []Attachment
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	EditedAt         *time.Time
 }
 
 type DirectChatReadPosition struct {
@@ -332,22 +346,26 @@ type TransferGroupOwnershipParams struct {
 }
 
 type CreateDirectChatMessageParams struct {
-	MessageID     string
-	ChatID        string
-	SenderUserID  string
-	Text          string
-	AttachmentIDs []string
-	CreatedAt     time.Time
+	MessageID        string
+	ChatID           string
+	SenderUserID     string
+	Text             string
+	AttachmentIDs    []string
+	ReplyToMessageID *string
+	ReplyPreview     *ReplyPreview
+	CreatedAt        time.Time
 }
 
 type CreateGroupMessageParams struct {
-	MessageID     string
-	GroupID       string
-	ThreadID      string
-	SenderUserID  string
-	Text          string
-	AttachmentIDs []string
-	CreatedAt     time.Time
+	MessageID        string
+	GroupID          string
+	ThreadID         string
+	SenderUserID     string
+	Text             string
+	AttachmentIDs    []string
+	ReplyToMessageID *string
+	ReplyPreview     *ReplyPreview
+	CreatedAt        time.Time
 }
 
 type EditDirectChatMessageParams struct {

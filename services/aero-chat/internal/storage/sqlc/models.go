@@ -51,15 +51,16 @@ type DirectChat struct {
 }
 
 type DirectChatMessage struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	ChatID         uuid.UUID          `db:"chat_id" json:"chat_id"`
-	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
-	Kind           string             `db:"kind" json:"kind"`
-	TextContent    string             `db:"text_content" json:"text_content"`
-	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	EditedAt       pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	ChatID           uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
 }
 
 type DirectChatMessageTombstone struct {
@@ -127,15 +128,16 @@ type GroupMembership struct {
 }
 
 type GroupMessage struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	ThreadID       uuid.UUID          `db:"thread_id" json:"thread_id"`
-	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
-	Kind           string             `db:"kind" json:"kind"`
-	TextContent    string             `db:"text_content" json:"text_content"`
-	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	EditedAt       pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	ThreadID         uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
 }
 
 type GroupThread struct {

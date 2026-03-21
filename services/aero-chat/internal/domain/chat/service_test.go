@@ -515,6 +515,73 @@ func TestSendTextMessageRejectsEmptyMessageWithoutTextOrAttachments(t *testing.T
 	}
 }
 
+func TestSendTextMessageSupportsReplyPreview(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	target := mustSendMessage(t, service, bob.Token, directChat.ID, "   foundation reply target   ")
+
+	reply, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "reply", nil, target.ID)
+	if err != nil {
+		t.Fatalf("send reply message: %v", err)
+	}
+	if reply.ReplyToMessageID == nil || *reply.ReplyToMessageID != target.ID {
+		t.Fatalf("ожидался reply_to_message_id %q, получено %+v", target.ID, reply.ReplyToMessageID)
+	}
+	if reply.ReplyPreview == nil {
+		t.Fatal("ожидался compact reply preview")
+	}
+	if reply.ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался preview на target %q, получено %q", target.ID, reply.ReplyPreview.MessageID)
+	}
+	if reply.ReplyPreview.Author == nil || reply.ReplyPreview.Author.ID != bob.User.ID {
+		t.Fatalf("ожидался author summary Bob, получено %+v", reply.ReplyPreview.Author)
+	}
+	if !reply.ReplyPreview.HasText || reply.ReplyPreview.TextPreview != "foundation reply target" {
+		t.Fatalf("ожидался text preview target message, получено %+v", reply.ReplyPreview)
+	}
+
+	messages, err := service.ListDirectChatMessages(context.Background(), bob.Token, directChat.ID, 0)
+	if err != nil {
+		t.Fatalf("list direct chat messages: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("ожидалось 2 сообщения в direct chat, получено %d", len(messages))
+	}
+	var listedReply *DirectChatMessage
+	for i := range messages {
+		if messages[i].ID == reply.ID {
+			listedReply = &messages[i]
+			break
+		}
+	}
+	if listedReply == nil || listedReply.ReplyPreview == nil || listedReply.ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался reply preview в истории, получено %+v", listedReply)
+	}
+}
+
+func TestSendTextMessageRejectsReplyToDeletedTarget(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	target := mustSendMessage(t, service, bob.Token, directChat.ID, "delete me")
+	_ = mustDeleteMessage(t, service, bob.Token, directChat.ID, target.ID)
+
+	if _, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "reply", nil, target.ID); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка reply на tombstone target, получено %v", err)
+	}
+}
+
 func TestSendTextMessageRequiresActiveFriendship(t *testing.T) {
 	t.Parallel()
 
@@ -827,6 +894,20 @@ func mustDeleteMessage(t *testing.T, service *Service, token string, chatID stri
 	}
 
 	return message
+}
+
+func copyReplyPreviewForTest(value *ReplyPreview) *ReplyPreview {
+	if value == nil {
+		return nil
+	}
+
+	copyValue := *value
+	if value.Author != nil {
+		authorCopy := *value.Author
+		copyValue.Author = &authorCopy
+	}
+
+	return &copyValue
 }
 
 type issuedAuth struct {
@@ -1586,14 +1667,16 @@ func (r *fakeRepository) CreateGroupMessage(_ context.Context, params CreateGrou
 	}
 
 	message := GroupMessage{
-		ID:           params.MessageID,
-		GroupID:      params.GroupID,
-		ThreadID:     params.ThreadID,
-		SenderUserID: params.SenderUserID,
-		Kind:         MessageKindText,
-		Text:         messageTextContentForTest(params.Text),
-		CreatedAt:    params.CreatedAt,
-		UpdatedAt:    params.CreatedAt,
+		ID:               params.MessageID,
+		GroupID:          params.GroupID,
+		ThreadID:         params.ThreadID,
+		SenderUserID:     params.SenderUserID,
+		Kind:             MessageKindText,
+		Text:             messageTextContentForTest(params.Text),
+		ReplyToMessageID: params.ReplyToMessageID,
+		ReplyPreview:     copyReplyPreviewForTest(params.ReplyPreview),
+		CreatedAt:        params.CreatedAt,
+		UpdatedAt:        params.CreatedAt,
 	}
 	for _, attachmentID := range params.AttachmentIDs {
 		attachment := r.attachments[attachmentID]
@@ -1674,13 +1757,15 @@ func (r *fakeRepository) CreateDirectChatMessage(_ context.Context, params Creat
 	}
 
 	message := DirectChatMessage{
-		ID:           params.MessageID,
-		ChatID:       params.ChatID,
-		SenderUserID: params.SenderUserID,
-		Kind:         MessageKindText,
-		Text:         messageTextContentForTest(params.Text),
-		CreatedAt:    params.CreatedAt,
-		UpdatedAt:    params.CreatedAt,
+		ID:               params.MessageID,
+		ChatID:           params.ChatID,
+		SenderUserID:     params.SenderUserID,
+		Kind:             MessageKindText,
+		Text:             messageTextContentForTest(params.Text),
+		ReplyToMessageID: params.ReplyToMessageID,
+		ReplyPreview:     copyReplyPreviewForTest(params.ReplyPreview),
+		CreatedAt:        params.CreatedAt,
+		UpdatedAt:        params.CreatedAt,
 	}
 	for _, attachmentID := range params.AttachmentIDs {
 		attachment := r.attachments[attachmentID]

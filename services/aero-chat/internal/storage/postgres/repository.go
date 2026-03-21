@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -742,19 +743,26 @@ func (r *Repository) ListGroupMessages(ctx context.Context, userID string, group
 	if err != nil {
 		return nil, err
 	}
+	replyPreviewByMessageID, err := r.listGroupReplyPreviewsByMessageIDs(ctx, userID, groupID, collectGroupReplyTargetIDs(rows))
+	if err != nil {
+		return nil, err
+	}
 
 	result := make([]chat.GroupMessage, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, chat.GroupMessage{
-			ID:           row.ID.String(),
-			GroupID:      row.GroupID.String(),
-			ThreadID:     row.ThreadID.String(),
-			SenderUserID: row.SenderUserID.String(),
-			Kind:         row.Kind,
-			Text:         messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy),
-			Attachments:  attachmentsByMessageID[row.ID.String()],
-			CreatedAt:    timestampValue(row.CreatedAt),
-			UpdatedAt:    timestampValue(row.UpdatedAt),
+			ID:               row.ID.String(),
+			GroupID:          row.GroupID.String(),
+			ThreadID:         row.ThreadID.String(),
+			SenderUserID:     row.SenderUserID.String(),
+			Kind:             row.Kind,
+			Text:             messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy),
+			ReplyToMessageID: uuidPointerString(row.ReplyToMessageID),
+			ReplyPreview:     cloneReplyPreview(replyPreviewByMessageID[uuidStringOrEmpty(row.ReplyToMessageID)]),
+			Attachments:      attachmentsByMessageID[row.ID.String()],
+			CreatedAt:        timestampValue(row.CreatedAt),
+			UpdatedAt:        timestampValue(row.UpdatedAt),
+			EditedAt:         timestamptzPointer(row.EditedAt),
 		})
 	}
 
@@ -871,14 +879,15 @@ func (r *Repository) CreateDirectChatMessage(ctx context.Context, params chat.Cr
 
 	q := r.queries.WithTx(tx)
 	row, err := q.CreateDirectChatMessage(ctx, chatsqlc.CreateDirectChatMessageParams{
-		ID:             mustParseUUID(params.MessageID),
-		ChatID:         mustParseUUID(params.ChatID),
-		SenderUserID:   mustParseUUID(params.SenderUserID),
-		Kind:           chat.MessageKindText,
-		TextContent:    params.Text,
-		MarkdownPolicy: chat.MarkdownPolicySafeSubsetV1,
-		CreatedAt:      timestamptzValue(params.CreatedAt),
-		UpdatedAt:      timestamptzValue(params.CreatedAt),
+		ID:               mustParseUUID(params.MessageID),
+		ChatID:           mustParseUUID(params.ChatID),
+		SenderUserID:     mustParseUUID(params.SenderUserID),
+		Kind:             chat.MessageKindText,
+		TextContent:      params.Text,
+		MarkdownPolicy:   chat.MarkdownPolicySafeSubsetV1,
+		ReplyToMessageID: nullableUUID(params.ReplyToMessageID),
+		CreatedAt:        timestamptzValue(params.CreatedAt),
+		UpdatedAt:        timestamptzValue(params.CreatedAt),
 	})
 	if err != nil {
 		return nil, convertError(err)
@@ -899,21 +908,24 @@ func (r *Repository) CreateDirectChatMessage(ctx context.Context, params chat.Cr
 	}
 
 	message := toDomainMessage(chatsqlc.ListDirectChatMessagesRow{
-		ID:             row.ID,
-		ChatID:         row.ChatID,
-		SenderUserID:   row.SenderUserID,
-		Kind:           row.Kind,
-		TextContent:    row.TextContent,
-		MarkdownPolicy: row.MarkdownPolicy,
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
-		Pinned:         false,
+		ID:               row.ID,
+		ChatID:           row.ChatID,
+		SenderUserID:     row.SenderUserID,
+		Kind:             row.Kind,
+		TextContent:      row.TextContent,
+		MarkdownPolicy:   row.MarkdownPolicy,
+		ReplyToMessageID: row.ReplyToMessageID,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
+		EditedAt:         row.EditedAt,
+		Pinned:           false,
 	})
 	attachmentsByMessageID, err := r.listDirectAttachmentsByMessageIDs(ctx, []uuid.UUID{row.ID})
 	if err != nil {
 		return nil, err
 	}
 	message.Attachments = attachmentsByMessageID[message.ID]
+	message.ReplyPreview = cloneReplyPreview(params.ReplyPreview)
 	return &message, nil
 }
 
@@ -928,14 +940,15 @@ func (r *Repository) CreateGroupMessage(ctx context.Context, params chat.CreateG
 
 	q := r.queries.WithTx(tx)
 	row, err := q.CreateGroupMessage(ctx, chatsqlc.CreateGroupMessageParams{
-		ID:             mustParseUUID(params.MessageID),
-		ThreadID:       mustParseUUID(params.ThreadID),
-		SenderUserID:   mustParseUUID(params.SenderUserID),
-		Kind:           chat.MessageKindText,
-		TextContent:    params.Text,
-		MarkdownPolicy: chat.MarkdownPolicySafeSubsetV1,
-		CreatedAt:      timestamptzValue(params.CreatedAt),
-		UpdatedAt:      timestamptzValue(params.CreatedAt),
+		ID:               mustParseUUID(params.MessageID),
+		ThreadID:         mustParseUUID(params.ThreadID),
+		SenderUserID:     mustParseUUID(params.SenderUserID),
+		Kind:             chat.MessageKindText,
+		TextContent:      params.Text,
+		MarkdownPolicy:   chat.MarkdownPolicySafeSubsetV1,
+		ReplyToMessageID: nullableUUID(params.ReplyToMessageID),
+		CreatedAt:        timestamptzValue(params.CreatedAt),
+		UpdatedAt:        timestamptzValue(params.CreatedAt),
 	})
 	if err != nil {
 		return nil, convertError(err)
@@ -967,16 +980,18 @@ func (r *Repository) CreateGroupMessage(ctx context.Context, params chat.CreateG
 	}
 
 	return &chat.GroupMessage{
-		ID:           row.ID.String(),
-		GroupID:      params.GroupID,
-		ThreadID:     row.ThreadID.String(),
-		SenderUserID: row.SenderUserID.String(),
-		Kind:         row.Kind,
-		Text:         messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy),
-		Attachments:  attachmentsByMessageID[row.ID.String()],
-		CreatedAt:    timestampValue(row.CreatedAt),
-		UpdatedAt:    timestampValue(row.UpdatedAt),
-		EditedAt:     timestamptzPointer(row.EditedAt),
+		ID:               row.ID.String(),
+		GroupID:          params.GroupID,
+		ThreadID:         row.ThreadID.String(),
+		SenderUserID:     row.SenderUserID.String(),
+		Kind:             row.Kind,
+		Text:             messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy),
+		ReplyToMessageID: uuidPointerString(row.ReplyToMessageID),
+		ReplyPreview:     cloneReplyPreview(params.ReplyPreview),
+		Attachments:      attachmentsByMessageID[row.ID.String()],
+		CreatedAt:        timestampValue(row.CreatedAt),
+		UpdatedAt:        timestampValue(row.UpdatedAt),
+		EditedAt:         timestamptzPointer(row.EditedAt),
 	}, nil
 }
 
@@ -997,11 +1012,18 @@ func (r *Repository) ListDirectChatMessages(ctx context.Context, userID string, 
 	if err != nil {
 		return nil, err
 	}
+	replyPreviewByMessageID, err := r.listDirectReplyPreviewsByMessageIDs(ctx, userID, chatID, collectDirectReplyTargetIDs(rows))
+	if err != nil {
+		return nil, err
+	}
 
 	result := make([]chat.DirectChatMessage, 0, len(rows))
 	for _, row := range rows {
 		message := toDomainMessage(row)
 		message.Attachments = attachmentsByMessageID[row.ID.String()]
+		if message.ReplyToMessageID != nil {
+			message.ReplyPreview = cloneReplyPreview(replyPreviewByMessageID[*message.ReplyToMessageID])
+		}
 		result = append(result, message)
 	}
 
@@ -1024,6 +1046,13 @@ func (r *Repository) GetDirectChatMessage(ctx context.Context, userID string, ch
 		return nil, err
 	}
 	message.Attachments = attachmentsByMessageID[message.ID]
+	if message.ReplyToMessageID != nil {
+		replyPreviewByMessageID, err := r.listDirectReplyPreviewsByMessageIDs(ctx, userID, chatID, []uuid.UUID{mustParseUUID(*message.ReplyToMessageID)})
+		if err != nil {
+			return nil, err
+		}
+		message.ReplyPreview = cloneReplyPreview(replyPreviewByMessageID[*message.ReplyToMessageID])
+	}
 	return &message, nil
 }
 
@@ -1042,18 +1071,28 @@ func (r *Repository) GetGroupMessage(ctx context.Context, userID string, groupID
 		return nil, err
 	}
 
-	return &chat.GroupMessage{
-		ID:           row.ID.String(),
-		GroupID:      row.GroupID.String(),
-		ThreadID:     row.ThreadID.String(),
-		SenderUserID: row.SenderUserID.String(),
-		Kind:         row.Kind,
-		Text:         messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy),
-		Attachments:  attachmentsByMessageID[row.ID.String()],
-		CreatedAt:    timestampValue(row.CreatedAt),
-		UpdatedAt:    timestampValue(row.UpdatedAt),
-		EditedAt:     timestamptzPointer(row.EditedAt),
-	}, nil
+	message := chat.GroupMessage{
+		ID:               row.ID.String(),
+		GroupID:          row.GroupID.String(),
+		ThreadID:         row.ThreadID.String(),
+		SenderUserID:     row.SenderUserID.String(),
+		Kind:             row.Kind,
+		Text:             messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy),
+		ReplyToMessageID: uuidPointerString(row.ReplyToMessageID),
+		Attachments:      attachmentsByMessageID[row.ID.String()],
+		CreatedAt:        timestampValue(row.CreatedAt),
+		UpdatedAt:        timestampValue(row.UpdatedAt),
+		EditedAt:         timestamptzPointer(row.EditedAt),
+	}
+	if message.ReplyToMessageID != nil {
+		replyPreviewByMessageID, err := r.listGroupReplyPreviewsByMessageIDs(ctx, userID, groupID, []uuid.UUID{mustParseUUID(*message.ReplyToMessageID)})
+		if err != nil {
+			return nil, err
+		}
+		message.ReplyPreview = cloneReplyPreview(replyPreviewByMessageID[*message.ReplyToMessageID])
+	}
+
+	return &message, nil
 }
 
 func (r *Repository) UpdateDirectChatMessageText(ctx context.Context, params chat.EditDirectChatMessageParams) (bool, error) {
@@ -1371,14 +1410,15 @@ func (r *Repository) collectChats(ctx context.Context, rows []listChatRow) ([]ch
 
 func toDomainMessage(row chatsqlc.ListDirectChatMessagesRow) chat.DirectChatMessage {
 	message := chat.DirectChatMessage{
-		ID:           row.ID.String(),
-		ChatID:       row.ChatID.String(),
-		SenderUserID: row.SenderUserID.String(),
-		Kind:         row.Kind,
-		Pinned:       row.Pinned,
-		CreatedAt:    timestampValue(row.CreatedAt),
-		UpdatedAt:    timestampValue(row.UpdatedAt),
-		EditedAt:     timestamptzPointer(row.EditedAt),
+		ID:               row.ID.String(),
+		ChatID:           row.ChatID.String(),
+		SenderUserID:     row.SenderUserID.String(),
+		Kind:             row.Kind,
+		Pinned:           row.Pinned,
+		ReplyToMessageID: uuidPointerString(row.ReplyToMessageID),
+		CreatedAt:        timestampValue(row.CreatedAt),
+		UpdatedAt:        timestampValue(row.UpdatedAt),
+		EditedAt:         timestamptzPointer(row.EditedAt),
 	}
 
 	if row.DeletedByUserID.Valid && row.DeletedAt.Valid {
@@ -1402,6 +1442,196 @@ func messageTextContentFromStorage(text string, markdownPolicy string) *chat.Tex
 		Text:           text,
 		MarkdownPolicy: markdownPolicy,
 	}
+}
+
+func (r *Repository) listDirectReplyPreviewsByMessageIDs(ctx context.Context, userID string, chatID string, messageIDs []uuid.UUID) (map[string]*chat.ReplyPreview, error) {
+	result := make(map[string]*chat.ReplyPreview, len(messageIDs))
+	if len(messageIDs) == 0 {
+		return result, nil
+	}
+
+	rows, err := r.queries.ListDirectReplyPreviewRows(ctx, chatsqlc.ListDirectReplyPreviewRowsParams{
+		UserID:  mustParseUUID(userID),
+		ChatID:  mustParseUUID(chatID),
+		Column3: messageIDs,
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	for _, row := range rows {
+		result[row.ID.String()] = &chat.ReplyPreview{
+			MessageID: row.ID.String(),
+			Author: &chat.UserSummary{
+				ID:        row.SenderUserID.String(),
+				Login:     row.Login,
+				Nickname:  row.Nickname,
+				AvatarURL: textPointer(row.AvatarUrl),
+			},
+			HasText:         row.TextContent != "",
+			TextPreview:     buildReplyPreviewText(row.TextContent),
+			AttachmentCount: row.AttachmentCount,
+			IsDeleted:       row.DeletedByUserID.Valid && row.DeletedAt.Valid,
+			IsUnavailable:   false,
+		}
+		if result[row.ID.String()].IsDeleted {
+			result[row.ID.String()].HasText = false
+			result[row.ID.String()].TextPreview = ""
+			result[row.ID.String()].AttachmentCount = 0
+		}
+	}
+
+	for _, messageID := range messageIDs {
+		key := messageID.String()
+		if _, ok := result[key]; ok {
+			continue
+		}
+		result[key] = unavailableReplyPreview(key)
+	}
+
+	return result, nil
+}
+
+func (r *Repository) listGroupReplyPreviewsByMessageIDs(ctx context.Context, userID string, groupID string, messageIDs []uuid.UUID) (map[string]*chat.ReplyPreview, error) {
+	result := make(map[string]*chat.ReplyPreview, len(messageIDs))
+	if len(messageIDs) == 0 {
+		return result, nil
+	}
+
+	rows, err := r.queries.ListGroupReplyPreviewRows(ctx, chatsqlc.ListGroupReplyPreviewRowsParams{
+		UserID:  mustParseUUID(userID),
+		GroupID: mustParseUUID(groupID),
+		Column3: messageIDs,
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	for _, row := range rows {
+		result[row.ID.String()] = &chat.ReplyPreview{
+			MessageID: row.ID.String(),
+			Author: &chat.UserSummary{
+				ID:        row.SenderUserID.String(),
+				Login:     row.Login,
+				Nickname:  row.Nickname,
+				AvatarURL: textPointer(row.AvatarUrl),
+			},
+			HasText:         row.TextContent != "",
+			TextPreview:     buildReplyPreviewText(row.TextContent),
+			AttachmentCount: row.AttachmentCount,
+		}
+	}
+
+	for _, messageID := range messageIDs {
+		key := messageID.String()
+		if _, ok := result[key]; ok {
+			continue
+		}
+		result[key] = unavailableReplyPreview(key)
+	}
+
+	return result, nil
+}
+
+func collectDirectReplyTargetIDs(rows []chatsqlc.ListDirectChatMessagesRow) []uuid.UUID {
+	result := make([]uuid.UUID, 0)
+	seen := make(map[string]struct{})
+	for _, row := range rows {
+		if !row.ReplyToMessageID.Valid {
+			continue
+		}
+		key := uuidStringOrEmpty(row.ReplyToMessageID)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, uuid.UUID(row.ReplyToMessageID.Bytes))
+	}
+
+	return result
+}
+
+func collectGroupReplyTargetIDs(rows []chatsqlc.ListGroupMessagesByGroupIDAndUserIDRow) []uuid.UUID {
+	result := make([]uuid.UUID, 0)
+	seen := make(map[string]struct{})
+	for _, row := range rows {
+		if !row.ReplyToMessageID.Valid {
+			continue
+		}
+		key := uuidStringOrEmpty(row.ReplyToMessageID)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, uuid.UUID(row.ReplyToMessageID.Bytes))
+	}
+
+	return result
+}
+
+func cloneReplyPreview(value *chat.ReplyPreview) *chat.ReplyPreview {
+	if value == nil {
+		return nil
+	}
+
+	copyValue := *value
+	if value.Author != nil {
+		authorCopy := *value.Author
+		copyValue.Author = &authorCopy
+	}
+
+	return &copyValue
+}
+
+func unavailableReplyPreview(messageID string) *chat.ReplyPreview {
+	return &chat.ReplyPreview{
+		MessageID:     messageID,
+		IsUnavailable: true,
+	}
+}
+
+func buildReplyPreviewText(value string) string {
+	const maxPreviewRunes = 140
+
+	normalized := strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if normalized == "" {
+		return ""
+	}
+
+	runes := []rune(normalized)
+	if len(runes) <= maxPreviewRunes {
+		return normalized
+	}
+
+	return string(runes[:maxPreviewRunes]) + "..."
+}
+
+func nullableUUID(value *string) pgtype.UUID {
+	if value == nil {
+		return pgtype.UUID{}
+	}
+
+	return pgtype.UUID{
+		Bytes: mustParseUUID(*value),
+		Valid: true,
+	}
+}
+
+func uuidPointerString(value pgtype.UUID) *string {
+	if !value.Valid {
+		return nil
+	}
+
+	result := uuid.UUID(value.Bytes).String()
+	return &result
+}
+
+func uuidStringOrEmpty(value pgtype.UUID) string {
+	if !value.Valid {
+		return ""
+	}
+
+	return uuid.UUID(value.Bytes).String()
 }
 
 func mustParseUUID(value string) uuid.UUID {

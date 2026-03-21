@@ -97,23 +97,35 @@ type textMessageContentWire struct {
 	MarkdownPolicy string `json:"markdownPolicy"`
 }
 
+type replyPreviewWire struct {
+	MessageID       string        `json:"messageId"`
+	Author          *chatUserWire `json:"author,omitempty"`
+	HasText         bool          `json:"hasText"`
+	TextPreview     string        `json:"textPreview"`
+	AttachmentCount uint32        `json:"attachmentCount"`
+	IsDeleted       bool          `json:"isDeleted"`
+	IsUnavailable   bool          `json:"isUnavailable"`
+}
+
 type messageTombstoneWire struct {
 	DeletedByUserID string `json:"deletedByUserId"`
 	DeletedAt       string `json:"deletedAt"`
 }
 
 type directChatMessageWire struct {
-	ID           string                  `json:"id"`
-	ChatID       string                  `json:"chatId"`
-	SenderUserID string                  `json:"senderUserId"`
-	Kind         string                  `json:"kind"`
-	Text         *textMessageContentWire `json:"text,omitempty"`
-	Tombstone    *messageTombstoneWire   `json:"tombstone,omitempty"`
-	Pinned       bool                    `json:"pinned"`
-	Attachments  []attachmentWire        `json:"attachments"`
-	CreatedAt    string                  `json:"createdAt"`
-	UpdatedAt    string                  `json:"updatedAt"`
-	EditedAt     string                  `json:"editedAt,omitempty"`
+	ID               string                  `json:"id"`
+	ChatID           string                  `json:"chatId"`
+	SenderUserID     string                  `json:"senderUserId"`
+	Kind             string                  `json:"kind"`
+	Text             *textMessageContentWire `json:"text,omitempty"`
+	Tombstone        *messageTombstoneWire   `json:"tombstone,omitempty"`
+	Pinned           bool                    `json:"pinned"`
+	ReplyToMessageID string                  `json:"replyToMessageId,omitempty"`
+	ReplyPreview     *replyPreviewWire       `json:"replyPreview,omitempty"`
+	Attachments      []attachmentWire        `json:"attachments"`
+	CreatedAt        string                  `json:"createdAt"`
+	UpdatedAt        string                  `json:"updatedAt"`
+	EditedAt         string                  `json:"editedAt,omitempty"`
 }
 
 type attachmentWire struct {
@@ -201,18 +213,45 @@ func toDirectChatMessageWire(message *chatv1.DirectChatMessage) *directChatMessa
 	}
 
 	return &directChatMessageWire{
-		ID:           message.GetId(),
-		ChatID:       message.GetChatId(),
-		SenderUserID: message.GetSenderUserId(),
-		Kind:         message.GetKind().String(),
-		Text:         toTextMessageContentWire(message.GetText()),
-		Tombstone:    toMessageTombstoneWire(message.GetTombstone()),
-		Pinned:       message.GetPinned(),
-		Attachments:  toAttachmentWires(message.GetAttachments()),
-		CreatedAt:    formatProtoTimestamp(message.GetCreatedAt()),
-		UpdatedAt:    formatProtoTimestamp(message.GetUpdatedAt()),
-		EditedAt:     formatProtoTimestamp(message.GetEditedAt()),
+		ID:               message.GetId(),
+		ChatID:           message.GetChatId(),
+		SenderUserID:     message.GetSenderUserId(),
+		Kind:             message.GetKind().String(),
+		Text:             toTextMessageContentWire(message.GetText()),
+		Tombstone:        toMessageTombstoneWire(message.GetTombstone()),
+		Pinned:           message.GetPinned(),
+		ReplyToMessageID: message.GetReplyToMessageId(),
+		ReplyPreview:     toReplyPreviewWire(message.GetReplyPreview()),
+		Attachments:      toAttachmentWires(message.GetAttachments()),
+		CreatedAt:        formatProtoTimestamp(message.GetCreatedAt()),
+		UpdatedAt:        formatProtoTimestamp(message.GetUpdatedAt()),
+		EditedAt:         formatProtoTimestamp(message.GetEditedAt()),
 	}
+}
+
+func toReplyPreviewWire(preview *chatv1.ReplyPreview) *replyPreviewWire {
+	if preview == nil {
+		return nil
+	}
+
+	result := &replyPreviewWire{
+		MessageID:       preview.GetMessageId(),
+		HasText:         preview.GetHasText(),
+		TextPreview:     preview.GetTextPreview(),
+		AttachmentCount: preview.GetAttachmentCount(),
+		IsDeleted:       preview.GetIsDeleted(),
+		IsUnavailable:   preview.GetIsUnavailable(),
+	}
+	if preview.GetAuthor() != nil {
+		result.Author = &chatUserWire{
+			ID:        preview.GetAuthor().GetId(),
+			Login:     preview.GetAuthor().GetLogin(),
+			Nickname:  preview.GetAuthor().GetNickname(),
+			AvatarURL: preview.GetAuthor().AvatarUrl,
+		}
+	}
+
+	return result
 }
 
 func toAttachmentWires(values []*chatv1.Attachment) []attachmentWire {

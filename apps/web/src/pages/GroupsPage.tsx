@@ -65,6 +65,7 @@ export function GroupsPage() {
   const [composerText, setComposerText] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState("");
+  const [selectedReplyMessage, setSelectedReplyMessage] = useState<GroupMessage | null>(null);
   const [inviteRole, setInviteRole] = useState<GroupMemberRole>("member");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -127,6 +128,13 @@ export function GroupsPage() {
   }, [selectedState]);
 
   useEffect(() => {
+    setEditingMessageId(null);
+    setEditingMessageText("");
+    setPendingEditMessageId(null);
+    setSelectedReplyMessage(null);
+  }, [selectedGroupId]);
+
+  useEffect(() => {
     if (joinTokenFromRoute !== "") {
       setJoinInput(joinTokenFromRoute);
     }
@@ -180,6 +188,8 @@ export function GroupsPage() {
       setComposerText("");
       setEditingMessageId(null);
       setEditingMessageText("");
+      setPendingEditMessageId(null);
+      setSelectedReplyMessage(null);
       setMemberRoleDrafts({});
       return;
     }
@@ -740,8 +750,10 @@ export function GroupsPage() {
         attachmentComposer.uploadedAttachmentId === null
           ? []
           : [attachmentComposer.uploadedAttachmentId],
+        selectedReplyMessage?.id ?? null,
       );
       setComposerText("");
+      setSelectedReplyMessage(null);
       if (attachmentComposer.uploadedAttachmentId !== null) {
         attachmentComposer.markSendSucceeded();
       }
@@ -1353,7 +1365,12 @@ export function GroupsPage() {
                         const isEditPending = pendingEditMessageId === message.id;
 
                       return (
-                        <article className={styles.messageCard} data-own={isOwn} key={message.id}>
+                        <article
+                          className={styles.messageCard}
+                          data-own={isOwn}
+                          id={`group-message-${message.id}`}
+                          key={message.id}
+                        >
                           <div className={styles.messageHeader}>
                             <div>
                               <p className={styles.messageAuthor}>
@@ -1403,11 +1420,32 @@ export function GroupsPage() {
                                   )}
                                 </>
                               ) : (
-                                hasMessageText && (
-                                  <div className={styles.messageText}>
-                                    <SafeMessageMarkdown text={message.text?.text ?? ""} />
-                                  </div>
-                                )
+                                <>
+                                  {message.replyPreview && (
+                                    <button
+                                      className={styles.replyPreviewCard}
+                                      onClick={() => {
+                                        jumpToMessage(`group-message-${message.replyPreview?.messageId ?? ""}`);
+                                      }}
+                                      type="button"
+                                    >
+                                      <span className={styles.replyPreviewAuthor}>
+                                        {describeGroupReplyPreviewAuthor(
+                                          message.replyPreview,
+                                          authState.profile.id,
+                                        )}
+                                      </span>
+                                      <span className={styles.replyPreviewText}>
+                                        {describeReplyPreviewText(message.replyPreview)}
+                                      </span>
+                                    </button>
+                                  )}
+                                  {hasMessageText && (
+                                    <div className={styles.messageText}>
+                                      <SafeMessageMarkdown text={message.text?.text ?? ""} />
+                                    </div>
+                                  )}
+                                </>
                               )}
 
                               {hasAttachments && (
@@ -1458,20 +1496,34 @@ export function GroupsPage() {
                                 </button>
                               </>
                             ) : (
-                              canEdit && (
+                              <>
+                                {canEdit && (
+                                  <button
+                                    className={styles.secondaryButton}
+                                    onClick={() => {
+                                      setEditingMessageId(message.id);
+                                      setEditingMessageText(message.text?.text ?? "");
+                                      setActionError(null);
+                                      setNotice(null);
+                                    }}
+                                    type="button"
+                                  >
+                                    Редактировать
+                                  </button>
+                                )}
+
                                 <button
-                                  className={styles.secondaryButton}
+                                  className={styles.ghostButton}
                                   onClick={() => {
-                                    setEditingMessageId(message.id);
-                                    setEditingMessageText(message.text?.text ?? "");
+                                    setSelectedReplyMessage(message);
                                     setActionError(null);
                                     setNotice(null);
                                   }}
                                   type="button"
                                 >
-                                  Редактировать
+                                  Ответить
                                 </button>
-                              )
+                              </>
                             )}
                           </div>
 
@@ -1506,6 +1558,33 @@ export function GroupsPage() {
                 )}
 
                 <form className={styles.composer} onSubmit={handleSendGroupMessage}>
+                  {selectedReplyMessage && (
+                    <div className={styles.replyComposerCard}>
+                      <div>
+                        <p className={styles.replyPreviewAuthor}>
+                          Ответ на{" "}
+                          {describeMessageAuthor(
+                            selectedReplyMessage.senderUserId,
+                            authState.profile.id,
+                            selectedState.members,
+                          )}
+                        </p>
+                        <p className={styles.replyPreviewText}>
+                          {describeGroupComposerReplyTarget(selectedReplyMessage)}
+                        </p>
+                      </div>
+                      <button
+                        className={styles.ghostButton}
+                        onClick={() => {
+                          setSelectedReplyMessage(null);
+                        }}
+                        type="button"
+                      >
+                        Отменить reply
+                      </button>
+                    </div>
+                  )}
+
                   <div className={styles.attachmentActions}>
                     <input
                       accept="*/*"
@@ -2102,6 +2181,75 @@ function isGroupMessageEditable(
   currentUserId: string,
 ): boolean {
   return message.senderUserId === currentUserId && message.text !== null;
+}
+
+function describeGroupReplyPreviewAuthor(
+  preview: GroupMessage["replyPreview"],
+  currentUserId: string,
+): string {
+  if (!preview?.author) {
+    if (preview?.isDeleted) {
+      return "Удалённое сообщение";
+    }
+    if (preview?.isUnavailable) {
+      return "Недоступное сообщение";
+    }
+    return "Ответ";
+  }
+  if (preview.author.id === currentUserId) {
+    return "Вы";
+  }
+  return preview.author.nickname || preview.author.login;
+}
+
+function describeReplyPreviewText(preview: GroupMessage["replyPreview"]): string {
+  if (!preview) {
+    return "";
+  }
+  if (preview.isDeleted) {
+    return "Сообщение удалено.";
+  }
+  if (preview.isUnavailable) {
+    return "Исходное сообщение больше недоступно.";
+  }
+  if (preview.hasText && preview.textPreview.trim() !== "") {
+    return preview.textPreview;
+  }
+  if (preview.attachmentCount > 0) {
+    return preview.attachmentCount === 1
+      ? "Вложение"
+      : `Вложения: ${preview.attachmentCount}`;
+  }
+  return "Пустой preview";
+}
+
+function describeGroupComposerReplyTarget(message: GroupMessage): string {
+  const normalizedText = normalizeComposerMessageText(message.text?.text ?? "");
+  if (normalizedText !== "") {
+    return normalizedText.length > 140 ? `${normalizedText.slice(0, 137)}...` : normalizedText;
+  }
+  if (message.attachments.length > 0) {
+    return message.attachments.length === 1
+      ? "Вложение"
+      : `Вложения: ${message.attachments.length}`;
+  }
+  return "Сообщение без текста";
+}
+
+function jumpToMessage(elementId: string) {
+  if (elementId.trim() === "") {
+    return;
+  }
+
+  const element = document.getElementById(elementId);
+  if (!element) {
+    return;
+  }
+
+  element.scrollIntoView({
+    behavior: "smooth",
+    block: "center",
+  });
 }
 
 function formatDateTime(value: string): string {
