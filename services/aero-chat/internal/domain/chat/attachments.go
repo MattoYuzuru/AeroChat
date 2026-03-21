@@ -70,6 +70,7 @@ func (s *Service) CreateAttachmentUploadIntent(
 		SizeBytes:       normalizedSize,
 		ExpiresAt:       upload.ExpiresAt,
 		CreatedAt:       now,
+		UserQuotaBytes:  s.mediaUserQuotaBytes,
 	})
 	if err != nil {
 		return nil, err

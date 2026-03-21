@@ -114,6 +114,7 @@ func run() error {
 		cfg.DirectChatPresenceTTL,
 		cfg.MediaUploadIntentTTL,
 		cfg.MediaMaxUploadSizeBytes,
+		cfg.MediaUserQuotaBytes,
 		cfg.MediaS3BucketName,
 	)
 	handler := connecthandler.NewHandler(serviceName, version, service)

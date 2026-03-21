@@ -23,6 +23,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 	t.Setenv("AERO_MEDIA_S3_PRESIGN_SECURE", "")
 	t.Setenv("AERO_MEDIA_UPLOAD_INTENT_TTL", "")
 	t.Setenv("AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES", "")
+	t.Setenv("AERO_MEDIA_USER_QUOTA_BYTES", "")
 	t.Setenv("AERO_MEDIA_ATTACHMENT_CLEANUP_INTERVAL", "")
 	t.Setenv("AERO_MEDIA_UNATTACHED_ATTACHMENT_TTL", "")
 	t.Setenv("AERO_MEDIA_ATTACHMENT_CLEANUP_BATCH_SIZE", "")
@@ -53,6 +54,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.MediaMaxUploadSizeBytes != 64*1024*1024 {
 		t.Fatalf("ожидался media max upload size по умолчанию, получен %d", cfg.MediaMaxUploadSizeBytes)
 	}
+	if cfg.MediaUserQuotaBytes != 512*1024*1024 {
+		t.Fatalf("ожидалась media user quota по умолчанию, получена %d", cfg.MediaUserQuotaBytes)
+	}
 	if cfg.MediaAttachmentCleanupInterval != 10*time.Minute {
 		t.Fatalf("ожидался cleanup interval по умолчанию, получен %s", cfg.MediaAttachmentCleanupInterval)
 	}
@@ -77,5 +81,13 @@ func TestLoadConfigRejectsInvalidAttachmentCleanupBatchSize(t *testing.T) {
 
 	if _, err := LoadConfig(":8082"); err == nil {
 		t.Fatal("ожидалась ошибка для невалидного cleanup batch size")
+	}
+}
+
+func TestLoadConfigRejectsNonPositiveMediaUserQuotaBytes(t *testing.T) {
+	t.Setenv("AERO_MEDIA_USER_QUOTA_BYTES", "0")
+
+	if _, err := LoadConfig(":8082"); err == nil {
+		t.Fatal("ожидалась ошибка для неположительной media user quota")
 	}
 }

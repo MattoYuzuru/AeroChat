@@ -226,6 +226,100 @@ func TestSendAttachmentOnlyMessageInGroupChat(t *testing.T) {
 	}
 }
 
+func TestCreateAttachmentUploadIntentRejectsQuotaExhaustion(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.mediaUserQuotaBytes = 4 * 1024
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "first.bin", "application/octet-stream", 2048); err != nil {
+		t.Fatalf("create first upload intent: %v", err)
+	}
+
+	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "second.bin", "application/octet-stream", 3072); !errors.Is(err, ErrResourceExhausted) {
+		t.Fatalf("ожидалась quota exhaustion ошибка, получено %v", err)
+	}
+}
+
+func TestCreateAttachmentUploadIntentIgnoresExpiredAndDeletedQuotaStates(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.mediaUserQuotaBytes = 4 * 1024
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	now := time.Date(2026, 3, 20, 15, 0, 0, 0, time.UTC)
+	repo.attachments["attached-counted"] = Attachment{
+		ID:          "attached-counted",
+		OwnerUserID: alice.User.ID,
+		Scope:       AttachmentScopeDirect,
+		ObjectKey:   "attachments/attached-counted",
+		FileName:    "attached.bin",
+		MimeType:    "application/octet-stream",
+		SizeBytes:   1024,
+		Status:      AttachmentStatusAttached,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	failedAt := now
+	repo.attachments["failed-counted"] = Attachment{
+		ID:          "failed-counted",
+		OwnerUserID: alice.User.ID,
+		Scope:       AttachmentScopeDirect,
+		ObjectKey:   "attachments/failed-counted",
+		FileName:    "failed.bin",
+		MimeType:    "application/octet-stream",
+		SizeBytes:   1024,
+		Status:      AttachmentStatusFailed,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		FailedAt:    &failedAt,
+	}
+	repo.attachments["expired-ignored"] = Attachment{
+		ID:          "expired-ignored",
+		OwnerUserID: alice.User.ID,
+		Scope:       AttachmentScopeDirect,
+		ObjectKey:   "attachments/expired-ignored",
+		FileName:    "expired.bin",
+		MimeType:    "application/octet-stream",
+		SizeBytes:   4096,
+		Status:      AttachmentStatusExpired,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	deletedAt := now
+	repo.attachments["deleted-ignored"] = Attachment{
+		ID:          "deleted-ignored",
+		OwnerUserID: alice.User.ID,
+		Scope:       AttachmentScopeDirect,
+		ObjectKey:   "attachments/deleted-ignored",
+		FileName:    "deleted.bin",
+		MimeType:    "application/octet-stream",
+		SizeBytes:   4096,
+		Status:      AttachmentStatusDeleted,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		DeletedAt:   &deletedAt,
+	}
+
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "fresh.bin", "application/octet-stream", 2048)
+	if err != nil {
+		t.Fatalf("ожидалось успешное создание upload intent вне expired/deleted quota states: %v", err)
+	}
+	if intent.Attachment.SizeBytes != 2048 {
+		t.Fatalf("ожидался attachment с размером 2048, получено %d", intent.Attachment.SizeBytes)
+	}
+}
+
 func TestCompleteAttachmentUploadMarksExpiredSession(t *testing.T) {
 	t.Parallel()
 
