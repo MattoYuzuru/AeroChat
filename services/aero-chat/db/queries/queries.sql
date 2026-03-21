@@ -428,6 +428,53 @@ WHERE self.user_id = $1
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT $3;
 
+-- name: SearchGroupMessages :many
+WITH search_query AS (
+    SELECT websearch_to_tsquery('simple', sqlc.arg(query_text)::TEXT) AS query
+)
+SELECT
+    m.id AS message_id,
+    t.group_id,
+    m.thread_id,
+    m.sender_user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    m.created_at,
+    m.edited_at,
+    COALESCE(
+        NULLIF(
+            ts_headline(
+                'simple',
+                m.text_content,
+                search_query.query,
+                'MaxFragments=2,MaxWords=18,MinWords=8,ShortWord=2,StartSel=,StopSel=,FragmentDelimiter= ... '
+            ),
+            ''
+        ),
+        LEFT(m.text_content, 160)
+    ) AS match_fragment
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+JOIN group_messages AS m ON m.thread_id = t.id
+JOIN users AS u ON u.id = m.sender_user_id
+CROSS JOIN search_query
+WHERE self.user_id = sqlc.arg(user_id)::UUID
+  AND t.thread_key = 'primary'
+  AND btrim(m.text_content) <> ''
+  AND (sqlc.narg(group_id)::UUID IS NULL OR t.group_id = sqlc.narg(group_id)::UUID)
+  AND m.search_vector @@ search_query.query
+  AND (
+      sqlc.narg(cursor_created_at)::TIMESTAMPTZ IS NULL
+      OR m.created_at < sqlc.narg(cursor_created_at)::TIMESTAMPTZ
+      OR (
+          m.created_at = sqlc.narg(cursor_created_at)::TIMESTAMPTZ
+          AND m.id < sqlc.narg(cursor_message_id)::UUID
+      )
+  )
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT sqlc.arg(limit_count);
+
 -- name: GetGroupMessageByIDAndUserID :one
 SELECT
     m.id,
@@ -595,6 +642,52 @@ LEFT JOIN direct_chat_message_tombstones AS t ON t.message_id = m.id
 WHERE self.user_id = $1 AND m.chat_id = $2
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT $3;
+
+-- name: SearchDirectMessages :many
+WITH search_query AS (
+    SELECT websearch_to_tsquery('simple', sqlc.arg(query_text)::TEXT) AS query
+)
+SELECT
+    m.id AS message_id,
+    m.chat_id,
+    m.sender_user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    m.created_at,
+    m.edited_at,
+    COALESCE(
+        NULLIF(
+            ts_headline(
+                'simple',
+                m.text_content,
+                search_query.query,
+                'MaxFragments=2,MaxWords=18,MinWords=8,ShortWord=2,StartSel=,StopSel=,FragmentDelimiter= ... '
+            ),
+            ''
+        ),
+        LEFT(m.text_content, 160)
+    ) AS match_fragment
+FROM direct_chat_participants AS self
+JOIN direct_chat_messages AS m ON m.chat_id = self.chat_id
+JOIN users AS u ON u.id = m.sender_user_id
+LEFT JOIN direct_chat_message_tombstones AS t ON t.message_id = m.id
+CROSS JOIN search_query
+WHERE self.user_id = sqlc.arg(user_id)::UUID
+  AND t.message_id IS NULL
+  AND btrim(m.text_content) <> ''
+  AND (sqlc.narg(chat_id)::UUID IS NULL OR m.chat_id = sqlc.narg(chat_id)::UUID)
+  AND m.search_vector @@ search_query.query
+  AND (
+      sqlc.narg(cursor_created_at)::TIMESTAMPTZ IS NULL
+      OR m.created_at < sqlc.narg(cursor_created_at)::TIMESTAMPTZ
+      OR (
+          m.created_at = sqlc.narg(cursor_created_at)::TIMESTAMPTZ
+          AND m.id < sqlc.narg(cursor_message_id)::UUID
+      )
+  )
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT sqlc.arg(limit_count);
 
 -- name: CreateDirectChatMessage :one
 INSERT INTO direct_chat_messages (

@@ -25,7 +25,10 @@ const (
 	GroupMemberRoleReader                  = "reader"
 	defaultMessagePageSize           int32 = 50
 	maxMessagePageSize               int32 = 200
+	defaultSearchPageSize            int32 = 20
+	maxSearchPageSize                int32 = 50
 	maxTextMessageLength                   = 4000
+	maxSearchQueryLength                   = 200
 	maxGroupNameLength                     = 80
 )
 
@@ -231,6 +234,59 @@ type GroupMessage struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	EditedAt         *time.Time
+}
+
+type MessageSearchCursor struct {
+	MessageCreatedAt time.Time
+	MessageID        string
+}
+
+type SearchMessagesParams struct {
+	Query      string
+	DirectChat *SearchDirectMessagesScope
+	Group      *SearchGroupMessagesScope
+	PageSize   int32
+	Cursor     *MessageSearchCursor
+}
+
+type SearchDirectMessagesParams struct {
+	Query    string
+	ChatID   *string
+	PageSize int32
+	Cursor   *MessageSearchCursor
+}
+
+type SearchGroupMessagesParams struct {
+	Query    string
+	GroupID  *string
+	PageSize int32
+	Cursor   *MessageSearchCursor
+}
+
+type SearchDirectMessagesScope struct {
+	ChatID *string
+}
+
+type SearchGroupMessagesScope struct {
+	GroupID *string
+}
+
+type MessageSearchPosition struct {
+	MessageID        string
+	MessageCreatedAt time.Time
+}
+
+type MessageSearchResult struct {
+	Scope         string
+	DirectChatID  string
+	GroupID       string
+	GroupThreadID string
+	MessageID     string
+	Author        UserSummary
+	CreatedAt     time.Time
+	EditedAt      *time.Time
+	MatchFragment string
+	Position      MessageSearchPosition
 }
 
 type DirectChatReadPosition struct {

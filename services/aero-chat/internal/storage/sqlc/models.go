@@ -61,6 +61,7 @@ type DirectChatMessage struct {
 	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	SearchVector     interface{}        `db:"search_vector" json:"search_vector"`
 }
 
 type DirectChatMessageTombstone struct {
@@ -138,6 +139,7 @@ type GroupMessage struct {
 	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	SearchVector     interface{}        `db:"search_vector" json:"search_vector"`
 }
 
 type GroupThread struct {

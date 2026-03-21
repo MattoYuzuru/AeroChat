@@ -40,6 +40,7 @@ service ChatService {
   rpc EditDirectChatMessage(EditDirectChatMessageRequest) returns (EditDirectChatMessageResponse);
   rpc ListDirectChatMessages(ListDirectChatMessagesRequest) returns (ListDirectChatMessagesResponse);
   rpc ListGroupMessages(ListGroupMessagesRequest) returns (ListGroupMessagesResponse);
+  rpc SearchMessages(SearchMessagesRequest) returns (SearchMessagesResponse);
   rpc SendGroupTextMessage(SendGroupTextMessageRequest) returns (SendGroupTextMessageResponse);
   rpc EditGroupMessage(EditGroupMessageRequest) returns (EditGroupMessageResponse);
   rpc DeleteMessageForEveryone(DeleteMessageForEveryoneRequest) returns (DeleteMessageForEveryoneResponse);
@@ -92,6 +93,12 @@ enum GroupMemberRole {
   GROUP_MEMBER_ROLE_ADMIN = 2;
   GROUP_MEMBER_ROLE_MEMBER = 3;
   GROUP_MEMBER_ROLE_READER = 4;
+}
+
+enum MessageSearchScopeKind {
+  MESSAGE_SEARCH_SCOPE_KIND_UNSPECIFIED = 0;
+  MESSAGE_SEARCH_SCOPE_KIND_DIRECT = 1;
+  MESSAGE_SEARCH_SCOPE_KIND_GROUP = 2;
 }
 
 message ChatUser {
@@ -576,6 +583,55 @@ message ListGroupMessagesRequest {
 
 message ListGroupMessagesResponse {
   repeated GroupMessage messages = 1;
+}
+
+message SearchDirectMessagesScope {
+  // Пустой chat_id означает поиск по всем direct chats, доступным текущему пользователю.
+  string chat_id = 1;
+}
+
+message SearchGroupMessagesScope {
+  // Пустой group_id означает поиск по всем группам, где пользователь сейчас состоит.
+  string group_id = 1;
+}
+
+message MessageSearchCursor {
+  google.protobuf.Timestamp message_created_at = 1;
+  string message_id = 2;
+}
+
+message MessageSearchPosition {
+  string message_id = 1;
+  google.protobuf.Timestamp message_created_at = 2;
+}
+
+message MessageSearchResult {
+  MessageSearchScopeKind scope = 1;
+  string direct_chat_id = 2;
+  string group_id = 3;
+  string group_thread_id = 4;
+  string message_id = 5;
+  ChatUser author = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp edited_at = 8;
+  string match_fragment = 9;
+  MessageSearchPosition position = 10;
+}
+
+message SearchMessagesRequest {
+  string query = 1;
+  oneof scope {
+    SearchDirectMessagesScope direct_scope = 2;
+    SearchGroupMessagesScope group_scope = 3;
+  }
+  uint32 page_size = 4;
+  MessageSearchCursor page_cursor = 5;
+}
+
+message SearchMessagesResponse {
+  repeated MessageSearchResult results = 1;
+  MessageSearchCursor next_page_cursor = 2;
+  bool has_more = 3;
 }
 
 message SendGroupTextMessageRequest {

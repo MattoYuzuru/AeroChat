@@ -822,6 +822,228 @@ func TestListDirectChatsRefreshesSessionTouchWhenLastSeenIsStale(t *testing.T) {
 	}
 }
 
+func TestSearchDirectMessagesSupportsAllAndSpecificScopes(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	charlie := repo.mustIssueAuth(testUUID(3), "charlie", "Charlie")
+
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+	repo.friendships[pairKey(alice.User.ID, charlie.User.ID)] = true
+
+	firstChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	secondChat := mustCreateDirectChat(t, service, alice.Token, charlie.User.ID)
+
+	edited := mustSendMessage(t, service, alice.Token, firstChat.ID, "draft")
+	if _, err := service.EditDirectChatMessage(context.Background(), alice.Token, firstChat.ID, edited.ID, "search foundation direct"); err != nil {
+		t.Fatalf("edit direct message for search: %v", err)
+	}
+
+	deleted := mustSendMessage(t, service, bob.Token, firstChat.ID, "search foundation tombstone")
+	if _, err := service.DeleteMessageForEveryone(context.Background(), bob.Token, firstChat.ID, deleted.ID); err != nil {
+		t.Fatalf("delete direct search candidate: %v", err)
+	}
+
+	other := mustSendMessage(t, service, charlie.Token, secondChat.ID, "search foundation second chat")
+
+	allResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), alice.Token, SearchMessagesParams{
+		Query: "search foundation",
+		DirectChat: &SearchDirectMessagesScope{
+			ChatID: stringPointerForTest(""),
+		},
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("search all direct messages: %v", err)
+	}
+	if hasMore {
+		t.Fatal("не ожидалось has_more для двух direct search hits")
+	}
+	if nextCursor != nil {
+		t.Fatalf("не ожидался next cursor, получено %+v", nextCursor)
+	}
+	if len(allResults) != 2 {
+		t.Fatalf("ожидалось 2 direct search hits, получено %d", len(allResults))
+	}
+	if allResults[0].MessageID != other.ID || allResults[1].MessageID != edited.ID {
+		t.Fatalf("ожидался порядок по убыванию created_at: %+v", allResults)
+	}
+	if allResults[0].DirectChatID != secondChat.ID || allResults[1].DirectChatID != firstChat.ID {
+		t.Fatalf("ожидались explicit direct_chat_id в hit'ах, получено %+v", allResults)
+	}
+	if allResults[1].EditedAt == nil {
+		t.Fatal("ожидался edited_at у direct search hit после edit")
+	}
+	if !strings.Contains(strings.ToLower(allResults[1].MatchFragment), "search foundation direct") {
+		t.Fatalf("ожидался fragment с актуальным direct text, получено %q", allResults[1].MatchFragment)
+	}
+
+	scopedResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "search foundation",
+		DirectChat: &SearchDirectMessagesScope{
+			ChatID: &firstChat.ID,
+		},
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("search specific direct chat: %v", err)
+	}
+	if hasMore || nextCursor != nil {
+		t.Fatal("не ожидалась пагинация для specific direct scope")
+	}
+	if len(scopedResults) != 1 || scopedResults[0].MessageID != edited.ID {
+		t.Fatalf("ожидался только один visible direct hit без tombstone, получено %+v", scopedResults)
+	}
+	if scopedResults[0].Position.MessageID != edited.ID || !scopedResults[0].Position.MessageCreatedAt.Equal(scopedResults[0].CreatedAt) {
+		t.Fatalf("ожидалась explicit position metadata, получено %+v", scopedResults[0].Position)
+	}
+}
+
+func TestSearchGroupMessagesHonorsMembershipBoundaries(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	charlie := repo.mustIssueAuth(testUUID(3), "charlie", "Charlie")
+
+	groupOne := mustCreateGroup(t, service, alice.Token, "Search one")
+	groupTwo := mustCreateGroup(t, service, alice.Token, "Search two")
+
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, groupOne.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create group one invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join group one: %v", err)
+	}
+
+	secondInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, groupTwo.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create group two invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), charlie.Token, secondInvite.InviteToken); err != nil {
+		t.Fatalf("join group two: %v", err)
+	}
+
+	firstMessage := mustSendGroupMessage(t, service, alice.Token, groupOne.ID, "group search alpha")
+	secondMessage := mustSendGroupMessage(t, service, alice.Token, groupTwo.ID, "group search beta")
+	if _, err := service.EditGroupMessage(context.Background(), alice.Token, groupTwo.ID, secondMessage.ID, "group search beta edited"); err != nil {
+		t.Fatalf("edit group search message: %v", err)
+	}
+
+	results, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "group search",
+		Group: &SearchGroupMessagesScope{
+			GroupID: stringPointerForTest(""),
+		},
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("search all groups for Bob: %v", err)
+	}
+	if hasMore || nextCursor != nil {
+		t.Fatal("не ожидалась пагинация для одного group search hit")
+	}
+	if len(results) != 1 || results[0].MessageID != firstMessage.ID {
+		t.Fatalf("ожидался только hit из доступной группы, получено %+v", results)
+	}
+	if results[0].GroupID != groupOne.ID || results[0].GroupThreadID == "" {
+		t.Fatalf("ожидались explicit group identifiers, получено %+v", results[0])
+	}
+
+	if _, _, _, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "group search",
+		Group: &SearchGroupMessagesScope{
+			GroupID: &groupTwo.ID,
+		},
+		PageSize: 10,
+	}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ожидалась not found для чужой specific group scope, получено %v", err)
+	}
+}
+
+func TestSearchMessagesUsesCursorPagination(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	first := mustSendMessage(t, service, alice.Token, directChat.ID, "cursor foundation one")
+	second := mustSendMessage(t, service, alice.Token, directChat.ID, "cursor foundation two")
+	third := mustSendMessage(t, service, alice.Token, directChat.ID, "cursor foundation three")
+
+	pageOne, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "cursor foundation",
+		DirectChat: &SearchDirectMessagesScope{
+			ChatID: &directChat.ID,
+		},
+		PageSize: 2,
+	})
+	if err != nil {
+		t.Fatalf("search first page: %v", err)
+	}
+	if !hasMore {
+		t.Fatal("ожидался второй page для cursor search")
+	}
+	if nextCursor == nil {
+		t.Fatal("ожидался next cursor для первого page")
+	}
+	if len(pageOne) != 2 || pageOne[0].MessageID != third.ID || pageOne[1].MessageID != second.ID {
+		t.Fatalf("ожидались два newest hits на первой странице, получено %+v", pageOne)
+	}
+
+	pageTwo, nextCursorTwo, hasMoreTwo, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "cursor foundation",
+		DirectChat: &SearchDirectMessagesScope{
+			ChatID: &directChat.ID,
+		},
+		PageSize: 2,
+		Cursor:   nextCursor,
+	})
+	if err != nil {
+		t.Fatalf("search second page: %v", err)
+	}
+	if hasMoreTwo {
+		t.Fatal("не ожидался третий page")
+	}
+	if nextCursorTwo != nil {
+		t.Fatalf("не ожидался next cursor после последней страницы, получено %+v", nextCursorTwo)
+	}
+	if len(pageTwo) != 1 || pageTwo[0].MessageID != first.ID {
+		t.Fatalf("ожидался один remaining hit на второй странице, получено %+v", pageTwo)
+	}
+}
+
+func TestSearchMessagesRejectsMissingScopeAndBlankQuery(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+
+	if _, _, _, err := service.SearchMessages(context.Background(), alice.Token, SearchMessagesParams{
+		Query:    "foundation",
+		PageSize: 10,
+	}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ожидалась ошибка missing scope, получено %v", err)
+	}
+
+	if _, _, _, err := service.SearchMessages(context.Background(), alice.Token, SearchMessagesParams{
+		Query: "   ",
+		DirectChat: &SearchDirectMessagesScope{
+			ChatID: stringPointerForTest(""),
+		},
+		PageSize: 10,
+	}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ожидалась ошибка blank query, получено %v", err)
+	}
+}
+
 func newTestService() (*Service, *fakeRepository) {
 	repo := newFakeRepository()
 	service := NewService(
@@ -908,6 +1130,10 @@ func copyReplyPreviewForTest(value *ReplyPreview) *ReplyPreview {
 	}
 
 	return &copyValue
+}
+
+func stringPointerForTest(value string) *string {
+	return &value
 }
 
 type issuedAuth struct {
@@ -1750,6 +1976,45 @@ func (r *fakeRepository) ListGroupMessages(_ context.Context, userID string, gro
 	return result, nil
 }
 
+func (r *fakeRepository) SearchGroupMessages(_ context.Context, userID string, params SearchGroupMessagesParams) ([]MessageSearchResult, error) {
+	if params.GroupID != nil {
+		if _, ok := r.groupMembers[*params.GroupID][userID]; !ok {
+			return nil, ErrNotFound
+		}
+	}
+
+	result := make([]MessageSearchResult, 0)
+	for _, message := range r.groupMessages {
+		if params.GroupID != nil && message.GroupID != *params.GroupID {
+			continue
+		}
+		if _, ok := r.groupMembers[message.GroupID][userID]; !ok {
+			continue
+		}
+		if !searchMessageMatches(message.Text, params.Query) || !searchBeforeCursor(message.CreatedAt, message.ID, params.Cursor) {
+			continue
+		}
+
+		result = append(result, MessageSearchResult{
+			Scope:         ChatKindGroup,
+			GroupID:       message.GroupID,
+			GroupThreadID: message.ThreadID,
+			MessageID:     message.ID,
+			Author:        searchAuthorForTest(r.users[message.SenderUserID]),
+			CreatedAt:     message.CreatedAt,
+			EditedAt:      message.EditedAt,
+			MatchFragment: searchFragmentForTest(message.Text),
+			Position: MessageSearchPosition{
+				MessageID:        message.ID,
+				MessageCreatedAt: message.CreatedAt,
+			},
+		})
+	}
+
+	sortSearchResultsForTest(result)
+	return result, nil
+}
+
 func (r *fakeRepository) CreateDirectChatMessage(_ context.Context, params CreateDirectChatMessageParams) (*DirectChatMessage, error) {
 	directChat, ok := r.chats[params.ChatID]
 	if !ok || !isParticipant(directChat, params.SenderUserID) {
@@ -1817,6 +2082,50 @@ func (r *fakeRepository) ListDirectChatMessages(_ context.Context, userID string
 		result = result[:limit]
 	}
 
+	return result, nil
+}
+
+func (r *fakeRepository) SearchDirectMessages(_ context.Context, userID string, params SearchDirectMessagesParams) ([]MessageSearchResult, error) {
+	if params.ChatID != nil {
+		directChat, ok := r.chats[*params.ChatID]
+		if !ok || !isParticipant(directChat, userID) {
+			return nil, ErrNotFound
+		}
+	}
+
+	result := make([]MessageSearchResult, 0)
+	for _, message := range r.messages {
+		if params.ChatID != nil && message.ChatID != *params.ChatID {
+			continue
+		}
+
+		directChat, ok := r.chats[message.ChatID]
+		if !ok || !isParticipant(directChat, userID) {
+			continue
+		}
+		if message.Tombstone != nil {
+			continue
+		}
+		if !searchMessageMatches(message.Text, params.Query) || !searchBeforeCursor(message.CreatedAt, message.ID, params.Cursor) {
+			continue
+		}
+
+		result = append(result, MessageSearchResult{
+			Scope:         ChatKindDirect,
+			DirectChatID:  message.ChatID,
+			MessageID:     message.ID,
+			Author:        searchAuthorForTest(r.users[message.SenderUserID]),
+			CreatedAt:     message.CreatedAt,
+			EditedAt:      message.EditedAt,
+			MatchFragment: searchFragmentForTest(message.Text),
+			Position: MessageSearchPosition{
+				MessageID:        message.ID,
+				MessageCreatedAt: message.CreatedAt,
+			},
+		})
+	}
+
+	sortSearchResultsForTest(result)
 	return result, nil
 }
 
@@ -2054,6 +2363,60 @@ func readPositionKey(chatID string, userID string) string {
 
 func groupReadPositionKey(groupID string, userID string) string {
 	return groupID + ":" + userID
+}
+
+func searchAuthorForTest(user UserSummary) UserSummary {
+	return UserSummary{
+		ID:        user.ID,
+		Login:     user.Login,
+		Nickname:  user.Nickname,
+		AvatarURL: user.AvatarURL,
+	}
+}
+
+func searchMessageMatches(text *TextMessageContent, query string) bool {
+	if text == nil {
+		return false
+	}
+
+	normalizedText := strings.ToLower(strings.TrimSpace(text.Text))
+	normalizedQuery := strings.ToLower(strings.TrimSpace(query))
+	if normalizedText == "" || normalizedQuery == "" {
+		return false
+	}
+
+	return strings.Contains(normalizedText, normalizedQuery)
+}
+
+func searchFragmentForTest(text *TextMessageContent) string {
+	if text == nil {
+		return ""
+	}
+
+	return buildReplyTextPreview(text.Text)
+}
+
+func searchBeforeCursor(createdAt time.Time, messageID string, cursor *MessageSearchCursor) bool {
+	if cursor == nil {
+		return true
+	}
+	if createdAt.Before(cursor.MessageCreatedAt) {
+		return true
+	}
+	if createdAt.Equal(cursor.MessageCreatedAt) && strings.Compare(messageID, cursor.MessageID) < 0 {
+		return true
+	}
+
+	return false
+}
+
+func sortSearchResultsForTest(results []MessageSearchResult) {
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].CreatedAt.Equal(results[j].CreatedAt) {
+			return results[i].MessageID > results[j].MessageID
+		}
+		return results[i].CreatedAt.After(results[j].CreatedAt)
+	})
 }
 
 func (r *fakeRepository) directUnreadCount(chatID string, userID string) int32 {

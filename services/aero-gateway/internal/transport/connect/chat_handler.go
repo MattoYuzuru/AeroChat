@@ -325,6 +325,10 @@ func (h *ChatHandler) ListGroupMessages(ctx context.Context, req *connect.Reques
 	return forwardUnary(ctx, req, h.client.ListGroupMessages)
 }
 
+func (h *ChatHandler) SearchMessages(ctx context.Context, req *connect.Request[chatv1.SearchMessagesRequest]) (*connect.Response[chatv1.SearchMessagesResponse], error) {
+	return forwardUnary(ctx, req, h.client.SearchMessages)
+}
+
 func (h *ChatHandler) SendGroupTextMessage(ctx context.Context, req *connect.Request[chatv1.SendGroupTextMessageRequest]) (*connect.Response[chatv1.SendGroupTextMessageResponse], error) {
 	response, err := forwardUnary(ctx, req, h.client.SendGroupTextMessage)
 	if err != nil {
