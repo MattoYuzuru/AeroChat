@@ -264,12 +264,18 @@ export function GroupsPage() {
     };
   }, [authState.status, expireSession, selectedGroupId, token]);
 
+  const authenticatedUserId =
+    authState.status === "authenticated" ? authState.profile.id : null;
+
   useEffect(() => {
     if (authState.status !== "authenticated") {
       return;
     }
 
-    const currentUserId = authState.profile.id;
+    const currentUserId = authenticatedUserId;
+    if (currentUserId === null) {
+      return;
+    }
 
     return subscribeRealtimeEnvelopes((envelope) => {
       const event = parseGroupRealtimeEvent(envelope);
@@ -308,7 +314,7 @@ export function GroupsPage() {
 
       setMemberRoleDrafts({});
     });
-  }, [authState.status, authState.profile.id, setSearchParams]);
+  }, [authState.status, authenticatedUserId, setSearchParams]);
 
   const latestSelectedMessage =
     selectedState.status === "ready" ? selectedState.messages[0] ?? null : null;
