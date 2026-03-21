@@ -60,6 +60,8 @@ type Repository interface {
 	UpdateGroupMessageText(context.Context, EditGroupMessageParams) (bool, error)
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
 	ListGroupMessages(context.Context, string, string, int32) ([]GroupMessage, error)
+	SearchDirectMessages(context.Context, string, SearchDirectMessagesParams) ([]MessageSearchResult, error)
+	SearchGroupMessages(context.Context, string, SearchGroupMessagesParams) ([]MessageSearchResult, error)
 	GetDirectChatMessage(context.Context, string, string, string) (*DirectChatMessage, error)
 	GetGroupMessage(context.Context, string, string, string) (*GroupMessage, error)
 	DeleteDirectChatMessageForEveryone(context.Context, string, string, string, time.Time) (bool, error)
@@ -965,6 +967,77 @@ func (s *Service) ListGroupMessages(ctx context.Context, token string, groupID s
 	return s.repo.ListGroupMessages(ctx, authSession.User.ID, group.ID, limit)
 }
 
+func (s *Service) SearchMessages(ctx context.Context, token string, params SearchMessagesParams) ([]MessageSearchResult, *MessageSearchCursor, bool, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	normalizedQuery, err := normalizeSearchQuery(params.Query)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	limit, err := normalizeSearchPageSize(uint32(params.PageSize))
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	cursor, err := normalizeSearchCursor(params.Cursor)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	switch {
+	case params.DirectChat != nil && params.Group != nil:
+		return nil, nil, false, fmt.Errorf("%w: exactly one search scope must be specified", ErrInvalidArgument)
+	case params.DirectChat != nil:
+		chatID, err := normalizeOptionalScopeID(params.DirectChat.ChatID, "chat_id")
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if chatID != nil {
+			if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, *chatID); err != nil {
+				return nil, nil, false, err
+			}
+		}
+
+		results, nextCursor, hasMore, err := s.searchDirectMessages(ctx, authSession.User.ID, SearchDirectMessagesParams{
+			Query:    normalizedQuery,
+			ChatID:   chatID,
+			PageSize: limit,
+			Cursor:   cursor,
+		})
+		if err != nil {
+			return nil, nil, false, err
+		}
+		return results, nextCursor, hasMore, nil
+	case params.Group != nil:
+		groupID, err := normalizeOptionalScopeID(params.Group.GroupID, "group_id")
+		if err != nil {
+			return nil, nil, false, err
+		}
+		if groupID != nil {
+			if _, err := s.repo.GetGroup(ctx, authSession.User.ID, *groupID); err != nil {
+				return nil, nil, false, err
+			}
+		}
+
+		results, nextCursor, hasMore, err := s.searchGroupMessages(ctx, authSession.User.ID, SearchGroupMessagesParams{
+			Query:    normalizedQuery,
+			GroupID:  groupID,
+			PageSize: limit,
+			Cursor:   cursor,
+		})
+		if err != nil {
+			return nil, nil, false, err
+		}
+		return results, nextCursor, hasMore, nil
+	default:
+		return nil, nil, false, fmt.Errorf("%w: search scope is required", ErrInvalidArgument)
+	}
+}
+
 func (s *Service) EditGroupMessage(ctx context.Context, token string, groupID string, messageID string, text string) (*GroupMessage, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
@@ -1645,6 +1718,89 @@ func normalizePageSize(value uint32) (int32, error) {
 	}
 
 	return int32(value), nil
+}
+
+func normalizeSearchPageSize(value uint32) (int32, error) {
+	if value == 0 {
+		return defaultSearchPageSize, nil
+	}
+	if value > uint32(maxSearchPageSize) {
+		return 0, fmt.Errorf("%w: page_size must be less than or equal to %d", ErrInvalidArgument, maxSearchPageSize)
+	}
+
+	return int32(value), nil
+}
+
+func normalizeSearchQuery(value string) (string, error) {
+	normalized := strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if normalized == "" {
+		return "", fmt.Errorf("%w: query cannot be empty", ErrInvalidArgument)
+	}
+	if len([]rune(normalized)) > maxSearchQueryLength {
+		return "", fmt.Errorf("%w: query is too long", ErrInvalidArgument)
+	}
+
+	return normalized, nil
+}
+
+func normalizeSearchCursor(value *MessageSearchCursor) (*MessageSearchCursor, error) {
+	if value == nil {
+		return nil, nil
+	}
+	if value.MessageCreatedAt.IsZero() {
+		return nil, fmt.Errorf("%w: page_cursor.message_created_at is required", ErrInvalidArgument)
+	}
+
+	normalizedMessageID, err := normalizeID(value.MessageID, "page_cursor.message_id")
+	if err != nil {
+		return nil, err
+	}
+
+	return &MessageSearchCursor{
+		MessageCreatedAt: value.MessageCreatedAt.UTC(),
+		MessageID:        normalizedMessageID,
+	}, nil
+}
+
+func normalizeOptionalScopeID(value *string, field string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	return normalizeOptionalID(*value, field)
+}
+
+func (s *Service) searchDirectMessages(ctx context.Context, userID string, params SearchDirectMessagesParams) ([]MessageSearchResult, *MessageSearchCursor, bool, error) {
+	results, err := s.repo.SearchDirectMessages(ctx, userID, params)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	page, nextCursor, hasMore := finalizeSearchPage(results, params.PageSize)
+	return page, nextCursor, hasMore, nil
+}
+
+func (s *Service) searchGroupMessages(ctx context.Context, userID string, params SearchGroupMessagesParams) ([]MessageSearchResult, *MessageSearchCursor, bool, error) {
+	results, err := s.repo.SearchGroupMessages(ctx, userID, params)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	page, nextCursor, hasMore := finalizeSearchPage(results, params.PageSize)
+	return page, nextCursor, hasMore, nil
+}
+
+func finalizeSearchPage(results []MessageSearchResult, pageSize int32) ([]MessageSearchResult, *MessageSearchCursor, bool) {
+	if len(results) <= int(pageSize) {
+		return results, nil, false
+	}
+
+	page := append([]MessageSearchResult(nil), results[:pageSize]...)
+	last := page[len(page)-1]
+	return page, &MessageSearchCursor{
+		MessageCreatedAt: last.Position.MessageCreatedAt,
+		MessageID:        last.Position.MessageID,
+	}, true
 }
 
 func CanonicalUserPair(firstUserID string, secondUserID string) (string, string) {

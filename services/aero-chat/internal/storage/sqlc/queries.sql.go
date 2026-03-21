@@ -2714,6 +2714,219 @@ func (q *Queries) PinDirectChatMessage(ctx context.Context, arg PinDirectChatMes
 	return result.RowsAffected(), nil
 }
 
+const searchDirectMessages = `-- name: SearchDirectMessages :many
+WITH search_query AS (
+    SELECT websearch_to_tsquery('simple', $6::TEXT) AS query
+)
+SELECT
+    m.id AS message_id,
+    m.chat_id,
+    m.sender_user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    m.created_at,
+    m.edited_at,
+    COALESCE(
+        NULLIF(
+            ts_headline(
+                'simple',
+                m.text_content,
+                search_query.query,
+                'MaxFragments=2,MaxWords=18,MinWords=8,ShortWord=2,StartSel=,StopSel=,FragmentDelimiter= ... '
+            ),
+            ''
+        ),
+        LEFT(m.text_content, 160)
+    ) AS match_fragment
+FROM direct_chat_participants AS self
+JOIN direct_chat_messages AS m ON m.chat_id = self.chat_id
+JOIN users AS u ON u.id = m.sender_user_id
+LEFT JOIN direct_chat_message_tombstones AS t ON t.message_id = m.id
+CROSS JOIN search_query
+WHERE self.user_id = $1::UUID
+  AND t.message_id IS NULL
+  AND btrim(m.text_content) <> ''
+  AND ($2::UUID IS NULL OR m.chat_id = $2::UUID)
+  AND m.search_vector @@ search_query.query
+  AND (
+      $3::TIMESTAMPTZ IS NULL
+      OR m.created_at < $3::TIMESTAMPTZ
+      OR (
+          m.created_at = $3::TIMESTAMPTZ
+          AND m.id < $4::UUID
+      )
+  )
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $5
+`
+
+type SearchDirectMessagesParams struct {
+	UserID          uuid.UUID          `db:"user_id" json:"user_id"`
+	ChatID          pgtype.UUID        `db:"chat_id" json:"chat_id"`
+	CursorCreatedAt pgtype.Timestamptz `db:"cursor_created_at" json:"cursor_created_at"`
+	CursorMessageID pgtype.UUID        `db:"cursor_message_id" json:"cursor_message_id"`
+	LimitCount      int32              `db:"limit_count" json:"limit_count"`
+	QueryText       string             `db:"query_text" json:"query_text"`
+}
+
+type SearchDirectMessagesRow struct {
+	MessageID     uuid.UUID          `db:"message_id" json:"message_id"`
+	ChatID        uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID  uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Login         string             `db:"login" json:"login"`
+	Nickname      string             `db:"nickname" json:"nickname"`
+	AvatarUrl     pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	EditedAt      pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	MatchFragment interface{}        `db:"match_fragment" json:"match_fragment"`
+}
+
+func (q *Queries) SearchDirectMessages(ctx context.Context, arg SearchDirectMessagesParams) ([]SearchDirectMessagesRow, error) {
+	rows, err := q.db.Query(ctx, searchDirectMessages,
+		arg.UserID,
+		arg.ChatID,
+		arg.CursorCreatedAt,
+		arg.CursorMessageID,
+		arg.LimitCount,
+		arg.QueryText,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchDirectMessagesRow
+	for rows.Next() {
+		var i SearchDirectMessagesRow
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.ChatID,
+			&i.SenderUserID,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+			&i.CreatedAt,
+			&i.EditedAt,
+			&i.MatchFragment,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchGroupMessages = `-- name: SearchGroupMessages :many
+WITH search_query AS (
+    SELECT websearch_to_tsquery('simple', $6::TEXT) AS query
+)
+SELECT
+    m.id AS message_id,
+    t.group_id,
+    m.thread_id,
+    m.sender_user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    m.created_at,
+    m.edited_at,
+    COALESCE(
+        NULLIF(
+            ts_headline(
+                'simple',
+                m.text_content,
+                search_query.query,
+                'MaxFragments=2,MaxWords=18,MinWords=8,ShortWord=2,StartSel=,StopSel=,FragmentDelimiter= ... '
+            ),
+            ''
+        ),
+        LEFT(m.text_content, 160)
+    ) AS match_fragment
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+JOIN group_messages AS m ON m.thread_id = t.id
+JOIN users AS u ON u.id = m.sender_user_id
+CROSS JOIN search_query
+WHERE self.user_id = $1::UUID
+  AND t.thread_key = 'primary'
+  AND btrim(m.text_content) <> ''
+  AND ($2::UUID IS NULL OR t.group_id = $2::UUID)
+  AND m.search_vector @@ search_query.query
+  AND (
+      $3::TIMESTAMPTZ IS NULL
+      OR m.created_at < $3::TIMESTAMPTZ
+      OR (
+          m.created_at = $3::TIMESTAMPTZ
+          AND m.id < $4::UUID
+      )
+  )
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $5
+`
+
+type SearchGroupMessagesParams struct {
+	UserID          uuid.UUID          `db:"user_id" json:"user_id"`
+	GroupID         pgtype.UUID        `db:"group_id" json:"group_id"`
+	CursorCreatedAt pgtype.Timestamptz `db:"cursor_created_at" json:"cursor_created_at"`
+	CursorMessageID pgtype.UUID        `db:"cursor_message_id" json:"cursor_message_id"`
+	LimitCount      int32              `db:"limit_count" json:"limit_count"`
+	QueryText       string             `db:"query_text" json:"query_text"`
+}
+
+type SearchGroupMessagesRow struct {
+	MessageID     uuid.UUID          `db:"message_id" json:"message_id"`
+	GroupID       uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID      uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID  uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Login         string             `db:"login" json:"login"`
+	Nickname      string             `db:"nickname" json:"nickname"`
+	AvatarUrl     pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	EditedAt      pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	MatchFragment interface{}        `db:"match_fragment" json:"match_fragment"`
+}
+
+func (q *Queries) SearchGroupMessages(ctx context.Context, arg SearchGroupMessagesParams) ([]SearchGroupMessagesRow, error) {
+	rows, err := q.db.Query(ctx, searchGroupMessages,
+		arg.UserID,
+		arg.GroupID,
+		arg.CursorCreatedAt,
+		arg.CursorMessageID,
+		arg.LimitCount,
+		arg.QueryText,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchGroupMessagesRow
+	for rows.Next() {
+		var i SearchGroupMessagesRow
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.GroupID,
+			&i.ThreadID,
+			&i.SenderUserID,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+			&i.CreatedAt,
+			&i.EditedAt,
+			&i.MatchFragment,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const touchDirectChatMessageUpdatedAt = `-- name: TouchDirectChatMessageUpdatedAt :exec
 UPDATE direct_chat_messages
 SET updated_at = $2

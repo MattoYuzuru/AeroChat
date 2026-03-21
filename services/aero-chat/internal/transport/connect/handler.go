@@ -594,6 +594,43 @@ func (h *Handler) ListGroupMessages(ctx context.Context, req *connect.Request[ch
 	return connect.NewResponse(response), nil
 }
 
+func (h *Handler) SearchMessages(ctx context.Context, req *connect.Request[chatv1.SearchMessagesRequest]) (*connect.Response[chatv1.SearchMessagesResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	params := chat.SearchMessagesParams{
+		Query:    req.Msg.Query,
+		PageSize: int32(req.Msg.PageSize),
+		Cursor:   fromProtoMessageSearchCursor(req.Msg.PageCursor),
+	}
+	if scope := req.Msg.GetDirectScope(); scope != nil {
+		chatID := scope.ChatId
+		params.DirectChat = &chat.SearchDirectMessagesScope{ChatID: &chatID}
+	}
+	if scope := req.Msg.GetGroupScope(); scope != nil {
+		groupID := scope.GroupId
+		params.Group = &chat.SearchGroupMessagesScope{GroupID: &groupID}
+	}
+
+	results, nextCursor, hasMore, err := h.service.SearchMessages(ctx, token, params)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &chatv1.SearchMessagesResponse{
+		Results:        make([]*chatv1.MessageSearchResult, 0, len(results)),
+		NextPageCursor: toProtoMessageSearchCursor(nextCursor),
+		HasMore:        hasMore,
+	}
+	for _, result := range results {
+		response.Results = append(response.Results, toProtoMessageSearchResult(result))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
 func (h *Handler) SendGroupTextMessage(ctx context.Context, req *connect.Request[chatv1.SendGroupTextMessageRequest]) (*connect.Response[chatv1.SendGroupTextMessageResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -878,6 +915,51 @@ func toProtoGroupMessage(value chat.GroupMessage) *chatv1.GroupMessage {
 	return result
 }
 
+func toProtoMessageSearchResult(value chat.MessageSearchResult) *chatv1.MessageSearchResult {
+	return &chatv1.MessageSearchResult{
+		Scope:         toProtoMessageSearchScopeKind(value.Scope),
+		DirectChatId:  value.DirectChatID,
+		GroupId:       value.GroupID,
+		GroupThreadId: value.GroupThreadID,
+		MessageId:     value.MessageID,
+		Author:        toProtoChatUser(value.Author),
+		CreatedAt:     timestamppb.New(value.CreatedAt),
+		EditedAt:      timestampPointer(value.EditedAt),
+		MatchFragment: value.MatchFragment,
+		Position: &chatv1.MessageSearchPosition{
+			MessageId:        value.Position.MessageID,
+			MessageCreatedAt: timestamppb.New(value.Position.MessageCreatedAt),
+		},
+	}
+}
+
+func toProtoMessageSearchCursor(value *chat.MessageSearchCursor) *chatv1.MessageSearchCursor {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.MessageSearchCursor{
+		MessageCreatedAt: timestamppb.New(value.MessageCreatedAt),
+		MessageId:        value.MessageID,
+	}
+}
+
+func fromProtoMessageSearchCursor(value *chatv1.MessageSearchCursor) *chat.MessageSearchCursor {
+	if value == nil {
+		return nil
+	}
+
+	var createdAt time.Time
+	if value.GetMessageCreatedAt() != nil {
+		createdAt = value.GetMessageCreatedAt().AsTime()
+	}
+
+	return &chat.MessageSearchCursor{
+		MessageCreatedAt: createdAt,
+		MessageID:        value.GetMessageId(),
+	}
+}
+
 func toProtoReplyPreview(value *chat.ReplyPreview) *chatv1.ReplyPreview {
 	if value == nil {
 		return nil
@@ -1022,6 +1104,17 @@ func toProtoGroupMemberRole(value string) chatv1.GroupMemberRole {
 		return chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER
 	default:
 		return chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_UNSPECIFIED
+	}
+}
+
+func toProtoMessageSearchScopeKind(value string) chatv1.MessageSearchScopeKind {
+	switch value {
+	case chat.ChatKindDirect:
+		return chatv1.MessageSearchScopeKind_MESSAGE_SEARCH_SCOPE_KIND_DIRECT
+	case chat.ChatKindGroup:
+		return chatv1.MessageSearchScopeKind_MESSAGE_SEARCH_SCOPE_KIND_GROUP
+	default:
+		return chatv1.MessageSearchScopeKind_MESSAGE_SEARCH_SCOPE_KIND_UNSPECIFIED
 	}
 }
 

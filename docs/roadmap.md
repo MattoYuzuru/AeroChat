@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] replies и quoted messages foundation для direct chats и groups
+- [x] search foundation для сообщений в direct chats и groups
 
 ---
 
@@ -96,6 +96,7 @@
 - [x] Tombstone deletion
 - [x] Message edit foundation
 - [x] Replies и quoted messages foundation
+- [x] Message search foundation через `aero-gateway`
 - [ ] Draft recovery
 - [x] Pin / unpin
 - [x] Web direct chat bootstrap через `aero-gateway`
@@ -127,6 +128,7 @@
 - [x] Group unread conversation state foundation
 - [x] Message edit foundation
 - [x] Replies и quoted messages foundation
+- [x] Message search foundation через `aero-gateway`
 - [ ] Max groups per user rules
 
 ---
