@@ -34,6 +34,8 @@ export function useAttachmentComposer({
     undefined,
     createInitialAttachmentComposerState,
   );
+  const scopeKind = scope?.kind ?? null;
+  const scopeId = scope?.id ?? null;
   const scopeRef = useRef(scope);
   const onUnauthenticatedRef = useRef(onUnauthenticated);
   const fileRef = useRef<File | null>(null);
@@ -44,19 +46,21 @@ export function useAttachmentComposer({
   }, [onUnauthenticated]);
 
   useEffect(() => {
-    scopeRef.current = scope;
-  }, [scope]);
+    scopeRef.current = resolveStableScope(scopeKind, scopeId);
+  }, [scopeId, scopeKind]);
 
   useEffect(() => {
     abortActiveUpload(abortControllerRef);
     fileRef.current = null;
 
-    if (!enabled || scope === null) {
+    const nextScope = resolveStableScope(scopeKind, scopeId);
+
+    if (!enabled || nextScope === null) {
       dispatch({ type: "draft_removed" });
       return;
     }
 
-    const restoredAttachment = loadStoredUploadedAttachment(scope);
+    const restoredAttachment = loadStoredUploadedAttachment(nextScope);
     if (restoredAttachment === null) {
       dispatch({ type: "draft_removed" });
       return;
@@ -66,7 +70,7 @@ export function useAttachmentComposer({
       type: "restore_uploaded",
       attachment: restoredAttachment,
     });
-  }, [enabled, scope]);
+  }, [enabled, scopeId, scopeKind]);
 
   async function selectFile(file: File): Promise<boolean> {
     if (!enabled || scopeRef.current === null) {
@@ -224,4 +228,28 @@ function abortActiveUpload(ref: { current: AbortController | null }) {
 function resolveMimeType(file: File): string {
   const normalized = file.type.trim();
   return normalized === "" ? "application/octet-stream" : normalized;
+}
+
+export function buildAttachmentComposerScopeKey(
+  scope: AttachmentComposerScope | null,
+): string | null {
+  if (scope === null) {
+    return null;
+  }
+
+  return `${scope.kind}:${scope.id}`;
+}
+
+function resolveStableScope(
+  kind: AttachmentComposerScope["kind"] | null,
+  id: string | null,
+): AttachmentComposerScope | null {
+  if (kind === null || id === null) {
+    return null;
+  }
+
+  return {
+    kind,
+    id,
+  };
 }
