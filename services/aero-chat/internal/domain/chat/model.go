@@ -14,6 +14,7 @@ const (
 	AttachmentStatusUploaded               = "uploaded"
 	AttachmentStatusAttached               = "attached"
 	AttachmentStatusFailed                 = "failed"
+	AttachmentStatusExpired                = "expired"
 	AttachmentStatusDeleted                = "deleted"
 	AttachmentUploadSessionPending         = "pending"
 	AttachmentUploadSessionCompleted       = "completed"
@@ -210,10 +211,28 @@ type AttachmentUploadIntent struct {
 	UploadSession AttachmentUploadSession
 }
 
+type AttachmentObjectCleanupCandidate struct {
+	ID        string
+	ObjectKey string
+	Status    string
+}
+
 type AttachmentAccess struct {
 	Attachment        Attachment
 	DownloadURL       string
 	DownloadExpiresAt *time.Time
+}
+
+type AttachmentLifecycleCleanupOptions struct {
+	Now           time.Time
+	UnattachedTTL time.Duration
+	BatchSize     int
+}
+
+type AttachmentLifecycleCleanupReport struct {
+	ExpiredUploadSessions    int64
+	ExpiredOrphanAttachments int64
+	DeletedAttachments       int
 }
 
 type MessageTombstone struct {
@@ -491,6 +510,13 @@ type FailAttachmentUploadParams struct {
 	UploadSessionID string
 	OwnerUserID     string
 	FailedAt        time.Time
+}
+
+type ExpireAttachmentUploadSessionParams struct {
+	AttachmentID    string
+	UploadSessionID string
+	OwnerUserID     string
+	ExpiredAt       time.Time
 }
 
 type UpsertDirectChatReadReceiptParams struct {

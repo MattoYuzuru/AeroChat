@@ -1528,6 +1528,131 @@ func (r *fakeRepository) FailAttachmentUpload(_ context.Context, params FailAtta
 	return &copy, nil
 }
 
+func (r *fakeRepository) ExpireAttachmentUploadSession(_ context.Context, params ExpireAttachmentUploadSessionParams) (bool, error) {
+	attachment, ok := r.attachments[params.AttachmentID]
+	if !ok || attachment.OwnerUserID != params.OwnerUserID {
+		return false, ErrNotFound
+	}
+	uploadSession, ok := r.uploadSessions[params.UploadSessionID]
+	if !ok || uploadSession.AttachmentID != params.AttachmentID {
+		return false, ErrNotFound
+	}
+	if attachment.Status != AttachmentStatusPending || uploadSession.Status != AttachmentUploadSessionPending {
+		return false, nil
+	}
+	if uploadSession.ExpiresAt.After(params.ExpiredAt) {
+		return false, nil
+	}
+
+	attachment.Status = AttachmentStatusExpired
+	attachment.UpdatedAt = params.ExpiredAt
+	uploadSession.Status = AttachmentUploadSessionExpired
+	uploadSession.UpdatedAt = params.ExpiredAt
+	r.attachments[attachment.ID] = attachment
+	r.uploadSessions[uploadSession.ID] = uploadSession
+	return true, nil
+}
+
+func (r *fakeRepository) ExpirePendingAttachmentUploadSessions(_ context.Context, at time.Time, limit int32) (int64, error) {
+	var affected int64
+	for sessionID, uploadSession := range r.uploadSessions {
+		if affected >= int64(limit) {
+			break
+		}
+		if uploadSession.Status != AttachmentUploadSessionPending || uploadSession.ExpiresAt.After(at) {
+			continue
+		}
+
+		attachment, ok := r.attachments[uploadSession.AttachmentID]
+		if !ok || attachment.Status != AttachmentStatusPending || attachment.MessageID != nil {
+			continue
+		}
+
+		attachment.Status = AttachmentStatusExpired
+		attachment.UpdatedAt = at
+		uploadSession.Status = AttachmentUploadSessionExpired
+		uploadSession.UpdatedAt = at
+		r.attachments[attachment.ID] = attachment
+		r.uploadSessions[sessionID] = uploadSession
+		affected++
+	}
+
+	return affected, nil
+}
+
+func (r *fakeRepository) ExpireOrphanUploadedAttachments(_ context.Context, uploadedBefore time.Time, expiredAt time.Time, limit int32) (int64, error) {
+	var affected int64
+	for attachmentID, attachment := range r.attachments {
+		if affected >= int64(limit) {
+			break
+		}
+		if attachment.Status != AttachmentStatusUploaded || attachment.MessageID != nil || attachment.UploadedAt == nil {
+			continue
+		}
+		if attachment.UploadedAt.After(uploadedBefore) {
+			continue
+		}
+
+		attachment.Status = AttachmentStatusExpired
+		attachment.UpdatedAt = expiredAt
+		r.attachments[attachmentID] = attachment
+		affected++
+	}
+
+	return affected, nil
+}
+
+func (r *fakeRepository) ListAttachmentObjectDeletionCandidates(_ context.Context, expiredBefore time.Time, failedBefore time.Time, limit int32) ([]AttachmentObjectCleanupCandidate, error) {
+	result := make([]AttachmentObjectCleanupCandidate, 0, limit)
+	for _, attachment := range r.attachments {
+		if int32(len(result)) >= limit {
+			break
+		}
+		if attachment.MessageID != nil {
+			continue
+		}
+		switch attachment.Status {
+		case AttachmentStatusExpired:
+			if !attachment.UpdatedAt.Before(expiredBefore) {
+				continue
+			}
+		case AttachmentStatusFailed:
+			if attachment.FailedAt == nil || attachment.FailedAt.After(failedBefore) {
+				continue
+			}
+		default:
+			continue
+		}
+
+		result = append(result, AttachmentObjectCleanupCandidate{
+			ID:        attachment.ID,
+			ObjectKey: attachment.ObjectKey,
+			Status:    attachment.Status,
+		})
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) MarkAttachmentDeleted(_ context.Context, attachmentID string, deletedAt time.Time) (bool, error) {
+	attachment, ok := r.attachments[attachmentID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	if attachment.MessageID != nil {
+		return false, nil
+	}
+	if attachment.Status != AttachmentStatusExpired && attachment.Status != AttachmentStatusFailed {
+		return false, nil
+	}
+
+	attachment.Status = AttachmentStatusDeleted
+	attachment.UpdatedAt = deletedAt
+	attachment.DeletedAt = &deletedAt
+	r.attachments[attachmentID] = attachment
+	return true, nil
+}
+
 func (r *fakeRepository) CreateGroup(_ context.Context, params CreateGroupParams) (*Group, error) {
 	group := Group{
 		ID:                  params.GroupID,
@@ -2613,7 +2738,8 @@ func (s *fakePresenceStore) ListDirectChatPresenceIndicators(_ context.Context, 
 }
 
 type fakeObjectStorage struct {
-	objects map[string]StoredObjectInfo
+	objects        map[string]StoredObjectInfo
+	deletedObjects []string
 }
 
 func newFakeObjectStorage() *fakeObjectStorage {
@@ -2650,6 +2776,12 @@ func (s *fakeObjectStorage) StatObject(_ context.Context, objectKey string) (*St
 		return nil, ErrNotFound
 	}
 	return &info, nil
+}
+
+func (s *fakeObjectStorage) DeleteObject(_ context.Context, objectKey string) error {
+	delete(s.objects, objectKey)
+	s.deletedObjects = append(s.deletedObjects, objectKey)
+	return nil
 }
 
 func testUUID(sequence int) string {

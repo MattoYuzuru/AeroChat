@@ -23,6 +23,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	t.Setenv("AERO_MEDIA_S3_PRESIGN_SECURE", "")
 	t.Setenv("AERO_MEDIA_UPLOAD_INTENT_TTL", "")
 	t.Setenv("AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES", "")
+	t.Setenv("AERO_MEDIA_ATTACHMENT_CLEANUP_INTERVAL", "")
+	t.Setenv("AERO_MEDIA_UNATTACHED_ATTACHMENT_TTL", "")
+	t.Setenv("AERO_MEDIA_ATTACHMENT_CLEANUP_BATCH_SIZE", "")
 
 	cfg, err := LoadConfig(":8082")
 	if err != nil {
@@ -50,6 +53,15 @@ func TestLoadConfigDefaults(t *testing.T) {
 	if cfg.MediaMaxUploadSizeBytes != 64*1024*1024 {
 		t.Fatalf("ожидался media max upload size по умолчанию, получен %d", cfg.MediaMaxUploadSizeBytes)
 	}
+	if cfg.MediaAttachmentCleanupInterval != 10*time.Minute {
+		t.Fatalf("ожидался cleanup interval по умолчанию, получен %s", cfg.MediaAttachmentCleanupInterval)
+	}
+	if cfg.MediaUnattachedAttachmentTTL != 24*time.Hour {
+		t.Fatalf("ожидался unattached attachment ttl по умолчанию, получен %s", cfg.MediaUnattachedAttachmentTTL)
+	}
+	if cfg.MediaAttachmentCleanupBatchSize != 100 {
+		t.Fatalf("ожидался cleanup batch size по умолчанию, получен %d", cfg.MediaAttachmentCleanupBatchSize)
+	}
 }
 
 func TestLoadConfigRejectsInvalidBootstrapDuration(t *testing.T) {
@@ -57,5 +69,13 @@ func TestLoadConfigRejectsInvalidBootstrapDuration(t *testing.T) {
 
 	if _, err := LoadConfig(":8082"); err == nil {
 		t.Fatal("ожидалась ошибка для невалидного database bootstrap timeout")
+	}
+}
+
+func TestLoadConfigRejectsInvalidAttachmentCleanupBatchSize(t *testing.T) {
+	t.Setenv("AERO_MEDIA_ATTACHMENT_CLEANUP_BATCH_SIZE", "many")
+
+	if _, err := LoadConfig(":8082"); err == nil {
+		t.Fatal("ожидалась ошибка для невалидного cleanup batch size")
 	}
 }

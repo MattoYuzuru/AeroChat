@@ -129,6 +129,20 @@ func (c *Client) StatObject(ctx context.Context, objectKey string) (*chat.Stored
 	}, nil
 }
 
+func (c *Client) DeleteObject(ctx context.Context, objectKey string) error {
+	err := c.bootstrap.RemoveObject(ctx, c.bucket, objectKey, minio.RemoveObjectOptions{})
+	if err == nil {
+		return nil
+	}
+
+	response := minio.ToErrorResponse(err)
+	if response.StatusCode == 404 || response.Code == "NoSuchKey" || response.Code == "NoSuchObject" {
+		return nil
+	}
+
+	return err
+}
+
 func (c *Client) BucketName() string {
 	return c.bucket
 }
