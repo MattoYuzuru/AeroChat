@@ -32,6 +32,11 @@ type Repository interface {
 	ListAttachments(context.Context, []string) ([]Attachment, error)
 	CompleteAttachmentUpload(context.Context, CompleteAttachmentUploadParams) (*Attachment, error)
 	FailAttachmentUpload(context.Context, FailAttachmentUploadParams) (*Attachment, error)
+	ExpireAttachmentUploadSession(context.Context, ExpireAttachmentUploadSessionParams) (bool, error)
+	ExpirePendingAttachmentUploadSessions(context.Context, time.Time, int32) (int64, error)
+	ExpireOrphanUploadedAttachments(context.Context, time.Time, time.Time, int32) (int64, error)
+	ListAttachmentObjectDeletionCandidates(context.Context, time.Time, time.Time, int32) ([]AttachmentObjectCleanupCandidate, error)
+	MarkAttachmentDeleted(context.Context, string, time.Time) (bool, error)
 	CreateGroup(context.Context, CreateGroupParams) (*Group, error)
 	ListGroups(context.Context, string) ([]Group, error)
 	GetGroup(context.Context, string, string) (*Group, error)
@@ -93,6 +98,7 @@ type ObjectStorage interface {
 	CreateUpload(context.Context, string, string, time.Time) (*PresignedObjectUpload, error)
 	CreateDownload(context.Context, string, time.Time) (*PresignedObjectDownload, error)
 	StatObject(context.Context, string) (*StoredObjectInfo, error)
+	DeleteObject(context.Context, string) error
 }
 
 type PresignedObjectUpload struct {

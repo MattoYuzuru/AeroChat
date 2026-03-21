@@ -73,6 +73,10 @@ AeroChat должен поддерживать:
   - polished file rendering для всех attachment kinds;
   - lazy inline preview для image attachments;
   - безопасное explicit open/download через presigned access.
+- attachment lifecycle hardening:
+  - real expiration для stale upload sessions;
+  - bounded cleanup path для orphaned unattached attachments;
+  - conservative object deletion только по backend state и explicit message linkage.
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
 

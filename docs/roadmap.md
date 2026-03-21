@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] group moderation foundation и admin policy expansion
+- [x] attachment lifecycle hardening
 
 ---
 
@@ -147,11 +147,12 @@
 - [x] Web attachment composer bootstrap через `aero-gateway`
 - [x] Attachment-only messages для direct chats и groups
 - [x] Web media message rendering polish для direct chats и groups
+- [x] Attachment lifecycle hardening
 - [ ] Voice notes
 - [ ] Video notes
 - [ ] Image/audio/video preview
 - [ ] Encrypted relay
-- [ ] TTL cleanup
+- [x] TTL cleanup
 - [ ] Quotas
 - [ ] Local media drafts
 

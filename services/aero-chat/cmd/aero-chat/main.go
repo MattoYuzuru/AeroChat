@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
 	"github.com/MattoYuzuru/AeroChat/libs/go/dbbootstrap"
@@ -120,6 +121,8 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	startAttachmentLifecycleCleanupLoop(ctx, logger, service, cfg)
+
 	meta := observability.ServiceMeta{
 		Name:    serviceName,
 		Version: version,
@@ -150,4 +153,49 @@ func run() error {
 	logger.Info("сервис остановлен")
 
 	return nil
+}
+
+func startAttachmentLifecycleCleanupLoop(ctx context.Context, logger *slog.Logger, service *chat.Service, cfg app.Config) {
+	if cfg.MediaAttachmentCleanupInterval <= 0 {
+		logger.Info("attachment lifecycle cleanup отключён", slog.Duration("interval", cfg.MediaAttachmentCleanupInterval))
+		return
+	}
+
+	runCleanup := func() {
+		report, err := service.RunAttachmentLifecycleCleanup(ctx, chat.AttachmentLifecycleCleanupOptions{
+			Now:           time.Now().UTC(),
+			UnattachedTTL: cfg.MediaUnattachedAttachmentTTL,
+			BatchSize:     cfg.MediaAttachmentCleanupBatchSize,
+		})
+		if err != nil {
+			logger.Error("attachment lifecycle cleanup завершился с ошибкой", slog.String("error", err.Error()))
+			return
+		}
+		if report.ExpiredUploadSessions == 0 && report.ExpiredOrphanAttachments == 0 && report.DeletedAttachments == 0 {
+			return
+		}
+
+		logger.Info(
+			"attachment lifecycle cleanup завершён",
+			slog.Int64("expired_upload_sessions", report.ExpiredUploadSessions),
+			slog.Int64("expired_orphan_attachments", report.ExpiredOrphanAttachments),
+			slog.Int("deleted_attachments", report.DeletedAttachments),
+		)
+	}
+
+	runCleanup()
+
+	go func() {
+		ticker := time.NewTicker(cfg.MediaAttachmentCleanupInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				runCleanup()
+			}
+		}
+	}()
 }

@@ -749,6 +749,131 @@ func (q *Queries) EditGroupMessageText(ctx context.Context, arg EditGroupMessage
 	return result.RowsAffected(), nil
 }
 
+const expireAttachmentUploadSession = `-- name: ExpireAttachmentUploadSession :execrows
+WITH updated_attachment AS (
+    UPDATE attachments
+    SET
+        status = 'expired',
+        updated_at = $4
+    WHERE id = $1
+      AND owner_user_id = $2
+      AND status = 'pending'
+    RETURNING id
+)
+UPDATE attachment_upload_sessions
+SET
+    status = 'expired',
+    updated_at = $4
+WHERE attachment_upload_sessions.id = $3
+  AND attachment_upload_sessions.attachment_id = $1
+  AND attachment_upload_sessions.owner_user_id = $2
+  AND attachment_upload_sessions.status = 'pending'
+  AND attachment_upload_sessions.expires_at <= $4
+  AND EXISTS (SELECT 1 FROM updated_attachment)
+`
+
+type ExpireAttachmentUploadSessionParams struct {
+	AttachmentID uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ID           uuid.UUID          `db:"id" json:"id"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ExpireAttachmentUploadSession(ctx context.Context, arg ExpireAttachmentUploadSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, expireAttachmentUploadSession,
+		arg.AttachmentID,
+		arg.OwnerUserID,
+		arg.ID,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const expireOrphanUploadedAttachments = `-- name: ExpireOrphanUploadedAttachments :execrows
+WITH candidates AS (
+    SELECT a.id
+    FROM attachments AS a
+    LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
+    WHERE a.status = 'uploaded'
+      AND a.uploaded_at IS NOT NULL
+      AND a.uploaded_at <= $1
+      AND ma.attachment_id IS NULL
+    ORDER BY a.uploaded_at ASC, a.id ASC
+    LIMIT $2
+    FOR UPDATE OF a SKIP LOCKED
+)
+UPDATE attachments AS a
+SET
+    status = 'expired',
+    updated_at = $3
+FROM candidates
+WHERE a.id = candidates.id
+  AND a.status = 'uploaded'
+`
+
+type ExpireOrphanUploadedAttachmentsParams struct {
+	UploadedAt pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	Limit      int32              `db:"limit" json:"limit"`
+	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ExpireOrphanUploadedAttachments(ctx context.Context, arg ExpireOrphanUploadedAttachmentsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, expireOrphanUploadedAttachments, arg.UploadedAt, arg.Limit, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const expirePendingAttachmentUploadSessions = `-- name: ExpirePendingAttachmentUploadSessions :execrows
+WITH candidates AS (
+    SELECT s.id, s.attachment_id
+    FROM attachment_upload_sessions AS s
+    JOIN attachments AS a ON a.id = s.attachment_id
+    LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
+    WHERE s.status = 'pending'
+      AND s.expires_at <= $1
+      AND a.status = 'pending'
+      AND ma.attachment_id IS NULL
+    ORDER BY s.expires_at ASC, s.id ASC
+    LIMIT $2
+    FOR UPDATE OF s, a SKIP LOCKED
+),
+updated_attachments AS (
+    UPDATE attachments AS a
+    SET
+        status = 'expired',
+        updated_at = $1
+    FROM candidates
+    WHERE a.id = candidates.attachment_id
+      AND a.status = 'pending'
+    RETURNING a.id
+)
+UPDATE attachment_upload_sessions AS s
+SET
+    status = 'expired',
+    updated_at = $1
+FROM candidates
+WHERE s.id = candidates.id
+  AND s.status = 'pending'
+`
+
+type ExpirePendingAttachmentUploadSessionsParams struct {
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Limit     int32              `db:"limit" json:"limit"`
+}
+
+func (q *Queries) ExpirePendingAttachmentUploadSessions(ctx context.Context, arg ExpirePendingAttachmentUploadSessionsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, expirePendingAttachmentUploadSessions, arg.UpdatedAt, arg.Limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const failAttachmentUpload = `-- name: FailAttachmentUpload :execrows
 WITH updated_attachment AS (
     UPDATE attachments
@@ -1577,6 +1702,57 @@ func (q *Queries) JoinGroupMembership(ctx context.Context, arg JoinGroupMembersh
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const listAttachmentObjectDeletionCandidates = `-- name: ListAttachmentObjectDeletionCandidates :many
+SELECT
+    a.id,
+    a.object_key,
+    a.status
+FROM attachments AS a
+LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
+WHERE ma.attachment_id IS NULL
+  AND (
+      (a.status = 'expired' AND a.updated_at < $1)
+      OR (a.status = 'failed' AND a.failed_at IS NOT NULL AND a.failed_at <= $2)
+  )
+ORDER BY
+    CASE WHEN a.status = 'expired' THEN 0 ELSE 1 END ASC,
+    COALESCE(a.failed_at, a.updated_at) ASC,
+    a.id ASC
+LIMIT $3
+`
+
+type ListAttachmentObjectDeletionCandidatesParams struct {
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	FailedAt  pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	Limit     int32              `db:"limit" json:"limit"`
+}
+
+type ListAttachmentObjectDeletionCandidatesRow struct {
+	ID        uuid.UUID `db:"id" json:"id"`
+	ObjectKey string    `db:"object_key" json:"object_key"`
+	Status    string    `db:"status" json:"status"`
+}
+
+func (q *Queries) ListAttachmentObjectDeletionCandidates(ctx context.Context, arg ListAttachmentObjectDeletionCandidatesParams) ([]ListAttachmentObjectDeletionCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listAttachmentObjectDeletionCandidates, arg.UpdatedAt, arg.FailedAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAttachmentObjectDeletionCandidatesRow
+	for rows.Next() {
+		var i ListAttachmentObjectDeletionCandidatesRow
+		if err := rows.Scan(&i.ID, &i.ObjectKey, &i.Status); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAttachmentRowsByIDs = `-- name: ListAttachmentRowsByIDs :many
@@ -2696,6 +2872,34 @@ type MarkAttachmentAttachedParams struct {
 
 func (q *Queries) MarkAttachmentAttached(ctx context.Context, arg MarkAttachmentAttachedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markAttachmentAttached, arg.ID, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const markAttachmentDeleted = `-- name: MarkAttachmentDeleted :execrows
+UPDATE attachments AS a
+SET
+    status = 'deleted',
+    updated_at = $2,
+    deleted_at = $2
+WHERE a.id = $1
+  AND a.status IN ('expired', 'failed')
+  AND NOT EXISTS (
+      SELECT 1
+      FROM message_attachments AS ma
+      WHERE ma.attachment_id = a.id
+  )
+`
+
+type MarkAttachmentDeletedParams struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) MarkAttachmentDeleted(ctx context.Context, arg MarkAttachmentDeletedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markAttachmentDeleted, arg.ID, arg.UpdatedAt)
 	if err != nil {
 		return 0, err
 	}

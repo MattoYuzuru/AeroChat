@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -148,6 +149,79 @@ func (r *Repository) FailAttachmentUpload(ctx context.Context, params chat.FailA
 
 	attachment, _, err := r.GetAttachment(ctx, params.AttachmentID)
 	return attachment, err
+}
+
+func (r *Repository) ExpireAttachmentUploadSession(ctx context.Context, params chat.ExpireAttachmentUploadSessionParams) (bool, error) {
+	affected, err := r.queries.ExpireAttachmentUploadSession(ctx, chatsqlc.ExpireAttachmentUploadSessionParams{
+		AttachmentID: mustParseUUID(params.AttachmentID),
+		OwnerUserID:  mustParseUUID(params.OwnerUserID),
+		ID:           mustParseUUID(params.UploadSessionID),
+		UpdatedAt:    timestamptzValue(params.ExpiredAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+
+	return affected > 0, nil
+}
+
+func (r *Repository) ExpirePendingAttachmentUploadSessions(ctx context.Context, at time.Time, limit int32) (int64, error) {
+	affected, err := r.queries.ExpirePendingAttachmentUploadSessions(ctx, chatsqlc.ExpirePendingAttachmentUploadSessionsParams{
+		UpdatedAt: timestamptzValue(at),
+		Limit:     limit,
+	})
+	if err != nil {
+		return 0, convertError(err)
+	}
+
+	return affected, nil
+}
+
+func (r *Repository) ExpireOrphanUploadedAttachments(ctx context.Context, uploadedBefore time.Time, expiredAt time.Time, limit int32) (int64, error) {
+	affected, err := r.queries.ExpireOrphanUploadedAttachments(ctx, chatsqlc.ExpireOrphanUploadedAttachmentsParams{
+		UploadedAt: timestamptzValue(uploadedBefore),
+		Limit:      limit,
+		UpdatedAt:  timestamptzValue(expiredAt),
+	})
+	if err != nil {
+		return 0, convertError(err)
+	}
+
+	return affected, nil
+}
+
+func (r *Repository) ListAttachmentObjectDeletionCandidates(ctx context.Context, expiredBefore time.Time, failedBefore time.Time, limit int32) ([]chat.AttachmentObjectCleanupCandidate, error) {
+	rows, err := r.queries.ListAttachmentObjectDeletionCandidates(ctx, chatsqlc.ListAttachmentObjectDeletionCandidatesParams{
+		UpdatedAt: timestamptzValue(expiredBefore),
+		FailedAt:  timestamptzValue(failedBefore),
+		Limit:     limit,
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.AttachmentObjectCleanupCandidate, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, chat.AttachmentObjectCleanupCandidate{
+			ID:        row.ID.String(),
+			ObjectKey: row.ObjectKey,
+			Status:    row.Status,
+		})
+	}
+
+	return result, nil
+}
+
+func (r *Repository) MarkAttachmentDeleted(ctx context.Context, attachmentID string, deletedAt time.Time) (bool, error) {
+	affected, err := r.queries.MarkAttachmentDeleted(ctx, chatsqlc.MarkAttachmentDeletedParams{
+		ID:        mustParseUUID(attachmentID),
+		UpdatedAt: timestamptzValue(deletedAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+
+	return affected > 0, nil
 }
 
 func attachmentFromModel(row chatsqlc.Attachment, messageID *string) chat.Attachment {

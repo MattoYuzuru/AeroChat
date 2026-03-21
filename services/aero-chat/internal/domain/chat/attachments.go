@@ -110,7 +110,17 @@ func (s *Service) CompleteAttachmentUpload(ctx context.Context, token string, at
 	if attachment.Status != AttachmentStatusPending || uploadSession.Status != AttachmentUploadSessionPending {
 		return nil, fmt.Errorf("%w: attachment upload intent is not pending", ErrConflict)
 	}
-	if !uploadSession.ExpiresAt.After(s.now()) {
+	now := s.now()
+	if !uploadSession.ExpiresAt.After(now) {
+		_, expireErr := s.repo.ExpireAttachmentUploadSession(ctx, ExpireAttachmentUploadSessionParams{
+			AttachmentID:    attachment.ID,
+			UploadSessionID: uploadSession.ID,
+			OwnerUserID:     authSession.User.ID,
+			ExpiredAt:       now,
+		})
+		if expireErr != nil {
+			return nil, expireErr
+		}
 		return nil, fmt.Errorf("%w: upload intent expired", ErrConflict)
 	}
 
@@ -135,7 +145,7 @@ func (s *Service) CompleteAttachmentUpload(ctx context.Context, token string, at
 		AttachmentID:    attachment.ID,
 		UploadSessionID: uploadSession.ID,
 		OwnerUserID:     authSession.User.ID,
-		CompletedAt:     s.now(),
+		CompletedAt:     now,
 	})
 }
 
