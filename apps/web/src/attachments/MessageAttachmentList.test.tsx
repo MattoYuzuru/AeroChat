@@ -85,7 +85,7 @@ describe("MessageAttachmentList", () => {
     );
 
     expect(markup).toContain("Inline preview");
-    expect(markup).toContain("Preview загрузится, когда карточка появится в ленте.");
+    expect(markup).toContain("Загружаем изображение...");
     expect(markup).toContain("Открыть изображение hero-shot.jpg");
   });
 

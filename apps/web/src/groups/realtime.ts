@@ -5,6 +5,8 @@ import type {
   GroupMember,
   GroupMemberRole,
   GroupMessage,
+  GroupReadPosition,
+  GroupReadState,
   GroupTypingIndicator,
   GroupTypingState,
   TextMessageContent,
@@ -125,10 +127,30 @@ interface GroupTypingStateWire {
   typers?: GroupTypingIndicatorWire[];
 }
 
+interface GroupReadPositionWire {
+  messageId?: string;
+  messageCreatedAt?: string;
+  updatedAt?: string;
+}
+
+interface GroupReadStateWire {
+  selfPosition?: GroupReadPositionWire;
+}
+
+interface UnreadStateWire {
+  unreadCount?: number | string;
+}
+
 interface GroupTypingUpdatedPayloadWire {
   groupId?: string;
   threadId?: string;
   typingState?: GroupTypingStateWire;
+}
+
+interface GroupReadUpdatedPayloadWire {
+  groupId?: string;
+  readState?: GroupReadStateWire;
+  unreadState?: UnreadStateWire;
 }
 
 export type GroupMembershipReason =
@@ -177,6 +199,12 @@ export type GroupRealtimeEvent =
       groupId: string;
       threadId: string;
       typingState: GroupTypingState;
+    }
+  | {
+      type: "group.read.updated";
+      groupId: string;
+      readState: GroupReadState | null;
+      unreadCount: number;
     };
 
 export function parseGroupRealtimeEvent(
@@ -260,6 +288,20 @@ export function parseGroupRealtimeEvent(
       groupId: payload.groupId,
       threadId: payload.threadId,
       typingState: payload.typingState,
+    };
+  }
+
+  if (envelope.type === "group.read.updated") {
+    const payload = normalizeReadUpdatedPayload(envelope.payload);
+    if (!payload) {
+      return null;
+    }
+
+    return {
+      type: "group.read.updated",
+      groupId: payload.groupId,
+      readState: payload.readState,
+      unreadCount: payload.unreadCount,
     };
   }
 
@@ -421,6 +463,30 @@ function normalizeTypingUpdatedPayload(
   };
 }
 
+function normalizeReadUpdatedPayload(
+  input: unknown,
+): {
+  groupId: string;
+  readState: GroupReadState | null;
+  unreadCount: number;
+} | null {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const payload = input as GroupReadUpdatedPayloadWire;
+  const groupId = typeof payload.groupId === "string" ? payload.groupId : "";
+  if (groupId === "") {
+    return null;
+  }
+
+  return {
+    groupId,
+    readState: normalizeGroupReadState(payload.readState),
+    unreadCount: normalizeUnreadCount(payload.unreadState),
+  };
+}
+
 function normalizeOptionalGroup(input: GroupWire | undefined): Group | null {
   const group = normalizeGroup(input);
   return group.id === "" ? null : group;
@@ -433,6 +499,7 @@ function normalizeGroup(input: GroupWire | undefined): Group {
     kind: input?.kind ?? "CHAT_KIND_GROUP",
     selfRole: normalizeGroupMemberRole(input?.selfRole),
     memberCount: input?.memberCount ?? 0,
+    unreadCount: 0,
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
   };
@@ -557,6 +624,59 @@ function normalizeGroupTypingState(
       .map(normalizeGroupTypingIndicator)
       .filter((indicator): indicator is GroupTypingIndicator => indicator !== null),
   };
+}
+
+function normalizeGroupReadPosition(
+  input: GroupReadPositionWire | undefined,
+): GroupReadPosition | null {
+  if (!input) {
+    return null;
+  }
+
+  const messageId = input.messageId ?? "";
+  const messageCreatedAt = input.messageCreatedAt ?? "";
+  const updatedAt = input.updatedAt ?? "";
+  if (messageId === "" && messageCreatedAt === "" && updatedAt === "") {
+    return null;
+  }
+
+  return {
+    messageId,
+    messageCreatedAt,
+    updatedAt,
+  };
+}
+
+function normalizeGroupReadState(
+  input: GroupReadStateWire | undefined,
+): GroupReadState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfPosition = normalizeGroupReadPosition(input.selfPosition);
+  if (!selfPosition) {
+    return null;
+  }
+
+  return {
+    selfPosition,
+  };
+}
+
+function normalizeUnreadCount(input: UnreadStateWire | undefined): number {
+  const rawValue = input?.unreadCount;
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+    return rawValue;
+  }
+  if (typeof rawValue === "string" && rawValue.trim() !== "") {
+    const parsed = Number(rawValue);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
 }
 
 function normalizeTextMessageContent(

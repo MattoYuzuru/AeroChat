@@ -37,6 +37,8 @@ type Querier interface {
 	GetGroupInviteLinkByIDAndGroupID(ctx context.Context, arg GetGroupInviteLinkByIDAndGroupIDParams) (GetGroupInviteLinkByIDAndGroupIDRow, error)
 	GetGroupInviteLinkForJoin(ctx context.Context, tokenHash string) (GetGroupInviteLinkForJoinRow, error)
 	GetGroupMemberRowByGroupIDAndUserID(ctx context.Context, arg GetGroupMemberRowByGroupIDAndUserIDParams) (GetGroupMemberRowByGroupIDAndUserIDRow, error)
+	GetGroupMessageByIDAndUserID(ctx context.Context, arg GetGroupMessageByIDAndUserIDParams) (GetGroupMessageByIDAndUserIDRow, error)
+	GetGroupReadStateEntryByGroupIDAndUserID(ctx context.Context, arg GetGroupReadStateEntryByGroupIDAndUserIDParams) (GetGroupReadStateEntryByGroupIDAndUserIDRow, error)
 	GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowByIDAndUserIDParams) (GetGroupRowByIDAndUserIDRow, error)
 	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
 	JoinGroupMembership(ctx context.Context, arg JoinGroupMembershipParams) (int64, error)
@@ -66,6 +68,7 @@ type Querier interface {
 	UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error)
 	UpdateGroupMembershipRole(ctx context.Context, arg UpdateGroupMembershipRoleParams) (int64, error)
 	UpsertDirectChatReadReceipt(ctx context.Context, arg UpsertDirectChatReadReceiptParams) (int64, error)
+	UpsertGroupChatReadState(ctx context.Context, arg UpsertGroupChatReadStateParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

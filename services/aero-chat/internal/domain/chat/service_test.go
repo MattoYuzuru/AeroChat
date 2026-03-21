@@ -88,12 +88,15 @@ func TestGetDirectChatReturnsPrivacyAwareReadState(t *testing.T) {
 	first := mustSendMessage(t, service, alice.Token, directChat.ID, "first")
 	second := mustSendMessage(t, service, alice.Token, directChat.ID, "second")
 
-	readState, err := service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, second.ID)
+	readState, unreadCount, err := service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, second.ID)
 	if err != nil {
 		t.Fatalf("mark direct chat read: %v", err)
 	}
 	if readState.SelfPosition == nil || readState.SelfPosition.MessageID != second.ID {
 		t.Fatal("ожидалась собственная read position Bob на втором сообщении")
+	}
+	if unreadCount != 0 {
+		t.Fatalf("ожидалось отсутствие непрочитанных после чтения второго сообщения, получено %d", unreadCount)
 	}
 
 	_, fetchedReadState, _, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
@@ -104,12 +107,15 @@ func TestGetDirectChatReturnsPrivacyAwareReadState(t *testing.T) {
 		t.Fatal("ожидалась peer read position Bob для Alice")
 	}
 
-	readState, err = service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, first.ID)
+	readState, unreadCount, err = service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, first.ID)
 	if err != nil {
 		t.Fatalf("mark direct chat read backwards: %v", err)
 	}
 	if readState.SelfPosition == nil || readState.SelfPosition.MessageID != second.ID {
 		t.Fatal("read position не должна откатываться назад")
+	}
+	if unreadCount != 0 {
+		t.Fatalf("ожидалось отсутствие непрочитанных после чтения назад, получено %d", unreadCount)
 	}
 }
 
@@ -125,12 +131,26 @@ func TestMarkDirectChatReadHonorsPrivacyFlag(t *testing.T) {
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
 	message := mustSendMessage(t, service, alice.Token, directChat.ID, "hello")
 
-	readState, err := service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, message.ID)
+	readState, unreadCount, err := service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, message.ID)
 	if err != nil {
 		t.Fatalf("mark direct chat read with disabled privacy flag: %v", err)
 	}
-	if readState.SelfPosition != nil {
-		t.Fatal("собственная read position не должна сохраняться при отключённых read receipts")
+	if readState.SelfPosition == nil || readState.SelfPosition.MessageID != message.ID {
+		t.Fatal("собственная read position должна сохраняться для unread even при отключённых read receipts")
+	}
+	if unreadCount != 0 {
+		t.Fatalf("ожидалось отсутствие непрочитанных после чтения, получено %d", unreadCount)
+	}
+
+	bobChat, bobReadState, _, _, err := service.GetDirectChat(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat as Bob: %v", err)
+	}
+	if bobChat.UnreadCount != 0 {
+		t.Fatalf("ожидалось 0 непрочитанных для Bob после mark read, получено %d", bobChat.UnreadCount)
+	}
+	if bobReadState.SelfPosition == nil || bobReadState.SelfPosition.MessageID != message.ID {
+		t.Fatal("Bob должен видеть собственную read position независимо от privacy flag")
 	}
 
 	_, fetchedReadState, _, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
@@ -139,6 +159,72 @@ func TestMarkDirectChatReadHonorsPrivacyFlag(t *testing.T) {
 	}
 	if fetchedReadState.PeerPosition != nil {
 		t.Fatal("peer read position не должна раскрываться при отключённых read receipts")
+	}
+}
+
+func TestDirectUnreadCountIsViewerRelativeAndExcludesSelfMessages(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	first := mustSendMessage(t, service, alice.Token, directChat.ID, "first")
+	_ = mustSendMessage(t, service, bob.Token, directChat.ID, "self")
+	third := mustSendMessage(t, service, alice.Token, directChat.ID, "third")
+
+	chats, err := service.ListDirectChats(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list direct chats: %v", err)
+	}
+	if len(chats) != 1 {
+		t.Fatalf("ожидался один direct chat, получено %d", len(chats))
+	}
+	if chats[0].UnreadCount != 2 {
+		t.Fatalf("ожидалось 2 непрочитанных для Bob, получено %d", chats[0].UnreadCount)
+	}
+
+	chatSnapshot, _, _, _, err := service.GetDirectChat(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat: %v", err)
+	}
+	if chatSnapshot.UnreadCount != 2 {
+		t.Fatalf("ожидалось 2 непрочитанных в snapshot, получено %d", chatSnapshot.UnreadCount)
+	}
+
+	readState, unreadCount, err := service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, first.ID)
+	if err != nil {
+		t.Fatalf("mark direct chat read at first message: %v", err)
+	}
+	if readState.SelfPosition == nil || readState.SelfPosition.MessageID != first.ID {
+		t.Fatal("ожидалась фиксация read position на первом сообщении")
+	}
+	if unreadCount != 1 {
+		t.Fatalf("ожидалось 1 непрочитанное после чтения первого сообщения, получено %d", unreadCount)
+	}
+
+	readState, unreadCount, err = service.MarkDirectChatRead(context.Background(), bob.Token, directChat.ID, third.ID)
+	if err != nil {
+		t.Fatalf("mark direct chat read at third message: %v", err)
+	}
+	if readState.SelfPosition == nil || readState.SelfPosition.MessageID != third.ID {
+		t.Fatal("ожидалась фиксация read position на третьем сообщении")
+	}
+	if unreadCount != 0 {
+		t.Fatalf("ожидалось 0 непрочитанных после полного чтения, получено %d", unreadCount)
+	}
+
+	aliceChats, err := service.ListDirectChats(context.Background(), alice.Token)
+	if err != nil {
+		t.Fatalf("list direct chats as Alice: %v", err)
+	}
+	if len(aliceChats) != 1 {
+		t.Fatalf("ожидался один direct chat для Alice, получено %d", len(aliceChats))
+	}
+	if aliceChats[0].UnreadCount != 1 {
+		t.Fatalf("ожидалось 1 непрочитанное для Alice от сообщения Bob, получено %d", aliceChats[0].UnreadCount)
 	}
 }
 
@@ -378,7 +464,7 @@ func TestMarkDirectChatReadIsParticipantScoped(t *testing.T) {
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
 	message := mustSendMessage(t, service, alice.Token, directChat.ID, "hello")
 
-	if _, err := service.MarkDirectChatRead(context.Background(), charlie.Token, directChat.ID, message.ID); !errors.Is(err, ErrNotFound) {
+	if _, _, err := service.MarkDirectChatRead(context.Background(), charlie.Token, directChat.ID, message.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ожидалась ошибка доступа для неучастника при mark read, получено %v", err)
 	}
 }
@@ -665,51 +751,53 @@ type issuedAuth struct {
 }
 
 type fakeRepository struct {
-	tokenManager   *libauth.SessionTokenManager
-	sessions       map[string]SessionAuth
-	users          map[string]UserSummary
-	friendships    map[string]bool
-	blocks         map[string]map[string]bool
-	groups         map[string]Group
-	groupThreads   map[string]GroupChatThread
-	groupMembers   map[string]map[string]GroupMember
-	groupInvites   map[string]GroupInviteLink
-	inviteHashes   map[string]string
-	inviteByHash   map[string]string
-	chats          map[string]DirectChat
-	groupMessages  map[string]GroupMessage
-	messages       map[string]DirectChatMessage
-	readPositions  map[string]DirectChatReadPosition
-	typingStore    *fakeTypingStore
-	presenceStore  *fakePresenceStore
-	objectStorage  *fakeObjectStorage
-	attachments    map[string]Attachment
-	uploadSessions map[string]AttachmentUploadSession
-	touchCalls     int
+	tokenManager       *libauth.SessionTokenManager
+	sessions           map[string]SessionAuth
+	users              map[string]UserSummary
+	friendships        map[string]bool
+	blocks             map[string]map[string]bool
+	groups             map[string]Group
+	groupThreads       map[string]GroupChatThread
+	groupMembers       map[string]map[string]GroupMember
+	groupInvites       map[string]GroupInviteLink
+	inviteHashes       map[string]string
+	inviteByHash       map[string]string
+	chats              map[string]DirectChat
+	groupMessages      map[string]GroupMessage
+	messages           map[string]DirectChatMessage
+	readPositions      map[string]DirectChatReadPosition
+	groupReadPositions map[string]GroupReadPosition
+	typingStore        *fakeTypingStore
+	presenceStore      *fakePresenceStore
+	objectStorage      *fakeObjectStorage
+	attachments        map[string]Attachment
+	uploadSessions     map[string]AttachmentUploadSession
+	touchCalls         int
 }
 
 func newFakeRepository() *fakeRepository {
 	return &fakeRepository{
-		tokenManager:   libauth.NewSessionTokenManager(),
-		sessions:       make(map[string]SessionAuth),
-		users:          make(map[string]UserSummary),
-		friendships:    make(map[string]bool),
-		blocks:         make(map[string]map[string]bool),
-		groups:         make(map[string]Group),
-		groupThreads:   make(map[string]GroupChatThread),
-		groupMembers:   make(map[string]map[string]GroupMember),
-		groupInvites:   make(map[string]GroupInviteLink),
-		inviteHashes:   make(map[string]string),
-		inviteByHash:   make(map[string]string),
-		chats:          make(map[string]DirectChat),
-		groupMessages:  make(map[string]GroupMessage),
-		messages:       make(map[string]DirectChatMessage),
-		readPositions:  make(map[string]DirectChatReadPosition),
-		typingStore:    newFakeTypingStore(),
-		presenceStore:  newFakePresenceStore(),
-		objectStorage:  newFakeObjectStorage(),
-		attachments:    make(map[string]Attachment),
-		uploadSessions: make(map[string]AttachmentUploadSession),
+		tokenManager:       libauth.NewSessionTokenManager(),
+		sessions:           make(map[string]SessionAuth),
+		users:              make(map[string]UserSummary),
+		friendships:        make(map[string]bool),
+		blocks:             make(map[string]map[string]bool),
+		groups:             make(map[string]Group),
+		groupThreads:       make(map[string]GroupChatThread),
+		groupMembers:       make(map[string]map[string]GroupMember),
+		groupInvites:       make(map[string]GroupInviteLink),
+		inviteHashes:       make(map[string]string),
+		inviteByHash:       make(map[string]string),
+		chats:              make(map[string]DirectChat),
+		groupMessages:      make(map[string]GroupMessage),
+		messages:           make(map[string]DirectChatMessage),
+		readPositions:      make(map[string]DirectChatReadPosition),
+		groupReadPositions: make(map[string]GroupReadPosition),
+		typingStore:        newFakeTypingStore(),
+		presenceStore:      newFakePresenceStore(),
+		objectStorage:      newFakeObjectStorage(),
+		attachments:        make(map[string]Attachment),
+		uploadSessions:     make(map[string]AttachmentUploadSession),
 	}
 }
 
@@ -866,6 +954,31 @@ func (r *fakeRepository) UpsertDirectChatReadReceipt(_ context.Context, params U
 	return true, nil
 }
 
+func (r *fakeRepository) UpsertGroupChatReadState(_ context.Context, params UpsertGroupChatReadStateParams) (bool, error) {
+	if _, ok := r.groupMembers[params.GroupID][params.UserID]; !ok {
+		return false, ErrNotFound
+	}
+
+	key := groupReadPositionKey(params.GroupID, params.UserID)
+	position := GroupReadPosition{
+		MessageID:        params.LastReadMessageID,
+		MessageCreatedAt: params.LastReadMessageAt,
+		UpdatedAt:        params.UpdatedAt,
+	}
+	current, ok := r.groupReadPositions[key]
+	if ok {
+		if current.MessageCreatedAt.After(position.MessageCreatedAt) {
+			return false, nil
+		}
+		if current.MessageCreatedAt.Equal(position.MessageCreatedAt) && strings.Compare(current.MessageID, position.MessageID) >= 0 {
+			return false, nil
+		}
+	}
+
+	r.groupReadPositions[key] = position
+	return true, nil
+}
+
 func (r *fakeRepository) CreateDirectChat(_ context.Context, params CreateDirectChatParams) (*DirectChat, error) {
 	key := pairKey(params.FirstUserID, params.SecondUserID)
 	for _, directChat := range r.chats {
@@ -881,8 +994,9 @@ func (r *fakeRepository) CreateDirectChat(_ context.Context, params CreateDirect
 			r.users[params.FirstUserID],
 			r.users[params.SecondUserID],
 		},
-		CreatedAt: params.CreatedAt,
-		UpdatedAt: params.CreatedAt,
+		UnreadCount: 0,
+		CreatedAt:   params.CreatedAt,
+		UpdatedAt:   params.CreatedAt,
 	}
 	r.chats[directChat.ID] = directChat
 	copy := directChat
@@ -893,6 +1007,7 @@ func (r *fakeRepository) ListDirectChats(_ context.Context, userID string) ([]Di
 	result := make([]DirectChat, 0)
 	for _, directChat := range r.chats {
 		if isParticipant(directChat, userID) {
+			directChat.UnreadCount = r.directUnreadCount(directChat.ID, userID)
 			result = append(result, directChat)
 		}
 	}
@@ -907,6 +1022,7 @@ func (r *fakeRepository) GetDirectChat(_ context.Context, userID string, chatID 
 	}
 
 	copy := directChat
+	copy.UnreadCount = r.directUnreadCount(chatID, userID)
 	return &copy, nil
 }
 
@@ -1028,6 +1144,7 @@ func (r *fakeRepository) CreateGroup(_ context.Context, params CreateGroupParams
 		CreatedByUserID: params.CreatedByUserID,
 		SelfRole:        GroupMemberRoleOwner,
 		MemberCount:     1,
+		UnreadCount:     0,
 		CreatedAt:       params.CreatedAt,
 		UpdatedAt:       params.CreatedAt,
 	}
@@ -1063,6 +1180,7 @@ func (r *fakeRepository) ListGroups(_ context.Context, userID string) ([]Group, 
 		group := r.groups[groupID]
 		group.SelfRole = member.Role
 		group.MemberCount = int32(len(memberships))
+		group.UnreadCount = r.groupUnreadCount(groupID, userID)
 		result = append(result, group)
 	}
 
@@ -1081,6 +1199,7 @@ func (r *fakeRepository) GetGroup(_ context.Context, userID string, groupID stri
 
 	group.SelfRole = member.Role
 	group.MemberCount = int32(len(r.groupMembers[groupID]))
+	group.UnreadCount = r.groupUnreadCount(groupID, userID)
 	copy := group
 	return &copy, nil
 }
@@ -1097,6 +1216,23 @@ func (r *fakeRepository) GetGroupChatThread(_ context.Context, userID string, gr
 
 	copy := thread
 	return &copy, nil
+}
+
+func (r *fakeRepository) GetGroupReadStateEntry(_ context.Context, userID string, groupID string) (*GroupReadStateEntry, error) {
+	if _, ok := r.groupMembers[groupID][userID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	entry := &GroupReadStateEntry{
+		GroupID: groupID,
+		UserID:  userID,
+	}
+	if position, ok := r.groupReadPositions[groupReadPositionKey(groupID, userID)]; ok {
+		copy := position
+		entry.LastReadPosition = &copy
+	}
+
+	return entry, nil
 }
 
 func (r *fakeRepository) ListGroupMembers(_ context.Context, userID string, groupID string) ([]GroupMember, error) {
@@ -1491,6 +1627,20 @@ func (r *fakeRepository) GetDirectChatMessage(_ context.Context, userID string, 
 	return &copy, nil
 }
 
+func (r *fakeRepository) GetGroupMessage(_ context.Context, userID string, groupID string, messageID string) (*GroupMessage, error) {
+	if _, ok := r.groupMembers[groupID][userID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	message, ok := r.groupMessages[messageID]
+	if !ok || message.GroupID != groupID {
+		return nil, ErrNotFound
+	}
+
+	copy := message
+	return &copy, nil
+}
+
 func (r *fakeRepository) DeleteDirectChatMessageForEveryone(_ context.Context, chatID string, messageID string, deletedByUserID string, at time.Time) (bool, error) {
 	message, ok := r.messages[messageID]
 	if !ok || message.ChatID != chatID {
@@ -1692,6 +1842,78 @@ func pairKey(firstUserID string, secondUserID string) string {
 
 func readPositionKey(chatID string, userID string) string {
 	return chatID + ":" + userID
+}
+
+func groupReadPositionKey(groupID string, userID string) string {
+	return groupID + ":" + userID
+}
+
+func (r *fakeRepository) directUnreadCount(chatID string, userID string) int32 {
+	var readPosition *DirectChatReadPosition
+	if position, ok := r.readPositions[readPositionKey(chatID, userID)]; ok {
+		copy := position
+		readPosition = &copy
+	}
+
+	var count int32
+	for _, message := range r.messages {
+		if message.ChatID != chatID || message.SenderUserID == userID || message.Tombstone != nil {
+			continue
+		}
+		if isDirectMessageNewerThanReadPosition(message, readPosition) {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (r *fakeRepository) groupUnreadCount(groupID string, userID string) int32 {
+	var readPosition *GroupReadPosition
+	if position, ok := r.groupReadPositions[groupReadPositionKey(groupID, userID)]; ok {
+		copy := position
+		readPosition = &copy
+	}
+
+	var count int32
+	for _, message := range r.groupMessages {
+		if message.GroupID != groupID || message.SenderUserID == userID {
+			continue
+		}
+		if isGroupMessageNewerThanReadPosition(message, readPosition) {
+			count++
+		}
+	}
+
+	return count
+}
+
+func isDirectMessageNewerThanReadPosition(message DirectChatMessage, readPosition *DirectChatReadPosition) bool {
+	if readPosition == nil {
+		return true
+	}
+	if message.CreatedAt.After(readPosition.MessageCreatedAt) {
+		return true
+	}
+	if message.CreatedAt.Equal(readPosition.MessageCreatedAt) && strings.Compare(message.ID, readPosition.MessageID) > 0 {
+		return true
+	}
+
+	return false
+}
+
+func isGroupMessageNewerThanReadPosition(message GroupMessage, readPosition *GroupReadPosition) bool {
+	if readPosition == nil {
+		return true
+	}
+	if message.CreatedAt.After(readPosition.MessageCreatedAt) {
+		return true
+	}
+	if message.CreatedAt.Equal(readPosition.MessageCreatedAt) && strings.Compare(message.ID, readPosition.MessageID) > 0 {
+		return true
+	}
+
+	return false
 }
 
 type fakeTypingStore struct {

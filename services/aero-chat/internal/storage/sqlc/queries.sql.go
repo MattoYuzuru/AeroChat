@@ -922,6 +922,24 @@ SELECT
     c.user_high_id,
     c.created_at AS chat_created_at,
     c.updated_at AS chat_updated_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM direct_chat_messages AS m
+        LEFT JOIN direct_chat_message_tombstones AS t ON t.message_id = m.id
+        LEFT JOIN direct_chat_read_receipts AS self_receipt
+            ON self_receipt.chat_id = c.id AND self_receipt.user_id = self.user_id
+        WHERE m.chat_id = c.id
+          AND t.message_id IS NULL
+          AND m.sender_user_id <> self.user_id
+          AND (
+              self_receipt.last_read_message_id IS NULL
+              OR m.created_at > self_receipt.last_read_message_created_at
+              OR (
+                  m.created_at = self_receipt.last_read_message_created_at
+                  AND m.id > self_receipt.last_read_message_id
+              )
+          )
+    ), 0)::INT AS unread_count,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
@@ -946,6 +964,7 @@ type GetDirectChatRowsByIDAndUserIDRow struct {
 	UserHighID           uuid.UUID          `db:"user_high_id" json:"user_high_id"`
 	ChatCreatedAt        pgtype.Timestamptz `db:"chat_created_at" json:"chat_created_at"`
 	ChatUpdatedAt        pgtype.Timestamptz `db:"chat_updated_at" json:"chat_updated_at"`
+	UnreadCount          int32              `db:"unread_count" json:"unread_count"`
 	ParticipantUserID    uuid.UUID          `db:"participant_user_id" json:"participant_user_id"`
 	ParticipantLogin     string             `db:"participant_login" json:"participant_login"`
 	ParticipantNickname  string             `db:"participant_nickname" json:"participant_nickname"`
@@ -968,6 +987,7 @@ func (q *Queries) GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDir
 			&i.UserHighID,
 			&i.ChatCreatedAt,
 			&i.ChatUpdatedAt,
+			&i.UnreadCount,
 			&i.ParticipantUserID,
 			&i.ParticipantLogin,
 			&i.ParticipantNickname,
@@ -1165,6 +1185,100 @@ func (q *Queries) GetGroupMemberRowByGroupIDAndUserID(ctx context.Context, arg G
 	return i, err
 }
 
+const getGroupMessageByIDAndUserID = `-- name: GetGroupMessageByIDAndUserID :one
+SELECT
+    m.id,
+    t.group_id,
+    m.thread_id,
+    m.sender_user_id,
+    m.kind,
+    m.text_content,
+    m.markdown_policy,
+    m.created_at,
+    m.updated_at
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+JOIN group_messages AS m ON m.thread_id = t.id
+WHERE self.user_id = $1
+  AND self.group_id = $2
+  AND m.id = $3
+  AND t.thread_key = 'primary'
+`
+
+type GetGroupMessageByIDAndUserIDParams struct {
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+	ID      uuid.UUID `db:"id" json:"id"`
+}
+
+type GetGroupMessageByIDAndUserIDRow struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID       uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind           string             `db:"kind" json:"kind"`
+	TextContent    string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetGroupMessageByIDAndUserID(ctx context.Context, arg GetGroupMessageByIDAndUserIDParams) (GetGroupMessageByIDAndUserIDRow, error) {
+	row := q.db.QueryRow(ctx, getGroupMessageByIDAndUserID, arg.UserID, arg.GroupID, arg.ID)
+	var i GetGroupMessageByIDAndUserIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.ThreadID,
+		&i.SenderUserID,
+		&i.Kind,
+		&i.TextContent,
+		&i.MarkdownPolicy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getGroupReadStateEntryByGroupIDAndUserID = `-- name: GetGroupReadStateEntryByGroupIDAndUserID :one
+SELECT
+    self.group_id,
+    self.user_id,
+    r.last_read_message_id,
+    r.last_read_message_created_at,
+    r.updated_at
+FROM group_memberships AS self
+LEFT JOIN group_chat_read_states AS r
+    ON r.group_id = self.group_id AND r.user_id = self.user_id
+WHERE self.user_id = $1 AND self.group_id = $2
+`
+
+type GetGroupReadStateEntryByGroupIDAndUserIDParams struct {
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+}
+
+type GetGroupReadStateEntryByGroupIDAndUserIDRow struct {
+	GroupID                  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        pgtype.UUID        `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetGroupReadStateEntryByGroupIDAndUserID(ctx context.Context, arg GetGroupReadStateEntryByGroupIDAndUserIDParams) (GetGroupReadStateEntryByGroupIDAndUserIDRow, error) {
+	row := q.db.QueryRow(ctx, getGroupReadStateEntryByGroupIDAndUserID, arg.UserID, arg.GroupID)
+	var i GetGroupReadStateEntryByGroupIDAndUserIDRow
+	err := row.Scan(
+		&i.GroupID,
+		&i.UserID,
+		&i.LastReadMessageID,
+		&i.LastReadMessageCreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getGroupRowByIDAndUserID = `-- name: GetGroupRowByIDAndUserID :one
 SELECT
     g.id,
@@ -1173,6 +1287,24 @@ SELECT
     self.role AS self_role,
     g.created_at,
     g.updated_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM group_threads AS primary_thread
+        JOIN group_messages AS gm ON gm.thread_id = primary_thread.id
+        LEFT JOIN group_chat_read_states AS self_read
+            ON self_read.group_id = g.id AND self_read.user_id = self.user_id
+        WHERE primary_thread.group_id = g.id
+          AND primary_thread.thread_key = 'primary'
+          AND gm.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR gm.created_at > self_read.last_read_message_created_at
+              OR (
+                  gm.created_at = self_read.last_read_message_created_at
+                  AND gm.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS unread_count,
     COUNT(m.user_id)::INT AS member_count
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
@@ -1193,6 +1325,7 @@ type GetGroupRowByIDAndUserIDRow struct {
 	SelfRole        string             `db:"self_role" json:"self_role"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UnreadCount     int32              `db:"unread_count" json:"unread_count"`
 	MemberCount     int32              `db:"member_count" json:"member_count"`
 }
 
@@ -1206,6 +1339,7 @@ func (q *Queries) GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowB
 		&i.SelfRole,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UnreadCount,
 		&i.MemberCount,
 	)
 	return i, err
@@ -1619,6 +1753,24 @@ SELECT
     c.user_high_id,
     c.created_at AS chat_created_at,
     c.updated_at AS chat_updated_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM direct_chat_messages AS m
+        LEFT JOIN direct_chat_message_tombstones AS t ON t.message_id = m.id
+        LEFT JOIN direct_chat_read_receipts AS self_receipt
+            ON self_receipt.chat_id = c.id AND self_receipt.user_id = self.user_id
+        WHERE m.chat_id = c.id
+          AND t.message_id IS NULL
+          AND m.sender_user_id <> self.user_id
+          AND (
+              self_receipt.last_read_message_id IS NULL
+              OR m.created_at > self_receipt.last_read_message_created_at
+              OR (
+                  m.created_at = self_receipt.last_read_message_created_at
+                  AND m.id > self_receipt.last_read_message_id
+              )
+          )
+    ), 0)::INT AS unread_count,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
@@ -1638,6 +1790,7 @@ type ListDirectChatRowsByUserIDRow struct {
 	UserHighID           uuid.UUID          `db:"user_high_id" json:"user_high_id"`
 	ChatCreatedAt        pgtype.Timestamptz `db:"chat_created_at" json:"chat_created_at"`
 	ChatUpdatedAt        pgtype.Timestamptz `db:"chat_updated_at" json:"chat_updated_at"`
+	UnreadCount          int32              `db:"unread_count" json:"unread_count"`
 	ParticipantUserID    uuid.UUID          `db:"participant_user_id" json:"participant_user_id"`
 	ParticipantLogin     string             `db:"participant_login" json:"participant_login"`
 	ParticipantNickname  string             `db:"participant_nickname" json:"participant_nickname"`
@@ -1660,6 +1813,7 @@ func (q *Queries) ListDirectChatRowsByUserID(ctx context.Context, userID uuid.UU
 			&i.UserHighID,
 			&i.ChatCreatedAt,
 			&i.ChatUpdatedAt,
+			&i.UnreadCount,
 			&i.ParticipantUserID,
 			&i.ParticipantLogin,
 			&i.ParticipantNickname,
@@ -2091,6 +2245,24 @@ SELECT
     self.role AS self_role,
     g.created_at,
     g.updated_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM group_threads AS primary_thread
+        JOIN group_messages AS gm ON gm.thread_id = primary_thread.id
+        LEFT JOIN group_chat_read_states AS self_read
+            ON self_read.group_id = g.id AND self_read.user_id = self.user_id
+        WHERE primary_thread.group_id = g.id
+          AND primary_thread.thread_key = 'primary'
+          AND gm.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR gm.created_at > self_read.last_read_message_created_at
+              OR (
+                  gm.created_at = self_read.last_read_message_created_at
+                  AND gm.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS unread_count,
     COUNT(m.user_id)::INT AS member_count
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
@@ -2107,6 +2279,7 @@ type ListGroupRowsByUserIDRow struct {
 	SelfRole        string             `db:"self_role" json:"self_role"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UnreadCount     int32              `db:"unread_count" json:"unread_count"`
 	MemberCount     int32              `db:"member_count" json:"member_count"`
 }
 
@@ -2126,6 +2299,7 @@ func (q *Queries) ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) (
 			&i.SelfRole,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.UnreadCount,
 			&i.MemberCount,
 		); err != nil {
 			return nil, err
@@ -2480,6 +2654,48 @@ type UpsertDirectChatReadReceiptParams struct {
 func (q *Queries) UpsertDirectChatReadReceipt(ctx context.Context, arg UpsertDirectChatReadReceiptParams) (int64, error) {
 	result, err := q.db.Exec(ctx, upsertDirectChatReadReceipt,
 		arg.ChatID,
+		arg.UserID,
+		arg.LastReadMessageID,
+		arg.LastReadMessageCreatedAt,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const upsertGroupChatReadState = `-- name: UpsertGroupChatReadState :execrows
+INSERT INTO group_chat_read_states (
+    group_id,
+    user_id,
+    last_read_message_id,
+    last_read_message_created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+    last_read_message_id = EXCLUDED.last_read_message_id,
+    last_read_message_created_at = EXCLUDED.last_read_message_created_at,
+    updated_at = EXCLUDED.updated_at
+WHERE group_chat_read_states.last_read_message_created_at < EXCLUDED.last_read_message_created_at
+   OR (
+        group_chat_read_states.last_read_message_created_at = EXCLUDED.last_read_message_created_at
+        AND group_chat_read_states.last_read_message_id < EXCLUDED.last_read_message_id
+   )
+`
+
+type UpsertGroupChatReadStateParams struct {
+	GroupID                  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpsertGroupChatReadState(ctx context.Context, arg UpsertGroupChatReadStateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertGroupChatReadState,
+		arg.GroupID,
 		arg.UserID,
 		arg.LastReadMessageID,
 		arg.LastReadMessageCreatedAt,

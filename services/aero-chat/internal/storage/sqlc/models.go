@@ -97,6 +97,14 @@ type Group struct {
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type GroupChatReadState struct {
+	GroupID                  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type GroupInviteLink struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	GroupID         uuid.UUID          `db:"group_id" json:"group_id"`

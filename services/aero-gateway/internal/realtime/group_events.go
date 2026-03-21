@@ -10,6 +10,7 @@ const (
 	EventTypeGroupRoleUpdated          = "group.role.updated"
 	EventTypeGroupOwnershipTransferred = "group.ownership.transferred"
 	EventTypeGroupTypingUpdated        = "group.typing.updated"
+	EventTypeGroupReadUpdated          = "group.read.updated"
 	GroupMessageReasonCreated          = "message_created"
 	GroupMembershipReasonJoined        = "member_joined"
 	GroupMembershipReasonRemoved       = "member_removed"
@@ -62,6 +63,13 @@ type GroupTypingUpdatedPayload struct {
 	TypingState *groupTypingStateWire `json:"typingState,omitempty"`
 }
 
+// GroupReadUpdatedPayload доставляет self-scoped group read/unread state для синхронизации активных сессий одного пользователя.
+type GroupReadUpdatedPayload struct {
+	GroupID     string                `json:"groupId"`
+	ReadState   *groupReadStateWire   `json:"readState,omitempty"`
+	UnreadState *groupUnreadStateWire `json:"unreadState,omitempty"`
+}
+
 type groupWire struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -108,6 +116,20 @@ type groupTypingIndicatorWire struct {
 type groupTypingStateWire struct {
 	ThreadID string                     `json:"threadId"`
 	Typers   []groupTypingIndicatorWire `json:"typers"`
+}
+
+type groupReadPositionWire struct {
+	MessageID        string `json:"messageId"`
+	MessageCreatedAt string `json:"messageCreatedAt"`
+	UpdatedAt        string `json:"updatedAt"`
+}
+
+type groupReadStateWire struct {
+	SelfPosition *groupReadPositionWire `json:"selfPosition,omitempty"`
+}
+
+type groupUnreadStateWire struct {
+	UnreadCount uint32 `json:"unreadCount"`
 }
 
 func NewGroupMessageUpdatedEnvelope(
@@ -185,6 +207,14 @@ func NewGroupTypingUpdatedEnvelope(groupID string, threadID string, typingState 
 		GroupID:     groupID,
 		ThreadID:    threadID,
 		TypingState: toGroupTypingStateWire(typingState),
+	})
+}
+
+func NewGroupReadUpdatedEnvelope(groupID string, readState *chatv1.GroupReadState, unreadState *chatv1.GroupUnreadState) Envelope {
+	return newEnvelope(EventTypeGroupReadUpdated, GroupReadUpdatedPayload{
+		GroupID:     groupID,
+		ReadState:   toGroupReadStateWire(readState),
+		UnreadState: toGroupUnreadStateWire(unreadState),
 	})
 }
 
@@ -276,5 +306,37 @@ func toGroupTypingStateWire(typingState *chatv1.GroupTypingState) *groupTypingSt
 	return &groupTypingStateWire{
 		ThreadID: typingState.GetThreadId(),
 		Typers:   typers,
+	}
+}
+
+func toGroupReadStateWire(readState *chatv1.GroupReadState) *groupReadStateWire {
+	if readState == nil {
+		return nil
+	}
+
+	return &groupReadStateWire{
+		SelfPosition: toGroupReadPositionWire(readState.GetSelfPosition()),
+	}
+}
+
+func toGroupReadPositionWire(position *chatv1.GroupReadPosition) *groupReadPositionWire {
+	if position == nil {
+		return nil
+	}
+
+	return &groupReadPositionWire{
+		MessageID:        position.GetMessageId(),
+		MessageCreatedAt: formatProtoTimestamp(position.GetMessageCreatedAt()),
+		UpdatedAt:        formatProtoTimestamp(position.GetUpdatedAt()),
+	}
+}
+
+func toGroupUnreadStateWire(unreadState *chatv1.GroupUnreadState) *groupUnreadStateWire {
+	if unreadState == nil {
+		return nil
+	}
+
+	return &groupUnreadStateWire{
+		UnreadCount: unreadState.GetUnreadCount(),
 	}
 }

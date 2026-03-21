@@ -69,6 +69,7 @@ type DirectChat struct {
 	Kind             string
 	Participants     []UserSummary
 	PinnedMessageIDs []string
+	UnreadCount      int32
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -80,6 +81,7 @@ type Group struct {
 	CreatedByUserID string
 	SelfRole        string
 	MemberCount     int32
+	UnreadCount     int32
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -221,9 +223,19 @@ type DirectChatReadPosition struct {
 	UpdatedAt        time.Time
 }
 
+type GroupReadPosition struct {
+	MessageID        string
+	MessageCreatedAt time.Time
+	UpdatedAt        time.Time
+}
+
 type DirectChatReadState struct {
 	SelfPosition *DirectChatReadPosition
 	PeerPosition *DirectChatReadPosition
+}
+
+type GroupReadState struct {
+	SelfPosition *GroupReadPosition
 }
 
 type DirectChatTypingIndicator struct {
@@ -250,6 +262,12 @@ type DirectChatReadStateEntry struct {
 	UserID              string
 	ReadReceiptsEnabled bool
 	LastReadPosition    *DirectChatReadPosition
+}
+
+type GroupReadStateEntry struct {
+	GroupID          string
+	UserID           string
+	LastReadPosition *GroupReadPosition
 }
 
 type DirectChatPresenceStateEntry struct {
@@ -362,6 +380,14 @@ type FailAttachmentUploadParams struct {
 
 type UpsertDirectChatReadReceiptParams struct {
 	ChatID            string
+	UserID            string
+	LastReadMessageID string
+	LastReadMessageAt time.Time
+	UpdatedAt         time.Time
+}
+
+type UpsertGroupChatReadStateParams struct {
+	GroupID           string
 	UserID            string
 	LastReadMessageID string
 	LastReadMessageAt time.Time

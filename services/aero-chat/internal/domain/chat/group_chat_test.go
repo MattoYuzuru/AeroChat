@@ -16,7 +16,7 @@ func TestGetGroupChatBootstrapsPrimaryThread(t *testing.T) {
 
 	group := mustCreateGroup(t, service, alice.Token, "Core team")
 
-	resolvedGroup, thread, typingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
+	resolvedGroup, thread, readState, typingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat: %v", err)
 	}
@@ -31,6 +31,9 @@ func TestGetGroupChatBootstrapsPrimaryThread(t *testing.T) {
 	}
 	if !thread.CanSendMessages {
 		t.Fatal("owner должен иметь право отправки в primary thread")
+	}
+	if readState != nil {
+		t.Fatalf("для новой группы не ожидался read state, получено %+v", readState)
 	}
 	if typingState == nil || typingState.ThreadID != thread.ID || len(typingState.Typers) != 0 {
 		t.Fatalf("ожидался пустой typing snapshot для thread %q, получено %+v", thread.ID, typingState)
@@ -102,7 +105,7 @@ func TestReaderGroupRoleIsReadOnlyInMessageFlow(t *testing.T) {
 		t.Fatalf("join reader invite: %v", err)
 	}
 
-	resolvedGroup, thread, typingState, err := service.GetGroupChat(context.Background(), bob.Token, group.ID)
+	resolvedGroup, thread, readState, typingState, err := service.GetGroupChat(context.Background(), bob.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat as reader: %v", err)
 	}
@@ -111,6 +114,9 @@ func TestReaderGroupRoleIsReadOnlyInMessageFlow(t *testing.T) {
 	}
 	if thread.CanSendMessages {
 		t.Fatal("reader не должен иметь право отправки")
+	}
+	if readState != nil {
+		t.Fatalf("до чтения reader не должен иметь read position, получено %+v", readState)
 	}
 	if typingState == nil || typingState.ThreadID != thread.ID {
 		t.Fatalf("ожидался typing snapshot reader для thread %q, получено %+v", thread.ID, typingState)
@@ -145,7 +151,7 @@ func TestGroupMessagesRejectRawHTMLAndRequireMembership(t *testing.T) {
 		t.Fatalf("ожидалась ошибка пустого group message, получено %v", err)
 	}
 
-	if _, _, _, err := service.GetGroupChat(context.Background(), bob.Token, group.ID); !errors.Is(err, ErrNotFound) {
+	if _, _, _, _, err := service.GetGroupChat(context.Background(), bob.Token, group.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ожидалась ошибка доступа к group chat для неучастника, получено %v", err)
 	}
 	if _, err := service.ListGroupMessages(context.Background(), bob.Token, group.ID, 0); !errors.Is(err, ErrNotFound) {
@@ -176,7 +182,7 @@ func TestSetAndClearGroupTypingUsesTTLAndThreadScope(t *testing.T) {
 		t.Fatalf("join member invite: %v", err)
 	}
 
-	_, thread, initialTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
+	_, thread, _, initialTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat before typing: %v", err)
 	}
@@ -192,7 +198,7 @@ func TestSetAndClearGroupTypingUsesTTLAndThreadScope(t *testing.T) {
 		t.Fatalf("ожидался typing snapshot Bob, получено %+v", typingState)
 	}
 
-	_, _, fetchedTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
+	_, _, _, fetchedTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat with typing: %v", err)
 	}
@@ -202,7 +208,7 @@ func TestSetAndClearGroupTypingUsesTTLAndThreadScope(t *testing.T) {
 
 	currentTime = currentTime.Add(6 * time.Second)
 
-	_, _, expiredTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
+	_, _, _, expiredTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat after typing ttl: %v", err)
 	}
@@ -256,7 +262,7 @@ func TestGroupTypingHonorsVisibilityAndRolePolicy(t *testing.T) {
 		t.Fatalf("join reader invite: %v", err)
 	}
 
-	_, thread, _, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
+	_, thread, _, _, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat: %v", err)
 	}
@@ -275,7 +281,7 @@ func TestGroupTypingHonorsVisibilityAndRolePolicy(t *testing.T) {
 		t.Fatalf("typing state не должен раскрываться при отключённой видимости, получено %+v", typingState)
 	}
 
-	_, _, fetchedTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
+	_, _, _, fetchedTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat after privacy change: %v", err)
 	}
@@ -317,7 +323,7 @@ func TestGroupTypingClearsOnRoleDowngradeAndLeave(t *testing.T) {
 		t.Fatalf("join second member invite: %v", err)
 	}
 
-	_, thread, _, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
+	_, thread, _, _, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat: %v", err)
 	}
@@ -329,7 +335,7 @@ func TestGroupTypingClearsOnRoleDowngradeAndLeave(t *testing.T) {
 		t.Fatalf("downgrade Bob to reader: %v", err)
 	}
 
-	_, _, afterDowngradeTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
+	_, _, _, afterDowngradeTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat after role downgrade: %v", err)
 	}
@@ -344,11 +350,112 @@ func TestGroupTypingClearsOnRoleDowngradeAndLeave(t *testing.T) {
 		t.Fatalf("leave group for Charlie: %v", err)
 	}
 
-	_, _, afterLeaveTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
+	_, _, _, afterLeaveTypingState, err := service.GetGroupChat(context.Background(), alice.Token, group.ID)
 	if err != nil {
 		t.Fatalf("get group chat after leave: %v", err)
 	}
 	if len(afterLeaveTypingState.Typers) != 0 {
 		t.Fatalf("typing должен очищаться после leave group, получено %+v", afterLeaveTypingState)
+	}
+}
+
+func TestGroupUnreadIsViewerRelativeAndReaderCanClearIt(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{13}, 64))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	group := mustCreateGroup(t, service, alice.Token, "Unread")
+	readerInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleReader)
+	if err != nil {
+		t.Fatalf("create reader invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, readerInvite.InviteToken); err != nil {
+		t.Fatalf("join reader invite: %v", err)
+	}
+
+	first := mustSendGroupMessage(t, service, alice.Token, group.ID, "first")
+	second := mustSendGroupMessage(t, service, alice.Token, group.ID, "second")
+
+	bobGroups, err := service.ListGroups(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list groups as Bob: %v", err)
+	}
+	if len(bobGroups) != 1 {
+		t.Fatalf("ожидалась одна группа у Bob, получено %d", len(bobGroups))
+	}
+	if bobGroups[0].UnreadCount != 2 {
+		t.Fatalf("ожидалось 2 непрочитанных сообщения у Bob, получено %d", bobGroups[0].UnreadCount)
+	}
+
+	groupSnapshot, _, readState, _, err := service.GetGroupChat(context.Background(), bob.Token, group.ID)
+	if err != nil {
+		t.Fatalf("get group chat as Bob: %v", err)
+	}
+	if groupSnapshot.UnreadCount != 2 {
+		t.Fatalf("ожидалось 2 непрочитанных в snapshot группы, получено %d", groupSnapshot.UnreadCount)
+	}
+	if readState != nil {
+		t.Fatalf("до mark read не ожидался read state, получено %+v", readState)
+	}
+
+	readState, unreadCount, err := service.MarkGroupChatRead(context.Background(), bob.Token, group.ID, first.ID)
+	if err != nil {
+		t.Fatalf("mark group chat read at first message: %v", err)
+	}
+	if readState == nil || readState.SelfPosition == nil || readState.SelfPosition.MessageID != first.ID {
+		t.Fatal("ожидалась фиксация group read position на первом сообщении")
+	}
+	if unreadCount != 1 {
+		t.Fatalf("ожидалось 1 непрочитанное после чтения первого сообщения, получено %d", unreadCount)
+	}
+
+	third := mustSendGroupMessage(t, service, alice.Token, group.ID, "third")
+
+	groupSnapshot, _, readState, _, err = service.GetGroupChat(context.Background(), bob.Token, group.ID)
+	if err != nil {
+		t.Fatalf("get group chat after third message: %v", err)
+	}
+	if groupSnapshot.UnreadCount != 2 {
+		t.Fatalf("ожидалось 2 непрочитанных после нового сообщения, получено %d", groupSnapshot.UnreadCount)
+	}
+	if readState == nil || readState.SelfPosition == nil || readState.SelfPosition.MessageID != first.ID {
+		t.Fatal("read state должен сохранять последнюю прочитанную позицию")
+	}
+
+	readState, unreadCount, err = service.MarkGroupChatRead(context.Background(), bob.Token, group.ID, third.ID)
+	if err != nil {
+		t.Fatalf("mark group chat read at third message: %v", err)
+	}
+	if readState == nil || readState.SelfPosition == nil || readState.SelfPosition.MessageID != third.ID {
+		t.Fatal("ожидалась фиксация group read position на последнем сообщении")
+	}
+	if unreadCount != 0 {
+		t.Fatalf("ожидалось отсутствие непрочитанных после полного чтения, получено %d", unreadCount)
+	}
+
+	aliceGroups, err := service.ListGroups(context.Background(), alice.Token)
+	if err != nil {
+		t.Fatalf("list groups as Alice: %v", err)
+	}
+	if len(aliceGroups) != 1 {
+		t.Fatalf("ожидалась одна группа у Alice, получено %d", len(aliceGroups))
+	}
+	if aliceGroups[0].UnreadCount != 0 {
+		t.Fatalf("собственные сообщения не должны увеличивать unread автора, получено %d", aliceGroups[0].UnreadCount)
+	}
+
+	readState, unreadCount, err = service.MarkGroupChatRead(context.Background(), bob.Token, group.ID, second.ID)
+	if err != nil {
+		t.Fatalf("mark group chat read backwards: %v", err)
+	}
+	if readState == nil || readState.SelfPosition == nil || readState.SelfPosition.MessageID != third.ID {
+		t.Fatal("group read position не должна откатываться назад")
+	}
+	if unreadCount != 0 {
+		t.Fatalf("ожидалось 0 непрочитанных после backward mark, получено %d", unreadCount)
 	}
 }

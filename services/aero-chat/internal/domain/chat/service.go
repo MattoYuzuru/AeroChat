@@ -36,6 +36,7 @@ type Repository interface {
 	ListGroups(context.Context, string) ([]Group, error)
 	GetGroup(context.Context, string, string) (*Group, error)
 	GetGroupChatThread(context.Context, string, string) (*GroupChatThread, error)
+	GetGroupReadStateEntry(context.Context, string, string) (*GroupReadStateEntry, error)
 	ListGroupMembers(context.Context, string, string) ([]GroupMember, error)
 	ListGroupTypingStateEntries(context.Context, string, string) ([]GroupTypingStateEntry, error)
 	GetGroupMember(context.Context, string, string) (*GroupMember, error)
@@ -52,11 +53,13 @@ type Repository interface {
 	ListDirectChatPresenceStateEntries(context.Context, string, string) ([]DirectChatPresenceStateEntry, error)
 	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
 	UpsertDirectChatReadReceipt(context.Context, UpsertDirectChatReadReceiptParams) (bool, error)
+	UpsertGroupChatReadState(context.Context, UpsertGroupChatReadStateParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
 	CreateGroupMessage(context.Context, CreateGroupMessageParams) (*GroupMessage, error)
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
 	ListGroupMessages(context.Context, string, string, int32) ([]GroupMessage, error)
 	GetDirectChatMessage(context.Context, string, string, string) (*DirectChatMessage, error)
+	GetGroupMessage(context.Context, string, string, string) (*GroupMessage, error)
 	DeleteDirectChatMessageForEveryone(context.Context, string, string, string, time.Time) (bool, error)
 	PinDirectChatMessage(context.Context, string, string, string, time.Time) (bool, error)
 	UnpinDirectChatMessage(context.Context, string, string) (bool, error)
@@ -291,23 +294,28 @@ func (s *Service) GetGroup(ctx context.Context, token string, groupID string) (*
 	return s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
 }
 
-func (s *Service) GetGroupChat(ctx context.Context, token string, groupID string) (*Group, *GroupChatThread, *GroupTypingState, error) {
+func (s *Service) GetGroupChat(ctx context.Context, token string, groupID string) (*Group, *GroupChatThread, *GroupReadState, *GroupTypingState, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	group, thread, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+
+	readState, err := s.getGroupReadState(ctx, authSession.User.ID, group.ID)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	typingState, err := s.getGroupTypingState(ctx, authSession.User.ID, group.ID, thread.ID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return group, thread, typingState, nil
+	return group, thread, readState, typingState, nil
 }
 
 func (s *Service) ListGroupMembers(ctx context.Context, token string, groupID string) ([]GroupMember, error) {
@@ -849,39 +857,90 @@ func (s *Service) ListGroupMessages(ctx context.Context, token string, groupID s
 	return s.repo.ListGroupMessages(ctx, authSession.User.ID, group.ID, limit)
 }
 
-func (s *Service) MarkDirectChatRead(ctx context.Context, token string, chatID string, messageID string) (*DirectChatReadState, error) {
+func (s *Service) MarkDirectChatRead(ctx context.Context, token string, chatID string, messageID string) (*DirectChatReadState, int32, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	normalizedChatID, err := normalizeID(chatID, "chat_id")
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	normalizedMessageID, err := normalizeID(messageID, "message_id")
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	message, err := s.repo.GetDirectChatMessage(ctx, authSession.User.ID, normalizedChatID, normalizedMessageID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	if authSession.User.ReadReceiptsEnabled {
-		if _, err := s.repo.UpsertDirectChatReadReceipt(ctx, UpsertDirectChatReadReceiptParams{
-			ChatID:            normalizedChatID,
-			UserID:            authSession.User.ID,
-			LastReadMessageID: message.ID,
-			LastReadMessageAt: message.CreatedAt,
-			UpdatedAt:         s.now(),
-		}); err != nil {
-			return nil, err
-		}
+	if _, err := s.repo.UpsertDirectChatReadReceipt(ctx, UpsertDirectChatReadReceiptParams{
+		ChatID:            normalizedChatID,
+		UserID:            authSession.User.ID,
+		LastReadMessageID: message.ID,
+		LastReadMessageAt: message.CreatedAt,
+		UpdatedAt:         s.now(),
+	}); err != nil {
+		return nil, 0, err
 	}
 
-	return s.getDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
+	readState, err := s.getDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return readState, directChat.UnreadCount, nil
+}
+
+func (s *Service) MarkGroupChatRead(ctx context.Context, token string, groupID string, messageID string) (*GroupReadState, int32, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, 0, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	message, err := s.repo.GetGroupMessage(ctx, authSession.User.ID, normalizedGroupID, normalizedMessageID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if _, err := s.repo.UpsertGroupChatReadState(ctx, UpsertGroupChatReadStateParams{
+		GroupID:           normalizedGroupID,
+		UserID:            authSession.User.ID,
+		LastReadMessageID: message.ID,
+		LastReadMessageAt: message.CreatedAt,
+		UpdatedAt:         s.now(),
+	}); err != nil {
+		return nil, 0, err
+	}
+
+	readState, err := s.getGroupReadState(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return readState, group.UnreadCount, nil
 }
 
 func (s *Service) SetGroupTyping(ctx context.Context, token string, groupID string, threadID string) (*GroupTypingState, error) {
@@ -1366,7 +1425,7 @@ func (s *Service) getDirectChatReadState(ctx context.Context, viewerUserID strin
 
 	state := &DirectChatReadState{}
 	for _, entry := range entries {
-		if !entry.ReadReceiptsEnabled || entry.LastReadPosition == nil {
+		if entry.LastReadPosition == nil {
 			continue
 		}
 
@@ -1376,10 +1435,29 @@ func (s *Service) getDirectChatReadState(ctx context.Context, viewerUserID strin
 			continue
 		}
 
+		if !entry.ReadReceiptsEnabled {
+			continue
+		}
+
 		state.PeerPosition = &position
 	}
 
 	return state, nil
+}
+
+func (s *Service) getGroupReadState(ctx context.Context, userID string, groupID string) (*GroupReadState, error) {
+	entry, err := s.repo.GetGroupReadStateEntry(ctx, userID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if entry == nil || entry.LastReadPosition == nil {
+		return nil, nil
+	}
+
+	position := *entry.LastReadPosition
+	return &GroupReadState{
+		SelfPosition: &position,
+	}, nil
 }
 
 func (s *Service) getGroupTypingState(ctx context.Context, viewerUserID string, groupID string, threadID string) (*GroupTypingState, error) {

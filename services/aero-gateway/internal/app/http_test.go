@@ -2599,11 +2599,14 @@ func readPeopleEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn)
 
 func newTestProfile(id string, login string, nickname string) *identityv1.Profile {
 	return &identityv1.Profile{
-		Id:        id,
-		Login:     login,
-		Nickname:  nickname,
-		CreatedAt: timestamppb.Now(),
-		UpdatedAt: timestamppb.Now(),
+		Id:                      id,
+		Login:                   login,
+		Nickname:                nickname,
+		ReadReceiptsEnabled:     true,
+		PresenceEnabled:         true,
+		TypingVisibilityEnabled: true,
+		CreatedAt:               timestamppb.Now(),
+		UpdatedAt:               timestamppb.Now(),
 	}
 }
 
@@ -2613,11 +2616,14 @@ func cloneProfile(profile *identityv1.Profile) *identityv1.Profile {
 	}
 
 	return &identityv1.Profile{
-		Id:        profile.GetId(),
-		Login:     profile.GetLogin(),
-		Nickname:  profile.GetNickname(),
-		CreatedAt: profile.GetCreatedAt(),
-		UpdatedAt: profile.GetUpdatedAt(),
+		Id:                      profile.GetId(),
+		Login:                   profile.GetLogin(),
+		Nickname:                profile.GetNickname(),
+		ReadReceiptsEnabled:     profile.GetReadReceiptsEnabled(),
+		PresenceEnabled:         profile.GetPresenceEnabled(),
+		TypingVisibilityEnabled: profile.GetTypingVisibilityEnabled(),
+		CreatedAt:               profile.GetCreatedAt(),
+		UpdatedAt:               profile.GetUpdatedAt(),
 	}
 }
 

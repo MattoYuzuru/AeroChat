@@ -56,21 +56,33 @@ export function createInitialGroupsSelectedState(): GroupsSelectedState {
 export function applyGroupRealtimeToGroups(
   groups: Group[],
   event: GroupRealtimeEvent,
+  currentUserId: string,
 ): Group[] {
   switch (event.type) {
     case "group.message.updated":
-      return sortGroups(upsertGroup(groups, event.group));
+      return sortGroups(
+        upsertGroup(
+          groups,
+          patchGroupFromMessage(findGroupByID(groups, event.group.id), event.message, currentUserId),
+        ),
+      );
     case "group.membership.updated":
       if (event.group === null || event.selfMember === null) {
         return groups.filter((group) => group.id !== event.groupId);
       }
-      return sortGroups(upsertGroup(groups, event.group));
+      return sortGroups(
+        upsertGroup(groups, mergeGroupPreservingUnread(findGroupByID(groups, event.group.id), event.group)),
+      );
     case "group.role.updated":
     case "group.ownership.transferred":
       if (event.group === null || event.selfMember === null) {
         return groups.filter((group) => group.id !== event.groupId);
       }
-      return sortGroups(upsertGroup(groups, event.group));
+      return sortGroups(
+        upsertGroup(groups, mergeGroupPreservingUnread(findGroupByID(groups, event.group.id), event.group)),
+      );
+    case "group.read.updated":
+      return replaceGroupUnreadCount(groups, event.groupId, event.unreadCount);
     default:
       return groups;
   }
@@ -79,6 +91,7 @@ export function applyGroupRealtimeToGroups(
 export function applyGroupRealtimeToSelectedState(
   state: GroupsSelectedState,
   event: GroupRealtimeEvent,
+  currentUserId: string,
 ): GroupsSelectedState {
   if (state.status !== "ready") {
     return state;
@@ -95,8 +108,9 @@ export function applyGroupRealtimeToSelectedState(
     return {
       status: "ready",
       snapshot: {
-        group: event.group,
-        thread: event.thread,
+        group: patchGroupFromMessage(state.snapshot.group, event.message, currentUserId),
+        thread: state.snapshot.thread,
+        readState: state.snapshot.readState,
         typingState: state.snapshot.typingState,
       },
       members: state.members,
@@ -116,6 +130,7 @@ export function applyGroupRealtimeToSelectedState(
       snapshot: {
         group: state.snapshot.group,
         thread: state.snapshot.thread,
+        readState: state.snapshot.readState,
         typingState: event.typingState,
       },
       members: state.members,
@@ -127,6 +142,25 @@ export function applyGroupRealtimeToSelectedState(
 
   if (event.groupId !== selectedGroupId) {
     return state;
+  }
+
+  if (event.type === "group.read.updated") {
+    return {
+      status: "ready",
+      snapshot: {
+        group: {
+          ...state.snapshot.group,
+          unreadCount: event.unreadCount,
+        },
+        thread: state.snapshot.thread,
+        readState: event.readState,
+        typingState: state.snapshot.typingState,
+      },
+      members: state.members,
+      inviteLinks: state.inviteLinks,
+      messages: state.messages,
+      errorMessage: null,
+    };
   }
 
   if (event.group === null || event.thread === null || event.selfMember === null) {
@@ -145,8 +179,9 @@ export function applyGroupRealtimeToSelectedState(
     return {
       status: "ready",
       snapshot: {
-        group: event.group,
+        group: mergeGroupPreservingUnread(state.snapshot.group, event.group),
         thread: event.thread,
+        readState: state.snapshot.readState,
         typingState: state.snapshot.typingState,
       },
       members: sortMembers(members),
@@ -160,8 +195,9 @@ export function applyGroupRealtimeToSelectedState(
     return {
       status: "ready",
       snapshot: {
-        group: event.group,
+        group: mergeGroupPreservingUnread(state.snapshot.group, event.group),
         thread: event.thread,
+        readState: state.snapshot.readState,
         typingState: state.snapshot.typingState,
       },
       members: sortMembers(
@@ -179,8 +215,9 @@ export function applyGroupRealtimeToSelectedState(
   return {
     status: "ready",
     snapshot: {
-      group: event.group,
+      group: mergeGroupPreservingUnread(state.snapshot.group, event.group),
       thread: event.thread,
+      readState: state.snapshot.readState,
       typingState: state.snapshot.typingState,
     },
     members: sortMembers(
@@ -206,7 +243,11 @@ export function shouldClearSelectedGroupOnRealtimeEvent(
     return false;
   }
 
-  if (event.type === "group.message.updated" || event.type === "group.typing.updated") {
+  if (
+    event.type === "group.message.updated" ||
+    event.type === "group.typing.updated" ||
+    event.type === "group.read.updated"
+  ) {
     return false;
   }
 
@@ -214,6 +255,10 @@ export function shouldClearSelectedGroupOnRealtimeEvent(
     event.groupId === state.snapshot.group.id &&
     (event.group === null || event.thread === null || event.selfMember === null)
   );
+}
+
+function findGroupByID(groups: Group[], groupId: string): Group | null {
+  return groups.find((group) => group.id === groupId) ?? null;
 }
 
 function upsertGroup(groups: Group[], nextGroup: Group): Group[] {
@@ -254,6 +299,55 @@ function filterInviteLinks(
   selfRole: GroupMemberRole,
 ): GroupInviteLink[] {
   return canManageInviteLinks(selfRole) ? inviteLinks : [];
+}
+
+function patchGroupFromMessage(
+  group: Group | null,
+  message: GroupMessage,
+  currentUserId: string,
+): Group {
+  if (group === null) {
+    return {
+      id: message.groupId,
+      name: "",
+      kind: "CHAT_KIND_GROUP",
+      selfRole: "member",
+      memberCount: 0,
+      unreadCount: message.senderUserId === currentUserId ? 0 : 1,
+      createdAt: "",
+      updatedAt: message.updatedAt || message.createdAt,
+    };
+  }
+
+  const candidateUpdatedAt = message.updatedAt || message.createdAt;
+  const shouldIncrementUnread =
+    message.senderUserId !== currentUserId &&
+    candidateUpdatedAt !== "" &&
+    group.updatedAt < candidateUpdatedAt;
+
+  return {
+    ...group,
+    unreadCount: shouldIncrementUnread ? group.unreadCount + 1 : group.unreadCount,
+    updatedAt: candidateUpdatedAt === "" ? group.updatedAt : candidateUpdatedAt,
+  };
+}
+
+function mergeGroupPreservingUnread(current: Group | null, next: Group): Group {
+  return {
+    ...next,
+    unreadCount: current?.unreadCount ?? next.unreadCount,
+  };
+}
+
+function replaceGroupUnreadCount(groups: Group[], groupId: string, unreadCount: number): Group[] {
+  return groups.map((group) =>
+    group.id !== groupId
+      ? group
+      : {
+          ...group,
+          unreadCount,
+        },
+  );
 }
 
 function canManageInviteLinks(role: GroupMemberRole): boolean {

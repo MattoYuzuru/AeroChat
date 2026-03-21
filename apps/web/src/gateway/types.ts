@@ -89,6 +89,7 @@ export interface Group {
   kind: string;
   selfRole: GroupMemberRole;
   memberCount: number;
+  unreadCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -141,6 +142,7 @@ export interface DirectChat {
   kind: string;
   participants: ChatUser[];
   pinnedMessageIds: string[];
+  unreadCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -230,9 +232,19 @@ export interface DirectChatReadPosition {
   updatedAt: string;
 }
 
+export interface GroupReadPosition {
+  messageId: string;
+  messageCreatedAt: string;
+  updatedAt: string;
+}
+
 export interface DirectChatReadState {
   selfPosition: DirectChatReadPosition | null;
   peerPosition: DirectChatReadPosition | null;
+}
+
+export interface GroupReadState {
+  selfPosition: GroupReadPosition | null;
 }
 
 export interface DirectChatTypingIndicator {
@@ -265,7 +277,18 @@ export interface DirectChatSnapshot {
 export interface GroupChatSnapshot {
   group: Group;
   thread: GroupChatThread;
+  readState: GroupReadState | null;
   typingState: GroupTypingState | null;
+}
+
+export interface DirectChatReadUpdate {
+  readState: DirectChatReadState | null;
+  unreadCount: number;
+}
+
+export interface GroupReadUpdate {
+  readState: GroupReadState | null;
+  unreadCount: number;
 }
 
 export interface RegisterInput {
@@ -320,6 +343,11 @@ export interface GatewayClient {
   listGroups(token: string): Promise<Group[]>;
   getGroup(token: string, groupId: string): Promise<Group>;
   getGroupChat(token: string, groupId: string): Promise<GroupChatSnapshot>;
+  markGroupChatRead(
+    token: string,
+    groupId: string,
+    messageId: string,
+  ): Promise<GroupReadUpdate>;
   createAttachmentUploadIntent(
     token: string,
     input:
@@ -394,7 +422,7 @@ export interface GatewayClient {
     token: string,
     chatId: string,
     messageId: string,
-  ): Promise<DirectChatReadState | null>;
+  ): Promise<DirectChatReadUpdate>;
   setDirectChatTyping(
     token: string,
     chatId: string,

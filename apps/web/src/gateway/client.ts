@@ -25,6 +25,8 @@ import type {
   GroupMessage,
   GroupMember,
   GroupMemberRole,
+  GroupReadPosition,
+  GroupReadState,
   GroupTypingIndicator,
   GroupTypingState,
   MessageTombstone,
@@ -148,6 +150,7 @@ interface DirectChatWire extends TimestampedWire {
   kind?: string;
   participants?: ChatUserWire[];
   pinnedMessageIds?: string[];
+  unreadState?: UnreadStateWire;
 }
 
 interface GroupWire extends TimestampedWire {
@@ -156,6 +159,11 @@ interface GroupWire extends TimestampedWire {
   kind?: string;
   selfRole?: string;
   memberCount?: number;
+  unreadState?: UnreadStateWire;
+}
+
+interface UnreadStateWire {
+  unreadCount?: number | string;
 }
 
 interface GroupChatThreadWire extends TimestampedWire {
@@ -257,9 +265,18 @@ interface DirectChatReadPositionWire extends TimestampedWire {
   messageCreatedAt?: string;
 }
 
+interface GroupReadPositionWire extends TimestampedWire {
+  messageId?: string;
+  messageCreatedAt?: string;
+}
+
 interface DirectChatReadStateWire {
   selfPosition?: DirectChatReadPositionWire;
   peerPosition?: DirectChatReadPositionWire;
+}
+
+interface GroupReadStateWire {
+  selfPosition?: GroupReadPositionWire;
 }
 
 interface DirectChatTypingIndicatorWire {
@@ -312,6 +329,7 @@ interface GetGroupResponseWire {
 interface GetGroupChatResponseWire {
   group?: GroupWire;
   thread?: GroupChatThreadWire;
+  readState?: GroupReadStateWire;
   typingState?: GroupTypingStateWire;
 }
 
@@ -336,6 +354,11 @@ interface SetGroupTypingResponseWire {
 
 interface ClearGroupTypingResponseWire {
   typingState?: GroupTypingStateWire;
+}
+
+interface MarkGroupChatReadResponseWire {
+  readState?: GroupReadStateWire;
+  unreadState?: UnreadStateWire;
 }
 
 interface ListGroupMembersResponseWire {
@@ -377,6 +400,7 @@ interface SendGroupTextMessageResponseWire {
 
 interface MarkDirectChatReadResponseWire {
   readState?: DirectChatReadStateWire;
+  unreadState?: UnreadStateWire;
 }
 
 interface SetDirectChatTypingResponseWire {
@@ -557,6 +581,25 @@ export function createGatewayClient(
       );
 
       return normalizeGroupChatSnapshot(response);
+    },
+
+    async markGroupChatRead(token, groupId, messageId) {
+      const response = await unaryCall<MarkGroupChatReadResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "MarkGroupChatRead",
+        {
+          groupId: groupId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return {
+        readState: normalizeGroupReadState(response.readState),
+        unreadCount: normalizeUnreadCount(response.unreadState),
+      };
     },
 
     async createAttachmentUploadIntent(token, input) {
@@ -878,7 +921,10 @@ export function createGatewayClient(
         token,
       );
 
-      return normalizeDirectChatReadState(response.readState);
+      return {
+        readState: normalizeDirectChatReadState(response.readState),
+        unreadCount: normalizeUnreadCount(response.unreadState),
+      };
     },
 
     async setDirectChatTyping(token, chatId) {
@@ -1372,6 +1418,7 @@ function normalizeGroup(input: GroupWire | undefined): Group {
     kind: input?.kind ?? "CHAT_KIND_UNSPECIFIED",
     selfRole: normalizeGroupMemberRole(input?.selfRole),
     memberCount: input?.memberCount ?? 0,
+    unreadCount: normalizeUnreadCount(input?.unreadState),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
   };
@@ -1429,10 +1476,49 @@ function normalizeGroupTypingState(
   };
 }
 
+function normalizeGroupReadPosition(
+  input: GroupReadPositionWire | undefined,
+): GroupReadPosition | null {
+  if (!input) {
+    return null;
+  }
+
+  const messageId = input.messageId ?? "";
+  const messageCreatedAt = input.messageCreatedAt ?? "";
+  const updatedAt = input.updatedAt ?? "";
+  if (messageId === "" && messageCreatedAt === "" && updatedAt === "") {
+    return null;
+  }
+
+  return {
+    messageId,
+    messageCreatedAt,
+    updatedAt,
+  };
+}
+
+function normalizeGroupReadState(
+  input: GroupReadStateWire | undefined,
+): GroupReadState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfPosition = normalizeGroupReadPosition(input.selfPosition);
+  if (!selfPosition) {
+    return null;
+  }
+
+  return {
+    selfPosition,
+  };
+}
+
 function normalizeGroupChatSnapshot(input: GetGroupChatResponseWire): GroupChatSnapshot {
   return {
     group: normalizeGroup(input.group),
     thread: normalizeGroupChatThread(input.thread),
+    readState: normalizeGroupReadState(input.readState),
     typingState: normalizeGroupTypingState(input.typingState),
   };
 }
@@ -1522,6 +1608,7 @@ function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
     pinnedMessageIds: (input?.pinnedMessageIds ?? []).filter(
       (value): value is string => typeof value === "string" && value.trim() !== "",
     ),
+    unreadCount: normalizeUnreadCount(input?.unreadState),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
   };
@@ -1709,6 +1796,10 @@ function normalizeNullableString(value: string | undefined): string | null {
   }
 
   return value === "" ? null : value;
+}
+
+function normalizeUnreadCount(value: UnreadStateWire | undefined): number {
+  return normalizeCount(value?.unreadCount);
 }
 
 function normalizeOptionalString(value: string): string | undefined {

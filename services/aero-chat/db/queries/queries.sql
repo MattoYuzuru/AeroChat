@@ -86,6 +86,24 @@ SELECT
     c.user_high_id,
     c.created_at AS chat_created_at,
     c.updated_at AS chat_updated_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM direct_chat_messages AS m
+        LEFT JOIN direct_chat_message_tombstones AS t ON t.message_id = m.id
+        LEFT JOIN direct_chat_read_receipts AS self_receipt
+            ON self_receipt.chat_id = c.id AND self_receipt.user_id = self.user_id
+        WHERE m.chat_id = c.id
+          AND t.message_id IS NULL
+          AND m.sender_user_id <> self.user_id
+          AND (
+              self_receipt.last_read_message_id IS NULL
+              OR m.created_at > self_receipt.last_read_message_created_at
+              OR (
+                  m.created_at = self_receipt.last_read_message_created_at
+                  AND m.id > self_receipt.last_read_message_id
+              )
+          )
+    ), 0)::INT AS unread_count,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
@@ -105,6 +123,24 @@ SELECT
     c.user_high_id,
     c.created_at AS chat_created_at,
     c.updated_at AS chat_updated_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM direct_chat_messages AS m
+        LEFT JOIN direct_chat_message_tombstones AS t ON t.message_id = m.id
+        LEFT JOIN direct_chat_read_receipts AS self_receipt
+            ON self_receipt.chat_id = c.id AND self_receipt.user_id = self.user_id
+        WHERE m.chat_id = c.id
+          AND t.message_id IS NULL
+          AND m.sender_user_id <> self.user_id
+          AND (
+              self_receipt.last_read_message_id IS NULL
+              OR m.created_at > self_receipt.last_read_message_created_at
+              OR (
+                  m.created_at = self_receipt.last_read_message_created_at
+                  AND m.id > self_receipt.last_read_message_id
+              )
+          )
+    ), 0)::INT AS unread_count,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
@@ -161,6 +197,24 @@ SELECT
     self.role AS self_role,
     g.created_at,
     g.updated_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM group_threads AS primary_thread
+        JOIN group_messages AS gm ON gm.thread_id = primary_thread.id
+        LEFT JOIN group_chat_read_states AS self_read
+            ON self_read.group_id = g.id AND self_read.user_id = self.user_id
+        WHERE primary_thread.group_id = g.id
+          AND primary_thread.thread_key = 'primary'
+          AND gm.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR gm.created_at > self_read.last_read_message_created_at
+              OR (
+                  gm.created_at = self_read.last_read_message_created_at
+                  AND gm.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS unread_count,
     COUNT(m.user_id)::INT AS member_count
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
@@ -177,6 +231,24 @@ SELECT
     self.role AS self_role,
     g.created_at,
     g.updated_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM group_threads AS primary_thread
+        JOIN group_messages AS gm ON gm.thread_id = primary_thread.id
+        LEFT JOIN group_chat_read_states AS self_read
+            ON self_read.group_id = g.id AND self_read.user_id = self.user_id
+        WHERE primary_thread.group_id = g.id
+          AND primary_thread.thread_key = 'primary'
+          AND gm.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR gm.created_at > self_read.last_read_message_created_at
+              OR (
+                  gm.created_at = self_read.last_read_message_created_at
+                  AND gm.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS unread_count,
     COUNT(m.user_id)::INT AS member_count
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
@@ -354,6 +426,25 @@ WHERE self.user_id = $1
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT $3;
 
+-- name: GetGroupMessageByIDAndUserID :one
+SELECT
+    m.id,
+    t.group_id,
+    m.thread_id,
+    m.sender_user_id,
+    m.kind,
+    m.text_content,
+    m.markdown_policy,
+    m.created_at,
+    m.updated_at
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+JOIN group_messages AS m ON m.thread_id = t.id
+WHERE self.user_id = $1
+  AND self.group_id = $2
+  AND m.id = $3
+  AND t.thread_key = 'primary';
+
 -- name: ListGroupTypingStateEntries :many
 SELECT
     m.user_id,
@@ -375,6 +466,18 @@ ORDER BY
     END,
     m.joined_at ASC,
     m.user_id ASC;
+
+-- name: GetGroupReadStateEntryByGroupIDAndUserID :one
+SELECT
+    self.group_id,
+    self.user_id,
+    r.last_read_message_id,
+    r.last_read_message_created_at,
+    r.updated_at
+FROM group_memberships AS self
+LEFT JOIN group_chat_read_states AS r
+    ON r.group_id = self.group_id AND r.user_id = self.user_id
+WHERE self.user_id = $1 AND self.group_id = $2;
 
 -- name: ListDirectChatReadStateEntries :many
 SELECT
@@ -763,6 +866,25 @@ WHERE direct_chat_read_receipts.last_read_message_created_at < EXCLUDED.last_rea
    OR (
         direct_chat_read_receipts.last_read_message_created_at = EXCLUDED.last_read_message_created_at
         AND direct_chat_read_receipts.last_read_message_id < EXCLUDED.last_read_message_id
+   );
+
+-- name: UpsertGroupChatReadState :execrows
+INSERT INTO group_chat_read_states (
+    group_id,
+    user_id,
+    last_read_message_id,
+    last_read_message_created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+    last_read_message_id = EXCLUDED.last_read_message_id,
+    last_read_message_created_at = EXCLUDED.last_read_message_created_at,
+    updated_at = EXCLUDED.updated_at
+WHERE group_chat_read_states.last_read_message_created_at < EXCLUDED.last_read_message_created_at
+   OR (
+        group_chat_read_states.last_read_message_created_at = EXCLUDED.last_read_message_created_at
+        AND group_chat_read_states.last_read_message_id < EXCLUDED.last_read_message_id
    );
 
 -- name: CreateDirectChatMessageTombstone :execrows

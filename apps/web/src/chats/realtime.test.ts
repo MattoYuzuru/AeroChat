@@ -101,6 +101,7 @@ describe("parseDirectChatRealtimeEvent", () => {
           updatedAt: "2026-04-06T12:01:00Z",
         },
       },
+      unreadCount: null,
     });
   });
 

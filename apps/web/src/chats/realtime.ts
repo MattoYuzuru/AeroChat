@@ -79,6 +79,10 @@ interface DirectChatReadStateWire {
   peerPosition?: DirectChatReadPositionWire;
 }
 
+interface DirectChatUnreadStateWire {
+  unreadCount?: number | string;
+}
+
 interface DirectChatMessageUpdatedPayloadWire {
   reason?: string;
   chat?: DirectChatWire;
@@ -88,6 +92,7 @@ interface DirectChatMessageUpdatedPayloadWire {
 interface DirectChatReadUpdatedPayloadWire {
   chatId?: string;
   readState?: DirectChatReadStateWire;
+  unread?: DirectChatUnreadStateWire;
 }
 
 interface DirectChatTypingIndicatorWire {
@@ -131,6 +136,7 @@ export type DirectChatRealtimeEvent =
       type: "direct_chat.read.updated";
       chatId: string;
       readState: DirectChatReadState | null;
+      unreadCount: number | null;
     }
   | {
       type: "direct_chat.typing.updated";
@@ -170,6 +176,7 @@ export function parseDirectChatRealtimeEvent(
       type: "direct_chat.read.updated",
       chatId: payload.chatId,
       readState: payload.readState,
+      unreadCount: payload.unreadCount,
     };
   }
 
@@ -233,6 +240,7 @@ function normalizeReadUpdatedPayload(
 ): {
   chatId: string;
   readState: DirectChatReadState | null;
+  unreadCount: number | null;
 } | null {
   if (!input || typeof input !== "object") {
     return null;
@@ -247,6 +255,7 @@ function normalizeReadUpdatedPayload(
   return {
     chatId,
     readState: normalizeReadState(payload.readState),
+    unreadCount: normalizeUnreadCount(payload.unread),
   };
 }
 
@@ -307,6 +316,7 @@ function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
     pinnedMessageIds: (input?.pinnedMessageIds ?? []).filter(
       (value): value is string => typeof value === "string" && value.trim() !== "",
     ),
+    unreadCount: 0,
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
   };
@@ -408,6 +418,27 @@ function normalizeReadPosition(
     messageCreatedAt,
     updatedAt,
   };
+}
+
+function normalizeUnreadCount(
+  input: DirectChatUnreadStateWire | undefined,
+): number | null {
+  if (!input) {
+    return null;
+  }
+
+  const rawValue = input.unreadCount;
+  if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+    return rawValue;
+  }
+  if (typeof rawValue === "string" && rawValue.trim() !== "") {
+    const parsed = Number(rawValue);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
 }
 
 function normalizeTypingState(

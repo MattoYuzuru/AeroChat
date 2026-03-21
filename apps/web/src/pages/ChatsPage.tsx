@@ -376,6 +376,11 @@ export function ChatsPage() {
                         </p>
 
                         <div className={styles.chatItemFooter}>
+                          {chat.unreadCount > 0 && (
+                            <span className={styles.statusBadge} data-tone="accent">
+                              Непрочитано: {chat.unreadCount}
+                            </span>
+                          )}
                           {chat.pinnedMessageIds.length > 0 && (
                             <span className={styles.statusBadge}>
                               Закреплено: {chat.pinnedMessageIds.length}

@@ -46,6 +46,7 @@ function createClient(overrides: Partial<GatewayClient>): GatewayClient {
     joinGroupByInviteLink: vi.fn(),
     listGroupMessages: vi.fn(),
     sendGroupTextMessage: vi.fn(),
+    markGroupChatRead: vi.fn(),
     createDirectChat: vi.fn(),
     listDirectChats: vi.fn(),
     getDirectChat: vi.fn(),

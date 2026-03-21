@@ -100,7 +100,7 @@ export function useChats({
       if (event.type === "direct_chat.message.updated") {
         dispatch({
           type: "message_updated",
-          chat: event.chat,
+          currentUserId,
           message: event.message,
           reason: event.reason,
         });
@@ -112,6 +112,7 @@ export function useChats({
           type: "read_state_replaced",
           chatId: event.chatId,
           readState: event.readState,
+          unreadCount: event.unreadCount,
         });
         return;
       }
@@ -131,7 +132,7 @@ export function useChats({
         presenceState: event.presenceState,
       });
     });
-  }, [enabled]);
+  }, [enabled, currentUserId]);
 
   const activePresenceChatId = resolveDirectChatPresenceHeartbeatChatId({
     enabled,
@@ -428,7 +429,7 @@ export function useChats({
 
     void gatewayClient
       .markDirectChatRead(token, activeThreadChatId, latestThreadMessageId)
-      .then((readState) => {
+      .then((result) => {
         if (cancelled || !mountedRef.current) {
           return;
         }
@@ -436,7 +437,8 @@ export function useChats({
         dispatch({
           type: "read_state_replaced",
           chatId: activeThreadChatId,
-          readState,
+          readState: result.readState,
+          unreadCount: result.unreadCount,
         });
       })
       .catch((error) => {
@@ -600,6 +602,7 @@ export function useChats({
 
       dispatch({
         type: "message_updated",
+        currentUserId,
         message,
         reason: "message_created",
       });
@@ -749,6 +752,7 @@ async function runMessageMutation(
 
     dispatch({
       type: "message_updated",
+      currentUserId: "",
       message,
       reason: options.reason,
     });
@@ -786,15 +790,19 @@ async function fetchThreadSnapshot(
   const messages = [...rawMessages].reverse();
 
   let readState = snapshot.readState;
+  let unreadCount = snapshot.chat.unreadCount;
   const latestMessage = messages.at(-1);
   if (latestMessage) {
-    readState =
-      (await gatewayClient.markDirectChatRead(token, chatId, latestMessage.id)) ??
-      readState;
+    const readUpdate = await gatewayClient.markDirectChatRead(token, chatId, latestMessage.id);
+    readState = readUpdate.readState ?? readState;
+    unreadCount = readUpdate.unreadCount;
   }
 
   return {
-    chat: snapshot.chat,
+    chat: {
+      ...snapshot.chat,
+      unreadCount,
+    },
     messages,
     readState,
     typingState: snapshot.typingState,

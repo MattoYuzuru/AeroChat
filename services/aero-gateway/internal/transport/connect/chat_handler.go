@@ -229,13 +229,24 @@ func (h *ChatHandler) ClearGroupTyping(ctx context.Context, req *connect.Request
 	return response, nil
 }
 
+func (h *ChatHandler) MarkGroupChatRead(ctx context.Context, req *connect.Request[chatv1.MarkGroupChatReadRequest]) (*connect.Response[chatv1.MarkGroupChatReadResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.MarkGroupChatRead)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishGroupReadUpdate(ctx, req.Header(), req.Msg.GroupId, response.Msg.ReadState, response.Msg.UnreadState)
+
+	return response, nil
+}
+
 func (h *ChatHandler) MarkDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkDirectChatReadRequest]) (*connect.Response[chatv1.MarkDirectChatReadResponse], error) {
 	response, err := forwardUnary(ctx, req, h.client.MarkDirectChatRead)
 	if err != nil {
 		return nil, err
 	}
 
-	h.publishReadStateUpdate(ctx, req.Header(), req.Msg.ChatId, response.Msg.ReadState)
+	h.publishReadStateUpdate(ctx, req.Header(), req.Msg.ChatId, response.Msg.ReadState, response.Msg.UnreadState)
 
 	return response, nil
 }
@@ -384,6 +395,7 @@ func (h *ChatHandler) publishReadStateUpdate(
 	headers http.Header,
 	chatID string,
 	readState *chatv1.DirectChatReadState,
+	unreadState *chatv1.DirectChatUnreadState,
 ) {
 	if h.realtimeHub == nil || readState == nil || chatID == "" {
 		return
@@ -417,7 +429,16 @@ func (h *ChatHandler) publishReadStateUpdate(
 
 		h.realtimeHub.PublishToUser(
 			participantID,
-			realtime.NewDirectChatReadUpdatedEnvelope(chatID, mirrorReadStateForRecipient(participantID, profile.GetId(), readState)),
+			realtime.NewDirectChatReadUpdatedEnvelope(
+				chatID,
+				mirrorReadStateForRecipient(
+					participantID,
+					profile.GetId(),
+					profile.GetReadReceiptsEnabled(),
+					readState,
+				),
+				unreadStateForRecipient(participantID, profile.GetId(), unreadState),
+			),
 		)
 	}
 }
@@ -542,6 +563,7 @@ func (h *ChatHandler) fetchCurrentProfile(ctx context.Context, headers http.Head
 func mirrorReadStateForRecipient(
 	recipientUserID string,
 	actorUserID string,
+	actorReadReceiptsEnabled bool,
 	readState *chatv1.DirectChatReadState,
 ) *chatv1.DirectChatReadState {
 	if readState == nil {
@@ -554,7 +576,7 @@ func mirrorReadStateForRecipient(
 
 	return &chatv1.DirectChatReadState{
 		SelfPosition: cloneReadPosition(readState.GetPeerPosition()),
-		PeerPosition: cloneReadPosition(readState.GetSelfPosition()),
+		PeerPosition: peerReadPositionForRecipient(actorReadReceiptsEnabled, readState.GetSelfPosition()),
 	}
 }
 
@@ -578,6 +600,31 @@ func cloneReadPosition(position *chatv1.DirectChatReadPosition) *chatv1.DirectCh
 		MessageId:        position.GetMessageId(),
 		MessageCreatedAt: position.GetMessageCreatedAt(),
 		UpdatedAt:        position.GetUpdatedAt(),
+	}
+}
+
+func peerReadPositionForRecipient(
+	actorReadReceiptsEnabled bool,
+	position *chatv1.DirectChatReadPosition,
+) *chatv1.DirectChatReadPosition {
+	if !actorReadReceiptsEnabled {
+		return nil
+	}
+
+	return cloneReadPosition(position)
+}
+
+func unreadStateForRecipient(
+	recipientUserID string,
+	actorUserID string,
+	unreadState *chatv1.DirectChatUnreadState,
+) *chatv1.DirectChatUnreadState {
+	if unreadState == nil || recipientUserID != actorUserID {
+		return nil
+	}
+
+	return &chatv1.DirectChatUnreadState{
+		UnreadCount: unreadState.GetUnreadCount(),
 	}
 }
 
@@ -973,6 +1020,33 @@ func (h *ChatHandler) publishGroupTypingSnapshot(state *groupRealtimeState) {
 			realtime.NewGroupTypingUpdatedEnvelope(state.group.GetId(), state.thread.GetId(), snapshot),
 		)
 	}
+}
+
+func (h *ChatHandler) publishGroupReadUpdate(
+	ctx context.Context,
+	headers http.Header,
+	groupID string,
+	readState *chatv1.GroupReadState,
+	unreadState *chatv1.GroupUnreadState,
+) {
+	if h.realtimeHub == nil || groupID == "" {
+		return
+	}
+
+	profile, err := h.fetchCurrentProfile(ctx, headers)
+	if err != nil {
+		h.logger.Error(
+			"не удалось получить текущий профиль для realtime group read update",
+			slog.String("group_id", groupID),
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	h.realtimeHub.PublishToUser(
+		profile.GetId(),
+		realtime.NewGroupReadUpdatedEnvelope(groupID, readState, unreadState),
+	)
 }
 
 func (h *ChatHandler) fetchGroupStateAndActorProfile(
