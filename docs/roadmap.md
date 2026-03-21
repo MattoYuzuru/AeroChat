@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] attachment retention and delete semantics foundation
+- [x] web audio and video inline preview bootstrap
 
 ---
 
@@ -152,7 +152,7 @@
 - [x] Attachment retention and delete semantics
 - [ ] Voice notes
 - [ ] Video notes
-- [ ] Image/audio/video preview
+- [x] Image/audio/video preview
 - [ ] Encrypted relay
 - [x] TTL cleanup
 - [ ] Local media drafts

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { Attachment } from "../gateway/types";
 import {
-  canRenderInlineImagePreview,
+  type AttachmentInlinePreviewKind,
   formatAttachmentSize,
+  getAttachmentInlinePreviewKind,
   getAttachmentDisplayDescriptor,
 } from "./metadata";
 import { resolveAttachmentDownloadUrl } from "./open";
@@ -37,6 +38,7 @@ export function MessageAttachmentList({
           fileName: attachment.fileName,
           mimeType: attachment.mimeType,
         });
+        const inlinePreviewKind = getAttachmentInlinePreviewKind(attachment.mimeType);
 
         return (
           <article
@@ -45,12 +47,13 @@ export function MessageAttachmentList({
             data-tone={tone}
             key={attachment.id}
           >
-            {canRenderInlineImagePreview(attachment.mimeType) && (
-              <InlineImageAttachmentPreview
+            {inlinePreviewKind !== null && (
+              <InlineAttachmentPreview
                 accessToken={accessToken}
                 attachment={attachment}
                 isPending={isPending}
                 onOpenAttachment={onOpenAttachment}
+                previewKind={inlinePreviewKind}
               />
             )}
 
@@ -106,18 +109,20 @@ export function MessageAttachmentList({
 
 type PreviewStatus = "idle" | "loading" | "ready" | "error";
 
-function InlineImageAttachmentPreview({
+function InlineAttachmentPreview({
   accessToken,
   attachment,
   isPending,
   onOpenAttachment,
+  previewKind,
 }: {
   accessToken: string;
   attachment: Attachment;
   isPending: boolean;
   onOpenAttachment(attachmentId: string): void;
+  previewKind: AttachmentInlinePreviewKind;
 }) {
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const triggerRef = useRef<HTMLDivElement | null>(null);
   const startsVisible = typeof IntersectionObserver === "undefined";
   const [isVisible, setIsVisible] = useState(startsVisible);
   const [status, setStatus] = useState<PreviewStatus>(startsVisible ? "loading" : "idle");
@@ -192,47 +197,182 @@ function InlineImageAttachmentPreview({
 
   return (
     <div className={styles.previewSection}>
-      <button
-        aria-label={`Открыть изображение ${attachment.fileName}`}
-        className={styles.previewButton}
-        data-state={status}
-        disabled={isPending}
-        onClick={() => {
-          onOpenAttachment(attachment.id);
-        }}
-        ref={triggerRef}
-        type="button"
-      >
+      <div className={styles.previewViewport} ref={triggerRef}>
         {status === "ready" && previewUrl !== null ? (
-          <>
-            <img
-              alt=""
-              className={styles.previewImage}
-              loading="lazy"
-              onError={handleImageError}
-              src={previewUrl}
-            />
-            <span className={styles.previewOverlay}>Открыть оригинал</span>
-          </>
+          <ReadyInlineAttachmentPreview
+            attachment={attachment}
+            isPending={isPending}
+            onMediaError={handleImageError}
+            onOpenAttachment={onOpenAttachment}
+            previewKind={previewKind}
+            previewUrl={previewUrl}
+          />
+        ) : previewKind === "image" ? (
+          <button
+            aria-label={`Открыть изображение ${attachment.fileName}`}
+            className={styles.previewButton}
+            data-kind={previewKind}
+            data-state={status}
+            disabled={isPending}
+            onClick={() => {
+              onOpenAttachment(attachment.id);
+            }}
+            type="button"
+          >
+            <div className={styles.previewPlaceholder} data-kind={previewKind}>
+              <span className={styles.previewPlaceholderLabel}>
+                {getPreviewPlaceholderLabel(previewKind)}
+              </span>
+              <span className={styles.previewPlaceholderText}>
+                {getPreviewPlaceholderText(previewKind, status)}
+              </span>
+            </div>
+          </button>
         ) : (
-          <span className={styles.previewPlaceholder}>
-            <span className={styles.previewPlaceholderLabel}>Inline preview</span>
-            <span className={styles.previewPlaceholderText}>
-              {status === "loading"
-                ? "Загружаем изображение..."
-                : status === "error"
-                  ? "Preview недоступен."
-                  : "Preview загрузится, когда карточка появится в ленте."}
+          <div className={styles.previewPlaceholder} data-kind={previewKind}>
+            <span className={styles.previewPlaceholderLabel}>
+              {getPreviewPlaceholderLabel(previewKind)}
             </span>
-          </span>
+            <span className={styles.previewPlaceholderText}>
+              {getPreviewPlaceholderText(previewKind, status)}
+            </span>
+          </div>
         )}
-      </button>
+      </div>
 
       {status === "error" && (
         <p className={styles.previewCaption}>
-          Переходим к обычной file-card модели: используйте кнопки «Открыть» или «Скачать».
+          {getPreviewErrorCaption(previewKind)}
         </p>
       )}
     </div>
   );
+}
+
+function ReadyInlineAttachmentPreview({
+  attachment,
+  isPending,
+  onMediaError,
+  onOpenAttachment,
+  previewKind,
+  previewUrl,
+}: {
+  attachment: Attachment;
+  isPending: boolean;
+  onMediaError(): void;
+  onOpenAttachment(attachmentId: string): void;
+  previewKind: AttachmentInlinePreviewKind;
+  previewUrl: string;
+}) {
+  if (previewKind === "image") {
+    return (
+      <button
+        aria-label={`Открыть изображение ${attachment.fileName}`}
+        className={styles.previewButton}
+        data-kind={previewKind}
+        data-state="ready"
+        disabled={isPending}
+        onClick={() => {
+          onOpenAttachment(attachment.id);
+        }}
+        type="button"
+      >
+        <img
+          alt=""
+          className={styles.previewImage}
+          loading="lazy"
+          onError={onMediaError}
+          src={previewUrl}
+        />
+        <span className={styles.previewOverlay}>Открыть оригинал</span>
+      </button>
+    );
+  }
+
+  if (previewKind === "audio") {
+    return (
+      <div className={styles.mediaSurface} data-kind={previewKind} data-state="ready">
+        <audio
+          aria-label={`Аудиовложение ${attachment.fileName}`}
+          className={styles.audioPlayer}
+          controls
+          onError={onMediaError}
+          preload="metadata"
+          src={previewUrl}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.mediaSurface} data-kind={previewKind} data-state="ready">
+      <video
+        aria-label={`Видеовложение ${attachment.fileName}`}
+        className={styles.videoPlayer}
+        controls
+        onError={onMediaError}
+        playsInline
+        preload="metadata"
+        src={previewUrl}
+      />
+    </div>
+  );
+}
+
+function getPreviewPlaceholderLabel(previewKind: AttachmentInlinePreviewKind): string {
+  switch (previewKind) {
+    case "audio":
+      return "Inline audio";
+    case "video":
+      return "Inline video";
+    default:
+      return "Inline preview";
+  }
+}
+
+function getPreviewPlaceholderText(
+  previewKind: AttachmentInlinePreviewKind,
+  status: PreviewStatus,
+): string {
+  if (status === "loading") {
+    switch (previewKind) {
+      case "audio":
+        return "Готовим inline-аудиоплеер...";
+      case "video":
+        return "Готовим inline-видеоплеер...";
+      default:
+        return "Загружаем изображение...";
+    }
+  }
+
+  if (status === "error") {
+    switch (previewKind) {
+      case "audio":
+        return "Inline-аудио недоступно.";
+      case "video":
+        return "Inline-видео недоступно.";
+      default:
+        return "Preview недоступен.";
+    }
+  }
+
+  switch (previewKind) {
+    case "audio":
+      return "Плеер загрузится, когда карточка появится в ленте.";
+    case "video":
+      return "Видеоплеер загрузится, когда карточка появится в ленте.";
+    default:
+      return "Preview загрузится, когда карточка появится в ленте.";
+  }
+}
+
+function getPreviewErrorCaption(previewKind: AttachmentInlinePreviewKind): string {
+  switch (previewKind) {
+    case "audio":
+      return "Inline-аудио недоступно. Используйте кнопки «Открыть» или «Скачать».";
+    case "video":
+      return "Inline-видео недоступно. Используйте кнопки «Открыть» или «Скачать».";
+    default:
+      return "Переходим к обычной file-card модели: используйте кнопки «Открыть» или «Скачать».";
+  }
 }

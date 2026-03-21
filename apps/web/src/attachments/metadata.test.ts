@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  canRenderInlineAudioPreview,
   canRenderInlineImagePreview,
+  canRenderInlineVideoPreview,
   classifyAttachmentForDisplay,
   describeAttachmentMimeType,
   formatAttachmentSize,
+  getAttachmentInlinePreviewKind,
   getAttachmentDisplayDescriptor,
 } from "./metadata";
 
@@ -77,5 +80,18 @@ describe("attachment metadata helpers", () => {
     expect(canRenderInlineImagePreview("image/svg+xml")).toBe(false);
     expect(canRenderInlineImagePreview("")).toBe(false);
     expect(canRenderInlineImagePreview("application/octet-stream")).toBe(false);
+  });
+
+  it("allows audio and video inline preview only for MIME-confirmed media", () => {
+    expect(getAttachmentInlinePreviewKind(" audio/ogg ")).toBe("audio");
+    expect(getAttachmentInlinePreviewKind("video/mp4")).toBe("video");
+    expect(getAttachmentInlinePreviewKind("")).toBeNull();
+    expect(getAttachmentInlinePreviewKind("application/octet-stream")).toBeNull();
+
+    expect(canRenderInlineAudioPreview("audio/ogg")).toBe(true);
+    expect(canRenderInlineAudioPreview("voice-note.ogg")).toBe(false);
+
+    expect(canRenderInlineVideoPreview("video/webm")).toBe(true);
+    expect(canRenderInlineVideoPreview("clip.mp4")).toBe(false);
   });
 });

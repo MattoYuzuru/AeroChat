@@ -89,6 +89,50 @@ describe("MessageAttachmentList", () => {
     expect(markup).toContain("Открыть изображение hero-shot.jpg");
   });
 
+  it("renders bounded inline audio playback only for MIME-confirmed audio", () => {
+    const markup = renderToStaticMarkup(
+      <MessageAttachmentList
+        accessToken="token-1"
+        attachments={[
+          createAttachment({
+            id: "attachment-5",
+            fileName: "voice-note.ogg",
+            mimeType: "audio/ogg",
+          }),
+        ]}
+        onDownloadAttachment={vi.fn()}
+        onOpenAttachment={vi.fn()}
+        pendingAttachmentId={null}
+      />,
+    );
+
+    expect(markup).toContain("Inline audio");
+    expect(markup).toContain("Готовим inline-аудиоплеер...");
+    expect(markup).toContain("voice-note.ogg");
+  });
+
+  it("renders bounded inline video playback only for MIME-confirmed video", () => {
+    const markup = renderToStaticMarkup(
+      <MessageAttachmentList
+        accessToken="token-1"
+        attachments={[
+          createAttachment({
+            id: "attachment-6",
+            fileName: "clip.webm",
+            mimeType: "video/webm",
+          }),
+        ]}
+        onDownloadAttachment={vi.fn()}
+        onOpenAttachment={vi.fn()}
+        pendingAttachmentId={null}
+      />,
+    );
+
+    expect(markup).toContain("Inline video");
+    expect(markup).toContain("Готовим inline-видеоплеер...");
+    expect(markup).toContain("clip.webm");
+  });
+
   it("keeps filename-only image guesses on the safe file-card fallback path", () => {
     const markup = renderToStaticMarkup(
       <MessageAttachmentList
@@ -108,5 +152,45 @@ describe("MessageAttachmentList", () => {
 
     expect(markup).not.toContain("Inline preview");
     expect(markup).toContain("looks-like-image.jpg");
+  });
+
+  it("keeps filename-only audio and video guesses on the safe file-card fallback path", () => {
+    const audioMarkup = renderToStaticMarkup(
+      <MessageAttachmentList
+        accessToken="token-1"
+        attachments={[
+          createAttachment({
+            id: "attachment-7",
+            fileName: "voice-note.ogg",
+            mimeType: "",
+          }),
+        ]}
+        onDownloadAttachment={vi.fn()}
+        onOpenAttachment={vi.fn()}
+        pendingAttachmentId={null}
+      />,
+    );
+
+    const videoMarkup = renderToStaticMarkup(
+      <MessageAttachmentList
+        accessToken="token-1"
+        attachments={[
+          createAttachment({
+            id: "attachment-8",
+            fileName: "clip.webm",
+            mimeType: "",
+          }),
+        ]}
+        onDownloadAttachment={vi.fn()}
+        onOpenAttachment={vi.fn()}
+        pendingAttachmentId={null}
+      />,
+    );
+
+    expect(audioMarkup).not.toContain("Готовим inline-аудиоплеер...");
+    expect(audioMarkup).toContain("voice-note.ogg");
+
+    expect(videoMarkup).not.toContain("Готовим inline-видеоплеер...");
+    expect(videoMarkup).toContain("clip.webm");
   });
 });

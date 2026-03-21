@@ -71,7 +71,7 @@ AeroChat должен поддерживать:
   - send text + attachment;
   - send attachment-only message;
   - polished file rendering для всех attachment kinds;
-  - lazy inline preview для image attachments;
+  - lazy inline preview для image/audio/video attachments;
   - безопасное explicit open/download через presigned access.
 - attachment lifecycle hardening:
   - real expiration для stale upload sessions;

@@ -6,6 +6,8 @@ export type AttachmentDisplayCategory =
   | "archive-binary"
   | "generic-file";
 
+export type AttachmentInlinePreviewKind = "image" | "audio" | "video";
+
 export interface AttachmentDisplayDescriptor {
   category: AttachmentDisplayCategory;
   badgeLabel: string;
@@ -184,8 +186,35 @@ export function describeAttachmentMimeType(mimeType: string): string {
 }
 
 export function canRenderInlineImagePreview(mimeType: string): boolean {
+  return getAttachmentInlinePreviewKind(mimeType) === "image";
+}
+
+export function canRenderInlineAudioPreview(mimeType: string): boolean {
+  return getAttachmentInlinePreviewKind(mimeType) === "audio";
+}
+
+export function canRenderInlineVideoPreview(mimeType: string): boolean {
+  return getAttachmentInlinePreviewKind(mimeType) === "video";
+}
+
+export function getAttachmentInlinePreviewKind(
+  mimeType: string,
+): AttachmentInlinePreviewKind | null {
   const normalized = normalizeMimeType(mimeType);
-  return normalized.startsWith("image/") && normalized !== "image/svg+xml";
+
+  if (normalized.startsWith("image/") && normalized !== "image/svg+xml") {
+    return "image";
+  }
+
+  if (normalized.startsWith("audio/")) {
+    return "audio";
+  }
+
+  if (normalized.startsWith("video/")) {
+    return "video";
+  }
+
+  return null;
 }
 
 export function classifyAttachmentForDisplay(input: {
