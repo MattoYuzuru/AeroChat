@@ -12,6 +12,7 @@ const (
 	EventTypeGroupTypingUpdated        = "group.typing.updated"
 	EventTypeGroupReadUpdated          = "group.read.updated"
 	GroupMessageReasonCreated          = "message_created"
+	GroupMessageReasonEdited           = "message_edited"
 	GroupMembershipReasonJoined        = "member_joined"
 	GroupMembershipReasonRemoved       = "member_removed"
 	GroupMembershipReasonLeft          = "member_left"
@@ -105,6 +106,7 @@ type groupMessageWire struct {
 	Attachments  []attachmentWire        `json:"attachments"`
 	CreatedAt    string                  `json:"createdAt"`
 	UpdatedAt    string                  `json:"updatedAt"`
+	EditedAt     string                  `json:"editedAt,omitempty"`
 }
 
 type groupTypingIndicatorWire struct {
@@ -281,6 +283,7 @@ func toGroupMessageWire(message *chatv1.GroupMessage) *groupMessageWire {
 		Attachments:  toAttachmentWires(message.GetAttachments()),
 		CreatedAt:    formatProtoTimestamp(message.GetCreatedAt()),
 		UpdatedAt:    formatProtoTimestamp(message.GetUpdatedAt()),
+		EditedAt:     formatProtoTimestamp(message.GetEditedAt()),
 	}
 }
 

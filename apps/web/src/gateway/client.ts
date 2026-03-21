@@ -248,6 +248,7 @@ interface DirectChatMessageWire extends TimestampedWire {
   tombstone?: MessageTombstoneWire;
   pinned?: boolean;
   attachments?: AttachmentWire[];
+  editedAt?: string;
 }
 
 interface GroupMessageWire extends TimestampedWire {
@@ -258,6 +259,7 @@ interface GroupMessageWire extends TimestampedWire {
   kind?: string;
   text?: TextMessageContentWire;
   attachments?: AttachmentWire[];
+  editedAt?: string;
 }
 
 interface DirectChatReadPositionWire extends TimestampedWire {
@@ -398,6 +400,10 @@ interface SendGroupTextMessageResponseWire {
   message?: GroupMessageWire;
 }
 
+interface EditGroupMessageResponseWire {
+  message?: GroupMessageWire;
+}
+
 interface MarkDirectChatReadResponseWire {
   readState?: DirectChatReadStateWire;
   unreadState?: UnreadStateWire;
@@ -420,6 +426,10 @@ interface ClearDirectChatPresenceResponseWire {
 }
 
 interface SendTextMessageResponseWire {
+  message?: DirectChatMessageWire;
+}
+
+interface EditDirectChatMessageResponseWire {
   message?: DirectChatMessageWire;
 }
 
@@ -865,6 +875,23 @@ export function createGatewayClient(
       return normalizeGroupMessage(response.message);
     },
 
+    async editGroupMessage(token, groupId, messageId, text) {
+      const response = await unaryCall<EditGroupMessageResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "EditGroupMessage",
+        {
+          groupId: groupId.trim(),
+          messageId: messageId.trim(),
+          text,
+        },
+        token,
+      );
+
+      return normalizeGroupMessage(response.message);
+    },
+
     async createDirectChat(token, peerUserId) {
       const response = await unaryCall<CreateDirectChatResponseWire>(
         fetchImpl,
@@ -997,6 +1024,23 @@ export function createGatewayClient(
           chatId: chatId.trim(),
           text,
           attachmentIds: normalizeIDs(attachmentIds),
+        },
+        token,
+      );
+
+      return normalizeDirectChatMessage(response.message);
+    },
+
+    async editDirectChatMessage(token, chatId, messageId, text) {
+      const response = await unaryCall<EditDirectChatMessageResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "EditDirectChatMessage",
+        {
+          chatId: chatId.trim(),
+          messageId: messageId.trim(),
+          text,
         },
         token,
       );
@@ -1597,6 +1641,7 @@ function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessag
     attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
+    editedAt: normalizeNullableString(input?.editedAt),
   };
 }
 
@@ -1660,6 +1705,7 @@ function normalizeDirectChatMessage(
     attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
+    editedAt: normalizeNullableString(input?.editedAt),
   };
 }
 

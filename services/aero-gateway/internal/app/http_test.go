@@ -1726,6 +1726,30 @@ func (h *testChatHandler) SendTextMessage(_ context.Context, req *connect.Reques
 	}), nil
 }
 
+func (h *testChatHandler) EditDirectChatMessage(_ context.Context, req *connect.Request[chatv1.EditDirectChatMessageRequest]) (*connect.Response[chatv1.EditDirectChatMessageResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	now := timestamppb.Now()
+
+	return connect.NewResponse(&chatv1.EditDirectChatMessageResponse{
+		Message: &chatv1.DirectChatMessage{
+			Id:           req.Msg.MessageId,
+			ChatId:       req.Msg.ChatId,
+			SenderUserId: userIDFromAuthorization(req.Header().Get("Authorization")),
+			Kind:         chatv1.MessageKind_MESSAGE_KIND_TEXT,
+			Text: &chatv1.TextMessageContent{
+				Text:           req.Msg.Text,
+				MarkdownPolicy: chatv1.MarkdownPolicy_MARKDOWN_POLICY_SAFE_SUBSET_V1,
+			},
+			CreatedAt: now,
+			UpdatedAt: now,
+			EditedAt:  now,
+		},
+	}), nil
+}
+
 func (h *testChatHandler) SendGroupTextMessage(_ context.Context, req *connect.Request[chatv1.SendGroupTextMessageRequest]) (*connect.Response[chatv1.SendGroupTextMessageResponse], error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -1759,6 +1783,38 @@ func (h *testChatHandler) SendGroupTextMessage(_ context.Context, req *connect.R
 	h.touchGroupMessageLocked(now)
 
 	return connect.NewResponse(&chatv1.SendGroupTextMessageResponse{
+		Message: cloneGroupMessageMessage(message),
+	}), nil
+}
+
+func (h *testChatHandler) EditGroupMessage(_ context.Context, req *connect.Request[chatv1.EditGroupMessageRequest]) (*connect.Response[chatv1.EditGroupMessageResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	if h.requireGroupMemberLocked(actorID) == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("group not found"))
+	}
+
+	now := timestamppb.Now()
+	message := &chatv1.GroupMessage{
+		Id:           req.Msg.MessageId,
+		GroupId:      req.Msg.GroupId,
+		ThreadId:     h.groupThread.GetId(),
+		SenderUserId: actorID,
+		Kind:         chatv1.MessageKind_MESSAGE_KIND_TEXT,
+		Text: &chatv1.TextMessageContent{
+			Text:           req.Msg.Text,
+			MarkdownPolicy: chatv1.MarkdownPolicy_MARKDOWN_POLICY_SAFE_SUBSET_V1,
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
+		EditedAt:  now,
+	}
+	h.touchGroupMessageLocked(now)
+
+	return connect.NewResponse(&chatv1.EditGroupMessageResponse{
 		Message: cloneGroupMessageMessage(message),
 	}), nil
 }

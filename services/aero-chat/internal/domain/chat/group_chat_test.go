@@ -159,6 +159,104 @@ func TestGroupMessagesRejectRawHTMLAndRequireMembership(t *testing.T) {
 	}
 }
 
+func TestEditGroupMessageAllowsAuthorAfterDowngradeToReader(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{10}, 64))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	group := mustCreateGroup(t, service, alice.Token, "Editors")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	message := mustSendGroupMessage(t, service, bob.Token, group.ID, "draft")
+	member, err := service.UpdateGroupMemberRole(context.Background(), alice.Token, group.ID, bob.User.ID, GroupMemberRoleReader)
+	if err != nil {
+		t.Fatalf("downgrade Bob to reader: %v", err)
+	}
+	if member.Role != GroupMemberRoleReader {
+		t.Fatalf("ожидалась роль reader после downgrade, получено %q", member.Role)
+	}
+	if _, err := service.SendGroupTextMessage(context.Background(), bob.Token, group.ID, "new send denied", nil); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("reader не должен отправлять новые сообщения, получено %v", err)
+	}
+
+	edited, err := service.EditGroupMessage(context.Background(), bob.Token, group.ID, message.ID, "edited by reader")
+	if err != nil {
+		t.Fatalf("edit group message after downgrade: %v", err)
+	}
+	if edited.Text == nil || edited.Text.Text != "edited by reader" {
+		t.Fatalf("ожидался обновлённый group text, получено %+v", edited.Text)
+	}
+	if edited.EditedAt == nil {
+		t.Fatal("ожидался explicit edited_at после group edit")
+	}
+}
+
+func TestEditGroupMessageRejectsNonAuthorAndAttachmentOnly(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{11}, 64))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	group := mustCreateGroup(t, service, alice.Token, "Guard rails")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	message := mustSendGroupMessage(t, service, alice.Token, group.ID, "owner text")
+	if _, err := service.EditGroupMessage(context.Background(), bob.Token, group.ID, message.ID, "unauthorized"); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("ожидалась ошибка group edit author only, получено %v", err)
+	}
+
+	intent, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		"",
+		group.ID,
+		"note.txt",
+		"text/plain",
+		64,
+	)
+	if err != nil {
+		t.Fatalf("create group attachment intent: %v", err)
+	}
+	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+		Size:        intent.Attachment.SizeBytes,
+		ContentType: intent.Attachment.MimeType,
+	}
+	uploadedAttachment, err := service.CompleteAttachmentUpload(context.Background(), alice.Token, intent.Attachment.ID, intent.UploadSession.ID)
+	if err != nil {
+		t.Fatalf("complete group attachment upload: %v", err)
+	}
+
+	attachmentOnly, err := service.SendGroupTextMessage(context.Background(), alice.Token, group.ID, "   ", []string{uploadedAttachment.ID})
+	if err != nil {
+		t.Fatalf("send attachment-only group message: %v", err)
+	}
+	if attachmentOnly.Text != nil {
+		t.Fatal("ожидался attachment-only group message без text payload")
+	}
+	if _, err := service.EditGroupMessage(context.Background(), alice.Token, group.ID, attachmentOnly.ID, "new text"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка edit attachment-only group message, получено %v", err)
+	}
+}
+
 func TestSetAndClearGroupTypingUsesTTLAndThreadScope(t *testing.T) {
 	t.Parallel()
 

@@ -66,6 +66,7 @@ interface DirectChatMessageWire {
   attachments?: AttachmentWire[];
   createdAt?: string;
   updatedAt?: string;
+  editedAt?: string;
 }
 
 interface DirectChatReadPositionWire {
@@ -336,6 +337,7 @@ function normalizeDirectChatMessage(
     attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
+    editedAt: normalizeNullableString(input?.editedAt),
   };
 }
 

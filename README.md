@@ -54,6 +54,7 @@ AeroChat должен поддерживать:
 
 - личные чаты и группы через `aero-gateway`;
 - bounded realtime для chat/group foundation;
+- message edit foundation для direct chats и groups с explicit edited marker;
 - первый attachment upload flow в direct chats и groups:
   - file picker;
   - presigned upload;

@@ -212,6 +212,7 @@ export interface DirectChatMessage {
   attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
+  editedAt: string | null;
 }
 
 export interface GroupMessage {
@@ -224,6 +225,7 @@ export interface GroupMessage {
   attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
+  editedAt: string | null;
 }
 
 export interface DirectChatReadPosition {
@@ -415,6 +417,12 @@ export interface GatewayClient {
     text: string,
     attachmentIds?: string[],
   ): Promise<GroupMessage>;
+  editGroupMessage(
+    token: string,
+    groupId: string,
+    messageId: string,
+    text: string,
+  ): Promise<GroupMessage>;
   createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
   listDirectChats(token: string): Promise<DirectChat[]>;
   getDirectChat(token: string, chatId: string): Promise<DirectChatSnapshot>;
@@ -444,6 +452,12 @@ export interface GatewayClient {
     chatId: string,
     text: string,
     attachmentIds?: string[],
+  ): Promise<DirectChatMessage>;
+  editDirectChatMessage(
+    token: string,
+    chatId: string,
+    messageId: string,
+    text: string,
   ): Promise<DirectChatMessage>;
   listDirectChatMessages(
     token: string,

@@ -355,7 +355,7 @@ INSERT INTO direct_chat_messages (
     created_at,
     updated_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at
+RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at, edited_at
 `
 
 type CreateDirectChatMessageParams struct {
@@ -390,6 +390,7 @@ func (q *Queries) CreateDirectChatMessage(ctx context.Context, arg CreateDirectC
 		&i.MarkdownPolicy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EditedAt,
 	)
 	return i, err
 }
@@ -534,7 +535,7 @@ INSERT INTO group_messages (
     created_at,
     updated_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at
+RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at, edited_at
 `
 
 type CreateGroupMessageParams struct {
@@ -569,6 +570,7 @@ func (q *Queries) CreateGroupMessage(ctx context.Context, arg CreateGroupMessage
 		&i.MarkdownPolicy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EditedAt,
 	)
 	return i, err
 }
@@ -645,6 +647,68 @@ type DisableGroupInviteLinkParams struct {
 
 func (q *Queries) DisableGroupInviteLink(ctx context.Context, arg DisableGroupInviteLinkParams) (int64, error) {
 	result, err := q.db.Exec(ctx, disableGroupInviteLink, arg.GroupID, arg.ID, arg.DisabledAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const editDirectChatMessageText = `-- name: EditDirectChatMessageText :execrows
+UPDATE direct_chat_messages
+SET
+    text_content = $3,
+    updated_at = $4,
+    edited_at = $4
+WHERE chat_id = $1
+  AND id = $2
+`
+
+type EditDirectChatMessageTextParams struct {
+	ChatID      uuid.UUID          `db:"chat_id" json:"chat_id"`
+	ID          uuid.UUID          `db:"id" json:"id"`
+	TextContent string             `db:"text_content" json:"text_content"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) EditDirectChatMessageText(ctx context.Context, arg EditDirectChatMessageTextParams) (int64, error) {
+	result, err := q.db.Exec(ctx, editDirectChatMessageText,
+		arg.ChatID,
+		arg.ID,
+		arg.TextContent,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const editGroupMessageText = `-- name: EditGroupMessageText :execrows
+UPDATE group_messages AS m
+SET
+    text_content = $3,
+    updated_at = $4,
+    edited_at = $4
+FROM group_threads AS t
+WHERE m.id = $2
+  AND m.thread_id = t.id
+  AND t.group_id = $1
+`
+
+type EditGroupMessageTextParams struct {
+	GroupID     uuid.UUID          `db:"group_id" json:"group_id"`
+	ID          uuid.UUID          `db:"id" json:"id"`
+	TextContent string             `db:"text_content" json:"text_content"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) EditGroupMessageText(ctx context.Context, arg EditGroupMessageTextParams) (int64, error) {
+	result, err := q.db.Exec(ctx, editGroupMessageText,
+		arg.GroupID,
+		arg.ID,
+		arg.TextContent,
+		arg.UpdatedAt,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -823,6 +887,7 @@ SELECT
     m.markdown_policy,
     m.created_at,
     m.updated_at,
+    m.edited_at,
     t.deleted_by_user_id,
     t.deleted_at,
     EXISTS (
@@ -851,6 +916,7 @@ type GetDirectChatMessageByIDRow struct {
 	MarkdownPolicy  string             `db:"markdown_policy" json:"markdown_policy"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt        pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 	DeletedByUserID pgtype.UUID        `db:"deleted_by_user_id" json:"deleted_by_user_id"`
 	DeletedAt       pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 	Pinned          bool               `db:"pinned" json:"pinned"`
@@ -868,6 +934,7 @@ func (q *Queries) GetDirectChatMessageByID(ctx context.Context, arg GetDirectCha
 		&i.MarkdownPolicy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EditedAt,
 		&i.DeletedByUserID,
 		&i.DeletedAt,
 		&i.Pinned,
@@ -1195,7 +1262,8 @@ SELECT
     m.text_content,
     m.markdown_policy,
     m.created_at,
-    m.updated_at
+    m.updated_at,
+    m.edited_at
 FROM group_memberships AS self
 JOIN group_threads AS t ON t.group_id = self.group_id
 JOIN group_messages AS m ON m.thread_id = t.id
@@ -1221,6 +1289,7 @@ type GetGroupMessageByIDAndUserIDRow struct {
 	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt       pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 }
 
 func (q *Queries) GetGroupMessageByIDAndUserID(ctx context.Context, arg GetGroupMessageByIDAndUserIDParams) (GetGroupMessageByIDAndUserIDRow, error) {
@@ -1236,6 +1305,7 @@ func (q *Queries) GetGroupMessageByIDAndUserID(ctx context.Context, arg GetGroup
 		&i.MarkdownPolicy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EditedAt,
 	)
 	return i, err
 }
@@ -1583,6 +1653,7 @@ SELECT
     m.markdown_policy,
     m.created_at,
     m.updated_at,
+    m.edited_at,
     t.deleted_by_user_id,
     t.deleted_at,
     EXISTS (
@@ -1613,6 +1684,7 @@ type ListDirectChatMessagesRow struct {
 	MarkdownPolicy  string             `db:"markdown_policy" json:"markdown_policy"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt        pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 	DeletedByUserID pgtype.UUID        `db:"deleted_by_user_id" json:"deleted_by_user_id"`
 	DeletedAt       pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 	Pinned          bool               `db:"pinned" json:"pinned"`
@@ -1636,6 +1708,7 @@ func (q *Queries) ListDirectChatMessages(ctx context.Context, arg ListDirectChat
 			&i.MarkdownPolicy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EditedAt,
 			&i.DeletedByUserID,
 			&i.DeletedAt,
 			&i.Pinned,
@@ -2178,7 +2251,8 @@ SELECT
     m.text_content,
     m.markdown_policy,
     m.created_at,
-    m.updated_at
+    m.updated_at,
+    m.edited_at
 FROM group_memberships AS self
 JOIN group_threads AS t ON t.group_id = self.group_id
 JOIN group_messages AS m ON m.thread_id = t.id
@@ -2205,6 +2279,7 @@ type ListGroupMessagesByGroupIDAndUserIDRow struct {
 	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt       pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 }
 
 func (q *Queries) ListGroupMessagesByGroupIDAndUserID(ctx context.Context, arg ListGroupMessagesByGroupIDAndUserIDParams) ([]ListGroupMessagesByGroupIDAndUserIDRow, error) {
@@ -2226,6 +2301,7 @@ func (q *Queries) ListGroupMessagesByGroupIDAndUserID(ctx context.Context, arg L
 			&i.MarkdownPolicy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EditedAt,
 		); err != nil {
 			return nil, err
 		}

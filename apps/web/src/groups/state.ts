@@ -63,7 +63,12 @@ export function applyGroupRealtimeToGroups(
       return sortGroups(
         upsertGroup(
           groups,
-          patchGroupFromMessage(findGroupByID(groups, event.group.id), event.message, currentUserId),
+          patchGroupFromMessage(
+            findGroupByID(groups, event.group.id),
+            event.message,
+            event.reason,
+            currentUserId,
+          ),
         ),
       );
     case "group.membership.updated":
@@ -107,11 +112,16 @@ export function applyGroupRealtimeToSelectedState(
 
     return {
       status: "ready",
-      snapshot: {
-        group: patchGroupFromMessage(state.snapshot.group, event.message, currentUserId),
-        thread: state.snapshot.thread,
-        readState: state.snapshot.readState,
-        typingState: state.snapshot.typingState,
+        snapshot: {
+          group: patchGroupFromMessage(
+            state.snapshot.group,
+            event.message,
+            event.reason,
+            currentUserId,
+          ),
+          thread: state.snapshot.thread,
+          readState: state.snapshot.readState,
+          typingState: state.snapshot.typingState,
       },
       members: state.members,
       inviteLinks: filterInviteLinks(state.inviteLinks, event.group.selfRole),
@@ -304,6 +314,7 @@ function filterInviteLinks(
 function patchGroupFromMessage(
   group: Group | null,
   message: GroupMessage,
+  reason: string,
   currentUserId: string,
 ): Group {
   if (group === null) {
@@ -313,7 +324,8 @@ function patchGroupFromMessage(
       kind: "CHAT_KIND_GROUP",
       selfRole: "member",
       memberCount: 0,
-      unreadCount: message.senderUserId === currentUserId ? 0 : 1,
+      unreadCount:
+        reason === "message_created" && message.senderUserId !== currentUserId ? 1 : 0,
       createdAt: "",
       updatedAt: message.updatedAt || message.createdAt,
     };
@@ -327,7 +339,10 @@ function patchGroupFromMessage(
 
   return {
     ...group,
-    unreadCount: shouldIncrementUnread ? group.unreadCount + 1 : group.unreadCount,
+    unreadCount:
+      reason === "message_created" && shouldIncrementUnread
+        ? group.unreadCount + 1
+        : group.unreadCount,
     updatedAt: candidateUpdatedAt === "" ? group.updatedAt : candidateUpdatedAt,
   };
 }

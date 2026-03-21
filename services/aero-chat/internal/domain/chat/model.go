@@ -203,6 +203,7 @@ type DirectChatMessage struct {
 	Attachments  []Attachment
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	EditedAt     *time.Time
 }
 
 type GroupMessage struct {
@@ -215,6 +216,7 @@ type GroupMessage struct {
 	Attachments  []Attachment
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	EditedAt     *time.Time
 }
 
 type DirectChatReadPosition struct {
@@ -346,6 +348,21 @@ type CreateGroupMessageParams struct {
 	Text          string
 	AttachmentIDs []string
 	CreatedAt     time.Time
+}
+
+type EditDirectChatMessageParams struct {
+	ChatID    string
+	MessageID string
+	Text      string
+	EditedAt  time.Time
+}
+
+type EditGroupMessageParams struct {
+	GroupID   string
+	ThreadID  string
+	MessageID string
+	Text      string
+	EditedAt  time.Time
 }
 
 type CreateAttachmentUploadIntentParams struct {

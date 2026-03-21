@@ -59,6 +59,7 @@ type DirectChatMessage struct {
 	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt       pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 }
 
 type DirectChatMessageTombstone struct {
@@ -134,6 +135,7 @@ type GroupMessage struct {
 	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt       pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 }
 
 type GroupThread struct {

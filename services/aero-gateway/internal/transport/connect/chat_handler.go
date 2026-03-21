@@ -306,6 +306,17 @@ func (h *ChatHandler) SendTextMessage(ctx context.Context, req *connect.Request[
 	return response, nil
 }
 
+func (h *ChatHandler) EditDirectChatMessage(ctx context.Context, req *connect.Request[chatv1.EditDirectChatMessageRequest]) (*connect.Response[chatv1.EditDirectChatMessageResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.EditDirectChatMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishMessageUpdate(ctx, req.Header(), req.Msg.ChatId, response.Msg.Message, realtime.DirectChatMessageReasonEdited)
+
+	return response, nil
+}
+
 func (h *ChatHandler) ListDirectChatMessages(ctx context.Context, req *connect.Request[chatv1.ListDirectChatMessagesRequest]) (*connect.Response[chatv1.ListDirectChatMessagesResponse], error) {
 	return forwardUnary(ctx, req, h.client.ListDirectChatMessages)
 }
@@ -320,7 +331,18 @@ func (h *ChatHandler) SendGroupTextMessage(ctx context.Context, req *connect.Req
 		return nil, err
 	}
 
-	h.publishGroupMessageUpdate(ctx, req.Header(), req.Msg.GroupId, response.Msg.Message)
+	h.publishGroupMessageUpdate(ctx, req.Header(), req.Msg.GroupId, response.Msg.Message, realtime.GroupMessageReasonCreated)
+
+	return response, nil
+}
+
+func (h *ChatHandler) EditGroupMessage(ctx context.Context, req *connect.Request[chatv1.EditGroupMessageRequest]) (*connect.Response[chatv1.EditGroupMessageResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.EditGroupMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishGroupMessageUpdate(ctx, req.Header(), req.Msg.GroupId, response.Msg.Message, realtime.GroupMessageReasonEdited)
 
 	return response, nil
 }
@@ -722,6 +744,7 @@ func (h *ChatHandler) publishGroupMessageUpdate(
 	headers http.Header,
 	groupID string,
 	message *chatv1.GroupMessage,
+	reason string,
 ) {
 	if h.realtimeHub == nil || message == nil || groupID == "" {
 		return
@@ -746,7 +769,7 @@ func (h *ChatHandler) publishGroupMessageUpdate(
 		h.realtimeHub.PublishToUser(
 			recipientID,
 			realtime.NewGroupMessageUpdatedEnvelope(
-				realtime.GroupMessageReasonCreated,
+				reason,
 				groupForRecipient(state.group, member),
 				threadForRecipient(state.thread, member),
 				message,
