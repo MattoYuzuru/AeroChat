@@ -1195,7 +1195,8 @@ export function GroupsPage() {
             <h1 className={styles.title}>Group attachment composer bootstrap</h1>
             <p className={styles.subtitle}>
               Slice делает group chat usable для реальных файлов: upload intent, presigned upload,
-              lazy inline preview для image attachments и send через существующий gateway-only flow.
+              lazy inline preview для image/audio/video attachments и send через существующий
+              gateway-only flow.
             </p>
           </div>
 
@@ -1456,8 +1457,8 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Primary group thread</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Thread показывает текст, polished file cards и inline preview для image
-                    attachments, но без player и media processing pipeline.
+                    Thread показывает текст, polished file cards и inline preview для
+                    image/audio/video attachments, но без media processing pipeline.
                   </p>
                 </div>
 

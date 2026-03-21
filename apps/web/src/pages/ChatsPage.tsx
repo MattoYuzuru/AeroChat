@@ -324,7 +324,8 @@ export function ChatsPage() {
             <p className={styles.subtitle}>
               Лёгкий direct chat shell остаётся gateway-only, уже поднимает bounded realtime
               transport foundation и single-file attachment flow с text-only, text + file и
-              attachment-only сообщениями, включая lazy inline preview для image attachments.
+              attachment-only сообщениями, включая lazy inline preview для image/audio/video
+              attachments.
             </p>
           </div>
 
@@ -649,7 +650,7 @@ export function ChatsPage() {
                     {selectedThread.messages.length === 0 ? (
                       <StateCard
                         title="Сообщений пока нет"
-                        message="Отправьте первое сообщение: текст, текст с файлом или attachment-only. Для image attachments inline preview уже доступен, а остальной richer media rendering остаётся отдельным slice."
+                        message="Отправьте первое сообщение: текст, текст с файлом или attachment-only. Для image/audio/video attachments inline preview уже доступен, а media processing pipeline остаётся отдельным slice."
                       />
                     ) : (
                       selectedThread.messages.map((message) => {
