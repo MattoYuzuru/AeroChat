@@ -22,6 +22,18 @@ func (r *Repository) CreateAttachmentUploadIntent(ctx context.Context, params ch
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockAttachmentQuotaOwner(ctx, mustParseUUID(params.OwnerUserID)); err != nil {
+		return nil, convertError(err)
+	}
+
+	usageBytes, err := q.GetAttachmentQuotaUsageByOwner(ctx, mustParseUUID(params.OwnerUserID))
+	if err != nil {
+		return nil, convertError(err)
+	}
+	if params.UserQuotaBytes > 0 && usageBytes+params.SizeBytes > params.UserQuotaBytes {
+		return nil, chat.ErrResourceExhausted
+	}
+
 	attachmentRow, err := q.CreateAttachment(ctx, chatsqlc.CreateAttachmentParams{
 		ID:           mustParseUUID(params.AttachmentID),
 		OwnerUserID:  mustParseUUID(params.OwnerUserID),

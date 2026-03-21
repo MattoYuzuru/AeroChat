@@ -26,6 +26,7 @@ type Config struct {
 	MediaS3PresignSecure            bool
 	MediaUploadIntentTTL            time.Duration
 	MediaMaxUploadSizeBytes         int64
+	MediaUserQuotaBytes             int64
 	MediaAttachmentCleanupInterval  time.Duration
 	MediaUnattachedAttachmentTTL    time.Duration
 	MediaAttachmentCleanupBatchSize int
@@ -65,6 +66,13 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	mediaUserQuotaBytes, err := lookupInt64("AERO_MEDIA_USER_QUOTA_BYTES", 512*1024*1024)
+	if err != nil {
+		return Config{}, err
+	}
+	if mediaUserQuotaBytes <= 0 {
+		return Config{}, fmt.Errorf("переменная %s должна быть положительной", "AERO_MEDIA_USER_QUOTA_BYTES")
+	}
 	attachmentCleanupBatchSize, err := lookupInt("AERO_MEDIA_ATTACHMENT_CLEANUP_BATCH_SIZE", 100)
 	if err != nil {
 		return Config{}, err
@@ -88,6 +96,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		MediaS3PresignSecure:            lookupBool("AERO_MEDIA_S3_PRESIGN_SECURE", false),
 		MediaUploadIntentTTL:            uploadIntentTTL,
 		MediaMaxUploadSizeBytes:         maxUploadSizeBytes,
+		MediaUserQuotaBytes:             mediaUserQuotaBytes,
 		MediaAttachmentCleanupInterval:  attachmentCleanupInterval,
 		MediaUnattachedAttachmentTTL:    unattachedAttachmentTTL,
 		MediaAttachmentCleanupBatchSize: attachmentCleanupBatchSize,

@@ -777,6 +777,18 @@ RETURNING
     completed_at,
     failed_at;
 
+-- name: LockAttachmentQuotaOwner :one
+SELECT id
+FROM users
+WHERE id = $1
+FOR UPDATE;
+
+-- name: GetAttachmentQuotaUsageByOwner :one
+SELECT COALESCE(SUM(size_bytes), 0)::BIGINT AS total_bytes
+FROM attachments
+WHERE owner_user_id = $1
+  AND status IN ('pending', 'uploaded', 'attached', 'failed');
+
 -- name: GetAttachmentRowByID :one
 SELECT
     a.id,

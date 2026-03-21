@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] attachment lifecycle hardening
+- [x] media quotas foundation for upload admission control
 
 ---
 
@@ -148,12 +148,12 @@
 - [x] Attachment-only messages для direct chats и groups
 - [x] Web media message rendering polish для direct chats и groups
 - [x] Attachment lifecycle hardening
+- [x] Quotas
 - [ ] Voice notes
 - [ ] Video notes
 - [ ] Image/audio/video preview
 - [ ] Encrypted relay
 - [x] TTL cleanup
-- [ ] Quotas
 - [ ] Local media drafts
 
 ---

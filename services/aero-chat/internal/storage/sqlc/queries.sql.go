@@ -936,6 +936,20 @@ func (q *Queries) FriendshipExists(ctx context.Context, arg FriendshipExistsPara
 	return friendship_exists, err
 }
 
+const getAttachmentQuotaUsageByOwner = `-- name: GetAttachmentQuotaUsageByOwner :one
+SELECT COALESCE(SUM(size_bytes), 0)::BIGINT AS total_bytes
+FROM attachments
+WHERE owner_user_id = $1
+  AND status IN ('pending', 'uploaded', 'attached', 'failed')
+`
+
+func (q *Queries) GetAttachmentQuotaUsageByOwner(ctx context.Context, ownerUserID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, getAttachmentQuotaUsageByOwner, ownerUserID)
+	var total_bytes int64
+	err := row.Scan(&total_bytes)
+	return total_bytes, err
+}
+
 const getAttachmentRowByID = `-- name: GetAttachmentRowByID :one
 SELECT
     a.id,
@@ -2854,6 +2868,19 @@ func (q *Queries) ListPinnedMessageIDsByChatID(ctx context.Context, chatID uuid.
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockAttachmentQuotaOwner = `-- name: LockAttachmentQuotaOwner :one
+SELECT id
+FROM users
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockAttachmentQuotaOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockAttachmentQuotaOwner, id)
+	err := row.Scan(&id)
+	return id, err
 }
 
 const markAttachmentAttached = `-- name: MarkAttachmentAttached :execrows

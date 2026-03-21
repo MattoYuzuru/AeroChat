@@ -131,6 +131,7 @@ type Service struct {
 	presenceTTL          time.Duration
 	uploadIntentTTL      time.Duration
 	maxUploadSizeBytes   int64
+	mediaUserQuotaBytes  int64
 	storageBucketName    string
 	randReader           io.Reader
 	now                  func() time.Time
@@ -148,6 +149,7 @@ func NewService(
 	presenceTTL time.Duration,
 	uploadIntentTTL time.Duration,
 	maxUploadSizeBytes int64,
+	mediaUserQuotaBytes int64,
 	storageBucketName string,
 ) *Service {
 	if typingTTL <= 0 {
@@ -162,6 +164,9 @@ func NewService(
 	if maxUploadSizeBytes <= 0 {
 		maxUploadSizeBytes = 64 * 1024 * 1024
 	}
+	if mediaUserQuotaBytes <= 0 {
+		mediaUserQuotaBytes = defaultMediaUserQuotaBytes
+	}
 
 	return &Service{
 		repo:                 repo,
@@ -175,6 +180,7 @@ func NewService(
 		presenceTTL:          presenceTTL,
 		uploadIntentTTL:      uploadIntentTTL,
 		maxUploadSizeBytes:   maxUploadSizeBytes,
+		mediaUserQuotaBytes:  mediaUserQuotaBytes,
 		storageBucketName:    storageBucketName,
 		randReader:           rand.Reader,
 		now: func() time.Time {

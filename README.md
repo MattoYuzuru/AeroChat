@@ -77,6 +77,10 @@ AeroChat должен поддерживать:
   - real expiration для stale upload sessions;
   - bounded cleanup path для orphaned unattached attachments;
   - conservative object deletion только по backend state и explicit message linkage.
+- media quota foundation:
+  - deterministic per-user byte quota на `CreateAttachmentUploadIntent`;
+  - quota usage считается только по backend-owned attachment state;
+  - `expired` и `deleted` lifecycle states больше не удерживают active quota budget.
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
 
@@ -257,6 +261,13 @@ Media/file foundation использует тот же локальный `minio
 
 - внутренний endpoint для service-to-storage доступа;
 - browser-visible endpoint для presigned upload URL.
+
+Для admission control upload intent у `aero-chat` также есть отдельный operator-facing лимит:
+
+- `AERO_MEDIA_USER_QUOTA_BYTES` задаёт общий per-user media budget в байтах;
+- quota проверяется на `CreateAttachmentUploadIntent`;
+- usage считается по attachment metadata в состояниях `pending`, `uploaded`, `attached` и `failed`;
+- `expired` и `deleted` больше не считаются частью активного quota budget.
 
 В `local/dev` шаблоне это уже сведено к `minio:9000` и `MEDIA_S3_PUBLIC_ENDPOINT`.
 Для browser upload compose runtime автоматически bootstrap'ит bucket privacy через `mc`,

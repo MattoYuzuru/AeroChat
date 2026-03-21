@@ -31,6 +31,7 @@ const (
 	maxTextMessageLength                   = 4000
 	maxSearchQueryLength                   = 200
 	maxGroupNameLength                     = 80
+	defaultMediaUserQuotaBytes       int64 = 512 * 1024 * 1024
 )
 
 type UserSummary struct {
@@ -496,6 +497,7 @@ type CreateAttachmentUploadIntentParams struct {
 	SizeBytes       int64
 	ExpiresAt       time.Time
 	CreatedAt       time.Time
+	UserQuotaBytes  int64
 }
 
 type CompleteAttachmentUploadParams struct {

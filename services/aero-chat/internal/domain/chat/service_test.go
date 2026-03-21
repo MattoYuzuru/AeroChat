@@ -1057,6 +1057,7 @@ func newTestService() (*Service, *fakeRepository) {
 		30*time.Second,
 		15*time.Minute,
 		64*1024*1024,
+		512*1024*1024,
 		"aerochat-attachments",
 	)
 	now := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
@@ -1419,6 +1420,20 @@ func (r *fakeRepository) GetDirectChat(_ context.Context, userID string, chatID 
 }
 
 func (r *fakeRepository) CreateAttachmentUploadIntent(_ context.Context, params CreateAttachmentUploadIntentParams) (*AttachmentUploadIntent, error) {
+	var usageBytes int64
+	for _, attachment := range r.attachments {
+		if attachment.OwnerUserID != params.OwnerUserID {
+			continue
+		}
+		switch attachment.Status {
+		case AttachmentStatusPending, AttachmentStatusUploaded, AttachmentStatusAttached, AttachmentStatusFailed:
+			usageBytes += attachment.SizeBytes
+		}
+	}
+	if params.UserQuotaBytes > 0 && usageBytes+params.SizeBytes > params.UserQuotaBytes {
+		return nil, ErrResourceExhausted
+	}
+
 	attachment := Attachment{
 		ID:           params.AttachmentID,
 		OwnerUserID:  params.OwnerUserID,

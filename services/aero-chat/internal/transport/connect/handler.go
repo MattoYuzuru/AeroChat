@@ -776,6 +776,8 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, chat.ErrPermissionDenied):
 		return connect.NewError(connect.CodePermissionDenied, err)
+	case errors.Is(err, chat.ErrResourceExhausted):
+		return connect.NewError(connect.CodeResourceExhausted, err)
 	case errors.Is(err, chat.ErrConflict):
 		return connect.NewError(connect.CodeFailedPrecondition, err)
 	default:
