@@ -1,9 +1,10 @@
+import { useEffect, useRef } from "react";
 import { describeAttachmentMimeType, formatAttachmentSize } from "./metadata";
-import type { VoiceNoteRecorderState } from "./useVoiceNoteRecorder";
+import type { VideoNoteRecorderState } from "./useVideoNoteRecorder";
 import styles from "./MediaNoteRecorderPanel.module.css";
 
-interface VoiceNoteRecorderPanelProps {
-  state: VoiceNoteRecorderState;
+interface VideoNoteRecorderPanelProps {
+  state: VideoNoteRecorderState;
   startDisabled: boolean;
   stopDisabled: boolean;
   discardDisabled: boolean;
@@ -15,7 +16,7 @@ interface VoiceNoteRecorderPanelProps {
   onSend(): void;
 }
 
-export function VoiceNoteRecorderPanel({
+export function VideoNoteRecorderPanel({
   state,
   startDisabled,
   stopDisabled,
@@ -26,17 +27,19 @@ export function VoiceNoteRecorderPanel({
   onStop,
   onDiscard,
   onSend,
-}: VoiceNoteRecorderPanelProps) {
+}: VideoNoteRecorderPanelProps) {
   const isRecorded = state.status === "recorded" && state.draft !== null;
   const recordedDraft = isRecorded ? state.draft : null;
+  const isVideoOnlyCapture = state.captureMode === "video-only";
 
   return (
     <section className={styles.panel}>
       <div className={styles.header}>
         <div>
-          <p className={styles.title}>Голосовая заметка</p>
+          <p className={styles.title}>Видео заметка</p>
           <p className={styles.hint}>
-            Запись остаётся single-file draft и после отправки идёт через текущий attachment flow.
+            Запись остаётся single-file draft и после отправки идёт через текущий attachment
+            flow.
           </p>
         </div>
 
@@ -48,7 +51,7 @@ export function VoiceNoteRecorderPanel({
               onClick={onStart}
               type="button"
             >
-              Записать голосовое
+              Записать видео
             </button>
           )}
 
@@ -70,18 +73,33 @@ export function VoiceNoteRecorderPanel({
       )}
 
       {state.status === "requesting_permission" && (
-        <p className={styles.status}>Запрашиваем доступ к микрофону...</p>
+        <p className={styles.status}>Запрашиваем доступ к камере и микрофону...</p>
       )}
 
       {state.status === "recording" && (
-        <p className={styles.status}>Идёт запись с микрофона. Остановите её, когда заметка будет готова.</p>
+        <p className={styles.status}>
+          Идёт запись видео заметки. Остановите её, когда preview будет готов к отправке.
+        </p>
       )}
 
       {state.status === "processing" && (
-        <p className={styles.status}>Сохраняем голосовую заметку и готовим её к review.</p>
+        <p className={styles.status}>Сохраняем видео заметку и готовим её к review.</p>
+      )}
+
+      {isVideoOnlyCapture && (
+        <p className={styles.notice}>
+          Микрофон недоступен. Видео заметка будет записана без звука.
+        </p>
       )}
 
       {state.errorMessage && <p className={styles.error}>{state.errorMessage}</p>}
+
+      {state.status === "recording" && state.livePreviewStream !== null && (
+        <div className={styles.livePreviewCard}>
+          <p className={styles.meta}>Live preview камеры</p>
+          <LiveCameraPreview stream={state.livePreviewStream} />
+        </div>
+      )}
 
       {recordedDraft && (
         <div className={styles.previewCard}>
@@ -93,10 +111,11 @@ export function VoiceNoteRecorderPanel({
             </p>
           </div>
 
-          <audio
-            aria-label={`Предпрослушивание ${recordedDraft.fileName}`}
-            className={styles.player}
+          <video
+            aria-label={`Предпросмотр ${recordedDraft.fileName}`}
+            className={styles.videoPreview}
             controls
+            playsInline
             preload="metadata"
             src={recordedDraft.previewUrl}
           />
@@ -116,11 +135,45 @@ export function VoiceNoteRecorderPanel({
               onClick={onSend}
               type="button"
             >
-              {isSending ? "Отправляем запись..." : "Отправить запись"}
+              {isSending ? "Отправляем видео..." : "Отправить видео"}
             </button>
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+function LiveCameraPreview({
+  stream,
+}: {
+  stream: MediaStream;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const node = videoRef.current;
+    if (node === null) {
+      return;
+    }
+
+    node.srcObject = stream;
+
+    return () => {
+      if (node.srcObject === stream) {
+        node.srcObject = null;
+      }
+    };
+  }, [stream]);
+
+  return (
+    <video
+      aria-label="Live preview видео заметки"
+      autoPlay
+      className={styles.livePreview}
+      muted
+      playsInline
+      ref={videoRef}
+    />
   );
 }

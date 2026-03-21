@@ -16,8 +16,10 @@ import {
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
 import { downloadAttachment, openAttachmentInNewTab } from "../attachments/open";
+import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
 import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
+import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
 import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import { createMarkdownPreview } from "../chats/createMarkdownPreview";
@@ -48,6 +50,7 @@ export function ChatsPage() {
   const [editingMessageText, setEditingMessageText] = useState("");
   const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
   const [isSendingVoiceNote, setIsSendingVoiceNote] = useState(false);
+  const [isSendingVideoNote, setIsSendingVideoNote] = useState(false);
   const [selectedReplyMessage, setSelectedReplyMessage] = useState<DirectChatMessage | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -77,8 +80,14 @@ export function ChatsPage() {
   const voiceNoteRecorder = useVoiceNoteRecorder({
     enabled: authState.status === "authenticated",
   });
+  const videoNoteRecorder = useVideoNoteRecorder({
+    enabled: authState.status === "authenticated",
+  });
   const discardVoiceNoteRecording = useEffectEvent(() => {
     voiceNoteRecorder.discardRecording();
+  });
+  const discardVideoNoteRecording = useEffectEvent(() => {
+    videoNoteRecorder.discardRecording();
   });
 
   const requestedChatId = searchParams.get("chat")?.trim() ?? "";
@@ -135,6 +144,7 @@ export function ChatsPage() {
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
     discardVoiceNoteRecording();
+    discardVideoNoteRecording();
   }, [chats.state.selectedChatId]);
 
   useEffect(() => {
@@ -210,6 +220,13 @@ export function ChatsPage() {
     voiceNoteStatus === "recording" ||
     voiceNoteStatus === "processing" ||
     voiceNoteStatus === "recorded";
+  const videoNoteStatus = videoNoteRecorder.state.status;
+  const hasPendingVideoNote =
+    videoNoteStatus === "requesting_permission" ||
+    videoNoteStatus === "recording" ||
+    videoNoteStatus === "processing" ||
+    videoNoteStatus === "recorded";
+  const isSendingRecordedNote = isSendingVoiceNote || isSendingVideoNote;
   const canSubmitComposer = canSubmitMessageComposer({
     text: composerText,
     uploadedAttachmentId,
@@ -217,14 +234,22 @@ export function ChatsPage() {
   });
   const canPickAttachment =
     !chats.state.isSendingMessage &&
-    !isSendingVoiceNote &&
+    !isSendingRecordedNote &&
     !attachmentComposer.isUploading &&
-    !hasPendingVoiceNote;
+    !hasPendingVoiceNote &&
+    !hasPendingVideoNote;
   const canRecordVoiceNote =
     !chats.state.isSendingMessage &&
-    !isSendingVoiceNote &&
+    !isSendingRecordedNote &&
     !attachmentComposer.isUploading &&
-    attachmentDraft === null;
+    attachmentDraft === null &&
+    !hasPendingVideoNote;
+  const canRecordVideoNote =
+    !chats.state.isSendingMessage &&
+    !isSendingRecordedNote &&
+    !attachmentComposer.isUploading &&
+    attachmentDraft === null &&
+    !hasPendingVoiceNote;
 
   async function submitComposer() {
     if (!canSubmitComposer) {
@@ -263,7 +288,7 @@ export function ChatsPage() {
       voiceNoteDraft === null ||
       chats.state.thread === null ||
       chats.state.isSendingMessage ||
-      isSendingVoiceNote ||
+      isSendingRecordedNote ||
       attachmentComposer.isUploading
     ) {
       return;
@@ -298,6 +323,50 @@ export function ChatsPage() {
       attachmentComposer.markSendFailed();
     } finally {
       setIsSendingVoiceNote(false);
+    }
+  }
+
+  async function handleSendVideoNote() {
+    const videoNoteDraft = videoNoteRecorder.state.draft;
+    if (
+      videoNoteDraft === null ||
+      chats.state.thread === null ||
+      chats.state.isSendingMessage ||
+      isSendingRecordedNote ||
+      attachmentComposer.isUploading
+    ) {
+      return;
+    }
+
+    setIsSendingVideoNote(true);
+    setComposerError(null);
+    chats.clearFeedback();
+
+    const recordedFile = videoNoteDraft.file;
+    videoNoteRecorder.discardRecording();
+
+    try {
+      const uploadedAttachment = await attachmentComposer.selectFile(recordedFile);
+      if (uploadedAttachment === null) {
+        return;
+      }
+
+      const success = await chats.sendMessage(
+        normalizeComposerMessageText(composerText),
+        [uploadedAttachment.id],
+        selectedReplyMessage?.id ?? null,
+      );
+
+      if (success) {
+        setComposerText("");
+        setSelectedReplyMessage(null);
+        attachmentComposer.markSendSucceeded();
+        return;
+      }
+
+      attachmentComposer.markSendFailed();
+    } finally {
+      setIsSendingVideoNote(false);
     }
   }
 
@@ -1025,13 +1094,13 @@ export function ChatsPage() {
                         {attachmentDraft === null ? "Выбрать файл" : "Заменить файл"}
                       </button>
                       <span className={styles.attachmentHint}>
-                        Single-file composer: можно выбрать файл, записать голосовую заметку,
-                        отправить текст + attachment или только attachment.
+                        Single-file composer: можно выбрать файл, записать голосовую или видео
+                        заметку, отправить текст + attachment или только attachment.
                       </span>
                     </div>
 
                     <VoiceNoteRecorderPanel
-                      discardDisabled={chats.state.isSendingMessage || isSendingVoiceNote}
+                      discardDisabled={chats.state.isSendingMessage || isSendingRecordedNote}
                       isSending={isSendingVoiceNote}
                       onDiscard={() => {
                         voiceNoteRecorder.discardRecording();
@@ -1047,12 +1116,37 @@ export function ChatsPage() {
                       }}
                       sendDisabled={
                         chats.state.isSendingMessage ||
-                        isSendingVoiceNote ||
+                        isSendingRecordedNote ||
                         attachmentComposer.isUploading
                       }
                       startDisabled={!canRecordVoiceNote}
                       state={voiceNoteRecorder.state}
-                      stopDisabled={isSendingVoiceNote}
+                      stopDisabled={isSendingRecordedNote}
+                    />
+
+                    <VideoNoteRecorderPanel
+                      discardDisabled={chats.state.isSendingMessage || isSendingRecordedNote}
+                      isSending={isSendingVideoNote}
+                      onDiscard={() => {
+                        videoNoteRecorder.discardRecording();
+                      }}
+                      onSend={() => {
+                        void handleSendVideoNote();
+                      }}
+                      onStart={() => {
+                        void videoNoteRecorder.startRecording();
+                      }}
+                      onStop={() => {
+                        videoNoteRecorder.stopRecording();
+                      }}
+                      sendDisabled={
+                        chats.state.isSendingMessage ||
+                        isSendingRecordedNote ||
+                        attachmentComposer.isUploading
+                      }
+                      startDisabled={!canRecordVideoNote}
+                      state={videoNoteRecorder.state}
+                      stopDisabled={isSendingRecordedNote}
                     />
 
                     {attachmentDraft && (

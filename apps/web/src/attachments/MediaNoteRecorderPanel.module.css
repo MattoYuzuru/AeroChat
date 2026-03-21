@@ -21,7 +21,8 @@
 .status,
 .error,
 .hint,
-.support {
+.support,
+.notice {
   margin: 0;
 }
 
@@ -37,9 +38,17 @@
   color: rgba(63, 87, 116, 0.82);
 }
 
-.status {
+.status,
+.notice {
   font-size: 0.84rem;
+}
+
+.status {
   color: rgba(14, 91, 150, 0.88);
+}
+
+.notice {
+  color: rgba(123, 81, 14, 0.92);
 }
 
 .error {
@@ -88,11 +97,22 @@
   opacity: 0.72;
 }
 
-.previewCard {
+.previewCard,
+.livePreviewCard {
   display: grid;
   gap: 0.7rem;
 }
 
-.player {
+.player,
+.videoPreview,
+.livePreview {
   width: min(100%, 28rem);
+  border-radius: 0.95rem;
+}
+
+.videoPreview,
+.livePreview {
+  background: rgba(8, 20, 34, 0.94);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
 }

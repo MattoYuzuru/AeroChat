@@ -86,6 +86,7 @@ AeroChat должен поддерживать:
   - direct message tombstone переводит linked attachment из `attached` в `detached`;
   - `detached` больше не удерживает active quota budget;
   - object cleanup для `detached` остаётся staged и выполняется отдельно после retention grace period.
+- bounded web video-notes recording через существующий attachment upload/send flow.
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
 

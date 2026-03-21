@@ -17,8 +17,10 @@ import {
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
 import { downloadAttachment, openAttachmentInNewTab } from "../attachments/open";
+import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
 import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
+import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
 import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
@@ -129,8 +131,14 @@ export function GroupsPage() {
   const voiceNoteRecorder = useVoiceNoteRecorder({
     enabled: authState.status === "authenticated",
   });
+  const videoNoteRecorder = useVideoNoteRecorder({
+    enabled: authState.status === "authenticated",
+  });
   const discardVoiceNoteRecording = useEffectEvent(() => {
     voiceNoteRecorder.discardRecording();
+  });
+  const discardVideoNoteRecording = useEffectEvent(() => {
+    videoNoteRecorder.discardRecording();
   });
   const voiceNoteStatus = voiceNoteRecorder.state.status;
   const hasPendingVoiceNote =
@@ -138,6 +146,12 @@ export function GroupsPage() {
     voiceNoteStatus === "recording" ||
     voiceNoteStatus === "processing" ||
     voiceNoteStatus === "recorded";
+  const videoNoteStatus = videoNoteRecorder.state.status;
+  const hasPendingVideoNote =
+    videoNoteStatus === "requesting_permission" ||
+    videoNoteStatus === "recording" ||
+    videoNoteStatus === "processing" ||
+    videoNoteStatus === "recorded";
   const canSubmitGroupComposer =
     selectedState.status === "ready" &&
     canSubmitMessageComposer({
@@ -151,12 +165,21 @@ export function GroupsPage() {
     !isSendingMessage &&
     !attachmentComposer.isUploading &&
     !hasPendingVoiceNote &&
+    !hasPendingVideoNote &&
     selectedState.snapshot.thread.canSendMessages;
   const canRecordVoiceNote =
     selectedState.status === "ready" &&
     !isSendingMessage &&
     !attachmentComposer.isUploading &&
     attachmentComposer.state.draft === null &&
+    !hasPendingVideoNote &&
+    selectedState.snapshot.thread.canSendMessages;
+  const canRecordVideoNote =
+    selectedState.status === "ready" &&
+    !isSendingMessage &&
+    !attachmentComposer.isUploading &&
+    attachmentComposer.state.draft === null &&
+    !hasPendingVoiceNote &&
     selectedState.snapshot.thread.canSendMessages;
 
   useEffect(() => {
@@ -171,6 +194,7 @@ export function GroupsPage() {
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
     discardVoiceNoteRecording();
+    discardVideoNoteRecording();
   }, [selectedGroupId]);
 
   useEffect(() => {
@@ -913,6 +937,58 @@ export function GroupsPage() {
       const message = resolveProtectedError(
         error,
         "Не удалось отправить голосовую заметку в группу.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }
+
+  async function handleSendGroupVideoNote() {
+    if (selectedState.status !== "ready" || videoNoteRecorder.state.draft === null) {
+      return;
+    }
+
+    if (isSendingMessage || attachmentComposer.isUploading) {
+      return;
+    }
+
+    setIsSendingMessage(true);
+    setActionError(null);
+    setNotice(null);
+
+    const recordedFile = videoNoteRecorder.state.draft.file;
+    let uploadedAttachmentId: string | null = null;
+    videoNoteRecorder.discardRecording();
+
+    try {
+      const uploadedAttachment = await attachmentComposer.selectFile(recordedFile);
+      if (uploadedAttachment === null) {
+        return;
+      }
+      uploadedAttachmentId = uploadedAttachment.id;
+
+      await gatewayClient.sendGroupTextMessage(
+        token,
+        selectedState.snapshot.group.id,
+        normalizeComposerMessageText(composerText),
+        [uploadedAttachmentId],
+        selectedReplyMessage?.id ?? null,
+      );
+      setComposerText("");
+      setSelectedReplyMessage(null);
+      attachmentComposer.markSendSucceeded();
+      setNotice("Видео заметка отправлена.");
+    } catch (error) {
+      if (uploadedAttachmentId !== null) {
+        attachmentComposer.markSendFailed();
+      }
+      const message = resolveProtectedError(
+        error,
+        "Не удалось отправить видео заметку в группу.",
         expireSession,
       );
       if (message !== null) {
@@ -1815,8 +1891,8 @@ export function GroupsPage() {
                         : "Заменить файл"}
                     </button>
                     <span className={styles.attachmentHint}>
-                      Single-file composer: файл или voice note можно отправить и без текста после
-                      upload.
+                      Single-file composer: файл, voice note или video note можно отправить и без
+                      текста после upload.
                     </span>
                   </div>
 
@@ -1842,6 +1918,31 @@ export function GroupsPage() {
                     }
                     startDisabled={!canRecordVoiceNote}
                     state={voiceNoteRecorder.state}
+                    stopDisabled={isSendingMessage}
+                  />
+
+                  <VideoNoteRecorderPanel
+                    discardDisabled={isSendingMessage}
+                    isSending={isSendingMessage}
+                    onDiscard={() => {
+                      videoNoteRecorder.discardRecording();
+                    }}
+                    onSend={() => {
+                      void handleSendGroupVideoNote();
+                    }}
+                    onStart={() => {
+                      void videoNoteRecorder.startRecording();
+                    }}
+                    onStop={() => {
+                      videoNoteRecorder.stopRecording();
+                    }}
+                    sendDisabled={
+                      isSendingMessage ||
+                      attachmentComposer.isUploading ||
+                      !selectedState.snapshot.thread.canSendMessages
+                    }
+                    startDisabled={!canRecordVideoNote}
+                    state={videoNoteRecorder.state}
                     stopDisabled={isSendingMessage}
                   />
 
