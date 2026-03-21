@@ -97,16 +97,18 @@ type groupMemberWire struct {
 }
 
 type groupMessageWire struct {
-	ID           string                  `json:"id"`
-	GroupID      string                  `json:"groupId"`
-	ThreadID     string                  `json:"threadId"`
-	SenderUserID string                  `json:"senderUserId"`
-	Kind         string                  `json:"kind"`
-	Text         *textMessageContentWire `json:"text,omitempty"`
-	Attachments  []attachmentWire        `json:"attachments"`
-	CreatedAt    string                  `json:"createdAt"`
-	UpdatedAt    string                  `json:"updatedAt"`
-	EditedAt     string                  `json:"editedAt,omitempty"`
+	ID               string                  `json:"id"`
+	GroupID          string                  `json:"groupId"`
+	ThreadID         string                  `json:"threadId"`
+	SenderUserID     string                  `json:"senderUserId"`
+	Kind             string                  `json:"kind"`
+	Text             *textMessageContentWire `json:"text,omitempty"`
+	ReplyToMessageID string                  `json:"replyToMessageId,omitempty"`
+	ReplyPreview     *replyPreviewWire       `json:"replyPreview,omitempty"`
+	Attachments      []attachmentWire        `json:"attachments"`
+	CreatedAt        string                  `json:"createdAt"`
+	UpdatedAt        string                  `json:"updatedAt"`
+	EditedAt         string                  `json:"editedAt,omitempty"`
 }
 
 type groupTypingIndicatorWire struct {
@@ -274,16 +276,18 @@ func toGroupMessageWire(message *chatv1.GroupMessage) *groupMessageWire {
 	}
 
 	return &groupMessageWire{
-		ID:           message.GetId(),
-		GroupID:      message.GetGroupId(),
-		ThreadID:     message.GetThreadId(),
-		SenderUserID: message.GetSenderUserId(),
-		Kind:         message.GetKind().String(),
-		Text:         toTextMessageContentWire(message.GetText()),
-		Attachments:  toAttachmentWires(message.GetAttachments()),
-		CreatedAt:    formatProtoTimestamp(message.GetCreatedAt()),
-		UpdatedAt:    formatProtoTimestamp(message.GetUpdatedAt()),
-		EditedAt:     formatProtoTimestamp(message.GetEditedAt()),
+		ID:               message.GetId(),
+		GroupID:          message.GetGroupId(),
+		ThreadID:         message.GetThreadId(),
+		SenderUserID:     message.GetSenderUserId(),
+		Kind:             message.GetKind().String(),
+		Text:             toTextMessageContentWire(message.GetText()),
+		ReplyToMessageID: message.GetReplyToMessageId(),
+		ReplyPreview:     toReplyPreviewWire(message.GetReplyPreview()),
+		Attachments:      toAttachmentWires(message.GetAttachments()),
+		CreatedAt:        formatProtoTimestamp(message.GetCreatedAt()),
+		UpdatedAt:        formatProtoTimestamp(message.GetUpdatedAt()),
+		EditedAt:         formatProtoTimestamp(message.GetEditedAt()),
 	}
 }
 

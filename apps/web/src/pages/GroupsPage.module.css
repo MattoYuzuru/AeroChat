@@ -320,6 +320,38 @@
   background: rgba(255, 255, 255, 0.56);
 }
 
+.replyPreviewCard,
+.replyComposerCard {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.72rem 0.82rem;
+  border: 1px solid rgba(91, 132, 176, 0.22);
+  border-radius: 0.95rem;
+  background: rgba(236, 245, 255, 0.76);
+  text-align: left;
+}
+
+.replyPreviewCard {
+  cursor: pointer;
+}
+
+.replyPreviewAuthor,
+.replyPreviewText {
+  margin: 0;
+}
+
+.replyPreviewAuthor {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(18, 66, 108, 0.9);
+}
+
+.replyPreviewText {
+  font-size: 0.84rem;
+  color: rgba(30, 58, 86, 0.82);
+}
+
 .messageText {
   overflow-wrap: anywhere;
 }
@@ -339,6 +371,11 @@
   display: grid;
   gap: 1rem;
   margin-top: 1rem;
+}
+
+.replyComposerCard {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 .attachmentInput {

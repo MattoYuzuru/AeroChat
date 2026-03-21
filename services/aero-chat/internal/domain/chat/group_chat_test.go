@@ -135,6 +135,51 @@ func TestReaderGroupRoleIsReadOnlyInMessageFlow(t *testing.T) {
 	}
 }
 
+func TestGroupMessagesSupportReplyPreview(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{9}, 64))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	group := mustCreateGroup(t, service, alice.Token, "Reply group")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	target := mustSendGroupMessage(t, service, bob.Token, group.ID, "group reply target")
+	reply, err := service.SendGroupTextMessage(context.Background(), alice.Token, group.ID, "reply", nil, target.ID)
+	if err != nil {
+		t.Fatalf("send group reply: %v", err)
+	}
+	if reply.ReplyToMessageID == nil || *reply.ReplyToMessageID != target.ID {
+		t.Fatalf("ожидался group reply target %q, получено %+v", target.ID, reply.ReplyToMessageID)
+	}
+	if reply.ReplyPreview == nil || reply.ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался group reply preview, получено %+v", reply.ReplyPreview)
+	}
+	if reply.ReplyPreview.Author == nil || reply.ReplyPreview.Author.ID != bob.User.ID {
+		t.Fatalf("ожидался author summary Bob в group reply preview, получено %+v", reply.ReplyPreview)
+	}
+
+	messages, err := service.ListGroupMessages(context.Background(), alice.Token, group.ID, 0)
+	if err != nil {
+		t.Fatalf("list group messages: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("ожидалось 2 сообщения в группе, получено %d", len(messages))
+	}
+	if messages[0].ReplyPreview == nil || messages[0].ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался reply preview в group history, получено %+v", messages[0].ReplyPreview)
+	}
+}
+
 func TestGroupMessagesRejectRawHTMLAndRequireMembership(t *testing.T) {
 	t.Parallel()
 

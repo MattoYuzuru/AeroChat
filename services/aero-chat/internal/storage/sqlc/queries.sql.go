@@ -352,24 +352,39 @@ INSERT INTO direct_chat_messages (
     kind,
     text_content,
     markdown_policy,
+    reply_to_message_id,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at, edited_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, reply_to_message_id, created_at, updated_at, edited_at
 `
 
 type CreateDirectChatMessageParams struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	ChatID         uuid.UUID          `db:"chat_id" json:"chat_id"`
-	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
-	Kind           string             `db:"kind" json:"kind"`
-	TextContent    string             `db:"text_content" json:"text_content"`
-	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	ChatID           uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) CreateDirectChatMessage(ctx context.Context, arg CreateDirectChatMessageParams) (DirectChatMessage, error) {
+type CreateDirectChatMessageRow struct {
+	ID               uuid.UUID          `db:"id" json:"id"`
+	ChatID           uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+}
+
+func (q *Queries) CreateDirectChatMessage(ctx context.Context, arg CreateDirectChatMessageParams) (CreateDirectChatMessageRow, error) {
 	row := q.db.QueryRow(ctx, createDirectChatMessage,
 		arg.ID,
 		arg.ChatID,
@@ -377,10 +392,11 @@ func (q *Queries) CreateDirectChatMessage(ctx context.Context, arg CreateDirectC
 		arg.Kind,
 		arg.TextContent,
 		arg.MarkdownPolicy,
+		arg.ReplyToMessageID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i DirectChatMessage
+	var i CreateDirectChatMessageRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChatID,
@@ -388,6 +404,7 @@ func (q *Queries) CreateDirectChatMessage(ctx context.Context, arg CreateDirectC
 		&i.Kind,
 		&i.TextContent,
 		&i.MarkdownPolicy,
+		&i.ReplyToMessageID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EditedAt,
@@ -532,24 +549,39 @@ INSERT INTO group_messages (
     kind,
     text_content,
     markdown_policy,
+    reply_to_message_id,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at, edited_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, reply_to_message_id, created_at, updated_at, edited_at
 `
 
 type CreateGroupMessageParams struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	ThreadID       uuid.UUID          `db:"thread_id" json:"thread_id"`
-	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
-	Kind           string             `db:"kind" json:"kind"`
-	TextContent    string             `db:"text_content" json:"text_content"`
-	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	ThreadID         uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) CreateGroupMessage(ctx context.Context, arg CreateGroupMessageParams) (GroupMessage, error) {
+type CreateGroupMessageRow struct {
+	ID               uuid.UUID          `db:"id" json:"id"`
+	ThreadID         uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+}
+
+func (q *Queries) CreateGroupMessage(ctx context.Context, arg CreateGroupMessageParams) (CreateGroupMessageRow, error) {
 	row := q.db.QueryRow(ctx, createGroupMessage,
 		arg.ID,
 		arg.ThreadID,
@@ -557,10 +589,11 @@ func (q *Queries) CreateGroupMessage(ctx context.Context, arg CreateGroupMessage
 		arg.Kind,
 		arg.TextContent,
 		arg.MarkdownPolicy,
+		arg.ReplyToMessageID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i GroupMessage
+	var i CreateGroupMessageRow
 	err := row.Scan(
 		&i.ID,
 		&i.ThreadID,
@@ -568,6 +601,7 @@ func (q *Queries) CreateGroupMessage(ctx context.Context, arg CreateGroupMessage
 		&i.Kind,
 		&i.TextContent,
 		&i.MarkdownPolicy,
+		&i.ReplyToMessageID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EditedAt,
@@ -885,6 +919,7 @@ SELECT
     m.kind,
     m.text_content,
     m.markdown_policy,
+    m.reply_to_message_id,
     m.created_at,
     m.updated_at,
     m.edited_at,
@@ -908,18 +943,19 @@ type GetDirectChatMessageByIDParams struct {
 }
 
 type GetDirectChatMessageByIDRow struct {
-	ID              uuid.UUID          `db:"id" json:"id"`
-	ChatID          uuid.UUID          `db:"chat_id" json:"chat_id"`
-	SenderUserID    uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
-	Kind            string             `db:"kind" json:"kind"`
-	TextContent     string             `db:"text_content" json:"text_content"`
-	MarkdownPolicy  string             `db:"markdown_policy" json:"markdown_policy"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	EditedAt        pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
-	DeletedByUserID pgtype.UUID        `db:"deleted_by_user_id" json:"deleted_by_user_id"`
-	DeletedAt       pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	Pinned          bool               `db:"pinned" json:"pinned"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	ChatID           uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	DeletedByUserID  pgtype.UUID        `db:"deleted_by_user_id" json:"deleted_by_user_id"`
+	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	Pinned           bool               `db:"pinned" json:"pinned"`
 }
 
 func (q *Queries) GetDirectChatMessageByID(ctx context.Context, arg GetDirectChatMessageByIDParams) (GetDirectChatMessageByIDRow, error) {
@@ -932,6 +968,7 @@ func (q *Queries) GetDirectChatMessageByID(ctx context.Context, arg GetDirectCha
 		&i.Kind,
 		&i.TextContent,
 		&i.MarkdownPolicy,
+		&i.ReplyToMessageID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EditedAt,
@@ -1261,6 +1298,7 @@ SELECT
     m.kind,
     m.text_content,
     m.markdown_policy,
+    m.reply_to_message_id,
     m.created_at,
     m.updated_at,
     m.edited_at
@@ -1280,16 +1318,17 @@ type GetGroupMessageByIDAndUserIDParams struct {
 }
 
 type GetGroupMessageByIDAndUserIDRow struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
-	ThreadID       uuid.UUID          `db:"thread_id" json:"thread_id"`
-	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
-	Kind           string             `db:"kind" json:"kind"`
-	TextContent    string             `db:"text_content" json:"text_content"`
-	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	EditedAt       pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	GroupID          uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID         uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 }
 
 func (q *Queries) GetGroupMessageByIDAndUserID(ctx context.Context, arg GetGroupMessageByIDAndUserIDParams) (GetGroupMessageByIDAndUserIDRow, error) {
@@ -1303,6 +1342,7 @@ func (q *Queries) GetGroupMessageByIDAndUserID(ctx context.Context, arg GetGroup
 		&i.Kind,
 		&i.TextContent,
 		&i.MarkdownPolicy,
+		&i.ReplyToMessageID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EditedAt,
@@ -1651,6 +1691,7 @@ SELECT
     m.kind,
     m.text_content,
     m.markdown_policy,
+    m.reply_to_message_id,
     m.created_at,
     m.updated_at,
     m.edited_at,
@@ -1676,18 +1717,19 @@ type ListDirectChatMessagesParams struct {
 }
 
 type ListDirectChatMessagesRow struct {
-	ID              uuid.UUID          `db:"id" json:"id"`
-	ChatID          uuid.UUID          `db:"chat_id" json:"chat_id"`
-	SenderUserID    uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
-	Kind            string             `db:"kind" json:"kind"`
-	TextContent     string             `db:"text_content" json:"text_content"`
-	MarkdownPolicy  string             `db:"markdown_policy" json:"markdown_policy"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	EditedAt        pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
-	DeletedByUserID pgtype.UUID        `db:"deleted_by_user_id" json:"deleted_by_user_id"`
-	DeletedAt       pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	Pinned          bool               `db:"pinned" json:"pinned"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	ChatID           uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	DeletedByUserID  pgtype.UUID        `db:"deleted_by_user_id" json:"deleted_by_user_id"`
+	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	Pinned           bool               `db:"pinned" json:"pinned"`
 }
 
 func (q *Queries) ListDirectChatMessages(ctx context.Context, arg ListDirectChatMessagesParams) ([]ListDirectChatMessagesRow, error) {
@@ -1706,6 +1748,7 @@ func (q *Queries) ListDirectChatMessages(ctx context.Context, arg ListDirectChat
 			&i.Kind,
 			&i.TextContent,
 			&i.MarkdownPolicy,
+			&i.ReplyToMessageID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.EditedAt,
@@ -2029,6 +2072,78 @@ func (q *Queries) ListDirectMessageAttachmentRowsByMessageIDs(ctx context.Contex
 	return items, nil
 }
 
+const listDirectReplyPreviewRows = `-- name: ListDirectReplyPreviewRows :many
+SELECT
+    m.id,
+    m.sender_user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    m.text_content,
+    t.deleted_by_user_id,
+    t.deleted_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM message_attachments AS ma
+        WHERE ma.direct_chat_message_id = m.id
+    ), 0)::INT AS attachment_count
+FROM direct_chat_participants AS self
+JOIN direct_chat_messages AS m ON m.chat_id = self.chat_id
+JOIN users AS u ON u.id = m.sender_user_id
+LEFT JOIN direct_chat_message_tombstones AS t ON t.message_id = m.id
+WHERE self.user_id = $1
+  AND self.chat_id = $2
+  AND m.id = ANY($3::UUID[])
+`
+
+type ListDirectReplyPreviewRowsParams struct {
+	UserID  uuid.UUID   `db:"user_id" json:"user_id"`
+	ChatID  uuid.UUID   `db:"chat_id" json:"chat_id"`
+	Column3 []uuid.UUID `db:"column_3" json:"column_3"`
+}
+
+type ListDirectReplyPreviewRowsRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	SenderUserID    uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Login           string             `db:"login" json:"login"`
+	Nickname        string             `db:"nickname" json:"nickname"`
+	AvatarUrl       pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	TextContent     string             `db:"text_content" json:"text_content"`
+	DeletedByUserID pgtype.UUID        `db:"deleted_by_user_id" json:"deleted_by_user_id"`
+	DeletedAt       pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	AttachmentCount int32              `db:"attachment_count" json:"attachment_count"`
+}
+
+func (q *Queries) ListDirectReplyPreviewRows(ctx context.Context, arg ListDirectReplyPreviewRowsParams) ([]ListDirectReplyPreviewRowsRow, error) {
+	rows, err := q.db.Query(ctx, listDirectReplyPreviewRows, arg.UserID, arg.ChatID, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDirectReplyPreviewRowsRow
+	for rows.Next() {
+		var i ListDirectReplyPreviewRowsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SenderUserID,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+			&i.TextContent,
+			&i.DeletedByUserID,
+			&i.DeletedAt,
+			&i.AttachmentCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGroupInviteLinksByGroupID = `-- name: ListGroupInviteLinksByGroupID :many
 SELECT
     id,
@@ -2250,6 +2365,7 @@ SELECT
     m.kind,
     m.text_content,
     m.markdown_policy,
+    m.reply_to_message_id,
     m.created_at,
     m.updated_at,
     m.edited_at
@@ -2270,16 +2386,17 @@ type ListGroupMessagesByGroupIDAndUserIDParams struct {
 }
 
 type ListGroupMessagesByGroupIDAndUserIDRow struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
-	ThreadID       uuid.UUID          `db:"thread_id" json:"thread_id"`
-	SenderUserID   uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
-	Kind           string             `db:"kind" json:"kind"`
-	TextContent    string             `db:"text_content" json:"text_content"`
-	MarkdownPolicy string             `db:"markdown_policy" json:"markdown_policy"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	EditedAt       pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	GroupID          uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID         uuid.UUID          `db:"thread_id" json:"thread_id"`
+	SenderUserID     uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	Kind             string             `db:"kind" json:"kind"`
+	TextContent      string             `db:"text_content" json:"text_content"`
+	MarkdownPolicy   string             `db:"markdown_policy" json:"markdown_policy"`
+	ReplyToMessageID pgtype.UUID        `db:"reply_to_message_id" json:"reply_to_message_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EditedAt         pgtype.Timestamptz `db:"edited_at" json:"edited_at"`
 }
 
 func (q *Queries) ListGroupMessagesByGroupIDAndUserID(ctx context.Context, arg ListGroupMessagesByGroupIDAndUserIDParams) ([]ListGroupMessagesByGroupIDAndUserIDRow, error) {
@@ -2299,9 +2416,77 @@ func (q *Queries) ListGroupMessagesByGroupIDAndUserID(ctx context.Context, arg L
 			&i.Kind,
 			&i.TextContent,
 			&i.MarkdownPolicy,
+			&i.ReplyToMessageID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.EditedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupReplyPreviewRows = `-- name: ListGroupReplyPreviewRows :many
+SELECT
+    m.id,
+    m.sender_user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    m.text_content,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM message_attachments AS ma
+        WHERE ma.group_message_id = m.id
+    ), 0)::INT AS attachment_count
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+JOIN group_messages AS m ON m.thread_id = t.id
+JOIN users AS u ON u.id = m.sender_user_id
+WHERE self.user_id = $1
+  AND self.group_id = $2
+  AND t.thread_key = 'primary'
+  AND m.id = ANY($3::UUID[])
+`
+
+type ListGroupReplyPreviewRowsParams struct {
+	UserID  uuid.UUID   `db:"user_id" json:"user_id"`
+	GroupID uuid.UUID   `db:"group_id" json:"group_id"`
+	Column3 []uuid.UUID `db:"column_3" json:"column_3"`
+}
+
+type ListGroupReplyPreviewRowsRow struct {
+	ID              uuid.UUID   `db:"id" json:"id"`
+	SenderUserID    uuid.UUID   `db:"sender_user_id" json:"sender_user_id"`
+	Login           string      `db:"login" json:"login"`
+	Nickname        string      `db:"nickname" json:"nickname"`
+	AvatarUrl       pgtype.Text `db:"avatar_url" json:"avatar_url"`
+	TextContent     string      `db:"text_content" json:"text_content"`
+	AttachmentCount int32       `db:"attachment_count" json:"attachment_count"`
+}
+
+func (q *Queries) ListGroupReplyPreviewRows(ctx context.Context, arg ListGroupReplyPreviewRowsParams) ([]ListGroupReplyPreviewRowsRow, error) {
+	rows, err := q.db.Query(ctx, listGroupReplyPreviewRows, arg.UserID, arg.GroupID, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGroupReplyPreviewRowsRow
+	for rows.Next() {
+		var i ListGroupReplyPreviewRowsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.SenderUserID,
+			&i.Login,
+			&i.Nickname,
+			&i.AvatarUrl,
+			&i.TextContent,
+			&i.AttachmentCount,
 		); err != nil {
 			return nil, err
 		}

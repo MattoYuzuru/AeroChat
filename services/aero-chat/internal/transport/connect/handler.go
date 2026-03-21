@@ -519,7 +519,14 @@ func (h *Handler) SendTextMessage(ctx context.Context, req *connect.Request[chat
 		return nil, err
 	}
 
-	message, err := h.service.SendTextMessage(ctx, token, req.Msg.ChatId, req.Msg.Text, req.Msg.AttachmentIds)
+	message, err := h.service.SendTextMessage(
+		ctx,
+		token,
+		req.Msg.ChatId,
+		req.Msg.Text,
+		req.Msg.AttachmentIds,
+		req.Msg.GetReplyToMessageId(),
+	)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -593,7 +600,14 @@ func (h *Handler) SendGroupTextMessage(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 
-	message, err := h.service.SendGroupTextMessage(ctx, token, req.Msg.GroupId, req.Msg.Text, req.Msg.AttachmentIds)
+	message, err := h.service.SendGroupTextMessage(
+		ctx,
+		token,
+		req.Msg.GroupId,
+		req.Msg.Text,
+		req.Msg.AttachmentIds,
+		req.Msg.GetReplyToMessageId(),
+	)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -812,6 +826,10 @@ func toProtoDirectChatMessage(value chat.DirectChatMessage) *chatv1.DirectChatMe
 		Attachments:  toProtoAttachments(value.Attachments),
 		CreatedAt:    timestamppb.New(value.CreatedAt),
 		UpdatedAt:    timestamppb.New(value.UpdatedAt),
+		ReplyPreview: toProtoReplyPreview(value.ReplyPreview),
+	}
+	if value.ReplyToMessageID != nil {
+		result.ReplyToMessageId = value.ReplyToMessageID
 	}
 	if value.Text != nil {
 		result.Text = &chatv1.TextMessageContent{
@@ -842,6 +860,10 @@ func toProtoGroupMessage(value chat.GroupMessage) *chatv1.GroupMessage {
 		Attachments:  toProtoAttachments(value.Attachments),
 		CreatedAt:    timestamppb.New(value.CreatedAt),
 		UpdatedAt:    timestamppb.New(value.UpdatedAt),
+		ReplyPreview: toProtoReplyPreview(value.ReplyPreview),
+	}
+	if value.ReplyToMessageID != nil {
+		result.ReplyToMessageId = value.ReplyToMessageID
 	}
 	if value.Text != nil {
 		result.Text = &chatv1.TextMessageContent{
@@ -851,6 +873,26 @@ func toProtoGroupMessage(value chat.GroupMessage) *chatv1.GroupMessage {
 	}
 	if value.EditedAt != nil {
 		result.EditedAt = timestamppb.New(*value.EditedAt)
+	}
+
+	return result
+}
+
+func toProtoReplyPreview(value *chat.ReplyPreview) *chatv1.ReplyPreview {
+	if value == nil {
+		return nil
+	}
+
+	result := &chatv1.ReplyPreview{
+		MessageId:       value.MessageID,
+		HasText:         value.HasText,
+		TextPreview:     value.TextPreview,
+		AttachmentCount: uint32(max(value.AttachmentCount, 0)),
+		IsDeleted:       value.IsDeleted,
+		IsUnavailable:   value.IsUnavailable,
+	}
+	if value.Author != nil {
+		result.Author = toProtoChatUser(*value.Author)
 	}
 
 	return result

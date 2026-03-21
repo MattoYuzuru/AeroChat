@@ -415,6 +415,7 @@ SELECT
     m.kind,
     m.text_content,
     m.markdown_policy,
+    m.reply_to_message_id,
     m.created_at,
     m.updated_at,
     m.edited_at
@@ -436,6 +437,7 @@ SELECT
     m.kind,
     m.text_content,
     m.markdown_policy,
+    m.reply_to_message_id,
     m.created_at,
     m.updated_at,
     m.edited_at
@@ -521,6 +523,29 @@ FROM direct_chat_pins
 WHERE chat_id = $1
 ORDER BY created_at DESC, message_id DESC;
 
+-- name: ListDirectReplyPreviewRows :many
+SELECT
+    m.id,
+    m.sender_user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    m.text_content,
+    t.deleted_by_user_id,
+    t.deleted_at,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM message_attachments AS ma
+        WHERE ma.direct_chat_message_id = m.id
+    ), 0)::INT AS attachment_count
+FROM direct_chat_participants AS self
+JOIN direct_chat_messages AS m ON m.chat_id = self.chat_id
+JOIN users AS u ON u.id = m.sender_user_id
+LEFT JOIN direct_chat_message_tombstones AS t ON t.message_id = m.id
+WHERE self.user_id = $1
+  AND self.chat_id = $2
+  AND m.id = ANY($3::UUID[]);
+
 -- name: GetDirectChatMessageByID :one
 SELECT
     m.id,
@@ -529,6 +554,7 @@ SELECT
     m.kind,
     m.text_content,
     m.markdown_policy,
+    m.reply_to_message_id,
     m.created_at,
     m.updated_at,
     m.edited_at,
@@ -552,6 +578,7 @@ SELECT
     m.kind,
     m.text_content,
     m.markdown_policy,
+    m.reply_to_message_id,
     m.created_at,
     m.updated_at,
     m.edited_at,
@@ -577,10 +604,11 @@ INSERT INTO direct_chat_messages (
     kind,
     text_content,
     markdown_policy,
+    reply_to_message_id,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at, edited_at;
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, reply_to_message_id, created_at, updated_at, edited_at;
 
 -- name: CreateAttachment :one
 INSERT INTO attachments (
@@ -833,10 +861,33 @@ INSERT INTO group_messages (
     kind,
     text_content,
     markdown_policy,
+    reply_to_message_id,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at, edited_at;
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, reply_to_message_id, created_at, updated_at, edited_at;
+
+-- name: ListGroupReplyPreviewRows :many
+SELECT
+    m.id,
+    m.sender_user_id,
+    u.login,
+    u.nickname,
+    u.avatar_url,
+    m.text_content,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM message_attachments AS ma
+        WHERE ma.group_message_id = m.id
+    ), 0)::INT AS attachment_count
+FROM group_memberships AS self
+JOIN group_threads AS t ON t.group_id = self.group_id
+JOIN group_messages AS m ON m.thread_id = t.id
+JOIN users AS u ON u.id = m.sender_user_id
+WHERE self.user_id = $1
+  AND self.group_id = $2
+  AND t.thread_key = 'primary'
+  AND m.id = ANY($3::UUID[]);
 
 -- name: TouchDirectChatUpdatedAt :exec
 UPDATE direct_chats

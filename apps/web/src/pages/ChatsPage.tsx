@@ -40,6 +40,7 @@ export function ChatsPage() {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState("");
   const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
+  const [selectedReplyMessage, setSelectedReplyMessage] = useState<DirectChatMessage | null>(null);
   const pendingPeerRef = useRef<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const sessionToken =
@@ -113,6 +114,7 @@ export function ChatsPage() {
   useEffect(() => {
     setEditingMessageId(null);
     setEditingMessageText("");
+    setSelectedReplyMessage(null);
   }, [chats.state.selectedChatId]);
 
   if (authState.status !== "authenticated") {
@@ -158,9 +160,11 @@ export function ChatsPage() {
     const success = await chats.sendMessage(
       normalizedText,
       uploadedAttachmentId === null ? [] : [uploadedAttachmentId],
+      selectedReplyMessage?.id ?? null,
     );
     if (success) {
       setComposerText("");
+      setSelectedReplyMessage(null);
       if (uploadedAttachmentId !== null) {
         attachmentComposer.markSendSucceeded();
       }
@@ -607,6 +611,7 @@ export function ChatsPage() {
                           <article
                             key={message.id}
                             className={styles.messageRow}
+                            id={`direct-message-${message.id}`}
                             data-own={isOwn}
                           >
                             <div className={styles.messageBubble} data-own={isOwn}>
@@ -681,6 +686,26 @@ export function ChatsPage() {
                                   </>
                                 ) : (
                                   <>
+                                    {message.replyPreview && (
+                                      <button
+                                        className={styles.replyPreviewCard}
+                                        onClick={() => {
+                                          jumpToMessage(`direct-message-${message.replyPreview?.messageId ?? ""}`);
+                                        }}
+                                        type="button"
+                                      >
+                                        <span className={styles.replyPreviewAuthor}>
+                                          {describeReplyPreviewAuthor(
+                                            message.replyPreview,
+                                            authState.profile.id,
+                                            selectedPeer?.nickname ?? "Собеседник",
+                                          )}
+                                        </span>
+                                        <span className={styles.replyPreviewText}>
+                                          {describeReplyPreviewText(message.replyPreview)}
+                                        </span>
+                                      </button>
+                                    )}
                                     {hasMessageText && (
                                       <div className={styles.messageText}>
                                         <SafeMessageMarkdown text={message.text?.text ?? ""} />
@@ -751,6 +776,19 @@ export function ChatsPage() {
                                         {message.pinned ? "Снять pin" : "Закрепить"}
                                       </button>
 
+                                      <button
+                                        className={styles.ghostButton}
+                                        disabled={pendingLabel !== null}
+                                        onClick={() => {
+                                          setSelectedReplyMessage(message);
+                                          setComposerError(null);
+                                          chats.clearFeedback();
+                                        }}
+                                        type="button"
+                                      >
+                                        Ответить
+                                      </button>
+
                                       {canEdit && (
                                         <button
                                           className={styles.ghostButton}
@@ -811,6 +849,31 @@ export function ChatsPage() {
                   </div>
 
                   <form className={styles.composer} onSubmit={handleComposerSubmit}>
+                    {selectedReplyMessage && (
+                      <div className={styles.replyComposerCard}>
+                        <div>
+                          <p className={styles.replyPreviewAuthor}>
+                            Ответ на {selectedReplyMessage.senderUserId === authState.profile.id ? "ваше сообщение" : selectedPeer?.nickname ?? "сообщение собеседника"}
+                          </p>
+                          <p className={styles.replyPreviewText}>
+                            {describeDirectComposerReplyTarget(
+                              selectedReplyMessage,
+                              authState.profile.id,
+                            )}
+                          </p>
+                        </div>
+                        <button
+                          className={styles.ghostButton}
+                          onClick={() => {
+                            setSelectedReplyMessage(null);
+                          }}
+                          type="button"
+                        >
+                          Отменить reply
+                        </button>
+                      </div>
+                    )}
+
                     <div className={styles.attachmentActions}>
                       <input
                         accept="*/*"
@@ -1100,6 +1163,82 @@ function describeOwnMessageReadLabel(
   }
 
   return null;
+}
+
+function describeReplyPreviewAuthor(
+  preview: DirectChatMessage["replyPreview"],
+  currentUserId: string,
+  fallbackPeerName: string,
+): string {
+  if (!preview?.author) {
+    if (preview?.isDeleted) {
+      return "Удалённое сообщение";
+    }
+    if (preview?.isUnavailable) {
+      return "Недоступное сообщение";
+    }
+    return "Ответ";
+  }
+  if (preview.author.id === currentUserId) {
+    return "Вы";
+  }
+  return preview.author.nickname || fallbackPeerName;
+}
+
+function describeReplyPreviewText(preview: DirectChatMessage["replyPreview"]): string {
+  if (!preview) {
+    return "";
+  }
+  if (preview.isDeleted) {
+    return "Сообщение удалено для всех.";
+  }
+  if (preview.isUnavailable) {
+    return "Исходное сообщение больше недоступно.";
+  }
+  if (preview.hasText && preview.textPreview.trim() !== "") {
+    return preview.textPreview;
+  }
+  if (preview.attachmentCount > 0) {
+    return preview.attachmentCount === 1
+      ? "Вложение"
+      : `Вложения: ${preview.attachmentCount}`;
+  }
+  return "Пустой preview";
+}
+
+function describeDirectComposerReplyTarget(
+  message: DirectChatMessage,
+  currentUserId: string,
+): string {
+  if (message.tombstone) {
+    return "Сообщение удалено для всех.";
+  }
+  const textPreview = createMarkdownPreview(message.text?.text ?? "");
+  if (textPreview !== "") {
+    return textPreview.length > 140 ? `${textPreview.slice(0, 137)}...` : textPreview;
+  }
+  if (message.attachments.length > 0) {
+    return message.attachments.length === 1
+      ? "Вложение"
+      : `Вложения: ${message.attachments.length}`;
+  }
+  return message.senderUserId === currentUserId ? "Ваше сообщение" : "Сообщение собеседника";
+}
+
+function jumpToMessage(elementId: string) {
+  if (elementId.trim() === "") {
+    return;
+  }
+
+  const element = document.getElementById(elementId);
+  if (!element) {
+    return;
+  }
+
+  element.scrollIntoView({
+    behavior: "smooth",
+    block: "center",
+  });
 }
 
 function formatDateTime(value: string): string {

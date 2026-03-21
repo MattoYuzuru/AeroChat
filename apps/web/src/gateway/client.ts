@@ -31,6 +31,7 @@ import type {
   GroupTypingState,
   MessageTombstone,
   Profile,
+  ReplyPreview,
   RevokeSessionOrDeviceTarget,
   Session,
   TextMessageContent,
@@ -205,6 +206,16 @@ interface TextMessageContentWire {
   markdownPolicy?: string;
 }
 
+interface ReplyPreviewWire {
+  messageId?: string;
+  author?: ChatUserWire;
+  hasText?: boolean;
+  textPreview?: string;
+  attachmentCount?: number | string;
+  isDeleted?: boolean;
+  isUnavailable?: boolean;
+}
+
 interface AttachmentWire extends TimestampedWire {
   id?: string;
   ownerUserId?: string;
@@ -247,6 +258,8 @@ interface DirectChatMessageWire extends TimestampedWire {
   text?: TextMessageContentWire;
   tombstone?: MessageTombstoneWire;
   pinned?: boolean;
+  replyToMessageId?: string;
+  replyPreview?: ReplyPreviewWire;
   attachments?: AttachmentWire[];
   editedAt?: string;
 }
@@ -258,6 +271,8 @@ interface GroupMessageWire extends TimestampedWire {
   senderUserId?: string;
   kind?: string;
   text?: TextMessageContentWire;
+  replyToMessageId?: string;
+  replyPreview?: ReplyPreviewWire;
   attachments?: AttachmentWire[];
   editedAt?: string;
 }
@@ -858,7 +873,13 @@ export function createGatewayClient(
       return (response.messages ?? []).map(normalizeGroupMessage);
     },
 
-    async sendGroupTextMessage(token, groupId, text, attachmentIds = []) {
+    async sendGroupTextMessage(
+      token,
+      groupId,
+      text,
+      attachmentIds = [],
+      replyToMessageId = null,
+    ) {
       const response = await unaryCall<SendGroupTextMessageResponseWire>(
         fetchImpl,
         baseUrl,
@@ -868,6 +889,7 @@ export function createGatewayClient(
           groupId: groupId.trim(),
           text,
           attachmentIds: normalizeIDs(attachmentIds),
+          replyToMessageId: normalizeOptionalString(replyToMessageId ?? ""),
         },
         token,
       );
@@ -1014,7 +1036,13 @@ export function createGatewayClient(
       return normalizeDirectChatPresenceState(response.presenceState);
     },
 
-    async sendTextMessage(token, chatId, text, attachmentIds = []) {
+    async sendTextMessage(
+      token,
+      chatId,
+      text,
+      attachmentIds = [],
+      replyToMessageId = null,
+    ) {
       const response = await unaryCall<SendTextMessageResponseWire>(
         fetchImpl,
         baseUrl,
@@ -1024,6 +1052,7 @@ export function createGatewayClient(
           chatId: chatId.trim(),
           text,
           attachmentIds: normalizeIDs(attachmentIds),
+          replyToMessageId: normalizeOptionalString(replyToMessageId ?? ""),
         },
         token,
       );
@@ -1638,6 +1667,8 @@ function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessag
     senderUserId: input?.senderUserId ?? "",
     kind: input?.kind ?? "",
     text: input?.text ? normalizeTextMessageContent(input.text) : null,
+    replyToMessageId: normalizeNullableString(input?.replyToMessageId),
+    replyPreview: normalizeReplyPreview(input?.replyPreview),
     attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
@@ -1702,10 +1733,33 @@ function normalizeDirectChatMessage(
     text: normalizeTextMessageContent(input?.text),
     tombstone: normalizeMessageTombstone(input?.tombstone),
     pinned: input?.pinned ?? false,
+    replyToMessageId: normalizeNullableString(input?.replyToMessageId),
+    replyPreview: normalizeReplyPreview(input?.replyPreview),
     attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
     editedAt: normalizeNullableString(input?.editedAt),
+  };
+}
+
+function normalizeReplyPreview(input: ReplyPreviewWire | undefined): ReplyPreview | null {
+  if (!input) {
+    return null;
+  }
+
+  const messageId = input.messageId ?? "";
+  if (messageId === "") {
+    return null;
+  }
+
+  return {
+    messageId,
+    author: input.author ? normalizeChatUser(input.author) : null,
+    hasText: input.hasText ?? false,
+    textPreview: input.textPreview ?? "",
+    attachmentCount: normalizeCount(input.attachmentCount),
+    isDeleted: input.isDeleted ?? false,
+    isUnavailable: input.isUnavailable ?? false,
   };
 }
 
