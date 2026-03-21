@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   type Dispatch,
@@ -16,7 +17,9 @@ import {
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
 import { downloadAttachment, openAttachmentInNewTab } from "../attachments/open";
+import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
+import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
 import { gatewayClient } from "../gateway/runtime";
@@ -123,6 +126,18 @@ export function GroupsPage() {
         : null,
     onUnauthenticated: expireSession,
   });
+  const voiceNoteRecorder = useVoiceNoteRecorder({
+    enabled: authState.status === "authenticated",
+  });
+  const discardVoiceNoteRecording = useEffectEvent(() => {
+    voiceNoteRecorder.discardRecording();
+  });
+  const voiceNoteStatus = voiceNoteRecorder.state.status;
+  const hasPendingVoiceNote =
+    voiceNoteStatus === "requesting_permission" ||
+    voiceNoteStatus === "recording" ||
+    voiceNoteStatus === "processing" ||
+    voiceNoteStatus === "recorded";
   const canSubmitGroupComposer =
     selectedState.status === "ready" &&
     canSubmitMessageComposer({
@@ -131,6 +146,18 @@ export function GroupsPage() {
       isUploading: attachmentComposer.isUploading,
       canSendMessages: selectedState.snapshot.thread.canSendMessages,
     });
+  const canPickAttachment =
+    selectedState.status === "ready" &&
+    !isSendingMessage &&
+    !attachmentComposer.isUploading &&
+    !hasPendingVoiceNote &&
+    selectedState.snapshot.thread.canSendMessages;
+  const canRecordVoiceNote =
+    selectedState.status === "ready" &&
+    !isSendingMessage &&
+    !attachmentComposer.isUploading &&
+    attachmentComposer.state.draft === null &&
+    selectedState.snapshot.thread.canSendMessages;
 
   useEffect(() => {
     selectedStateRef.current = selectedState;
@@ -143,6 +170,7 @@ export function GroupsPage() {
     setSelectedReplyMessage(null);
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
+    discardVoiceNoteRecording();
   }, [selectedGroupId]);
 
   useEffect(() => {
@@ -833,6 +861,58 @@ export function GroupsPage() {
       const message = resolveProtectedError(
         error,
         "Не удалось отправить сообщение в группу.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }
+
+  async function handleSendGroupVoiceNote() {
+    if (selectedState.status !== "ready" || voiceNoteRecorder.state.draft === null) {
+      return;
+    }
+
+    if (isSendingMessage || attachmentComposer.isUploading) {
+      return;
+    }
+
+    setIsSendingMessage(true);
+    setActionError(null);
+    setNotice(null);
+
+    const recordedFile = voiceNoteRecorder.state.draft.file;
+    let uploadedAttachmentId: string | null = null;
+    voiceNoteRecorder.discardRecording();
+
+    try {
+      const uploadedAttachment = await attachmentComposer.selectFile(recordedFile);
+      if (uploadedAttachment === null) {
+        return;
+      }
+      uploadedAttachmentId = uploadedAttachment.id;
+
+      await gatewayClient.sendGroupTextMessage(
+        token,
+        selectedState.snapshot.group.id,
+        normalizeComposerMessageText(composerText),
+        [uploadedAttachmentId],
+        selectedReplyMessage?.id ?? null,
+      );
+      setComposerText("");
+      setSelectedReplyMessage(null);
+      attachmentComposer.markSendSucceeded();
+      setNotice("Голосовая заметка отправлена.");
+    } catch (error) {
+      if (uploadedAttachmentId !== null) {
+        attachmentComposer.markSendFailed();
+      }
+      const message = resolveProtectedError(
+        error,
+        "Не удалось отправить голосовую заметку в группу.",
         expireSession,
       );
       if (message !== null) {
@@ -1668,8 +1748,9 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Новое сообщение</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Raw HTML запрещён. Файл загружается отдельно, а single-file composer допускает
-                    text-only, text + attachment и attachment-only сообщения.
+                    Raw HTML запрещён. Файл или записанная голосовая заметка загружаются отдельно,
+                    а single-file composer допускает text-only, text + attachment и attachment-only
+                    сообщения.
                   </p>
                 </div>
 
@@ -1723,11 +1804,7 @@ export function GroupsPage() {
                     />
                     <button
                       className={styles.secondaryButton}
-                      disabled={
-                        isSendingMessage ||
-                        attachmentComposer.isUploading ||
-                        !selectedState.snapshot.thread.canSendMessages
-                      }
+                      disabled={!canPickAttachment}
                       onClick={() => {
                         attachmentInputRef.current?.click();
                       }}
@@ -1738,9 +1815,35 @@ export function GroupsPage() {
                         : "Заменить файл"}
                     </button>
                     <span className={styles.attachmentHint}>
-                      Single-file composer: файл можно отправить и без текста после upload.
+                      Single-file composer: файл или voice note можно отправить и без текста после
+                      upload.
                     </span>
                   </div>
+
+                  <VoiceNoteRecorderPanel
+                    discardDisabled={isSendingMessage}
+                    isSending={isSendingMessage}
+                    onDiscard={() => {
+                      voiceNoteRecorder.discardRecording();
+                    }}
+                    onSend={() => {
+                      void handleSendGroupVoiceNote();
+                    }}
+                    onStart={() => {
+                      void voiceNoteRecorder.startRecording();
+                    }}
+                    onStop={() => {
+                      voiceNoteRecorder.stopRecording();
+                    }}
+                    sendDisabled={
+                      isSendingMessage ||
+                      attachmentComposer.isUploading ||
+                      !selectedState.snapshot.thread.canSendMessages
+                    }
+                    startDisabled={!canRecordVoiceNote}
+                    state={voiceNoteRecorder.state}
+                    stopDisabled={isSendingMessage}
+                  />
 
                   {attachmentComposer.state.draft && (
                     <div className={styles.attachmentDraftCard}>

@@ -16,7 +16,9 @@ import {
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
 import { downloadAttachment, openAttachmentInNewTab } from "../attachments/open";
+import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
+import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import { createMarkdownPreview } from "../chats/createMarkdownPreview";
 import { resolveChatsRouteSyncAction } from "../chats/route-sync";
@@ -45,6 +47,7 @@ export function ChatsPage() {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState("");
   const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
+  const [isSendingVoiceNote, setIsSendingVoiceNote] = useState(false);
   const [selectedReplyMessage, setSelectedReplyMessage] = useState<DirectChatMessage | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -70,6 +73,12 @@ export function ChatsPage() {
           }
         : null,
     onUnauthenticated: () => expireSession(),
+  });
+  const voiceNoteRecorder = useVoiceNoteRecorder({
+    enabled: authState.status === "authenticated",
+  });
+  const discardVoiceNoteRecording = useEffectEvent(() => {
+    voiceNoteRecorder.discardRecording();
   });
 
   const requestedChatId = searchParams.get("chat")?.trim() ?? "";
@@ -125,6 +134,7 @@ export function ChatsPage() {
     setSelectedReplyMessage(null);
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
+    discardVoiceNoteRecording();
   }, [chats.state.selectedChatId]);
 
   useEffect(() => {
@@ -194,14 +204,29 @@ export function ChatsPage() {
         );
   const uploadedAttachmentId = attachmentComposer.uploadedAttachmentId;
   const attachmentDraft = attachmentComposer.state.draft;
+  const voiceNoteStatus = voiceNoteRecorder.state.status;
+  const hasPendingVoiceNote =
+    voiceNoteStatus === "requesting_permission" ||
+    voiceNoteStatus === "recording" ||
+    voiceNoteStatus === "processing" ||
+    voiceNoteStatus === "recorded";
   const canSubmitComposer = canSubmitMessageComposer({
     text: composerText,
     uploadedAttachmentId,
     isUploading: attachmentComposer.isUploading,
   });
+  const canPickAttachment =
+    !chats.state.isSendingMessage &&
+    !isSendingVoiceNote &&
+    !attachmentComposer.isUploading &&
+    !hasPendingVoiceNote;
+  const canRecordVoiceNote =
+    !chats.state.isSendingMessage &&
+    !isSendingVoiceNote &&
+    !attachmentComposer.isUploading &&
+    attachmentDraft === null;
 
   async function submitComposer() {
-    const normalizedText = normalizeComposerMessageText(composerText);
     if (!canSubmitComposer) {
       setComposerError(
         attachmentComposer.isUploading
@@ -214,7 +239,7 @@ export function ChatsPage() {
 
     setComposerError(null);
     const success = await chats.sendMessage(
-      normalizedText,
+      normalizeComposerMessageText(composerText),
       uploadedAttachmentId === null ? [] : [uploadedAttachmentId],
       selectedReplyMessage?.id ?? null,
     );
@@ -229,6 +254,50 @@ export function ChatsPage() {
 
     if (uploadedAttachmentId !== null) {
       attachmentComposer.markSendFailed();
+    }
+  }
+
+  async function handleSendVoiceNote() {
+    const voiceNoteDraft = voiceNoteRecorder.state.draft;
+    if (
+      voiceNoteDraft === null ||
+      chats.state.thread === null ||
+      chats.state.isSendingMessage ||
+      isSendingVoiceNote ||
+      attachmentComposer.isUploading
+    ) {
+      return;
+    }
+
+    setIsSendingVoiceNote(true);
+    setComposerError(null);
+    chats.clearFeedback();
+
+    const recordedFile = voiceNoteDraft.file;
+    voiceNoteRecorder.discardRecording();
+
+    try {
+      const uploadedAttachment = await attachmentComposer.selectFile(recordedFile);
+      if (uploadedAttachment === null) {
+        return;
+      }
+
+      const success = await chats.sendMessage(
+        normalizeComposerMessageText(composerText),
+        [uploadedAttachment.id],
+        selectedReplyMessage?.id ?? null,
+      );
+
+      if (success) {
+        setComposerText("");
+        setSelectedReplyMessage(null);
+        attachmentComposer.markSendSucceeded();
+        return;
+      }
+
+      attachmentComposer.markSendFailed();
+    } finally {
+      setIsSendingVoiceNote(false);
     }
   }
 
@@ -947,7 +1016,7 @@ export function ChatsPage() {
                       />
                       <button
                         className={styles.secondaryButton}
-                        disabled={chats.state.isSendingMessage || attachmentComposer.isUploading}
+                        disabled={!canPickAttachment}
                         onClick={() => {
                           attachmentInputRef.current?.click();
                         }}
@@ -956,9 +1025,35 @@ export function ChatsPage() {
                         {attachmentDraft === null ? "Выбрать файл" : "Заменить файл"}
                       </button>
                       <span className={styles.attachmentHint}>
-                        Single-file composer: можно отправить текст, текст + файл или только файл.
+                        Single-file composer: можно выбрать файл, записать голосовую заметку,
+                        отправить текст + attachment или только attachment.
                       </span>
                     </div>
+
+                    <VoiceNoteRecorderPanel
+                      discardDisabled={chats.state.isSendingMessage || isSendingVoiceNote}
+                      isSending={isSendingVoiceNote}
+                      onDiscard={() => {
+                        voiceNoteRecorder.discardRecording();
+                      }}
+                      onSend={() => {
+                        void handleSendVoiceNote();
+                      }}
+                      onStart={() => {
+                        void voiceNoteRecorder.startRecording();
+                      }}
+                      onStop={() => {
+                        voiceNoteRecorder.stopRecording();
+                      }}
+                      sendDisabled={
+                        chats.state.isSendingMessage ||
+                        isSendingVoiceNote ||
+                        attachmentComposer.isUploading
+                      }
+                      startDisabled={!canRecordVoiceNote}
+                      state={voiceNoteRecorder.state}
+                      stopDisabled={isSendingVoiceNote}
+                    />
 
                     {attachmentDraft && (
                       <div className={styles.attachmentDraftCard}>
@@ -1018,7 +1113,11 @@ export function ChatsPage() {
                     <label className={styles.field}>
                       <span>Текст сообщения</span>
                       <textarea
-                        disabled={chats.state.isSendingMessage || attachmentComposer.isUploading}
+                        disabled={
+                          chats.state.isSendingMessage ||
+                          isSendingVoiceNote ||
+                          attachmentComposer.isUploading
+                        }
                         maxLength={4000}
                         onChange={(event) => {
                           setComposerText(event.target.value);
@@ -1042,6 +1141,7 @@ export function ChatsPage() {
                           className={styles.primaryButton}
                         disabled={
                           chats.state.isSendingMessage ||
+                          isSendingVoiceNote ||
                           !canSubmitComposer
                         }
                         type="submit"

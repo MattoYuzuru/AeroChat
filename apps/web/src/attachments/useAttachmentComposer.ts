@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useRef } from "react";
 import { gatewayClient } from "../gateway/runtime";
+import type { Attachment } from "../gateway/types";
 import { describeGatewayError, isGatewayErrorCode } from "../gateway/types";
 import {
   attachmentComposerReducer,
@@ -72,9 +73,9 @@ export function useAttachmentComposer({
     });
   }, [enabled, scopeId, scopeKind]);
 
-  async function selectFile(file: File): Promise<boolean> {
+  async function selectFile(file: File): Promise<Attachment | null> {
     if (!enabled || scopeRef.current === null) {
-      return false;
+      return null;
     }
 
     abortActiveUpload(abortControllerRef);
@@ -90,14 +91,14 @@ export function useAttachmentComposer({
     return uploadSelectedFile(file);
   }
 
-  async function retryUpload(): Promise<boolean> {
+  async function retryUpload(): Promise<Attachment | null> {
     const file = fileRef.current;
     if (!enabled || scopeRef.current === null || file === null) {
       dispatch({
         type: "upload_failed",
         message: "Повторная загрузка недоступна после перезагрузки страницы.",
       });
-      return false;
+      return null;
     }
 
     clearStoredUploadedAttachment(scopeRef.current);
@@ -131,9 +132,9 @@ export function useAttachmentComposer({
     dispatch({ type: "send_failed" });
   }
 
-  async function uploadSelectedFile(file: File): Promise<boolean> {
+  async function uploadSelectedFile(file: File): Promise<Attachment | null> {
     if (scopeRef.current === null) {
-      return false;
+      return null;
     }
 
     try {
@@ -181,22 +182,22 @@ export function useAttachmentComposer({
         type: "upload_succeeded",
         attachment,
       });
-      return true;
+      return attachment;
     } catch (error) {
       if (error instanceof AttachmentUploadAbortedError) {
-        return false;
+        return null;
       }
 
       if (isGatewayErrorCode(error, "unauthenticated")) {
         onUnauthenticatedRef.current();
-        return false;
+        return null;
       }
 
       dispatch({
         type: "upload_failed",
         message: describeGatewayError(error, "Не удалось загрузить файл."),
       });
-      return false;
+      return null;
     } finally {
       abortControllerRef.current = null;
     }
