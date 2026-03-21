@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] media quotas foundation for upload admission control
+- [x] attachment retention and delete semantics foundation
 
 ---
 
@@ -149,6 +149,7 @@
 - [x] Web media message rendering polish для direct chats и groups
 - [x] Attachment lifecycle hardening
 - [x] Quotas
+- [x] Attachment retention and delete semantics
 - [ ] Voice notes
 - [ ] Video notes
 - [ ] Image/audio/video preview

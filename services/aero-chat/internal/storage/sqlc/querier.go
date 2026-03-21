@@ -26,6 +26,7 @@ type Querier interface {
 	CreateGroupMessage(ctx context.Context, arg CreateGroupMessageParams) (CreateGroupMessageRow, error)
 	CreateGroupThread(ctx context.Context, arg CreateGroupThreadParams) (GroupThread, error)
 	DeleteGroupMembership(ctx context.Context, arg DeleteGroupMembershipParams) (int64, error)
+	DetachDirectMessageAttachments(ctx context.Context, arg DetachDirectMessageAttachmentsParams) (int64, error)
 	DisableGroupInviteLink(ctx context.Context, arg DisableGroupInviteLinkParams) (int64, error)
 	EditDirectChatMessageText(ctx context.Context, arg EditDirectChatMessageTextParams) (int64, error)
 	EditGroupMessageText(ctx context.Context, arg EditGroupMessageTextParams) (int64, error)

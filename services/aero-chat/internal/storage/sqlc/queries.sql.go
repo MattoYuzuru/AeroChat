@@ -665,6 +665,30 @@ func (q *Queries) DeleteGroupMembership(ctx context.Context, arg DeleteGroupMemb
 	return result.RowsAffected(), nil
 }
 
+const detachDirectMessageAttachments = `-- name: DetachDirectMessageAttachments :execrows
+UPDATE attachments AS a
+SET
+    status = 'detached',
+    updated_at = $2
+FROM message_attachments AS ma
+WHERE ma.attachment_id = a.id
+  AND ma.direct_chat_message_id = $1
+  AND a.status = 'attached'
+`
+
+type DetachDirectMessageAttachmentsParams struct {
+	DirectChatMessageID pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) DetachDirectMessageAttachments(ctx context.Context, arg DetachDirectMessageAttachmentsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, detachDirectMessageAttachments, arg.DirectChatMessageID, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const disableGroupInviteLink = `-- name: DisableGroupInviteLink :execrows
 UPDATE group_invite_links
 SET
@@ -1724,23 +1748,46 @@ SELECT
     a.object_key,
     a.status
 FROM attachments AS a
-LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
-WHERE ma.attachment_id IS NULL
-  AND (
-      (a.status = 'expired' AND a.updated_at < $1)
-      OR (a.status = 'failed' AND a.failed_at IS NOT NULL AND a.failed_at <= $2)
+WHERE
+  (
+      a.status = 'expired'
+      AND a.updated_at < $1
+      AND NOT EXISTS (
+          SELECT 1
+          FROM message_attachments AS ma
+          WHERE ma.attachment_id = a.id
+      )
+  )
+  OR (
+      a.status = 'failed'
+      AND a.failed_at IS NOT NULL
+      AND a.failed_at <= $2
+      AND NOT EXISTS (
+          SELECT 1
+          FROM message_attachments AS ma
+          WHERE ma.attachment_id = a.id
+      )
+  )
+  OR (
+      a.status = 'detached'
+      AND a.updated_at <= $3
   )
 ORDER BY
-    CASE WHEN a.status = 'expired' THEN 0 ELSE 1 END ASC,
+    CASE
+        WHEN a.status = 'expired' THEN 0
+        WHEN a.status = 'detached' THEN 1
+        ELSE 2
+    END ASC,
     COALESCE(a.failed_at, a.updated_at) ASC,
     a.id ASC
-LIMIT $3
+LIMIT $4
 `
 
 type ListAttachmentObjectDeletionCandidatesParams struct {
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	FailedAt  pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
-	Limit     int32              `db:"limit" json:"limit"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	FailedAt    pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	UpdatedAt_2 pgtype.Timestamptz `db:"updated_at_2" json:"updated_at_2"`
+	Limit       int32              `db:"limit" json:"limit"`
 }
 
 type ListAttachmentObjectDeletionCandidatesRow struct {
@@ -1750,7 +1797,12 @@ type ListAttachmentObjectDeletionCandidatesRow struct {
 }
 
 func (q *Queries) ListAttachmentObjectDeletionCandidates(ctx context.Context, arg ListAttachmentObjectDeletionCandidatesParams) ([]ListAttachmentObjectDeletionCandidatesRow, error) {
-	rows, err := q.db.Query(ctx, listAttachmentObjectDeletionCandidates, arg.UpdatedAt, arg.FailedAt, arg.Limit)
+	rows, err := q.db.Query(ctx, listAttachmentObjectDeletionCandidates,
+		arg.UpdatedAt,
+		arg.FailedAt,
+		arg.UpdatedAt_2,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -2912,11 +2964,16 @@ SET
     updated_at = $2,
     deleted_at = $2
 WHERE a.id = $1
-  AND a.status IN ('expired', 'failed')
-  AND NOT EXISTS (
-      SELECT 1
-      FROM message_attachments AS ma
-      WHERE ma.attachment_id = a.id
+  AND (
+      a.status = 'detached'
+      OR (
+          a.status IN ('expired', 'failed')
+          AND NOT EXISTS (
+              SELECT 1
+              FROM message_attachments AS ma
+              WHERE ma.attachment_id = a.id
+          )
+      )
   )
 `
 

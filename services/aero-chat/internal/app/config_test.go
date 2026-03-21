@@ -26,6 +26,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 	t.Setenv("AERO_MEDIA_USER_QUOTA_BYTES", "")
 	t.Setenv("AERO_MEDIA_ATTACHMENT_CLEANUP_INTERVAL", "")
 	t.Setenv("AERO_MEDIA_UNATTACHED_ATTACHMENT_TTL", "")
+	t.Setenv("AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION", "")
 	t.Setenv("AERO_MEDIA_ATTACHMENT_CLEANUP_BATCH_SIZE", "")
 
 	cfg, err := LoadConfig(":8082")
@@ -62,6 +63,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	}
 	if cfg.MediaUnattachedAttachmentTTL != 24*time.Hour {
 		t.Fatalf("ожидался unattached attachment ttl по умолчанию, получен %s", cfg.MediaUnattachedAttachmentTTL)
+	}
+	if cfg.MediaDetachedAttachmentRetention != 7*24*time.Hour {
+		t.Fatalf("ожидался detached attachment retention по умолчанию, получен %s", cfg.MediaDetachedAttachmentRetention)
 	}
 	if cfg.MediaAttachmentCleanupBatchSize != 100 {
 		t.Fatalf("ожидался cleanup batch size по умолчанию, получен %d", cfg.MediaAttachmentCleanupBatchSize)

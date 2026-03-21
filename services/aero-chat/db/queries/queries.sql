@@ -983,17 +983,39 @@ SELECT
     a.object_key,
     a.status
 FROM attachments AS a
-LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
-WHERE ma.attachment_id IS NULL
-  AND (
-      (a.status = 'expired' AND a.updated_at < $1)
-      OR (a.status = 'failed' AND a.failed_at IS NOT NULL AND a.failed_at <= $2)
+WHERE
+  (
+      a.status = 'expired'
+      AND a.updated_at < $1
+      AND NOT EXISTS (
+          SELECT 1
+          FROM message_attachments AS ma
+          WHERE ma.attachment_id = a.id
+      )
+  )
+  OR (
+      a.status = 'failed'
+      AND a.failed_at IS NOT NULL
+      AND a.failed_at <= $2
+      AND NOT EXISTS (
+          SELECT 1
+          FROM message_attachments AS ma
+          WHERE ma.attachment_id = a.id
+      )
+  )
+  OR (
+      a.status = 'detached'
+      AND a.updated_at <= $3
   )
 ORDER BY
-    CASE WHEN a.status = 'expired' THEN 0 ELSE 1 END ASC,
+    CASE
+        WHEN a.status = 'expired' THEN 0
+        WHEN a.status = 'detached' THEN 1
+        ELSE 2
+    END ASC,
     COALESCE(a.failed_at, a.updated_at) ASC,
     a.id ASC
-LIMIT $3;
+LIMIT $4;
 
 -- name: MarkAttachmentDeleted :execrows
 UPDATE attachments AS a
@@ -1002,12 +1024,27 @@ SET
     updated_at = $2,
     deleted_at = $2
 WHERE a.id = $1
-  AND a.status IN ('expired', 'failed')
-  AND NOT EXISTS (
-      SELECT 1
-      FROM message_attachments AS ma
-      WHERE ma.attachment_id = a.id
+  AND (
+      a.status = 'detached'
+      OR (
+          a.status IN ('expired', 'failed')
+          AND NOT EXISTS (
+              SELECT 1
+              FROM message_attachments AS ma
+              WHERE ma.attachment_id = a.id
+          )
+      )
   );
+
+-- name: DetachDirectMessageAttachments :execrows
+UPDATE attachments AS a
+SET
+    status = 'detached',
+    updated_at = $2
+FROM message_attachments AS ma
+WHERE ma.attachment_id = a.id
+  AND ma.direct_chat_message_id = $1
+  AND a.status = 'attached';
 
 -- name: AttachDirectMessageAttachment :exec
 INSERT INTO message_attachments (

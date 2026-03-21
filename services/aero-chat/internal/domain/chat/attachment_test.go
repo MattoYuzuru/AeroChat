@@ -246,7 +246,7 @@ func TestCreateAttachmentUploadIntentRejectsQuotaExhaustion(t *testing.T) {
 	}
 }
 
-func TestCreateAttachmentUploadIntentIgnoresExpiredAndDeletedQuotaStates(t *testing.T) {
+func TestCreateAttachmentUploadIntentIgnoresDetachedExpiredAndDeletedQuotaStates(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -296,6 +296,20 @@ func TestCreateAttachmentUploadIntentIgnoresExpiredAndDeletedQuotaStates(t *test
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
+	messageID := "detached-message"
+	repo.attachments["detached-ignored"] = Attachment{
+		ID:          "detached-ignored",
+		OwnerUserID: alice.User.ID,
+		Scope:       AttachmentScopeDirect,
+		MessageID:   &messageID,
+		ObjectKey:   "attachments/detached-ignored",
+		FileName:    "detached.bin",
+		MimeType:    "application/octet-stream",
+		SizeBytes:   4096,
+		Status:      AttachmentStatusDetached,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
 	deletedAt := now
 	repo.attachments["deleted-ignored"] = Attachment{
 		ID:          "deleted-ignored",
@@ -317,6 +331,77 @@ func TestCreateAttachmentUploadIntentIgnoresExpiredAndDeletedQuotaStates(t *test
 	}
 	if intent.Attachment.SizeBytes != 2048 {
 		t.Fatalf("ожидался attachment с размером 2048, получено %d", intent.Attachment.SizeBytes)
+	}
+}
+
+func TestDeleteDirectMessageTransitionsAttachmentToDetached(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "photo.jpg", "image/jpeg", 2048)
+	if err != nil {
+		t.Fatalf("create upload intent: %v", err)
+	}
+
+	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+		Size:        intent.Attachment.SizeBytes,
+		ContentType: intent.Attachment.MimeType,
+	}
+
+	uploadedAttachment, err := service.CompleteAttachmentUpload(context.Background(), alice.Token, intent.Attachment.ID, intent.UploadSession.ID)
+	if err != nil {
+		t.Fatalf("complete attachment upload: %v", err)
+	}
+
+	message, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "with file", []string{uploadedAttachment.ID})
+	if err != nil {
+		t.Fatalf("send text message with attachment: %v", err)
+	}
+
+	deleted, err := service.DeleteMessageForEveryone(context.Background(), alice.Token, directChat.ID, message.ID)
+	if err != nil {
+		t.Fatalf("delete message for everyone: %v", err)
+	}
+	if deleted.Tombstone == nil {
+		t.Fatal("ожидался tombstone после удаления сообщения")
+	}
+	if len(deleted.Attachments) != 0 {
+		t.Fatalf("tombstoned message не должен сохранять активные attachments, получено %d", len(deleted.Attachments))
+	}
+
+	detachedAttachment := repo.attachments[uploadedAttachment.ID]
+	if detachedAttachment.Status != AttachmentStatusDetached {
+		t.Fatalf("ожидался detached attachment после tombstone, получено %q", detachedAttachment.Status)
+	}
+
+	ownerAccess, err := service.GetAttachment(context.Background(), alice.Token, uploadedAttachment.ID)
+	if err != nil {
+		t.Fatalf("owner get detached attachment: %v", err)
+	}
+	if ownerAccess.Attachment.Status != AttachmentStatusDetached {
+		t.Fatalf("ожидался detached status в owner access, получено %q", ownerAccess.Attachment.Status)
+	}
+	if ownerAccess.DownloadURL != "" {
+		t.Fatal("detached attachment не должен возвращать download url")
+	}
+	if _, err := service.GetAttachment(context.Background(), bob.Token, uploadedAttachment.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("peer не должен получать detached attachment, получено %v", err)
+	}
+
+	messages, err := service.ListDirectChatMessages(context.Background(), bob.Token, directChat.ID, 0)
+	if err != nil {
+		t.Fatalf("list messages after delete: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("ожидалось одно сообщение после удаления, получено %d", len(messages))
+	}
+	if len(messages[0].Attachments) != 0 {
+		t.Fatalf("tombstoned message из истории не должен возвращать active attachments, получено %d", len(messages[0].Attachments))
 	}
 }
 
@@ -414,6 +499,24 @@ func TestRunAttachmentLifecycleCleanupIsConservative(t *testing.T) {
 	}
 	repo.objectStorage.objects["attachments/failed"] = StoredObjectInfo{Size: 256}
 
+	detachedAt := now.Add(-72 * time.Hour)
+	detachedMessageID := "message-detached"
+	repo.attachments["detached-old"] = Attachment{
+		ID:          "detached-old",
+		OwnerUserID: testUUID(1),
+		Scope:       AttachmentScopeDirect,
+		MessageID:   &detachedMessageID,
+		ObjectKey:   "attachments/detached",
+		FileName:    "detached.bin",
+		MimeType:    "application/octet-stream",
+		SizeBytes:   384,
+		Status:      AttachmentStatusDetached,
+		CreatedAt:   detachedAt,
+		UpdatedAt:   detachedAt,
+		AttachedAt:  &detachedAt,
+	}
+	repo.objectStorage.objects["attachments/detached"] = StoredObjectInfo{Size: 384}
+
 	attachedAt := now.Add(-96 * time.Hour)
 	messageID := "message-1"
 	repo.attachments["attached-keep"] = Attachment{
@@ -433,9 +536,10 @@ func TestRunAttachmentLifecycleCleanupIsConservative(t *testing.T) {
 	repo.objectStorage.objects["attachments/attached"] = StoredObjectInfo{Size: 512}
 
 	firstReport, err := service.RunAttachmentLifecycleCleanup(context.Background(), AttachmentLifecycleCleanupOptions{
-		Now:           now,
-		UnattachedTTL: 24 * time.Hour,
-		BatchSize:     20,
+		Now:               now,
+		UnattachedTTL:     24 * time.Hour,
+		DetachedRetention: 24 * time.Hour,
+		BatchSize:         20,
 	})
 	if err != nil {
 		t.Fatalf("run first cleanup: %v", err)
@@ -446,8 +550,8 @@ func TestRunAttachmentLifecycleCleanupIsConservative(t *testing.T) {
 	if firstReport.ExpiredOrphanAttachments != 1 {
 		t.Fatalf("ожидался один expired orphan attachment, получено %d", firstReport.ExpiredOrphanAttachments)
 	}
-	if firstReport.DeletedAttachments != 1 {
-		t.Fatalf("ожидался один deleted attachment на первом проходе, получено %d", firstReport.DeletedAttachments)
+	if firstReport.DeletedAttachments != 2 {
+		t.Fatalf("ожидалось два deleted attachment на первом проходе, получено %d", firstReport.DeletedAttachments)
 	}
 	if repo.attachments["pending-attachment"].Status != AttachmentStatusExpired {
 		t.Fatalf("ожидался expired pending attachment после cleanup, получено %q", repo.attachments["pending-attachment"].Status)
@@ -461,14 +565,18 @@ func TestRunAttachmentLifecycleCleanupIsConservative(t *testing.T) {
 	if repo.attachments["failed-orphan"].Status != AttachmentStatusDeleted {
 		t.Fatalf("ожидался deleted failed orphan, получено %q", repo.attachments["failed-orphan"].Status)
 	}
+	if repo.attachments["detached-old"].Status != AttachmentStatusDeleted {
+		t.Fatalf("ожидался deleted detached attachment, получено %q", repo.attachments["detached-old"].Status)
+	}
 	if repo.attachments["attached-keep"].Status != AttachmentStatusAttached {
 		t.Fatalf("attached attachment не должен очищаться, получено %q", repo.attachments["attached-keep"].Status)
 	}
 
 	secondReport, err := service.RunAttachmentLifecycleCleanup(context.Background(), AttachmentLifecycleCleanupOptions{
-		Now:           now.Add(time.Minute),
-		UnattachedTTL: 24 * time.Hour,
-		BatchSize:     20,
+		Now:               now.Add(time.Minute),
+		UnattachedTTL:     24 * time.Hour,
+		DetachedRetention: 24 * time.Hour,
+		BatchSize:         20,
 	})
 	if err != nil {
 		t.Fatalf("run second cleanup: %v", err)
@@ -481,6 +589,9 @@ func TestRunAttachmentLifecycleCleanupIsConservative(t *testing.T) {
 	}
 	if repo.attachments["uploaded-orphan"].Status != AttachmentStatusDeleted {
 		t.Fatalf("ожидался deleted uploaded orphan после второго прохода, получено %q", repo.attachments["uploaded-orphan"].Status)
+	}
+	if _, ok := repo.objectStorage.objects["attachments/detached"]; ok {
+		t.Fatal("detached object должен удаляться после retention grace period")
 	}
 	if _, ok := repo.objectStorage.objects["attachments/attached"]; !ok {
 		t.Fatal("attached object не должен удаляться из storage")

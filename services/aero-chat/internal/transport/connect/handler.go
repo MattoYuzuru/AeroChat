@@ -1310,6 +1310,8 @@ func toProtoAttachmentStatus(value string) chatv1.AttachmentStatus {
 		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_UPLOADED
 	case chat.AttachmentStatusAttached:
 		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_ATTACHED
+	case chat.AttachmentStatusDetached:
+		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_DETACHED
 	case chat.AttachmentStatusFailed:
 		return chatv1.AttachmentStatus_ATTACHMENT_STATUS_FAILED
 	case chat.AttachmentStatusDeleted:

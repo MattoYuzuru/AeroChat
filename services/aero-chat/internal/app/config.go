@@ -9,27 +9,28 @@ import (
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
 type Config struct {
-	DatabaseURL                     string
-	RedisAddress                    string
-	HTTPAddress                     string
-	LogLevel                        string
-	ShutdownTimeout                 time.Duration
-	DatabaseBootstrapTimeout        time.Duration
-	DirectChatTypingTTL             time.Duration
-	DirectChatPresenceTTL           time.Duration
-	MediaS3InternalEndpoint         string
-	MediaS3PresignEndpoint          string
-	MediaS3AccessKey                string
-	MediaS3SecretKey                string
-	MediaS3BucketName               string
-	MediaS3InternalSecure           bool
-	MediaS3PresignSecure            bool
-	MediaUploadIntentTTL            time.Duration
-	MediaMaxUploadSizeBytes         int64
-	MediaUserQuotaBytes             int64
-	MediaAttachmentCleanupInterval  time.Duration
-	MediaUnattachedAttachmentTTL    time.Duration
-	MediaAttachmentCleanupBatchSize int
+	DatabaseURL                      string
+	RedisAddress                     string
+	HTTPAddress                      string
+	LogLevel                         string
+	ShutdownTimeout                  time.Duration
+	DatabaseBootstrapTimeout         time.Duration
+	DirectChatTypingTTL              time.Duration
+	DirectChatPresenceTTL            time.Duration
+	MediaS3InternalEndpoint          string
+	MediaS3PresignEndpoint           string
+	MediaS3AccessKey                 string
+	MediaS3SecretKey                 string
+	MediaS3BucketName                string
+	MediaS3InternalSecure            bool
+	MediaS3PresignSecure             bool
+	MediaUploadIntentTTL             time.Duration
+	MediaMaxUploadSizeBytes          int64
+	MediaUserQuotaBytes              int64
+	MediaAttachmentCleanupInterval   time.Duration
+	MediaUnattachedAttachmentTTL     time.Duration
+	MediaDetachedAttachmentRetention time.Duration
+	MediaAttachmentCleanupBatchSize  int
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -62,6 +63,10 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	detachedAttachmentRetention, err := lookupDuration("AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION", 7*24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
 	maxUploadSizeBytes, err := lookupInt64("AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES", 64*1024*1024)
 	if err != nil {
 		return Config{}, err
@@ -79,27 +84,28 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	}
 
 	return Config{
-		DatabaseURL:                     lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
-		RedisAddress:                    lookupString("AERO_REDIS_ADDR", "localhost:6379"),
-		HTTPAddress:                     lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
-		LogLevel:                        lookupString("AERO_LOG_LEVEL", "info"),
-		ShutdownTimeout:                 shutdownTimeout,
-		DatabaseBootstrapTimeout:        bootstrapTimeout,
-		DirectChatTypingTTL:             typingTTL,
-		DirectChatPresenceTTL:           presenceTTL,
-		MediaS3InternalEndpoint:         lookupString("AERO_MEDIA_S3_INTERNAL_ENDPOINT", "localhost:9000"),
-		MediaS3PresignEndpoint:          lookupString("AERO_MEDIA_S3_PRESIGN_ENDPOINT", "127.0.0.1:9000"),
-		MediaS3AccessKey:                lookupString("AERO_MEDIA_S3_ACCESS_KEY", "minioadmin"),
-		MediaS3SecretKey:                lookupString("AERO_MEDIA_S3_SECRET_KEY", "minioadmin"),
-		MediaS3BucketName:               lookupString("AERO_MEDIA_S3_BUCKET", "aerochat-attachments"),
-		MediaS3InternalSecure:           lookupBool("AERO_MEDIA_S3_INTERNAL_SECURE", false),
-		MediaS3PresignSecure:            lookupBool("AERO_MEDIA_S3_PRESIGN_SECURE", false),
-		MediaUploadIntentTTL:            uploadIntentTTL,
-		MediaMaxUploadSizeBytes:         maxUploadSizeBytes,
-		MediaUserQuotaBytes:             mediaUserQuotaBytes,
-		MediaAttachmentCleanupInterval:  attachmentCleanupInterval,
-		MediaUnattachedAttachmentTTL:    unattachedAttachmentTTL,
-		MediaAttachmentCleanupBatchSize: attachmentCleanupBatchSize,
+		DatabaseURL:                      lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
+		RedisAddress:                     lookupString("AERO_REDIS_ADDR", "localhost:6379"),
+		HTTPAddress:                      lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
+		LogLevel:                         lookupString("AERO_LOG_LEVEL", "info"),
+		ShutdownTimeout:                  shutdownTimeout,
+		DatabaseBootstrapTimeout:         bootstrapTimeout,
+		DirectChatTypingTTL:              typingTTL,
+		DirectChatPresenceTTL:            presenceTTL,
+		MediaS3InternalEndpoint:          lookupString("AERO_MEDIA_S3_INTERNAL_ENDPOINT", "localhost:9000"),
+		MediaS3PresignEndpoint:           lookupString("AERO_MEDIA_S3_PRESIGN_ENDPOINT", "127.0.0.1:9000"),
+		MediaS3AccessKey:                 lookupString("AERO_MEDIA_S3_ACCESS_KEY", "minioadmin"),
+		MediaS3SecretKey:                 lookupString("AERO_MEDIA_S3_SECRET_KEY", "minioadmin"),
+		MediaS3BucketName:                lookupString("AERO_MEDIA_S3_BUCKET", "aerochat-attachments"),
+		MediaS3InternalSecure:            lookupBool("AERO_MEDIA_S3_INTERNAL_SECURE", false),
+		MediaS3PresignSecure:             lookupBool("AERO_MEDIA_S3_PRESIGN_SECURE", false),
+		MediaUploadIntentTTL:             uploadIntentTTL,
+		MediaMaxUploadSizeBytes:          maxUploadSizeBytes,
+		MediaUserQuotaBytes:              mediaUserQuotaBytes,
+		MediaAttachmentCleanupInterval:   attachmentCleanupInterval,
+		MediaUnattachedAttachmentTTL:     unattachedAttachmentTTL,
+		MediaDetachedAttachmentRetention: detachedAttachmentRetention,
+		MediaAttachmentCleanupBatchSize:  attachmentCleanupBatchSize,
 	}, nil
 }
 

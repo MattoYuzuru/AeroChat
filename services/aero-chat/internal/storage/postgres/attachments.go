@@ -202,11 +202,12 @@ func (r *Repository) ExpireOrphanUploadedAttachments(ctx context.Context, upload
 	return affected, nil
 }
 
-func (r *Repository) ListAttachmentObjectDeletionCandidates(ctx context.Context, expiredBefore time.Time, failedBefore time.Time, limit int32) ([]chat.AttachmentObjectCleanupCandidate, error) {
+func (r *Repository) ListAttachmentObjectDeletionCandidates(ctx context.Context, expiredBefore time.Time, failedBefore time.Time, detachedBefore time.Time, limit int32) ([]chat.AttachmentObjectCleanupCandidate, error) {
 	rows, err := r.queries.ListAttachmentObjectDeletionCandidates(ctx, chatsqlc.ListAttachmentObjectDeletionCandidatesParams{
-		UpdatedAt: timestamptzValue(expiredBefore),
-		FailedAt:  timestamptzValue(failedBefore),
-		Limit:     limit,
+		UpdatedAt:   timestamptzValue(expiredBefore),
+		FailedAt:    timestamptzValue(failedBefore),
+		UpdatedAt_2: timestamptzValue(detachedBefore),
+		Limit:       limit,
 	})
 	if err != nil {
 		return nil, convertError(err)
@@ -361,6 +362,9 @@ func (r *Repository) listDirectAttachmentsByMessageIDs(ctx context.Context, mess
 		}
 		messageID := uuid.UUID(row.DirectChatMessageID.Bytes).String()
 		attachment := attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, &messageID)
+		if attachment.Status != chat.AttachmentStatusAttached {
+			continue
+		}
 		result[messageID] = append(result[messageID], attachment)
 	}
 
@@ -384,6 +388,9 @@ func (r *Repository) listGroupAttachmentsByMessageIDs(ctx context.Context, messa
 		}
 		messageID := uuid.UUID(row.GroupMessageID.Bytes).String()
 		attachment := attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, &messageID)
+		if attachment.Status != chat.AttachmentStatusAttached {
+			continue
+		}
 		result[messageID] = append(result[messageID], attachment)
 	}
 
