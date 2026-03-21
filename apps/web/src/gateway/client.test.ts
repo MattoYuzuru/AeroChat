@@ -1218,4 +1218,97 @@ describe("createGatewayClient", () => {
       }),
     );
   });
+
+  it("calls SearchMessages through gateway chat endpoint and normalizes compact hits", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          results: [
+            {
+              scope: "MESSAGE_SEARCH_SCOPE_KIND_DIRECT",
+              directChatId: "chat-1",
+              messageId: "message-1",
+              author: {
+                id: "user-2",
+                login: "bob",
+                nickname: "Bob",
+              },
+              createdAt: "2026-03-21T10:00:00Z",
+              editedAt: "2026-03-21T10:05:00Z",
+              matchFragment: "release notes fragment",
+              position: {
+                messageId: "message-1",
+                messageCreatedAt: "2026-03-21T10:00:00Z",
+              },
+            },
+          ],
+          nextPageCursor: {
+            messageId: "message-2",
+            messageCreatedAt: "2026-03-21T09:59:00Z",
+          },
+          hasMore: true,
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const page = await client.searchMessages("token-1", {
+      query: "  release notes  ",
+      scope: {
+        kind: "direct",
+      },
+      pageSize: 20,
+    });
+
+    expect(page).toEqual({
+      results: [
+        {
+          scope: "direct",
+          directChatId: "chat-1",
+          groupId: null,
+          groupThreadId: null,
+          messageId: "message-1",
+          author: {
+            id: "user-2",
+            login: "bob",
+            nickname: "Bob",
+            avatarUrl: null,
+          },
+          createdAt: "2026-03-21T10:00:00Z",
+          editedAt: "2026-03-21T10:05:00Z",
+          matchFragment: "release notes fragment",
+          position: {
+            messageId: "message-1",
+            messageCreatedAt: "2026-03-21T10:00:00Z",
+          },
+        },
+      ],
+      nextPageCursor: {
+        messageId: "message-2",
+        messageCreatedAt: "2026-03-21T09:59:00Z",
+      },
+      hasMore: true,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/SearchMessages",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          query: "release notes",
+          directScope: {
+            chatId: "",
+          },
+          pageSize: 20,
+        }),
+      }),
+    );
+  });
 });
