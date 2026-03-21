@@ -79,6 +79,7 @@ interface GroupMessageWire {
   attachments?: AttachmentWire[];
   createdAt?: string;
   updatedAt?: string;
+  editedAt?: string;
 }
 
 interface GroupMessageUpdatedPayloadWire {
@@ -558,6 +559,7 @@ function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessag
     attachments: (input?.attachments ?? []).map(normalizeAttachment),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
+    editedAt: normalizeNullableString(input?.editedAt),
   };
 }
 

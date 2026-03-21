@@ -416,7 +416,8 @@ SELECT
     m.text_content,
     m.markdown_policy,
     m.created_at,
-    m.updated_at
+    m.updated_at,
+    m.edited_at
 FROM group_memberships AS self
 JOIN group_threads AS t ON t.group_id = self.group_id
 JOIN group_messages AS m ON m.thread_id = t.id
@@ -436,7 +437,8 @@ SELECT
     m.text_content,
     m.markdown_policy,
     m.created_at,
-    m.updated_at
+    m.updated_at,
+    m.edited_at
 FROM group_memberships AS self
 JOIN group_threads AS t ON t.group_id = self.group_id
 JOIN group_messages AS m ON m.thread_id = t.id
@@ -529,6 +531,7 @@ SELECT
     m.markdown_policy,
     m.created_at,
     m.updated_at,
+    m.edited_at,
     t.deleted_by_user_id,
     t.deleted_at,
     EXISTS (
@@ -551,6 +554,7 @@ SELECT
     m.markdown_policy,
     m.created_at,
     m.updated_at,
+    m.edited_at,
     t.deleted_by_user_id,
     t.deleted_at,
     EXISTS (
@@ -576,7 +580,7 @@ INSERT INTO direct_chat_messages (
     created_at,
     updated_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at;
+RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at, edited_at;
 
 -- name: CreateAttachment :one
 INSERT INTO attachments (
@@ -832,7 +836,7 @@ INSERT INTO group_messages (
     created_at,
     updated_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at;
+RETURNING id, thread_id, sender_user_id, kind, text_content, markdown_policy, created_at, updated_at, edited_at;
 
 -- name: TouchDirectChatUpdatedAt :exec
 UPDATE direct_chats
@@ -848,6 +852,26 @@ WHERE id = $1;
 UPDATE direct_chat_messages
 SET updated_at = $2
 WHERE id = $1;
+
+-- name: EditDirectChatMessageText :execrows
+UPDATE direct_chat_messages
+SET
+    text_content = $3,
+    updated_at = $4,
+    edited_at = $4
+WHERE chat_id = $1
+  AND id = $2;
+
+-- name: EditGroupMessageText :execrows
+UPDATE group_messages AS m
+SET
+    text_content = $3,
+    updated_at = $4,
+    edited_at = $4
+FROM group_threads AS t
+WHERE m.id = $2
+  AND m.thread_id = t.id
+  AND t.group_id = $1;
 
 -- name: UpsertDirectChatReadReceipt :execrows
 INSERT INTO direct_chat_read_receipts (

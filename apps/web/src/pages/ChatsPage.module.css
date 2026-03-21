@@ -341,6 +341,17 @@
   overflow-wrap: anywhere;
 }
 
+.editField textarea {
+  min-height: 6.5rem;
+}
+
+.editHint,
+.editMeta {
+  margin: 0;
+  font-size: 0.84rem;
+  color: rgba(52, 74, 102, 0.82);
+}
+
 .tombstoneText {
   margin-top: 0;
   font-style: italic;

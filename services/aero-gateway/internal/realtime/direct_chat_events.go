@@ -14,6 +14,7 @@ const (
 	EventTypeDirectChatPresenceUpdated = "direct_chat.presence.updated"
 
 	DirectChatMessageReasonCreated            = "message_created"
+	DirectChatMessageReasonEdited             = "message_edited"
 	DirectChatMessageReasonDeletedForEveryone = "message_deleted_for_everyone"
 	DirectChatMessageReasonPinned             = "message_pinned"
 	DirectChatMessageReasonUnpinned           = "message_unpinned"
@@ -112,6 +113,7 @@ type directChatMessageWire struct {
 	Attachments  []attachmentWire        `json:"attachments"`
 	CreatedAt    string                  `json:"createdAt"`
 	UpdatedAt    string                  `json:"updatedAt"`
+	EditedAt     string                  `json:"editedAt,omitempty"`
 }
 
 type attachmentWire struct {
@@ -209,6 +211,7 @@ func toDirectChatMessageWire(message *chatv1.DirectChatMessage) *directChatMessa
 		Attachments:  toAttachmentWires(message.GetAttachments()),
 		CreatedAt:    formatProtoTimestamp(message.GetCreatedAt()),
 		UpdatedAt:    formatProtoTimestamp(message.GetUpdatedAt()),
+		EditedAt:     formatProtoTimestamp(message.GetEditedAt()),
 	}
 }
 

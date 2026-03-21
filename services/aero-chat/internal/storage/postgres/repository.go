@@ -976,6 +976,7 @@ func (r *Repository) CreateGroupMessage(ctx context.Context, params chat.CreateG
 		Attachments:  attachmentsByMessageID[row.ID.String()],
 		CreatedAt:    timestampValue(row.CreatedAt),
 		UpdatedAt:    timestampValue(row.UpdatedAt),
+		EditedAt:     timestamptzPointer(row.EditedAt),
 	}, nil
 }
 
@@ -1051,7 +1052,94 @@ func (r *Repository) GetGroupMessage(ctx context.Context, userID string, groupID
 		Attachments:  attachmentsByMessageID[row.ID.String()],
 		CreatedAt:    timestampValue(row.CreatedAt),
 		UpdatedAt:    timestampValue(row.UpdatedAt),
+		EditedAt:     timestamptzPointer(row.EditedAt),
 	}, nil
+}
+
+func (r *Repository) UpdateDirectChatMessageText(ctx context.Context, params chat.EditDirectChatMessageParams) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	affected, err := q.EditDirectChatMessageText(ctx, chatsqlc.EditDirectChatMessageTextParams{
+		ChatID:      mustParseUUID(params.ChatID),
+		ID:          mustParseUUID(params.MessageID),
+		TextContent: params.Text,
+		UpdatedAt:   timestamptzValue(params.EditedAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchDirectChatUpdatedAt(ctx, chatsqlc.TouchDirectChatUpdatedAtParams{
+		ID:        mustParseUUID(params.ChatID),
+		UpdatedAt: timestamptzValue(params.EditedAt),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return true, nil
+}
+
+func (r *Repository) UpdateGroupMessageText(ctx context.Context, params chat.EditGroupMessageParams) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	affected, err := q.EditGroupMessageText(ctx, chatsqlc.EditGroupMessageTextParams{
+		GroupID:     mustParseUUID(params.GroupID),
+		ID:          mustParseUUID(params.MessageID),
+		TextContent: params.Text,
+		UpdatedAt:   timestamptzValue(params.EditedAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchGroupThreadUpdatedAt(ctx, chatsqlc.TouchGroupThreadUpdatedAtParams{
+		ID:        mustParseUUID(params.ThreadID),
+		UpdatedAt: timestamptzValue(params.EditedAt),
+	}); err != nil {
+		return false, convertError(err)
+	}
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(params.GroupID),
+		UpdatedAt: timestamptzValue(params.EditedAt),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return true, nil
 }
 
 func (r *Repository) DeleteDirectChatMessageForEveryone(ctx context.Context, chatID string, messageID string, deletedByUserID string, at time.Time) (bool, error) {
@@ -1290,6 +1378,7 @@ func toDomainMessage(row chatsqlc.ListDirectChatMessagesRow) chat.DirectChatMess
 		Pinned:       row.Pinned,
 		CreatedAt:    timestampValue(row.CreatedAt),
 		UpdatedAt:    timestampValue(row.UpdatedAt),
+		EditedAt:     timestamptzPointer(row.EditedAt),
 	}
 
 	if row.DeletedByUserID.Valid && row.DeletedAt.Valid {

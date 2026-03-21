@@ -37,9 +37,11 @@ service ChatService {
   rpc SetDirectChatPresenceHeartbeat(SetDirectChatPresenceHeartbeatRequest) returns (SetDirectChatPresenceHeartbeatResponse);
   rpc ClearDirectChatPresence(ClearDirectChatPresenceRequest) returns (ClearDirectChatPresenceResponse);
   rpc SendTextMessage(SendTextMessageRequest) returns (SendTextMessageResponse);
+  rpc EditDirectChatMessage(EditDirectChatMessageRequest) returns (EditDirectChatMessageResponse);
   rpc ListDirectChatMessages(ListDirectChatMessagesRequest) returns (ListDirectChatMessagesResponse);
   rpc ListGroupMessages(ListGroupMessagesRequest) returns (ListGroupMessagesResponse);
   rpc SendGroupTextMessage(SendGroupTextMessageRequest) returns (SendGroupTextMessageResponse);
+  rpc EditGroupMessage(EditGroupMessageRequest) returns (EditGroupMessageResponse);
   rpc DeleteMessageForEveryone(DeleteMessageForEveryoneRequest) returns (DeleteMessageForEveryoneResponse);
   rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
   rpc UnpinMessage(UnpinMessageRequest) returns (UnpinMessageResponse);
@@ -212,6 +214,7 @@ message DirectChatMessage {
   repeated Attachment attachments = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  google.protobuf.Timestamp edited_at = 11;
 }
 
 message GroupMessage {
@@ -224,6 +227,7 @@ message GroupMessage {
   repeated Attachment attachments = 7;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
+  google.protobuf.Timestamp edited_at = 10;
 }
 
 message DirectChatReadPosition {
@@ -530,6 +534,17 @@ message SendTextMessageResponse {
   DirectChatMessage message = 1;
 }
 
+message EditDirectChatMessageRequest {
+  string chat_id = 1;
+  string message_id = 2;
+  // text обязателен для edit: attachment-only message не получает synthetic text semantics.
+  string text = 3;
+}
+
+message EditDirectChatMessageResponse {
+  DirectChatMessage message = 1;
+}
+
 message ListDirectChatMessagesRequest {
   string chat_id = 1;
   uint32 page_size = 2;
@@ -557,6 +572,17 @@ message SendGroupTextMessageRequest {
 }
 
 message SendGroupTextMessageResponse {
+  GroupMessage message = 1;
+}
+
+message EditGroupMessageRequest {
+  string group_id = 1;
+  string message_id = 2;
+  // text обязателен для edit: attachment-only message не получает synthetic text semantics.
+  string text = 3;
+}
+
+message EditGroupMessageResponse {
   GroupMessage message = 1;
 }
 

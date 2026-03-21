@@ -46,6 +46,7 @@ describe("parseDirectChatRealtimeEvent", () => {
           ],
           createdAt: "2026-04-06T12:00:00Z",
           updatedAt: "2026-04-06T12:00:00Z",
+          editedAt: null,
         },
       },
     });

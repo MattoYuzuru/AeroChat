@@ -39,6 +39,15 @@ interface MessageMutationOptions {
   reason: string;
 }
 
+interface MessageTextMutationOptions {
+  fallbackMessage: string;
+  messageId: string;
+  pendingLabel: string;
+  text: string;
+  perform(chatId: string, text: string): Promise<DirectChatMessage>;
+  reason: string;
+}
+
 export function useChats({
   enabled,
   token,
@@ -626,6 +635,26 @@ export function useChats({
     }
   }
 
+  async function editMessage(messageId: string, text: string) {
+    return runMessageTextMutation(
+      token,
+      mountedRef,
+      dispatch,
+      stateRef,
+      onUnauthenticatedRef,
+      {
+        messageId,
+        text,
+        pendingLabel: "Сохраняем...",
+        fallbackMessage: "Не удалось сохранить изменения сообщения.",
+        reason: "message_edited",
+        perform: (chatId, nextText) =>
+          gatewayClient.editDirectChatMessage(token, chatId, messageId, nextText),
+      },
+      currentUserId,
+    );
+  }
+
   async function deleteMessageForEveryone(messageId: string) {
     return runMessageMutation(
       token,
@@ -684,6 +713,7 @@ export function useChats({
     openChat,
     ensureDirectChat,
     sendMessage,
+    editMessage,
     deleteMessageForEveryone,
     pinMessage,
     unpinMessage,
@@ -753,6 +783,62 @@ async function runMessageMutation(
     dispatch({
       type: "message_updated",
       currentUserId: "",
+      message,
+      reason: options.reason,
+    });
+    return true;
+  } catch (error) {
+    const message = resolveProtectedError(
+      error,
+      options.fallbackMessage,
+      onUnauthenticatedRef,
+    );
+    if (!mountedRef.current || message === null) {
+      return false;
+    }
+
+    dispatch({ type: "list_refresh_failed", message });
+    return false;
+  } finally {
+    if (mountedRef.current) {
+      dispatch({
+        type: "message_action_finished",
+        messageId: options.messageId,
+      });
+    }
+  }
+}
+
+async function runMessageTextMutation(
+  token: string,
+  mountedRef: { current: boolean },
+  dispatch: ChatsDispatch,
+  stateRef: { current: ReturnType<typeof createInitialChatsState> },
+  onUnauthenticatedRef: { current: () => void },
+  options: MessageTextMutationOptions,
+  currentUserId: string,
+): Promise<boolean> {
+  const chatId = stateRef.current.selectedChatId;
+  if (!chatId) {
+    return false;
+  }
+
+  dispatch({ type: "clear_feedback" });
+  dispatch({
+    type: "message_action_started",
+    messageId: options.messageId,
+    label: options.pendingLabel,
+  });
+
+  try {
+    const message = await options.perform(chatId, options.text);
+    if (!mountedRef.current) {
+      return false;
+    }
+
+    dispatch({
+      type: "message_updated",
+      currentUserId,
       message,
       reason: options.reason,
     });

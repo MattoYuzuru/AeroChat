@@ -75,6 +75,7 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
         attachments: [],
         createdAt: "2026-04-10T11:00:00Z",
         updatedAt: "2026-04-10T11:00:00Z",
+        editedAt: null,
       },
     ],
     errorMessage: null,
@@ -108,6 +109,7 @@ describe("group realtime state helpers", () => {
         attachments: [],
         createdAt: "2026-04-10T12:05:00Z",
         updatedAt: "2026-04-10T12:05:00Z",
+        editedAt: null,
       },
     };
 
@@ -213,5 +215,34 @@ describe("group realtime state helpers", () => {
 
     expect(duplicatedState.snapshot.typingState?.typers).toHaveLength(1);
     expect(duplicatedState.snapshot.typingState?.typers[0]?.user.id).toBe("user-2");
+  });
+
+  it("does not increment unread count for group message edit realtime", () => {
+    const state = createReadyState();
+    const event: GroupRealtimeEvent = {
+      type: "group.message.updated",
+      reason: "message_edited",
+      group: {
+        ...state.snapshot.group,
+        updatedAt: "2026-04-10T12:07:00Z",
+      },
+      thread: {
+        ...state.snapshot.thread,
+        updatedAt: "2026-04-10T12:07:00Z",
+      },
+      message: {
+        ...state.messages[0]!,
+        senderUserId: "user-2",
+        text: {
+          text: "edited",
+          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        },
+        updatedAt: "2026-04-10T12:07:00Z",
+        editedAt: "2026-04-10T12:07:00Z",
+      },
+    };
+
+    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event, "user-1");
+    expect(nextGroups[0]?.unreadCount).toBe(0);
   });
 });

@@ -45,6 +45,7 @@ const threadSnapshot: ChatThreadSnapshot = {
       attachments: [],
       createdAt: "2026-03-25T10:11:00Z",
       updatedAt: "2026-03-25T10:11:00Z",
+      editedAt: null,
     },
   ],
   readState: null,
@@ -175,6 +176,7 @@ describe("chatsReducer", () => {
         attachments: [],
         createdAt: "2026-04-06T12:01:00Z",
         updatedAt: "2026-04-06T12:01:00Z",
+        editedAt: null,
       },
     });
 
@@ -292,5 +294,35 @@ describe("chatsReducer", () => {
     });
 
     expect(secondState.thread?.presenceState).toEqual(presenceState);
+  });
+
+  it("does not increment unread count for message edit realtime", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [
+        {
+          ...directChat,
+          unreadCount: 2,
+        },
+      ],
+    });
+
+    const nextState = chatsReducer(readyState, {
+      type: "message_updated",
+      currentUserId: "user-1",
+      reason: "message_edited",
+      message: {
+        ...threadSnapshot.messages[0]!,
+        senderUserId: "user-2",
+        text: {
+          text: "edited",
+          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        },
+        updatedAt: "2026-04-06T12:04:00Z",
+        editedAt: "2026-04-06T12:04:00Z",
+      },
+    });
+
+    expect(nextState.chats[0]?.unreadCount).toBe(2);
   });
 });

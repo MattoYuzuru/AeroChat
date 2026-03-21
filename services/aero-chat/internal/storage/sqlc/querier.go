@@ -27,6 +27,8 @@ type Querier interface {
 	CreateGroupThread(ctx context.Context, arg CreateGroupThreadParams) (GroupThread, error)
 	DeleteGroupMembership(ctx context.Context, arg DeleteGroupMembershipParams) (int64, error)
 	DisableGroupInviteLink(ctx context.Context, arg DisableGroupInviteLinkParams) (int64, error)
+	EditDirectChatMessageText(ctx context.Context, arg EditDirectChatMessageTextParams) (int64, error)
+	EditGroupMessageText(ctx context.Context, arg EditGroupMessageTextParams) (int64, error)
 	FailAttachmentUpload(ctx context.Context, arg FailAttachmentUploadParams) (int64, error)
 	FriendshipExists(ctx context.Context, arg FriendshipExistsParams) (bool, error)
 	GetAttachmentRowByID(ctx context.Context, id uuid.UUID) (GetAttachmentRowByIDRow, error)

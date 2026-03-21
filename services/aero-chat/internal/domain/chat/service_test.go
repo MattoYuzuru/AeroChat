@@ -601,6 +601,91 @@ func TestDeleteMessageUsesTombstoneAndAuthorRule(t *testing.T) {
 	}
 }
 
+func TestEditDirectChatMessageUpdatesTextAndEditedAt(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	message := mustSendMessage(t, service, alice.Token, directChat.ID, "before edit")
+
+	edited, err := service.EditDirectChatMessage(context.Background(), alice.Token, directChat.ID, message.ID, " after edit ")
+	if err != nil {
+		t.Fatalf("edit direct chat message: %v", err)
+	}
+	if edited.Text == nil || edited.Text.Text != "after edit" {
+		t.Fatalf("ожидался обновлённый текст сообщения, получено %+v", edited.Text)
+	}
+	if edited.EditedAt == nil {
+		t.Fatal("ожидался explicit edited_at после редактирования")
+	}
+	if !edited.UpdatedAt.Equal(*edited.EditedAt) {
+		t.Fatal("updated_at и edited_at должны совпадать для edit mutation")
+	}
+}
+
+func TestEditDirectChatMessageRejectsNonAuthorAndNonEditableMessages(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	message := mustSendMessage(t, service, alice.Token, directChat.ID, "immutable")
+
+	if _, err := service.EditDirectChatMessage(context.Background(), bob.Token, directChat.ID, message.ID, "hack"); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("ожидалась ошибка edit author only, получено %v", err)
+	}
+
+	deleted := mustDeleteMessage(t, service, alice.Token, directChat.ID, message.ID)
+	if deleted.Tombstone == nil {
+		t.Fatal("ожидался tombstone перед проверкой edit tombstone")
+	}
+	if _, err := service.EditDirectChatMessage(context.Background(), alice.Token, directChat.ID, message.ID, "revive"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка edit tombstoned message, получено %v", err)
+	}
+
+	intent, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		directChat.ID,
+		"",
+		"note.txt",
+		"text/plain",
+		64,
+	)
+	if err != nil {
+		t.Fatalf("create direct attachment intent: %v", err)
+	}
+	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+		Size:        intent.Attachment.SizeBytes,
+		ContentType: intent.Attachment.MimeType,
+	}
+	uploadedAttachment, err := service.CompleteAttachmentUpload(context.Background(), alice.Token, intent.Attachment.ID, intent.UploadSession.ID)
+	if err != nil {
+		t.Fatalf("complete direct attachment upload: %v", err)
+	}
+
+	attachmentOnly, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "   ", []string{uploadedAttachment.ID})
+	if err != nil {
+		t.Fatalf("send attachment-only direct message: %v", err)
+	}
+	if attachmentOnly.Text != nil {
+		t.Fatal("ожидался attachment-only message без text payload")
+	}
+	if _, err := service.EditDirectChatMessage(context.Background(), alice.Token, directChat.ID, attachmentOnly.ID, "new text"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка edit attachment-only message, получено %v", err)
+	}
+	if _, err := service.EditDirectChatMessage(context.Background(), alice.Token, directChat.ID, attachmentOnly.ID, "   "); !errors.Is(err, ErrConflict) {
+		t.Fatalf("attachment-only message сначала должен отклониться как non-editable, получено %v", err)
+	}
+}
+
 func TestPinAndUnpinMessage(t *testing.T) {
 	t.Parallel()
 
@@ -1532,6 +1617,27 @@ func (r *fakeRepository) CreateGroupMessage(_ context.Context, params CreateGrou
 	return &copy, nil
 }
 
+func (r *fakeRepository) UpdateGroupMessageText(_ context.Context, params EditGroupMessageParams) (bool, error) {
+	message, ok := r.groupMessages[params.MessageID]
+	if !ok || message.GroupID != params.GroupID || message.ThreadID != params.ThreadID {
+		return false, ErrNotFound
+	}
+
+	message.Text = messageTextContentForTest(params.Text)
+	message.UpdatedAt = params.EditedAt
+	message.EditedAt = &params.EditedAt
+	r.groupMessages[params.MessageID] = message
+
+	thread := r.groupThreads[params.GroupID]
+	thread.UpdatedAt = params.EditedAt
+	r.groupThreads[params.GroupID] = thread
+
+	group := r.groups[params.GroupID]
+	group.UpdatedAt = params.EditedAt
+	r.groups[params.GroupID] = group
+	return true, nil
+}
+
 func (r *fakeRepository) ListGroupMessages(_ context.Context, userID string, groupID string, limit int32) ([]GroupMessage, error) {
 	memberships, ok := r.groupMembers[groupID]
 	if !ok {
@@ -1591,6 +1697,23 @@ func (r *fakeRepository) CreateDirectChatMessage(_ context.Context, params Creat
 
 	copy := message
 	return &copy, nil
+}
+
+func (r *fakeRepository) UpdateDirectChatMessageText(_ context.Context, params EditDirectChatMessageParams) (bool, error) {
+	message, ok := r.messages[params.MessageID]
+	if !ok || message.ChatID != params.ChatID {
+		return false, ErrNotFound
+	}
+
+	message.Text = messageTextContentForTest(params.Text)
+	message.UpdatedAt = params.EditedAt
+	message.EditedAt = &params.EditedAt
+	r.messages[params.MessageID] = message
+
+	directChat := r.chats[params.ChatID]
+	directChat.UpdatedAt = params.EditedAt
+	r.chats[params.ChatID] = directChat
+	return true, nil
 }
 
 func (r *fakeRepository) ListDirectChatMessages(_ context.Context, userID string, chatID string, limit int32) ([]DirectChatMessage, error) {

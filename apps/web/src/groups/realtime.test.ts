@@ -52,6 +52,7 @@ describe("parseGroupRealtimeEvent", () => {
           ],
           createdAt: "2026-04-10T12:00:00Z",
           updatedAt: "2026-04-10T12:00:00Z",
+          editedAt: null,
         },
       },
     });

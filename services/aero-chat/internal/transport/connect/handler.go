@@ -529,6 +529,22 @@ func (h *Handler) SendTextMessage(ctx context.Context, req *connect.Request[chat
 	}), nil
 }
 
+func (h *Handler) EditDirectChatMessage(ctx context.Context, req *connect.Request[chatv1.EditDirectChatMessageRequest]) (*connect.Response[chatv1.EditDirectChatMessageResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	message, err := h.service.EditDirectChatMessage(ctx, token, req.Msg.ChatId, req.Msg.MessageId, req.Msg.Text)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.EditDirectChatMessageResponse{
+		Message: toProtoDirectChatMessage(*message),
+	}), nil
+}
+
 func (h *Handler) ListDirectChatMessages(ctx context.Context, req *connect.Request[chatv1.ListDirectChatMessagesRequest]) (*connect.Response[chatv1.ListDirectChatMessagesResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -583,6 +599,22 @@ func (h *Handler) SendGroupTextMessage(ctx context.Context, req *connect.Request
 	}
 
 	return connect.NewResponse(&chatv1.SendGroupTextMessageResponse{
+		Message: toProtoGroupMessage(*message),
+	}), nil
+}
+
+func (h *Handler) EditGroupMessage(ctx context.Context, req *connect.Request[chatv1.EditGroupMessageRequest]) (*connect.Response[chatv1.EditGroupMessageResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	message, err := h.service.EditGroupMessage(ctx, token, req.Msg.GroupId, req.Msg.MessageId, req.Msg.Text)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.EditGroupMessageResponse{
 		Message: toProtoGroupMessage(*message),
 	}), nil
 }
@@ -793,6 +825,9 @@ func toProtoDirectChatMessage(value chat.DirectChatMessage) *chatv1.DirectChatMe
 			DeletedAt:       timestamppb.New(value.Tombstone.DeletedAt),
 		}
 	}
+	if value.EditedAt != nil {
+		result.EditedAt = timestamppb.New(*value.EditedAt)
+	}
 
 	return result
 }
@@ -813,6 +848,9 @@ func toProtoGroupMessage(value chat.GroupMessage) *chatv1.GroupMessage {
 			Text:           value.Text.Text,
 			MarkdownPolicy: toProtoMarkdownPolicy(value.Text.MarkdownPolicy),
 		}
+	}
+	if value.EditedAt != nil {
+		result.EditedAt = timestamppb.New(*value.EditedAt)
 	}
 
 	return result

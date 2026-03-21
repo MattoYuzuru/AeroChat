@@ -56,6 +56,8 @@ type Repository interface {
 	UpsertGroupChatReadState(context.Context, UpsertGroupChatReadStateParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
 	CreateGroupMessage(context.Context, CreateGroupMessageParams) (*GroupMessage, error)
+	UpdateDirectChatMessageText(context.Context, EditDirectChatMessageParams) (bool, error)
+	UpdateGroupMessageText(context.Context, EditGroupMessageParams) (bool, error)
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
 	ListGroupMessages(context.Context, string, string, int32) ([]GroupMessage, error)
 	GetDirectChatMessage(context.Context, string, string, string) (*DirectChatMessage, error)
@@ -771,6 +773,67 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 	})
 }
 
+func (s *Service) EditDirectChatMessage(ctx context.Context, token string, chatID string, messageID string, text string) (*DirectChatMessage, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+
+	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureDirectChatWriteAllowed(ctx, authSession.User.ID, *directChat); err != nil {
+		return nil, err
+	}
+
+	message, err := s.repo.GetDirectChatMessage(ctx, authSession.User.ID, normalizedChatID, normalizedMessageID)
+	if err != nil {
+		return nil, err
+	}
+	if message.SenderUserID != authSession.User.ID {
+		return nil, fmt.Errorf("%w: only the author can edit the message", ErrPermissionDenied)
+	}
+	if message.Tombstone != nil {
+		return nil, fmt.Errorf("%w: tombstoned message cannot be edited", ErrConflict)
+	}
+	if message.Text == nil {
+		return nil, fmt.Errorf("%w: message has no editable text payload", ErrConflict)
+	}
+
+	normalizedText, err := normalizeMessageText(text)
+	if err != nil {
+		return nil, err
+	}
+	if normalizedText == "" {
+		return nil, fmt.Errorf("%w: edited message text cannot be empty", ErrInvalidArgument)
+	}
+	if message.Text.Text == normalizedText {
+		return message, nil
+	}
+
+	now := s.now()
+	if _, err := s.repo.UpdateDirectChatMessageText(ctx, EditDirectChatMessageParams{
+		ChatID:    normalizedChatID,
+		MessageID: normalizedMessageID,
+		Text:      normalizedText,
+		EditedAt:  now,
+	}); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetDirectChatMessage(ctx, authSession.User.ID, normalizedChatID, normalizedMessageID)
+}
+
 func (s *Service) ensureDirectChatWriteAllowed(ctx context.Context, userID string, directChat DirectChat) error {
 	peerUserID, err := directChatPeerUserID(directChat, userID)
 	if err != nil {
@@ -855,6 +918,58 @@ func (s *Service) ListGroupMessages(ctx context.Context, token string, groupID s
 	}
 
 	return s.repo.ListGroupMessages(ctx, authSession.User.ID, group.ID, limit)
+}
+
+func (s *Service) EditGroupMessage(ctx context.Context, token string, groupID string, messageID string, text string) (*GroupMessage, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	group, _, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+
+	message, err := s.repo.GetGroupMessage(ctx, authSession.User.ID, group.ID, normalizedMessageID)
+	if err != nil {
+		return nil, err
+	}
+	if message.SenderUserID != authSession.User.ID {
+		return nil, fmt.Errorf("%w: only the author can edit the group message", ErrPermissionDenied)
+	}
+	if message.Text == nil {
+		return nil, fmt.Errorf("%w: message has no editable text payload", ErrConflict)
+	}
+
+	normalizedText, err := normalizeMessageText(text)
+	if err != nil {
+		return nil, err
+	}
+	if normalizedText == "" {
+		return nil, fmt.Errorf("%w: edited message text cannot be empty", ErrInvalidArgument)
+	}
+	if message.Text.Text == normalizedText {
+		return message, nil
+	}
+
+	now := s.now()
+	if _, err := s.repo.UpdateGroupMessageText(ctx, EditGroupMessageParams{
+		GroupID:   group.ID,
+		ThreadID:  message.ThreadID,
+		MessageID: normalizedMessageID,
+		Text:      normalizedText,
+		EditedAt:  now,
+	}); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetGroupMessage(ctx, authSession.User.ID, group.ID, normalizedMessageID)
 }
 
 func (s *Service) MarkDirectChatRead(ctx context.Context, token string, chatID string, messageID string) (*DirectChatReadState, int32, error) {

@@ -27,6 +27,7 @@ import {
   type Group,
   type GroupMember,
   type GroupMemberRole,
+  type GroupMessage,
   type GroupTypingState,
 } from "../gateway/types";
 import { buildGroupInviteUrl, extractGroupInviteToken } from "../groups/invite-token";
@@ -62,6 +63,8 @@ export function GroupsPage() {
   const [groupName, setGroupName] = useState("");
   const [joinInput, setJoinInput] = useState("");
   const [composerText, setComposerText] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState("");
   const [inviteRole, setInviteRole] = useState<GroupMemberRole>("member");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -73,6 +76,7 @@ export function GroupsPage() {
   const [pendingRemoveUserId, setPendingRemoveUserId] = useState<string | null>(null);
   const [pendingTransferUserId, setPendingTransferUserId] = useState<string | null>(null);
   const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
+  const [pendingEditMessageId, setPendingEditMessageId] = useState<string | null>(null);
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, GroupMemberRole>>({});
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
@@ -174,6 +178,8 @@ export function GroupsPage() {
     if (selectedGroupId === "") {
       setSelectedState(createInitialGroupsSelectedState());
       setComposerText("");
+      setEditingMessageId(null);
+      setEditingMessageText("");
       setMemberRoleDrafts({});
       return;
     }
@@ -757,6 +763,46 @@ export function GroupsPage() {
     }
   }
 
+  async function handleSaveGroupMessageEdit(messageId: string) {
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    const normalizedText = normalizeComposerMessageText(editingMessageText);
+    if (normalizedText === "") {
+      setActionError("Отредактированное сообщение не может быть полностью пустым.");
+      setNotice(null);
+      return;
+    }
+
+    setPendingEditMessageId(messageId);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      await gatewayClient.editGroupMessage(
+        token,
+        selectedState.snapshot.group.id,
+        messageId,
+        normalizedText,
+      );
+      setEditingMessageId(null);
+      setEditingMessageText("");
+      setNotice("Сообщение обновлено.");
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось сохранить изменения сообщения.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
+    } finally {
+      setPendingEditMessageId(null);
+    }
+  }
+
   async function handleAttachmentSelection(file: File | null) {
     if (file === null) {
       return;
@@ -1297,11 +1343,14 @@ export function GroupsPage() {
                       title="Сообщений пока нет"
                       message="Primary thread уже создан, но ни text-only, ни attachment-only сообщений пока нет."
                     />
-                  ) : (
-                    threadMessages.map((message) => {
-                      const isOwn = message.senderUserId === authState.profile.id;
-                      const hasMessageText = hasRenderableMessageText(message.text);
-                      const hasAttachments = message.attachments.length > 0;
+                    ) : (
+                      threadMessages.map((message) => {
+                        const isOwn = message.senderUserId === authState.profile.id;
+                        const canEdit = isGroupMessageEditable(message, authState.profile.id);
+                        const isEditing = editingMessageId === message.id;
+                        const hasMessageText = hasRenderableMessageText(message.text);
+                        const hasAttachments = message.attachments.length > 0;
+                        const isEditPending = pendingEditMessageId === message.id;
 
                       return (
                         <article className={styles.messageCard} data-own={isOwn} key={message.id}>
@@ -1318,17 +1367,47 @@ export function GroupsPage() {
                                 {formatDateTime(message.createdAt)}
                               </p>
                             </div>
-                            <span className={styles.statusPill}>
-                              {describeGroupMessageKind(message)}
-                            </span>
+                            <div className={styles.badgeColumn}>
+                              <span className={styles.statusPill}>
+                                {describeGroupMessageKind(message)}
+                              </span>
+                              {message.editedAt && (
+                                <span className={styles.statusPill}>Изменено</span>
+                              )}
+                            </div>
                           </div>
 
                           {(hasMessageText || hasAttachments) && (
                             <div className={styles.messageBody}>
-                              {hasMessageText && (
-                                <div className={styles.messageText}>
-                                  <SafeMessageMarkdown text={message.text?.text ?? ""} />
-                                </div>
+                              {isEditing ? (
+                                <>
+                                  <label className={`${styles.field} ${styles.editField}`}>
+                                    <span>Текст сообщения</span>
+                                    <textarea
+                                      disabled={isEditPending}
+                                      maxLength={4000}
+                                      onChange={(event) => {
+                                        setEditingMessageText(event.target.value);
+                                        setActionError(null);
+                                        setNotice(null);
+                                      }}
+                                      rows={4}
+                                      value={editingMessageText}
+                                    />
+                                  </label>
+
+                                  {hasAttachments && (
+                                    <p className={styles.editHint}>
+                                      Вложения остаются без изменений, редактируется только текст.
+                                    </p>
+                                  )}
+                                </>
+                              ) : (
+                                hasMessageText && (
+                                  <div className={styles.messageText}>
+                                    <SafeMessageMarkdown text={message.text?.text ?? ""} />
+                                  </div>
+                                )
                               )}
 
                               {hasAttachments && (
@@ -1349,6 +1428,57 @@ export function GroupsPage() {
                                 />
                               )}
                             </div>
+                          )}
+
+                          <div className={styles.actions}>
+                            {isEditing ? (
+                              <>
+                                <button
+                                  className={styles.primaryButton}
+                                  disabled={isEditPending}
+                                  onClick={() => {
+                                    void handleSaveGroupMessageEdit(message.id);
+                                  }}
+                                  type="button"
+                                >
+                                  {isEditPending ? "Сохраняем..." : "Сохранить"}
+                                </button>
+                                <button
+                                  className={styles.secondaryButton}
+                                  disabled={isEditPending}
+                                  onClick={() => {
+                                    setEditingMessageId(null);
+                                    setEditingMessageText("");
+                                    setActionError(null);
+                                    setNotice(null);
+                                  }}
+                                  type="button"
+                                >
+                                  Отмена
+                                </button>
+                              </>
+                            ) : (
+                              canEdit && (
+                                <button
+                                  className={styles.secondaryButton}
+                                  onClick={() => {
+                                    setEditingMessageId(message.id);
+                                    setEditingMessageText(message.text?.text ?? "");
+                                    setActionError(null);
+                                    setNotice(null);
+                                  }}
+                                  type="button"
+                                >
+                                  Редактировать
+                                </button>
+                              )
+                            )}
+                          </div>
+
+                          {message.editedAt && (
+                            <p className={styles.editMeta}>
+                              Последнее редактирование: {formatDateTime(message.editedAt)}
+                            </p>
                           )}
                         </article>
                       );
@@ -1965,6 +2095,13 @@ function describeGroupMessageKind(message: { text: { text: string } | null; atta
     return "Только файл";
   }
   return "Текст";
+}
+
+function isGroupMessageEditable(
+  message: GroupMessage,
+  currentUserId: string,
+): boolean {
+  return message.senderUserId === currentUserId && message.text !== null;
 }
 
 function formatDateTime(value: string): string {

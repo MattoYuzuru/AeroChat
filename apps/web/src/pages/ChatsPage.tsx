@@ -37,6 +37,8 @@ export function ChatsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [composerText, setComposerText] = useState("");
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState("");
   const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
   const pendingPeerRef = useRef<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
@@ -107,6 +109,11 @@ export function ChatsPage() {
     requestedChatId,
     requestedPeerUserId,
   ]);
+
+  useEffect(() => {
+    setEditingMessageId(null);
+    setEditingMessageText("");
+  }, [chats.state.selectedChatId]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -193,6 +200,24 @@ export function ChatsPage() {
     setComposerError(null);
     chats.clearFeedback();
     await attachmentComposer.selectFile(file);
+  }
+
+  async function handleSaveMessageEdit(messageId: string) {
+    const normalizedText = normalizeComposerMessageText(editingMessageText);
+    if (normalizedText === "") {
+      setComposerError("Отредактированное сообщение не может быть полностью пустым.");
+      chats.clearFeedback();
+      return;
+    }
+
+    setComposerError(null);
+    const success = await chats.editMessage(messageId, normalizedText);
+    if (!success) {
+      return;
+    }
+
+    setEditingMessageId(null);
+    setEditingMessageText("");
   }
 
   async function handleOpenAttachment(attachmentId: string) {
@@ -568,6 +593,8 @@ export function ChatsPage() {
                     ) : (
                       selectedThread.messages.map((message) => {
                         const isOwn = message.senderUserId === authState.profile.id;
+                        const canEdit = isDirectMessageEditable(message, authState.profile.id);
+                        const isEditing = editingMessageId === message.id;
                         const hasMessageText = hasRenderableMessageText(message.text);
                         const hasAttachments = message.attachments.length > 0;
                         const pendingLabel = chats.state.pendingMessageActions[message.id] ?? null;
@@ -599,6 +626,9 @@ export function ChatsPage() {
                                       Закреплено
                                     </span>
                                   )}
+                                  {message.editedAt && (
+                                    <span className={styles.statusBadge}>Изменено</span>
+                                  )}
                                   {readLabel && (
                                     <span className={styles.statusBadge}>{readLabel}</span>
                                   )}
@@ -608,6 +638,47 @@ export function ChatsPage() {
                               <div className={styles.messageBody}>
                                 {message.tombstone ? (
                                   <p className={styles.tombstoneText}>Сообщение удалено для всех.</p>
+                                ) : isEditing ? (
+                                  <>
+                                    <label className={`${styles.field} ${styles.editField}`}>
+                                      <span>Текст сообщения</span>
+                                      <textarea
+                                        disabled={pendingLabel !== null}
+                                        maxLength={4000}
+                                        onChange={(event) => {
+                                          setEditingMessageText(event.target.value);
+                                          setComposerError(null);
+                                          chats.clearFeedback();
+                                        }}
+                                        rows={4}
+                                        value={editingMessageText}
+                                      />
+                                    </label>
+
+                                    {hasAttachments && (
+                                      <p className={styles.editHint}>
+                                        Вложения остаются без изменений, редактируется только текст.
+                                      </p>
+                                    )}
+
+                                    {hasAttachments && (
+                                      <MessageAttachmentList
+                                        accessToken={sessionToken}
+                                        attachments={message.attachments}
+                                        onDownloadAttachment={(attachment) => {
+                                          void handleDownloadAttachment(
+                                            attachment.id,
+                                            attachment.fileName,
+                                          );
+                                        }}
+                                        onOpenAttachment={(attachmentId) => {
+                                          void handleOpenAttachment(attachmentId);
+                                        }}
+                                        pendingAttachmentId={pendingOpenAttachmentId}
+                                        tone={isOwn ? "own" : "other"}
+                                      />
+                                    )}
+                                  </>
                                 ) : (
                                   <>
                                     {hasMessageText && (
@@ -639,32 +710,84 @@ export function ChatsPage() {
 
                               {!message.tombstone && (
                                 <div className={styles.actions}>
-                                  <button
-                                    className={styles.ghostButton}
-                                    disabled={pendingLabel !== null}
-                                    onClick={() => {
-                                      void (message.pinned
-                                        ? chats.unpinMessage(message.id)
-                                        : chats.pinMessage(message.id));
-                                    }}
-                                    type="button"
-                                  >
-                                    {message.pinned ? "Снять pin" : "Закрепить"}
-                                  </button>
+                                  {isEditing ? (
+                                    <>
+                                      <button
+                                        className={styles.primaryButton}
+                                        disabled={pendingLabel !== null}
+                                        onClick={() => {
+                                          void handleSaveMessageEdit(message.id);
+                                        }}
+                                        type="button"
+                                      >
+                                        Сохранить
+                                      </button>
+                                      <button
+                                        className={styles.ghostButton}
+                                        disabled={pendingLabel !== null}
+                                        onClick={() => {
+                                          setEditingMessageId(null);
+                                          setEditingMessageText("");
+                                          setComposerError(null);
+                                          chats.clearFeedback();
+                                        }}
+                                        type="button"
+                                      >
+                                        Отмена
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        className={styles.ghostButton}
+                                        disabled={pendingLabel !== null}
+                                        onClick={() => {
+                                          void (message.pinned
+                                            ? chats.unpinMessage(message.id)
+                                            : chats.pinMessage(message.id));
+                                        }}
+                                        type="button"
+                                      >
+                                        {message.pinned ? "Снять pin" : "Закрепить"}
+                                      </button>
 
-                                  {isOwn && (
-                                    <button
-                                      className={styles.ghostButton}
-                                      disabled={pendingLabel !== null}
-                                      onClick={() => {
-                                        void chats.deleteMessageForEveryone(message.id);
-                                      }}
-                                      type="button"
-                                    >
-                                      Удалить для всех
-                                    </button>
+                                      {canEdit && (
+                                        <button
+                                          className={styles.ghostButton}
+                                          disabled={pendingLabel !== null}
+                                          onClick={() => {
+                                            setEditingMessageId(message.id);
+                                            setEditingMessageText(message.text?.text ?? "");
+                                            setComposerError(null);
+                                            chats.clearFeedback();
+                                          }}
+                                          type="button"
+                                        >
+                                          Редактировать
+                                        </button>
+                                      )}
+
+                                      {isOwn && (
+                                        <button
+                                          className={styles.ghostButton}
+                                          disabled={pendingLabel !== null}
+                                          onClick={() => {
+                                            void chats.deleteMessageForEveryone(message.id);
+                                          }}
+                                          type="button"
+                                        >
+                                          Удалить для всех
+                                        </button>
+                                      )}
+                                    </>
                                   )}
                                 </div>
+                              )}
+
+                              {!message.tombstone && message.editedAt && (
+                                <p className={styles.editMeta}>
+                                  Последнее редактирование: {formatDateTime(message.editedAt)}
+                                </p>
                               )}
 
                               {pendingLabel && <p className={styles.pendingText}>{pendingLabel}</p>}
@@ -936,6 +1059,17 @@ function describeTypingStatus(typingState: DirectChatTypingState | null): string
   }
 
   return "Печатает...";
+}
+
+function isDirectMessageEditable(
+  message: DirectChatMessage,
+  currentUserId: string,
+): boolean {
+  return (
+    message.senderUserId === currentUserId &&
+    message.tombstone === null &&
+    message.text !== null
+  );
 }
 
 function describePresenceStatus(presenceState: DirectChatPresenceState | null): string {

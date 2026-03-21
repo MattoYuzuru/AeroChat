@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] unread conversation state foundation для direct chats и groups
+- [x] message edit foundation для direct chats и groups
 
 ---
 
@@ -94,6 +94,7 @@
 - [x] Presence foundation
 - [x] Privacy toggles через web settings и `aero-gateway`
 - [x] Tombstone deletion
+- [x] Message edit foundation
 - [ ] Draft recovery
 - [x] Pin / unpin
 - [x] Web direct chat bootstrap через `aero-gateway`
@@ -123,6 +124,7 @@
 - [x] Group realtime bootstrap через `aero-gateway`
 - [x] Group typing bootstrap через `aero-gateway` и `apps/web`
 - [x] Group unread conversation state foundation
+- [x] Message edit foundation
 - [ ] Max groups per user rules
 
 ---

@@ -115,6 +115,9 @@ const (
 	// ChatServiceSendTextMessageProcedure is the fully-qualified name of the ChatService's
 	// SendTextMessage RPC.
 	ChatServiceSendTextMessageProcedure = "/aerochat.chat.v1.ChatService/SendTextMessage"
+	// ChatServiceEditDirectChatMessageProcedure is the fully-qualified name of the ChatService's
+	// EditDirectChatMessage RPC.
+	ChatServiceEditDirectChatMessageProcedure = "/aerochat.chat.v1.ChatService/EditDirectChatMessage"
 	// ChatServiceListDirectChatMessagesProcedure is the fully-qualified name of the ChatService's
 	// ListDirectChatMessages RPC.
 	ChatServiceListDirectChatMessagesProcedure = "/aerochat.chat.v1.ChatService/ListDirectChatMessages"
@@ -124,6 +127,9 @@ const (
 	// ChatServiceSendGroupTextMessageProcedure is the fully-qualified name of the ChatService's
 	// SendGroupTextMessage RPC.
 	ChatServiceSendGroupTextMessageProcedure = "/aerochat.chat.v1.ChatService/SendGroupTextMessage"
+	// ChatServiceEditGroupMessageProcedure is the fully-qualified name of the ChatService's
+	// EditGroupMessage RPC.
+	ChatServiceEditGroupMessageProcedure = "/aerochat.chat.v1.ChatService/EditGroupMessage"
 	// ChatServiceDeleteMessageForEveryoneProcedure is the fully-qualified name of the ChatService's
 	// DeleteMessageForEveryone RPC.
 	ChatServiceDeleteMessageForEveryoneProcedure = "/aerochat.chat.v1.ChatService/DeleteMessageForEveryone"
@@ -165,9 +171,11 @@ type ChatServiceClient interface {
 	SetDirectChatPresenceHeartbeat(context.Context, *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error)
 	ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
+	EditDirectChatMessage(context.Context, *connect.Request[v1.EditDirectChatMessageRequest]) (*connect.Response[v1.EditDirectChatMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
 	ListGroupMessages(context.Context, *connect.Request[v1.ListGroupMessagesRequest]) (*connect.Response[v1.ListGroupMessagesResponse], error)
 	SendGroupTextMessage(context.Context, *connect.Request[v1.SendGroupTextMessageRequest]) (*connect.Response[v1.SendGroupTextMessageResponse], error)
+	EditGroupMessage(context.Context, *connect.Request[v1.EditGroupMessageRequest]) (*connect.Response[v1.EditGroupMessageResponse], error)
 	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
 	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
 	UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error)
@@ -358,6 +366,12 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("SendTextMessage")),
 			connect.WithClientOptions(opts...),
 		),
+		editDirectChatMessage: connect.NewClient[v1.EditDirectChatMessageRequest, v1.EditDirectChatMessageResponse](
+			httpClient,
+			baseURL+ChatServiceEditDirectChatMessageProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("EditDirectChatMessage")),
+			connect.WithClientOptions(opts...),
+		),
 		listDirectChatMessages: connect.NewClient[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse](
 			httpClient,
 			baseURL+ChatServiceListDirectChatMessagesProcedure,
@@ -374,6 +388,12 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+ChatServiceSendGroupTextMessageProcedure,
 			connect.WithSchema(chatServiceMethods.ByName("SendGroupTextMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		editGroupMessage: connect.NewClient[v1.EditGroupMessageRequest, v1.EditGroupMessageResponse](
+			httpClient,
+			baseURL+ChatServiceEditGroupMessageProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("EditGroupMessage")),
 			connect.WithClientOptions(opts...),
 		),
 		deleteMessageForEveryone: connect.NewClient[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse](
@@ -428,9 +448,11 @@ type chatServiceClient struct {
 	setDirectChatPresenceHeartbeat *connect.Client[v1.SetDirectChatPresenceHeartbeatRequest, v1.SetDirectChatPresenceHeartbeatResponse]
 	clearDirectChatPresence        *connect.Client[v1.ClearDirectChatPresenceRequest, v1.ClearDirectChatPresenceResponse]
 	sendTextMessage                *connect.Client[v1.SendTextMessageRequest, v1.SendTextMessageResponse]
+	editDirectChatMessage          *connect.Client[v1.EditDirectChatMessageRequest, v1.EditDirectChatMessageResponse]
 	listDirectChatMessages         *connect.Client[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse]
 	listGroupMessages              *connect.Client[v1.ListGroupMessagesRequest, v1.ListGroupMessagesResponse]
 	sendGroupTextMessage           *connect.Client[v1.SendGroupTextMessageRequest, v1.SendGroupTextMessageResponse]
+	editGroupMessage               *connect.Client[v1.EditGroupMessageRequest, v1.EditGroupMessageResponse]
 	deleteMessageForEveryone       *connect.Client[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse]
 	pinMessage                     *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
 	unpinMessage                   *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
@@ -581,6 +603,11 @@ func (c *chatServiceClient) SendTextMessage(ctx context.Context, req *connect.Re
 	return c.sendTextMessage.CallUnary(ctx, req)
 }
 
+// EditDirectChatMessage calls aerochat.chat.v1.ChatService.EditDirectChatMessage.
+func (c *chatServiceClient) EditDirectChatMessage(ctx context.Context, req *connect.Request[v1.EditDirectChatMessageRequest]) (*connect.Response[v1.EditDirectChatMessageResponse], error) {
+	return c.editDirectChatMessage.CallUnary(ctx, req)
+}
+
 // ListDirectChatMessages calls aerochat.chat.v1.ChatService.ListDirectChatMessages.
 func (c *chatServiceClient) ListDirectChatMessages(ctx context.Context, req *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error) {
 	return c.listDirectChatMessages.CallUnary(ctx, req)
@@ -594,6 +621,11 @@ func (c *chatServiceClient) ListGroupMessages(ctx context.Context, req *connect.
 // SendGroupTextMessage calls aerochat.chat.v1.ChatService.SendGroupTextMessage.
 func (c *chatServiceClient) SendGroupTextMessage(ctx context.Context, req *connect.Request[v1.SendGroupTextMessageRequest]) (*connect.Response[v1.SendGroupTextMessageResponse], error) {
 	return c.sendGroupTextMessage.CallUnary(ctx, req)
+}
+
+// EditGroupMessage calls aerochat.chat.v1.ChatService.EditGroupMessage.
+func (c *chatServiceClient) EditGroupMessage(ctx context.Context, req *connect.Request[v1.EditGroupMessageRequest]) (*connect.Response[v1.EditGroupMessageResponse], error) {
+	return c.editGroupMessage.CallUnary(ctx, req)
 }
 
 // DeleteMessageForEveryone calls aerochat.chat.v1.ChatService.DeleteMessageForEveryone.
@@ -642,9 +674,11 @@ type ChatServiceHandler interface {
 	SetDirectChatPresenceHeartbeat(context.Context, *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error)
 	ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
+	EditDirectChatMessage(context.Context, *connect.Request[v1.EditDirectChatMessageRequest]) (*connect.Response[v1.EditDirectChatMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
 	ListGroupMessages(context.Context, *connect.Request[v1.ListGroupMessagesRequest]) (*connect.Response[v1.ListGroupMessagesResponse], error)
 	SendGroupTextMessage(context.Context, *connect.Request[v1.SendGroupTextMessageRequest]) (*connect.Response[v1.SendGroupTextMessageResponse], error)
+	EditGroupMessage(context.Context, *connect.Request[v1.EditGroupMessageRequest]) (*connect.Response[v1.EditGroupMessageResponse], error)
 	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
 	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
 	UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error)
@@ -831,6 +865,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceMethods.ByName("SendTextMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceEditDirectChatMessageHandler := connect.NewUnaryHandler(
+		ChatServiceEditDirectChatMessageProcedure,
+		svc.EditDirectChatMessage,
+		connect.WithSchema(chatServiceMethods.ByName("EditDirectChatMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatServiceListDirectChatMessagesHandler := connect.NewUnaryHandler(
 		ChatServiceListDirectChatMessagesProcedure,
 		svc.ListDirectChatMessages,
@@ -847,6 +887,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		ChatServiceSendGroupTextMessageProcedure,
 		svc.SendGroupTextMessage,
 		connect.WithSchema(chatServiceMethods.ByName("SendGroupTextMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceEditGroupMessageHandler := connect.NewUnaryHandler(
+		ChatServiceEditGroupMessageProcedure,
+		svc.EditGroupMessage,
+		connect.WithSchema(chatServiceMethods.ByName("EditGroupMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
 	chatServiceDeleteMessageForEveryoneHandler := connect.NewUnaryHandler(
@@ -927,12 +973,16 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceClearDirectChatPresenceHandler.ServeHTTP(w, r)
 		case ChatServiceSendTextMessageProcedure:
 			chatServiceSendTextMessageHandler.ServeHTTP(w, r)
+		case ChatServiceEditDirectChatMessageProcedure:
+			chatServiceEditDirectChatMessageHandler.ServeHTTP(w, r)
 		case ChatServiceListDirectChatMessagesProcedure:
 			chatServiceListDirectChatMessagesHandler.ServeHTTP(w, r)
 		case ChatServiceListGroupMessagesProcedure:
 			chatServiceListGroupMessagesHandler.ServeHTTP(w, r)
 		case ChatServiceSendGroupTextMessageProcedure:
 			chatServiceSendGroupTextMessageHandler.ServeHTTP(w, r)
+		case ChatServiceEditGroupMessageProcedure:
+			chatServiceEditGroupMessageHandler.ServeHTTP(w, r)
 		case ChatServiceDeleteMessageForEveryoneProcedure:
 			chatServiceDeleteMessageForEveryoneHandler.ServeHTTP(w, r)
 		case ChatServicePinMessageProcedure:
@@ -1064,6 +1114,10 @@ func (UnimplementedChatServiceHandler) SendTextMessage(context.Context, *connect
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.SendTextMessage is not implemented"))
 }
 
+func (UnimplementedChatServiceHandler) EditDirectChatMessage(context.Context, *connect.Request[v1.EditDirectChatMessageRequest]) (*connect.Response[v1.EditDirectChatMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.EditDirectChatMessage is not implemented"))
+}
+
 func (UnimplementedChatServiceHandler) ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ListDirectChatMessages is not implemented"))
 }
@@ -1074,6 +1128,10 @@ func (UnimplementedChatServiceHandler) ListGroupMessages(context.Context, *conne
 
 func (UnimplementedChatServiceHandler) SendGroupTextMessage(context.Context, *connect.Request[v1.SendGroupTextMessageRequest]) (*connect.Response[v1.SendGroupTextMessageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.SendGroupTextMessage is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) EditGroupMessage(context.Context, *connect.Request[v1.EditGroupMessageRequest]) (*connect.Response[v1.EditGroupMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.EditGroupMessage is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error) {
