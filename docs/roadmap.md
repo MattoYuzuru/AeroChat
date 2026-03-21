@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] web voice notes bootstrap through attachment upload flow
+- [x] web video notes bootstrap through attachment upload flow
 
 ---
 
@@ -151,7 +151,7 @@
 - [x] Quotas
 - [x] Attachment retention and delete semantics
 - [x] Voice notes
-- [ ] Video notes
+- [x] Video notes
 - [x] Image/audio/video preview
 - [ ] Encrypted relay
 - [x] TTL cleanup
