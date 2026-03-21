@@ -115,6 +115,7 @@ func run() error {
 		cfg.MediaUploadIntentTTL,
 		cfg.MediaMaxUploadSizeBytes,
 		cfg.MediaUserQuotaBytes,
+		cfg.MaxActiveGroupMembershipsPerUser,
 		cfg.MediaS3BucketName,
 	)
 	handler := connecthandler.NewHandler(serviceName, version, service)

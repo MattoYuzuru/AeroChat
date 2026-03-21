@@ -86,6 +86,10 @@ AeroChat должен поддерживать:
   - direct message tombstone переводит linked attachment из `attached` в `detached`;
   - `detached` больше не удерживает active quota budget;
   - object cleanup для `detached` остаётся staged и выполняется отдельно после retention grace period.
+- max groups per user rules foundation:
+  - configurable per-user limit по active group memberships;
+  - limit применяется на `CreateGroup` и `JoinGroupByInviteLink`;
+  - `leave` и `remove` естественно освобождают capacity, потому что учитываются только текущие membership.
 - bounded web video-notes recording через существующий attachment upload/send flow.
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
@@ -275,6 +279,13 @@ Media/file foundation использует тот же локальный `minio
 - usage считается по attachment metadata в состояниях `pending`, `uploaded`, `attached` и `failed`;
 - `detached`, `expired` и `deleted` больше не считаются частью активного quota budget;
 - `AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION` задаёт grace period перед cleanup для attachment, оставшихся только у tombstoned direct messages.
+
+Для групп у `aero-chat` есть отдельный operator-facing лимит:
+
+- `AERO_MAX_ACTIVE_GROUP_MEMBERSHIPS_PER_USER` задаёт максимум активных group membership на пользователя;
+- лимит проверяется на `CreateGroup` и `JoinGroupByInviteLink`;
+- source of truth остаётся в `group_memberships`, без отдельного counter/caching слоя;
+- удалённые и вышедшие membership не удерживают лимит, потому что больше не существуют в активной SQL-модели.
 
 В `local/dev` шаблоне это уже сведено к `minio:9000` и `MEDIA_S3_PUBLIC_ENDPOINT`.
 Для browser upload compose runtime автоматически bootstrap'ит bucket privacy через `mc`,

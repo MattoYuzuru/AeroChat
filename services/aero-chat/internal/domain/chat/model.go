@@ -3,36 +3,37 @@ package chat
 import "time"
 
 const (
-	ChatKindDirect                         = "direct"
-	ChatKindGroup                          = "group"
-	GroupThreadKeyPrimary                  = "primary"
-	MessageKindText                        = "text"
-	MarkdownPolicySafeSubsetV1             = "safe_subset_v1"
-	AttachmentScopeDirect                  = "direct"
-	AttachmentScopeGroup                   = "group"
-	AttachmentStatusPending                = "pending"
-	AttachmentStatusUploaded               = "uploaded"
-	AttachmentStatusAttached               = "attached"
-	AttachmentStatusDetached               = "detached"
-	AttachmentStatusFailed                 = "failed"
-	AttachmentStatusExpired                = "expired"
-	AttachmentStatusDeleted                = "deleted"
-	AttachmentUploadSessionPending         = "pending"
-	AttachmentUploadSessionCompleted       = "completed"
-	AttachmentUploadSessionFailed          = "failed"
-	AttachmentUploadSessionExpired         = "expired"
-	GroupMemberRoleOwner                   = "owner"
-	GroupMemberRoleAdmin                   = "admin"
-	GroupMemberRoleMember                  = "member"
-	GroupMemberRoleReader                  = "reader"
-	defaultMessagePageSize           int32 = 50
-	maxMessagePageSize               int32 = 200
-	defaultSearchPageSize            int32 = 20
-	maxSearchPageSize                int32 = 50
-	maxTextMessageLength                   = 4000
-	maxSearchQueryLength                   = 200
-	maxGroupNameLength                     = 80
-	defaultMediaUserQuotaBytes       int64 = 512 * 1024 * 1024
+	ChatKindDirect                                = "direct"
+	ChatKindGroup                                 = "group"
+	GroupThreadKeyPrimary                         = "primary"
+	MessageKindText                               = "text"
+	MarkdownPolicySafeSubsetV1                    = "safe_subset_v1"
+	AttachmentScopeDirect                         = "direct"
+	AttachmentScopeGroup                          = "group"
+	AttachmentStatusPending                       = "pending"
+	AttachmentStatusUploaded                      = "uploaded"
+	AttachmentStatusAttached                      = "attached"
+	AttachmentStatusDetached                      = "detached"
+	AttachmentStatusFailed                        = "failed"
+	AttachmentStatusExpired                       = "expired"
+	AttachmentStatusDeleted                       = "deleted"
+	AttachmentUploadSessionPending                = "pending"
+	AttachmentUploadSessionCompleted              = "completed"
+	AttachmentUploadSessionFailed                 = "failed"
+	AttachmentUploadSessionExpired                = "expired"
+	GroupMemberRoleOwner                          = "owner"
+	GroupMemberRoleAdmin                          = "admin"
+	GroupMemberRoleMember                         = "member"
+	GroupMemberRoleReader                         = "reader"
+	defaultMaxActiveGroupMembershipsPerUser       = 100
+	defaultMessagePageSize                  int32 = 50
+	maxMessagePageSize                      int32 = 200
+	defaultSearchPageSize                   int32 = 20
+	maxSearchPageSize                       int32 = 50
+	maxTextMessageLength                          = 4000
+	maxSearchQueryLength                          = 200
+	maxGroupNameLength                            = 80
+	defaultMediaUserQuotaBytes              int64 = 512 * 1024 * 1024
 )
 
 type UserSummary struct {
@@ -409,11 +410,12 @@ type CreateDirectChatParams struct {
 }
 
 type CreateGroupParams struct {
-	GroupID         string
-	PrimaryThreadID string
-	Name            string
-	CreatedByUserID string
-	CreatedAt       time.Time
+	GroupID                          string
+	PrimaryThreadID                  string
+	Name                             string
+	CreatedByUserID                  string
+	CreatedAt                        time.Time
+	MaxActiveGroupMembershipsPerUser int
 }
 
 type CreateGroupInviteLinkParams struct {
@@ -423,6 +425,15 @@ type CreateGroupInviteLinkParams struct {
 	Role            string
 	TokenHash       string
 	CreatedAt       time.Time
+}
+
+type JoinGroupByInviteLinkParams struct {
+	GroupID                          string
+	UserID                           string
+	Role                             string
+	InviteLinkID                     string
+	JoinedAt                         time.Time
+	MaxActiveGroupMembershipsPerUser int
 }
 
 type UpdateGroupMemberRoleParams struct {

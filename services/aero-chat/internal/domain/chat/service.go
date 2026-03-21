@@ -54,7 +54,7 @@ type Repository interface {
 	GetGroupInviteLink(context.Context, string, string) (*GroupInviteLink, error)
 	DisableGroupInviteLink(context.Context, string, string, time.Time) (bool, error)
 	GetGroupInviteLinkForJoin(context.Context, string) (*GroupInviteLinkJoinTarget, error)
-	JoinGroupByInviteLink(context.Context, string, string, string, string, time.Time) (bool, error)
+	JoinGroupByInviteLink(context.Context, JoinGroupByInviteLinkParams) (bool, error)
 	ListDirectChatReadStateEntries(context.Context, string, string) ([]DirectChatReadStateEntry, error)
 	ListDirectChatPresenceStateEntries(context.Context, string, string) ([]DirectChatPresenceStateEntry, error)
 	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
@@ -120,22 +120,23 @@ type StoredObjectInfo struct {
 }
 
 type Service struct {
-	repo                 Repository
-	friendships          FriendshipChecker
-	typingStore          TypingStateStore
-	presenceStore        PresenceStateStore
-	objectStorage        ObjectStorage
-	sessionToken         *libauth.SessionTokenManager
-	sessionTouchInterval time.Duration
-	typingTTL            time.Duration
-	presenceTTL          time.Duration
-	uploadIntentTTL      time.Duration
-	maxUploadSizeBytes   int64
-	mediaUserQuotaBytes  int64
-	storageBucketName    string
-	randReader           io.Reader
-	now                  func() time.Time
-	newID                func() string
+	repo                             Repository
+	friendships                      FriendshipChecker
+	typingStore                      TypingStateStore
+	presenceStore                    PresenceStateStore
+	objectStorage                    ObjectStorage
+	sessionToken                     *libauth.SessionTokenManager
+	sessionTouchInterval             time.Duration
+	typingTTL                        time.Duration
+	presenceTTL                      time.Duration
+	uploadIntentTTL                  time.Duration
+	maxUploadSizeBytes               int64
+	mediaUserQuotaBytes              int64
+	maxActiveGroupMembershipsPerUser int
+	storageBucketName                string
+	randReader                       io.Reader
+	now                              func() time.Time
+	newID                            func() string
 }
 
 func NewService(
@@ -150,6 +151,7 @@ func NewService(
 	uploadIntentTTL time.Duration,
 	maxUploadSizeBytes int64,
 	mediaUserQuotaBytes int64,
+	maxActiveGroupMembershipsPerUser int,
 	storageBucketName string,
 ) *Service {
 	if typingTTL <= 0 {
@@ -167,22 +169,26 @@ func NewService(
 	if mediaUserQuotaBytes <= 0 {
 		mediaUserQuotaBytes = defaultMediaUserQuotaBytes
 	}
+	if maxActiveGroupMembershipsPerUser <= 0 {
+		maxActiveGroupMembershipsPerUser = defaultMaxActiveGroupMembershipsPerUser
+	}
 
 	return &Service{
-		repo:                 repo,
-		friendships:          friendships,
-		typingStore:          typingStore,
-		presenceStore:        presenceStore,
-		objectStorage:        objectStorage,
-		sessionToken:         sessionToken,
-		sessionTouchInterval: defaultSessionTouchInterval,
-		typingTTL:            typingTTL,
-		presenceTTL:          presenceTTL,
-		uploadIntentTTL:      uploadIntentTTL,
-		maxUploadSizeBytes:   maxUploadSizeBytes,
-		mediaUserQuotaBytes:  mediaUserQuotaBytes,
-		storageBucketName:    storageBucketName,
-		randReader:           rand.Reader,
+		repo:                             repo,
+		friendships:                      friendships,
+		typingStore:                      typingStore,
+		presenceStore:                    presenceStore,
+		objectStorage:                    objectStorage,
+		sessionToken:                     sessionToken,
+		sessionTouchInterval:             defaultSessionTouchInterval,
+		typingTTL:                        typingTTL,
+		presenceTTL:                      presenceTTL,
+		uploadIntentTTL:                  uploadIntentTTL,
+		maxUploadSizeBytes:               maxUploadSizeBytes,
+		mediaUserQuotaBytes:              mediaUserQuotaBytes,
+		maxActiveGroupMembershipsPerUser: maxActiveGroupMembershipsPerUser,
+		storageBucketName:                storageBucketName,
+		randReader:                       rand.Reader,
 		now: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -280,11 +286,12 @@ func (s *Service) CreateGroup(ctx context.Context, token string, name string) (*
 
 	now := s.now()
 	group, err := s.repo.CreateGroup(ctx, CreateGroupParams{
-		GroupID:         s.newID(),
-		PrimaryThreadID: s.newID(),
-		Name:            normalizedName,
-		CreatedByUserID: authSession.User.ID,
-		CreatedAt:       now,
+		GroupID:                          s.newID(),
+		PrimaryThreadID:                  s.newID(),
+		Name:                             normalizedName,
+		CreatedByUserID:                  authSession.User.ID,
+		CreatedAt:                        now,
+		MaxActiveGroupMembershipsPerUser: s.maxActiveGroupMembershipsPerUser,
 	})
 	if err != nil {
 		return nil, err
@@ -836,14 +843,14 @@ func (s *Service) JoinGroupByInviteLink(ctx context.Context, token string, invit
 		return nil, ErrNotFound
 	}
 
-	if _, err := s.repo.JoinGroupByInviteLink(
-		ctx,
-		target.Group.ID,
-		authSession.User.ID,
-		target.InviteLink.Role,
-		target.InviteLink.ID,
-		s.now(),
-	); err != nil {
+	if _, err := s.repo.JoinGroupByInviteLink(ctx, JoinGroupByInviteLinkParams{
+		GroupID:                          target.Group.ID,
+		UserID:                           authSession.User.ID,
+		Role:                             target.InviteLink.Role,
+		InviteLinkID:                     target.InviteLink.ID,
+		JoinedAt:                         s.now(),
+		MaxActiveGroupMembershipsPerUser: s.maxActiveGroupMembershipsPerUser,
+	}); err != nil {
 		return nil, err
 	}
 

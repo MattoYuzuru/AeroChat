@@ -960,6 +960,19 @@ func (q *Queries) FriendshipExists(ctx context.Context, arg FriendshipExistsPara
 	return friendship_exists, err
 }
 
+const getActiveGroupMembershipCountByUserID = `-- name: GetActiveGroupMembershipCountByUserID :one
+SELECT COUNT(*)::BIGINT AS active_membership_count
+FROM group_memberships
+WHERE user_id = $1
+`
+
+func (q *Queries) GetActiveGroupMembershipCountByUserID(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, getActiveGroupMembershipCountByUserID, userID)
+	var active_membership_count int64
+	err := row.Scan(&active_membership_count)
+	return active_membership_count, err
+}
+
 const getAttachmentQuotaUsageByOwner = `-- name: GetAttachmentQuotaUsageByOwner :one
 SELECT COALESCE(SUM(size_bytes), 0)::BIGINT AS total_bytes
 FROM attachments
@@ -2931,6 +2944,19 @@ FOR UPDATE
 
 func (q *Queries) LockAttachmentQuotaOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, lockAttachmentQuotaOwner, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
+const lockGroupMembershipQuotaOwner = `-- name: LockGroupMembershipQuotaOwner :one
+SELECT id
+FROM users
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockGroupMembershipQuotaOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockGroupMembershipQuotaOwner, id)
 	err := row.Scan(&id)
 	return id, err
 }

@@ -197,6 +197,18 @@ func (r *Repository) CreateGroup(ctx context.Context, params chat.CreateGroupPar
 	q := r.queries.WithTx(tx)
 	groupID := mustParseUUID(params.GroupID)
 	createdByUserID := mustParseUUID(params.CreatedByUserID)
+	if _, err := q.LockGroupMembershipQuotaOwner(ctx, createdByUserID); err != nil {
+		return nil, convertError(err)
+	}
+
+	activeMemberships, err := q.GetActiveGroupMembershipCountByUserID(ctx, createdByUserID)
+	if err != nil {
+		return nil, convertError(err)
+	}
+	if params.MaxActiveGroupMembershipsPerUser > 0 && activeMemberships >= int64(params.MaxActiveGroupMembershipsPerUser) {
+		return nil, chat.ErrResourceExhausted
+	}
+
 	if _, err := q.CreateGroup(ctx, chatsqlc.CreateGroupParams{
 		ID:              groupID,
 		Name:            params.Name,
@@ -528,6 +540,10 @@ func (r *Repository) DeleteGroupMembership(ctx context.Context, groupID string, 
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupMembershipQuotaOwner(ctx, mustParseUUID(userID)); err != nil {
+		return false, convertError(err)
+	}
+
 	affected, err := q.DeleteGroupMembership(ctx, chatsqlc.DeleteGroupMembershipParams{
 		GroupID: mustParseUUID(groupID),
 		UserID:  mustParseUUID(userID),
@@ -716,7 +732,7 @@ func (r *Repository) GetGroupInviteLinkForJoin(ctx context.Context, tokenHash st
 	}, nil
 }
 
-func (r *Repository) JoinGroupByInviteLink(ctx context.Context, groupID string, userID string, role string, inviteLinkID string, joinedAt time.Time) (bool, error) {
+func (r *Repository) JoinGroupByInviteLink(ctx context.Context, params chat.JoinGroupByInviteLinkParams) (bool, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return false, fmt.Errorf("begin tx: %w", err)
@@ -726,9 +742,13 @@ func (r *Repository) JoinGroupByInviteLink(ctx context.Context, groupID string, 
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupMembershipQuotaOwner(ctx, mustParseUUID(params.UserID)); err != nil {
+		return false, convertError(err)
+	}
+
 	link, err := q.GetGroupInviteLinkByIDAndGroupID(ctx, chatsqlc.GetGroupInviteLinkByIDAndGroupIDParams{
-		GroupID: mustParseUUID(groupID),
-		ID:      mustParseUUID(inviteLinkID),
+		GroupID: mustParseUUID(params.GroupID),
+		ID:      mustParseUUID(params.InviteLinkID),
 	})
 	if err != nil {
 		return false, convertError(err)
@@ -737,11 +757,31 @@ func (r *Repository) JoinGroupByInviteLink(ctx context.Context, groupID string, 
 		return false, chat.ErrNotFound
 	}
 
+	if _, err := q.GetGroupMemberRowByGroupIDAndUserID(ctx, chatsqlc.GetGroupMemberRowByGroupIDAndUserIDParams{
+		GroupID: mustParseUUID(params.GroupID),
+		UserID:  mustParseUUID(params.UserID),
+	}); err == nil {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return false, convertError(err)
+	}
+
+	activeMemberships, err := q.GetActiveGroupMembershipCountByUserID(ctx, mustParseUUID(params.UserID))
+	if err != nil {
+		return false, convertError(err)
+	}
+	if params.MaxActiveGroupMembershipsPerUser > 0 && activeMemberships >= int64(params.MaxActiveGroupMembershipsPerUser) {
+		return false, chat.ErrResourceExhausted
+	}
+
 	affected, err := q.JoinGroupMembership(ctx, chatsqlc.JoinGroupMembershipParams{
-		GroupID:  mustParseUUID(groupID),
-		UserID:   mustParseUUID(userID),
-		Role:     role,
-		JoinedAt: timestamptzValue(joinedAt),
+		GroupID:  mustParseUUID(params.GroupID),
+		UserID:   mustParseUUID(params.UserID),
+		Role:     params.Role,
+		JoinedAt: timestamptzValue(params.JoinedAt),
 	})
 	if err != nil {
 		return false, convertError(err)
@@ -754,14 +794,14 @@ func (r *Repository) JoinGroupByInviteLink(ctx context.Context, groupID string, 
 	}
 
 	if err := q.TouchGroupInviteLinkJoin(ctx, chatsqlc.TouchGroupInviteLinkJoinParams{
-		ID:           mustParseUUID(inviteLinkID),
-		LastJoinedAt: timestamptzValue(joinedAt),
+		ID:           mustParseUUID(params.InviteLinkID),
+		LastJoinedAt: timestamptzValue(params.JoinedAt),
 	}); err != nil {
 		return false, convertError(err)
 	}
 	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
-		ID:        mustParseUUID(groupID),
-		UpdatedAt: timestamptzValue(joinedAt),
+		ID:        mustParseUUID(params.GroupID),
+		UpdatedAt: timestamptzValue(params.JoinedAt),
 	}); err != nil {
 		return false, convertError(err)
 	}

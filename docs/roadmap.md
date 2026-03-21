@@ -130,7 +130,7 @@
 - [x] Replies и quoted messages foundation
 - [x] Message search foundation через `aero-gateway`
 - [x] Group moderation foundation и admin policy expansion
-- [ ] Max groups per user rules
+- [x] Max groups per user rules
 
 ---
 
