@@ -234,7 +234,7 @@ func (s *Service) resolveAttachmentScope(ctx context.Context, userID string, dir
 	if err != nil {
 		return "", nil, nil, err
 	}
-	if !canSendGroupMessages(group.SelfRole) {
+	if !canSendGroupMessages(group.SelfRole, group.SelfWriteRestricted) {
 		return "", nil, nil, fmt.Errorf("%w: current group role is read-only for attachment uploads", ErrPermissionDenied)
 	}
 	return AttachmentScopeGroup, nil, &resolvedGroupID, nil

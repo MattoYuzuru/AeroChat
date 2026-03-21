@@ -78,15 +78,29 @@ type DirectChat struct {
 }
 
 type Group struct {
-	ID              string
-	Name            string
-	Kind            string
-	CreatedByUserID string
-	SelfRole        string
-	MemberCount     int32
-	UnreadCount     int32
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                  string
+	Name                string
+	Kind                string
+	CreatedByUserID     string
+	SelfRole            string
+	SelfPermissions     GroupPermissions
+	SelfWriteRestricted bool
+	MemberCount         int32
+	UnreadCount         int32
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
+type GroupPermissions struct {
+	CanManageInviteLinks      bool
+	CreatableInviteRoles      []string
+	CanManageMemberRoles      bool
+	RoleManagementTargetRoles []string
+	AssignableRoles           []string
+	CanTransferOwnership      bool
+	RemovableMemberRoles      []string
+	RestrictableMemberRoles   []string
+	CanLeaveGroup             bool
 }
 
 type GroupChatThread struct {
@@ -110,10 +124,12 @@ type GroupTypingState struct {
 }
 
 type GroupMember struct {
-	GroupID  string
-	User     UserSummary
-	Role     string
-	JoinedAt time.Time
+	GroupID           string
+	User              UserSummary
+	Role              string
+	JoinedAt          time.Time
+	IsWriteRestricted bool
+	WriteRestrictedAt *time.Time
 }
 
 type GroupInviteLink struct {
@@ -399,6 +415,14 @@ type TransferGroupOwnershipParams struct {
 	CurrentOwnerUserID string
 	NewOwnerUserID     string
 	UpdatedAt          time.Time
+}
+
+type SetGroupMemberWriteRestrictionParams struct {
+	GroupID           string
+	UserID            string
+	IsWriteRestricted bool
+	WriteRestrictedAt *time.Time
+	UpdatedAt         time.Time
 }
 
 type CreateDirectChatMessageParams struct {

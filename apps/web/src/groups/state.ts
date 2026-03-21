@@ -79,6 +79,7 @@ export function applyGroupRealtimeToGroups(
         upsertGroup(groups, mergeGroupPreservingUnread(findGroupByID(groups, event.group.id), event.group)),
       );
     case "group.role.updated":
+    case "group.moderation.updated":
     case "group.ownership.transferred":
       if (event.group === null || event.selfMember === null) {
         return groups.filter((group) => group.id !== event.groupId);
@@ -222,6 +223,27 @@ export function applyGroupRealtimeToSelectedState(
     };
   }
 
+  if (event.type === "group.moderation.updated") {
+    return {
+      status: "ready",
+      snapshot: {
+        group: mergeGroupPreservingUnread(state.snapshot.group, event.group),
+        thread: event.thread ?? state.snapshot.thread,
+        readState: state.snapshot.readState,
+        typingState: state.snapshot.typingState,
+      },
+      members: sortMembers(
+        upsertMember(
+          upsertOptionalMember(state.members, event.selfMember),
+          event.member,
+        ),
+      ),
+      inviteLinks: filterInviteLinks(state.inviteLinks, event.group.selfRole),
+      messages: state.messages,
+      errorMessage: null,
+    };
+  }
+
   return {
     status: "ready",
     snapshot: {
@@ -326,6 +348,17 @@ function patchGroupFromMessage(
       memberCount: 0,
       unreadCount:
         reason === "message_created" && message.senderUserId !== currentUserId ? 1 : 0,
+      permissions: {
+        canManageInviteLinks: false,
+        creatableInviteRoles: [],
+        canManageMemberRoles: false,
+        roleManagementTargetRoles: [],
+        assignableRoles: [],
+        canTransferOwnership: false,
+        removableMemberRoles: [],
+        restrictableMemberRoles: [],
+        canLeaveGroup: true,
+      },
       createdAt: "",
       updatedAt: message.updatedAt || message.createdAt,
     };

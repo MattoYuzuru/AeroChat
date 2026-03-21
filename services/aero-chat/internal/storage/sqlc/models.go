@@ -122,10 +122,12 @@ type GroupInviteLink struct {
 }
 
 type GroupMembership struct {
-	GroupID  uuid.UUID          `db:"group_id" json:"group_id"`
-	UserID   uuid.UUID          `db:"user_id" json:"user_id"`
-	Role     string             `db:"role" json:"role"`
-	JoinedAt pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	GroupID           uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	Role              string             `db:"role" json:"role"`
+	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	IsWriteRestricted bool               `db:"is_write_restricted" json:"is_write_restricted"`
+	WriteRestrictedAt pgtype.Timestamptz `db:"write_restricted_at" json:"write_restricted_at"`
 }
 
 type GroupMessage struct {

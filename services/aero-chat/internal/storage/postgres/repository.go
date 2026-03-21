@@ -241,15 +241,16 @@ func (r *Repository) ListGroups(ctx context.Context, userID string) ([]chat.Grou
 	result := make([]chat.Group, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, chat.Group{
-			ID:              row.ID.String(),
-			Name:            row.Name,
-			Kind:            chat.ChatKindGroup,
-			CreatedByUserID: row.CreatedByUserID.String(),
-			SelfRole:        row.SelfRole,
-			MemberCount:     row.MemberCount,
-			UnreadCount:     row.UnreadCount,
-			CreatedAt:       timestampValue(row.CreatedAt),
-			UpdatedAt:       timestampValue(row.UpdatedAt),
+			ID:                  row.ID.String(),
+			Name:                row.Name,
+			Kind:                chat.ChatKindGroup,
+			CreatedByUserID:     row.CreatedByUserID.String(),
+			SelfRole:            row.SelfRole,
+			SelfWriteRestricted: row.SelfIsWriteRestricted,
+			MemberCount:         row.MemberCount,
+			UnreadCount:         row.UnreadCount,
+			CreatedAt:           timestampValue(row.CreatedAt),
+			UpdatedAt:           timestampValue(row.UpdatedAt),
 		})
 	}
 
@@ -266,15 +267,16 @@ func (r *Repository) GetGroup(ctx context.Context, userID string, groupID string
 	}
 
 	group := &chat.Group{
-		ID:              row.ID.String(),
-		Name:            row.Name,
-		Kind:            chat.ChatKindGroup,
-		CreatedByUserID: row.CreatedByUserID.String(),
-		SelfRole:        row.SelfRole,
-		MemberCount:     row.MemberCount,
-		UnreadCount:     row.UnreadCount,
-		CreatedAt:       timestampValue(row.CreatedAt),
-		UpdatedAt:       timestampValue(row.UpdatedAt),
+		ID:                  row.ID.String(),
+		Name:                row.Name,
+		Kind:                chat.ChatKindGroup,
+		CreatedByUserID:     row.CreatedByUserID.String(),
+		SelfRole:            row.SelfRole,
+		SelfWriteRestricted: row.SelfIsWriteRestricted,
+		MemberCount:         row.MemberCount,
+		UnreadCount:         row.UnreadCount,
+		CreatedAt:           timestampValue(row.CreatedAt),
+		UpdatedAt:           timestampValue(row.UpdatedAt),
 	}
 	return group, nil
 }
@@ -340,8 +342,10 @@ func (r *Repository) ListGroupMembers(ctx context.Context, userID string, groupI
 				Nickname:  row.Nickname,
 				AvatarURL: textPointer(row.AvatarUrl),
 			},
-			Role:     row.Role,
-			JoinedAt: timestampValue(row.JoinedAt),
+			Role:              row.Role,
+			JoinedAt:          timestampValue(row.JoinedAt),
+			IsWriteRestricted: row.IsWriteRestricted,
+			WriteRestrictedAt: timestamptzPointer(row.WriteRestrictedAt),
 		})
 	}
 
@@ -390,8 +394,10 @@ func (r *Repository) GetGroupMember(ctx context.Context, groupID string, userID 
 			Nickname:  row.Nickname,
 			AvatarURL: textPointer(row.AvatarUrl),
 		},
-		Role:     row.Role,
-		JoinedAt: timestampValue(row.JoinedAt),
+		Role:              row.Role,
+		JoinedAt:          timestampValue(row.JoinedAt),
+		IsWriteRestricted: row.IsWriteRestricted,
+		WriteRestrictedAt: timestamptzPointer(row.WriteRestrictedAt),
 	}
 	return member, nil
 }
@@ -431,6 +437,46 @@ func (r *Repository) UpdateGroupMemberRole(ctx context.Context, params chat.Upda
 	if err := tx.Commit(ctx); err != nil {
 		return false, fmt.Errorf("commit tx: %w", err)
 	}
+	return true, nil
+}
+
+func (r *Repository) SetGroupMemberWriteRestriction(ctx context.Context, params chat.SetGroupMemberWriteRestrictionParams) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	affected, err := q.SetGroupMembershipWriteRestriction(ctx, chatsqlc.SetGroupMembershipWriteRestrictionParams{
+		GroupID:           mustParseUUID(params.GroupID),
+		UserID:            mustParseUUID(params.UserID),
+		IsWriteRestricted: params.IsWriteRestricted,
+		WriteRestrictedAt: nullableTimestamptz(params.WriteRestrictedAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(params.GroupID),
+		UpdatedAt: timestamptzValue(params.UpdatedAt),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+
 	return true, nil
 }
 

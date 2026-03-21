@@ -79,6 +79,7 @@ export function GroupsPage() {
   const [isCreatingInviteLink, setIsCreatingInviteLink] = useState(false);
   const [pendingDisableInviteId, setPendingDisableInviteId] = useState<string | null>(null);
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
+  const [pendingRestrictionUserId, setPendingRestrictionUserId] = useState<string | null>(null);
   const [pendingRemoveUserId, setPendingRemoveUserId] = useState<string | null>(null);
   const [pendingTransferUserId, setPendingTransferUserId] = useState<string | null>(null);
   const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
@@ -233,7 +234,7 @@ export function GroupsPage() {
         const snapshot = await gatewayClient.getGroupChat(token, selectedGroupId);
         const membersPromise = gatewayClient.listGroupMembers(token, selectedGroupId);
         const messagesPromise = gatewayClient.listGroupMessages(token, selectedGroupId);
-        const inviteLinksPromise = canManageInviteLinks(snapshot.group.selfRole)
+        const inviteLinksPromise = snapshot.group.permissions.canManageInviteLinks
           ? gatewayClient.listGroupInviteLinks(token, selectedGroupId)
           : Promise.resolve([]);
         const [members, messages, inviteLinks] = await Promise.all([
@@ -589,6 +590,24 @@ export function GroupsPage() {
     setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
   }, [searchJumpIntent, searchParams, selectedGroupId, selectedState, setSearchParams]);
 
+  const selectedGroupPermissions =
+    selectedState.status === "ready" ? selectedState.snapshot.group.permissions : null;
+  useEffect(() => {
+    if (selectedGroupPermissions === null) {
+      return;
+    }
+
+    if (
+      selectedGroupPermissions.creatableInviteRoles.length > 0 &&
+      !selectedGroupPermissions.creatableInviteRoles.includes(inviteRole)
+    ) {
+      const nextInviteRole = selectedGroupPermissions.creatableInviteRoles[0];
+      if (nextInviteRole) {
+        setInviteRole(nextInviteRole);
+      }
+    }
+  }, [inviteRole, selectedGroupPermissions]);
+
   if (authState.status !== "authenticated") {
     return null;
   }
@@ -597,6 +616,10 @@ export function GroupsPage() {
     selectedState.status === "ready"
       ? selectedState.inviteLinks.filter((inviteLink) => inviteLink.disabledAt === null).length
       : 0;
+  const selectedSelfMember =
+    selectedState.status === "ready"
+      ? selectedState.members.find((member) => member.user.id === authState.profile.id) ?? null
+      : null;
   const requestedJoinToken = extractGroupInviteToken(joinInput || joinTokenFromRoute);
   const threadMessages =
     selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
@@ -604,10 +627,6 @@ export function GroupsPage() {
     selectedState.status === "ready"
       ? describeGroupTypingLabel(selectedState.snapshot.typingState, authState.profile.id)
       : null;
-  const canManageMembership =
-    selectedState.status === "ready" &&
-    selectedState.snapshot.group.selfRole === "owner";
-
   async function reloadGroups() {
     if (groupsStatus === "loading") {
       return;
@@ -1029,6 +1048,55 @@ export function GroupsPage() {
     }
   }
 
+  async function handleSetGroupRestriction(userId: string, restricted: boolean) {
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    const member = selectedState.members.find((candidate) => candidate.user.id === userId);
+    if (!member) {
+      return;
+    }
+
+    const confirmMessage = restricted
+      ? `Ограничить отправку сообщений для ${member.user.nickname || `@${member.user.login}`}?`
+      : `Снять ограничение на отправку сообщений для ${member.user.nickname || `@${member.user.login}`}?`;
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setPendingRestrictionUserId(userId);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      if (restricted) {
+        await gatewayClient.restrictGroupMember(token, selectedState.snapshot.group.id, userId);
+        setNotice(
+          `Отправка сообщений ограничена для ${member.user.nickname || `@${member.user.login}`}.`,
+        );
+      } else {
+        await gatewayClient.unrestrictGroupMember(token, selectedState.snapshot.group.id, userId);
+        setNotice(
+          `Ограничение на отправку снято для ${member.user.nickname || `@${member.user.login}`}.`,
+        );
+      }
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        restricted
+          ? "Не удалось ограничить отправку сообщений."
+          : "Не удалось снять ограничение на отправку сообщений.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
+    } finally {
+      setPendingRestrictionUserId(null);
+    }
+  }
+
   async function handleLeaveGroup() {
     if (selectedState.status !== "ready") {
       return;
@@ -1064,7 +1132,7 @@ export function GroupsPage() {
       const snapshot = await gatewayClient.getGroupChat(token, groupId);
       const membersPromise = gatewayClient.listGroupMembers(token, groupId);
       const messagesPromise = gatewayClient.listGroupMessages(token, groupId);
-      const inviteLinksPromise = canManageInviteLinks(snapshot.group.selfRole)
+      const inviteLinksPromise = snapshot.group.permissions.canManageInviteLinks
         ? gatewayClient.listGroupInviteLinks(token, groupId)
         : Promise.resolve([]);
       const [members, messages, inviteLinks] = await Promise.all([
@@ -1354,9 +1422,11 @@ export function GroupsPage() {
                     <span className={styles.statusPill}>
                       {selectedState.snapshot.thread.canSendMessages
                         ? "write allowed"
-                        : "read only"}
+                        : selectedSelfMember?.isWriteRestricted
+                          ? "write restricted"
+                          : "read only"}
                     </span>
-                    {selectedState.snapshot.group.selfRole !== "owner" && (
+                    {selectedState.snapshot.group.permissions.canLeaveGroup && (
                       <button
                         className={styles.dangerButton}
                         disabled={isLeavingGroup}
@@ -1604,7 +1674,9 @@ export function GroupsPage() {
 
                 {!selectedState.snapshot.thread.canSendMessages && (
                   <div className={styles.readOnlyNotice}>
-                    Роль `reader` видит историю группы, но не может отправлять сообщения.
+                    {selectedSelfMember?.isWriteRestricted
+                      ? "Для текущего участника включено backend-ограничение на отправку сообщений и typing."
+                      : "Роль `reader` видит историю группы, но не может отправлять сообщения."}
                   </div>
                 )}
 
@@ -1773,8 +1845,9 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Участники группы</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Список участников доступен всем membership roles, включая `reader`. Управление
-                    ролями и удаление участников в этом PR остаются owner-only.
+                    Список участников доступен всем membership roles, включая `reader`. В этом
+                    slice owner управляет ролями, а admin получает bounded remove/restrict powers
+                    без обхода owner-only invariants.
                   </p>
                 </div>
 
@@ -1797,12 +1870,27 @@ export function GroupsPage() {
                     {selectedState.members.map((member) => {
                       const isCurrentUser = member.user.id === authState.profile.id;
                       const draftRole = memberRoleDrafts[member.user.id] ?? member.role;
+                      const permissions = selectedState.snapshot.group.permissions;
                       const canAdjustRole =
-                        canManageMembership && !isCurrentUser && member.role !== "owner";
+                        permissions.canManageMemberRoles &&
+                        !isCurrentUser &&
+                        permissions.roleManagementTargetRoles.includes(member.role);
                       const canTransferOwnership =
-                        canManageMembership && !isCurrentUser && member.role !== "owner";
+                        permissions.canTransferOwnership &&
+                        !isCurrentUser &&
+                        member.role !== "owner" &&
+                        !member.isWriteRestricted;
                       const canRemoveMember =
-                        canManageMembership && !isCurrentUser && member.role !== "owner";
+                        !isCurrentUser &&
+                        permissions.removableMemberRoles.includes(member.role);
+                      const canRestrictMember =
+                        !isCurrentUser &&
+                        !member.isWriteRestricted &&
+                        permissions.restrictableMemberRoles.includes(member.role);
+                      const canUnrestrictMember =
+                        !isCurrentUser &&
+                        member.isWriteRestricted &&
+                        permissions.restrictableMemberRoles.includes(member.role);
 
                       return (
                         <article className={styles.memberCard} key={member.user.id}>
@@ -1814,76 +1902,120 @@ export function GroupsPage() {
                                 В группе с {formatDateTime(member.joinedAt)}
                                 {isCurrentUser ? " • это вы" : ""}
                               </p>
+                              {member.isWriteRestricted && (
+                                <p className={styles.helperText}>
+                                  Ограничение на отправку активно
+                                  {member.writeRestrictedAt
+                                    ? ` с ${formatDateTime(member.writeRestrictedAt)}`
+                                    : "."}
+                                </p>
+                              )}
                             </div>
                             <span className={styles.rolePill}>{roleLabel(member.role)}</span>
                           </div>
 
-                          {canAdjustRole && (
+                          {(canAdjustRole ||
+                            canTransferOwnership ||
+                            canRemoveMember ||
+                            canRestrictMember ||
+                            canUnrestrictMember) && (
                             <div className={styles.memberActions}>
-                              <label className={styles.field}>
-                                <span>Новая роль</span>
-                                <select
-                                  onChange={(event) =>
-                                    setMemberRoleDrafts((current) => ({
-                                      ...current,
-                                      [member.user.id]: event.target.value as GroupMemberRole,
-                                    }))
-                                  }
-                                  value={draftRole}
-                                >
-                                  <option value="admin">admin</option>
-                                  <option value="member">member</option>
-                                  <option value="reader">reader</option>
-                                </select>
-                              </label>
+                              {canAdjustRole && (
+                                <label className={styles.field}>
+                                  <span>Новая роль</span>
+                                  <select
+                                    onChange={(event) =>
+                                      setMemberRoleDrafts((current) => ({
+                                        ...current,
+                                        [member.user.id]: event.target.value as GroupMemberRole,
+                                      }))
+                                    }
+                                    value={draftRole}
+                                  >
+                                    {permissions.assignableRoles.map((role) => (
+                                      <option key={role} value={role}>
+                                        {role}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              )}
 
                               <div className={styles.memberButtons}>
-                                <button
-                                  className={styles.secondaryButton}
-                                  disabled={
-                                    pendingRoleUserId === member.user.id || draftRole === member.role
-                                  }
-                                  onClick={() => {
-                                    void handleUpdateGroupMemberRole(member.user.id);
-                                  }}
-                                  type="button"
-                                >
-                                  {pendingRoleUserId === member.user.id
-                                    ? "Сохраняем..."
-                                    : "Обновить роль"}
-                                </button>
+                                {canAdjustRole && (
+                                  <button
+                                    className={styles.secondaryButton}
+                                    disabled={
+                                      pendingRoleUserId === member.user.id || draftRole === member.role
+                                    }
+                                    onClick={() => {
+                                      void handleUpdateGroupMemberRole(member.user.id);
+                                    }}
+                                    type="button"
+                                  >
+                                    {pendingRoleUserId === member.user.id
+                                      ? "Сохраняем..."
+                                      : "Обновить роль"}
+                                  </button>
+                                )}
 
-                                <button
-                                  className={styles.secondaryButton}
-                                  disabled={pendingTransferUserId === member.user.id}
-                                  onClick={() => {
-                                    void handleTransferOwnership(member.user.id);
-                                  }}
-                                  type="button"
-                                >
-                                  {pendingTransferUserId === member.user.id
-                                    ? "Передаём..."
-                                    : "Передать ownership"}
-                                </button>
+                                {canTransferOwnership && (
+                                  <button
+                                    className={styles.secondaryButton}
+                                    disabled={pendingTransferUserId === member.user.id}
+                                    onClick={() => {
+                                      void handleTransferOwnership(member.user.id);
+                                    }}
+                                    type="button"
+                                  >
+                                    {pendingTransferUserId === member.user.id
+                                      ? "Передаём..."
+                                      : "Передать ownership"}
+                                  </button>
+                                )}
 
-                                <button
-                                  className={styles.dangerButton}
-                                  disabled={pendingRemoveUserId === member.user.id}
-                                  onClick={() => {
-                                    void handleRemoveGroupMember(member.user.id);
-                                  }}
-                                  type="button"
-                                >
-                                  {pendingRemoveUserId === member.user.id
-                                    ? "Удаляем..."
-                                    : "Удалить"}
-                                </button>
+                                {(canRestrictMember || canUnrestrictMember) && (
+                                  <button
+                                    className={styles.secondaryButton}
+                                    disabled={pendingRestrictionUserId === member.user.id}
+                                    onClick={() => {
+                                      void handleSetGroupRestriction(
+                                        member.user.id,
+                                        !member.isWriteRestricted,
+                                      );
+                                    }}
+                                    type="button"
+                                  >
+                                    {pendingRestrictionUserId === member.user.id
+                                      ? "Сохраняем..."
+                                      : member.isWriteRestricted
+                                        ? "Снять restriction"
+                                        : "Ограничить write"}
+                                  </button>
+                                )}
+
+                                {canRemoveMember && (
+                                  <button
+                                    className={styles.dangerButton}
+                                    disabled={pendingRemoveUserId === member.user.id}
+                                    onClick={() => {
+                                      void handleRemoveGroupMember(member.user.id);
+                                    }}
+                                    type="button"
+                                  >
+                                    {pendingRemoveUserId === member.user.id
+                                      ? "Удаляем..."
+                                      : "Удалить"}
+                                  </button>
+                                )}
                               </div>
                             </div>
                           )}
 
                           {!canAdjustRole &&
                             !canTransferOwnership &&
+                            !canRestrictMember &&
+                            !canUnrestrictMember &&
                             !canRemoveMember &&
                             isCurrentUser && (
                               <p className={styles.helperText}>
@@ -1910,14 +2042,14 @@ export function GroupsPage() {
                   </p>
                 </div>
 
-                {!canManageInviteLinks(selectedState.snapshot.group.selfRole) && (
+                {!selectedState.snapshot.group.permissions.canManageInviteLinks && (
                   <p className={styles.emptyState}>
                     Текущая роль не управляет invite links. Для этого требуется `owner` или
                     `admin`.
                   </p>
                 )}
 
-                {canManageInviteLinks(selectedState.snapshot.group.selfRole) && (
+                {selectedState.snapshot.group.permissions.canManageInviteLinks && (
                   <>
                     <form className={styles.form} onSubmit={handleCreateInviteLink}>
                       <label className={styles.field}>
@@ -1928,11 +2060,13 @@ export function GroupsPage() {
                           }
                           value={inviteRole}
                         >
-                          {selectedState.snapshot.group.selfRole === "owner" && (
-                            <option value="admin">admin</option>
+                          {selectedState.snapshot.group.permissions.creatableInviteRoles.map(
+                            (role) => (
+                              <option key={role} value={role}>
+                                {role}
+                              </option>
+                            ),
                           )}
-                          <option value="member">member</option>
-                          <option value="reader">reader</option>
                         </select>
                       </label>
 
@@ -2189,10 +2323,6 @@ function InlineState({
       {action && <div className={styles.actions}>{action}</div>}
     </section>
   );
-}
-
-function canManageInviteLinks(role: GroupMemberRole): boolean {
-  return role === "owner" || role === "admin";
 }
 
 function buildMemberRoleDrafts(members: GroupMember[]): Record<string, GroupMemberRole> {

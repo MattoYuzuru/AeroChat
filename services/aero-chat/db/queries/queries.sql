@@ -195,6 +195,7 @@ SELECT
     g.name,
     g.created_by_user_id,
     self.role AS self_role,
+    self.is_write_restricted AS self_is_write_restricted,
     g.created_at,
     g.updated_at,
     COALESCE((
@@ -229,6 +230,7 @@ SELECT
     g.name,
     g.created_by_user_id,
     self.role AS self_role,
+    self.is_write_restricted AS self_is_write_restricted,
     g.created_at,
     g.updated_at,
     COALESCE((
@@ -274,6 +276,8 @@ SELECT
     m.group_id,
     m.user_id,
     m.role,
+    m.is_write_restricted,
+    m.write_restricted_at,
     m.joined_at,
     u.login,
     u.nickname,
@@ -298,6 +302,8 @@ SELECT
     m.group_id,
     m.user_id,
     m.role,
+    m.is_write_restricted,
+    m.write_restricted_at,
     m.joined_at,
     u.login,
     u.nickname,
@@ -310,6 +316,18 @@ WHERE m.group_id = $1 AND m.user_id = $2;
 UPDATE group_memberships
 SET role = $3
 WHERE group_id = $1 AND user_id = $2 AND role <> $3;
+
+-- name: SetGroupMembershipWriteRestriction :execrows
+UPDATE group_memberships
+SET
+    is_write_restricted = $3,
+    write_restricted_at = CASE WHEN $3 THEN $4 ELSE NULL END
+WHERE group_id = $1
+  AND user_id = $2
+  AND (
+      is_write_restricted IS DISTINCT FROM $3
+      OR write_restricted_at IS DISTINCT FROM CASE WHEN $3 THEN $4 ELSE NULL END
+  );
 
 -- name: TransferGroupOwnership :execrows
 UPDATE group_memberships

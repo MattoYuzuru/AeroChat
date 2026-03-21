@@ -64,6 +64,7 @@ type Querier interface {
 	PinDirectChatMessage(ctx context.Context, arg PinDirectChatMessageParams) (int64, error)
 	SearchDirectMessages(ctx context.Context, arg SearchDirectMessagesParams) ([]SearchDirectMessagesRow, error)
 	SearchGroupMessages(ctx context.Context, arg SearchGroupMessagesParams) ([]SearchGroupMessagesRow, error)
+	SetGroupMembershipWriteRestriction(ctx context.Context, arg SetGroupMembershipWriteRestrictionParams) (int64, error)
 	TouchDirectChatMessageUpdatedAt(ctx context.Context, arg TouchDirectChatMessageUpdatedAtParams) error
 	TouchDirectChatUpdatedAt(ctx context.Context, arg TouchDirectChatUpdatedAtParams) error
 	TouchGroupInviteLinkJoin(ctx context.Context, arg TouchGroupInviteLinkJoinParams) error

@@ -1250,6 +1250,8 @@ SELECT
     m.group_id,
     m.user_id,
     m.role,
+    m.is_write_restricted,
+    m.write_restricted_at,
     m.joined_at,
     u.login,
     u.nickname,
@@ -1265,13 +1267,15 @@ type GetGroupMemberRowByGroupIDAndUserIDParams struct {
 }
 
 type GetGroupMemberRowByGroupIDAndUserIDRow struct {
-	GroupID   uuid.UUID          `db:"group_id" json:"group_id"`
-	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
-	Role      string             `db:"role" json:"role"`
-	JoinedAt  pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
-	Login     string             `db:"login" json:"login"`
-	Nickname  string             `db:"nickname" json:"nickname"`
-	AvatarUrl pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	GroupID           uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	Role              string             `db:"role" json:"role"`
+	IsWriteRestricted bool               `db:"is_write_restricted" json:"is_write_restricted"`
+	WriteRestrictedAt pgtype.Timestamptz `db:"write_restricted_at" json:"write_restricted_at"`
+	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	Login             string             `db:"login" json:"login"`
+	Nickname          string             `db:"nickname" json:"nickname"`
+	AvatarUrl         pgtype.Text        `db:"avatar_url" json:"avatar_url"`
 }
 
 func (q *Queries) GetGroupMemberRowByGroupIDAndUserID(ctx context.Context, arg GetGroupMemberRowByGroupIDAndUserIDParams) (GetGroupMemberRowByGroupIDAndUserIDRow, error) {
@@ -1281,6 +1285,8 @@ func (q *Queries) GetGroupMemberRowByGroupIDAndUserID(ctx context.Context, arg G
 		&i.GroupID,
 		&i.UserID,
 		&i.Role,
+		&i.IsWriteRestricted,
+		&i.WriteRestrictedAt,
 		&i.JoinedAt,
 		&i.Login,
 		&i.Nickname,
@@ -1395,6 +1401,7 @@ SELECT
     g.name,
     g.created_by_user_id,
     self.role AS self_role,
+    self.is_write_restricted AS self_is_write_restricted,
     g.created_at,
     g.updated_at,
     COALESCE((
@@ -1429,14 +1436,15 @@ type GetGroupRowByIDAndUserIDParams struct {
 }
 
 type GetGroupRowByIDAndUserIDRow struct {
-	ID              uuid.UUID          `db:"id" json:"id"`
-	Name            string             `db:"name" json:"name"`
-	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
-	SelfRole        string             `db:"self_role" json:"self_role"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UnreadCount     int32              `db:"unread_count" json:"unread_count"`
-	MemberCount     int32              `db:"member_count" json:"member_count"`
+	ID                    uuid.UUID          `db:"id" json:"id"`
+	Name                  string             `db:"name" json:"name"`
+	CreatedByUserID       uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	SelfRole              string             `db:"self_role" json:"self_role"`
+	SelfIsWriteRestricted bool               `db:"self_is_write_restricted" json:"self_is_write_restricted"`
+	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UnreadCount           int32              `db:"unread_count" json:"unread_count"`
+	MemberCount           int32              `db:"member_count" json:"member_count"`
 }
 
 func (q *Queries) GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowByIDAndUserIDParams) (GetGroupRowByIDAndUserIDRow, error) {
@@ -1447,6 +1455,7 @@ func (q *Queries) GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowB
 		&i.Name,
 		&i.CreatedByUserID,
 		&i.SelfRole,
+		&i.SelfIsWriteRestricted,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.UnreadCount,
@@ -2207,6 +2216,8 @@ SELECT
     m.group_id,
     m.user_id,
     m.role,
+    m.is_write_restricted,
+    m.write_restricted_at,
     m.joined_at,
     u.login,
     u.nickname,
@@ -2233,13 +2244,15 @@ type ListGroupMemberRowsByGroupIDAndUserIDParams struct {
 }
 
 type ListGroupMemberRowsByGroupIDAndUserIDRow struct {
-	GroupID   uuid.UUID          `db:"group_id" json:"group_id"`
-	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
-	Role      string             `db:"role" json:"role"`
-	JoinedAt  pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
-	Login     string             `db:"login" json:"login"`
-	Nickname  string             `db:"nickname" json:"nickname"`
-	AvatarUrl pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	GroupID           uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	Role              string             `db:"role" json:"role"`
+	IsWriteRestricted bool               `db:"is_write_restricted" json:"is_write_restricted"`
+	WriteRestrictedAt pgtype.Timestamptz `db:"write_restricted_at" json:"write_restricted_at"`
+	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	Login             string             `db:"login" json:"login"`
+	Nickname          string             `db:"nickname" json:"nickname"`
+	AvatarUrl         pgtype.Text        `db:"avatar_url" json:"avatar_url"`
 }
 
 func (q *Queries) ListGroupMemberRowsByGroupIDAndUserID(ctx context.Context, arg ListGroupMemberRowsByGroupIDAndUserIDParams) ([]ListGroupMemberRowsByGroupIDAndUserIDRow, error) {
@@ -2255,6 +2268,8 @@ func (q *Queries) ListGroupMemberRowsByGroupIDAndUserID(ctx context.Context, arg
 			&i.GroupID,
 			&i.UserID,
 			&i.Role,
+			&i.IsWriteRestricted,
+			&i.WriteRestrictedAt,
 			&i.JoinedAt,
 			&i.Login,
 			&i.Nickname,
@@ -2504,6 +2519,7 @@ SELECT
     g.name,
     g.created_by_user_id,
     self.role AS self_role,
+    self.is_write_restricted AS self_is_write_restricted,
     g.created_at,
     g.updated_at,
     COALESCE((
@@ -2534,14 +2550,15 @@ ORDER BY g.updated_at DESC, g.id DESC
 `
 
 type ListGroupRowsByUserIDRow struct {
-	ID              uuid.UUID          `db:"id" json:"id"`
-	Name            string             `db:"name" json:"name"`
-	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
-	SelfRole        string             `db:"self_role" json:"self_role"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UnreadCount     int32              `db:"unread_count" json:"unread_count"`
-	MemberCount     int32              `db:"member_count" json:"member_count"`
+	ID                    uuid.UUID          `db:"id" json:"id"`
+	Name                  string             `db:"name" json:"name"`
+	CreatedByUserID       uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	SelfRole              string             `db:"self_role" json:"self_role"`
+	SelfIsWriteRestricted bool               `db:"self_is_write_restricted" json:"self_is_write_restricted"`
+	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UnreadCount           int32              `db:"unread_count" json:"unread_count"`
+	MemberCount           int32              `db:"member_count" json:"member_count"`
 }
 
 func (q *Queries) ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) ([]ListGroupRowsByUserIDRow, error) {
@@ -2558,6 +2575,7 @@ func (q *Queries) ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) (
 			&i.Name,
 			&i.CreatedByUserID,
 			&i.SelfRole,
+			&i.SelfIsWriteRestricted,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.UnreadCount,
@@ -2925,6 +2943,39 @@ func (q *Queries) SearchGroupMessages(ctx context.Context, arg SearchGroupMessag
 		return nil, err
 	}
 	return items, nil
+}
+
+const setGroupMembershipWriteRestriction = `-- name: SetGroupMembershipWriteRestriction :execrows
+UPDATE group_memberships
+SET
+    is_write_restricted = $3,
+    write_restricted_at = CASE WHEN $3 THEN $4 ELSE NULL END
+WHERE group_id = $1
+  AND user_id = $2
+  AND (
+      is_write_restricted IS DISTINCT FROM $3
+      OR write_restricted_at IS DISTINCT FROM CASE WHEN $3 THEN $4 ELSE NULL END
+  )
+`
+
+type SetGroupMembershipWriteRestrictionParams struct {
+	GroupID           uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	IsWriteRestricted bool               `db:"is_write_restricted" json:"is_write_restricted"`
+	WriteRestrictedAt pgtype.Timestamptz `db:"write_restricted_at" json:"write_restricted_at"`
+}
+
+func (q *Queries) SetGroupMembershipWriteRestriction(ctx context.Context, arg SetGroupMembershipWriteRestrictionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setGroupMembershipWriteRestriction,
+		arg.GroupID,
+		arg.UserID,
+		arg.IsWriteRestricted,
+		arg.WriteRestrictedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const touchDirectChatMessageUpdatedAt = `-- name: TouchDirectChatMessageUpdatedAt :exec

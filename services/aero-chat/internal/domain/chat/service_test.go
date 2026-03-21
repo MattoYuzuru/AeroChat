@@ -1530,15 +1530,16 @@ func (r *fakeRepository) FailAttachmentUpload(_ context.Context, params FailAtta
 
 func (r *fakeRepository) CreateGroup(_ context.Context, params CreateGroupParams) (*Group, error) {
 	group := Group{
-		ID:              params.GroupID,
-		Name:            params.Name,
-		Kind:            ChatKindGroup,
-		CreatedByUserID: params.CreatedByUserID,
-		SelfRole:        GroupMemberRoleOwner,
-		MemberCount:     1,
-		UnreadCount:     0,
-		CreatedAt:       params.CreatedAt,
-		UpdatedAt:       params.CreatedAt,
+		ID:                  params.GroupID,
+		Name:                params.Name,
+		Kind:                ChatKindGroup,
+		CreatedByUserID:     params.CreatedByUserID,
+		SelfRole:            GroupMemberRoleOwner,
+		SelfWriteRestricted: false,
+		MemberCount:         1,
+		UnreadCount:         0,
+		CreatedAt:           params.CreatedAt,
+		UpdatedAt:           params.CreatedAt,
 	}
 	r.groups[group.ID] = group
 	r.groupMembers[group.ID] = map[string]GroupMember{
@@ -1571,6 +1572,7 @@ func (r *fakeRepository) ListGroups(_ context.Context, userID string) ([]Group, 
 
 		group := r.groups[groupID]
 		group.SelfRole = member.Role
+		group.SelfWriteRestricted = member.IsWriteRestricted
 		group.MemberCount = int32(len(memberships))
 		group.UnreadCount = r.groupUnreadCount(groupID, userID)
 		result = append(result, group)
@@ -1590,6 +1592,7 @@ func (r *fakeRepository) GetGroup(_ context.Context, userID string, groupID stri
 	}
 
 	group.SelfRole = member.Role
+	group.SelfWriteRestricted = member.IsWriteRestricted
 	group.MemberCount = int32(len(r.groupMembers[groupID]))
 	group.UnreadCount = r.groupUnreadCount(groupID, userID)
 	copy := group
@@ -1699,6 +1702,31 @@ func (r *fakeRepository) UpdateGroupMemberRole(_ context.Context, params UpdateG
 	}
 
 	member.Role = params.Role
+	memberships[params.UserID] = member
+	r.groupMembers[params.GroupID] = memberships
+
+	group := r.groups[params.GroupID]
+	group.UpdatedAt = params.UpdatedAt
+	r.groups[params.GroupID] = group
+	return true, nil
+}
+
+func (r *fakeRepository) SetGroupMemberWriteRestriction(_ context.Context, params SetGroupMemberWriteRestrictionParams) (bool, error) {
+	memberships, ok := r.groupMembers[params.GroupID]
+	if !ok {
+		return false, ErrNotFound
+	}
+
+	member, ok := memberships[params.UserID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	if member.IsWriteRestricted == params.IsWriteRestricted {
+		return false, nil
+	}
+
+	member.IsWriteRestricted = params.IsWriteRestricted
+	member.WriteRestrictedAt = params.WriteRestrictedAt
 	memberships[params.UserID] = member
 	r.groupMembers[params.GroupID] = memberships
 

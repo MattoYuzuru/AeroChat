@@ -308,6 +308,38 @@ func (h *Handler) LeaveGroup(ctx context.Context, req *connect.Request[chatv1.Le
 	return connect.NewResponse(&chatv1.LeaveGroupResponse{}), nil
 }
 
+func (h *Handler) RestrictGroupMember(ctx context.Context, req *connect.Request[chatv1.RestrictGroupMemberRequest]) (*connect.Response[chatv1.RestrictGroupMemberResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	member, err := h.service.RestrictGroupMember(ctx, token, req.Msg.GroupId, req.Msg.UserId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.RestrictGroupMemberResponse{
+		Member: toProtoGroupMember(*member),
+	}), nil
+}
+
+func (h *Handler) UnrestrictGroupMember(ctx context.Context, req *connect.Request[chatv1.UnrestrictGroupMemberRequest]) (*connect.Response[chatv1.UnrestrictGroupMemberResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	member, err := h.service.UnrestrictGroupMember(ctx, token, req.Msg.GroupId, req.Msg.UserId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.UnrestrictGroupMemberResponse{
+		Member: toProtoGroupMember(*member),
+	}), nil
+}
+
 func (h *Handler) CreateGroupInviteLink(ctx context.Context, req *connect.Request[chatv1.CreateGroupInviteLinkRequest]) (*connect.Response[chatv1.CreateGroupInviteLinkResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -778,6 +810,21 @@ func toProtoGroup(value chat.Group) *chatv1.Group {
 		CreatedAt:   timestamppb.New(value.CreatedAt),
 		UpdatedAt:   timestamppb.New(value.UpdatedAt),
 		UnreadState: toProtoGroupUnreadState(value.UnreadCount),
+		Permissions: toProtoGroupPermissions(value.SelfPermissions),
+	}
+}
+
+func toProtoGroupPermissions(value chat.GroupPermissions) *chatv1.GroupPermissions {
+	return &chatv1.GroupPermissions{
+		CanManageInviteLinks:      value.CanManageInviteLinks,
+		CreatableInviteRoles:      toProtoGroupMemberRoles(value.CreatableInviteRoles),
+		CanManageMemberRoles:      value.CanManageMemberRoles,
+		RoleManagementTargetRoles: toProtoGroupMemberRoles(value.RoleManagementTargetRoles),
+		AssignableRoles:           toProtoGroupMemberRoles(value.AssignableRoles),
+		CanTransferOwnership:      value.CanTransferOwnership,
+		RemovableMemberRoles:      toProtoGroupMemberRoles(value.RemovableMemberRoles),
+		RestrictableMemberRoles:   toProtoGroupMemberRoles(value.RestrictableMemberRoles),
+		CanLeaveGroup:             value.CanLeaveGroup,
 	}
 }
 
@@ -813,11 +860,17 @@ func toProtoGroupTypingState(value *chat.GroupTypingState) *chatv1.GroupTypingSt
 }
 
 func toProtoGroupMember(value chat.GroupMember) *chatv1.GroupMember {
-	return &chatv1.GroupMember{
-		User:     toProtoChatUser(value.User),
-		Role:     toProtoGroupMemberRole(value.Role),
-		JoinedAt: timestamppb.New(value.JoinedAt),
+	member := &chatv1.GroupMember{
+		User:              toProtoChatUser(value.User),
+		Role:              toProtoGroupMemberRole(value.Role),
+		JoinedAt:          timestamppb.New(value.JoinedAt),
+		IsWriteRestricted: value.IsWriteRestricted,
 	}
+	if value.WriteRestrictedAt != nil {
+		member.WriteRestrictedAt = timestamppb.New(*value.WriteRestrictedAt)
+	}
+
+	return member
 }
 
 func toProtoGroupInviteLink(value chat.GroupInviteLink) *chatv1.GroupInviteLink {
@@ -1105,6 +1158,23 @@ func toProtoGroupMemberRole(value string) chatv1.GroupMemberRole {
 	default:
 		return chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_UNSPECIFIED
 	}
+}
+
+func toProtoGroupMemberRoles(values []string) []chatv1.GroupMemberRole {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]chatv1.GroupMemberRole, 0, len(values))
+	for _, value := range values {
+		role := toProtoGroupMemberRole(value)
+		if role == chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_UNSPECIFIED {
+			continue
+		}
+		result = append(result, role)
+	}
+
+	return result
 }
 
 func toProtoMessageSearchScopeKind(value string) chatv1.MessageSearchScopeKind {

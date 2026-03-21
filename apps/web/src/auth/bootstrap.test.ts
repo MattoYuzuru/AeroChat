@@ -37,6 +37,8 @@ function createClient(overrides: Partial<GatewayClient>): GatewayClient {
     clearGroupTyping: vi.fn(),
     listGroupMembers: vi.fn(),
     updateGroupMemberRole: vi.fn(),
+    restrictGroupMember: vi.fn(),
+    unrestrictGroupMember: vi.fn(),
     transferGroupOwnership: vi.fn(),
     removeGroupMember: vi.fn(),
     leaveGroup: vi.fn(),

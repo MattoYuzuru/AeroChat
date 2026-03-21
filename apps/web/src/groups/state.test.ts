@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { GroupPermissions } from "../gateway/types";
 import {
   applyGroupRealtimeToGroups,
   applyGroupRealtimeToSelectedState,
@@ -7,6 +8,30 @@ import {
   type GroupsSelectedState,
 } from "./state";
 import type { GroupRealtimeEvent } from "./realtime";
+
+const ownerPermissions: GroupPermissions = {
+  canManageInviteLinks: true,
+  creatableInviteRoles: ["admin", "member", "reader"],
+  canManageMemberRoles: true,
+  roleManagementTargetRoles: ["admin", "member", "reader"],
+  assignableRoles: ["admin", "member", "reader"],
+  canTransferOwnership: true,
+  removableMemberRoles: ["admin", "member", "reader"],
+  restrictableMemberRoles: ["admin", "member", "reader"],
+  canLeaveGroup: false,
+};
+
+const readerPermissions: GroupPermissions = {
+  canManageInviteLinks: false,
+  creatableInviteRoles: [],
+  canManageMemberRoles: false,
+  roleManagementTargetRoles: [],
+  assignableRoles: [],
+  canTransferOwnership: false,
+  removableMemberRoles: [],
+  restrictableMemberRoles: [],
+  canLeaveGroup: true,
+};
 
 function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
   return {
@@ -19,6 +44,7 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
         selfRole: "owner",
         memberCount: 2,
         unreadCount: 0,
+        permissions: ownerPermissions,
         createdAt: "2026-04-09T09:00:00Z",
         updatedAt: "2026-04-10T12:00:00Z",
       },
@@ -41,11 +67,15 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
         user: { id: "user-1", login: "alice", nickname: "Alice", avatarUrl: null },
         role: "owner",
         joinedAt: "2026-04-09T09:00:00Z",
+        isWriteRestricted: false,
+        writeRestrictedAt: null,
       },
       {
         user: { id: "user-2", login: "bob", nickname: "Bob", avatarUrl: null },
         role: "member",
         joinedAt: "2026-04-09T09:05:00Z",
+        isWriteRestricted: false,
+        writeRestrictedAt: null,
       },
     ],
     inviteLinks: [
@@ -155,6 +185,7 @@ describe("group realtime state helpers", () => {
       group: {
         ...state.snapshot.group,
         selfRole: "reader",
+        permissions: readerPermissions,
       },
       thread: {
         ...state.snapshot.thread,
@@ -164,11 +195,15 @@ describe("group realtime state helpers", () => {
         user: { id: "user-1", login: "alice", nickname: "Alice", avatarUrl: null },
         role: "reader",
         joinedAt: "2026-04-09T09:00:00Z",
+        isWriteRestricted: false,
+        writeRestrictedAt: null,
       },
       selfMember: {
         user: { id: "user-1", login: "alice", nickname: "Alice", avatarUrl: null },
         role: "reader",
         joinedAt: "2026-04-09T09:00:00Z",
+        isWriteRestricted: false,
+        writeRestrictedAt: null,
       },
       previousRole: "owner",
     };

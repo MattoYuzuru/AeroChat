@@ -166,6 +166,19 @@ interface GroupWire extends TimestampedWire {
   selfRole?: string;
   memberCount?: number;
   unreadState?: UnreadStateWire;
+  permissions?: GroupPermissionsWire;
+}
+
+interface GroupPermissionsWire {
+  canManageInviteLinks?: boolean;
+  creatableInviteRoles?: string[];
+  canManageMemberRoles?: boolean;
+  roleManagementTargetRoles?: string[];
+  assignableRoles?: string[];
+  canTransferOwnership?: boolean;
+  removableMemberRoles?: string[];
+  restrictableMemberRoles?: string[];
+  canLeaveGroup?: boolean;
 }
 
 interface UnreadStateWire {
@@ -194,6 +207,8 @@ interface GroupMemberWire {
   user?: ChatUserWire;
   role?: string;
   joinedAt?: string;
+  isWriteRestricted?: boolean;
+  writeRestrictedAt?: string;
 }
 
 interface GroupInviteLinkWire extends TimestampedWire {
@@ -388,6 +403,14 @@ interface ListGroupMembersResponseWire {
 }
 
 interface UpdateGroupMemberRoleResponseWire {
+  member?: GroupMemberWire;
+}
+
+interface RestrictGroupMemberResponseWire {
+  member?: GroupMemberWire;
+}
+
+interface UnrestrictGroupMemberResponseWire {
   member?: GroupMemberWire;
 }
 
@@ -775,6 +798,38 @@ export function createGatewayClient(
           groupId: groupId.trim(),
           userId: userId.trim(),
           role: normalizeGroupMemberRoleForWire(role),
+        },
+        token,
+      );
+
+      return normalizeGroupMember(response.member ?? {});
+    },
+
+    async restrictGroupMember(token, groupId, userId) {
+      const response = await unaryCall<RestrictGroupMemberResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "RestrictGroupMember",
+        {
+          groupId: groupId.trim(),
+          userId: userId.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroupMember(response.member ?? {});
+    },
+
+    async unrestrictGroupMember(token, groupId, userId) {
+      const response = await unaryCall<UnrestrictGroupMemberResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "UnrestrictGroupMember",
+        {
+          groupId: groupId.trim(),
+          userId: userId.trim(),
         },
         token,
       );
@@ -1542,8 +1597,23 @@ function normalizeGroup(input: GroupWire | undefined): Group {
     selfRole: normalizeGroupMemberRole(input?.selfRole),
     memberCount: input?.memberCount ?? 0,
     unreadCount: normalizeUnreadCount(input?.unreadState),
+    permissions: normalizeGroupPermissions(input?.permissions),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeGroupPermissions(input: GroupPermissionsWire | undefined) {
+  return {
+    canManageInviteLinks: input?.canManageInviteLinks ?? false,
+    creatableInviteRoles: normalizeGroupMemberRoles(input?.creatableInviteRoles),
+    canManageMemberRoles: input?.canManageMemberRoles ?? false,
+    roleManagementTargetRoles: normalizeGroupMemberRoles(input?.roleManagementTargetRoles),
+    assignableRoles: normalizeGroupMemberRoles(input?.assignableRoles),
+    canTransferOwnership: input?.canTransferOwnership ?? false,
+    removableMemberRoles: normalizeGroupMemberRoles(input?.removableMemberRoles),
+    restrictableMemberRoles: normalizeGroupMemberRoles(input?.restrictableMemberRoles),
+    canLeaveGroup: input?.canLeaveGroup ?? false,
   };
 }
 
@@ -1651,7 +1721,17 @@ function normalizeGroupMember(input: GroupMemberWire): GroupMember {
     user: normalizeChatUser(input.user),
     role: normalizeGroupMemberRole(input.role),
     joinedAt: input.joinedAt ?? "",
+    isWriteRestricted: input.isWriteRestricted ?? false,
+    writeRestrictedAt: normalizeNullableString(input.writeRestrictedAt),
   };
+}
+
+function normalizeGroupMemberRoles(values: string[] | undefined): GroupMemberRole[] {
+  if (!values) {
+    return [];
+  }
+
+  return values.map((value) => normalizeGroupMemberRole(value));
 }
 
 function normalizeGroupInviteLink(

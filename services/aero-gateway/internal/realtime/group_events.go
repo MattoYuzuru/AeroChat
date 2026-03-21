@@ -8,6 +8,7 @@ const (
 	EventTypeGroupMessageUpdated       = "group.message.updated"
 	EventTypeGroupMembershipUpdated    = "group.membership.updated"
 	EventTypeGroupRoleUpdated          = "group.role.updated"
+	EventTypeGroupModerationUpdated    = "group.moderation.updated"
 	EventTypeGroupOwnershipTransferred = "group.ownership.transferred"
 	EventTypeGroupTypingUpdated        = "group.typing.updated"
 	EventTypeGroupReadUpdated          = "group.read.updated"
@@ -16,6 +17,8 @@ const (
 	GroupMembershipReasonJoined        = "member_joined"
 	GroupMembershipReasonRemoved       = "member_removed"
 	GroupMembershipReasonLeft          = "member_left"
+	GroupModerationReasonRestricted    = "member_restricted"
+	GroupModerationReasonUnrestricted  = "member_unrestricted"
 )
 
 // GroupMessageUpdatedPayload доставляет recipient-aware snapshot группы и thread вместе с сообщением.
@@ -47,6 +50,16 @@ type GroupRoleUpdatedPayload struct {
 	PreviousRole string           `json:"previousRole"`
 }
 
+// GroupModerationUpdatedPayload доставляет recipient-aware write restriction update для roster и shell.
+type GroupModerationUpdatedPayload struct {
+	Reason     string           `json:"reason"`
+	GroupID    string           `json:"groupId"`
+	Group      *groupWire       `json:"group,omitempty"`
+	Thread     *groupThreadWire `json:"thread,omitempty"`
+	Member     *groupMemberWire `json:"member,omitempty"`
+	SelfMember *groupMemberWire `json:"selfMember,omitempty"`
+}
+
 // GroupOwnershipTransferredPayload доставляет две role changes в одной явной ownership операции.
 type GroupOwnershipTransferredPayload struct {
 	GroupID             string           `json:"groupId"`
@@ -72,13 +85,26 @@ type GroupReadUpdatedPayload struct {
 }
 
 type groupWire struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Kind        string `json:"kind"`
-	SelfRole    string `json:"selfRole"`
-	MemberCount uint32 `json:"memberCount"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
+	ID          string                `json:"id"`
+	Name        string                `json:"name"`
+	Kind        string                `json:"kind"`
+	SelfRole    string                `json:"selfRole"`
+	MemberCount uint32                `json:"memberCount"`
+	Permissions *groupPermissionsWire `json:"permissions,omitempty"`
+	CreatedAt   string                `json:"createdAt"`
+	UpdatedAt   string                `json:"updatedAt"`
+}
+
+type groupPermissionsWire struct {
+	CanManageInviteLinks      bool     `json:"canManageInviteLinks"`
+	CreatableInviteRoles      []string `json:"creatableInviteRoles"`
+	CanManageMemberRoles      bool     `json:"canManageMemberRoles"`
+	RoleManagementTargetRoles []string `json:"roleManagementTargetRoles"`
+	AssignableRoles           []string `json:"assignableRoles"`
+	CanTransferOwnership      bool     `json:"canTransferOwnership"`
+	RemovableMemberRoles      []string `json:"removableMemberRoles"`
+	RestrictableMemberRoles   []string `json:"restrictableMemberRoles"`
+	CanLeaveGroup             bool     `json:"canLeaveGroup"`
 }
 
 type groupThreadWire struct {
@@ -91,9 +117,11 @@ type groupThreadWire struct {
 }
 
 type groupMemberWire struct {
-	User     *chatUserWire `json:"user,omitempty"`
-	Role     string        `json:"role"`
-	JoinedAt string        `json:"joinedAt"`
+	User              *chatUserWire `json:"user,omitempty"`
+	Role              string        `json:"role"`
+	JoinedAt          string        `json:"joinedAt"`
+	IsWriteRestricted bool          `json:"isWriteRestricted"`
+	WriteRestrictedAt string        `json:"writeRestrictedAt,omitempty"`
 }
 
 type groupMessageWire struct {
@@ -188,6 +216,24 @@ func NewGroupRoleUpdatedEnvelope(
 	})
 }
 
+func NewGroupModerationUpdatedEnvelope(
+	reason string,
+	groupID string,
+	group *chatv1.Group,
+	thread *chatv1.GroupChatThread,
+	member *chatv1.GroupMember,
+	selfMember *chatv1.GroupMember,
+) Envelope {
+	return newEnvelope(EventTypeGroupModerationUpdated, GroupModerationUpdatedPayload{
+		Reason:     reason,
+		GroupID:    groupID,
+		Group:      toGroupWire(group),
+		Thread:     toGroupThreadWire(thread),
+		Member:     toGroupMemberWire(member),
+		SelfMember: toGroupMemberWire(selfMember),
+	})
+}
+
 func NewGroupOwnershipTransferredEnvelope(
 	groupID string,
 	group *chatv1.Group,
@@ -233,8 +279,27 @@ func toGroupWire(group *chatv1.Group) *groupWire {
 		Kind:        group.GetKind().String(),
 		SelfRole:    group.GetSelfRole().String(),
 		MemberCount: group.GetMemberCount(),
+		Permissions: toGroupPermissionsWire(group.GetPermissions()),
 		CreatedAt:   formatProtoTimestamp(group.GetCreatedAt()),
 		UpdatedAt:   formatProtoTimestamp(group.GetUpdatedAt()),
+	}
+}
+
+func toGroupPermissionsWire(permissions *chatv1.GroupPermissions) *groupPermissionsWire {
+	if permissions == nil {
+		return nil
+	}
+
+	return &groupPermissionsWire{
+		CanManageInviteLinks:      permissions.GetCanManageInviteLinks(),
+		CreatableInviteRoles:      groupRolesToStrings(permissions.GetCreatableInviteRoles()),
+		CanManageMemberRoles:      permissions.GetCanManageMemberRoles(),
+		RoleManagementTargetRoles: groupRolesToStrings(permissions.GetRoleManagementTargetRoles()),
+		AssignableRoles:           groupRolesToStrings(permissions.GetAssignableRoles()),
+		CanTransferOwnership:      permissions.GetCanTransferOwnership(),
+		RemovableMemberRoles:      groupRolesToStrings(permissions.GetRemovableMemberRoles()),
+		RestrictableMemberRoles:   groupRolesToStrings(permissions.GetRestrictableMemberRoles()),
+		CanLeaveGroup:             permissions.GetCanLeaveGroup(),
 	}
 }
 
@@ -265,9 +330,24 @@ func toGroupMemberWire(member *chatv1.GroupMember) *groupMemberWire {
 			Nickname:  member.GetUser().GetNickname(),
 			AvatarURL: member.GetUser().AvatarUrl,
 		},
-		Role:     member.GetRole().String(),
-		JoinedAt: formatProtoTimestamp(member.GetJoinedAt()),
+		Role:              member.GetRole().String(),
+		JoinedAt:          formatProtoTimestamp(member.GetJoinedAt()),
+		IsWriteRestricted: member.GetIsWriteRestricted(),
+		WriteRestrictedAt: formatProtoTimestamp(member.GetWriteRestrictedAt()),
 	}
+}
+
+func groupRolesToStrings(roles []chatv1.GroupMemberRole) []string {
+	if len(roles) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(roles))
+	for _, role := range roles {
+		result = append(result, role.String())
+	}
+
+	return result
 }
 
 func toGroupMessageWire(message *chatv1.GroupMessage) *groupMessageWire {

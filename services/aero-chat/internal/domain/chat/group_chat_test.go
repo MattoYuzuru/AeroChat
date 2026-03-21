@@ -135,6 +135,91 @@ func TestReaderGroupRoleIsReadOnlyInMessageFlow(t *testing.T) {
 	}
 }
 
+func TestRestrictedGroupMemberKeepsReadAccessButCannotSendOrType(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.typingTTL = 5 * time.Second
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{8}, 64))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	group := mustCreateGroup(t, service, alice.Token, "Moderated")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join group by member invite: %v", err)
+	}
+
+	firstMessage := mustSendGroupMessage(t, service, alice.Token, group.ID, "first")
+	if _, _, err := service.MarkGroupChatRead(context.Background(), bob.Token, group.ID, firstMessage.ID); err != nil {
+		t.Fatalf("mark group read before restriction: %v", err)
+	}
+
+	_, thread, _, _, err := service.GetGroupChat(context.Background(), bob.Token, group.ID)
+	if err != nil {
+		t.Fatalf("get group chat before restriction: %v", err)
+	}
+	if _, err := service.SetGroupTyping(context.Background(), bob.Token, group.ID, thread.ID); err != nil {
+		t.Fatalf("set typing before restriction: %v", err)
+	}
+
+	restrictedMember, err := service.RestrictGroupMember(context.Background(), alice.Token, group.ID, bob.User.ID)
+	if err != nil {
+		t.Fatalf("restrict member: %v", err)
+	}
+	if !restrictedMember.IsWriteRestricted {
+		t.Fatalf("ожидалось сохранённое write restriction, получено %+v", restrictedMember)
+	}
+
+	groupSnapshot, threadSnapshot, readState, typingState, err := service.GetGroupChat(context.Background(), bob.Token, group.ID)
+	if err != nil {
+		t.Fatalf("get group chat after restriction: %v", err)
+	}
+	if groupSnapshot.SelfRole != GroupMemberRoleMember {
+		t.Fatalf("ожидалась сохранённая membership role member, получено %q", groupSnapshot.SelfRole)
+	}
+	if threadSnapshot.CanSendMessages {
+		t.Fatalf("restricted member не должен иметь can_send_messages, получено %+v", threadSnapshot)
+	}
+	if readState == nil || readState.SelfPosition == nil || readState.SelfPosition.MessageID != firstMessage.ID {
+		t.Fatalf("ожидалось сохранённое read state после restriction, получено %+v", readState)
+	}
+	if typingState == nil || len(typingState.Typers) != 0 {
+		t.Fatalf("typing state должен очищаться после restriction, получено %+v", typingState)
+	}
+
+	messages, err := service.ListGroupMessages(context.Background(), bob.Token, group.ID, 0)
+	if err != nil {
+		t.Fatalf("restricted member list group messages: %v", err)
+	}
+	if len(messages) != 1 || messages[0].ID != firstMessage.ID {
+		t.Fatal("restricted member должен сохранять доступ к истории группы")
+	}
+
+	if _, err := service.SendGroupTextMessage(context.Background(), bob.Token, group.ID, "blocked", nil); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("ожидалась ошибка send для restricted member, получено %v", err)
+	}
+	if _, err := service.SetGroupTyping(context.Background(), bob.Token, group.ID, thread.ID); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("ожидалась ошибка typing для restricted member, получено %v", err)
+	}
+
+	if _, err := service.UnrestrictGroupMember(context.Background(), alice.Token, group.ID, bob.User.ID); err != nil {
+		t.Fatalf("unrestrict member: %v", err)
+	}
+
+	_, unmutedThread, _, _, err := service.GetGroupChat(context.Background(), bob.Token, group.ID)
+	if err != nil {
+		t.Fatalf("get group chat after unrestrict: %v", err)
+	}
+	if !unmutedThread.CanSendMessages {
+		t.Fatalf("после unrestrict member должен снова иметь can_send_messages, получено %+v", unmutedThread)
+	}
+}
+
 func TestGroupMessagesSupportReplyPreview(t *testing.T) {
 	t.Parallel()
 
