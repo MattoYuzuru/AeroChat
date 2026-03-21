@@ -30,6 +30,7 @@ service ChatService {
   rpc JoinGroupByInviteLink(JoinGroupByInviteLinkRequest) returns (JoinGroupByInviteLinkResponse);
   rpc SetGroupTyping(SetGroupTypingRequest) returns (SetGroupTypingResponse);
   rpc ClearGroupTyping(ClearGroupTypingRequest) returns (ClearGroupTypingResponse);
+  rpc MarkGroupChatRead(MarkGroupChatReadRequest) returns (MarkGroupChatReadResponse);
   rpc MarkDirectChatRead(MarkDirectChatReadRequest) returns (MarkDirectChatReadResponse);
   rpc SetDirectChatTyping(SetDirectChatTypingRequest) returns (SetDirectChatTypingResponse);
   rpc ClearDirectChatTyping(ClearDirectChatTypingRequest) returns (ClearDirectChatTypingResponse);
@@ -105,6 +106,7 @@ message DirectChat {
   repeated string pinned_message_ids = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+  DirectChatUnreadState unread_state = 7;
 }
 
 message Group {
@@ -115,6 +117,7 @@ message Group {
   uint32 member_count = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  GroupUnreadState unread_state = 8;
 }
 
 message GroupMember {
@@ -229,9 +232,27 @@ message DirectChatReadPosition {
   google.protobuf.Timestamp updated_at = 3;
 }
 
+message GroupReadPosition {
+  string message_id = 1;
+  google.protobuf.Timestamp message_created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+}
+
+message DirectChatUnreadState {
+  uint32 unread_count = 1;
+}
+
+message GroupUnreadState {
+  uint32 unread_count = 1;
+}
+
 message DirectChatReadState {
   DirectChatReadPosition self_position = 1;
   DirectChatReadPosition peer_position = 2;
+}
+
+message GroupReadState {
+  GroupReadPosition self_position = 1;
 }
 
 message DirectChatTypingIndicator {
@@ -349,6 +370,7 @@ message GetGroupChatResponse {
   Group group = 1;
   GroupChatThread thread = 2;
   GroupTypingState typing_state = 3;
+  GroupReadState read_state = 4;
 }
 
 message ListGroupMembersRequest {
@@ -444,6 +466,16 @@ message ClearGroupTypingResponse {
   GroupTypingState typing_state = 1;
 }
 
+message MarkGroupChatReadRequest {
+  string group_id = 1;
+  string message_id = 2;
+}
+
+message MarkGroupChatReadResponse {
+  GroupReadState read_state = 1;
+  GroupUnreadState unread_state = 2;
+}
+
 message MarkDirectChatReadRequest {
   string chat_id = 1;
   string message_id = 2;
@@ -451,6 +483,7 @@ message MarkDirectChatReadRequest {
 
 message MarkDirectChatReadResponse {
   DirectChatReadState read_state = 1;
+  DirectChatUnreadState unread_state = 2;
 }
 
 message SetDirectChatTypingRequest {

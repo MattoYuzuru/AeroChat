@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] attachment-only message semantics bootstrap поверх существующего media foundation
+- [x] unread conversation state foundation для direct chats и groups
 
 ---
 
@@ -89,6 +89,7 @@
 - [x] Message model
 - [x] Safe markdown subset
 - [x] Read receipts
+- [x] Unread conversation state
 - [x] Typing foundation
 - [x] Presence foundation
 - [x] Privacy toggles через web settings и `aero-gateway`
@@ -121,6 +122,7 @@
 - [x] Membership remove / leave / ownership transfer bootstrap
 - [x] Group realtime bootstrap через `aero-gateway`
 - [x] Group typing bootstrap через `aero-gateway` и `apps/web`
+- [x] Group unread conversation state foundation
 - [ ] Max groups per user rules
 
 ---

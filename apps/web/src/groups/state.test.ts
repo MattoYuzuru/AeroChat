@@ -18,6 +18,7 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
         kind: "CHAT_KIND_GROUP",
         selfRole: "owner",
         memberCount: 2,
+        unreadCount: 0,
         createdAt: "2026-04-09T09:00:00Z",
         updatedAt: "2026-04-10T12:00:00Z",
       },
@@ -29,6 +30,7 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
         createdAt: "2026-04-09T09:00:00Z",
         updatedAt: "2026-04-10T12:00:00Z",
       },
+      readState: null,
       typingState: {
         threadId: "thread-1",
         typers: [],
@@ -109,8 +111,8 @@ describe("group realtime state helpers", () => {
       },
     };
 
-    const nextState = applyGroupRealtimeToSelectedState(state, event);
-    const duplicatedState = applyGroupRealtimeToSelectedState(nextState, event);
+    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
+    const duplicatedState = applyGroupRealtimeToSelectedState(nextState, event, "user-1");
 
     expect(nextState.status).toBe("ready");
     if (duplicatedState.status !== "ready") {
@@ -135,8 +137,8 @@ describe("group realtime state helpers", () => {
       selfMember: null,
     };
 
-    const nextState = applyGroupRealtimeToSelectedState(state, event);
-    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event);
+    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
+    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event, "user-1");
 
     expect(shouldClearSelectedGroupOnRealtimeEvent(state, event)).toBe(true);
     expect(nextState).toEqual(createInitialGroupsSelectedState());
@@ -169,7 +171,7 @@ describe("group realtime state helpers", () => {
       previousRole: "owner",
     };
 
-    const nextState = applyGroupRealtimeToSelectedState(state, event);
+    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
 
     expect(nextState.status).toBe("ready");
     if (nextState.status !== "ready") {
@@ -201,8 +203,8 @@ describe("group realtime state helpers", () => {
       },
     };
 
-    const nextState = applyGroupRealtimeToSelectedState(state, event);
-    const duplicatedState = applyGroupRealtimeToSelectedState(nextState, event);
+    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
+    const duplicatedState = applyGroupRealtimeToSelectedState(nextState, event, "user-1");
 
     expect(duplicatedState.status).toBe("ready");
     if (duplicatedState.status !== "ready") {

@@ -94,6 +94,9 @@ const (
 	// ChatServiceClearGroupTypingProcedure is the fully-qualified name of the ChatService's
 	// ClearGroupTyping RPC.
 	ChatServiceClearGroupTypingProcedure = "/aerochat.chat.v1.ChatService/ClearGroupTyping"
+	// ChatServiceMarkGroupChatReadProcedure is the fully-qualified name of the ChatService's
+	// MarkGroupChatRead RPC.
+	ChatServiceMarkGroupChatReadProcedure = "/aerochat.chat.v1.ChatService/MarkGroupChatRead"
 	// ChatServiceMarkDirectChatReadProcedure is the fully-qualified name of the ChatService's
 	// MarkDirectChatRead RPC.
 	ChatServiceMarkDirectChatReadProcedure = "/aerochat.chat.v1.ChatService/MarkDirectChatRead"
@@ -155,6 +158,7 @@ type ChatServiceClient interface {
 	JoinGroupByInviteLink(context.Context, *connect.Request[v1.JoinGroupByInviteLinkRequest]) (*connect.Response[v1.JoinGroupByInviteLinkResponse], error)
 	SetGroupTyping(context.Context, *connect.Request[v1.SetGroupTypingRequest]) (*connect.Response[v1.SetGroupTypingResponse], error)
 	ClearGroupTyping(context.Context, *connect.Request[v1.ClearGroupTypingRequest]) (*connect.Response[v1.ClearGroupTypingResponse], error)
+	MarkGroupChatRead(context.Context, *connect.Request[v1.MarkGroupChatReadRequest]) (*connect.Response[v1.MarkGroupChatReadResponse], error)
 	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
 	SetDirectChatTyping(context.Context, *connect.Request[v1.SetDirectChatTypingRequest]) (*connect.Response[v1.SetDirectChatTypingResponse], error)
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
@@ -312,6 +316,12 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("ClearGroupTyping")),
 			connect.WithClientOptions(opts...),
 		),
+		markGroupChatRead: connect.NewClient[v1.MarkGroupChatReadRequest, v1.MarkGroupChatReadResponse](
+			httpClient,
+			baseURL+ChatServiceMarkGroupChatReadProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("MarkGroupChatRead")),
+			connect.WithClientOptions(opts...),
+		),
 		markDirectChatRead: connect.NewClient[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse](
 			httpClient,
 			baseURL+ChatServiceMarkDirectChatReadProcedure,
@@ -411,6 +421,7 @@ type chatServiceClient struct {
 	joinGroupByInviteLink          *connect.Client[v1.JoinGroupByInviteLinkRequest, v1.JoinGroupByInviteLinkResponse]
 	setGroupTyping                 *connect.Client[v1.SetGroupTypingRequest, v1.SetGroupTypingResponse]
 	clearGroupTyping               *connect.Client[v1.ClearGroupTypingRequest, v1.ClearGroupTypingResponse]
+	markGroupChatRead              *connect.Client[v1.MarkGroupChatReadRequest, v1.MarkGroupChatReadResponse]
 	markDirectChatRead             *connect.Client[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse]
 	setDirectChatTyping            *connect.Client[v1.SetDirectChatTypingRequest, v1.SetDirectChatTypingResponse]
 	clearDirectChatTyping          *connect.Client[v1.ClearDirectChatTypingRequest, v1.ClearDirectChatTypingResponse]
@@ -535,6 +546,11 @@ func (c *chatServiceClient) ClearGroupTyping(ctx context.Context, req *connect.R
 	return c.clearGroupTyping.CallUnary(ctx, req)
 }
 
+// MarkGroupChatRead calls aerochat.chat.v1.ChatService.MarkGroupChatRead.
+func (c *chatServiceClient) MarkGroupChatRead(ctx context.Context, req *connect.Request[v1.MarkGroupChatReadRequest]) (*connect.Response[v1.MarkGroupChatReadResponse], error) {
+	return c.markGroupChatRead.CallUnary(ctx, req)
+}
+
 // MarkDirectChatRead calls aerochat.chat.v1.ChatService.MarkDirectChatRead.
 func (c *chatServiceClient) MarkDirectChatRead(ctx context.Context, req *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error) {
 	return c.markDirectChatRead.CallUnary(ctx, req)
@@ -619,6 +635,7 @@ type ChatServiceHandler interface {
 	JoinGroupByInviteLink(context.Context, *connect.Request[v1.JoinGroupByInviteLinkRequest]) (*connect.Response[v1.JoinGroupByInviteLinkResponse], error)
 	SetGroupTyping(context.Context, *connect.Request[v1.SetGroupTypingRequest]) (*connect.Response[v1.SetGroupTypingResponse], error)
 	ClearGroupTyping(context.Context, *connect.Request[v1.ClearGroupTypingRequest]) (*connect.Response[v1.ClearGroupTypingResponse], error)
+	MarkGroupChatRead(context.Context, *connect.Request[v1.MarkGroupChatReadRequest]) (*connect.Response[v1.MarkGroupChatReadResponse], error)
 	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
 	SetDirectChatTyping(context.Context, *connect.Request[v1.SetDirectChatTypingRequest]) (*connect.Response[v1.SetDirectChatTypingResponse], error)
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
@@ -772,6 +789,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceMethods.ByName("ClearGroupTyping")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceMarkGroupChatReadHandler := connect.NewUnaryHandler(
+		ChatServiceMarkGroupChatReadProcedure,
+		svc.MarkGroupChatRead,
+		connect.WithSchema(chatServiceMethods.ByName("MarkGroupChatRead")),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatServiceMarkDirectChatReadHandler := connect.NewUnaryHandler(
 		ChatServiceMarkDirectChatReadProcedure,
 		svc.MarkDirectChatRead,
@@ -890,6 +913,8 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceSetGroupTypingHandler.ServeHTTP(w, r)
 		case ChatServiceClearGroupTypingProcedure:
 			chatServiceClearGroupTypingHandler.ServeHTTP(w, r)
+		case ChatServiceMarkGroupChatReadProcedure:
+			chatServiceMarkGroupChatReadHandler.ServeHTTP(w, r)
 		case ChatServiceMarkDirectChatReadProcedure:
 			chatServiceMarkDirectChatReadHandler.ServeHTTP(w, r)
 		case ChatServiceSetDirectChatTypingProcedure:
@@ -1009,6 +1034,10 @@ func (UnimplementedChatServiceHandler) SetGroupTyping(context.Context, *connect.
 
 func (UnimplementedChatServiceHandler) ClearGroupTyping(context.Context, *connect.Request[v1.ClearGroupTypingRequest]) (*connect.Response[v1.ClearGroupTypingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ClearGroupTyping is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) MarkGroupChatRead(context.Context, *connect.Request[v1.MarkGroupChatReadRequest]) (*connect.Response[v1.MarkGroupChatReadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.MarkGroupChatRead is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error) {

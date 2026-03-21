@@ -28,8 +28,9 @@ type DirectChatMessageUpdatedPayload struct {
 
 // DirectChatReadUpdatedPayload доставляет viewer-relative read state для конкретного пользователя.
 type DirectChatReadUpdatedPayload struct {
-	ChatID    string                   `json:"chatId"`
-	ReadState *directChatReadStateWire `json:"readState,omitempty"`
+	ChatID    string                     `json:"chatId"`
+	ReadState *directChatReadStateWire   `json:"readState,omitempty"`
+	Unread    *directChatUnreadStateWire `json:"unread,omitempty"`
 }
 
 // DirectChatTypingUpdatedPayload доставляет viewer-relative typing state для конкретного пользователя.
@@ -52,10 +53,11 @@ func NewDirectChatMessageUpdatedEnvelope(reason string, chat *chatv1.DirectChat,
 	})
 }
 
-func NewDirectChatReadUpdatedEnvelope(chatID string, readState *chatv1.DirectChatReadState) Envelope {
+func NewDirectChatReadUpdatedEnvelope(chatID string, readState *chatv1.DirectChatReadState, unreadState *chatv1.DirectChatUnreadState) Envelope {
 	return newEnvelope(EventTypeDirectChatReadUpdated, DirectChatReadUpdatedPayload{
 		ChatID:    chatID,
 		ReadState: toDirectChatReadStateWire(readState),
+		Unread:    toDirectChatUnreadStateWire(unreadState),
 	})
 }
 
@@ -140,6 +142,10 @@ type directChatReadPositionWire struct {
 type directChatReadStateWire struct {
 	SelfPosition *directChatReadPositionWire `json:"selfPosition,omitempty"`
 	PeerPosition *directChatReadPositionWire `json:"peerPosition,omitempty"`
+}
+
+type directChatUnreadStateWire struct {
+	UnreadCount uint32 `json:"unreadCount"`
 }
 
 type directChatTypingIndicatorWire struct {
@@ -278,6 +284,16 @@ func toDirectChatReadPositionWire(position *chatv1.DirectChatReadPosition) *dire
 		MessageID:        position.GetMessageId(),
 		MessageCreatedAt: formatProtoTimestamp(position.GetMessageCreatedAt()),
 		UpdatedAt:        formatProtoTimestamp(position.GetUpdatedAt()),
+	}
+}
+
+func toDirectChatUnreadStateWire(unreadState *chatv1.DirectChatUnreadState) *directChatUnreadStateWire {
+	if unreadState == nil {
+		return nil
+	}
+
+	return &directChatUnreadStateWire{
+		UnreadCount: unreadState.GetUnreadCount(),
 	}
 }
 

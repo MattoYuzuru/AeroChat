@@ -210,7 +210,7 @@ func (h *Handler) GetGroupChat(ctx context.Context, req *connect.Request[chatv1.
 		return nil, err
 	}
 
-	group, thread, typingState, err := h.service.GetGroupChat(ctx, token, req.Msg.GroupId)
+	group, thread, readState, typingState, err := h.service.GetGroupChat(ctx, token, req.Msg.GroupId)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -219,6 +219,7 @@ func (h *Handler) GetGroupChat(ctx context.Context, req *connect.Request[chatv1.
 		Group:       toProtoGroup(*group),
 		Thread:      toProtoGroupChatThread(*thread),
 		TypingState: toProtoGroupTypingState(typingState),
+		ReadState:   toProtoGroupReadState(readState),
 	}), nil
 }
 
@@ -414,19 +415,37 @@ func (h *Handler) ClearGroupTyping(ctx context.Context, req *connect.Request[cha
 	}), nil
 }
 
+func (h *Handler) MarkGroupChatRead(ctx context.Context, req *connect.Request[chatv1.MarkGroupChatReadRequest]) (*connect.Response[chatv1.MarkGroupChatReadResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	readState, unreadCount, err := h.service.MarkGroupChatRead(ctx, token, req.Msg.GroupId, req.Msg.MessageId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.MarkGroupChatReadResponse{
+		ReadState:   toProtoGroupReadState(readState),
+		UnreadState: toProtoGroupUnreadState(unreadCount),
+	}), nil
+}
+
 func (h *Handler) MarkDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkDirectChatReadRequest]) (*connect.Response[chatv1.MarkDirectChatReadResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
 		return nil, err
 	}
 
-	readState, err := h.service.MarkDirectChatRead(ctx, token, req.Msg.ChatId, req.Msg.MessageId)
+	readState, unreadCount, err := h.service.MarkDirectChatRead(ctx, token, req.Msg.ChatId, req.Msg.MessageId)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
 	return connect.NewResponse(&chatv1.MarkDirectChatReadResponse{
-		ReadState: toProtoDirectChatReadState(readState),
+		ReadState:   toProtoDirectChatReadState(readState),
+		UnreadState: toProtoDirectChatUnreadState(unreadCount),
 	}), nil
 }
 
@@ -657,6 +676,7 @@ func toProtoDirectChat(value chat.DirectChat) *chatv1.DirectChat {
 		PinnedMessageIds: append([]string(nil), value.PinnedMessageIDs...),
 		CreatedAt:        timestamppb.New(value.CreatedAt),
 		UpdatedAt:        timestamppb.New(value.UpdatedAt),
+		UnreadState:      toProtoDirectChatUnreadState(value.UnreadCount),
 	}
 	for _, participant := range value.Participants {
 		result.Participants = append(result.Participants, toProtoChatUser(participant))
@@ -674,6 +694,7 @@ func toProtoGroup(value chat.Group) *chatv1.Group {
 		MemberCount: uint32(value.MemberCount),
 		CreatedAt:   timestamppb.New(value.CreatedAt),
 		UpdatedAt:   timestamppb.New(value.UpdatedAt),
+		UnreadState: toProtoGroupUnreadState(value.UnreadCount),
 	}
 }
 
@@ -805,6 +826,40 @@ func toProtoDirectChatReadState(value *chat.DirectChatReadState) *chatv1.DirectC
 	return &chatv1.DirectChatReadState{
 		SelfPosition: toProtoDirectChatReadPosition(value.SelfPosition),
 		PeerPosition: toProtoDirectChatReadPosition(value.PeerPosition),
+	}
+}
+
+func toProtoGroupReadState(value *chat.GroupReadState) *chatv1.GroupReadState {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.GroupReadState{
+		SelfPosition: toProtoGroupReadPosition(value.SelfPosition),
+	}
+}
+
+func toProtoGroupReadPosition(value *chat.GroupReadPosition) *chatv1.GroupReadPosition {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.GroupReadPosition{
+		MessageId:        value.MessageID,
+		MessageCreatedAt: timestamppb.New(value.MessageCreatedAt),
+		UpdatedAt:        timestamppb.New(value.UpdatedAt),
+	}
+}
+
+func toProtoDirectChatUnreadState(value int32) *chatv1.DirectChatUnreadState {
+	return &chatv1.DirectChatUnreadState{
+		UnreadCount: uint32(max(value, 0)),
+	}
+}
+
+func toProtoGroupUnreadState(value int32) *chatv1.GroupUnreadState {
+	return &chatv1.GroupUnreadState{
+		UnreadCount: uint32(max(value, 0)),
 	}
 }
 

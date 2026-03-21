@@ -262,6 +262,7 @@
 }
 
 .rolePill,
+.unreadPill,
 .statusPill {
   align-self: start;
   padding: 0.45rem 0.72rem;
@@ -270,6 +271,11 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
   font-size: 0.8rem;
   color: rgba(3, 50, 82, 0.72);
+}
+
+.unreadPill {
+  background: rgba(23, 130, 209, 0.16);
+  color: rgba(8, 78, 132, 0.9);
 }
 
 .statusPill[data-tone="danger"] {

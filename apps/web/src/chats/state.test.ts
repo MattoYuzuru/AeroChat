@@ -23,6 +23,7 @@ const directChat = {
     },
   ],
   pinnedMessageIds: [],
+  unreadCount: 0,
   createdAt: "2026-03-25T10:00:00Z",
   updatedAt: "2026-03-25T10:10:00Z",
 };
@@ -154,6 +155,7 @@ describe("chatsReducer", () => {
 
     const nextState = chatsReducer(threadState, {
       type: "message_updated",
+      currentUserId: "user-1",
       reason: "message_created",
       chat: {
         ...directChat,
@@ -195,6 +197,7 @@ describe("chatsReducer", () => {
 
     const nextState = chatsReducer(threadState, {
       type: "message_updated",
+      currentUserId: "user-1",
       reason: "message_pinned",
       message: {
         ...threadSnapshot.messages[0]!,

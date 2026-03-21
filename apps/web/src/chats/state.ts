@@ -45,6 +45,7 @@ type ChatsAction =
   | { type: "thread_load_failed"; chatId: string; message: string }
   | {
       type: "message_updated";
+      currentUserId: string;
       chat?: DirectChat;
       message: DirectChatMessage;
       reason: string;
@@ -53,6 +54,7 @@ type ChatsAction =
       type: "read_state_replaced";
       chatId: string;
       readState: DirectChatReadState | null;
+      unreadCount?: number | null;
     }
   | {
       type: "typing_state_replaced";
@@ -202,17 +204,7 @@ export function chatsReducer(
     case "message_updated":
       return applyMessageUpdate(state, action);
     case "read_state_replaced":
-      if (state.thread?.chat.id !== action.chatId) {
-        return state;
-      }
-
-      return {
-        ...state,
-        thread: {
-          ...state.thread,
-          readState: action.readState,
-        },
-      };
+      return applyReadStateReplacement(state, action);
     case "send_started":
       return {
         ...state,
@@ -261,7 +253,13 @@ function applyMessageUpdate(
 ): ChatsState {
   const nextChats = upsertChatInList(
     state.chats,
-    action.chat ?? patchChatFromMessage(findChatByID(state.chats, action.message.chatId), action.message, action.reason),
+    action.chat ??
+      patchChatFromMessage(
+        findChatByID(state.chats, action.message.chatId),
+        action.message,
+        action.reason,
+        action.currentUserId,
+      ),
   );
 
   if (state.thread?.chat.id !== action.message.chatId) {
@@ -272,7 +270,13 @@ function applyMessageUpdate(
   }
 
   const nextThreadChat =
-    action.chat ?? patchChatFromMessage(state.thread.chat, action.message, action.reason);
+    action.chat ??
+    patchChatFromMessage(
+      state.thread.chat,
+      action.message,
+      action.reason,
+      action.currentUserId,
+    );
   if (!nextThreadChat) {
     return {
       ...state,
@@ -287,6 +291,39 @@ function applyMessageUpdate(
       ...state.thread,
       chat: nextThreadChat,
       messages: upsertMessage(state.thread.messages, action.message),
+    },
+  };
+}
+
+function applyReadStateReplacement(
+  state: ChatsState,
+  action: Extract<ChatsAction, { type: "read_state_replaced" }>,
+): ChatsState {
+  const nextChats =
+    action.unreadCount === undefined || action.unreadCount === null
+      ? state.chats
+      : replaceChatUnreadCount(state.chats, action.chatId, action.unreadCount);
+
+  if (state.thread?.chat.id !== action.chatId) {
+    return {
+      ...state,
+      chats: nextChats,
+    };
+  }
+
+  return {
+    ...state,
+    chats: nextChats,
+    thread: {
+      ...state.thread,
+      chat:
+        action.unreadCount === undefined || action.unreadCount === null
+          ? state.thread.chat
+          : {
+              ...state.thread.chat,
+              unreadCount: action.unreadCount,
+            },
+      readState: action.readState,
     },
   };
 }
@@ -319,15 +356,18 @@ function patchChatFromMessage(
   chat: DirectChat | null,
   message: DirectChatMessage,
   reason: string,
+  currentUserId: string,
 ): DirectChat | null {
   if (!chat) {
     return null;
   }
 
+  const candidateUpdatedAt = resolveChatUpdatedAt(chat.updatedAt, message);
   return {
     ...chat,
     pinnedMessageIds: patchPinnedMessageIDs(chat.pinnedMessageIds, message, reason),
-    updatedAt: resolveChatUpdatedAt(chat.updatedAt, message),
+    unreadCount: resolveUnreadCount(chat, message, reason, currentUserId, candidateUpdatedAt),
+    updatedAt: candidateUpdatedAt,
   };
 }
 
@@ -364,6 +404,25 @@ function resolveChatUpdatedAt(currentUpdatedAt: string, message: DirectChatMessa
   return candidate;
 }
 
+function resolveUnreadCount(
+  chat: DirectChat,
+  message: DirectChatMessage,
+  reason: string,
+  currentUserId: string,
+  candidateUpdatedAt: string,
+): number {
+  if (
+    reason !== "message_created" ||
+    message.senderUserId === currentUserId ||
+    candidateUpdatedAt === "" ||
+    chat.updatedAt >= candidateUpdatedAt
+  ) {
+    return chat.unreadCount;
+  }
+
+  return chat.unreadCount + 1;
+}
+
 function upsertMessage(messages: DirectChatMessage[], message: DirectChatMessage): DirectChatMessage[] {
   const nextMessages = messages.filter((entry) => entry.id !== message.id);
   nextMessages.push(message);
@@ -395,4 +454,19 @@ export function createReadState(
     selfPosition,
     peerPosition,
   };
+}
+
+function replaceChatUnreadCount(
+  chats: DirectChat[],
+  chatId: string,
+  unreadCount: number,
+): DirectChat[] {
+  return chats.map((chat) =>
+    chat.id !== chatId
+      ? chat
+      : {
+          ...chat,
+          unreadCount,
+        },
+  );
 }

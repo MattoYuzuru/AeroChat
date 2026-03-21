@@ -205,9 +205,32 @@ export function GroupsPage() {
           return;
         }
 
+        let readState = snapshot.readState;
+        let group = snapshot.group;
+        const latestMessage = messages[0] ?? null;
+        if (latestMessage) {
+          const readUpdate = await gatewayClient.markGroupChatRead(
+            token,
+            selectedGroupId,
+            latestMessage.id,
+          );
+          if (!active) {
+            return;
+          }
+          readState = readUpdate.readState ?? readState;
+          group = {
+            ...group,
+            unreadCount: readUpdate.unreadCount,
+          };
+        }
+
         setSelectedState({
           status: "ready",
-          snapshot,
+          snapshot: {
+            ...snapshot,
+            group,
+            readState,
+          },
           members,
           inviteLinks,
           messages,
@@ -252,7 +275,7 @@ export function GroupsPage() {
         return;
       }
 
-      setGroups((current) => applyGroupRealtimeToGroups(current, event));
+      setGroups((current) => applyGroupRealtimeToGroups(current, event, authState.profile.id));
 
       const shouldClearSelection = shouldClearSelectedGroupOnRealtimeEvent(
         selectedStateRef.current,
@@ -267,6 +290,7 @@ export function GroupsPage() {
       const nextSelectedState = applyGroupRealtimeToSelectedState(
         selectedStateRef.current,
         event,
+        authState.profile.id,
       );
       selectedStateRef.current = nextSelectedState;
       setSelectedState(nextSelectedState);
@@ -283,6 +307,66 @@ export function GroupsPage() {
       setMemberRoleDrafts({});
     });
   }, [authState.status, setSearchParams]);
+
+  const latestSelectedMessage =
+    selectedState.status === "ready" ? selectedState.messages[0] ?? null : null;
+  const shouldAutoMarkGroupRead =
+    authState.status === "authenticated" &&
+    isPageVisible &&
+    selectedState.status === "ready" &&
+    latestSelectedMessage !== null &&
+    latestSelectedMessage.senderUserId !== authState.profile.id &&
+    selectedState.snapshot.readState?.selfPosition?.messageId !== latestSelectedMessage.id;
+
+  useEffect(() => {
+    if (
+      !shouldAutoMarkGroupRead ||
+      selectedState.status !== "ready" ||
+      latestSelectedMessage === null
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const activeGroupId = selectedState.snapshot.group.id;
+
+    void gatewayClient
+      .markGroupChatRead(token, activeGroupId, latestSelectedMessage.id)
+      .then((readUpdate) => {
+        if (cancelled) {
+          return;
+        }
+
+        setSelectedState((current) => {
+          if (current.status !== "ready" || current.snapshot.group.id !== activeGroupId) {
+            return current;
+          }
+
+          return {
+            ...current,
+            snapshot: {
+              ...current.snapshot,
+              group: {
+                ...current.snapshot.group,
+                unreadCount: readUpdate.unreadCount,
+              },
+              readState: readUpdate.readState,
+            },
+          };
+        });
+      })
+      .catch((error) => {
+        resolveProtectedError(
+          error,
+          "Не удалось обновить group read state через gateway.",
+          expireSession,
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expireSession, latestSelectedMessage, selectedState, shouldAutoMarkGroupRead, token]);
 
   useEffect(() => {
     const clearTypingTimers = () => {
@@ -1088,7 +1172,14 @@ export function GroupsPage() {
                             {group.memberCount} участников • роль {roleLabel(group.selfRole)}
                           </p>
                         </div>
-                        <span className={styles.rolePill}>{roleLabel(group.selfRole)}</span>
+                        <div className={styles.badgeColumn}>
+                          {group.unreadCount > 0 && (
+                            <span className={styles.unreadPill}>
+                              Непрочитано: {group.unreadCount}
+                            </span>
+                          )}
+                          <span className={styles.rolePill}>{roleLabel(group.selfRole)}</span>
+                        </div>
                       </div>
                     </article>
                   </button>

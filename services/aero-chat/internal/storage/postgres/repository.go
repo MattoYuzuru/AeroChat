@@ -246,6 +246,7 @@ func (r *Repository) ListGroups(ctx context.Context, userID string) ([]chat.Grou
 			CreatedByUserID: row.CreatedByUserID.String(),
 			SelfRole:        row.SelfRole,
 			MemberCount:     row.MemberCount,
+			UnreadCount:     row.UnreadCount,
 			CreatedAt:       timestampValue(row.CreatedAt),
 			UpdatedAt:       timestampValue(row.UpdatedAt),
 		})
@@ -270,6 +271,7 @@ func (r *Repository) GetGroup(ctx context.Context, userID string, groupID string
 		CreatedByUserID: row.CreatedByUserID.String(),
 		SelfRole:        row.SelfRole,
 		MemberCount:     row.MemberCount,
+		UnreadCount:     row.UnreadCount,
 		CreatedAt:       timestampValue(row.CreatedAt),
 		UpdatedAt:       timestampValue(row.UpdatedAt),
 	}
@@ -292,6 +294,30 @@ func (r *Repository) GetGroupChatThread(ctx context.Context, userID string, grou
 		CreatedAt: timestampValue(row.CreatedAt),
 		UpdatedAt: timestampValue(row.UpdatedAt),
 	}, nil
+}
+
+func (r *Repository) GetGroupReadStateEntry(ctx context.Context, userID string, groupID string) (*chat.GroupReadStateEntry, error) {
+	row, err := r.queries.GetGroupReadStateEntryByGroupIDAndUserID(ctx, chatsqlc.GetGroupReadStateEntryByGroupIDAndUserIDParams{
+		UserID:  mustParseUUID(userID),
+		GroupID: mustParseUUID(groupID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	entry := &chat.GroupReadStateEntry{
+		GroupID: row.GroupID.String(),
+		UserID:  row.UserID.String(),
+	}
+	if row.LastReadMessageID.Valid && row.LastReadMessageCreatedAt.Valid && row.UpdatedAt.Valid {
+		entry.LastReadPosition = &chat.GroupReadPosition{
+			MessageID:        row.LastReadMessageID.String(),
+			MessageCreatedAt: timestampValue(row.LastReadMessageCreatedAt),
+			UpdatedAt:        timestampValue(row.UpdatedAt),
+		}
+	}
+
+	return entry, nil
 }
 
 func (r *Repository) ListGroupMembers(ctx context.Context, userID string, groupID string) ([]chat.GroupMember, error) {
@@ -819,6 +845,21 @@ func (r *Repository) UpsertDirectChatReadReceipt(ctx context.Context, params cha
 	return affected > 0, nil
 }
 
+func (r *Repository) UpsertGroupChatReadState(ctx context.Context, params chat.UpsertGroupChatReadStateParams) (bool, error) {
+	affected, err := r.queries.UpsertGroupChatReadState(ctx, chatsqlc.UpsertGroupChatReadStateParams{
+		GroupID:                  mustParseUUID(params.GroupID),
+		UserID:                   mustParseUUID(params.UserID),
+		LastReadMessageID:        mustParseUUID(params.LastReadMessageID),
+		LastReadMessageCreatedAt: timestamptzValue(params.LastReadMessageAt),
+		UpdatedAt:                timestamptzValue(params.UpdatedAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+
+	return affected > 0, nil
+}
+
 func (r *Repository) CreateDirectChatMessage(ctx context.Context, params chat.CreateDirectChatMessageParams) (*chat.DirectChatMessage, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -985,6 +1026,34 @@ func (r *Repository) GetDirectChatMessage(ctx context.Context, userID string, ch
 	return &message, nil
 }
 
+func (r *Repository) GetGroupMessage(ctx context.Context, userID string, groupID string, messageID string) (*chat.GroupMessage, error) {
+	row, err := r.queries.GetGroupMessageByIDAndUserID(ctx, chatsqlc.GetGroupMessageByIDAndUserIDParams{
+		UserID:  mustParseUUID(userID),
+		GroupID: mustParseUUID(groupID),
+		ID:      mustParseUUID(messageID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	attachmentsByMessageID, err := r.listGroupAttachmentsByMessageIDs(ctx, []uuid.UUID{row.ID})
+	if err != nil {
+		return nil, err
+	}
+
+	return &chat.GroupMessage{
+		ID:           row.ID.String(),
+		GroupID:      row.GroupID.String(),
+		ThreadID:     row.ThreadID.String(),
+		SenderUserID: row.SenderUserID.String(),
+		Kind:         row.Kind,
+		Text:         messageTextContentFromStorage(row.TextContent, row.MarkdownPolicy),
+		Attachments:  attachmentsByMessageID[row.ID.String()],
+		CreatedAt:    timestampValue(row.CreatedAt),
+		UpdatedAt:    timestampValue(row.UpdatedAt),
+	}, nil
+}
+
 func (r *Repository) DeleteDirectChatMessageForEveryone(ctx context.Context, chatID string, messageID string, deletedByUserID string, at time.Time) (bool, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -1132,6 +1201,7 @@ type listChatRow struct {
 	ChatID               uuid.UUID
 	ChatCreatedAt        pgtype.Timestamptz
 	ChatUpdatedAt        pgtype.Timestamptz
+	UnreadCount          int32
 	ParticipantUserID    uuid.UUID
 	ParticipantLogin     string
 	ParticipantNickname  string
@@ -1145,6 +1215,7 @@ func rowsToListChatRows(rows []chatsqlc.ListDirectChatRowsByUserIDRow) []listCha
 			ChatID:               row.ChatID,
 			ChatCreatedAt:        row.ChatCreatedAt,
 			ChatUpdatedAt:        row.ChatUpdatedAt,
+			UnreadCount:          row.UnreadCount,
 			ParticipantUserID:    row.ParticipantUserID,
 			ParticipantLogin:     row.ParticipantLogin,
 			ParticipantNickname:  row.ParticipantNickname,
@@ -1161,6 +1232,7 @@ func rowsToGetChatRows(rows []chatsqlc.GetDirectChatRowsByIDAndUserIDRow) []list
 			ChatID:               row.ChatID,
 			ChatCreatedAt:        row.ChatCreatedAt,
 			ChatUpdatedAt:        row.ChatUpdatedAt,
+			UnreadCount:          row.UnreadCount,
 			ParticipantUserID:    row.ParticipantUserID,
 			ParticipantLogin:     row.ParticipantLogin,
 			ParticipantNickname:  row.ParticipantNickname,
@@ -1190,6 +1262,7 @@ func (r *Repository) collectChats(ctx context.Context, rows []listChatRow) ([]ch
 				Kind:             chat.ChatKindDirect,
 				Participants:     make([]chat.UserSummary, 0, 2),
 				PinnedMessageIDs: uuidSliceToStrings(pinnedIDs),
+				UnreadCount:      row.UnreadCount,
 				CreatedAt:        timestampValue(row.ChatCreatedAt),
 				UpdatedAt:        timestampValue(row.ChatUpdatedAt),
 			})
