@@ -36,6 +36,13 @@ require_env AERO_MEDIA_HOST_PORT
 require_env AERO_EDGE_DOMAIN
 require_env AERO_MEDIA_EDGE_DOMAIN
 
+case "$AERO_MEDIA_EDGE_DOMAIN" in
+  *."$AERO_EDGE_DOMAIN")
+    echo "AERO_MEDIA_EDGE_DOMAIN не должен быть nested host под AERO_EDGE_DOMAIN: ожидается sibling-host вида media.<zone-domain>" >&2
+    exit 1
+    ;;
+esac
+
 namespace="${AERO_K8S_EDGE_NAMESPACE:-aerochat-edge}"
 ingress_class="${AERO_K8S_INGRESS_CLASS:-traefik}"
 cluster_issuer="${AERO_K8S_CLUSTER_ISSUER:-letsencrypt-prod}"
