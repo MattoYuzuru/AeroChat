@@ -11,6 +11,8 @@ import (
 	"github.com/coder/websocket/wsjson"
 )
 
+var errHubClosed = errors.New("realtime hub is closed")
+
 // Hub хранит process-local websocket-сессии и публикует user-scoped события.
 type Hub struct {
 	logger       *slog.Logger
@@ -142,7 +144,7 @@ func (h *Hub) register(conn *websocket.Conn, principal Principal) (*session, err
 	defer h.mu.Unlock()
 
 	if h.closed {
-		return nil, errors.New("realtime hub is closed")
+		return nil, errHubClosed
 	}
 
 	baseCtx, cancel := context.WithCancel(context.Background())

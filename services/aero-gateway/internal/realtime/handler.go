@@ -47,8 +47,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.logger.Warn("websocket upgrade отклонён", slog.String("error", err.Error()))
 		return
 	}
+	closeNow := true
 	defer func() {
-		_ = conn.CloseNow()
+		if closeNow {
+			_ = conn.CloseNow()
+		}
 	}()
 
 	if conn.Subprotocol() != Protocol {
@@ -56,12 +59,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.hub.ServeConnection(conn, principal); err != nil && !isExpectedClose(err) {
-		h.logger.Warn(
-			"realtime-сессия завершилась с ошибкой",
-			slog.String("user_id", principal.UserID),
-			slog.String("error", err.Error()),
-		)
+	if err := h.hub.ServeConnection(conn, principal); errors.Is(err, errHubClosed) {
+		_ = conn.Close(websocket.StatusGoingAway, "server shutdown")
+		closeNow = false
+		return
+	} else {
+		closeNow = false
+		if err != nil && !isExpectedClose(err) {
+			h.logger.Warn(
+				"realtime-сессия завершилась с ошибкой",
+				slog.String("user_id", principal.UserID),
+				slog.String("error", err.Error()),
+			)
+		}
 	}
 }
 
