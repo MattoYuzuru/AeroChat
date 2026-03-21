@@ -255,6 +255,106 @@ func TestTransferGroupOwnershipIsExplicitAndUnblocksOwnerLeave(t *testing.T) {
 	}
 }
 
+func TestCreateGroupRejectsWhenActiveMembershipLimitReached(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.maxActiveGroupMembershipsPerUser = 1
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+
+	firstGroup := mustCreateGroup(t, service, alice.Token, "First")
+	if firstGroup.MemberCount != 1 {
+		t.Fatalf("ожидался один участник в первой группе, получено %d", firstGroup.MemberCount)
+	}
+
+	if _, err := service.CreateGroup(context.Background(), alice.Token, "Second"); !errors.Is(err, ErrResourceExhausted) {
+		t.Fatalf("ожидалась ошибка превышения лимита active group memberships, получено %v", err)
+	}
+}
+
+func TestJoinGroupByInviteLinkRejectsWhenActiveMembershipLimitWouldBeExceeded(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.maxActiveGroupMembershipsPerUser = 10
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{7}, 64))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	groupOne := mustCreateGroup(t, service, alice.Token, "One")
+	groupTwo := mustCreateGroup(t, service, alice.Token, "Two")
+
+	firstInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, groupOne.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create first invite: %v", err)
+	}
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{8}, 64))
+	secondInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, groupTwo.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create second invite: %v", err)
+	}
+
+	service.maxActiveGroupMembershipsPerUser = 1
+
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, firstInvite.InviteToken); err != nil {
+		t.Fatalf("join first group: %v", err)
+	}
+
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, secondInvite.InviteToken); !errors.Is(err, ErrResourceExhausted) {
+		t.Fatalf("ожидалась ошибка лимита при join второй группы, получено %v", err)
+	}
+
+	rejoinedGroup, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, firstInvite.InviteToken)
+	if err != nil {
+		t.Fatalf("повторный join текущей группы не должен падать: %v", err)
+	}
+	if rejoinedGroup.ID != groupOne.ID {
+		t.Fatalf("ожидалась идемпотентная выдача первой группы, получена %q", rejoinedGroup.ID)
+	}
+}
+
+func TestLeaveGroupFreesCapacityForLaterJoin(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.maxActiveGroupMembershipsPerUser = 10
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{9}, 64))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	groupOne := mustCreateGroup(t, service, alice.Token, "One")
+	groupTwo := mustCreateGroup(t, service, alice.Token, "Two")
+
+	firstInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, groupOne.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create first invite: %v", err)
+	}
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{10}, 64))
+	secondInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, groupTwo.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create second invite: %v", err)
+	}
+
+	service.maxActiveGroupMembershipsPerUser = 1
+
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, firstInvite.InviteToken); err != nil {
+		t.Fatalf("join first group: %v", err)
+	}
+	if err := service.LeaveGroup(context.Background(), bob.Token, groupOne.ID); err != nil {
+		t.Fatalf("leave first group: %v", err)
+	}
+
+	joinedGroup, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, secondInvite.InviteToken)
+	if err != nil {
+		t.Fatalf("ожидался успешный join после освобождения capacity: %v", err)
+	}
+	if joinedGroup.ID != groupTwo.ID {
+		t.Fatalf("ожидалась вторая группа после leave, получена %q", joinedGroup.ID)
+	}
+}
+
 func TestRemoveGroupMemberAndLeaveGroupRespectExpandedAdminPolicy(t *testing.T) {
 	t.Parallel()
 

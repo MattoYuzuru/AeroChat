@@ -24,6 +24,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 	t.Setenv("AERO_MEDIA_UPLOAD_INTENT_TTL", "")
 	t.Setenv("AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES", "")
 	t.Setenv("AERO_MEDIA_USER_QUOTA_BYTES", "")
+	t.Setenv("AERO_MAX_ACTIVE_GROUP_MEMBERSHIPS_PER_USER", "")
 	t.Setenv("AERO_MEDIA_ATTACHMENT_CLEANUP_INTERVAL", "")
 	t.Setenv("AERO_MEDIA_UNATTACHED_ATTACHMENT_TTL", "")
 	t.Setenv("AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION", "")
@@ -57,6 +58,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	}
 	if cfg.MediaUserQuotaBytes != 512*1024*1024 {
 		t.Fatalf("ожидалась media user quota по умолчанию, получена %d", cfg.MediaUserQuotaBytes)
+	}
+	if cfg.MaxActiveGroupMembershipsPerUser != 100 {
+		t.Fatalf("ожидался лимит active group memberships по умолчанию, получен %d", cfg.MaxActiveGroupMembershipsPerUser)
 	}
 	if cfg.MediaAttachmentCleanupInterval != 10*time.Minute {
 		t.Fatalf("ожидался cleanup interval по умолчанию, получен %s", cfg.MediaAttachmentCleanupInterval)
@@ -93,5 +97,13 @@ func TestLoadConfigRejectsNonPositiveMediaUserQuotaBytes(t *testing.T) {
 
 	if _, err := LoadConfig(":8082"); err == nil {
 		t.Fatal("ожидалась ошибка для неположительной media user quota")
+	}
+}
+
+func TestLoadConfigRejectsNonPositiveMaxActiveGroupMembershipsPerUser(t *testing.T) {
+	t.Setenv("AERO_MAX_ACTIVE_GROUP_MEMBERSHIPS_PER_USER", "0")
+
+	if _, err := LoadConfig(":8082"); err == nil {
+		t.Fatal("ожидалась ошибка для неположительного лимита active group memberships")
 	}
 }

@@ -189,6 +189,17 @@ INSERT INTO group_memberships (
 ) VALUES ($1, $2, $3, $4)
 ON CONFLICT (group_id, user_id) DO NOTHING;
 
+-- name: LockGroupMembershipQuotaOwner :one
+SELECT id
+FROM users
+WHERE id = $1
+FOR UPDATE;
+
+-- name: GetActiveGroupMembershipCountByUserID :one
+SELECT COUNT(*)::BIGINT AS active_membership_count
+FROM group_memberships
+WHERE user_id = $1;
+
 -- name: ListGroupRowsByUserID :many
 SELECT
     g.id,

@@ -1058,6 +1058,7 @@ func newTestService() (*Service, *fakeRepository) {
 		15*time.Minute,
 		64*1024*1024,
 		512*1024*1024,
+		100,
 		"aerochat-attachments",
 	)
 	now := time.Date(2026, 3, 18, 12, 0, 0, 0, time.UTC)
@@ -1676,6 +1677,10 @@ func (r *fakeRepository) MarkAttachmentDeleted(_ context.Context, attachmentID s
 }
 
 func (r *fakeRepository) CreateGroup(_ context.Context, params CreateGroupParams) (*Group, error) {
+	if params.MaxActiveGroupMembershipsPerUser > 0 && r.countActiveGroupMemberships(params.CreatedByUserID) >= params.MaxActiveGroupMembershipsPerUser {
+		return nil, ErrResourceExhausted
+	}
+
 	group := Group{
 		ID:                  params.GroupID,
 		Name:                params.Name,
@@ -2018,38 +2023,41 @@ func (r *fakeRepository) GetGroupInviteLinkForJoin(_ context.Context, tokenHash 
 	}, nil
 }
 
-func (r *fakeRepository) JoinGroupByInviteLink(_ context.Context, groupID string, userID string, role string, inviteLinkID string, joinedAt time.Time) (bool, error) {
-	group, ok := r.groups[groupID]
+func (r *fakeRepository) JoinGroupByInviteLink(_ context.Context, params JoinGroupByInviteLinkParams) (bool, error) {
+	group, ok := r.groups[params.GroupID]
 	if !ok {
 		return false, ErrNotFound
 	}
-	inviteLink, ok := r.groupInvites[inviteLinkID]
-	if !ok || inviteLink.GroupID != groupID {
+	inviteLink, ok := r.groupInvites[params.InviteLinkID]
+	if !ok || inviteLink.GroupID != params.GroupID {
 		return false, ErrNotFound
 	}
 	if inviteLink.DisabledAt != nil {
 		return false, ErrNotFound
 	}
-	if r.groupMembers[groupID] == nil {
-		r.groupMembers[groupID] = make(map[string]GroupMember)
+	if r.groupMembers[params.GroupID] == nil {
+		r.groupMembers[params.GroupID] = make(map[string]GroupMember)
 	}
-	if _, ok := r.groupMembers[groupID][userID]; ok {
+	if _, ok := r.groupMembers[params.GroupID][params.UserID]; ok {
 		return false, nil
 	}
+	if params.MaxActiveGroupMembershipsPerUser > 0 && r.countActiveGroupMemberships(params.UserID) >= params.MaxActiveGroupMembershipsPerUser {
+		return false, ErrResourceExhausted
+	}
 
-	r.groupMembers[groupID][userID] = GroupMember{
-		GroupID:  groupID,
-		User:     r.users[userID],
-		Role:     role,
-		JoinedAt: joinedAt,
+	r.groupMembers[params.GroupID][params.UserID] = GroupMember{
+		GroupID:  params.GroupID,
+		User:     r.users[params.UserID],
+		Role:     params.Role,
+		JoinedAt: params.JoinedAt,
 	}
 	inviteLink.JoinCount++
-	inviteLink.LastJoinedAt = &joinedAt
-	inviteLink.UpdatedAt = joinedAt
-	r.groupInvites[inviteLinkID] = inviteLink
+	inviteLink.LastJoinedAt = &params.JoinedAt
+	inviteLink.UpdatedAt = params.JoinedAt
+	r.groupInvites[params.InviteLinkID] = inviteLink
 
-	group.UpdatedAt = joinedAt
-	r.groups[groupID] = group
+	group.UpdatedAt = params.JoinedAt
+	r.groups[params.GroupID] = group
 	return true, nil
 }
 
@@ -2640,6 +2648,17 @@ func (r *fakeRepository) groupUnreadCount(groupID string, userID string) int32 {
 			continue
 		}
 		if isGroupMessageNewerThanReadPosition(message, readPosition) {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (r *fakeRepository) countActiveGroupMemberships(userID string) int {
+	count := 0
+	for _, memberships := range r.groupMembers {
+		if _, ok := memberships[userID]; ok {
 			count++
 		}
 	}

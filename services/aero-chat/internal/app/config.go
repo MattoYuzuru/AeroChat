@@ -27,6 +27,7 @@ type Config struct {
 	MediaUploadIntentTTL             time.Duration
 	MediaMaxUploadSizeBytes          int64
 	MediaUserQuotaBytes              int64
+	MaxActiveGroupMembershipsPerUser int
 	MediaAttachmentCleanupInterval   time.Duration
 	MediaUnattachedAttachmentTTL     time.Duration
 	MediaDetachedAttachmentRetention time.Duration
@@ -78,6 +79,13 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if mediaUserQuotaBytes <= 0 {
 		return Config{}, fmt.Errorf("переменная %s должна быть положительной", "AERO_MEDIA_USER_QUOTA_BYTES")
 	}
+	maxActiveGroupMembershipsPerUser, err := lookupInt("AERO_MAX_ACTIVE_GROUP_MEMBERSHIPS_PER_USER", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if maxActiveGroupMembershipsPerUser <= 0 {
+		return Config{}, fmt.Errorf("переменная %s должна быть положительной", "AERO_MAX_ACTIVE_GROUP_MEMBERSHIPS_PER_USER")
+	}
 	attachmentCleanupBatchSize, err := lookupInt("AERO_MEDIA_ATTACHMENT_CLEANUP_BATCH_SIZE", 100)
 	if err != nil {
 		return Config{}, err
@@ -102,6 +110,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		MediaUploadIntentTTL:             uploadIntentTTL,
 		MediaMaxUploadSizeBytes:          maxUploadSizeBytes,
 		MediaUserQuotaBytes:              mediaUserQuotaBytes,
+		MaxActiveGroupMembershipsPerUser: maxActiveGroupMembershipsPerUser,
 		MediaAttachmentCleanupInterval:   attachmentCleanupInterval,
 		MediaUnattachedAttachmentTTL:     unattachedAttachmentTTL,
 		MediaDetachedAttachmentRetention: detachedAttachmentRetention,
