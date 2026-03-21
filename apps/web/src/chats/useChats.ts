@@ -132,7 +132,7 @@ export function useChats({
         presenceState: event.presenceState,
       });
     });
-  }, [enabled]);
+  }, [enabled, currentUserId]);
 
   const activePresenceChatId = resolveDirectChatPresenceHeartbeatChatId({
     enabled,

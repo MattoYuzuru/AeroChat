@@ -269,13 +269,15 @@ export function GroupsPage() {
       return;
     }
 
+    const currentUserId = authState.profile.id;
+
     return subscribeRealtimeEnvelopes((envelope) => {
       const event = parseGroupRealtimeEvent(envelope);
       if (!event) {
         return;
       }
 
-      setGroups((current) => applyGroupRealtimeToGroups(current, event, authState.profile.id));
+      setGroups((current) => applyGroupRealtimeToGroups(current, event, currentUserId));
 
       const shouldClearSelection = shouldClearSelectedGroupOnRealtimeEvent(
         selectedStateRef.current,
@@ -290,7 +292,7 @@ export function GroupsPage() {
       const nextSelectedState = applyGroupRealtimeToSelectedState(
         selectedStateRef.current,
         event,
-        authState.profile.id,
+        currentUserId,
       );
       selectedStateRef.current = nextSelectedState;
       setSelectedState(nextSelectedState);
@@ -306,7 +308,7 @@ export function GroupsPage() {
 
       setMemberRoleDrafts({});
     });
-  }, [authState.status, setSearchParams]);
+  }, [authState.status, authState.profile.id, setSearchParams]);
 
   const latestSelectedMessage =
     selectedState.status === "ready" ? selectedState.messages[0] ?? null : null;
