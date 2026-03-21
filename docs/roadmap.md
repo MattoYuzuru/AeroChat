@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] web message search bootstrap через `aero-gateway`
+- [x] group moderation foundation и admin policy expansion
 
 ---
 
@@ -129,6 +129,7 @@
 - [x] Message edit foundation
 - [x] Replies и quoted messages foundation
 - [x] Message search foundation через `aero-gateway`
+- [x] Group moderation foundation и admin policy expansion
 - [ ] Max groups per user rules
 
 ---

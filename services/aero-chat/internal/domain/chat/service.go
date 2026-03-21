@@ -41,6 +41,7 @@ type Repository interface {
 	ListGroupTypingStateEntries(context.Context, string, string) ([]GroupTypingStateEntry, error)
 	GetGroupMember(context.Context, string, string) (*GroupMember, error)
 	UpdateGroupMemberRole(context.Context, UpdateGroupMemberRoleParams) (bool, error)
+	SetGroupMemberWriteRestriction(context.Context, SetGroupMemberWriteRestrictionParams) (bool, error)
 	TransferGroupOwnership(context.Context, TransferGroupOwnershipParams) (bool, error)
 	DeleteGroupMembership(context.Context, string, string, time.Time) (bool, error)
 	CreateGroupInviteLink(context.Context, CreateGroupInviteLinkParams) (*GroupInviteLink, error)
@@ -266,13 +267,18 @@ func (s *Service) CreateGroup(ctx context.Context, token string, name string) (*
 	}
 
 	now := s.now()
-	return s.repo.CreateGroup(ctx, CreateGroupParams{
+	group, err := s.repo.CreateGroup(ctx, CreateGroupParams{
 		GroupID:         s.newID(),
 		PrimaryThreadID: s.newID(),
 		Name:            normalizedName,
 		CreatedByUserID: authSession.User.ID,
 		CreatedAt:       now,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return enrichGroupPolicy(group), nil
 }
 
 func (s *Service) ListGroups(ctx context.Context, token string) ([]Group, error) {
@@ -281,7 +287,16 @@ func (s *Service) ListGroups(ctx context.Context, token string) ([]Group, error)
 		return nil, err
 	}
 
-	return s.repo.ListGroups(ctx, authSession.User.ID)
+	groups, err := s.repo.ListGroups(ctx, authSession.User.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	for index := range groups {
+		enrichGroupPolicy(&groups[index])
+	}
+
+	return groups, nil
 }
 
 func (s *Service) GetGroup(ctx context.Context, token string, groupID string) (*Group, error) {
@@ -295,7 +310,12 @@ func (s *Service) GetGroup(ctx context.Context, token string, groupID string) (*
 		return nil, err
 	}
 
-	return s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	return enrichGroupPolicy(group), nil
 }
 
 func (s *Service) GetGroupChat(ctx context.Context, token string, groupID string) (*Group, *GroupChatThread, *GroupReadState, *GroupTypingState, error) {
@@ -355,7 +375,7 @@ func (s *Service) UpdateGroupMemberRole(ctx context.Context, token string, group
 	if err != nil {
 		return nil, err
 	}
-	if !canManageGroupMembers(group.SelfRole) {
+	if !canManageGroupMemberRoles(group.SelfRole) {
 		return nil, fmt.Errorf("%w: only the owner can manage group member roles", ErrPermissionDenied)
 	}
 
@@ -369,10 +389,16 @@ func (s *Service) UpdateGroupMemberRole(ctx context.Context, token string, group
 	if normalizedTargetUserID == authSession.User.ID {
 		return nil, fmt.Errorf("%w: owner cannot change own role without ownership transfer", ErrConflict)
 	}
+	if !canManageRoleForTarget(group.SelfRole, targetMember.Role) {
+		return nil, fmt.Errorf("%w: current actor cannot change this target role", ErrPermissionDenied)
+	}
 
 	targetRole, err := normalizeManagedGroupRole(role)
 	if err != nil {
 		return nil, err
+	}
+	if !canAssignGroupRole(group.SelfRole, targetRole) {
+		return nil, fmt.Errorf("%w: current actor cannot assign this role", ErrPermissionDenied)
 	}
 	if targetMember.Role == targetRole {
 		return targetMember, nil
@@ -422,7 +448,7 @@ func (s *Service) TransferGroupOwnership(ctx context.Context, token string, grou
 	if err != nil {
 		return nil, err
 	}
-	if !canManageGroupMembers(group.SelfRole) {
+	if !canTransferGroupOwnership(group.SelfRole) {
 		return nil, fmt.Errorf("%w: only the owner can transfer ownership", ErrPermissionDenied)
 	}
 	if normalizedTargetUserID == authSession.User.ID {
@@ -435,6 +461,9 @@ func (s *Service) TransferGroupOwnership(ctx context.Context, token string, grou
 	}
 	if targetMember.Role == GroupMemberRoleOwner {
 		return nil, fmt.Errorf("%w: target user already owns the group", ErrConflict)
+	}
+	if targetMember.IsWriteRestricted {
+		return nil, fmt.Errorf("%w: ownership transfer target cannot be write-restricted", ErrConflict)
 	}
 
 	transferred, err := s.repo.TransferGroupOwnership(ctx, TransferGroupOwnershipParams{
@@ -450,7 +479,12 @@ func (s *Service) TransferGroupOwnership(ctx context.Context, token string, grou
 		return nil, fmt.Errorf("%w: ownership transfer was not applied", ErrConflict)
 	}
 
-	return s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	group, err = s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	return enrichGroupPolicy(group), nil
 }
 
 func (s *Service) RemoveGroupMember(ctx context.Context, token string, groupID string, targetUserID string) error {
@@ -472,9 +506,6 @@ func (s *Service) RemoveGroupMember(ctx context.Context, token string, groupID s
 	if err != nil {
 		return err
 	}
-	if !canManageGroupMembers(group.SelfRole) {
-		return fmt.Errorf("%w: only the owner can remove group members", ErrPermissionDenied)
-	}
 	if normalizedTargetUserID == authSession.User.ID {
 		return fmt.Errorf("%w: owner must use leave group flow for self-removal", ErrConflict)
 	}
@@ -485,6 +516,9 @@ func (s *Service) RemoveGroupMember(ctx context.Context, token string, groupID s
 	}
 	if targetMember.Role == GroupMemberRoleOwner {
 		return fmt.Errorf("%w: owner cannot be removed from the group", ErrConflict)
+	}
+	if !canRemoveGroupMember(group.SelfRole, targetMember.Role) {
+		return fmt.Errorf("%w: current actor cannot remove this group member", ErrPermissionDenied)
 	}
 	thread, err := s.repo.GetGroupChatThread(ctx, authSession.User.ID, normalizedGroupID)
 	if err != nil {
@@ -503,6 +537,120 @@ func (s *Service) RemoveGroupMember(ctx context.Context, token string, groupID s
 	}
 
 	return nil
+}
+
+func (s *Service) RestrictGroupMember(ctx context.Context, token string, groupID string, targetUserID string) (*GroupMember, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedTargetUserID, err := normalizeID(targetUserID, "user_id")
+	if err != nil {
+		return nil, err
+	}
+	if normalizedTargetUserID == authSession.User.ID {
+		return nil, fmt.Errorf("%w: self-restriction is not allowed", ErrConflict)
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	targetMember, err := s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+	if err != nil {
+		return nil, err
+	}
+	if targetMember.Role == GroupMemberRoleOwner {
+		return nil, fmt.Errorf("%w: owner cannot be write-restricted", ErrConflict)
+	}
+	if !canRestrictGroupMember(group.SelfRole, targetMember.Role) {
+		return nil, fmt.Errorf("%w: current actor cannot restrict this group member", ErrPermissionDenied)
+	}
+	if targetMember.IsWriteRestricted {
+		return targetMember, nil
+	}
+
+	now := s.now()
+	restrictedAt := now
+	updated, err := s.repo.SetGroupMemberWriteRestriction(ctx, SetGroupMemberWriteRestrictionParams{
+		GroupID:           normalizedGroupID,
+		UserID:            normalizedTargetUserID,
+		IsWriteRestricted: true,
+		WriteRestrictedAt: &restrictedAt,
+		UpdatedAt:         now,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	thread, err := s.repo.GetGroupChatThread(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.typingStore.ClearGroupTypingIndicator(ctx, normalizedGroupID, thread.ID, normalizedTargetUserID); err != nil {
+		return nil, err
+	}
+	if !updated {
+		return s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+	}
+
+	return s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+}
+
+func (s *Service) UnrestrictGroupMember(ctx context.Context, token string, groupID string, targetUserID string) (*GroupMember, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedTargetUserID, err := normalizeID(targetUserID, "user_id")
+	if err != nil {
+		return nil, err
+	}
+	if normalizedTargetUserID == authSession.User.ID {
+		return nil, fmt.Errorf("%w: self-unrestriction is not allowed", ErrConflict)
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	targetMember, err := s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
+	if err != nil {
+		return nil, err
+	}
+	if targetMember.Role == GroupMemberRoleOwner {
+		return nil, fmt.Errorf("%w: owner has no write restriction state", ErrConflict)
+	}
+	if !canRestrictGroupMember(group.SelfRole, targetMember.Role) {
+		return nil, fmt.Errorf("%w: current actor cannot unrestrict this group member", ErrPermissionDenied)
+	}
+	if !targetMember.IsWriteRestricted {
+		return targetMember, nil
+	}
+
+	if _, err := s.repo.SetGroupMemberWriteRestriction(ctx, SetGroupMemberWriteRestrictionParams{
+		GroupID:           normalizedGroupID,
+		UserID:            normalizedTargetUserID,
+		IsWriteRestricted: false,
+		WriteRestrictedAt: nil,
+		UpdatedAt:         s.now(),
+	}); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetGroupMember(ctx, normalizedGroupID, normalizedTargetUserID)
 }
 
 func (s *Service) LeaveGroup(ctx context.Context, token string, groupID string) error {
@@ -687,7 +835,12 @@ func (s *Service) JoinGroupByInviteLink(ctx context.Context, token string, invit
 		return nil, err
 	}
 
-	return s.repo.GetGroup(ctx, authSession.User.ID, target.Group.ID)
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, target.Group.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return enrichGroupPolicy(group), nil
 }
 
 func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupID string, text string, attachmentIDs []string, replyToMessageIDInput ...string) (*GroupMessage, error) {
@@ -700,7 +853,7 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 	if err != nil {
 		return nil, err
 	}
-	if !canSendGroupMessages(group.SelfRole) {
+	if !canSendGroupMessages(group.SelfRole, group.SelfWriteRestricted) {
 		return nil, fmt.Errorf("%w: current group role is read-only for sending messages", ErrPermissionDenied)
 	}
 
@@ -1186,7 +1339,7 @@ func (s *Service) SetGroupTyping(ctx context.Context, token string, groupID stri
 	if err != nil {
 		return nil, err
 	}
-	if !canSendGroupMessages(group.SelfRole) {
+	if !canSendGroupMessages(group.SelfRole, group.SelfWriteRestricted) {
 		return nil, fmt.Errorf("%w: current group role is read-only for typing", ErrPermissionDenied)
 	}
 
@@ -1671,27 +1824,13 @@ func normalizeInviteToken(value string) (string, error) {
 	return normalized, nil
 }
 
-func canManageGroupInviteLinks(role string) bool {
-	return role == GroupMemberRoleOwner || role == GroupMemberRoleAdmin
-}
-
-func canManageGroupMembers(role string) bool {
-	return role == GroupMemberRoleOwner
-}
-
-func canSendGroupMessages(role string) bool {
-	return role == GroupMemberRoleOwner || role == GroupMemberRoleAdmin || role == GroupMemberRoleMember
-}
-
-func canCreateInviteForRole(actorRole string, targetRole string) bool {
-	switch actorRole {
-	case GroupMemberRoleOwner:
-		return targetRole == GroupMemberRoleAdmin || targetRole == GroupMemberRoleMember || targetRole == GroupMemberRoleReader
-	case GroupMemberRoleAdmin:
-		return targetRole == GroupMemberRoleMember || targetRole == GroupMemberRoleReader
-	default:
-		return false
+func enrichGroupPolicy(group *Group) *Group {
+	if group == nil {
+		return nil
 	}
+
+	group.SelfPermissions = buildGroupPermissions(group.SelfRole)
+	return group
 }
 
 func (s *Service) newGroupInviteToken() (string, string, error) {
@@ -1821,12 +1960,13 @@ func (s *Service) resolveGroupChat(ctx context.Context, userID string, groupID s
 	if err != nil {
 		return nil, nil, err
 	}
+	enrichGroupPolicy(group)
 
 	thread, err := s.repo.GetGroupChatThread(ctx, userID, normalizedGroupID)
 	if err != nil {
 		return nil, nil, err
 	}
-	thread.CanSendMessages = canSendGroupMessages(group.SelfRole)
+	thread.CanSendMessages = canSendGroupMessages(group.SelfRole, group.SelfWriteRestricted)
 
 	return group, thread, nil
 }

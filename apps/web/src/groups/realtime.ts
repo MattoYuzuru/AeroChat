@@ -19,8 +19,21 @@ interface GroupWire {
   kind?: string;
   selfRole?: string;
   memberCount?: number;
+  permissions?: GroupPermissionsWire;
   createdAt?: string;
   updatedAt?: string;
+}
+
+interface GroupPermissionsWire {
+  canManageInviteLinks?: boolean;
+  creatableInviteRoles?: string[];
+  canManageMemberRoles?: boolean;
+  roleManagementTargetRoles?: string[];
+  assignableRoles?: string[];
+  canTransferOwnership?: boolean;
+  removableMemberRoles?: string[];
+  restrictableMemberRoles?: string[];
+  canLeaveGroup?: boolean;
 }
 
 interface GroupThreadWire {
@@ -43,6 +56,8 @@ interface GroupMemberWire {
   user?: ChatUserWire;
   role?: string;
   joinedAt?: string;
+  isWriteRestricted?: boolean;
+  writeRestrictedAt?: string;
 }
 
 interface TextMessageContentWire {
@@ -129,6 +144,15 @@ interface GroupOwnershipTransferredPayloadWire {
   selfMember?: GroupMemberWire;
 }
 
+interface GroupModerationUpdatedPayloadWire {
+  reason?: string;
+  groupId?: string;
+  group?: GroupWire;
+  thread?: GroupThreadWire;
+  member?: GroupMemberWire;
+  selfMember?: GroupMemberWire;
+}
+
 interface GroupTypingIndicatorWire {
   user?: ChatUserWire;
   updatedAt?: string;
@@ -205,6 +229,15 @@ export type GroupRealtimeEvent =
       thread: GroupChatThread | null;
       ownerMember: GroupMember;
       previousOwnerMember: GroupMember;
+      selfMember: GroupMember | null;
+    }
+  | {
+      type: "group.moderation.updated";
+      reason: "member_restricted" | "member_unrestricted";
+      groupId: string;
+      group: Group | null;
+      thread: GroupChatThread | null;
+      member: GroupMember;
       selfMember: GroupMember | null;
     }
   | {
@@ -286,6 +319,23 @@ export function parseGroupRealtimeEvent(
       thread: payload.thread,
       ownerMember: payload.ownerMember,
       previousOwnerMember: payload.previousOwnerMember,
+      selfMember: payload.selfMember,
+    };
+  }
+
+  if (envelope.type === "group.moderation.updated") {
+    const payload = normalizeModerationUpdatedPayload(envelope.payload);
+    if (!payload) {
+      return null;
+    }
+
+    return {
+      type: "group.moderation.updated",
+      reason: payload.reason,
+      groupId: payload.groupId,
+      group: payload.group,
+      thread: payload.thread,
+      member: payload.member,
       selfMember: payload.selfMember,
     };
   }
@@ -450,6 +500,41 @@ function normalizeOwnershipTransferredPayload(
   };
 }
 
+function normalizeModerationUpdatedPayload(
+  input: unknown,
+): {
+  reason: "member_restricted" | "member_unrestricted";
+  groupId: string;
+  group: Group | null;
+  thread: GroupChatThread | null;
+  member: GroupMember;
+  selfMember: GroupMember | null;
+} | null {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const payload = input as GroupModerationUpdatedPayloadWire;
+  const groupId = typeof payload.groupId === "string" ? payload.groupId : "";
+  const member = normalizeOptionalGroupMember(payload.member);
+  const reason =
+    payload.reason === "member_restricted" || payload.reason === "member_unrestricted"
+      ? payload.reason
+      : null;
+  if (groupId === "" || member === null || reason === null) {
+    return null;
+  }
+
+  return {
+    reason,
+    groupId,
+    group: normalizeOptionalGroup(payload.group),
+    thread: normalizeOptionalGroupThread(payload.thread),
+    member,
+    selfMember: normalizeOptionalGroupMember(payload.selfMember),
+  };
+}
+
 function normalizeTypingUpdatedPayload(
   input: unknown,
 ): {
@@ -513,8 +598,23 @@ function normalizeGroup(input: GroupWire | undefined): Group {
     selfRole: normalizeGroupMemberRole(input?.selfRole),
     memberCount: input?.memberCount ?? 0,
     unreadCount: 0,
+    permissions: normalizeGroupPermissions(input?.permissions),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeGroupPermissions(input: GroupPermissionsWire | undefined) {
+  return {
+    canManageInviteLinks: input?.canManageInviteLinks ?? false,
+    creatableInviteRoles: normalizeGroupMemberRoles(input?.creatableInviteRoles),
+    canManageMemberRoles: input?.canManageMemberRoles ?? false,
+    roleManagementTargetRoles: normalizeGroupMemberRoles(input?.roleManagementTargetRoles),
+    assignableRoles: normalizeGroupMemberRoles(input?.assignableRoles),
+    canTransferOwnership: input?.canTransferOwnership ?? false,
+    removableMemberRoles: normalizeGroupMemberRoles(input?.removableMemberRoles),
+    restrictableMemberRoles: normalizeGroupMemberRoles(input?.restrictableMemberRoles),
+    canLeaveGroup: input?.canLeaveGroup ?? false,
   };
 }
 
@@ -557,7 +657,17 @@ function normalizeOptionalGroupMember(
     },
     role: normalizeGroupMemberRole(input.role),
     joinedAt: input.joinedAt ?? "",
+    isWriteRestricted: input.isWriteRestricted ?? false,
+    writeRestrictedAt: normalizeNullableString(input.writeRestrictedAt),
   };
+}
+
+function normalizeGroupMemberRoles(values: string[] | undefined): GroupMemberRole[] {
+  if (!values) {
+    return [];
+  }
+
+  return values.map((value) => normalizeGroupMemberRole(value));
 }
 
 function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessage {

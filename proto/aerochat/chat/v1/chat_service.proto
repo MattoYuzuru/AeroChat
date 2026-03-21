@@ -24,6 +24,8 @@ service ChatService {
   rpc TransferGroupOwnership(TransferGroupOwnershipRequest) returns (TransferGroupOwnershipResponse);
   rpc RemoveGroupMember(RemoveGroupMemberRequest) returns (RemoveGroupMemberResponse);
   rpc LeaveGroup(LeaveGroupRequest) returns (LeaveGroupResponse);
+  rpc RestrictGroupMember(RestrictGroupMemberRequest) returns (RestrictGroupMemberResponse);
+  rpc UnrestrictGroupMember(UnrestrictGroupMemberRequest) returns (UnrestrictGroupMemberResponse);
   rpc CreateGroupInviteLink(CreateGroupInviteLinkRequest) returns (CreateGroupInviteLinkResponse);
   rpc ListGroupInviteLinks(ListGroupInviteLinksRequest) returns (ListGroupInviteLinksResponse);
   rpc DisableGroupInviteLink(DisableGroupInviteLinkRequest) returns (DisableGroupInviteLinkResponse);
@@ -127,12 +129,27 @@ message Group {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
   GroupUnreadState unread_state = 8;
+  GroupPermissions permissions = 9;
+}
+
+message GroupPermissions {
+  bool can_manage_invite_links = 1;
+  repeated GroupMemberRole creatable_invite_roles = 2;
+  bool can_manage_member_roles = 3;
+  repeated GroupMemberRole role_management_target_roles = 4;
+  repeated GroupMemberRole assignable_roles = 5;
+  bool can_transfer_ownership = 6;
+  repeated GroupMemberRole removable_member_roles = 7;
+  repeated GroupMemberRole restrictable_member_roles = 8;
+  bool can_leave_group = 9;
 }
 
 message GroupMember {
   ChatUser user = 1;
   GroupMemberRole role = 2;
   google.protobuf.Timestamp joined_at = 3;
+  bool is_write_restricted = 4;
+  google.protobuf.Timestamp write_restricted_at = 5;
 }
 
 message GroupInviteLink {
@@ -437,6 +454,24 @@ message LeaveGroupRequest {
 }
 
 message LeaveGroupResponse {}
+
+message RestrictGroupMemberRequest {
+  string group_id = 1;
+  string user_id = 2;
+}
+
+message RestrictGroupMemberResponse {
+  GroupMember member = 1;
+}
+
+message UnrestrictGroupMemberRequest {
+  string group_id = 1;
+  string user_id = 2;
+}
+
+message UnrestrictGroupMemberResponse {
+  GroupMember member = 1;
+}
 
 message CreateGroupInviteLinkRequest {
   string group_id = 1;

@@ -83,6 +83,18 @@ export interface ChatUser {
 
 export type GroupMemberRole = "owner" | "admin" | "member" | "reader";
 
+export interface GroupPermissions {
+  canManageInviteLinks: boolean;
+  creatableInviteRoles: GroupMemberRole[];
+  canManageMemberRoles: boolean;
+  roleManagementTargetRoles: GroupMemberRole[];
+  assignableRoles: GroupMemberRole[];
+  canTransferOwnership: boolean;
+  removableMemberRoles: GroupMemberRole[];
+  restrictableMemberRoles: GroupMemberRole[];
+  canLeaveGroup: boolean;
+}
+
 export interface Group {
   id: string;
   name: string;
@@ -90,6 +102,7 @@ export interface Group {
   selfRole: GroupMemberRole;
   memberCount: number;
   unreadCount: number;
+  permissions: GroupPermissions;
   createdAt: string;
   updatedAt: string;
 }
@@ -118,6 +131,8 @@ export interface GroupMember {
   user: ChatUser;
   role: GroupMemberRole;
   joinedAt: string;
+  isWriteRestricted: boolean;
+  writeRestrictedAt: string | null;
 }
 
 export interface GroupInviteLink {
@@ -453,6 +468,8 @@ export interface GatewayClient {
     userId: string,
     role: GroupMemberRole,
   ): Promise<GroupMember>;
+  restrictGroupMember(token: string, groupId: string, userId: string): Promise<GroupMember>;
+  unrestrictGroupMember(token: string, groupId: string, userId: string): Promise<GroupMember>;
   transferGroupOwnership(token: string, groupId: string, targetUserId: string): Promise<Group>;
   removeGroupMember(token: string, groupId: string, userId: string): Promise<void>;
   leaveGroup(token: string, groupId: string): Promise<void>;

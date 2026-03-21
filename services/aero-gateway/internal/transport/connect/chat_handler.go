@@ -184,6 +184,40 @@ func (h *ChatHandler) LeaveGroup(ctx context.Context, req *connect.Request[chatv
 	return response, nil
 }
 
+func (h *ChatHandler) RestrictGroupMember(ctx context.Context, req *connect.Request[chatv1.RestrictGroupMemberRequest]) (*connect.Response[chatv1.RestrictGroupMemberResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.RestrictGroupMember)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishGroupModerationUpdate(
+		ctx,
+		req.Header(),
+		req.Msg.GroupId,
+		response.Msg.Member,
+		realtime.GroupModerationReasonRestricted,
+	)
+
+	return response, nil
+}
+
+func (h *ChatHandler) UnrestrictGroupMember(ctx context.Context, req *connect.Request[chatv1.UnrestrictGroupMemberRequest]) (*connect.Response[chatv1.UnrestrictGroupMemberResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.UnrestrictGroupMember)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishGroupModerationUpdate(
+		ctx,
+		req.Header(),
+		req.Msg.GroupId,
+		response.Msg.Member,
+		realtime.GroupModerationReasonUnrestricted,
+	)
+
+	return response, nil
+}
+
 func (h *ChatHandler) CreateGroupInviteLink(ctx context.Context, req *connect.Request[chatv1.CreateGroupInviteLinkRequest]) (*connect.Response[chatv1.CreateGroupInviteLinkResponse], error) {
 	return forwardUnary(ctx, req, h.client.CreateGroupInviteLink)
 }
@@ -887,6 +921,54 @@ func (h *ChatHandler) publishGroupRoleUpdate(
 	}
 }
 
+func (h *ChatHandler) publishGroupModerationUpdate(
+	ctx context.Context,
+	headers http.Header,
+	groupID string,
+	member *chatv1.GroupMember,
+	reason string,
+) {
+	if h.realtimeHub == nil || member == nil || groupID == "" {
+		return
+	}
+
+	state, err := h.fetchGroupRealtimeState(ctx, headers, groupID)
+	if err != nil {
+		h.logger.Error(
+			"не удалось дочитать group chat для realtime moderation update",
+			slog.String("group_id", groupID),
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	updatedMember := findGroupMemberByUserID(state.members, member.GetUser().GetId())
+	if updatedMember == nil {
+		updatedMember = cloneGroupMember(member)
+	}
+
+	for _, recipient := range state.members {
+		recipientID := recipient.GetUser().GetId()
+		if recipientID == "" {
+			continue
+		}
+
+		h.realtimeHub.PublishToUser(
+			recipientID,
+			realtime.NewGroupModerationUpdatedEnvelope(
+				reason,
+				groupID,
+				groupForRecipient(state.group, recipient),
+				threadForRecipient(state.thread, recipient),
+				updatedMember,
+				recipient,
+			),
+		)
+	}
+
+	h.publishGroupTypingSnapshot(state)
+}
+
 func (h *ChatHandler) publishGroupOwnershipTransfer(
 	ctx context.Context,
 	headers http.Header,
@@ -1162,6 +1244,7 @@ func groupForRecipient(group *chatv1.Group, selfMember *chatv1.GroupMember) *cha
 
 	cloned := cloneGroup(group)
 	cloned.SelfRole = selfMember.GetRole()
+	cloned.Permissions = groupPermissionsForRole(selfMember.GetRole())
 	return cloned
 }
 
@@ -1171,11 +1254,15 @@ func threadForRecipient(thread *chatv1.GroupChatThread, selfMember *chatv1.Group
 	}
 
 	cloned := cloneGroupThread(thread)
-	cloned.CanSendMessages = canSendGroupMessages(selfMember.GetRole())
+	cloned.CanSendMessages = canSendGroupMessages(selfMember.GetRole(), selfMember.GetIsWriteRestricted())
 	return cloned
 }
 
-func canSendGroupMessages(role chatv1.GroupMemberRole) bool {
+func canSendGroupMessages(role chatv1.GroupMemberRole, isWriteRestricted bool) bool {
+	if isWriteRestricted {
+		return false
+	}
+
 	switch role {
 	case chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER,
 		chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN,
@@ -1249,6 +1336,7 @@ func cloneGroup(group *chatv1.Group) *chatv1.Group {
 		Kind:        group.GetKind(),
 		SelfRole:    group.GetSelfRole(),
 		MemberCount: group.GetMemberCount(),
+		Permissions: cloneGroupPermissions(group.GetPermissions()),
 		CreatedAt:   group.GetCreatedAt(),
 		UpdatedAt:   group.GetUpdatedAt(),
 	}
@@ -1281,8 +1369,58 @@ func cloneGroupMember(member *chatv1.GroupMember) *chatv1.GroupMember {
 			Nickname:  member.GetUser().GetNickname(),
 			AvatarUrl: member.GetUser().AvatarUrl,
 		},
-		Role:     member.GetRole(),
-		JoinedAt: member.GetJoinedAt(),
+		Role:              member.GetRole(),
+		JoinedAt:          member.GetJoinedAt(),
+		IsWriteRestricted: member.GetIsWriteRestricted(),
+		WriteRestrictedAt: member.GetWriteRestrictedAt(),
+	}
+}
+
+func cloneGroupPermissions(permissions *chatv1.GroupPermissions) *chatv1.GroupPermissions {
+	if permissions == nil {
+		return nil
+	}
+
+	return &chatv1.GroupPermissions{
+		CanManageInviteLinks:      permissions.GetCanManageInviteLinks(),
+		CreatableInviteRoles:      append([]chatv1.GroupMemberRole(nil), permissions.GetCreatableInviteRoles()...),
+		CanManageMemberRoles:      permissions.GetCanManageMemberRoles(),
+		RoleManagementTargetRoles: append([]chatv1.GroupMemberRole(nil), permissions.GetRoleManagementTargetRoles()...),
+		AssignableRoles:           append([]chatv1.GroupMemberRole(nil), permissions.GetAssignableRoles()...),
+		CanTransferOwnership:      permissions.GetCanTransferOwnership(),
+		RemovableMemberRoles:      append([]chatv1.GroupMemberRole(nil), permissions.GetRemovableMemberRoles()...),
+		RestrictableMemberRoles:   append([]chatv1.GroupMemberRole(nil), permissions.GetRestrictableMemberRoles()...),
+		CanLeaveGroup:             permissions.GetCanLeaveGroup(),
+	}
+}
+
+func groupPermissionsForRole(role chatv1.GroupMemberRole) *chatv1.GroupPermissions {
+	switch role {
+	case chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER:
+		return &chatv1.GroupPermissions{
+			CanManageInviteLinks:      true,
+			CreatableInviteRoles:      []chatv1.GroupMemberRole{chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER},
+			CanManageMemberRoles:      true,
+			RoleManagementTargetRoles: []chatv1.GroupMemberRole{chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER},
+			AssignableRoles:           []chatv1.GroupMemberRole{chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER},
+			CanTransferOwnership:      true,
+			RemovableMemberRoles:      []chatv1.GroupMemberRole{chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER},
+			RestrictableMemberRoles:   []chatv1.GroupMemberRole{chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER},
+		}
+	case chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_ADMIN:
+		return &chatv1.GroupPermissions{
+			CanManageInviteLinks:    true,
+			CreatableInviteRoles:    []chatv1.GroupMemberRole{chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER},
+			RemovableMemberRoles:    []chatv1.GroupMemberRole{chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER},
+			RestrictableMemberRoles: []chatv1.GroupMemberRole{chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER},
+			CanLeaveGroup:           true,
+		}
+	case chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_MEMBER, chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_READER:
+		return &chatv1.GroupPermissions{
+			CanLeaveGroup: true,
+		}
+	default:
+		return &chatv1.GroupPermissions{}
 	}
 }
 
