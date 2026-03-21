@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] search foundation для сообщений в direct chats и groups
+- [x] web message search bootstrap через `aero-gateway`
 
 ---
 
@@ -181,6 +181,7 @@
 Задачи:
 
 - [x] Web direct chat polish foundation в `apps/web`
+- [x] Web message search bootstrap через `aero-gateway`
 - [ ] Push notifications
 - [ ] PWA
 - [ ] Desktop shell polish

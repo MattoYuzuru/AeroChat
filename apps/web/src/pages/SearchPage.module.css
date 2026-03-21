@@ -1,0 +1,289 @@
+.layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.heroCard,
+.resultsSection,
+.stateCard,
+.metricCard,
+.resultCard,
+.inlineState {
+  border: 1px solid var(--color-border-soft);
+  border-radius: 1.55rem;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(16px);
+}
+
+.heroCard,
+.resultsSection,
+.stateCard {
+  padding: 1.35rem;
+}
+
+.heroHeader,
+.resultsHeader,
+.formFooter,
+.resultHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cardLabel {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(3, 50, 82, 0.72);
+}
+
+.title,
+.sectionTitle,
+.stateTitle,
+.inlineStateTitle,
+.resultTitle {
+  margin: 0.35rem 0 0;
+}
+
+.title {
+  font-size: clamp(1.8rem, 3vw, 2.2rem);
+}
+
+.subtitle,
+.stateMessage,
+.sectionDescription,
+.resultMeta,
+.fragment,
+.inlineStateMessage,
+.helperText,
+.scopeHint {
+  margin: 0.8rem 0 0;
+  color: rgba(3, 50, 82, 0.78);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.metricCard {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-panel-strong);
+}
+
+.metricCard span {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  color: rgba(3, 50, 82, 0.7);
+}
+
+.metricCard strong {
+  font-size: 1.8rem;
+}
+
+.error,
+.limitNotice {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+}
+
+.error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger-ink);
+}
+
+.limitNotice {
+  background: rgba(16, 130, 203, 0.12);
+}
+
+.form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.controlsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field span {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.field input,
+.field select {
+  min-height: 3rem;
+  padding: 0.75rem 0.95rem;
+  border: 1px solid rgba(3, 50, 82, 0.14);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.field input:focus-visible,
+.field select:focus-visible {
+  border-color: var(--color-primary-bright);
+  box-shadow:
+    0 0 0 4px rgba(23, 130, 209, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.helperText {
+  font-size: 0.85rem;
+}
+
+.formFooter {
+  align-items: center;
+}
+
+.scopeHint {
+  margin: 0;
+}
+
+.primaryButton,
+.secondaryButton,
+.linkButton {
+  min-height: 2.95rem;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  box-shadow: var(--shadow-button);
+}
+
+.primaryButton {
+  color: #ffffff;
+  background: var(--surface-button-primary);
+}
+
+.secondaryButton,
+.linkButton {
+  background: var(--surface-button);
+  border-color: rgba(3, 50, 82, 0.12);
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: inherit;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.stateCard[data-tone="error"],
+.inlineState[data-tone="error"] {
+  border-color: rgba(181, 38, 38, 0.24);
+}
+
+.stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 0.95rem;
+}
+
+.resultsSection {
+  display: grid;
+  gap: 1rem;
+}
+
+.metaTag,
+.scopeBadge,
+.metaBadge {
+  align-self: start;
+  padding: 0.45rem 0.72rem;
+  border-radius: 999px;
+  background: var(--color-chip);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  font-size: 0.8rem;
+  color: rgba(3, 50, 82, 0.74);
+}
+
+.scopeBadge {
+  background: rgba(23, 130, 209, 0.16);
+}
+
+.resultList {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.resultCard {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.resultTitle {
+  font-size: 1.08rem;
+}
+
+.resultMeta {
+  margin-top: 0.45rem;
+}
+
+.fragment {
+  margin: 0;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.inlineState {
+  padding: 1rem;
+}
+
+.inlineStateTitle {
+  font-size: 1rem;
+}
+
+.inlineStateMessage {
+  margin-top: 0.5rem;
+}
+
+.loadMoreRow {
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .heroHeader,
+  .resultsHeader,
+  .formFooter,
+  .resultHeaderRow {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .controlsGrid,
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+}

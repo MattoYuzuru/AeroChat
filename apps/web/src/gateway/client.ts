@@ -29,10 +29,15 @@ import type {
   GroupReadState,
   GroupTypingIndicator,
   GroupTypingState,
+  MessageSearchCursor,
+  MessageSearchPosition,
+  MessageSearchResult,
+  MessageSearchScopeInput,
   MessageTombstone,
   Profile,
   ReplyPreview,
   RevokeSessionOrDeviceTarget,
+  SearchMessagesInput,
   Session,
   TextMessageContent,
 } from "./types";
@@ -462,6 +467,34 @@ interface PinMessageResponseWire {
 
 interface UnpinMessageResponseWire {
   message?: DirectChatMessageWire;
+}
+
+interface MessageSearchCursorWire {
+  messageCreatedAt?: string;
+  messageId?: string;
+}
+
+interface MessageSearchPositionWire {
+  messageId?: string;
+  messageCreatedAt?: string;
+}
+
+interface MessageSearchResultWire extends TimestampedWire {
+  scope?: string;
+  directChatId?: string;
+  groupId?: string;
+  groupThreadId?: string;
+  messageId?: string;
+  author?: ChatUserWire;
+  editedAt?: string;
+  matchFragment?: string;
+  position?: MessageSearchPositionWire;
+}
+
+interface SearchMessagesResponseWire {
+  results?: MessageSearchResultWire[];
+  nextPageCursor?: MessageSearchCursorWire;
+  hasMore?: boolean;
 }
 
 export function createGatewayClient(
@@ -1093,6 +1126,23 @@ export function createGatewayClient(
       return (response.messages ?? []).map(normalizeDirectChatMessage);
     },
 
+    async searchMessages(token, input) {
+      const response = await unaryCall<SearchMessagesResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "SearchMessages",
+        buildSearchMessagesBody(input),
+        token,
+      );
+
+      return {
+        results: (response.results ?? []).map(normalizeMessageSearchResult),
+        nextPageCursor: normalizeMessageSearchCursor(response.nextPageCursor),
+        hasMore: response.hasMore ?? false,
+      };
+    },
+
     async deleteMessageForEveryone(token, chatId, messageId) {
       const response = await unaryCall<DeleteMessageForEveryoneResponseWire>(
         fetchImpl,
@@ -1690,6 +1740,32 @@ function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
   };
 }
 
+function buildSearchMessagesBody(input: SearchMessagesInput): Record<string, unknown> {
+  return {
+    query: input.query.trim(),
+    ...(input.scope.kind === "direct"
+      ? {
+          directScope: {
+            chatId: input.scope.chatId?.trim() ?? "",
+          },
+        }
+      : {
+          groupScope: {
+            groupId: input.scope.groupId?.trim() ?? "",
+          },
+        }),
+    ...(input.pageSize === undefined ? {} : { pageSize: input.pageSize }),
+    ...(input.pageCursor
+      ? {
+          pageCursor: {
+            messageCreatedAt: input.pageCursor.messageCreatedAt,
+            messageId: input.pageCursor.messageId,
+          },
+        }
+      : {}),
+  };
+}
+
 function normalizeTextMessageContent(
   input: TextMessageContentWire | undefined,
 ): TextMessageContent | null {
@@ -1760,6 +1836,83 @@ function normalizeReplyPreview(input: ReplyPreviewWire | undefined): ReplyPrevie
     attachmentCount: normalizeCount(input.attachmentCount),
     isDeleted: input.isDeleted ?? false,
     isUnavailable: input.isUnavailable ?? false,
+  };
+}
+
+function normalizeMessageSearchScope(
+  value: string | undefined,
+  directChatId: string | null,
+  groupId: string | null,
+): MessageSearchScopeInput["kind"] {
+  switch (value) {
+    case "MESSAGE_SEARCH_SCOPE_KIND_GROUP":
+    case "group":
+      return "group";
+    case "MESSAGE_SEARCH_SCOPE_KIND_DIRECT":
+    case "direct":
+      return "direct";
+    default:
+      return groupId !== null && groupId !== "" && (directChatId === null || directChatId === "")
+        ? "group"
+        : "direct";
+  }
+}
+
+function normalizeMessageSearchCursor(
+  input: MessageSearchCursorWire | undefined,
+): MessageSearchCursor | null {
+  if (!input) {
+    return null;
+  }
+
+  const messageCreatedAt = input.messageCreatedAt ?? "";
+  const messageId = input.messageId ?? "";
+  if (messageCreatedAt === "" && messageId === "") {
+    return null;
+  }
+
+  return {
+    messageCreatedAt,
+    messageId,
+  };
+}
+
+function normalizeMessageSearchPosition(
+  input: MessageSearchPositionWire | undefined,
+): MessageSearchPosition | null {
+  if (!input) {
+    return null;
+  }
+
+  const messageId = input.messageId ?? "";
+  const messageCreatedAt = input.messageCreatedAt ?? "";
+  if (messageId === "" && messageCreatedAt === "") {
+    return null;
+  }
+
+  return {
+    messageId,
+    messageCreatedAt,
+  };
+}
+
+function normalizeMessageSearchResult(
+  input: MessageSearchResultWire | undefined,
+): MessageSearchResult {
+  const directChatId = normalizeNullableString(input?.directChatId);
+  const groupId = normalizeNullableString(input?.groupId);
+
+  return {
+    scope: normalizeMessageSearchScope(input?.scope, directChatId, groupId),
+    directChatId,
+    groupId,
+    groupThreadId: normalizeNullableString(input?.groupThreadId),
+    messageId: input?.messageId ?? "",
+    author: input?.author ? normalizeChatUser(input.author) : null,
+    createdAt: input?.createdAt ?? "",
+    editedAt: normalizeNullableString(input?.editedAt),
+    matchFragment: input?.matchFragment ?? "",
+    position: normalizeMessageSearchPosition(input?.position),
   };
 }
 

@@ -307,6 +307,54 @@ export interface GroupReadUpdate {
   unreadCount: number;
 }
 
+export type MessageSearchScopeKind = "direct" | "group";
+
+export interface MessageSearchCursor {
+  messageCreatedAt: string;
+  messageId: string;
+}
+
+export interface MessageSearchPosition {
+  messageId: string;
+  messageCreatedAt: string;
+}
+
+export interface MessageSearchResult {
+  scope: MessageSearchScopeKind;
+  directChatId: string | null;
+  groupId: string | null;
+  groupThreadId: string | null;
+  messageId: string;
+  author: ChatUser | null;
+  createdAt: string;
+  editedAt: string | null;
+  matchFragment: string;
+  position: MessageSearchPosition | null;
+}
+
+export type MessageSearchScopeInput =
+  | {
+      kind: "direct";
+      chatId?: string | null;
+    }
+  | {
+      kind: "group";
+      groupId?: string | null;
+    };
+
+export interface SearchMessagesInput {
+  query: string;
+  scope: MessageSearchScopeInput;
+  pageSize?: number;
+  pageCursor?: MessageSearchCursor | null;
+}
+
+export interface MessageSearchPage {
+  results: MessageSearchResult[];
+  nextPageCursor: MessageSearchCursor | null;
+  hasMore: boolean;
+}
+
 export interface RegisterInput {
   login: string;
   password: string;
@@ -480,6 +528,7 @@ export interface GatewayClient {
     chatId: string,
     pageSize?: number,
   ): Promise<DirectChatMessage[]>;
+  searchMessages(token: string, input: SearchMessagesInput): Promise<MessageSearchPage>;
   deleteMessageForEveryone(
     token: string,
     chatId: string,

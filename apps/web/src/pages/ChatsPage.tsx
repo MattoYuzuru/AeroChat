@@ -30,6 +30,11 @@ import type {
   DirectChatReadState,
   DirectChatTypingState,
 } from "../gateway/types";
+import {
+  clearSearchJumpParams,
+  findJumpTarget,
+  readSearchJumpIntent,
+} from "../search/jump";
 import styles from "./ChatsPage.module.css";
 
 export function ChatsPage() {
@@ -41,6 +46,8 @@ export function ChatsPage() {
   const [editingMessageText, setEditingMessageText] = useState("");
   const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
   const [selectedReplyMessage, setSelectedReplyMessage] = useState<DirectChatMessage | null>(null);
+  const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const pendingPeerRef = useRef<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const sessionToken =
@@ -68,6 +75,7 @@ export function ChatsPage() {
   const requestedChatId = searchParams.get("chat")?.trim() ?? "";
   const requestedPeerUserId = searchParams.get("peer")?.trim() ?? "";
   const isThreadRouteActive = requestedChatId !== "" || requestedPeerUserId !== "";
+  const searchJumpIntent = readSearchJumpIntent(searchParams);
   const syncRouteSelection = useEffectEvent(async () => {
     const action = resolveChatsRouteSyncAction({
       requestedChatId,
@@ -115,7 +123,55 @@ export function ChatsPage() {
     setEditingMessageId(null);
     setEditingMessageText("");
     setSelectedReplyMessage(null);
+    setSearchJumpNotice(null);
+    setHighlightedMessageId(null);
   }, [chats.state.selectedChatId]);
+
+  useEffect(() => {
+    if (highlightedMessageId === null) {
+      return;
+    }
+
+    const timeoutID = window.setTimeout(() => {
+      setHighlightedMessageId(null);
+    }, 4200);
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
+  }, [highlightedMessageId]);
+
+  useEffect(() => {
+    if (searchJumpIntent === null || chats.state.threadStatus !== "ready" || chats.state.thread === null) {
+      return;
+    }
+
+    if (requestedChatId !== "" && chats.state.thread.chat.id !== requestedChatId) {
+      return;
+    }
+
+    const targetMessage = findJumpTarget(chats.state.thread.messages, searchJumpIntent.messageId);
+    if (targetMessage === null) {
+      setSearchJumpNotice(
+        "Найденное сообщение пока не попало в текущую загруженную историю direct chat. Переход ограничен последним загруженным окном сообщений.",
+      );
+      setHighlightedMessageId(null);
+      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+      return;
+    }
+
+    setSearchJumpNotice(null);
+    setHighlightedMessageId(targetMessage.id);
+    jumpToMessage(`direct-message-${targetMessage.id}`);
+    setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+  }, [
+    chats.state.thread,
+    chats.state.threadStatus,
+    requestedChatId,
+    searchJumpIntent,
+    searchParams,
+    setSearchParams,
+  ]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -295,6 +351,7 @@ export function ChatsPage() {
         </div>
 
         {chats.state.notice && <div className={styles.notice}>{chats.state.notice}</div>}
+        {searchJumpNotice && <div className={styles.notice}>{searchJumpNotice}</div>}
         {(composerError || chats.state.actionErrorMessage) && (
           <div className={styles.error}>
             {composerError ?? chats.state.actionErrorMessage}
@@ -613,6 +670,7 @@ export function ChatsPage() {
                             className={styles.messageRow}
                             id={`direct-message-${message.id}`}
                             data-own={isOwn}
+                            data-search-target={highlightedMessageId === message.id}
                           >
                             <div className={styles.messageBubble} data-own={isOwn}>
                               <div className={styles.messageHeader}>

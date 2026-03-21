@@ -47,6 +47,11 @@ import {
   type GroupTypingSessionTarget,
 } from "../groups/typing";
 import { subscribeRealtimeEnvelopes } from "../realtime/events";
+import {
+  clearSearchJumpParams,
+  findJumpTarget,
+  readSearchJumpIntent,
+} from "../search/jump";
 import styles from "./GroupsPage.module.css";
 
 export function GroupsPage() {
@@ -81,6 +86,8 @@ export function GroupsPage() {
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, GroupMemberRole>>({});
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
+  const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const selectedStateRef = useRef(selectedState);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const activeTypingTargetRef = useRef<GroupTypingSessionTarget | null>(null);
@@ -91,6 +98,7 @@ export function GroupsPage() {
 
   const selectedGroupId = searchParams.get("group")?.trim() ?? "";
   const joinTokenFromRoute = searchParams.get("join")?.trim() ?? "";
+  const searchJumpIntent = readSearchJumpIntent(searchParams);
   const token = authState.status === "authenticated" ? authState.token : "";
   const activeTypingTarget = resolveGroupTypingSessionTarget({
     enabled: authState.status === "authenticated",
@@ -132,7 +140,23 @@ export function GroupsPage() {
     setEditingMessageText("");
     setPendingEditMessageId(null);
     setSelectedReplyMessage(null);
+    setSearchJumpNotice(null);
+    setHighlightedMessageId(null);
   }, [selectedGroupId]);
+
+  useEffect(() => {
+    if (highlightedMessageId === null) {
+      return;
+    }
+
+    const timeoutID = window.setTimeout(() => {
+      setHighlightedMessageId(null);
+    }, 4200);
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
+  }, [highlightedMessageId]);
 
   useEffect(() => {
     if (joinTokenFromRoute !== "") {
@@ -539,6 +563,31 @@ export function GroupsPage() {
       }
     };
   }, [expireSession, token]);
+
+  useEffect(() => {
+    if (searchJumpIntent === null || selectedState.status !== "ready") {
+      return;
+    }
+
+    if (selectedState.snapshot.group.id !== selectedGroupId) {
+      return;
+    }
+
+    const targetMessage = findJumpTarget(selectedState.messages, searchJumpIntent.messageId);
+    if (targetMessage === null) {
+      setSearchJumpNotice(
+        "Найденное сообщение пока не попало в текущую загруженную историю группы. Переход ограничен последним загруженным окном primary thread.",
+      );
+      setHighlightedMessageId(null);
+      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+      return;
+    }
+
+    setSearchJumpNotice(null);
+    setHighlightedMessageId(targetMessage.id);
+    jumpToMessage(`group-message-${targetMessage.id}`);
+    setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+  }, [searchJumpIntent, searchParams, selectedGroupId, selectedState, setSearchParams]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -1103,8 +1152,9 @@ export function GroupsPage() {
           <Metric label="Активные invite links" value={activeInviteCount} />
         </div>
 
-        {notice && <div className={styles.notice}>{notice}</div>}
-        {actionError && <div className={styles.error}>{actionError}</div>}
+      {notice && <div className={styles.notice}>{notice}</div>}
+      {searchJumpNotice && <div className={styles.notice}>{searchJumpNotice}</div>}
+      {actionError && <div className={styles.error}>{actionError}</div>}
 
         <div className={styles.heroForms}>
           <form className={styles.panelCard} onSubmit={handleCreateGroup}>
@@ -1368,6 +1418,7 @@ export function GroupsPage() {
                         <article
                           className={styles.messageCard}
                           data-own={isOwn}
+                          data-search-target={highlightedMessageId === message.id}
                           id={`group-message-${message.id}`}
                           key={message.id}
                         >

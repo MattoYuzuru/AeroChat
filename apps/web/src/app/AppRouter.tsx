@@ -8,6 +8,7 @@ import { ChatsPage } from "../pages/ChatsPage";
 import { GroupsPage } from "../pages/GroupsPage";
 import { StateScreen } from "../ui/StateScreen";
 import { SettingsPage } from "../pages/SettingsPage";
+import { SearchPage } from "../pages/SearchPage";
 
 export function AppRouter() {
   return (
@@ -24,6 +25,7 @@ export function AppRouter() {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="chats" element={<ChatsPage />} />
             <Route path="groups" element={<GroupsPage />} />
+            <Route path="search" element={<SearchPage />} />
             <Route path="people" element={<PeoplePage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
