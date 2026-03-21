@@ -1617,22 +1617,29 @@ func (r *fakeRepository) ExpireOrphanUploadedAttachments(_ context.Context, uplo
 	return affected, nil
 }
 
-func (r *fakeRepository) ListAttachmentObjectDeletionCandidates(_ context.Context, expiredBefore time.Time, failedBefore time.Time, limit int32) ([]AttachmentObjectCleanupCandidate, error) {
+func (r *fakeRepository) ListAttachmentObjectDeletionCandidates(_ context.Context, expiredBefore time.Time, failedBefore time.Time, detachedBefore time.Time, limit int32) ([]AttachmentObjectCleanupCandidate, error) {
 	result := make([]AttachmentObjectCleanupCandidate, 0, limit)
 	for _, attachment := range r.attachments {
 		if int32(len(result)) >= limit {
 			break
 		}
-		if attachment.MessageID != nil {
-			continue
-		}
 		switch attachment.Status {
 		case AttachmentStatusExpired:
+			if attachment.MessageID != nil {
+				continue
+			}
 			if !attachment.UpdatedAt.Before(expiredBefore) {
 				continue
 			}
 		case AttachmentStatusFailed:
+			if attachment.MessageID != nil {
+				continue
+			}
 			if attachment.FailedAt == nil || attachment.FailedAt.After(failedBefore) {
+				continue
+			}
+		case AttachmentStatusDetached:
+			if attachment.UpdatedAt.After(detachedBefore) {
 				continue
 			}
 		default:
@@ -1654,10 +1661,10 @@ func (r *fakeRepository) MarkAttachmentDeleted(_ context.Context, attachmentID s
 	if !ok {
 		return false, ErrNotFound
 	}
-	if attachment.MessageID != nil {
+	if attachment.Status != AttachmentStatusExpired && attachment.Status != AttachmentStatusFailed && attachment.Status != AttachmentStatusDetached {
 		return false, nil
 	}
-	if attachment.Status != AttachmentStatusExpired && attachment.Status != AttachmentStatusFailed {
+	if attachment.MessageID != nil && attachment.Status != AttachmentStatusDetached {
 		return false, nil
 	}
 
@@ -2336,6 +2343,7 @@ func (r *fakeRepository) DeleteDirectChatMessageForEveryone(_ context.Context, c
 	}
 
 	message.Text = nil
+	message.Attachments = nil
 	message.Pinned = false
 	message.Tombstone = &MessageTombstone{
 		DeletedByUserID: deletedByUserID,
@@ -2343,6 +2351,18 @@ func (r *fakeRepository) DeleteDirectChatMessageForEveryone(_ context.Context, c
 	}
 	message.UpdatedAt = at
 	r.messages[messageID] = message
+
+	for attachmentID, attachment := range r.attachments {
+		if attachment.MessageID == nil || *attachment.MessageID != messageID {
+			continue
+		}
+		if attachment.Status != AttachmentStatusAttached {
+			continue
+		}
+		attachment.Status = AttachmentStatusDetached
+		attachment.UpdatedAt = at
+		r.attachments[attachmentID] = attachment
+	}
 
 	directChat := r.chats[chatID]
 	directChat.UpdatedAt = at

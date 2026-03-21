@@ -223,6 +223,7 @@ const (
 	AttachmentStatus_ATTACHMENT_STATUS_FAILED      AttachmentStatus = 4
 	AttachmentStatus_ATTACHMENT_STATUS_DELETED     AttachmentStatus = 5
 	AttachmentStatus_ATTACHMENT_STATUS_EXPIRED     AttachmentStatus = 6
+	AttachmentStatus_ATTACHMENT_STATUS_DETACHED    AttachmentStatus = 7
 )
 
 // Enum value maps for AttachmentStatus.
@@ -235,6 +236,7 @@ var (
 		4: "ATTACHMENT_STATUS_FAILED",
 		5: "ATTACHMENT_STATUS_DELETED",
 		6: "ATTACHMENT_STATUS_EXPIRED",
+		7: "ATTACHMENT_STATUS_DETACHED",
 	}
 	AttachmentStatus_value = map[string]int32{
 		"ATTACHMENT_STATUS_UNSPECIFIED": 0,
@@ -244,6 +246,7 @@ var (
 		"ATTACHMENT_STATUS_FAILED":      4,
 		"ATTACHMENT_STATUS_DELETED":     5,
 		"ATTACHMENT_STATUS_EXPIRED":     6,
+		"ATTACHMENT_STATUS_DETACHED":    7,
 	}
 )
 
@@ -7211,7 +7214,7 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\x0fAttachmentScope\x12 \n" +
 	"\x1cATTACHMENT_SCOPE_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cATTACHMENT_SCOPE_DIRECT_CHAT\x10\x01\x12\x1a\n" +
-	"\x16ATTACHMENT_SCOPE_GROUP\x10\x02*\xf0\x01\n" +
+	"\x16ATTACHMENT_SCOPE_GROUP\x10\x02*\x90\x02\n" +
 	"\x10AttachmentStatus\x12!\n" +
 	"\x1dATTACHMENT_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19ATTACHMENT_STATUS_PENDING\x10\x01\x12\x1e\n" +
@@ -7219,7 +7222,8 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\x1aATTACHMENT_STATUS_ATTACHED\x10\x03\x12\x1c\n" +
 	"\x18ATTACHMENT_STATUS_FAILED\x10\x04\x12\x1d\n" +
 	"\x19ATTACHMENT_STATUS_DELETED\x10\x05\x12\x1d\n" +
-	"\x19ATTACHMENT_STATUS_EXPIRED\x10\x06*\x8a\x02\n" +
+	"\x19ATTACHMENT_STATUS_EXPIRED\x10\x06\x12\x1e\n" +
+	"\x1aATTACHMENT_STATUS_DETACHED\x10\a*\x8a\x02\n" +
 	"\x1dAttachmentUploadSessionStatus\x120\n" +
 	",ATTACHMENT_UPLOAD_SESSION_STATUS_UNSPECIFIED\x10\x00\x12,\n" +
 	"(ATTACHMENT_UPLOAD_SESSION_STATUS_PENDING\x10\x01\x12.\n" +

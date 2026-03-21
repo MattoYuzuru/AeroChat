@@ -81,6 +81,10 @@ AeroChat должен поддерживать:
   - deterministic per-user byte quota на `CreateAttachmentUploadIntent`;
   - quota usage считается только по backend-owned attachment state;
   - `expired` и `deleted` lifecycle states больше не удерживают active quota budget.
+- attachment retention/delete semantics foundation:
+  - direct message tombstone переводит linked attachment из `attached` в `detached`;
+  - `detached` больше не удерживает active quota budget;
+  - object cleanup для `detached` остаётся staged и выполняется отдельно после retention grace period.
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
 
@@ -267,7 +271,8 @@ Media/file foundation использует тот же локальный `minio
 - `AERO_MEDIA_USER_QUOTA_BYTES` задаёт общий per-user media budget в байтах;
 - quota проверяется на `CreateAttachmentUploadIntent`;
 - usage считается по attachment metadata в состояниях `pending`, `uploaded`, `attached` и `failed`;
-- `expired` и `deleted` больше не считаются частью активного quota budget.
+- `detached`, `expired` и `deleted` больше не считаются частью активного quota budget;
+- `AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION` задаёт grace period перед cleanup для attachment, оставшихся только у tombstoned direct messages.
 
 В `local/dev` шаблоне это уже сведено к `minio:9000` и `MEDIA_S3_PUBLIC_ENDPOINT`.
 Для browser upload compose runtime автоматически bootstrap'ит bucket privacy через `mc`,

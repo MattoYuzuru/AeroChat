@@ -13,6 +13,7 @@ const (
 	AttachmentStatusPending                = "pending"
 	AttachmentStatusUploaded               = "uploaded"
 	AttachmentStatusAttached               = "attached"
+	AttachmentStatusDetached               = "detached"
 	AttachmentStatusFailed                 = "failed"
 	AttachmentStatusExpired                = "expired"
 	AttachmentStatusDeleted                = "deleted"
@@ -225,9 +226,10 @@ type AttachmentAccess struct {
 }
 
 type AttachmentLifecycleCleanupOptions struct {
-	Now           time.Time
-	UnattachedTTL time.Duration
-	BatchSize     int
+	Now               time.Time
+	UnattachedTTL     time.Duration
+	DetachedRetention time.Duration
+	BatchSize         int
 }
 
 type AttachmentLifecycleCleanupReport struct {

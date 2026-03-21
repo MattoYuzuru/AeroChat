@@ -35,7 +35,7 @@ type Repository interface {
 	ExpireAttachmentUploadSession(context.Context, ExpireAttachmentUploadSessionParams) (bool, error)
 	ExpirePendingAttachmentUploadSessions(context.Context, time.Time, int32) (int64, error)
 	ExpireOrphanUploadedAttachments(context.Context, time.Time, time.Time, int32) (int64, error)
-	ListAttachmentObjectDeletionCandidates(context.Context, time.Time, time.Time, int32) ([]AttachmentObjectCleanupCandidate, error)
+	ListAttachmentObjectDeletionCandidates(context.Context, time.Time, time.Time, time.Time, int32) ([]AttachmentObjectCleanupCandidate, error)
 	MarkAttachmentDeleted(context.Context, string, time.Time) (bool, error)
 	CreateGroup(context.Context, CreateGroupParams) (*Group, error)
 	ListGroups(context.Context, string) ([]Group, error)

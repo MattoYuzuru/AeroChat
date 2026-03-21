@@ -9,6 +9,7 @@ const (
 	defaultAttachmentLifecycleBatchSize = 100
 	maxAttachmentLifecycleBatchSize     = 1000
 	defaultUnattachedAttachmentTTL      = 24 * time.Hour
+	defaultDetachedAttachmentRetention  = 7 * 24 * time.Hour
 )
 
 func (s *Service) RunAttachmentLifecycleCleanup(ctx context.Context, options AttachmentLifecycleCleanupOptions) (*AttachmentLifecycleCleanupReport, error) {
@@ -20,6 +21,10 @@ func (s *Service) RunAttachmentLifecycleCleanup(ctx context.Context, options Att
 	unattachedTTL := options.UnattachedTTL
 	if unattachedTTL <= 0 {
 		unattachedTTL = defaultUnattachedAttachmentTTL
+	}
+	detachedRetention := options.DetachedRetention
+	if detachedRetention <= 0 {
+		detachedRetention = defaultDetachedAttachmentRetention
 	}
 
 	batchSize := options.BatchSize
@@ -45,7 +50,7 @@ func (s *Service) RunAttachmentLifecycleCleanup(ctx context.Context, options Att
 	}
 	report.ExpiredOrphanAttachments = expiredOrphans
 
-	candidates, err := s.repo.ListAttachmentObjectDeletionCandidates(ctx, now, now.Add(-unattachedTTL), limit)
+	candidates, err := s.repo.ListAttachmentObjectDeletionCandidates(ctx, now, now.Add(-unattachedTTL), now.Add(-detachedRetention), limit)
 	if err != nil {
 		return nil, err
 	}

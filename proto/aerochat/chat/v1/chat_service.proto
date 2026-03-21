@@ -80,6 +80,7 @@ enum AttachmentStatus {
   ATTACHMENT_STATUS_FAILED = 4;
   ATTACHMENT_STATUS_DELETED = 5;
   ATTACHMENT_STATUS_EXPIRED = 6;
+  ATTACHMENT_STATUS_DETACHED = 7;
 }
 
 enum AttachmentUploadSessionStatus {

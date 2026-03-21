@@ -1348,6 +1348,12 @@ func (r *Repository) DeleteDirectChatMessageForEveryone(ctx context.Context, cha
 	}); err != nil {
 		return false, convertError(err)
 	}
+	if _, err := q.DetachDirectMessageAttachments(ctx, chatsqlc.DetachDirectMessageAttachmentsParams{
+		DirectChatMessageID: pgtype.UUID{Bytes: mustParseUUID(messageID), Valid: true},
+		UpdatedAt:           timestamptzValue(at),
+	}); err != nil {
+		return false, convertError(err)
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return false, fmt.Errorf("commit tx: %w", err)

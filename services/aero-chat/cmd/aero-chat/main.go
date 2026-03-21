@@ -164,9 +164,10 @@ func startAttachmentLifecycleCleanupLoop(ctx context.Context, logger *slog.Logge
 
 	runCleanup := func() {
 		report, err := service.RunAttachmentLifecycleCleanup(ctx, chat.AttachmentLifecycleCleanupOptions{
-			Now:           time.Now().UTC(),
-			UnattachedTTL: cfg.MediaUnattachedAttachmentTTL,
-			BatchSize:     cfg.MediaAttachmentCleanupBatchSize,
+			Now:               time.Now().UTC(),
+			UnattachedTTL:     cfg.MediaUnattachedAttachmentTTL,
+			DetachedRetention: cfg.MediaDetachedAttachmentRetention,
+			BatchSize:         cfg.MediaAttachmentCleanupBatchSize,
 		})
 		if err != nil {
 			logger.Error("attachment lifecycle cleanup завершился с ошибкой", slog.String("error", err.Error()))
