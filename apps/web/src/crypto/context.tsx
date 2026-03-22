@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PropsWithChildren } from "react";
 import { useAuth } from "../auth/useAuth";
+import { clearEncryptedLocalSearchIndex } from "../search/encrypted-local-search";
 import { createCryptoRuntimeClient } from "./runtime-client";
 import type { CryptoRuntimeClient, CryptoRuntimeSession } from "./types";
 import {
@@ -37,6 +38,7 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (authState.status !== "authenticated") {
       currentSessionRef.current = null;
+      clearEncryptedLocalSearchIndex();
       setState({
         status: "disabled",
         snapshot: null,
@@ -51,6 +53,7 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
       profileId: authState.profile.id,
       login: authState.profile.login,
     } satisfies CryptoRuntimeSession;
+    clearEncryptedLocalSearchIndex();
     currentSessionRef.current = session;
 
     setState((current) => ({

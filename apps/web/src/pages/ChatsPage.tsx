@@ -57,6 +57,7 @@ import {
   findJumpTarget,
   readSearchJumpIntent,
 } from "../search/jump";
+import { primeEncryptedDirectLocalSearchIndex } from "../search/encrypted-local-search";
 import styles from "./ChatsPage.module.css";
 
 export function ChatsPage() {
@@ -202,38 +203,6 @@ export function ChatsPage() {
     };
   }, [highlightedMessageId]);
 
-  useEffect(() => {
-    if (searchJumpIntent === null || chats.state.threadStatus !== "ready" || chats.state.thread === null) {
-      return;
-    }
-
-    if (requestedChatId !== "" && chats.state.thread.chat.id !== requestedChatId) {
-      return;
-    }
-
-    const targetMessage = findJumpTarget(chats.state.thread.messages, searchJumpIntent.messageId);
-    if (targetMessage === null) {
-      setSearchJumpNotice(
-        "Найденное сообщение пока не попало в текущую загруженную историю direct chat. Переход ограничен последним загруженным окном сообщений.",
-      );
-      setHighlightedMessageId(null);
-      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
-      return;
-    }
-
-    setSearchJumpNotice(null);
-    setHighlightedMessageId(targetMessage.id);
-    jumpToMessage(`direct-message-${targetMessage.id}`);
-    setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
-  }, [
-    chats.state.thread,
-    chats.state.threadStatus,
-    requestedChatId,
-    searchJumpIntent,
-    searchParams,
-    setSearchParams,
-  ]);
-
   const selectedThread = isThreadRouteActive ? chats.state.thread : null;
   const encryptedLane = useEncryptedDirectMessageV2Lane({
     enabled: authState.status === "authenticated",
@@ -256,6 +225,86 @@ export function ChatsPage() {
     latestEncryptedMessage !== null &&
     latestEncryptedMessage.senderUserId !== authState.profile.id &&
     selectedThread.encryptedReadState?.selfPosition?.messageId !== latestEncryptedMessage.messageId;
+
+  useEffect(() => {
+    if (selectedThread === null || encryptedLane.status !== "ready") {
+      return;
+    }
+
+    primeEncryptedDirectLocalSearchIndex({
+      chat: selectedThread.chat,
+      items: encryptedLane.items,
+    });
+  }, [encryptedLane.items, encryptedLane.status, selectedThread]);
+
+  useEffect(() => {
+    if (searchJumpIntent === null || chats.state.threadStatus !== "ready" || chats.state.thread === null) {
+      return;
+    }
+
+    if (requestedChatId !== "" && chats.state.thread.chat.id !== requestedChatId) {
+      return;
+    }
+
+    if (searchJumpIntent.lane === "encrypted") {
+      if (encryptedLane.status === "idle" || encryptedLane.status === "loading") {
+        return;
+      }
+
+      if (encryptedLane.status !== "ready") {
+        setSearchJumpNotice(
+          encryptedLane.errorMessage ??
+            "Encrypted search result нельзя открыть в этом browser profile: local crypto runtime или bounded lane недоступны.",
+        );
+        setHighlightedMessageId(null);
+        setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+        return;
+      }
+
+      const encryptedTarget =
+        encryptedMessageEntries.find((entry) => entry.messageId === searchJumpIntent.messageId) ??
+        null;
+      if (encryptedTarget === null) {
+        setSearchJumpNotice(
+          "Найденное encrypted сообщение пока не попало в текущее локально загруженное окно direct lane. Deep history backfill в этом slice не реализован.",
+        );
+        setHighlightedMessageId(null);
+        setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+        return;
+      }
+
+      setSearchJumpNotice(null);
+      setHighlightedMessageId(encryptedTarget.messageId);
+      jumpToMessage(`encrypted-direct-message-${encryptedTarget.messageId}`);
+      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+      return;
+    }
+
+    const targetMessage = findJumpTarget(chats.state.thread.messages, searchJumpIntent.messageId);
+    if (targetMessage === null) {
+      setSearchJumpNotice(
+        "Найденное сообщение пока не попало в текущую загруженную историю direct chat. Переход ограничен последним загруженным окном сообщений.",
+      );
+      setHighlightedMessageId(null);
+      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+      return;
+    }
+
+    setSearchJumpNotice(null);
+    setHighlightedMessageId(targetMessage.id);
+    jumpToMessage(`direct-message-${targetMessage.id}`);
+    setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+  }, [
+    chats.state.thread,
+    chats.state.threadStatus,
+    encryptedLane.errorMessage,
+    encryptedLane.status,
+    encryptedMessageEntries,
+    requestedChatId,
+    searchJumpIntent,
+    searchParams,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     if (

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { gatewayClient } from "../gateway/runtime";
 import {
   describeGatewayError,
@@ -11,6 +12,11 @@ import {
   type MessageSearchResult,
 } from "../gateway/types";
 import {
+  searchEncryptedLocalMessages,
+  type EncryptedLocalSearchResult,
+  type EncryptedLocalSearchSummary,
+} from "../search/encrypted-local-search";
+import {
   buildMessageSearchScope,
   buildSearchResultHref,
   describeDirectChatLabel,
@@ -18,6 +24,7 @@ import {
   describeSearchResultContainer,
   describeSearchResultScope,
   describeSearchScope,
+  type SearchResultLike,
   type SearchScopeSelection,
 } from "../search/model";
 import styles from "./SearchPage.module.css";
@@ -30,8 +37,12 @@ interface SubmittedSearch {
   scope: NonNullable<ReturnType<typeof buildMessageSearchScope>>;
 }
 
+type SearchPathStatus = "idle" | "loading" | "ready" | "error";
+type EncryptedSearchPathStatus = SearchPathStatus | "unavailable";
+
 export function SearchPage() {
   const { state: authState, expireSession } = useAuth();
+  const cryptoRuntime = useCryptoRuntime();
   const [query, setQuery] = useState("");
   const [scopeSelection, setScopeSelection] = useState<SearchScopeSelection>("all-direct");
   const [selectedDirectChatId, setSelectedDirectChatId] = useState("");
@@ -42,17 +53,26 @@ export function SearchPage() {
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [isRefreshingMetadata, setIsRefreshingMetadata] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [searchStatus, setSearchStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [results, setResults] = useState<MessageSearchResult[]>([]);
+  const [legacySearchStatus, setLegacySearchStatus] = useState<SearchPathStatus>("idle");
+  const [legacySearchError, setLegacySearchError] = useState<string | null>(null);
+  const [legacyResults, setLegacyResults] = useState<MessageSearchResult[]>([]);
   const [nextPageCursor, setNextPageCursor] = useState<MessageSearchCursor | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [encryptedSearchStatus, setEncryptedSearchStatus] =
+    useState<EncryptedSearchPathStatus>("idle");
+  const [encryptedSearchError, setEncryptedSearchError] = useState<string | null>(null);
+  const [encryptedResults, setEncryptedResults] = useState<EncryptedLocalSearchResult[]>([]);
+  const [encryptedSummary, setEncryptedSummary] = useState<EncryptedLocalSearchSummary | null>(
+    null,
+  );
   const [submittedSearch, setSubmittedSearch] = useState<SubmittedSearch | null>(null);
   const searchRequestIDRef = useRef(0);
   const token = authState.status === "authenticated" ? authState.token : "";
   const currentUserId =
     authState.status === "authenticated" ? authState.profile.id : "";
+  const isRunningSearch =
+    legacySearchStatus === "loading" || encryptedSearchStatus === "loading" || isLoadingMore;
 
   useEffect(() => {
     if (authState.status !== "authenticated") {
@@ -154,7 +174,6 @@ export function SearchPage() {
     const normalizedQuery = query.trim();
     if (normalizedQuery === "") {
       setFormError("Введите текстовый запрос, прежде чем запускать поиск.");
-      setSearchError(null);
       return;
     }
 
@@ -169,7 +188,6 @@ export function SearchPage() {
           ? "Выберите конкретный личный чат."
           : "Выберите конкретную группу.",
       );
-      setSearchError(null);
       return;
     }
 
@@ -211,60 +229,104 @@ export function SearchPage() {
       mode === "replace" ? searchRequestIDRef.current + 1 : searchRequestIDRef.current;
     if (mode === "replace") {
       searchRequestIDRef.current = requestID;
-      setSearchStatus("loading");
-      setSearchError(null);
-      setResults([]);
+      setSubmittedSearch(request);
+      setLegacySearchStatus("loading");
+      setLegacySearchError(null);
+      setLegacyResults([]);
       setHasMore(false);
       setNextPageCursor(null);
+      setEncryptedSearchStatus("loading");
+      setEncryptedSearchError(null);
+      setEncryptedResults([]);
+      setEncryptedSummary(null);
     } else {
       setIsLoadingMore(true);
-      setSearchError(null);
+      setLegacySearchError(null);
     }
 
     try {
-      const response = await gatewayClient.searchMessages(token, {
-        query: request.query,
-        scope: request.scope,
-        pageSize: SEARCH_PAGE_SIZE,
-        pageCursor: cursor,
-      });
+      if (mode === "append") {
+        const response = await gatewayClient.searchMessages(token, {
+          query: request.query,
+          scope: request.scope,
+          pageSize: SEARCH_PAGE_SIZE,
+          pageCursor: cursor,
+        });
+
+        if (requestID !== searchRequestIDRef.current) {
+          return;
+        }
+
+        setLegacyResults((current) => [...current, ...response.results]);
+        setNextPageCursor(response.nextPageCursor);
+        setHasMore(response.hasMore);
+        return;
+      }
+
+      const [legacyResult, encryptedResult] = await Promise.allSettled([
+        gatewayClient.searchMessages(token, {
+          query: request.query,
+          scope: request.scope,
+          pageSize: SEARCH_PAGE_SIZE,
+          pageCursor: null,
+        }),
+        searchEncryptedLocalMessages({
+          query: request.query,
+          scopeSelection: request.scopeSelection,
+          directChats,
+          groups,
+          directChatId: selectedDirectChatId,
+          groupId: selectedGroupId,
+          token,
+          cryptoRuntime,
+        }),
+      ]);
 
       if (requestID !== searchRequestIDRef.current) {
         return;
       }
 
-      if (mode === "replace") {
-        setSubmittedSearch(request);
-        setResults(response.results);
-        setSearchStatus("ready");
+      if (legacyResult.status === "fulfilled") {
+        setLegacyResults(legacyResult.value.results);
+        setLegacySearchStatus("ready");
+        setNextPageCursor(legacyResult.value.nextPageCursor);
+        setHasMore(legacyResult.value.hasMore);
       } else {
-        setResults((current) => [...current, ...response.results]);
+        const message = resolveProtectedError(
+          legacyResult.reason,
+          "Не удалось выполнить поиск legacy plaintext сообщений через gateway.",
+          expireSession,
+        );
+        if (message !== null) {
+          setLegacySearchStatus("error");
+          setLegacySearchError(message);
+          setLegacyResults([]);
+          setNextPageCursor(null);
+          setHasMore(false);
+        }
       }
 
-      setNextPageCursor(response.nextPageCursor);
-      setHasMore(response.hasMore);
-    } catch (error) {
-      const message = resolveProtectedError(
-        error,
-        "Не удалось выполнить поиск сообщений через gateway.",
-        expireSession,
-      );
-      if (message === null || requestID !== searchRequestIDRef.current) {
-        return;
-      }
-
-      setSearchError(message);
-      if (mode === "replace") {
-        setSearchStatus("error");
-        setResults([]);
-        setHasMore(false);
-        setNextPageCursor(null);
+      if (encryptedResult.status === "fulfilled") {
+        setEncryptedResults(encryptedResult.value.results);
+        setEncryptedSummary(encryptedResult.value.summary);
+        setEncryptedSearchStatus(
+          encryptedResult.value.status === "unavailable" ? "unavailable" : "ready",
+        );
+        setEncryptedSearchError(encryptedResult.value.errorMessage);
+      } else {
+        setEncryptedSearchStatus("error");
+        setEncryptedSearchError(
+          describeGatewayError(
+            encryptedResult.reason,
+            "Не удалось выполнить local encrypted search в текущем browser profile.",
+          ),
+        );
+        setEncryptedResults([]);
+        setEncryptedSummary(null);
       }
     } finally {
-      if (requestID === searchRequestIDRef.current) {
-        if (mode === "append") {
-          setIsLoadingMore(false);
-        }
+      if (requestID === searchRequestIDRef.current && mode === "append") {
+        setIsLoadingMore(false);
       }
     }
   }
@@ -299,9 +361,9 @@ export function SearchPage() {
             <p className={styles.cardLabel}>Search</p>
             <h1 className={styles.title}>Поиск сообщений</h1>
             <p className={styles.subtitle}>
-              Узкий web bootstrap поверх существующего `SearchMessages` API. Поиск остаётся
-              gateway-only, а jump подсвечивает target message только внутри текущей загруженной
-              истории direct chat или group.
+              `/app/search` сохраняет текущий entrypoint, но честно разделяет два path:
+              server-backed legacy plaintext search и local encrypted search по bounded decrypted
+              окну текущего browser/runtime.
             </p>
           </div>
 
@@ -320,25 +382,24 @@ export function SearchPage() {
         <div className={styles.metrics}>
           <Metric label="Direct chats" value={directChats.length} />
           <Metric label="Группы" value={groups.length} />
-          <Metric label="Результаты" value={results.length} />
+          <Metric label="Legacy hits" value={legacyResults.length} />
+          <Metric label="Encrypted hits" value={encryptedResults.length} />
         </div>
 
         {metadataStatus === "error" && metadataError && (
           <div className={styles.error}>{metadataError}</div>
         )}
         {formError && <div className={styles.error}>{formError}</div>}
-        {searchError && <div className={styles.error}>{searchError}</div>}
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <label className={styles.field}>
             <span>Текстовый запрос</span>
             <input
-              disabled={metadataStatus !== "ready" || searchStatus === "loading"}
+              disabled={metadataStatus !== "ready" || isRunningSearch}
               maxLength={200}
               onChange={(event) => {
                 setQuery(event.target.value);
                 setFormError(null);
-                setSearchError(null);
               }}
               placeholder="Например: release notes"
               value={query}
@@ -349,12 +410,11 @@ export function SearchPage() {
             <label className={styles.field}>
               <span>Scope</span>
               <select
-                disabled={metadataStatus !== "ready" || searchStatus === "loading"}
+                disabled={metadataStatus !== "ready" || isRunningSearch}
                 onChange={(event) => {
                   const nextValue = event.target.value as SearchScopeSelection;
                   setScopeSelection(nextValue);
                   setFormError(null);
-                  setSearchError(null);
                 }}
                 value={scopeSelection}
               >
@@ -369,11 +429,10 @@ export function SearchPage() {
               <label className={styles.field}>
                 <span>Личный чат</span>
                 <select
-                  disabled={metadataStatus !== "ready" || directChats.length === 0}
+                  disabled={metadataStatus !== "ready" || directChats.length === 0 || isRunningSearch}
                   onChange={(event) => {
                     setSelectedDirectChatId(event.target.value);
                     setFormError(null);
-                    setSearchError(null);
                   }}
                   value={selectedDirectChatId}
                 >
@@ -396,11 +455,10 @@ export function SearchPage() {
               <label className={styles.field}>
                 <span>Группа</span>
                 <select
-                  disabled={metadataStatus !== "ready" || groups.length === 0}
+                  disabled={metadataStatus !== "ready" || groups.length === 0 || isRunningSearch}
                   onChange={(event) => {
                     setSelectedGroupId(event.target.value);
                     setFormError(null);
-                    setSearchError(null);
                   }}
                   value={selectedGroupId}
                 >
@@ -425,17 +483,21 @@ export function SearchPage() {
               Текущий scope:{" "}
               <strong>
                 {describeSearchScope(scopeSelection)}
-                {selectedDirectChat ? ` · ${describeDirectChatLabel(selectedDirectChat, currentUserId)}` : ""}
+                {selectedDirectChat
+                  ? ` · ${describeDirectChatLabel(selectedDirectChat, currentUserId)}`
+                  : ""}
                 {selectedGroup ? ` · ${selectedGroup.name || "Группа"}` : ""}
               </strong>
             </p>
 
             <button
               className={styles.primaryButton}
-              disabled={metadataStatus !== "ready" || searchStatus === "loading"}
+              disabled={metadataStatus !== "ready" || isRunningSearch}
               type="submit"
             >
-              {searchStatus === "loading" ? "Ищем..." : "Искать"}
+              {legacySearchStatus === "loading" || encryptedSearchStatus === "loading"
+                ? "Ищем..."
+                : "Искать"}
             </button>
           </div>
         </form>
@@ -444,7 +506,7 @@ export function SearchPage() {
       {metadataStatus === "loading" && (
         <StateCard
           title="Подготавливаем search bootstrap"
-          message="Загружаем доступные direct chats и группы, чтобы форма могла явно ограничивать scope и подписывать результаты."
+          message="Загружаем direct chats и группы, чтобы форма могла явно ограничивать scope и честно подписывать legacy/encrypted results."
         />
       )}
 
@@ -475,114 +537,244 @@ export function SearchPage() {
               <h2 className={styles.sectionTitle}>Найденные сообщения</h2>
               <p className={styles.sectionDescription}>
                 {searchScopeSummary ??
-                  "Выберите scope, введите запрос и запустите поиск по текущему stored text сообщений."}
+                  "Один и тот же query/scope теперь честно идёт по двум путям: legacy plaintext через gateway и encrypted local search по bounded decrypted окну."}
               </p>
             </div>
 
             {submittedSearch && (
               <span className={styles.metaTag}>
-                {results.length === 0 ? "0 hit'ов" : `${results.length} hit'ов`}
+                {legacyResults.length} legacy / {encryptedResults.length} encrypted
               </span>
             )}
           </div>
 
-          {(searchStatus === "ready" || searchStatus === "error") && (
+          {submittedSearch !== null && (
             <div className={styles.limitNotice}>
-              Jump из результата подсвечивает target message только если он уже входит в текущую
-              загруженную историю чата или группы.
+              Legacy results приходят из `SearchMessages`, а encrypted results строятся только
+              локально. Jump для encrypted target работает только если он уже materialized в
+              текущем bounded local projection.
             </div>
           )}
 
-          {searchStatus === "idle" && (
+          {submittedSearch === null && (
             <InlineState
               title="Поиск ещё не запускался"
-              message="Этот bootstrap intentionally narrow: без ranking redesign, без fuzzy search и без deep history backfill."
+              message="Legacy path остаётся server-backed для plaintext history. Encrypted path intentionally bounded: без server-side plaintext indexing, без deep history backfill и без claims о full parity."
             />
           )}
 
-          {searchStatus === "loading" && (
-            <InlineState
-              title="Ищем сообщения"
-              message="Выполняем запрос через существующий SearchMessages API и готовим компактный jump-oriented список."
-            />
-          )}
+          {submittedSearch !== null && (
+            <div className={styles.pathGrid}>
+              <section className={styles.pathSection}>
+                <div className={styles.pathHeader}>
+                  <div>
+                    <p className={styles.cardLabel}>Legacy Path</p>
+                    <h3 className={styles.pathTitle}>Server plaintext search</h3>
+                    <p className={styles.pathDescription}>
+                      Текущий `SearchMessages` path для legacy plaintext history остаётся без
+                      архитектурных изменений.
+                    </p>
+                  </div>
+                  <span className={styles.metaTag}>
+                    {legacySearchStatus === "loading"
+                      ? "Ищем..."
+                      : legacyResults.length === 0
+                        ? "0 hit'ов"
+                        : `${legacyResults.length} hit'ов`}
+                  </span>
+                </div>
 
-          {searchStatus === "error" && (
-            <InlineState
-              title="Поиск не выполнен"
-              message={searchError ?? "Не удалось выполнить поиск сообщений."}
-              tone="error"
-            />
-          )}
+                {legacySearchStatus === "loading" && (
+                  <InlineState
+                    title="Ищем legacy сообщения"
+                    message="Выполняем server-backed запрос через существующий SearchMessages API."
+                  />
+                )}
 
-          {searchStatus === "ready" && results.length === 0 && (
-            <InlineState
-              title="Совпадений нет"
-              message="Попробуйте скорректировать текст запроса или изменить scope поиска."
-            />
-          )}
+                {legacySearchStatus === "error" && (
+                  <InlineState
+                    title="Legacy path недоступен"
+                    message={
+                      legacySearchError ??
+                      "Не удалось выполнить поиск legacy plaintext сообщений."
+                    }
+                    tone="error"
+                  />
+                )}
 
-          {results.length > 0 && (
-            <>
-              <div className={styles.resultList}>
-                {results.map((result) => (
-                  <article className={styles.resultCard} key={`${result.messageId}-${result.createdAt}`}>
-                    <div className={styles.resultHeaderRow}>
-                      <div>
-                        <div className={styles.badgeRow}>
-                          <span className={styles.scopeBadge}>
-                            {describeSearchResultScope(result)}
-                          </span>
-                          {result.editedAt && (
-                            <span className={styles.metaBadge}>Изменено</span>
-                          )}
-                        </div>
-                        <h3 className={styles.resultTitle}>
-                          {describeSearchResultContainer(
-                            result,
-                            directChats,
-                            groups,
-                            currentUserId,
-                          )}
-                        </h3>
-                        <p className={styles.resultMeta}>
-                          {describeSearchResultAuthor(result.author, currentUserId)} ·{" "}
-                          {formatDateTime(result.createdAt)}
-                          {result.editedAt && ` · ред. ${formatDateTime(result.editedAt)}`}
-                        </p>
-                      </div>
+                {legacySearchStatus === "ready" && legacyResults.length === 0 && (
+                  <InlineState
+                    title="Legacy plaintext совпадений нет"
+                    message="В этом scope серверный plaintext path не вернул подходящих сообщений."
+                  />
+                )}
 
-                      <Link className={styles.linkButton} to={buildSearchResultHref(result)}>
-                        Открыть
-                      </Link>
+                {legacyResults.length > 0 && (
+                  <>
+                    <div className={styles.resultList}>
+                      {legacyResults.map((result) => (
+                        <SearchResultCard
+                          currentUserId={currentUserId}
+                          directChats={directChats}
+                          groups={groups}
+                          key={`legacy:${result.messageId}:${result.createdAt}`}
+                          pathLabel="Legacy server"
+                          result={result}
+                        />
+                      ))}
                     </div>
 
-                    <p className={styles.fragment}>
-                      {normalizeMatchFragment(result.matchFragment)}
-                    </p>
-                  </article>
-                ))}
-              </div>
+                    {hasMore && (
+                      <div className={styles.loadMoreRow}>
+                        <button
+                          className={styles.secondaryButton}
+                          disabled={isLoadingMore}
+                          onClick={() => {
+                            void handleLoadMore();
+                          }}
+                          type="button"
+                        >
+                          {isLoadingMore ? "Загружаем..." : "Загрузить ещё"}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
 
-              {hasMore && (
-                <div className={styles.loadMoreRow}>
-                  <button
-                    className={styles.secondaryButton}
-                    disabled={isLoadingMore}
-                    onClick={() => {
-                      void handleLoadMore();
-                    }}
-                    type="button"
-                  >
-                    {isLoadingMore ? "Загружаем..." : "Загрузить ещё"}
-                  </button>
+              <section className={styles.pathSection}>
+                <div className={styles.pathHeader}>
+                  <div>
+                    <p className={styles.cardLabel}>Encrypted Path</p>
+                    <h3 className={styles.pathTitle}>Local encrypted search</h3>
+                    <p className={styles.pathDescription}>
+                      Поиск идёт только по локально fetched + decrypted message text. Decrypted
+                      index хранится только в памяти текущей browser session.
+                    </p>
+                  </div>
+                  <span className={styles.metaTag}>
+                    {encryptedSearchStatus === "loading"
+                      ? "Готовим..."
+                      : encryptedResults.length === 0
+                        ? "0 hit'ов"
+                        : `${encryptedResults.length} hit'ов`}
+                  </span>
                 </div>
-              )}
-            </>
+
+                {encryptedSummary && (
+                  <div className={styles.limitNotice}>
+                    {describeEncryptedSummary(encryptedSummary, submittedSearch.scopeSelection)}
+                  </div>
+                )}
+
+                {encryptedSearchStatus === "loading" && (
+                  <InlineState
+                    title="Готовим encrypted local search"
+                    message="Подтягиваем opaque envelopes, локально расшифровываем bounded window и строим session-local index без server-side plaintext fallback."
+                  />
+                )}
+
+                {encryptedSearchStatus === "unavailable" && (
+                  <InlineState
+                    title="Encrypted path недоступен"
+                    message={
+                      encryptedSearchError ??
+                      "Текущий browser profile ещё не готов к local encrypted search."
+                    }
+                    tone="error"
+                  />
+                )}
+
+                {encryptedSearchStatus === "error" && (
+                  <InlineState
+                    title="Encrypted local search не выполнен"
+                    message={
+                      encryptedSearchError ??
+                      "Не удалось выполнить local encrypted search в текущем browser profile."
+                    }
+                    tone="error"
+                  />
+                )}
+
+                {encryptedSearchStatus === "ready" && encryptedResults.length === 0 && (
+                  <InlineState
+                    title="Encrypted совпадений нет"
+                    message="В текущем локально indexed окне encrypted conversations подходящих message bodies не найдено."
+                  />
+                )}
+
+                {encryptedSearchStatus === "ready" && encryptedSearchError && (
+                  <div className={styles.error}>{encryptedSearchError}</div>
+                )}
+
+                {encryptedResults.length > 0 && (
+                  <div className={styles.resultList}>
+                    {encryptedResults.map((result) => (
+                      <SearchResultCard
+                        currentUserId={currentUserId}
+                        directChats={directChats}
+                        groups={groups}
+                        key={`encrypted:${result.messageId}:${result.createdAt}`}
+                        pathLabel="Encrypted local"
+                        result={result}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
           )}
         </section>
       )}
     </div>
+  );
+}
+
+interface SearchResultCardProps {
+  currentUserId: string;
+  directChats: DirectChat[];
+  groups: Group[];
+  pathLabel: string;
+  result: SearchResultLike & {
+    createdAt: string;
+    editedAt: string | null;
+    matchFragment: string;
+  };
+}
+
+function SearchResultCard({
+  currentUserId,
+  directChats,
+  groups,
+  pathLabel,
+  result,
+}: SearchResultCardProps) {
+  return (
+    <article className={styles.resultCard}>
+      <div className={styles.resultHeaderRow}>
+        <div>
+          <div className={styles.badgeRow}>
+            <span className={styles.scopeBadge}>{describeSearchResultScope(result)}</span>
+            <span className={styles.pathBadge}>{pathLabel}</span>
+            {result.editedAt && <span className={styles.metaBadge}>Изменено</span>}
+          </div>
+          <h3 className={styles.resultTitle}>
+            {describeSearchResultContainer(result, directChats, groups, currentUserId)}
+          </h3>
+          <p className={styles.resultMeta}>
+            {describeSearchResultAuthor(result.author, currentUserId)} ·{" "}
+            {formatDateTime(result.createdAt)}
+            {result.editedAt && ` · ред. ${formatDateTime(result.editedAt)}`}
+          </p>
+        </div>
+
+        <Link className={styles.linkButton} to={buildSearchResultHref(result)}>
+          Открыть
+        </Link>
+      </div>
+
+      <p className={styles.fragment}>{normalizeMatchFragment(result.matchFragment)}</p>
+    </article>
   );
 }
 
@@ -665,6 +857,26 @@ function describeSubmittedSearch(
   }
 
   return `Запрос: “${search.query}” · ${describeSearchScope(search.scopeSelection)}`;
+}
+
+function describeEncryptedSummary(
+  summary: EncryptedLocalSearchSummary,
+  scopeSelection: SearchScopeSelection,
+): string {
+  const base =
+    scopeSelection === "direct" || scopeSelection === "group"
+      ? `Локально просмотрено текущее bounded окно encrypted lane: до ${summary.laneMessageLimit} decrypted сообщений.`
+      : `Локально просмотрено ${summary.searchedLaneCount} из ${summary.availableLaneCount} recent encrypted lanes, до ${summary.laneMessageLimit} decrypted сообщений на lane.`;
+
+  const limited = summary.limitedByLaneBudget
+    ? ` All-scope encrypted search ограничен recent lane budget ${summary.laneLimit}.`
+    : "";
+  const failures =
+    summary.failedLaneCount > 0
+      ? ` ${summary.failedLaneCount} lane не удалось локально подготовить в этом запросе.`
+      : "";
+
+  return `${base} Session-local cache ограничен ${summary.cacheLaneLimit} lanes.${limited}${failures}`;
 }
 
 function normalizeMatchFragment(value: string): string {
