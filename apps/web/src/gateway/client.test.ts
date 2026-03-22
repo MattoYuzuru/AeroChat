@@ -179,6 +179,75 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("sends encrypted group message through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          envelope: {
+            messageId: "message-1",
+            groupId: "group-1",
+            threadId: "thread-1",
+            mlsGroupId: "mls-1",
+            rosterVersion: 7,
+            senderUserId: "user-1",
+            senderCryptoDeviceId: "crypto-1",
+            operationKind: "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT",
+            revision: 1,
+            createdAt: "2026-03-22T12:11:00Z",
+            storedAt: "2026-03-22T12:11:01Z",
+            storedDeliveryCount: 2,
+            storedDeliveries: [
+              {
+                recipientUserId: "user-1",
+                recipientCryptoDeviceId: "crypto-1",
+                storedAt: "2026-03-22T12:11:01Z",
+              },
+            ],
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const result = await client.sendEncryptedGroupMessage("token-1", {
+      groupId: "group-1",
+      messageId: "message-1",
+      mlsGroupId: "mls-1",
+      rosterVersion: 7,
+      senderCryptoDeviceId: "crypto-1",
+      operationKind: "content",
+      revision: 1,
+      ciphertext: "Y2lwaGVydGV4dA==",
+    });
+
+    expect(result.groupId).toBe("group-1");
+    expect(result.storedDeliveryCount).toBe(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/SendEncryptedGroupMessage",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          groupId: "group-1",
+          messageId: "message-1",
+          mlsGroupId: "mls-1",
+          rosterVersion: 7,
+          senderCryptoDeviceId: "crypto-1",
+          operationKind: "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT",
+          revision: 1,
+          ciphertext: "Y2lwaGVydGV4dA==",
+        }),
+      }),
+    );
+  });
+
   it("loads devices with nested sessions through gateway identity endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

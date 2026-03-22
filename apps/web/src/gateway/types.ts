@@ -480,6 +480,23 @@ export interface EncryptedGroupEnvelope {
   viewerDelivery: EncryptedGroupMessageDelivery;
 }
 
+export interface EncryptedGroupStoredEnvelope {
+  messageId: string;
+  groupId: string;
+  threadId: string;
+  mlsGroupId: string;
+  rosterVersion: number;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: string;
+  targetMessageId: string | null;
+  revision: number;
+  createdAt: string;
+  storedAt: string;
+  storedDeliveryCount: number;
+  storedDeliveries: EncryptedGroupMessageDelivery[];
+}
+
 export interface EncryptedGroupBootstrap {
   lane: EncryptedGroupLane;
   rosterMembers: EncryptedGroupRosterMember[];
@@ -874,6 +891,20 @@ export interface GatewayClient {
     groupId: string,
     viewerCryptoDeviceId: string,
   ): Promise<EncryptedGroupBootstrap>;
+  sendEncryptedGroupMessage(
+    token: string,
+    input: {
+      groupId: string;
+      messageId: string;
+      mlsGroupId: string;
+      rosterVersion: number;
+      senderCryptoDeviceId: string;
+      operationKind: "content" | "control";
+      targetMessageId?: string | null;
+      revision: number;
+      ciphertext: string;
+    },
+  ): Promise<EncryptedGroupStoredEnvelope>;
   listEncryptedGroupMessages(
     token: string,
     groupId: string,

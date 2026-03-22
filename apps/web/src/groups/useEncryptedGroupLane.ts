@@ -17,6 +17,11 @@ import {
   listBufferedEncryptedGroupRealtimeEvents,
   subscribeEncryptedGroupRealtimeEvents,
 } from "./encrypted-group-realtime";
+import {
+  discardBufferedLocalEncryptedGroupProjection,
+  listBufferedLocalEncryptedGroupProjection,
+  subscribeLocalEncryptedGroupProjection,
+} from "./encrypted-group-local-outbound";
 
 interface UseEncryptedGroupLaneOptions {
   enabled: boolean;
@@ -130,6 +135,14 @@ export function useEncryptedGroupLane({
         return;
       }
 
+      discardBufferedLocalEncryptedGroupProjection([
+        {
+          groupId: event.envelope.groupId,
+          messageId: event.envelope.messageId,
+          revision: event.envelope.revision,
+        },
+      ]);
+
       void cryptoRuntime
         .decryptEncryptedGroupEnvelopes([event.envelope])
         .then((updates) => {
@@ -167,6 +180,26 @@ export function useEncryptedGroupLane({
       unsubscribe();
     };
   }, [cryptoRuntime, loadDescriptor]);
+
+  useEffect(() => {
+    if (loadDescriptor.kind !== "load") {
+      return;
+    }
+
+    return subscribeLocalEncryptedGroupProjection((event) => {
+      if (event.projection.groupId !== loadDescriptor.groupId) {
+        return;
+      }
+
+      setLoadedState((current) => ({
+        requestKey: loadDescriptor.requestKey,
+        status: "ready",
+        bootstrap: current.bootstrap,
+        items: mergeEncryptedGroupProjection(current.items, [event.projection]),
+        errorMessage: current.errorMessage,
+      }));
+    });
+  }, [loadDescriptor]);
 
   if (loadDescriptor.kind === "idle") {
     return {
@@ -243,13 +276,21 @@ async function loadEncryptedGroupLane(input: {
     ...envelopes,
     ...buffered,
   ]);
+  discardBufferedLocalEncryptedGroupProjection(
+    mergedOpaqueEnvelopes.map((envelope) => ({
+      groupId: envelope.groupId,
+      messageId: envelope.messageId,
+      revision: envelope.revision,
+    })),
+  );
   const updates = await input.cryptoRuntime.decryptEncryptedGroupEnvelopes(
     mergedOpaqueEnvelopes,
   );
+  const localOutbound = listBufferedLocalEncryptedGroupProjection(input.groupId);
 
   return {
     bootstrap,
-    items: mergeEncryptedGroupProjection([], updates),
+    items: mergeEncryptedGroupProjection([], [...updates, ...localOutbound]),
   };
 }
 

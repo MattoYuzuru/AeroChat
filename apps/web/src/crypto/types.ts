@@ -5,6 +5,7 @@ import type {
   EncryptedDirectMessageV2Envelope,
   EncryptedGroupEnvelope,
   EncryptedDirectMessageV2StoredEnvelope,
+  EncryptedGroupStoredEnvelope,
 } from "../gateway/types";
 
 export interface CryptoRuntimeSession {
@@ -191,6 +192,11 @@ export interface EncryptedDirectMessageV2OutboundSendResult {
   localProjection: EncryptedDirectMessageV2ReadyProjection;
 }
 
+export interface EncryptedGroupOutboundSendResult {
+  storedEnvelope: EncryptedGroupStoredEnvelope;
+  localProjection: EncryptedGroupReadyProjection;
+}
+
 export interface CryptoRuntimeClient {
   bootstrapSession(session: CryptoRuntimeSession): Promise<CryptoRuntimeSnapshot>;
   createPendingLinkedDevice(session: CryptoRuntimeSession): Promise<CryptoRuntimeSnapshot>;
@@ -233,6 +239,13 @@ export interface CryptoRuntimeClient {
       }>;
     },
   ): Promise<EncryptedDirectMessageV2OutboundSendResult>;
+  sendEncryptedGroupContent(
+    session: CryptoRuntimeSession,
+    input: {
+      groupId: string;
+      text: string;
+    },
+  ): Promise<EncryptedGroupOutboundSendResult>;
   dispose(): void;
 }
 
@@ -275,6 +288,13 @@ export interface CryptoWorkerRequestMap {
       }>;
     };
   };
+  sendEncryptedGroupContent: {
+    session: CryptoRuntimeSession;
+    input: {
+      groupId: string;
+      text: string;
+    };
+  };
 }
 
 export interface CryptoWorkerResultMap {
@@ -287,6 +307,7 @@ export interface CryptoWorkerResultMap {
   prepareEncryptedMediaRelayUpload: PreparedEncryptedMediaRelayUpload;
   decryptEncryptedMediaAttachment: DecryptedEncryptedMediaAttachment;
   sendEncryptedDirectMessageV2Content: EncryptedDirectMessageV2OutboundSendResult;
+  sendEncryptedGroupContent: EncryptedGroupOutboundSendResult;
 }
 
 export type CryptoWorkerRequest =
@@ -330,6 +351,11 @@ export type CryptoWorkerRequest =
       id: number;
       type: "sendEncryptedDirectMessageV2Content";
       payload: CryptoWorkerRequestMap["sendEncryptedDirectMessageV2Content"];
+    }
+  | {
+      id: number;
+      type: "sendEncryptedGroupContent";
+      payload: CryptoWorkerRequestMap["sendEncryptedGroupContent"];
     };
 
 export type CryptoWorkerResponse =

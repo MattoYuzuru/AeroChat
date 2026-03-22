@@ -24,6 +24,7 @@ import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
 import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
+import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { gatewayClient } from "../gateway/runtime";
 import {
   describeGatewayError,
@@ -41,6 +42,7 @@ import {
   describeEncryptedGroupLaneIssue,
 } from "../groups/useEncryptedGroupLane";
 import type { EncryptedGroupProjectionEntry } from "../groups/encrypted-group-projection";
+import { publishLocalEncryptedGroupProjection } from "../groups/encrypted-group-local-outbound";
 import {
   applyGroupRealtimeToGroups,
   applyGroupRealtimeToSelectedState,
@@ -66,6 +68,7 @@ import styles from "./GroupsPage.module.css";
 
 export function GroupsPage() {
   const { state: authState, expireSession } = useAuth();
+  const cryptoRuntime = useCryptoRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupsStatus, setGroupsStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -78,6 +81,8 @@ export function GroupsPage() {
   const [groupName, setGroupName] = useState("");
   const [joinInput, setJoinInput] = useState("");
   const [composerText, setComposerText] = useState("");
+  const [encryptedComposerText, setEncryptedComposerText] = useState("");
+  const [encryptedComposerError, setEncryptedComposerError] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState("");
   const [selectedReplyMessage, setSelectedReplyMessage] = useState<GroupMessage | null>(null);
@@ -201,6 +206,8 @@ export function GroupsPage() {
     setEditingMessageText("");
     setPendingEditMessageId(null);
     setSelectedReplyMessage(null);
+    setEncryptedComposerText("");
+    setEncryptedComposerError(null);
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
     discardVoiceNoteRecording();
@@ -687,6 +694,13 @@ export function GroupsPage() {
     selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
   const encryptedThreadMessages =
     selectedState.status === "ready" ? [...encryptedGroupLane.items].reverse() : [];
+  const canSendEncryptedGroupText =
+    selectedState.status === "ready" &&
+    encryptedGroupLane.status === "ready" &&
+    encryptedGroupLane.bootstrap !== null &&
+    selectedState.snapshot.thread.canSendMessages &&
+    !cryptoRuntime.state.isActionPending &&
+    normalizeComposerMessageText(encryptedComposerText) !== "";
   const typingLabel =
     selectedState.status === "ready"
       ? describeGroupTypingLabel(selectedState.snapshot.typingState, authState.profile.id)
@@ -904,6 +918,64 @@ export function GroupsPage() {
       }
     } finally {
       setIsSendingMessage(false);
+    }
+  }
+
+  async function handleSendEncryptedGroupMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    if (encryptedGroupLane.status !== "ready" || encryptedGroupLane.bootstrap === null) {
+      setEncryptedComposerError(
+        encryptedGroupLane.errorMessage ??
+          "Encrypted group lane ещё не готов для outbound bootstrap send.",
+      );
+      setNotice(null);
+      return;
+    }
+    if (!selectedState.snapshot.thread.canSendMessages) {
+      setEncryptedComposerError(
+        selectedSelfMember?.isWriteRestricted
+          ? "Backend-ограничение на отправку сообщений запрещает encrypted group send для текущего участника."
+          : "Роль `reader` не может отправлять encrypted group messages.",
+      );
+      setNotice(null);
+      return;
+    }
+
+    const normalizedText = normalizeComposerMessageText(encryptedComposerText);
+    if (normalizedText === "") {
+      setEncryptedComposerError(
+        "Введите текст, прежде чем отправлять encrypted group message.",
+      );
+      setNotice(null);
+      return;
+    }
+
+    setEncryptedComposerError(null);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      const result = await cryptoRuntime.sendEncryptedGroupContent(
+        selectedState.snapshot.group.id,
+        normalizedText,
+      );
+      if (result === null) {
+        return;
+      }
+
+      publishLocalEncryptedGroupProjection(result.localProjection);
+      setEncryptedComposerText("");
+      setNotice("Encrypted group message отправлено через local crypto runtime.");
+    } catch (error) {
+      setEncryptedComposerError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось отправить encrypted group message через crypto runtime.",
+      );
     }
   }
 
@@ -1680,80 +1752,147 @@ export function GroupsPage() {
                 )}
 
                 {encryptedGroupLane.status === "ready" && (
-                  <div className={styles.messagesList}>
-                    {encryptedThreadMessages.length === 0 ? (
-                      <InlineState
-                        title="Encrypted group messages пока не materialized"
-                        message="Control-plane уже может быть подготовлен, но для текущего bounded окна ещё нет decrypt-ready encrypted envelopes."
-                      />
-                    ) : (
-                      encryptedThreadMessages.map((entry) => (
-                        <article
-                          className={styles.messageCard}
-                          data-own={
-                            entry.senderUserId === authState.profile.id ? "true" : undefined
-                          }
-                          key={entry.key}
-                        >
-                          <div className={styles.messageHeader}>
-                            <div>
-                              <p className={styles.messageAuthor}>
-                                {describeEncryptedGroupAuthor(
-                                  entry,
-                                  authState.profile.id,
-                                  selectedState.members,
-                                )}
-                              </p>
-                              <p className={styles.messageMeta}>
-                                {formatDateTime(entry.createdAt)}
-                              </p>
-                            </div>
-                            <div className={styles.badgeColumn}>
-                              <span className={styles.statusPill}>encrypted</span>
-                              <span className={styles.statusPill}>
-                                {entry.kind === "message"
-                                  ? entry.isTombstone
-                                    ? "tombstone"
-                                    : entry.editedAt
-                                      ? "edited"
-                                      : "content"
-                                  : "decrypt failed"}
-                              </span>
-                            </div>
-                          </div>
+                  <>
+                    <div className={styles.notice}>
+                      Encrypted outbound bootstrap в этом PR ограничен text-only send.
+                      Media, reply, edit recovery, search и unread parity остаются отдельными
+                      later slices.
+                    </div>
 
-                          <div className={styles.messageBody}>
-                            {entry.kind === "message" ? (
-                              entry.isTombstone ? (
-                                <p className={styles.helperText}>
-                                  Сообщение скрыто локальным tombstone из encrypted lane.
-                                </p>
-                              ) : entry.text && entry.text.trim() !== "" ? (
-                                <div className={styles.messageText}>
-                                  <SafeMessageMarkdown text={entry.text} />
-                                </div>
-                              ) : (
-                                <p className={styles.helperText}>
-                                  Bootstrap payload не содержит renderable text body.
-                                </p>
-                              )
-                            ) : (
-                              <div className={styles.error}>
-                                {describeEncryptedGroupLaneIssue(entry)}
-                              </div>
-                            )}
-                          </div>
-
-                          <p className={styles.editMeta}>
-                            stored {formatDateTime(entry.storedAt)}
-                            {entry.kind === "message" && entry.editedAt
-                              ? ` • edited ${formatDateTime(entry.editedAt)}`
-                              : ""}
-                          </p>
-                        </article>
-                      ))
+                    {!selectedState.snapshot.thread.canSendMessages && (
+                      <div className={styles.readOnlyNotice}>
+                        {selectedSelfMember?.isWriteRestricted
+                          ? "Текущий участник остаётся читателем encrypted lane, но backend запретил outbound send и typing."
+                          : "Роль `reader` может читать encrypted lane, но не может отправлять новые encrypted сообщения."}
+                      </div>
                     )}
-                  </div>
+
+                    <form
+                      className={styles.composer}
+                      onSubmit={handleSendEncryptedGroupMessage}
+                    >
+                      <label className={styles.field}>
+                        <span>Encrypted text</span>
+                        <textarea
+                          disabled={
+                            cryptoRuntime.state.isActionPending ||
+                            !selectedState.snapshot.thread.canSendMessages
+                          }
+                          maxLength={4000}
+                          onChange={(event) => {
+                            setEncryptedComposerText(event.target.value);
+                            setEncryptedComposerError(null);
+                          }}
+                          placeholder={
+                            selectedState.snapshot.thread.canSendMessages
+                              ? "Отправить text-only encrypted group message через local crypto runtime"
+                              : "Текущая роль не может отправлять encrypted group messages"
+                          }
+                          rows={4}
+                          value={encryptedComposerText}
+                        />
+                      </label>
+
+                      {encryptedComposerError && (
+                        <div className={styles.error}>{encryptedComposerError}</div>
+                      )}
+
+                      <p className={styles.helperText}>
+                        Этот composer не подключён к legacy attachment flow и не делает
+                        plaintext fallback.
+                      </p>
+
+                      <div className={styles.composerFooter}>
+                        <span className={styles.characterCount}>
+                          {encryptedComposerText.trim().length}/4000
+                        </span>
+                        <button
+                          className={styles.primaryButton}
+                          disabled={!canSendEncryptedGroupText}
+                          type="submit"
+                        >
+                          {cryptoRuntime.state.isActionPending
+                            ? "Собираем..."
+                            : "Отправить encrypted text"}
+                        </button>
+                      </div>
+                    </form>
+
+                    <div className={styles.messagesList}>
+                      {encryptedThreadMessages.length === 0 ? (
+                        <InlineState
+                          title="Encrypted group messages пока не materialized"
+                          message="Control-plane уже может быть подготовлен, но для текущего bounded окна ещё нет decrypt-ready encrypted envelopes."
+                        />
+                      ) : (
+                        encryptedThreadMessages.map((entry) => (
+                          <article
+                            className={styles.messageCard}
+                            data-own={
+                              entry.senderUserId === authState.profile.id ? "true" : undefined
+                            }
+                            key={entry.key}
+                          >
+                            <div className={styles.messageHeader}>
+                              <div>
+                                <p className={styles.messageAuthor}>
+                                  {describeEncryptedGroupAuthor(
+                                    entry,
+                                    authState.profile.id,
+                                    selectedState.members,
+                                  )}
+                                </p>
+                                <p className={styles.messageMeta}>
+                                  {formatDateTime(entry.createdAt)}
+                                </p>
+                              </div>
+                              <div className={styles.badgeColumn}>
+                                <span className={styles.statusPill}>encrypted</span>
+                                <span className={styles.statusPill}>
+                                  {entry.kind === "message"
+                                    ? entry.isTombstone
+                                      ? "tombstone"
+                                      : entry.editedAt
+                                        ? "edited"
+                                        : "content"
+                                    : "decrypt failed"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className={styles.messageBody}>
+                              {entry.kind === "message" ? (
+                                entry.isTombstone ? (
+                                  <p className={styles.helperText}>
+                                    Сообщение скрыто локальным tombstone из encrypted lane.
+                                  </p>
+                                ) : entry.text && entry.text.trim() !== "" ? (
+                                  <div className={styles.messageText}>
+                                    <SafeMessageMarkdown text={entry.text} />
+                                  </div>
+                                ) : (
+                                  <p className={styles.helperText}>
+                                    Bootstrap payload не содержит renderable text body.
+                                  </p>
+                                )
+                              ) : (
+                                <div className={styles.error}>
+                                  {describeEncryptedGroupLaneIssue(entry)}
+                                </div>
+                              )}
+                            </div>
+
+                            <p className={styles.editMeta}>
+                              stored {formatDateTime(entry.storedAt)}
+                              {entry.kind === "message" && entry.editedAt
+                                ? ` • edited ${formatDateTime(entry.editedAt)}`
+                                : ""}
+                            </p>
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  </>
                 )}
               </section>
 

@@ -21,6 +21,7 @@ import type {
   EncryptedGroupMessageDelivery,
   EncryptedGroupRosterDevice,
   EncryptedGroupRosterMember,
+  EncryptedGroupStoredEnvelope,
   DirectChatMessage,
   DirectChatPresenceIndicator,
   DirectChatPresenceState,
@@ -532,6 +533,23 @@ interface EncryptedGroupEnvelopeWire {
   viewerDelivery?: EncryptedGroupMessageDeliveryWire;
 }
 
+interface EncryptedGroupStoredEnvelopeWire {
+  messageId?: string;
+  groupId?: string;
+  threadId?: string;
+  mlsGroupId?: string;
+  rosterVersion?: number | string;
+  senderUserId?: string;
+  senderCryptoDeviceId?: string;
+  operationKind?: string;
+  targetMessageId?: string;
+  revision?: number | string;
+  createdAt?: string;
+  storedAt?: string;
+  storedDeliveryCount?: number | string;
+  storedDeliveries?: EncryptedGroupMessageDeliveryWire[];
+}
+
 interface GetEncryptedDirectMessageV2SendBootstrapResponseWire {
   chatId?: string;
   recipientUserId?: string;
@@ -543,6 +561,10 @@ interface GetEncryptedGroupBootstrapResponseWire {
   lane?: EncryptedGroupLaneWire;
   rosterMembers?: EncryptedGroupRosterMemberWire[];
   rosterDevices?: EncryptedGroupRosterDeviceWire[];
+}
+
+interface SendEncryptedGroupMessageResponseWire {
+  envelope?: EncryptedGroupStoredEnvelopeWire;
 }
 
 interface GroupReadStateWire {
@@ -1665,6 +1687,31 @@ export function createGatewayClient(
       return normalizeEncryptedGroupBootstrap(response);
     },
 
+    async sendEncryptedGroupMessage(token, input) {
+      const response = await unaryCall<SendEncryptedGroupMessageResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "SendEncryptedGroupMessage",
+        {
+          groupId: input.groupId.trim(),
+          messageId: input.messageId.trim(),
+          mlsGroupId: input.mlsGroupId.trim(),
+          rosterVersion: input.rosterVersion,
+          senderCryptoDeviceId: input.senderCryptoDeviceId.trim(),
+          operationKind: normalizeEncryptedGroupOperationKindForWire(
+            input.operationKind,
+          ),
+          targetMessageId: normalizeOptionalString(input.targetMessageId ?? ""),
+          revision: input.revision,
+          ciphertext: input.ciphertext,
+        },
+        token,
+      );
+
+      return normalizeEncryptedGroupStoredEnvelope(response.envelope);
+    },
+
     async listEncryptedGroupMessages(
       token,
       groupId,
@@ -2496,6 +2543,19 @@ function normalizeEncryptedDirectMessageV2OperationKindForWire(
   }
 }
 
+function normalizeEncryptedGroupOperationKindForWire(
+  value: "content" | "control",
+): string {
+  switch (value) {
+    case "content":
+      return "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT";
+    case "control":
+      return "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTROL";
+    default:
+      return "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_UNSPECIFIED";
+  }
+}
+
 function buildSearchMessagesBody(input: SearchMessagesInput): Record<string, unknown> {
   return {
     query: input.query.trim(),
@@ -2737,6 +2797,29 @@ function normalizeEncryptedGroupEnvelope(
     createdAt: input?.createdAt ?? "",
     storedAt: input?.storedAt ?? "",
     viewerDelivery: normalizeEncryptedGroupMessageDelivery(input?.viewerDelivery),
+  };
+}
+
+function normalizeEncryptedGroupStoredEnvelope(
+  input: EncryptedGroupStoredEnvelopeWire | undefined,
+): EncryptedGroupStoredEnvelope {
+  return {
+    messageId: input?.messageId ?? "",
+    groupId: input?.groupId ?? "",
+    threadId: input?.threadId ?? "",
+    mlsGroupId: input?.mlsGroupId ?? "",
+    rosterVersion: normalizeCount(input?.rosterVersion),
+    senderUserId: input?.senderUserId ?? "",
+    senderCryptoDeviceId: input?.senderCryptoDeviceId ?? "",
+    operationKind: input?.operationKind ?? "",
+    targetMessageId: normalizeNullableString(input?.targetMessageId),
+    revision: normalizeCount(input?.revision),
+    createdAt: input?.createdAt ?? "",
+    storedAt: input?.storedAt ?? "",
+    storedDeliveryCount: normalizeCount(input?.storedDeliveryCount),
+    storedDeliveries: (input?.storedDeliveries ?? []).map(
+      normalizeEncryptedGroupMessageDelivery,
+    ),
   };
 }
 
