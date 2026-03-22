@@ -509,6 +509,50 @@ func TestRestrictGroupMemberHonorsActorAndTargetBoundaries(t *testing.T) {
 	}
 }
 
+func TestListGroupsKeepsSelfWriteRestrictedState(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{8}, 64))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	group := mustCreateGroup(t, service, alice.Token, "Writers")
+
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	if _, err := service.RestrictGroupMember(context.Background(), alice.Token, group.ID, bob.User.ID); err != nil {
+		t.Fatalf("restrict member: %v", err)
+	}
+
+	bobGroups, err := service.ListGroups(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list groups as restricted member: %v", err)
+	}
+	if len(bobGroups) != 1 {
+		t.Fatalf("ожидалась одна группа у restricted member, получено %d", len(bobGroups))
+	}
+	if !bobGroups[0].SelfWriteRestricted {
+		t.Fatalf("ожидался сохранённый self write restriction в ListGroups, получено %+v", bobGroups[0])
+	}
+	if bobGroups[0].SelfRole != GroupMemberRoleMember {
+		t.Fatalf("ожидалась роль member после restrict, получено %q", bobGroups[0].SelfRole)
+	}
+	if bobGroups[0].SelfPermissions.CanLeaveGroup != true {
+		t.Fatalf("restricted member не должен терять can_leave_group, получено %+v", bobGroups[0].SelfPermissions)
+	}
+	if bobGroups[0].SelfPermissions.CanManageInviteLinks {
+		t.Fatalf("restricted member не должен получать invite management, получено %+v", bobGroups[0].SelfPermissions)
+	}
+}
+
 func mustCreateGroup(t *testing.T, service *Service, token string, name string) *Group {
 	t.Helper()
 
