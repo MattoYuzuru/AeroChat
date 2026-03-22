@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] proof-bound crypto bundle update and rotation hardening
+- [x] encrypted direct-message envelope and storage v2 foundation
 
 ---
 
