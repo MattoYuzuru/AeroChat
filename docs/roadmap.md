@@ -93,6 +93,7 @@
 
 - [x] Chat creation
 - [x] Message model
+- [x] Encrypted direct-message v2 intake and opaque storage foundation
 - [x] Safe markdown subset
 - [x] Read receipts
 - [x] Unread conversation state

@@ -58,13 +58,16 @@ type Repository interface {
 	ListDirectChatReadStateEntries(context.Context, string, string) ([]DirectChatReadStateEntry, error)
 	ListDirectChatPresenceStateEntries(context.Context, string, string) ([]DirectChatPresenceStateEntry, error)
 	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
+	ListActiveCryptoDevicesByUserIDs(context.Context, []string) ([]CryptoDevice, error)
 	UpsertDirectChatReadReceipt(context.Context, UpsertDirectChatReadReceiptParams) (bool, error)
 	UpsertGroupChatReadState(context.Context, UpsertGroupChatReadStateParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
+	CreateEncryptedDirectMessageV2(context.Context, CreateEncryptedDirectMessageV2Params) (*EncryptedDirectMessageV2StoredEnvelope, error)
 	CreateGroupMessage(context.Context, CreateGroupMessageParams) (*GroupMessage, error)
 	UpdateDirectChatMessageText(context.Context, EditDirectChatMessageParams) (bool, error)
 	UpdateGroupMessageText(context.Context, EditGroupMessageParams) (bool, error)
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
+	ListEncryptedDirectMessageV2(context.Context, string, string, string, int32) ([]EncryptedDirectMessageV2Envelope, error)
 	ListGroupMessages(context.Context, string, string, int32) ([]GroupMessage, error)
 	SearchDirectMessages(context.Context, string, SearchDirectMessagesParams) ([]MessageSearchResult, error)
 	SearchGroupMessages(context.Context, string, SearchGroupMessagesParams) ([]MessageSearchResult, error)
@@ -926,6 +929,121 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 	})
 }
 
+func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string, params SendEncryptedDirectMessageV2Params) (*EncryptedDirectMessageV2StoredEnvelope, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(params.ChatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedMessageID, err := normalizeID(params.MessageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedSenderCryptoDeviceID, err := normalizeID(params.SenderCryptoDeviceID, "sender_crypto_device_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedOperationKind, err := normalizeEncryptedDirectMessageV2OperationKind(params.OperationKind)
+	if err != nil {
+		return nil, err
+	}
+	normalizedTargetMessageID, err := normalizeOptionalID(valueOrEmpty(params.TargetMessageID), "target_message_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedRevision, err := normalizeEncryptedDirectMessageV2Revision(params.Revision)
+	if err != nil {
+		return nil, err
+	}
+	normalizedDeliveries, err := normalizeEncryptedDirectMessageV2DeliveryDrafts(params.Deliveries)
+	if err != nil {
+		return nil, err
+	}
+
+	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureDirectChatWriteAllowed(ctx, authSession.User.ID, *directChat); err != nil {
+		return nil, err
+	}
+	if err := validateEncryptedDirectMessageV2Operation(normalizedOperationKind, normalizedTargetMessageID); err != nil {
+		return nil, err
+	}
+
+	peerUserID, err := directChatPeerUserID(*directChat, authSession.User.ID)
+	if err != nil {
+		return nil, err
+	}
+	activeDevices, err := s.repo.ListActiveCryptoDevicesByUserIDs(ctx, []string{authSession.User.ID, peerUserID})
+	if err != nil {
+		return nil, err
+	}
+
+	targetDeliveries, err := resolveEncryptedDirectMessageV2Deliveries(
+		authSession.User.ID,
+		peerUserID,
+		normalizedSenderCryptoDeviceID,
+		activeDevices,
+		normalizedDeliveries,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	return s.repo.CreateEncryptedDirectMessageV2(ctx, CreateEncryptedDirectMessageV2Params{
+		MessageID:            normalizedMessageID,
+		ChatID:               normalizedChatID,
+		SenderUserID:         authSession.User.ID,
+		SenderCryptoDeviceID: normalizedSenderCryptoDeviceID,
+		OperationKind:        normalizedOperationKind,
+		TargetMessageID:      normalizedTargetMessageID,
+		Revision:             normalizedRevision,
+		Deliveries:           targetDeliveries,
+		CreatedAt:            now,
+		StoredAt:             now,
+	})
+}
+
+func (s *Service) ListEncryptedDirectMessageV2(ctx context.Context, token string, chatID string, viewerCryptoDeviceID string, pageSize uint32) ([]EncryptedDirectMessageV2Envelope, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedViewerCryptoDeviceID, err := normalizeID(viewerCryptoDeviceID, "viewer_crypto_device_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, err
+	}
+
+	activeDevices, err := s.repo.ListActiveCryptoDevicesByUserIDs(ctx, []string{authSession.User.ID})
+	if err != nil {
+		return nil, err
+	}
+	if !hasActiveCryptoDevice(activeDevices, authSession.User.ID, normalizedViewerCryptoDeviceID) {
+		return nil, fmt.Errorf("%w: viewer crypto device must be active and owned by current user", ErrConflict)
+	}
+
+	limit, err := normalizePageSize(pageSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.ListEncryptedDirectMessageV2(ctx, authSession.User.ID, normalizedChatID, normalizedViewerCryptoDeviceID, limit)
+}
+
 func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string, attachmentIDs []string, replyToMessageIDInput ...string) (*DirectChatMessage, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
@@ -1701,6 +1819,156 @@ func normalizeMessageText(value string) (string, error) {
 	}
 
 	return normalized, nil
+}
+
+func normalizeEncryptedDirectMessageV2OperationKind(value string) (string, error) {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case EncryptedDirectMessageV2OperationContent:
+		return EncryptedDirectMessageV2OperationContent, nil
+	case EncryptedDirectMessageV2OperationEdit:
+		return EncryptedDirectMessageV2OperationEdit, nil
+	case EncryptedDirectMessageV2OperationTombstone:
+		return EncryptedDirectMessageV2OperationTombstone, nil
+	default:
+		return "", fmt.Errorf("%w: encrypted direct message v2 operation_kind is unsupported", ErrInvalidArgument)
+	}
+}
+
+func normalizeEncryptedDirectMessageV2Revision(value uint32) (uint32, error) {
+	if value == 0 {
+		return 0, fmt.Errorf("%w: encrypted direct message v2 revision must be greater than zero", ErrInvalidArgument)
+	}
+
+	return value, nil
+}
+
+func normalizeEncryptedDirectMessageV2DeliveryDrafts(values []EncryptedDirectMessageV2DeliveryDraft) ([]EncryptedDirectMessageV2DeliveryDraft, error) {
+	if len(values) == 0 {
+		return nil, fmt.Errorf("%w: encrypted direct message v2 deliveries are required", ErrInvalidArgument)
+	}
+
+	result := make([]EncryptedDirectMessageV2DeliveryDraft, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for index, value := range values {
+		fieldPrefix := fmt.Sprintf("deliveries[%d]", index)
+		recipientCryptoDeviceID, err := normalizeID(value.RecipientCryptoDeviceID, fieldPrefix+".recipient_crypto_device_id")
+		if err != nil {
+			return nil, err
+		}
+		if len(value.Ciphertext) == 0 {
+			return nil, fmt.Errorf("%w: %s.ciphertext must be non-empty", ErrInvalidArgument, fieldPrefix)
+		}
+		if _, ok := seen[recipientCryptoDeviceID]; ok {
+			return nil, fmt.Errorf("%w: duplicate encrypted direct message v2 delivery target %s", ErrInvalidArgument, recipientCryptoDeviceID)
+		}
+		seen[recipientCryptoDeviceID] = struct{}{}
+		result = append(result, EncryptedDirectMessageV2DeliveryDraft{
+			RecipientCryptoDeviceID: recipientCryptoDeviceID,
+			TransportHeader:         append([]byte(nil), value.TransportHeader...),
+			Ciphertext:              append([]byte(nil), value.Ciphertext...),
+		})
+	}
+
+	return result, nil
+}
+
+func validateEncryptedDirectMessageV2Operation(operationKind string, targetMessageID *string) error {
+	switch operationKind {
+	case EncryptedDirectMessageV2OperationContent:
+		if targetMessageID != nil {
+			return fmt.Errorf("%w: encrypted direct message v2 content operation must not include target_message_id", ErrInvalidArgument)
+		}
+	case EncryptedDirectMessageV2OperationEdit, EncryptedDirectMessageV2OperationTombstone:
+		if targetMessageID == nil {
+			return fmt.Errorf("%w: encrypted direct message v2 mutation must include target_message_id", ErrInvalidArgument)
+		}
+	default:
+		return fmt.Errorf("%w: encrypted direct message v2 operation_kind is unsupported", ErrInvalidArgument)
+	}
+
+	return nil
+}
+
+func resolveEncryptedDirectMessageV2Deliveries(
+	senderUserID string,
+	recipientUserID string,
+	senderCryptoDeviceID string,
+	activeDevices []CryptoDevice,
+	requestedDeliveries []EncryptedDirectMessageV2DeliveryDraft,
+) ([]EncryptedDirectMessageV2Delivery, error) {
+	expectedTargets := make(map[string]string)
+	senderDeviceIsActive := false
+	recipientActiveDeviceCount := 0
+	for _, device := range activeDevices {
+		if device.Status != CryptoDeviceStatusActive {
+			continue
+		}
+		switch device.UserID {
+		case senderUserID:
+			if device.ID == senderCryptoDeviceID {
+				senderDeviceIsActive = true
+				continue
+			}
+			expectedTargets[device.ID] = senderUserID
+		case recipientUserID:
+			recipientActiveDeviceCount++
+			expectedTargets[device.ID] = recipientUserID
+		}
+	}
+
+	if !senderDeviceIsActive {
+		return nil, fmt.Errorf("%w: sender crypto device must be active", ErrConflict)
+	}
+	if recipientActiveDeviceCount == 0 {
+		return nil, fmt.Errorf("%w: recipient must have at least one active crypto device", ErrConflict)
+	}
+	if len(expectedTargets) == 0 {
+		return nil, fmt.Errorf("%w: encrypted direct message v2 target roster is empty", ErrConflict)
+	}
+	if len(requestedDeliveries) != len(expectedTargets) {
+		return nil, fmt.Errorf("%w: encrypted direct message v2 deliveries do not match active target roster", ErrConflict)
+	}
+
+	result := make([]EncryptedDirectMessageV2Delivery, 0, len(requestedDeliveries))
+	for _, delivery := range requestedDeliveries {
+		recipientForDevice, ok := expectedTargets[delivery.RecipientCryptoDeviceID]
+		if !ok {
+			return nil, fmt.Errorf("%w: encrypted direct message v2 delivery target %s is not allowed", ErrConflict, delivery.RecipientCryptoDeviceID)
+		}
+
+		result = append(result, EncryptedDirectMessageV2Delivery{
+			RecipientUserID:         recipientForDevice,
+			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
+			TransportHeader:         append([]byte(nil), delivery.TransportHeader...),
+			Ciphertext:              append([]byte(nil), delivery.Ciphertext...),
+			CiphertextSizeBytes:     int64(len(delivery.Ciphertext)),
+		})
+		delete(expectedTargets, delivery.RecipientCryptoDeviceID)
+	}
+
+	if len(expectedTargets) > 0 {
+		return nil, fmt.Errorf("%w: encrypted direct message v2 target roster is incomplete", ErrConflict)
+	}
+
+	return result, nil
+}
+
+func hasActiveCryptoDevice(devices []CryptoDevice, ownerUserID string, cryptoDeviceID string) bool {
+	for _, device := range devices {
+		if device.UserID == ownerUserID && device.ID == cryptoDeviceID && device.Status == CryptoDeviceStatusActive {
+			return true
+		}
+	}
+
+	return false
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+
+	return *value
 }
 
 func buildDirectReplyPreview(message DirectChatMessage, participants []UserSummary) *ReplyPreview {

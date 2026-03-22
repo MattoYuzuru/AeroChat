@@ -66,7 +66,7 @@ func run() error {
 		Requirements: []dbbootstrap.Requirement{
 			{
 				ServiceName: "aero-identity",
-				Migration:   "000002_social_graph_foundation.sql",
+				Migration:   "000003_crypto_device_registry_foundation.sql",
 			},
 		},
 	}); err != nil {

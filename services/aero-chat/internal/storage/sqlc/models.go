@@ -107,6 +107,28 @@ type DirectChat struct {
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type DirectChatEncryptedMessageDeliveriesV2 struct {
+	MessageID               uuid.UUID          `db:"message_id" json:"message_id"`
+	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
+	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	TransportHeader         []byte             `db:"transport_header" json:"transport_header"`
+	Ciphertext              []byte             `db:"ciphertext" json:"ciphertext"`
+	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
+	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+type DirectChatEncryptedMessagesV2 struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
 type DirectChatMessage struct {
 	ID               uuid.UUID          `db:"id" json:"id"`
 	ChatID           uuid.UUID          `db:"chat_id" json:"chat_id"`

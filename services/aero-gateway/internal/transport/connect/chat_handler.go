@@ -329,6 +329,14 @@ func (h *ChatHandler) ClearDirectChatPresence(ctx context.Context, req *connect.
 	return response, nil
 }
 
+func (h *ChatHandler) SendEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.SendEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.SendEncryptedDirectMessageV2Response], error) {
+	return forwardUnary(ctx, req, h.client.SendEncryptedDirectMessageV2)
+}
+
+func (h *ChatHandler) ListEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.ListEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.ListEncryptedDirectMessageV2Response], error) {
+	return forwardUnary(ctx, req, h.client.ListEncryptedDirectMessageV2)
+}
+
 func (h *ChatHandler) SendTextMessage(ctx context.Context, req *connect.Request[chatv1.SendTextMessageRequest]) (*connect.Response[chatv1.SendTextMessageResponse], error) {
 	response, err := forwardUnary(ctx, req, h.client.SendTextMessage)
 	if err != nil {

@@ -993,6 +993,97 @@ func (r *Repository) UpsertGroupChatReadState(ctx context.Context, params chat.U
 	return affected > 0, nil
 }
 
+func (r *Repository) ListActiveCryptoDevicesByUserIDs(ctx context.Context, userIDs []string) ([]chat.CryptoDevice, error) {
+	normalizedUserIDs := uniqueUUIDs(userIDs)
+	if len(normalizedUserIDs) == 0 {
+		return nil, nil
+	}
+
+	rows, err := r.queries.ListActiveCryptoDevicesByUserIDs(ctx, normalizedUserIDs)
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.CryptoDevice, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, chat.CryptoDevice{
+			ID:     row.ID.String(),
+			UserID: row.UserID.String(),
+			Status: row.Status,
+		})
+	}
+
+	return result, nil
+}
+
+func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params chat.CreateEncryptedDirectMessageV2Params) (*chat.EncryptedDirectMessageV2StoredEnvelope, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	row, err := q.CreateDirectChatEncryptedMessageV2(ctx, chatsqlc.CreateDirectChatEncryptedMessageV2Params{
+		ID:                   mustParseUUID(params.MessageID),
+		ChatID:               mustParseUUID(params.ChatID),
+		SenderUserID:         mustParseUUID(params.SenderUserID),
+		SenderCryptoDeviceID: mustParseUUID(params.SenderCryptoDeviceID),
+		OperationKind:        params.OperationKind,
+		TargetMessageID:      nullableUUID(params.TargetMessageID),
+		Revision:             int32(params.Revision),
+		CreatedAt:            timestamptzValue(params.CreatedAt),
+		StoredAt:             timestamptzValue(params.StoredAt),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	for _, delivery := range params.Deliveries {
+		storedAt := delivery.StoredAt
+		if storedAt.IsZero() {
+			storedAt = params.StoredAt
+		}
+		if err := q.CreateDirectChatEncryptedMessageV2Delivery(ctx, chatsqlc.CreateDirectChatEncryptedMessageV2DeliveryParams{
+			MessageID:               row.ID,
+			RecipientUserID:         mustParseUUID(delivery.RecipientUserID),
+			RecipientCryptoDeviceID: mustParseUUID(delivery.RecipientCryptoDeviceID),
+			TransportHeader:         append([]byte(nil), delivery.TransportHeader...),
+			Ciphertext:              append([]byte(nil), delivery.Ciphertext...),
+			CiphertextSizeBytes:     delivery.CiphertextSizeBytes,
+			StoredAt:                timestamptzValue(storedAt),
+		}); err != nil {
+			return nil, convertError(err)
+		}
+	}
+
+	if err := q.TouchDirectChatUpdatedAt(ctx, chatsqlc.TouchDirectChatUpdatedAtParams{
+		ID:        mustParseUUID(params.ChatID),
+		UpdatedAt: timestamptzValue(params.StoredAt),
+	}); err != nil {
+		return nil, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return &chat.EncryptedDirectMessageV2StoredEnvelope{
+		MessageID:            row.ID.String(),
+		ChatID:               row.ChatID.String(),
+		SenderUserID:         row.SenderUserID.String(),
+		SenderCryptoDeviceID: row.SenderCryptoDeviceID.String(),
+		OperationKind:        row.OperationKind,
+		TargetMessageID:      uuidPointerString(row.TargetMessageID),
+		Revision:             uint32(row.Revision),
+		CreatedAt:            timestampValue(row.CreatedAt),
+		StoredAt:             timestampValue(row.StoredAt),
+		StoredDeliveryCount:  uint32(len(params.Deliveries)),
+	}, nil
+}
+
 func (r *Repository) CreateDirectChatMessage(ctx context.Context, params chat.CreateDirectChatMessageParams) (*chat.DirectChatMessage, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -1150,6 +1241,25 @@ func (r *Repository) ListDirectChatMessages(ctx context.Context, userID string, 
 			message.ReplyPreview = cloneReplyPreview(replyPreviewByMessageID[*message.ReplyToMessageID])
 		}
 		result = append(result, message)
+	}
+
+	return result, nil
+}
+
+func (r *Repository) ListEncryptedDirectMessageV2(ctx context.Context, userID string, chatID string, viewerCryptoDeviceID string, limit int32) ([]chat.EncryptedDirectMessageV2Envelope, error) {
+	rows, err := r.queries.ListDirectChatEncryptedMessageV2ByDevice(ctx, chatsqlc.ListDirectChatEncryptedMessageV2ByDeviceParams{
+		UserID:                  mustParseUUID(userID),
+		ChatID:                  mustParseUUID(chatID),
+		RecipientCryptoDeviceID: mustParseUUID(viewerCryptoDeviceID),
+		Limit:                   limit,
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.EncryptedDirectMessageV2Envelope, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, toDomainEncryptedDirectMessageV2Envelope(row))
 	}
 
 	return result, nil
@@ -1602,6 +1712,28 @@ func toDomainMessage(row chatsqlc.ListDirectChatMessagesRow) chat.DirectChatMess
 	return message
 }
 
+func toDomainEncryptedDirectMessageV2Envelope(row chatsqlc.ListDirectChatEncryptedMessageV2ByDeviceRow) chat.EncryptedDirectMessageV2Envelope {
+	return chat.EncryptedDirectMessageV2Envelope{
+		MessageID:            row.ID.String(),
+		ChatID:               row.ChatID.String(),
+		SenderUserID:         row.SenderUserID.String(),
+		SenderCryptoDeviceID: row.SenderCryptoDeviceID.String(),
+		OperationKind:        row.OperationKind,
+		TargetMessageID:      uuidPointerString(row.TargetMessageID),
+		Revision:             uint32(row.Revision),
+		CreatedAt:            timestampValue(row.CreatedAt),
+		StoredAt:             timestampValue(row.StoredAt),
+		ViewerDelivery: chat.EncryptedDirectMessageV2Delivery{
+			RecipientUserID:         row.RecipientUserID.String(),
+			RecipientCryptoDeviceID: row.RecipientCryptoDeviceID.String(),
+			TransportHeader:         append([]byte(nil), row.TransportHeader...),
+			Ciphertext:              append([]byte(nil), row.Ciphertext...),
+			CiphertextSizeBytes:     row.CiphertextSizeBytes,
+			StoredAt:                timestampValue(row.DeliveryStoredAt),
+		},
+	}
+}
+
 func messageTextContentFromStorage(text string, markdownPolicy string) *chat.TextMessageContent {
 	if text == "" {
 		return nil
@@ -1882,6 +2014,25 @@ func uuidSliceToStrings(values []uuid.UUID) []string {
 	for _, value := range values {
 		result = append(result, value.String())
 	}
+	return result
+}
+
+func uniqueUUIDs(values []string) []uuid.UUID {
+	result := make([]uuid.UUID, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		parsed := mustParseUUID(value)
+		key := parsed.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, parsed)
+	}
+
 	return result
 }
 

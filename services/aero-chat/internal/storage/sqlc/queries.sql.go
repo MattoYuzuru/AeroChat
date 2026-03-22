@@ -344,6 +344,104 @@ func (q *Queries) CreateDirectChat(ctx context.Context, arg CreateDirectChatPara
 	return i, err
 }
 
+const createDirectChatEncryptedMessageV2 = `-- name: CreateDirectChatEncryptedMessageV2 :one
+INSERT INTO direct_chat_encrypted_messages_v2 (
+    id,
+    chat_id,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    created_at,
+    stored_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING
+    id,
+    chat_id,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    created_at,
+    stored_at
+`
+
+type CreateDirectChatEncryptedMessageV2Params struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+func (q *Queries) CreateDirectChatEncryptedMessageV2(ctx context.Context, arg CreateDirectChatEncryptedMessageV2Params) (DirectChatEncryptedMessagesV2, error) {
+	row := q.db.QueryRow(ctx, createDirectChatEncryptedMessageV2,
+		arg.ID,
+		arg.ChatID,
+		arg.SenderUserID,
+		arg.SenderCryptoDeviceID,
+		arg.OperationKind,
+		arg.TargetMessageID,
+		arg.Revision,
+		arg.CreatedAt,
+		arg.StoredAt,
+	)
+	var i DirectChatEncryptedMessagesV2
+	err := row.Scan(
+		&i.ID,
+		&i.ChatID,
+		&i.SenderUserID,
+		&i.SenderCryptoDeviceID,
+		&i.OperationKind,
+		&i.TargetMessageID,
+		&i.Revision,
+		&i.CreatedAt,
+		&i.StoredAt,
+	)
+	return i, err
+}
+
+const createDirectChatEncryptedMessageV2Delivery = `-- name: CreateDirectChatEncryptedMessageV2Delivery :exec
+INSERT INTO direct_chat_encrypted_message_deliveries_v2 (
+    message_id,
+    recipient_user_id,
+    recipient_crypto_device_id,
+    transport_header,
+    ciphertext,
+    ciphertext_size_bytes,
+    stored_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`
+
+type CreateDirectChatEncryptedMessageV2DeliveryParams struct {
+	MessageID               uuid.UUID          `db:"message_id" json:"message_id"`
+	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
+	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	TransportHeader         []byte             `db:"transport_header" json:"transport_header"`
+	Ciphertext              []byte             `db:"ciphertext" json:"ciphertext"`
+	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
+	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+func (q *Queries) CreateDirectChatEncryptedMessageV2Delivery(ctx context.Context, arg CreateDirectChatEncryptedMessageV2DeliveryParams) error {
+	_, err := q.db.Exec(ctx, createDirectChatEncryptedMessageV2Delivery,
+		arg.MessageID,
+		arg.RecipientUserID,
+		arg.RecipientCryptoDeviceID,
+		arg.TransportHeader,
+		arg.Ciphertext,
+		arg.CiphertextSizeBytes,
+		arg.StoredAt,
+	)
+	return err
+}
+
 const createDirectChatMessage = `-- name: CreateDirectChatMessage :one
 INSERT INTO direct_chat_messages (
     id,
@@ -1755,6 +1853,43 @@ func (q *Queries) JoinGroupMembership(ctx context.Context, arg JoinGroupMembersh
 	return result.RowsAffected(), nil
 }
 
+const listActiveCryptoDevicesByUserIDs = `-- name: ListActiveCryptoDevicesByUserIDs :many
+SELECT
+    id,
+    user_id,
+    status
+FROM crypto_devices
+WHERE status = 'active'
+  AND user_id = ANY($1::uuid[])
+ORDER BY user_id ASC, created_at ASC, id ASC
+`
+
+type ListActiveCryptoDevicesByUserIDsRow struct {
+	ID     uuid.UUID `db:"id" json:"id"`
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+	Status string    `db:"status" json:"status"`
+}
+
+func (q *Queries) ListActiveCryptoDevicesByUserIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListActiveCryptoDevicesByUserIDsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveCryptoDevicesByUserIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveCryptoDevicesByUserIDsRow
+	for rows.Next() {
+		var i ListActiveCryptoDevicesByUserIDsRow
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Status); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAttachmentObjectDeletionCandidates = `-- name: ListAttachmentObjectDeletionCandidates :many
 SELECT
     a.id,
@@ -1936,6 +2071,100 @@ func (q *Queries) ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.U
 			&i.UploadSessionFailedAt,
 			&i.DirectChatMessageID,
 			&i.GroupMessageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDirectChatEncryptedMessageV2ByDevice = `-- name: ListDirectChatEncryptedMessageV2ByDevice :many
+SELECT
+    m.id,
+    m.chat_id,
+    m.sender_user_id,
+    m.sender_crypto_device_id,
+    m.operation_kind,
+    m.target_message_id,
+    m.revision,
+    m.created_at,
+    m.stored_at,
+    d.recipient_user_id,
+    d.recipient_crypto_device_id,
+    d.transport_header,
+    d.ciphertext,
+    d.ciphertext_size_bytes,
+    d.stored_at AS delivery_stored_at
+FROM direct_chat_encrypted_messages_v2 AS m
+JOIN direct_chat_participants AS self ON self.chat_id = m.chat_id
+JOIN direct_chat_encrypted_message_deliveries_v2 AS d ON d.message_id = m.id
+WHERE self.user_id = $1
+  AND m.chat_id = $2
+  AND d.recipient_user_id = $1
+  AND d.recipient_crypto_device_id = $3
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $4
+`
+
+type ListDirectChatEncryptedMessageV2ByDeviceParams struct {
+	UserID                  uuid.UUID `db:"user_id" json:"user_id"`
+	ChatID                  uuid.UUID `db:"chat_id" json:"chat_id"`
+	RecipientCryptoDeviceID uuid.UUID `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	Limit                   int32     `db:"limit" json:"limit"`
+}
+
+type ListDirectChatEncryptedMessageV2ByDeviceRow struct {
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	ChatID                  uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID            uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID    uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind           string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID         pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision                int32              `db:"revision" json:"revision"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
+	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	TransportHeader         []byte             `db:"transport_header" json:"transport_header"`
+	Ciphertext              []byte             `db:"ciphertext" json:"ciphertext"`
+	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
+	DeliveryStoredAt        pgtype.Timestamptz `db:"delivery_stored_at" json:"delivery_stored_at"`
+}
+
+func (q *Queries) ListDirectChatEncryptedMessageV2ByDevice(ctx context.Context, arg ListDirectChatEncryptedMessageV2ByDeviceParams) ([]ListDirectChatEncryptedMessageV2ByDeviceRow, error) {
+	rows, err := q.db.Query(ctx, listDirectChatEncryptedMessageV2ByDevice,
+		arg.UserID,
+		arg.ChatID,
+		arg.RecipientCryptoDeviceID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDirectChatEncryptedMessageV2ByDeviceRow
+	for rows.Next() {
+		var i ListDirectChatEncryptedMessageV2ByDeviceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChatID,
+			&i.SenderUserID,
+			&i.SenderCryptoDeviceID,
+			&i.OperationKind,
+			&i.TargetMessageID,
+			&i.Revision,
+			&i.CreatedAt,
+			&i.StoredAt,
+			&i.RecipientUserID,
+			&i.RecipientCryptoDeviceID,
+			&i.TransportHeader,
+			&i.Ciphertext,
+			&i.CiphertextSizeBytes,
+			&i.DeliveryStoredAt,
 		); err != nil {
 			return nil, err
 		}
