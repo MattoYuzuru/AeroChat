@@ -13,6 +13,7 @@ import {
   subscribeEncryptedDirectMessageV2RealtimeEvents,
 } from "./encrypted-v2-realtime";
 import {
+  discardBufferedLocalEncryptedDirectMessageV2Projection,
   listBufferedLocalEncryptedDirectMessageV2Projection,
   subscribeLocalEncryptedDirectMessageV2Projection,
 } from "./encrypted-v2-local-outbound";
@@ -126,6 +127,14 @@ export function useEncryptedDirectMessageV2Lane({
       ) {
         return;
       }
+
+      discardBufferedLocalEncryptedDirectMessageV2Projection([
+        {
+          chatId: event.envelope.chatId,
+          messageId: event.envelope.messageId,
+          revision: event.envelope.revision,
+        },
+      ]);
 
       void cryptoRuntime
         .decryptEncryptedDirectMessageV2Envelopes([event.envelope])
@@ -247,6 +256,13 @@ async function loadEncryptedLane(input: {
     ...envelopes,
     ...buffered,
   ]);
+  discardBufferedLocalEncryptedDirectMessageV2Projection(
+    mergedOpaqueEnvelopes.map((envelope) => ({
+      chatId: envelope.chatId,
+      messageId: envelope.messageId,
+      revision: envelope.revision,
+    })),
+  );
   const decrypted = await input.cryptoRuntime.decryptEncryptedDirectMessageV2Envelopes(
     mergedOpaqueEnvelopes,
   );

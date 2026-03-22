@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] web encrypted direct-message v2 outbound bootstrap send foundation
+- [x] encrypted direct-message v2 sender self-delivery and convergence hardening
 
 ---
 
@@ -97,6 +97,7 @@
 - [x] Device-aware gateway transport for encrypted direct-message v2
 - [x] Web encrypted direct-message v2 local projection foundation
 - [x] Web encrypted direct-message v2 outbound bootstrap send foundation
+- [x] Encrypted direct-message v2 sender self-delivery and convergence hardening
 - [x] Safe markdown subset
 - [x] Read receipts
 - [x] Unread conversation state

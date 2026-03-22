@@ -663,6 +663,11 @@ func TestSendEncryptedDirectMessageV2CreatesDeviceScopedDeliveries(t *testing.T)
 		Revision:             1,
 		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
 			{
+				RecipientCryptoDeviceID: aliceSender.ID,
+				TransportHeader:         []byte("sender-self-header"),
+				Ciphertext:              []byte("sender-self-ciphertext"),
+			},
+			{
 				RecipientCryptoDeviceID: aliceOther.ID,
 				TransportHeader:         []byte("sender-other-header"),
 				Ciphertext:              []byte("sender-other-ciphertext"),
@@ -682,11 +687,25 @@ func TestSendEncryptedDirectMessageV2CreatesDeviceScopedDeliveries(t *testing.T)
 	if err != nil {
 		t.Fatalf("send encrypted direct message v2: %v", err)
 	}
-	if receipt.StoredDeliveryCount != 3 {
-		t.Fatalf("ожидалось 3 delivery records, получено %d", receipt.StoredDeliveryCount)
+	if receipt.StoredDeliveryCount != 4 {
+		t.Fatalf("ожидалось 4 delivery records, получено %d", receipt.StoredDeliveryCount)
 	}
 	if receipt.OperationKind != EncryptedDirectMessageV2OperationContent {
 		t.Fatalf("ожидался content operation, получено %q", receipt.OperationKind)
+	}
+
+	aliceSenderView, err := service.ListEncryptedDirectMessageV2(context.Background(), alice.Token, directChat.ID, aliceSender.ID, 0)
+	if err != nil {
+		t.Fatalf("list encrypted direct message v2 for sender origin device: %v", err)
+	}
+	if len(aliceSenderView) != 1 {
+		t.Fatalf("ожидался один envelope для sender origin device, получено %d", len(aliceSenderView))
+	}
+	if aliceSenderView[0].ViewerDelivery.RecipientCryptoDeviceID != aliceSender.ID {
+		t.Fatalf("ожидался delivery target %q, получено %q", aliceSender.ID, aliceSenderView[0].ViewerDelivery.RecipientCryptoDeviceID)
+	}
+	if string(aliceSenderView[0].ViewerDelivery.Ciphertext) != "sender-self-ciphertext" {
+		t.Fatalf("неверный ciphertext для sender origin device: %q", string(aliceSenderView[0].ViewerDelivery.Ciphertext))
 	}
 
 	bobView, err := service.ListEncryptedDirectMessageV2(context.Background(), bob.Token, directChat.ID, bobFirst.ID, 0)
@@ -820,6 +839,11 @@ func TestListEncryptedDirectMessageV2RequiresActiveViewerDevice(t *testing.T) {
 		Revision:             1,
 		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
 			{
+				RecipientCryptoDeviceID: aliceSender.ID,
+				TransportHeader:         []byte("alice-self-header"),
+				Ciphertext:              []byte("alice-self-ciphertext"),
+			},
+			{
 				RecipientCryptoDeviceID: bobFirst.ID,
 				TransportHeader:         []byte("bob-header"),
 				Ciphertext:              []byte("bob-ciphertext"),
@@ -854,6 +878,11 @@ func TestGetEncryptedDirectMessageV2ReturnsViewerScopedEnvelope(t *testing.T) {
 		OperationKind:        EncryptedDirectMessageV2OperationContent,
 		Revision:             1,
 		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: aliceSender.ID,
+				TransportHeader:         []byte("alice-self-header"),
+				Ciphertext:              []byte("alice-self-ciphertext"),
+			},
 			{
 				RecipientCryptoDeviceID: aliceOther.ID,
 				TransportHeader:         []byte("alice-other-header"),

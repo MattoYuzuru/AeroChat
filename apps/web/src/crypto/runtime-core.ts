@@ -300,6 +300,12 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           "Encrypted DM v2 send доступен только для browser profile с active local crypto-device.",
         );
       }
+      const localBundle = await dependencies.materialFactory.buildBundle(localMaterial);
+      if (localBundle.signedPrekeyPublicBase64.trim() === "") {
+        throw new Error(
+          "Текущий local crypto-device не имеет signed prekey для server-backed self-delivery.",
+        );
+      }
 
       const sendBootstrap =
         await dependencies.gatewayClient.getEncryptedDirectMessageV2SendBootstrap(
@@ -308,8 +314,18 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           localMaterial.record.cryptoDeviceId,
         );
       const targetDevices = [
-        ...sendBootstrap.recipientDevices,
-        ...sendBootstrap.senderOtherDevices,
+        {
+          cryptoDeviceId: localMaterial.record.cryptoDeviceId,
+          signedPrekeyPublicBase64: localBundle.signedPrekeyPublicBase64,
+        },
+        ...sendBootstrap.senderOtherDevices.map((device) => ({
+          cryptoDeviceId: device.cryptoDeviceId,
+          signedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
+        })),
+        ...sendBootstrap.recipientDevices.map((device) => ({
+          cryptoDeviceId: device.cryptoDeviceId,
+          signedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
+        })),
       ];
       if (targetDevices.length === 0) {
         throw new Error("Encrypted DM v2 send bootstrap не вернул target crypto-device roster.");

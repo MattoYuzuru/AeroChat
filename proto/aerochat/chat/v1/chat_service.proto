@@ -350,6 +350,10 @@ message GetEncryptedDirectMessageV2SendBootstrapResponse {
   string chat_id = 1;
   string recipient_user_id = 2;
   repeated EncryptedDirectMessageV2SendTargetDevice recipient_devices = 3;
+  // sender_other_devices содержит только secondary active devices отправителя.
+  // Originating sender device не возвращается здесь повторно:
+  // его self-delivery всё равно обязателен и собирается внутри local crypto runtime
+  // из текущего active local material, после чего проходит тем же server-backed storage path.
   repeated EncryptedDirectMessageV2SendTargetDevice sender_other_devices = 4;
 }
 
@@ -671,6 +675,9 @@ message SendEncryptedDirectMessageV2Request {
   EncryptedDirectMessageV2OperationKind operation_kind = 4;
   optional string target_message_id = 5;
   uint32 revision = 6;
+  // deliveries должны покрывать весь active target roster:
+  // все active devices получателя и все active devices отправителя,
+  // включая originating sender device для server-backed self-delivery.
   repeated EncryptedDirectMessageV2DeliveryInput deliveries = 7;
 }
 

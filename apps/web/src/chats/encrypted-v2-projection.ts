@@ -111,6 +111,11 @@ function applyReadyProjection(
   update: EncryptedDirectMessageV2ReadyProjection,
 ): boolean {
   if (update.operationKind === "content") {
+    const current = entries.get(buildMessageKey(update.messageId));
+    if (current?.kind === "message" && current.revision > update.revision) {
+      return false;
+    }
+
     entries.set(buildMessageKey(update.messageId), {
       kind: "message",
       key: buildMessageKey(update.messageId),
