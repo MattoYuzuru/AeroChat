@@ -1292,6 +1292,32 @@ WHERE self.user_id = $1
 ORDER BY m.created_at DESC, m.id DESC
 LIMIT $4;
 
+-- name: GetDirectChatEncryptedMessageV2ByDevice :one
+SELECT
+    m.id,
+    m.chat_id,
+    m.sender_user_id,
+    m.sender_crypto_device_id,
+    m.operation_kind,
+    m.target_message_id,
+    m.revision,
+    m.created_at,
+    m.stored_at,
+    d.recipient_user_id,
+    d.recipient_crypto_device_id,
+    d.transport_header,
+    d.ciphertext,
+    d.ciphertext_size_bytes,
+    d.stored_at AS delivery_stored_at
+FROM direct_chat_encrypted_messages_v2 AS m
+JOIN direct_chat_participants AS self ON self.chat_id = m.chat_id
+JOIN direct_chat_encrypted_message_deliveries_v2 AS d ON d.message_id = m.id
+WHERE self.user_id = $1
+  AND m.chat_id = $2
+  AND m.id = $3
+  AND d.recipient_user_id = $1
+  AND d.recipient_crypto_device_id = $4;
+
 -- name: UpsertGroupChatReadState :execrows
 INSERT INTO group_chat_read_states (
     group_id,

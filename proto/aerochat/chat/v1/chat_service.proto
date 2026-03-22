@@ -40,6 +40,7 @@ service ChatService {
   rpc ClearDirectChatPresence(ClearDirectChatPresenceRequest) returns (ClearDirectChatPresenceResponse);
   rpc SendEncryptedDirectMessageV2(SendEncryptedDirectMessageV2Request) returns (SendEncryptedDirectMessageV2Response);
   rpc ListEncryptedDirectMessageV2(ListEncryptedDirectMessageV2Request) returns (ListEncryptedDirectMessageV2Response);
+  rpc GetEncryptedDirectMessageV2(GetEncryptedDirectMessageV2Request) returns (GetEncryptedDirectMessageV2Response);
   rpc SendTextMessage(SendTextMessageRequest) returns (SendTextMessageResponse);
   rpc EditDirectChatMessage(EditDirectChatMessageRequest) returns (EditDirectChatMessageResponse);
   rpc ListDirectChatMessages(ListDirectChatMessagesRequest) returns (ListDirectChatMessagesResponse);
@@ -654,6 +655,17 @@ message ListEncryptedDirectMessageV2Request {
 
 message ListEncryptedDirectMessageV2Response {
   repeated EncryptedDirectMessageV2Envelope envelopes = 1;
+}
+
+message GetEncryptedDirectMessageV2Request {
+  string chat_id = 1;
+  string message_id = 2;
+  // viewer_crypto_device_id фиксирует, для какого локального active crypto device нужно вернуть opaque delivery.
+  string viewer_crypto_device_id = 3;
+}
+
+message GetEncryptedDirectMessageV2Response {
+  EncryptedDirectMessageV2Envelope envelope = 1;
 }
 
 message SendTextMessageRequest {

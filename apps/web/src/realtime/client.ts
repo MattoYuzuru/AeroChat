@@ -12,8 +12,14 @@ export interface RealtimeEnvelope {
   payload?: unknown;
 }
 
+export interface RealtimeClientEnvelope {
+  type: string;
+  payload?: unknown;
+}
+
 export interface RealtimeConnection {
   close(): void;
+  send(envelope: RealtimeClientEnvelope): boolean;
 }
 
 export interface RealtimeConnectionOptions {
@@ -29,6 +35,9 @@ export function connectRealtime(
   if (token === "" || typeof WebSocket === "undefined") {
     return {
       close() {},
+      send() {
+        return false;
+      },
     };
   }
 
@@ -38,6 +47,35 @@ export function connectRealtime(
   let socket: WebSocket | null = null;
   let reconnectAttempt = 0;
   let reconnectTimer: number | null = null;
+  const connection: RealtimeConnection = {
+    close() {
+      disposed = true;
+      clearReconnectTimer();
+      if (activeRealtimeConnection === connection) {
+        activeRealtimeConnection = null;
+      }
+      const activeSocket = socket;
+      socket = null;
+      activeSocket?.close(1000, "client shutdown");
+    },
+    send(envelope) {
+      if (
+        socket === null ||
+        socket.readyState !== WebSocket.OPEN ||
+        typeof envelope.type !== "string" ||
+        envelope.type.trim() === ""
+      ) {
+        return false;
+      }
+
+      socket.send(JSON.stringify({
+        type: envelope.type,
+        payload: envelope.payload,
+      }));
+
+      return true;
+    },
+  };
 
   function clearReconnectTimer() {
     if (reconnectTimer === null) {
@@ -92,17 +130,10 @@ export function connectRealtime(
     socket = nextSocket;
   }
 
+  activeRealtimeConnection = connection;
   open();
 
-  return {
-    close() {
-      disposed = true;
-      clearReconnectTimer();
-      const activeSocket = socket;
-      socket = null;
-      activeSocket?.close(1000, "client shutdown");
-    },
-  };
+  return connection;
 }
 
 export function resolveRealtimeUrl(
@@ -119,6 +150,12 @@ export function buildRealtimeProtocols(token: string): string[] {
   const trimmedToken = token.trim();
 
   return [realtimeProtocol, `${realtimeAuthProtocolPrefix}${trimmedToken}`];
+}
+
+let activeRealtimeConnection: RealtimeConnection | null = null;
+
+export function sendRealtimeClientEnvelope(envelope: RealtimeClientEnvelope): boolean {
+  return activeRealtimeConnection?.send(envelope) ?? false;
 }
 
 function normalizeBaseUrl(baseUrl: string): string {

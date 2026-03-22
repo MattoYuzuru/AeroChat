@@ -59,7 +59,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.hub.ServeConnection(conn, principal); errors.Is(err, errHubClosed) {
+	if err := h.hub.ServeConnection(conn, principal, token); errors.Is(err, errHubClosed) {
 		_ = conn.Close(websocket.StatusGoingAway, "server shutdown")
 		closeNow = false
 		return

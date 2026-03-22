@@ -4,50 +4,63 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 )
 
 var errHubClosed = errors.New("realtime hub is closed")
 
-// Hub хранит process-local websocket-сессии и публикует user-scoped события.
+// Hub хранит process-local websocket-сессии и публикует user/device-scoped события.
 type Hub struct {
-	logger       *slog.Logger
-	pingInterval time.Duration
-	writeTimeout time.Duration
+	logger           *slog.Logger
+	pingInterval     time.Duration
+	writeTimeout     time.Duration
+	deviceAuthorizer CryptoDeviceAuthorizer
 
-	mu              sync.RWMutex
-	sessions        map[string]map[string]*session
-	sessionsByLogin map[string]map[string]*session
-	closed          bool
+	mu                     sync.RWMutex
+	sessions               map[string]map[string]*session
+	sessionsByLogin        map[string]map[string]*session
+	sessionsByCryptoDevice map[string]map[string]*session
+	closed                 bool
 }
 
 type session struct {
-	logger       *slog.Logger
-	conn         *websocket.Conn
-	connectionID string
-	principal    Principal
-	outbound     chan Envelope
-	ctx          context.Context
-	cancel       context.CancelFunc
-	closeOnce    sync.Once
+	logger              *slog.Logger
+	conn                *websocket.Conn
+	connectionID        string
+	principal           Principal
+	authToken           string
+	boundCryptoDeviceID string
+	outbound            chan Envelope
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	closeOnce           sync.Once
 }
 
-func NewHub(logger *slog.Logger, pingInterval time.Duration, writeTimeout time.Duration) *Hub {
+func NewHub(
+	logger *slog.Logger,
+	pingInterval time.Duration,
+	writeTimeout time.Duration,
+	deviceAuthorizer CryptoDeviceAuthorizer,
+) *Hub {
 	return &Hub{
-		logger:          logger,
-		pingInterval:    pingInterval,
-		writeTimeout:    writeTimeout,
-		sessions:        make(map[string]map[string]*session),
-		sessionsByLogin: make(map[string]map[string]*session),
+		logger:                 logger,
+		pingInterval:           pingInterval,
+		writeTimeout:           writeTimeout,
+		deviceAuthorizer:       deviceAuthorizer,
+		sessions:               make(map[string]map[string]*session),
+		sessionsByLogin:        make(map[string]map[string]*session),
+		sessionsByCryptoDevice: make(map[string]map[string]*session),
 	}
 }
 
-func (h *Hub) ServeConnection(conn *websocket.Conn, principal Principal) error {
-	s, err := h.register(conn, principal)
+func (h *Hub) ServeConnection(conn *websocket.Conn, principal Principal, authToken string) error {
+	s, err := h.register(conn, principal, authToken)
 	if err != nil {
 		return err
 	}
@@ -59,7 +72,7 @@ func (h *Hub) ServeConnection(conn *websocket.Conn, principal Principal) error {
 		return nil
 	}
 
-	return s.run(h.pingInterval, h.writeTimeout)
+	return s.run(h, h.pingInterval, h.writeTimeout)
 }
 
 func (h *Hub) PublishToUser(userID string, envelope Envelope) int {
@@ -70,10 +83,15 @@ func (h *Hub) PublishToLogin(login string, envelope Envelope) int {
 	return h.publishFromBucket(h.userSessionsByLogin(login), envelope)
 }
 
+func (h *Hub) PublishToCryptoDevice(cryptoDeviceID string, envelope Envelope) int {
+	return h.publishFromBucket(h.cryptoDeviceSessionsByID(cryptoDeviceID), envelope)
+}
+
 func (h *Hub) userSessionsByID(userID string) []*session {
 	h.mu.RLock()
+	defer h.mu.RUnlock()
+
 	if h.closed {
-		h.mu.RUnlock()
 		return nil
 	}
 
@@ -82,24 +100,40 @@ func (h *Hub) userSessionsByID(userID string) []*session {
 	for _, s := range userSessions {
 		targets = append(targets, s)
 	}
-	h.mu.RUnlock()
 
 	return targets
 }
 
 func (h *Hub) userSessionsByLogin(login string) []*session {
 	h.mu.RLock()
+	defer h.mu.RUnlock()
+
 	if h.closed {
-		h.mu.RUnlock()
 		return nil
 	}
 
-	userSessions := h.sessionsByLogin[login]
-	targets := make([]*session, 0, len(userSessions))
-	for _, s := range userSessions {
+	loginSessions := h.sessionsByLogin[login]
+	targets := make([]*session, 0, len(loginSessions))
+	for _, s := range loginSessions {
 		targets = append(targets, s)
 	}
-	h.mu.RUnlock()
+
+	return targets
+}
+
+func (h *Hub) cryptoDeviceSessionsByID(cryptoDeviceID string) []*session {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if h.closed {
+		return nil
+	}
+
+	deviceSessions := h.sessionsByCryptoDevice[cryptoDeviceID]
+	targets := make([]*session, 0, len(deviceSessions))
+	for _, s := range deviceSessions {
+		targets = append(targets, s)
+	}
 
 	return targets
 }
@@ -139,7 +173,7 @@ func (h *Hub) Close() {
 	}
 }
 
-func (h *Hub) register(conn *websocket.Conn, principal Principal) (*session, error) {
+func (h *Hub) register(conn *websocket.Conn, principal Principal, authToken string) (*session, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -147,13 +181,13 @@ func (h *Hub) register(conn *websocket.Conn, principal Principal) (*session, err
 		return nil, errHubClosed
 	}
 
-	baseCtx, cancel := context.WithCancel(context.Background())
-	ctx := conn.CloseRead(baseCtx)
+	ctx, cancel := context.WithCancel(context.Background())
 	s := &session{
 		logger:       h.logger.With(slog.String("user_id", principal.UserID)),
 		conn:         conn,
 		connectionID: newEnvelopeID(),
 		principal:    principal,
+		authToken:    strings.TrimSpace(authToken),
 		outbound:     make(chan Envelope, defaultOutboundBuffer),
 		ctx:          ctx,
 		cancel:       cancel,
@@ -183,29 +217,64 @@ func (h *Hub) unregister(s *session) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	userSessions, ok := h.sessions[s.principal.UserID]
-	if !ok {
-		return
-	}
-
-	delete(userSessions, s.connectionID)
-	if len(userSessions) == 0 {
-		delete(h.sessions, s.principal.UserID)
+	if userSessions, ok := h.sessions[s.principal.UserID]; ok {
+		delete(userSessions, s.connectionID)
+		if len(userSessions) == 0 {
+			delete(h.sessions, s.principal.UserID)
+		}
 	}
 	if s.principal.Login != "" {
-		loginSessions, ok := h.sessionsByLogin[s.principal.Login]
-		if ok {
+		if loginSessions, ok := h.sessionsByLogin[s.principal.Login]; ok {
 			delete(loginSessions, s.connectionID)
 			if len(loginSessions) == 0 {
 				delete(h.sessionsByLogin, s.principal.Login)
 			}
 		}
 	}
+	h.unbindSessionLocked(s)
 
 	s.logger.Info("realtime-сессия отключена", slog.String("connection_id", s.connectionID))
 }
 
-func (s *session) run(pingInterval time.Duration, writeTimeout time.Duration) error {
+func (h *Hub) bindSessionToCryptoDevice(s *session, cryptoDeviceID string) {
+	normalizedID := strings.TrimSpace(cryptoDeviceID)
+	if normalizedID == "" {
+		return
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.closed {
+		return
+	}
+
+	h.unbindSessionLocked(s)
+	if h.sessionsByCryptoDevice[normalizedID] == nil {
+		h.sessionsByCryptoDevice[normalizedID] = make(map[string]*session)
+	}
+	h.sessionsByCryptoDevice[normalizedID][s.connectionID] = s
+	s.boundCryptoDeviceID = normalizedID
+}
+
+func (h *Hub) unbindSessionLocked(s *session) {
+	if s.boundCryptoDeviceID == "" {
+		return
+	}
+
+	if deviceSessions, ok := h.sessionsByCryptoDevice[s.boundCryptoDeviceID]; ok {
+		delete(deviceSessions, s.connectionID)
+		if len(deviceSessions) == 0 {
+			delete(h.sessionsByCryptoDevice, s.boundCryptoDeviceID)
+		}
+	}
+	s.boundCryptoDeviceID = ""
+}
+
+func (s *session) run(h *Hub, pingInterval time.Duration, writeTimeout time.Duration) error {
+	readResult := make(chan error, 1)
+	go s.readLoop(h, readResult)
+
 	ticker := time.NewTicker(pingInterval)
 	defer ticker.Stop()
 
@@ -213,10 +282,16 @@ func (s *session) run(pingInterval time.Duration, writeTimeout time.Duration) er
 		select {
 		case <-s.ctx.Done():
 			return nil
+		case err := <-readResult:
+			if err == nil || isExpectedClose(err) || errors.Is(err, context.Canceled) {
+				return nil
+			}
+			s.close(websocket.StatusInternalError, "read failed")
+			return err
 		case envelope := <-s.outbound:
 			if err := s.writeEnvelope(envelope, writeTimeout); err != nil {
 				s.close(websocket.StatusInternalError, "write failed")
-				if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+				if isExpectedClose(err) {
 					return nil
 				}
 				return err
@@ -224,12 +299,109 @@ func (s *session) run(pingInterval time.Duration, writeTimeout time.Duration) er
 		case <-ticker.C:
 			if err := s.ping(writeTimeout); err != nil {
 				s.close(websocket.StatusGoingAway, "ping timeout")
-				if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+				if isExpectedClose(err) {
 					return nil
 				}
 				return err
 			}
 		}
+	}
+}
+
+func (s *session) readLoop(h *Hub, result chan<- error) {
+	defer close(result)
+
+	for {
+		var inbound inboundEnvelope
+		if err := wsjson.Read(s.ctx, s.conn, &inbound); err != nil {
+			result <- err
+			return
+		}
+		if err := s.handleInboundEnvelope(h, inbound); err != nil {
+			result <- err
+			return
+		}
+	}
+}
+
+func (s *session) handleInboundEnvelope(h *Hub, inbound inboundEnvelope) error {
+	switch strings.TrimSpace(inbound.Type) {
+	case ClientEventTypeBindCryptoDevice:
+		return s.handleBindCryptoDevice(h, inbound.Payload)
+	case "":
+		if !s.enqueue(newCryptoDeviceBindRejectedEnvelope(
+			s.connectionID,
+			"",
+			cryptoDeviceBindRejectReasonInvalidPayload,
+			"Тип client-side realtime события обязателен.",
+		)) {
+			s.close(websocket.StatusPolicyViolation, "session closed")
+		}
+		return nil
+	default:
+		if !s.enqueue(newCryptoDeviceBindRejectedEnvelope(
+			s.connectionID,
+			"",
+			cryptoDeviceBindRejectReasonInvalidPayload,
+			"Неподдерживаемый client-side realtime event.",
+		)) {
+			s.close(websocket.StatusPolicyViolation, "session closed")
+		}
+		return nil
+	}
+}
+
+func (s *session) handleBindCryptoDevice(h *Hub, rawPayload []byte) error {
+	payload, err := parseBindCryptoDevicePayload(rawPayload)
+	if err != nil {
+		s.enqueue(newCryptoDeviceBindRejectedEnvelope(
+			s.connectionID,
+			"",
+			cryptoDeviceBindRejectReasonInvalidPayload,
+			"Некорректный payload для bind crypto-device realtime-сессии.",
+		))
+		return nil
+	}
+	if h.deviceAuthorizer == nil {
+		s.enqueue(newCryptoDeviceBindRejectedEnvelope(
+			s.connectionID,
+			payload.CryptoDeviceID,
+			cryptoDeviceBindRejectReasonUnavailable,
+			"Проверка crypto-device сейчас недоступна.",
+		))
+		return nil
+	}
+
+	device, err := h.deviceAuthorizer.AuthorizeActiveDevice(s.ctx, s.authToken, s.principal.UserID, payload.CryptoDeviceID)
+	if err != nil {
+		reason, message := bindRejectDetails(err)
+		s.enqueue(newCryptoDeviceBindRejectedEnvelope(s.connectionID, payload.CryptoDeviceID, reason, message))
+		return nil
+	}
+
+	h.bindSessionToCryptoDevice(s, device.ID)
+	s.logger.Info(
+		"realtime-сессия привязана к crypto-device",
+		slog.String("connection_id", s.connectionID),
+		slog.String("crypto_device_id", device.ID),
+	)
+	if !s.enqueue(newCryptoDeviceBoundEnvelope(s.connectionID, s.principal.UserID, device.ID)) {
+		s.close(websocket.StatusPolicyViolation, "session closed")
+	}
+
+	return nil
+}
+
+func bindRejectDetails(err error) (string, string) {
+	switch connect.CodeOf(err) {
+	case connect.CodePermissionDenied, connect.CodeUnauthenticated:
+		return cryptoDeviceBindRejectReasonPermissionDenied, "Crypto-device не принадлежит текущему аккаунту."
+	case connect.CodeFailedPrecondition:
+		return cryptoDeviceBindRejectReasonRejected, "Только active crypto-device может участвовать в encrypted realtime transport."
+	case connect.CodeUnavailable, connect.CodeDeadlineExceeded:
+		return cryptoDeviceBindRejectReasonUnavailable, "Проверка crypto-device временно недоступна."
+	default:
+		return cryptoDeviceBindRejectReasonRejected, "Не удалось привязать crypto-device к realtime-сессии."
 	}
 }
 

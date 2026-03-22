@@ -124,6 +124,9 @@ const (
 	// ChatServiceListEncryptedDirectMessageV2Procedure is the fully-qualified name of the ChatService's
 	// ListEncryptedDirectMessageV2 RPC.
 	ChatServiceListEncryptedDirectMessageV2Procedure = "/aerochat.chat.v1.ChatService/ListEncryptedDirectMessageV2"
+	// ChatServiceGetEncryptedDirectMessageV2Procedure is the fully-qualified name of the ChatService's
+	// GetEncryptedDirectMessageV2 RPC.
+	ChatServiceGetEncryptedDirectMessageV2Procedure = "/aerochat.chat.v1.ChatService/GetEncryptedDirectMessageV2"
 	// ChatServiceSendTextMessageProcedure is the fully-qualified name of the ChatService's
 	// SendTextMessage RPC.
 	ChatServiceSendTextMessageProcedure = "/aerochat.chat.v1.ChatService/SendTextMessage"
@@ -189,6 +192,7 @@ type ChatServiceClient interface {
 	ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error)
 	SendEncryptedDirectMessageV2(context.Context, *connect.Request[v1.SendEncryptedDirectMessageV2Request]) (*connect.Response[v1.SendEncryptedDirectMessageV2Response], error)
 	ListEncryptedDirectMessageV2(context.Context, *connect.Request[v1.ListEncryptedDirectMessageV2Request]) (*connect.Response[v1.ListEncryptedDirectMessageV2Response], error)
+	GetEncryptedDirectMessageV2(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2Request]) (*connect.Response[v1.GetEncryptedDirectMessageV2Response], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
 	EditDirectChatMessage(context.Context, *connect.Request[v1.EditDirectChatMessageRequest]) (*connect.Response[v1.EditDirectChatMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
@@ -404,6 +408,12 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("ListEncryptedDirectMessageV2")),
 			connect.WithClientOptions(opts...),
 		),
+		getEncryptedDirectMessageV2: connect.NewClient[v1.GetEncryptedDirectMessageV2Request, v1.GetEncryptedDirectMessageV2Response](
+			httpClient,
+			baseURL+ChatServiceGetEncryptedDirectMessageV2Procedure,
+			connect.WithSchema(chatServiceMethods.ByName("GetEncryptedDirectMessageV2")),
+			connect.WithClientOptions(opts...),
+		),
 		sendTextMessage: connect.NewClient[v1.SendTextMessageRequest, v1.SendTextMessageResponse](
 			httpClient,
 			baseURL+ChatServiceSendTextMessageProcedure,
@@ -501,6 +511,7 @@ type chatServiceClient struct {
 	clearDirectChatPresence        *connect.Client[v1.ClearDirectChatPresenceRequest, v1.ClearDirectChatPresenceResponse]
 	sendEncryptedDirectMessageV2   *connect.Client[v1.SendEncryptedDirectMessageV2Request, v1.SendEncryptedDirectMessageV2Response]
 	listEncryptedDirectMessageV2   *connect.Client[v1.ListEncryptedDirectMessageV2Request, v1.ListEncryptedDirectMessageV2Response]
+	getEncryptedDirectMessageV2    *connect.Client[v1.GetEncryptedDirectMessageV2Request, v1.GetEncryptedDirectMessageV2Response]
 	sendTextMessage                *connect.Client[v1.SendTextMessageRequest, v1.SendTextMessageResponse]
 	editDirectChatMessage          *connect.Client[v1.EditDirectChatMessageRequest, v1.EditDirectChatMessageResponse]
 	listDirectChatMessages         *connect.Client[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse]
@@ -673,6 +684,11 @@ func (c *chatServiceClient) ListEncryptedDirectMessageV2(ctx context.Context, re
 	return c.listEncryptedDirectMessageV2.CallUnary(ctx, req)
 }
 
+// GetEncryptedDirectMessageV2 calls aerochat.chat.v1.ChatService.GetEncryptedDirectMessageV2.
+func (c *chatServiceClient) GetEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[v1.GetEncryptedDirectMessageV2Request]) (*connect.Response[v1.GetEncryptedDirectMessageV2Response], error) {
+	return c.getEncryptedDirectMessageV2.CallUnary(ctx, req)
+}
+
 // SendTextMessage calls aerochat.chat.v1.ChatService.SendTextMessage.
 func (c *chatServiceClient) SendTextMessage(ctx context.Context, req *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error) {
 	return c.sendTextMessage.CallUnary(ctx, req)
@@ -757,6 +773,7 @@ type ChatServiceHandler interface {
 	ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error)
 	SendEncryptedDirectMessageV2(context.Context, *connect.Request[v1.SendEncryptedDirectMessageV2Request]) (*connect.Response[v1.SendEncryptedDirectMessageV2Response], error)
 	ListEncryptedDirectMessageV2(context.Context, *connect.Request[v1.ListEncryptedDirectMessageV2Request]) (*connect.Response[v1.ListEncryptedDirectMessageV2Response], error)
+	GetEncryptedDirectMessageV2(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2Request]) (*connect.Response[v1.GetEncryptedDirectMessageV2Response], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
 	EditDirectChatMessage(context.Context, *connect.Request[v1.EditDirectChatMessageRequest]) (*connect.Response[v1.EditDirectChatMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
@@ -968,6 +985,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceMethods.ByName("ListEncryptedDirectMessageV2")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceGetEncryptedDirectMessageV2Handler := connect.NewUnaryHandler(
+		ChatServiceGetEncryptedDirectMessageV2Procedure,
+		svc.GetEncryptedDirectMessageV2,
+		connect.WithSchema(chatServiceMethods.ByName("GetEncryptedDirectMessageV2")),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatServiceSendTextMessageHandler := connect.NewUnaryHandler(
 		ChatServiceSendTextMessageProcedure,
 		svc.SendTextMessage,
@@ -1094,6 +1117,8 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceSendEncryptedDirectMessageV2Handler.ServeHTTP(w, r)
 		case ChatServiceListEncryptedDirectMessageV2Procedure:
 			chatServiceListEncryptedDirectMessageV2Handler.ServeHTTP(w, r)
+		case ChatServiceGetEncryptedDirectMessageV2Procedure:
+			chatServiceGetEncryptedDirectMessageV2Handler.ServeHTTP(w, r)
 		case ChatServiceSendTextMessageProcedure:
 			chatServiceSendTextMessageHandler.ServeHTTP(w, r)
 		case ChatServiceEditDirectChatMessageProcedure:
@@ -1249,6 +1274,10 @@ func (UnimplementedChatServiceHandler) SendEncryptedDirectMessageV2(context.Cont
 
 func (UnimplementedChatServiceHandler) ListEncryptedDirectMessageV2(context.Context, *connect.Request[v1.ListEncryptedDirectMessageV2Request]) (*connect.Response[v1.ListEncryptedDirectMessageV2Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ListEncryptedDirectMessageV2 is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetEncryptedDirectMessageV2(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2Request]) (*connect.Response[v1.GetEncryptedDirectMessageV2Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetEncryptedDirectMessageV2 is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error) {

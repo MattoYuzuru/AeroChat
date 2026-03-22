@@ -1185,6 +1185,86 @@ func (q *Queries) GetAttachmentRowByID(ctx context.Context, id uuid.UUID) (GetAt
 	return i, err
 }
 
+const getDirectChatEncryptedMessageV2ByDevice = `-- name: GetDirectChatEncryptedMessageV2ByDevice :one
+SELECT
+    m.id,
+    m.chat_id,
+    m.sender_user_id,
+    m.sender_crypto_device_id,
+    m.operation_kind,
+    m.target_message_id,
+    m.revision,
+    m.created_at,
+    m.stored_at,
+    d.recipient_user_id,
+    d.recipient_crypto_device_id,
+    d.transport_header,
+    d.ciphertext,
+    d.ciphertext_size_bytes,
+    d.stored_at AS delivery_stored_at
+FROM direct_chat_encrypted_messages_v2 AS m
+JOIN direct_chat_participants AS self ON self.chat_id = m.chat_id
+JOIN direct_chat_encrypted_message_deliveries_v2 AS d ON d.message_id = m.id
+WHERE self.user_id = $1
+  AND m.chat_id = $2
+  AND m.id = $3
+  AND d.recipient_user_id = $1
+  AND d.recipient_crypto_device_id = $4
+`
+
+type GetDirectChatEncryptedMessageV2ByDeviceParams struct {
+	UserID                  uuid.UUID `db:"user_id" json:"user_id"`
+	ChatID                  uuid.UUID `db:"chat_id" json:"chat_id"`
+	ID                      uuid.UUID `db:"id" json:"id"`
+	RecipientCryptoDeviceID uuid.UUID `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+}
+
+type GetDirectChatEncryptedMessageV2ByDeviceRow struct {
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	ChatID                  uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID            uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID    uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind           string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID         pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision                int32              `db:"revision" json:"revision"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
+	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	TransportHeader         []byte             `db:"transport_header" json:"transport_header"`
+	Ciphertext              []byte             `db:"ciphertext" json:"ciphertext"`
+	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
+	DeliveryStoredAt        pgtype.Timestamptz `db:"delivery_stored_at" json:"delivery_stored_at"`
+}
+
+func (q *Queries) GetDirectChatEncryptedMessageV2ByDevice(ctx context.Context, arg GetDirectChatEncryptedMessageV2ByDeviceParams) (GetDirectChatEncryptedMessageV2ByDeviceRow, error) {
+	row := q.db.QueryRow(ctx, getDirectChatEncryptedMessageV2ByDevice,
+		arg.UserID,
+		arg.ChatID,
+		arg.ID,
+		arg.RecipientCryptoDeviceID,
+	)
+	var i GetDirectChatEncryptedMessageV2ByDeviceRow
+	err := row.Scan(
+		&i.ID,
+		&i.ChatID,
+		&i.SenderUserID,
+		&i.SenderCryptoDeviceID,
+		&i.OperationKind,
+		&i.TargetMessageID,
+		&i.Revision,
+		&i.CreatedAt,
+		&i.StoredAt,
+		&i.RecipientUserID,
+		&i.RecipientCryptoDeviceID,
+		&i.TransportHeader,
+		&i.Ciphertext,
+		&i.CiphertextSizeBytes,
+		&i.DeliveryStoredAt,
+	)
+	return i, err
+}
+
 const getDirectChatMessageByID = `-- name: GetDirectChatMessageByID :one
 SELECT
     m.id,
