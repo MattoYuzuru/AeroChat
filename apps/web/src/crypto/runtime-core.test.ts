@@ -257,6 +257,19 @@ describe("createCryptoRuntimeCore", () => {
       baseSession.token,
       "intent-1",
       "crypto-1",
+      {
+        payload: {
+          version: 1,
+          linkIntentId: "intent-1",
+          approverCryptoDeviceId: "crypto-1",
+          pendingCryptoDeviceId: "crypto-pending",
+          pendingBundleDigestBase64: "digest-1",
+          approvalChallengeBase64: "challenge-1",
+          challengeExpiresAt: "2026-03-22T13:00:00Z",
+          issuedAt: expect.any(String),
+        },
+        signatureBase64: "approval-signature",
+      },
     );
   });
 });
@@ -309,6 +322,21 @@ function createFakeMaterialFactory(): CryptoMaterialFactory {
         material.record.bundleDigestBase64,
         material.record.signedPrekeyId,
       );
+    },
+    async buildLinkApprovalProof(_material, input) {
+      return {
+        payload: {
+          version: 1,
+          linkIntentId: input.linkIntentId,
+          approverCryptoDeviceId: input.approverCryptoDeviceId,
+          pendingCryptoDeviceId: input.pendingCryptoDeviceId,
+          pendingBundleDigestBase64: input.pendingBundleDigestBase64,
+          approvalChallengeBase64: input.approvalChallengeBase64,
+          challengeExpiresAt: input.challengeExpiresAt,
+          issuedAt: input.issuedAt,
+        },
+        signatureBase64: "approval-signature",
+      };
     },
     syncRecordFromServer(material, input) {
       return {
@@ -440,6 +468,7 @@ function createCryptoDeviceLinkIntent(
     pendingCryptoDeviceId: overrides.pendingCryptoDeviceId,
     status: overrides.status,
     bundleDigestBase64: overrides.bundleDigestBase64 ?? "digest-1",
+    approvalChallengeBase64: overrides.approvalChallengeBase64 ?? "challenge-1",
     createdAt: overrides.createdAt ?? "2026-03-22T12:00:00Z",
     expiresAt: overrides.expiresAt ?? "2026-03-22T13:00:00Z",
     approvedAt: overrides.approvedAt ?? null,

@@ -79,6 +79,7 @@ RETURNING
     pending_crypto_device_id,
     status,
     bundle_digest,
+    approval_challenge,
     created_at,
     expires_at,
     approved_at,
@@ -93,20 +94,35 @@ type ApproveCryptoDeviceLinkIntentByIDAndUserIDParams struct {
 	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
 }
 
-func (q *Queries) ApproveCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg ApproveCryptoDeviceLinkIntentByIDAndUserIDParams) (CryptoDeviceLinkIntent, error) {
+type ApproveCryptoDeviceLinkIntentByIDAndUserIDRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	PendingCryptoDeviceID    uuid.UUID          `db:"pending_crypto_device_id" json:"pending_crypto_device_id"`
+	Status                   string             `db:"status" json:"status"`
+	BundleDigest             []byte             `db:"bundle_digest" json:"bundle_digest"`
+	ApprovalChallenge        []byte             `db:"approval_challenge" json:"approval_challenge"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt                pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ApprovedAt               pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
+	ExpiredAt                pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
+	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
+}
+
+func (q *Queries) ApproveCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg ApproveCryptoDeviceLinkIntentByIDAndUserIDParams) (ApproveCryptoDeviceLinkIntentByIDAndUserIDRow, error) {
 	row := q.db.QueryRow(ctx, approveCryptoDeviceLinkIntentByIDAndUserID,
 		arg.ID,
 		arg.UserID,
 		arg.ApprovedAt,
 		arg.ApprovedByCryptoDeviceID,
 	)
-	var i CryptoDeviceLinkIntent
+	var i ApproveCryptoDeviceLinkIntentByIDAndUserIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.PendingCryptoDeviceID,
 		&i.Status,
 		&i.BundleDigest,
+		&i.ApprovalChallenge,
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.ApprovedAt,
@@ -329,6 +345,7 @@ INSERT INTO crypto_device_link_intents (
     pending_crypto_device_id,
     status,
     bundle_digest,
+    approval_challenge,
     created_at,
     expires_at,
     approved_at,
@@ -344,7 +361,8 @@ INSERT INTO crypto_device_link_intents (
     $7,
     $8,
     $9,
-    $10
+    $10,
+    $11
 )
 RETURNING
     id,
@@ -352,6 +370,7 @@ RETURNING
     pending_crypto_device_id,
     status,
     bundle_digest,
+    approval_challenge,
     created_at,
     expires_at,
     approved_at,
@@ -365,6 +384,7 @@ type CreateCryptoDeviceLinkIntentParams struct {
 	PendingCryptoDeviceID    uuid.UUID          `db:"pending_crypto_device_id" json:"pending_crypto_device_id"`
 	Status                   string             `db:"status" json:"status"`
 	BundleDigest             []byte             `db:"bundle_digest" json:"bundle_digest"`
+	ApprovalChallenge        []byte             `db:"approval_challenge" json:"approval_challenge"`
 	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	ExpiresAt                pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	ApprovedAt               pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
@@ -372,26 +392,42 @@ type CreateCryptoDeviceLinkIntentParams struct {
 	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
 }
 
-func (q *Queries) CreateCryptoDeviceLinkIntent(ctx context.Context, arg CreateCryptoDeviceLinkIntentParams) (CryptoDeviceLinkIntent, error) {
+type CreateCryptoDeviceLinkIntentRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	PendingCryptoDeviceID    uuid.UUID          `db:"pending_crypto_device_id" json:"pending_crypto_device_id"`
+	Status                   string             `db:"status" json:"status"`
+	BundleDigest             []byte             `db:"bundle_digest" json:"bundle_digest"`
+	ApprovalChallenge        []byte             `db:"approval_challenge" json:"approval_challenge"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt                pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ApprovedAt               pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
+	ExpiredAt                pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
+	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
+}
+
+func (q *Queries) CreateCryptoDeviceLinkIntent(ctx context.Context, arg CreateCryptoDeviceLinkIntentParams) (CreateCryptoDeviceLinkIntentRow, error) {
 	row := q.db.QueryRow(ctx, createCryptoDeviceLinkIntent,
 		arg.ID,
 		arg.UserID,
 		arg.PendingCryptoDeviceID,
 		arg.Status,
 		arg.BundleDigest,
+		arg.ApprovalChallenge,
 		arg.CreatedAt,
 		arg.ExpiresAt,
 		arg.ApprovedAt,
 		arg.ExpiredAt,
 		arg.ApprovedByCryptoDeviceID,
 	)
-	var i CryptoDeviceLinkIntent
+	var i CreateCryptoDeviceLinkIntentRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.PendingCryptoDeviceID,
 		&i.Status,
 		&i.BundleDigest,
+		&i.ApprovalChallenge,
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.ApprovedAt,
@@ -413,6 +449,7 @@ RETURNING
     pending_crypto_device_id,
     status,
     bundle_digest,
+    approval_challenge,
     created_at,
     expires_at,
     approved_at,
@@ -426,15 +463,30 @@ type ExpireCryptoDeviceLinkIntentByIDAndUserIDParams struct {
 	ExpiredAt pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
 }
 
-func (q *Queries) ExpireCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg ExpireCryptoDeviceLinkIntentByIDAndUserIDParams) (CryptoDeviceLinkIntent, error) {
+type ExpireCryptoDeviceLinkIntentByIDAndUserIDRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	PendingCryptoDeviceID    uuid.UUID          `db:"pending_crypto_device_id" json:"pending_crypto_device_id"`
+	Status                   string             `db:"status" json:"status"`
+	BundleDigest             []byte             `db:"bundle_digest" json:"bundle_digest"`
+	ApprovalChallenge        []byte             `db:"approval_challenge" json:"approval_challenge"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt                pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ApprovedAt               pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
+	ExpiredAt                pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
+	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
+}
+
+func (q *Queries) ExpireCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg ExpireCryptoDeviceLinkIntentByIDAndUserIDParams) (ExpireCryptoDeviceLinkIntentByIDAndUserIDRow, error) {
 	row := q.db.QueryRow(ctx, expireCryptoDeviceLinkIntentByIDAndUserID, arg.ID, arg.UserID, arg.ExpiredAt)
-	var i CryptoDeviceLinkIntent
+	var i ExpireCryptoDeviceLinkIntentByIDAndUserIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.PendingCryptoDeviceID,
 		&i.Status,
 		&i.BundleDigest,
+		&i.ApprovalChallenge,
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.ApprovedAt,
@@ -536,6 +588,7 @@ SELECT
     pending_crypto_device_id,
     status,
     bundle_digest,
+    approval_challenge,
     created_at,
     expires_at,
     approved_at,
@@ -550,15 +603,30 @@ type GetCryptoDeviceLinkIntentByIDAndUserIDParams struct {
 	UserID uuid.UUID `db:"user_id" json:"user_id"`
 }
 
-func (q *Queries) GetCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg GetCryptoDeviceLinkIntentByIDAndUserIDParams) (CryptoDeviceLinkIntent, error) {
+type GetCryptoDeviceLinkIntentByIDAndUserIDRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	PendingCryptoDeviceID    uuid.UUID          `db:"pending_crypto_device_id" json:"pending_crypto_device_id"`
+	Status                   string             `db:"status" json:"status"`
+	BundleDigest             []byte             `db:"bundle_digest" json:"bundle_digest"`
+	ApprovalChallenge        []byte             `db:"approval_challenge" json:"approval_challenge"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt                pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ApprovedAt               pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
+	ExpiredAt                pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
+	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
+}
+
+func (q *Queries) GetCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg GetCryptoDeviceLinkIntentByIDAndUserIDParams) (GetCryptoDeviceLinkIntentByIDAndUserIDRow, error) {
 	row := q.db.QueryRow(ctx, getCryptoDeviceLinkIntentByIDAndUserID, arg.ID, arg.UserID)
-	var i CryptoDeviceLinkIntent
+	var i GetCryptoDeviceLinkIntentByIDAndUserIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.PendingCryptoDeviceID,
 		&i.Status,
 		&i.BundleDigest,
+		&i.ApprovalChallenge,
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.ApprovedAt,
@@ -695,6 +763,7 @@ SELECT
     pending_crypto_device_id,
     status,
     bundle_digest,
+    approval_challenge,
     created_at,
     expires_at,
     approved_at,
@@ -704,15 +773,30 @@ FROM crypto_device_link_intents
 WHERE pending_crypto_device_id = $1 AND status = 'pending'
 `
 
-func (q *Queries) GetPendingCryptoDeviceLinkIntentByDeviceID(ctx context.Context, pendingCryptoDeviceID uuid.UUID) (CryptoDeviceLinkIntent, error) {
+type GetPendingCryptoDeviceLinkIntentByDeviceIDRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	PendingCryptoDeviceID    uuid.UUID          `db:"pending_crypto_device_id" json:"pending_crypto_device_id"`
+	Status                   string             `db:"status" json:"status"`
+	BundleDigest             []byte             `db:"bundle_digest" json:"bundle_digest"`
+	ApprovalChallenge        []byte             `db:"approval_challenge" json:"approval_challenge"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt                pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ApprovedAt               pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
+	ExpiredAt                pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
+	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
+}
+
+func (q *Queries) GetPendingCryptoDeviceLinkIntentByDeviceID(ctx context.Context, pendingCryptoDeviceID uuid.UUID) (GetPendingCryptoDeviceLinkIntentByDeviceIDRow, error) {
 	row := q.db.QueryRow(ctx, getPendingCryptoDeviceLinkIntentByDeviceID, pendingCryptoDeviceID)
-	var i CryptoDeviceLinkIntent
+	var i GetPendingCryptoDeviceLinkIntentByDeviceIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.PendingCryptoDeviceID,
 		&i.Status,
 		&i.BundleDigest,
+		&i.ApprovalChallenge,
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.ApprovedAt,
@@ -729,6 +813,7 @@ SELECT
     pending_crypto_device_id,
     status,
     bundle_digest,
+    approval_challenge,
     created_at,
     expires_at,
     approved_at,
@@ -739,21 +824,36 @@ WHERE user_id = $1
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListCryptoDeviceLinkIntentsByUserID(ctx context.Context, userID uuid.UUID) ([]CryptoDeviceLinkIntent, error) {
+type ListCryptoDeviceLinkIntentsByUserIDRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	PendingCryptoDeviceID    uuid.UUID          `db:"pending_crypto_device_id" json:"pending_crypto_device_id"`
+	Status                   string             `db:"status" json:"status"`
+	BundleDigest             []byte             `db:"bundle_digest" json:"bundle_digest"`
+	ApprovalChallenge        []byte             `db:"approval_challenge" json:"approval_challenge"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt                pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ApprovedAt               pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
+	ExpiredAt                pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
+	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
+}
+
+func (q *Queries) ListCryptoDeviceLinkIntentsByUserID(ctx context.Context, userID uuid.UUID) ([]ListCryptoDeviceLinkIntentsByUserIDRow, error) {
 	rows, err := q.db.Query(ctx, listCryptoDeviceLinkIntentsByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []CryptoDeviceLinkIntent
+	var items []ListCryptoDeviceLinkIntentsByUserIDRow
 	for rows.Next() {
-		var i CryptoDeviceLinkIntent
+		var i ListCryptoDeviceLinkIntentsByUserIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
 			&i.PendingCryptoDeviceID,
 			&i.Status,
 			&i.BundleDigest,
+			&i.ApprovalChallenge,
 			&i.CreatedAt,
 			&i.ExpiresAt,
 			&i.ApprovedAt,

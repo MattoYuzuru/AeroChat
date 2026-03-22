@@ -486,7 +486,13 @@ func (h *Handler) ApproveCryptoDeviceLinkIntent(ctx context.Context, req *connec
 		return nil, err
 	}
 
-	linkIntent, device, err := h.service.ApproveCryptoDeviceLinkIntent(ctx, token, req.Msg.LinkIntentId, req.Msg.ApproverCryptoDeviceId)
+	linkIntent, device, err := h.service.ApproveCryptoDeviceLinkIntent(
+		ctx,
+		token,
+		req.Msg.LinkIntentId,
+		req.Msg.ApproverCryptoDeviceId,
+		fromProtoCryptoDeviceLinkApprovalProof(req.Msg.Proof),
+	)
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -645,6 +651,35 @@ func fromProtoCryptoDeviceBundlePayload(value *identityv1.CryptoDeviceBundlePayl
 	}
 }
 
+func fromProtoCryptoDeviceLinkApprovalProof(value *identityv1.CryptoDeviceLinkApprovalProof) identity.CryptoDeviceLinkApprovalProof {
+	if value == nil {
+		return identity.CryptoDeviceLinkApprovalProof{}
+	}
+
+	payload := identity.CryptoDeviceLinkApprovalPayload{}
+	if value.GetPayload() != nil {
+		payload = identity.CryptoDeviceLinkApprovalPayload{
+			Version:                value.GetPayload().GetVersion(),
+			LinkIntentID:           value.GetPayload().GetLinkIntentId(),
+			ApproverCryptoDeviceID: value.GetPayload().GetApproverCryptoDeviceId(),
+			PendingCryptoDeviceID:  value.GetPayload().GetPendingCryptoDeviceId(),
+			PendingBundleDigest:    append([]byte(nil), value.GetPayload().GetPendingBundleDigest()...),
+			ApprovalChallenge:      append([]byte(nil), value.GetPayload().GetApprovalChallenge()...),
+		}
+		if value.GetPayload().GetChallengeExpiresAt() != nil {
+			payload.ChallengeExpiresAt = value.GetPayload().GetChallengeExpiresAt().AsTime().UTC()
+		}
+		if value.GetPayload().GetIssuedAt() != nil {
+			payload.IssuedAt = value.GetPayload().GetIssuedAt().AsTime().UTC()
+		}
+	}
+
+	return identity.CryptoDeviceLinkApprovalProof{
+		Payload:   payload,
+		Signature: append([]byte(nil), value.GetSignature()...),
+	}
+}
+
 func toProtoCryptoDevice(value identity.CryptoDevice) *identityv1.CryptoDevice {
 	device := &identityv1.CryptoDevice{
 		Id:        value.ID,
@@ -723,6 +758,7 @@ func toProtoCryptoDeviceLinkIntent(value *identity.CryptoDeviceLinkIntent) *iden
 		PendingCryptoDeviceId: value.PendingCryptoDeviceID,
 		Status:                toProtoCryptoDeviceLinkIntentStatus(value.Status),
 		BundleDigest:          append([]byte(nil), value.BundleDigest...),
+		ApprovalChallenge:     append([]byte(nil), value.ApprovalChallenge...),
 		CreatedAt:             timestamppb.New(value.CreatedAt),
 		ExpiresAt:             timestamppb.New(value.ExpiresAt),
 	}

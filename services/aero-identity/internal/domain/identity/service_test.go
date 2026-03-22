@@ -415,6 +415,11 @@ func newTestService() *Service {
 		sequence++
 		return testUUID(sequence)
 	}
+	challengeSequence := 0
+	service.newCryptoLinkApprovalChallenge = func() ([]byte, error) {
+		challengeSequence++
+		return []byte("approval-challenge-" + testUUID(10_000+challengeSequence)), nil
+	}
 
 	return service
 }
@@ -844,6 +849,9 @@ func (r *fakeRepository) PublishCryptoDeviceBundle(_ context.Context, userID str
 	if !ok {
 		return nil, nil, ErrNotFound
 	}
+	if string(currentBundle.IdentityPublicKey) != string(input.Bundle.IdentityPublicKey) {
+		return nil, nil, ErrConflict
+	}
 
 	nextVersion := currentBundle.BundleVersion + 1
 	device.LastBundleVersion = int64Ptr(nextVersion)
@@ -916,6 +924,7 @@ func (r *fakeRepository) CreateCryptoDeviceLinkIntent(_ context.Context, params 
 	}
 
 	linkIntent := params.LinkIntent
+	linkIntent.ApprovalChallenge = cloneBytes(linkIntent.ApprovalChallenge)
 	r.linkIntents[linkIntent.ID] = linkIntent
 	linkIntentCopy := cloneLinkIntent(linkIntent)
 	return &linkIntentCopy, nil
@@ -952,6 +961,9 @@ func (r *fakeRepository) ApproveCryptoDeviceLinkIntent(_ context.Context, params
 	if intent.Status != CryptoDeviceLinkIntentStatusPending {
 		return nil, nil, ErrConflict
 	}
+	if params.Proof.Payload.LinkIntentID != params.LinkIntentID || params.Proof.Payload.ApproverCryptoDeviceID != params.ApproverCryptoDeviceID {
+		return nil, nil, ErrConflict
+	}
 	if !intent.ExpiresAt.After(params.ApprovedAt) {
 		intent.Status = CryptoDeviceLinkIntentStatusExpired
 		intent.ExpiredAt = &params.ApprovedAt
@@ -970,9 +982,27 @@ func (r *fakeRepository) ApproveCryptoDeviceLinkIntent(_ context.Context, params
 		r.linkIntents[intent.ID] = intent
 		return nil, nil, ErrConflict
 	}
+	if params.ApproverCryptoDeviceID == intent.PendingCryptoDeviceID {
+		return nil, nil, ErrConflict
+	}
+	if params.Proof.Payload.PendingCryptoDeviceID != intent.PendingCryptoDeviceID ||
+		string(params.Proof.Payload.PendingBundleDigest) != string(bundle.BundleDigest) ||
+		string(params.Proof.Payload.ApprovalChallenge) != string(intent.ApprovalChallenge) ||
+		!params.Proof.Payload.ChallengeExpiresAt.Equal(intent.ExpiresAt) ||
+		params.Proof.Payload.IssuedAt.Before(intent.CreatedAt) ||
+		params.Proof.Payload.IssuedAt.After(params.ApprovedAt) {
+		return nil, nil, ErrConflict
+	}
 
 	approverDevice, ok := r.cryptoDevices[params.ApproverCryptoDeviceID]
 	if !ok || approverDevice.UserID != params.UserID || approverDevice.Status != CryptoDeviceStatusActive {
+		return nil, nil, ErrConflict
+	}
+	approverBundle, ok := r.cryptoBundles[params.ApproverCryptoDeviceID]
+	if !ok {
+		return nil, nil, ErrConflict
+	}
+	if err := VerifyCryptoDeviceLinkApprovalSignature(approverBundle.IdentityPublicKey, params.Proof); err != nil {
 		return nil, nil, ErrConflict
 	}
 
@@ -1070,6 +1100,7 @@ func cloneLinkIntent(value CryptoDeviceLinkIntent) CryptoDeviceLinkIntent {
 		PendingCryptoDeviceID:  value.PendingCryptoDeviceID,
 		Status:                 value.Status,
 		BundleDigest:           append([]byte(nil), value.BundleDigest...),
+		ApprovalChallenge:      append([]byte(nil), value.ApprovalChallenge...),
 		CreatedAt:              value.CreatedAt,
 		ExpiresAt:              value.ExpiresAt,
 		ApprovedAt:             cloneTimePtr(value.ApprovedAt),

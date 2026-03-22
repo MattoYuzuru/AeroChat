@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] web video notes bootstrap through attachment upload flow
+- [x] proof-bound linked-device approval hardening
 
 ---
 
@@ -60,6 +60,7 @@
 - [x] Public crypto bundles and prekey inventory foundation
 - [x] Linked-device control-plane foundation
 - [x] Web secure key storage and crypto worker foundation
+- [x] Proof-bound linked-device approval hardening
 - [ ] Block list
 - [ ] Key backup status
 

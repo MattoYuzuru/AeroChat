@@ -2,8 +2,14 @@ package identity
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestRegisterFirstAndPendingCryptoDevices(t *testing.T) {
@@ -11,10 +17,11 @@ func TestRegisterFirstAndPendingCryptoDevices(t *testing.T) {
 
 	service := newTestService()
 	authSession := mustRegister(t, service, "crypto-owner", "Crypto Owner")
+	firstDeviceMaterial := newTestCryptoDeviceMaterial(t)
 
 	firstDetails, err := service.RegisterFirstCryptoDevice(context.Background(), authSession.Token, RegisterCryptoDeviceInput{
 		DeviceLabel: strPtr("Основной крипто-девайс"),
-		Bundle:      testCryptoBundleInput(1),
+		Bundle:      firstDeviceMaterial.BundleInput(1),
 	})
 	if err != nil {
 		t.Fatalf("register first crypto device: %v", err)
@@ -27,14 +34,15 @@ func TestRegisterFirstAndPendingCryptoDevices(t *testing.T) {
 	}
 
 	if _, err := service.RegisterFirstCryptoDevice(context.Background(), authSession.Token, RegisterCryptoDeviceInput{
-		Bundle: testCryptoBundleInput(2),
+		Bundle: newTestCryptoDeviceMaterial(t).BundleInput(2),
 	}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("ожидалась ошибка повторного first-device bootstrap, получено %v", err)
 	}
 
+	pendingDeviceMaterial := newTestCryptoDeviceMaterial(t)
 	pendingDetails, err := service.RegisterPendingLinkedCryptoDevice(context.Background(), authSession.Token, RegisterCryptoDeviceInput{
 		DeviceLabel: strPtr("Связываемое устройство"),
-		Bundle:      testCryptoBundleInput(3),
+		Bundle:      pendingDeviceMaterial.BundleInput(3),
 	})
 	if err != nil {
 		t.Fatalf("register pending linked crypto device: %v", err)
@@ -57,16 +65,18 @@ func TestCryptoDeviceLinkIntentApprovalFlow(t *testing.T) {
 
 	service := newTestService()
 	authSession := mustRegister(t, service, "crypto-link", "Crypto Link")
+	firstDeviceMaterial := newTestCryptoDeviceMaterial(t)
 
 	firstDetails, err := service.RegisterFirstCryptoDevice(context.Background(), authSession.Token, RegisterCryptoDeviceInput{
-		Bundle: testCryptoBundleInput(10),
+		Bundle: firstDeviceMaterial.BundleInput(10),
 	})
 	if err != nil {
 		t.Fatalf("register first crypto device: %v", err)
 	}
 
+	pendingDeviceMaterial := newTestCryptoDeviceMaterial(t)
 	pendingDetails, err := service.RegisterPendingLinkedCryptoDevice(context.Background(), authSession.Token, RegisterCryptoDeviceInput{
-		Bundle: testCryptoBundleInput(11),
+		Bundle: pendingDeviceMaterial.BundleInput(11),
 	})
 	if err != nil {
 		t.Fatalf("register pending crypto device: %v", err)
@@ -85,6 +95,13 @@ func TestCryptoDeviceLinkIntentApprovalFlow(t *testing.T) {
 		authSession.Token,
 		linkIntent.ID,
 		firstDetails.Device.ID,
+		firstDeviceMaterial.ApprovalProof(
+			linkIntent,
+			firstDetails.Device.ID,
+			pendingDetails.Device.ID,
+			pendingDetails.CurrentBundle.BundleDigest,
+			linkIntent.CreatedAt,
+		),
 	)
 	if err != nil {
 		t.Fatalf("approve crypto link intent: %v", err)
@@ -108,14 +125,76 @@ func TestCryptoDeviceLinkIntentApprovalFlow(t *testing.T) {
 	}
 }
 
+func TestCryptoDeviceLinkIntentApprovalRejectsInvalidProofAndSelfApproval(t *testing.T) {
+	t.Parallel()
+
+	service := newTestService()
+	authSession := mustRegister(t, service, "crypto-proof", "Crypto Proof")
+	firstDeviceMaterial := newTestCryptoDeviceMaterial(t)
+
+	firstDetails, err := service.RegisterFirstCryptoDevice(context.Background(), authSession.Token, RegisterCryptoDeviceInput{
+		Bundle: firstDeviceMaterial.BundleInput(30),
+	})
+	if err != nil {
+		t.Fatalf("register first crypto device: %v", err)
+	}
+
+	pendingDeviceMaterial := newTestCryptoDeviceMaterial(t)
+	pendingDetails, err := service.RegisterPendingLinkedCryptoDevice(context.Background(), authSession.Token, RegisterCryptoDeviceInput{
+		Bundle: pendingDeviceMaterial.BundleInput(31),
+	})
+	if err != nil {
+		t.Fatalf("register pending crypto device: %v", err)
+	}
+
+	linkIntent, err := service.CreateCryptoDeviceLinkIntent(context.Background(), authSession.Token, pendingDetails.Device.ID)
+	if err != nil {
+		t.Fatalf("create crypto link intent: %v", err)
+	}
+
+	if _, _, err := service.ApproveCryptoDeviceLinkIntent(
+		context.Background(),
+		authSession.Token,
+		linkIntent.ID,
+		pendingDetails.Device.ID,
+		pendingDeviceMaterial.ApprovalProof(
+			linkIntent,
+			pendingDetails.Device.ID,
+			pendingDetails.Device.ID,
+			pendingDetails.CurrentBundle.BundleDigest,
+			linkIntent.CreatedAt,
+		),
+	); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидался conflict на self-approval pending device, получено %v", err)
+	}
+
+	rogueMaterial := newTestCryptoDeviceMaterial(t)
+	if _, _, err := service.ApproveCryptoDeviceLinkIntent(
+		context.Background(),
+		authSession.Token,
+		linkIntent.ID,
+		firstDetails.Device.ID,
+		rogueMaterial.ApprovalProof(
+			linkIntent,
+			firstDetails.Device.ID,
+			pendingDetails.Device.ID,
+			pendingDetails.CurrentBundle.BundleDigest,
+			linkIntent.CreatedAt,
+		),
+	); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидался conflict на approval с неверной подписью, получено %v", err)
+	}
+}
+
 func TestPublishPendingBundleExpiresExistingLinkIntentAndRevokePersistsState(t *testing.T) {
 	t.Parallel()
 
 	service := newTestService()
 	authSession := mustRegister(t, service, "crypto-revoke", "Crypto Revoke")
+	firstDeviceMaterial := newTestCryptoDeviceMaterial(t)
 
 	firstDetails, err := service.RegisterFirstCryptoDevice(context.Background(), authSession.Token, RegisterCryptoDeviceInput{
-		Bundle: testCryptoBundleInput(20),
+		Bundle: firstDeviceMaterial.BundleInput(20),
 	})
 	if err != nil {
 		t.Fatalf("register first crypto device: %v", err)
@@ -124,8 +203,9 @@ func TestPublishPendingBundleExpiresExistingLinkIntentAndRevokePersistsState(t *
 		t.Fatalf("ожидался active first device, получено %q", firstDetails.Device.Status)
 	}
 
+	pendingDeviceMaterial := newTestCryptoDeviceMaterial(t)
 	pendingDetails, err := service.RegisterPendingLinkedCryptoDevice(context.Background(), authSession.Token, RegisterCryptoDeviceInput{
-		Bundle: testCryptoBundleInput(21),
+		Bundle: pendingDeviceMaterial.BundleInput(21),
 	})
 	if err != nil {
 		t.Fatalf("register pending crypto device: %v", err)
@@ -138,7 +218,7 @@ func TestPublishPendingBundleExpiresExistingLinkIntentAndRevokePersistsState(t *
 
 	updatedDetails, err := service.PublishCryptoDeviceBundle(context.Background(), authSession.Token, PublishCryptoDeviceBundleInput{
 		CryptoDeviceID: pendingDetails.Device.ID,
-		Bundle:         testCryptoBundleInput(22),
+		Bundle:         pendingDeviceMaterial.BundleInput(22),
 	})
 	if err != nil {
 		t.Fatalf("publish crypto bundle: %v", err)
@@ -170,10 +250,34 @@ func TestPublishPendingBundleExpiresExistingLinkIntentAndRevokePersistsState(t *
 	}
 }
 
-func testCryptoBundleInput(sequence int) CryptoDeviceBundleInput {
+type testCryptoDeviceMaterial struct {
+	identityPrivateKey *ecdsa.PrivateKey
+	identityPublicKey  []byte
+}
+
+func newTestCryptoDeviceMaterial(t *testing.T) *testCryptoDeviceMaterial {
+	t.Helper()
+
+	identityPrivateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate identity key: %v", err)
+	}
+
+	identityPublicKey, err := x509.MarshalPKIXPublicKey(&identityPrivateKey.PublicKey)
+	if err != nil {
+		t.Fatalf("marshal identity public key: %v", err)
+	}
+
+	return &testCryptoDeviceMaterial{
+		identityPrivateKey: identityPrivateKey,
+		identityPublicKey:  identityPublicKey,
+	}
+}
+
+func (m *testCryptoDeviceMaterial) BundleInput(sequence int) CryptoDeviceBundleInput {
 	return CryptoDeviceBundleInput{
-		CryptoSuite:             "signal-pqxdh-v1",
-		IdentityPublicKey:       []byte("identity-public-" + testUUID(sequence)),
+		CryptoSuite:             "webcrypto-p256-foundation-v1",
+		IdentityPublicKey:       append([]byte(nil), m.identityPublicKey...),
 		SignedPrekeyPublic:      []byte("signed-prekey-public-" + testUUID(sequence)),
 		SignedPrekeyID:          "spk-" + testUUID(sequence),
 		SignedPrekeySignature:   []byte("signed-prekey-signature-" + testUUID(sequence)),
@@ -184,4 +288,47 @@ func testCryptoBundleInput(sequence int) CryptoDeviceBundleInput {
 		OneTimePrekeysAvailable: 24,
 		BundleDigest:            []byte("bundle-digest-" + testUUID(sequence)),
 	}
+}
+
+func (m *testCryptoDeviceMaterial) ApprovalProof(
+	linkIntent *CryptoDeviceLinkIntent,
+	approverCryptoDeviceID string,
+	pendingCryptoDeviceID string,
+	pendingBundleDigest []byte,
+	issuedAt time.Time,
+) CryptoDeviceLinkApprovalProof {
+	payload := CryptoDeviceLinkApprovalPayload{
+		Version:                CryptoDeviceLinkApprovalProofVersion,
+		LinkIntentID:           linkIntent.ID,
+		ApproverCryptoDeviceID: approverCryptoDeviceID,
+		PendingCryptoDeviceID:  pendingCryptoDeviceID,
+		PendingBundleDigest:    append([]byte(nil), pendingBundleDigest...),
+		ApprovalChallenge:      append([]byte(nil), linkIntent.ApprovalChallenge...),
+		ChallengeExpiresAt:     linkIntent.ExpiresAt,
+		IssuedAt:               issuedAt.UTC(),
+	}
+	digest := sha256.Sum256(buildCryptoDeviceLinkApprovalSigningMessage(payload))
+	r, s, err := ecdsa.Sign(rand.Reader, m.identityPrivateKey, digest[:])
+	if err != nil {
+		panic(err)
+	}
+
+	signature := make([]byte, 64)
+	copy(signature[:32], leftPadBytes(r.Bytes(), 32))
+	copy(signature[32:], leftPadBytes(s.Bytes(), 32))
+
+	return CryptoDeviceLinkApprovalProof{
+		Payload:   payload,
+		Signature: signature,
+	}
+}
+
+func leftPadBytes(value []byte, size int) []byte {
+	if len(value) >= size {
+		return value[len(value)-size:]
+	}
+
+	padded := make([]byte, size)
+	copy(padded[size-len(value):], value)
+	return padded
 }

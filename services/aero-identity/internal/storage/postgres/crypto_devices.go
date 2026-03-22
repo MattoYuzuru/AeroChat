@@ -152,6 +152,9 @@ func (r *Repository) PublishCryptoDeviceBundle(ctx context.Context, userID strin
 	if err != nil {
 		return nil, nil, convertError(err)
 	}
+	if !bytes.Equal(currentBundleRow.IdentityPublicKey, input.Bundle.IdentityPublicKey) {
+		return nil, nil, fmt.Errorf("%w: crypto device identity_public_key is immutable across bundle publish", identity.ErrConflict)
+	}
 
 	if _, err := q.SupersedeCurrentCryptoDeviceBundle(ctx, identitysqlc.SupersedeCurrentCryptoDeviceBundleParams{
 		CryptoDeviceID: mustParseUUID(input.CryptoDeviceID),
@@ -261,6 +264,7 @@ func (r *Repository) CreateCryptoDeviceLinkIntent(ctx context.Context, params id
 		PendingCryptoDeviceID:    mustParseUUID(params.LinkIntent.PendingCryptoDeviceID),
 		Status:                   params.LinkIntent.Status,
 		BundleDigest:             params.LinkIntent.BundleDigest,
+		ApprovalChallenge:        params.LinkIntent.ApprovalChallenge,
 		CreatedAt:                timestampValue(params.LinkIntent.CreatedAt),
 		ExpiresAt:                timestampValue(params.LinkIntent.ExpiresAt),
 		ApprovedAt:               timestamptzValue(params.LinkIntent.ApprovedAt),
@@ -324,6 +328,12 @@ func (r *Repository) ApproveCryptoDeviceLinkIntent(ctx context.Context, params i
 	if linkIntentRow.Status == identity.CryptoDeviceLinkIntentStatusExpired {
 		return nil, nil, identity.ErrConflict
 	}
+	if params.Proof.Payload.LinkIntentID != params.LinkIntentID {
+		return nil, nil, fmt.Errorf("%w: approval proof link_intent_id mismatch", identity.ErrConflict)
+	}
+	if params.Proof.Payload.ApproverCryptoDeviceID != params.ApproverCryptoDeviceID {
+		return nil, nil, fmt.Errorf("%w: approval proof approver_crypto_device_id mismatch", identity.ErrConflict)
+	}
 	if !linkIntentRow.ExpiresAt.Time.After(params.ApprovedAt) {
 		expiredRow, expireErr := q.ExpireCryptoDeviceLinkIntentByIDAndUserID(ctx, identitysqlc.ExpireCryptoDeviceLinkIntentByIDAndUserIDParams{
 			ID:        mustParseUUID(params.LinkIntentID),
@@ -347,6 +357,9 @@ func (r *Repository) ApproveCryptoDeviceLinkIntent(ctx context.Context, params i
 	if pendingDeviceRow.Status != identity.CryptoDeviceStatusPendingLink {
 		return nil, nil, identity.ErrConflict
 	}
+	if params.ApproverCryptoDeviceID == pendingDeviceRow.ID.String() {
+		return nil, nil, fmt.Errorf("%w: pending crypto device cannot self-approve link intent", identity.ErrConflict)
+	}
 
 	currentBundleRow, err := q.GetCurrentCryptoDeviceBundleByDeviceID(ctx, linkIntentRow.PendingCryptoDeviceID)
 	if err != nil {
@@ -362,6 +375,24 @@ func (r *Repository) ApproveCryptoDeviceLinkIntent(ctx context.Context, params i
 		}
 		return nil, nil, identity.ErrConflict
 	}
+	if params.Proof.Payload.PendingCryptoDeviceID != pendingDeviceRow.ID.String() {
+		return nil, nil, fmt.Errorf("%w: approval proof pending_crypto_device_id mismatch", identity.ErrConflict)
+	}
+	if !bytes.Equal(params.Proof.Payload.PendingBundleDigest, currentBundleRow.BundleDigest) {
+		return nil, nil, fmt.Errorf("%w: approval proof pending_bundle_digest mismatch", identity.ErrConflict)
+	}
+	if !bytes.Equal(params.Proof.Payload.ApprovalChallenge, linkIntentRow.ApprovalChallenge) {
+		return nil, nil, fmt.Errorf("%w: approval proof challenge mismatch", identity.ErrConflict)
+	}
+	if !params.Proof.Payload.ChallengeExpiresAt.Equal(linkIntentRow.ExpiresAt.Time.UTC()) {
+		return nil, nil, fmt.Errorf("%w: approval proof challenge_expires_at mismatch", identity.ErrConflict)
+	}
+	if params.Proof.Payload.IssuedAt.Before(linkIntentRow.CreatedAt.Time.UTC()) {
+		return nil, nil, fmt.Errorf("%w: approval proof issued_at is earlier than link intent creation", identity.ErrConflict)
+	}
+	if params.Proof.Payload.IssuedAt.After(params.ApprovedAt) {
+		return nil, nil, fmt.Errorf("%w: approval proof issued_at is in the future", identity.ErrConflict)
+	}
 
 	approverDeviceRow, err := q.GetCryptoDeviceByIDAndUserID(ctx, identitysqlc.GetCryptoDeviceByIDAndUserIDParams{
 		ID:     mustParseUUID(params.ApproverCryptoDeviceID),
@@ -373,8 +404,15 @@ func (r *Repository) ApproveCryptoDeviceLinkIntent(ctx context.Context, params i
 	if approverDeviceRow.Status != identity.CryptoDeviceStatusActive || approverDeviceRow.RevokedAt.Valid {
 		return nil, nil, identity.ErrConflict
 	}
+	approverBundleRow, err := q.GetCurrentCryptoDeviceBundleByDeviceID(ctx, mustParseUUID(params.ApproverCryptoDeviceID))
+	if err != nil {
+		return nil, nil, convertError(err)
+	}
+	if err := identity.VerifyCryptoDeviceLinkApprovalSignature(approverBundleRow.IdentityPublicKey, params.Proof); err != nil {
+		return nil, nil, err
+	}
 
-	linkIntentRow, err = q.ApproveCryptoDeviceLinkIntentByIDAndUserID(ctx, identitysqlc.ApproveCryptoDeviceLinkIntentByIDAndUserIDParams{
+	approvedLinkIntentRow, err := q.ApproveCryptoDeviceLinkIntentByIDAndUserID(ctx, identitysqlc.ApproveCryptoDeviceLinkIntentByIDAndUserIDParams{
 		ID:                       mustParseUUID(params.LinkIntentID),
 		UserID:                   mustParseUUID(params.UserID),
 		ApprovedAt:               timestampValue(params.ApprovedAt),
@@ -385,7 +423,7 @@ func (r *Repository) ApproveCryptoDeviceLinkIntent(ctx context.Context, params i
 	}
 
 	activatedDeviceRow, err := q.ActivateCryptoDevice(ctx, identitysqlc.ActivateCryptoDeviceParams{
-		ID:                     linkIntentRow.PendingCryptoDeviceID,
+		ID:                     approvedLinkIntentRow.PendingCryptoDeviceID,
 		UserID:                 mustParseUUID(params.UserID),
 		ActivatedAt:            timestampValue(params.ApprovedAt),
 		LinkedByCryptoDeviceID: uuidValue(&params.ApproverCryptoDeviceID),
@@ -398,7 +436,7 @@ func (r *Repository) ApproveCryptoDeviceLinkIntent(ctx context.Context, params i
 		return nil, nil, fmt.Errorf("commit tx: %w", err)
 	}
 
-	linkIntent := toDomainCryptoDeviceLinkIntent(linkIntentRow)
+	linkIntent := toDomainCryptoDeviceLinkIntent(approvedLinkIntentRow)
 	device := toDomainCryptoDevice(activatedDeviceRow)
 	return &linkIntent, &device, nil
 }
@@ -432,7 +470,7 @@ func (r *Repository) ExpireCryptoDeviceLinkIntent(ctx context.Context, userID st
 		return nil, identity.ErrConflict
 	}
 
-	linkIntentRow, err = q.ExpireCryptoDeviceLinkIntentByIDAndUserID(ctx, identitysqlc.ExpireCryptoDeviceLinkIntentByIDAndUserIDParams{
+	expiredLinkIntentRow, err := q.ExpireCryptoDeviceLinkIntentByIDAndUserID(ctx, identitysqlc.ExpireCryptoDeviceLinkIntentByIDAndUserIDParams{
 		ID:        mustParseUUID(linkIntentID),
 		UserID:    mustParseUUID(userID),
 		ExpiredAt: timestampValue(now),
@@ -445,7 +483,7 @@ func (r *Repository) ExpireCryptoDeviceLinkIntent(ctx context.Context, userID st
 		return nil, fmt.Errorf("commit tx: %w", err)
 	}
 
-	linkIntent := toDomainCryptoDeviceLinkIntent(linkIntentRow)
+	linkIntent := toDomainCryptoDeviceLinkIntent(expiredLinkIntentRow)
 	return &linkIntent, nil
 }
 
@@ -539,18 +577,122 @@ func toDomainCryptoDeviceBundle(row identitysqlc.CryptoDeviceBundle) identity.Cr
 	}
 }
 
-func toDomainCryptoDeviceLinkIntent(row identitysqlc.CryptoDeviceLinkIntent) identity.CryptoDeviceLinkIntent {
+func toDomainCryptoDeviceLinkIntent(row any) identity.CryptoDeviceLinkIntent {
+	switch value := row.(type) {
+	case identitysqlc.CryptoDeviceLinkIntent:
+		return toDomainCryptoDeviceLinkIntentFields(
+			value.ID,
+			value.UserID,
+			value.PendingCryptoDeviceID,
+			value.Status,
+			value.BundleDigest,
+			value.ApprovalChallenge,
+			value.CreatedAt,
+			value.ExpiresAt,
+			value.ApprovedAt,
+			value.ExpiredAt,
+			value.ApprovedByCryptoDeviceID,
+		)
+	case identitysqlc.CreateCryptoDeviceLinkIntentRow:
+		return toDomainCryptoDeviceLinkIntentFields(
+			value.ID,
+			value.UserID,
+			value.PendingCryptoDeviceID,
+			value.Status,
+			value.BundleDigest,
+			value.ApprovalChallenge,
+			value.CreatedAt,
+			value.ExpiresAt,
+			value.ApprovedAt,
+			value.ExpiredAt,
+			value.ApprovedByCryptoDeviceID,
+		)
+	case identitysqlc.GetCryptoDeviceLinkIntentByIDAndUserIDRow:
+		return toDomainCryptoDeviceLinkIntentFields(
+			value.ID,
+			value.UserID,
+			value.PendingCryptoDeviceID,
+			value.Status,
+			value.BundleDigest,
+			value.ApprovalChallenge,
+			value.CreatedAt,
+			value.ExpiresAt,
+			value.ApprovedAt,
+			value.ExpiredAt,
+			value.ApprovedByCryptoDeviceID,
+		)
+	case identitysqlc.ListCryptoDeviceLinkIntentsByUserIDRow:
+		return toDomainCryptoDeviceLinkIntentFields(
+			value.ID,
+			value.UserID,
+			value.PendingCryptoDeviceID,
+			value.Status,
+			value.BundleDigest,
+			value.ApprovalChallenge,
+			value.CreatedAt,
+			value.ExpiresAt,
+			value.ApprovedAt,
+			value.ExpiredAt,
+			value.ApprovedByCryptoDeviceID,
+		)
+	case identitysqlc.ApproveCryptoDeviceLinkIntentByIDAndUserIDRow:
+		return toDomainCryptoDeviceLinkIntentFields(
+			value.ID,
+			value.UserID,
+			value.PendingCryptoDeviceID,
+			value.Status,
+			value.BundleDigest,
+			value.ApprovalChallenge,
+			value.CreatedAt,
+			value.ExpiresAt,
+			value.ApprovedAt,
+			value.ExpiredAt,
+			value.ApprovedByCryptoDeviceID,
+		)
+	case identitysqlc.ExpireCryptoDeviceLinkIntentByIDAndUserIDRow:
+		return toDomainCryptoDeviceLinkIntentFields(
+			value.ID,
+			value.UserID,
+			value.PendingCryptoDeviceID,
+			value.Status,
+			value.BundleDigest,
+			value.ApprovalChallenge,
+			value.CreatedAt,
+			value.ExpiresAt,
+			value.ApprovedAt,
+			value.ExpiredAt,
+			value.ApprovedByCryptoDeviceID,
+		)
+	default:
+		panic(fmt.Sprintf("unsupported crypto device link intent row type %T", row))
+	}
+}
+
+func toDomainCryptoDeviceLinkIntentFields(
+	id uuid.UUID,
+	userID uuid.UUID,
+	pendingCryptoDeviceID uuid.UUID,
+	status string,
+	bundleDigest []byte,
+	approvalChallenge []byte,
+	createdAt pgtype.Timestamptz,
+	expiresAt pgtype.Timestamptz,
+	approvedAt pgtype.Timestamptz,
+	expiredAt pgtype.Timestamptz,
+	approvedByCryptoDeviceID pgtype.UUID,
+) identity.CryptoDeviceLinkIntent {
 	return identity.CryptoDeviceLinkIntent{
-		ID:                     row.ID.String(),
-		UserID:                 row.UserID.String(),
-		PendingCryptoDeviceID:  row.PendingCryptoDeviceID.String(),
-		Status:                 row.Status,
-		BundleDigest:           cloneByteSlice(row.BundleDigest),
-		CreatedAt:              timestampPointer(row.CreatedAt),
-		ExpiresAt:              timestampPointer(row.ExpiresAt),
-		ApprovedAt:             timestamptzPointer(row.ApprovedAt),
-		ExpiredAt:              timestamptzPointer(row.ExpiredAt),
-		ApproverCryptoDeviceID: uuidPointer(row.ApprovedByCryptoDeviceID),
+		ID:                     id.String(),
+		UserID:                 userID.String(),
+		PendingCryptoDeviceID:  pendingCryptoDeviceID.String(),
+		Status:                 status,
+		BundleDigest:           cloneByteSlice(bundleDigest),
+		ApprovalChallenge:      cloneByteSlice(approvalChallenge),
+		CreatedAt:              timestampPointer(createdAt),
+		ExpiresAt:              timestampPointer(expiresAt),
+		ApprovedAt:             timestamptzPointer(approvedAt),
+		ExpiredAt:              timestamptzPointer(expiredAt),
+		ApproverCryptoDeviceID: uuidPointer(approvedByCryptoDeviceID),
 	}
 }
 
