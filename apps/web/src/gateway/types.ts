@@ -910,6 +910,7 @@ export interface GatewayClient {
       operationKind: "content" | "edit" | "tombstone";
       targetMessageId?: string | null;
       revision: number;
+      attachmentIds?: string[];
       deliveries: Array<{
         recipientCryptoDeviceId: string;
         transportHeader: string;
@@ -957,6 +958,7 @@ export interface GatewayClient {
       operationKind: "content" | "control" | "edit" | "tombstone";
       targetMessageId?: string | null;
       revision: number;
+      attachmentIds?: string[];
       ciphertext: string;
     },
   ): Promise<EncryptedGroupStoredEnvelope>;

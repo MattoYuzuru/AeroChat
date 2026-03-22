@@ -315,11 +315,13 @@ type GroupThread struct {
 }
 
 type MessageAttachment struct {
-	AttachmentID        uuid.UUID          `db:"attachment_id" json:"attachment_id"`
-	DirectChatMessageID pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
-	GroupMessageID      pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
-	AttachedByUserID    uuid.UUID          `db:"attached_by_user_id" json:"attached_by_user_id"`
-	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	AttachmentID               uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	DirectChatMessageID        pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	GroupMessageID             pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	AttachedByUserID           uuid.UUID          `db:"attached_by_user_id" json:"attached_by_user_id"`
+	CreatedAt                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	EncryptedDirectMessageV2ID pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
+	EncryptedGroupMessageV1ID  pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
 }
 
 type User struct {

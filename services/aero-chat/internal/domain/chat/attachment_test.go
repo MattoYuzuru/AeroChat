@@ -281,6 +281,95 @@ func TestSendAttachmentOnlyMessageInGroupChat(t *testing.T) {
 	}
 }
 
+func TestSendEncryptedGroupMessageAttachesEncryptedRelayBlobForGroupParticipants(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	_ = repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	group := mustCreateGroup(t, service, alice.Token, "Encrypted media")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	intent, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		"",
+		group.ID,
+		"ciphertext.bin",
+		"application/octet-stream",
+		AttachmentRelaySchemaEncryptedBlobV1,
+		2048,
+	)
+	if err != nil {
+		t.Fatalf("create encrypted group upload intent: %v", err)
+	}
+
+	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+		Size:        intent.Attachment.SizeBytes,
+		ContentType: intent.Attachment.MimeType,
+	}
+
+	uploadedAttachment, err := service.CompleteAttachmentUpload(context.Background(), alice.Token, intent.Attachment.ID, intent.UploadSession.ID)
+	if err != nil {
+		t.Fatalf("complete encrypted group upload: %v", err)
+	}
+	if uploadedAttachment.Status != AttachmentStatusUploaded {
+		t.Fatalf("ожидался uploaded attachment перед encrypted group linkage, получено %q", uploadedAttachment.Status)
+	}
+
+	bootstrap, err := service.GetEncryptedGroupBootstrap(context.Background(), alice.Token, group.ID, aliceSender.ID)
+	if err != nil {
+		t.Fatalf("bootstrap encrypted group: %v", err)
+	}
+
+	receipt, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
+		GroupID:              group.ID,
+		MessageID:            testUUID(706),
+		MLSGroupID:           bootstrap.Lane.MLSGroupID,
+		RosterVersion:        bootstrap.Lane.RosterVersion,
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedGroupMessageOperationContent,
+		Revision:             1,
+		AttachmentIDs:        []string{uploadedAttachment.ID},
+		Ciphertext:           []byte("group-encrypted-media"),
+	})
+	if err != nil {
+		t.Fatalf("send encrypted group message with media: %v", err)
+	}
+	if receipt.StoredDeliveryCount == 0 {
+		t.Fatal("ожидались stored deliveries для encrypted group media message")
+	}
+
+	linkedAttachment := repo.attachments[uploadedAttachment.ID]
+	if linkedAttachment.Status != AttachmentStatusAttached {
+		t.Fatalf("ожидался attached status после encrypted group linkage, получено %q", linkedAttachment.Status)
+	}
+	if linkedAttachment.MessageID == nil || *linkedAttachment.MessageID != receipt.MessageID {
+		t.Fatalf("ожидалась linkage к encrypted group message %q, получено %+v", receipt.MessageID, linkedAttachment.MessageID)
+	}
+
+	participantAccess, err := service.GetAttachment(context.Background(), bob.Token, uploadedAttachment.ID)
+	if err != nil {
+		t.Fatalf("group participant get encrypted relay attachment: %v", err)
+	}
+	if participantAccess.Attachment.Status != AttachmentStatusAttached {
+		t.Fatalf("ожидался attached attachment для group participant, получено %q", participantAccess.Attachment.Status)
+	}
+	if participantAccess.DownloadURL == "" {
+		t.Fatal("ожидался presigned download url для encrypted relay blob")
+	}
+}
+
 func TestCreateAttachmentUploadIntentRejectsQuotaExhaustion(t *testing.T) {
 	t.Parallel()
 

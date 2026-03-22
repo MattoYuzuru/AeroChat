@@ -23,7 +23,10 @@ import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
 import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
 import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
+import { EncryptedMessageAttachmentList } from "../chats/EncryptedMessageAttachmentList";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
+import { useEncryptedMediaAttachmentDraft } from "../chats/useEncryptedMediaAttachmentDraft";
+import type { CryptoContextState } from "../crypto/runtime-context";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { gatewayClient } from "../gateway/runtime";
 import {
@@ -114,6 +117,7 @@ export function GroupsPage() {
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const selectedStateRef = useRef(selectedState);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const activeTypingTargetRef = useRef<GroupTypingSessionTarget | null>(null);
   const typingLastSentAtRef = useRef(0);
   const typingRefreshTimerRef = useRef<number | null>(null);
@@ -151,6 +155,18 @@ export function GroupsPage() {
         : null,
     onUnauthenticated: expireSession,
   });
+  const encryptedMediaAttachmentDraft = useEncryptedMediaAttachmentDraft({
+    enabled: authState.status === "authenticated",
+    token,
+    scope:
+      selectedState.status === "ready"
+        ? {
+            kind: "group",
+            id: selectedState.snapshot.group.id,
+          }
+        : null,
+    onUnauthenticated: expireSession,
+  });
   const voiceNoteRecorder = useVoiceNoteRecorder({
     enabled: authState.status === "authenticated",
   });
@@ -175,11 +191,15 @@ export function GroupsPage() {
     videoNoteStatus === "recording" ||
     videoNoteStatus === "processing" ||
     videoNoteStatus === "recorded";
+  const uploadedAttachmentId = attachmentComposer.uploadedAttachmentId;
+  const attachmentDraft = attachmentComposer.state.draft;
+  const encryptedAttachmentDraft = encryptedMediaAttachmentDraft.draft;
+  const uploadedEncryptedAttachmentDraft = encryptedMediaAttachmentDraft.uploadedDraft;
   const canSubmitGroupComposer =
     selectedState.status === "ready" &&
     canSubmitMessageComposer({
       text: composerText,
-      uploadedAttachmentId: attachmentComposer.uploadedAttachmentId,
+      uploadedAttachmentId,
       isUploading: attachmentComposer.isUploading,
       canSendMessages: selectedState.snapshot.thread.canSendMessages,
     });
@@ -187,6 +207,9 @@ export function GroupsPage() {
     selectedState.status === "ready" &&
     !isSendingMessage &&
     !attachmentComposer.isUploading &&
+    !encryptedMediaAttachmentDraft.isUploading &&
+    encryptedAttachmentDraft === null &&
+    uploadedEncryptedAttachmentDraft === null &&
     !hasPendingVoiceNote &&
     !hasPendingVideoNote &&
     selectedState.snapshot.thread.canSendMessages;
@@ -194,14 +217,18 @@ export function GroupsPage() {
     selectedState.status === "ready" &&
     !isSendingMessage &&
     !attachmentComposer.isUploading &&
-    attachmentComposer.state.draft === null &&
+    !encryptedMediaAttachmentDraft.isUploading &&
+    attachmentDraft === null &&
+    encryptedAttachmentDraft === null &&
     !hasPendingVideoNote &&
     selectedState.snapshot.thread.canSendMessages;
   const canRecordVideoNote =
     selectedState.status === "ready" &&
     !isSendingMessage &&
     !attachmentComposer.isUploading &&
-    attachmentComposer.state.draft === null &&
+    !encryptedMediaAttachmentDraft.isUploading &&
+    attachmentDraft === null &&
+    encryptedAttachmentDraft === null &&
     !hasPendingVoiceNote &&
     selectedState.snapshot.thread.canSendMessages;
 
@@ -931,13 +958,49 @@ export function GroupsPage() {
           messageId,
           entry: encryptedMessageIndex.get(messageId) ?? null,
         }));
+  const canPickEncryptedAttachment =
+    selectedState.status === "ready" &&
+    encryptedGroupLane.status === "ready" &&
+    encryptedGroupLane.bootstrap !== null &&
+    selectedState.snapshot.thread.canSendMessages &&
+    !isSendingMessage &&
+    !cryptoRuntime.state.isActionPending &&
+    !attachmentComposer.isUploading &&
+    !encryptedMediaAttachmentDraft.isUploading &&
+    attachmentDraft === null &&
+    uploadedAttachmentId === null &&
+    !hasPendingVoiceNote &&
+    !hasPendingVideoNote &&
+    editingEncryptedEntry === null;
   const canSendEncryptedGroupText =
     selectedState.status === "ready" &&
     encryptedGroupLane.status === "ready" &&
     encryptedGroupLane.bootstrap !== null &&
     selectedState.snapshot.thread.canSendMessages &&
+    !isSendingMessage &&
     !cryptoRuntime.state.isActionPending &&
-    normalizeComposerMessageText(encryptedComposerText) !== "";
+    !attachmentComposer.isUploading &&
+    !encryptedMediaAttachmentDraft.isUploading &&
+    attachmentDraft === null &&
+    uploadedAttachmentId === null &&
+    !hasPendingVoiceNote &&
+    !hasPendingVideoNote &&
+    (editingEncryptedEntry !== null
+      ? normalizeComposerMessageText(encryptedComposerText) !== "" &&
+        uploadedEncryptedAttachmentDraft === null
+      : normalizeComposerMessageText(encryptedComposerText) !== "" ||
+          uploadedEncryptedAttachmentDraft !== null);
+  const encryptedSendHint = describeEncryptedGroupBootstrapSendHint({
+    groupSelected: selectedState.status === "ready",
+    composerText: encryptedComposerText,
+    legacyAttachmentDraftPresent: attachmentDraft !== null || uploadedAttachmentId !== null,
+    encryptedAttachmentDraft,
+    hasPendingVoiceNote,
+    hasPendingVideoNote,
+    isEditingEncryptedMessage: editingEncryptedEntry !== null,
+    hasEncryptedReplyTarget: selectedEncryptedReplyEntry !== null,
+    cryptoRuntimeState: cryptoRuntime.state,
+  });
   const typingLabel =
     selectedState.status === "ready"
       ? describeGroupTypingLabel(selectedState.snapshot.typingState, authState.profile.id)
@@ -1182,11 +1245,35 @@ export function GroupsPage() {
       setNotice(null);
       return;
     }
+    if (attachmentDraft !== null || uploadedAttachmentId !== null) {
+      setEncryptedComposerError(
+        "Legacy group attachment composer не подключён к encrypted group send. Используйте отдельный encrypted media draft.",
+      );
+      setNotice(null);
+      return;
+    }
+    if (hasPendingVoiceNote || hasPendingVideoNote) {
+      setEncryptedComposerError(
+        "Voice/video note path остаётся legacy group attachment flow и не входит в encrypted group media bootstrap.",
+      );
+      setNotice(null);
+      return;
+    }
 
     const normalizedText = normalizeComposerMessageText(encryptedComposerText);
-    if (normalizedText === "") {
+    if (
+      editingEncryptedEntry !== null &&
+      (encryptedAttachmentDraft !== null || uploadedEncryptedAttachmentDraft !== null)
+    ) {
       setEncryptedComposerError(
-        "Введите текст, прежде чем отправлять encrypted group message.",
+        "Encrypted group edit в этом slice не добавляет новые вложения. Уберите encrypted draft и повторите text-only edit.",
+      );
+      setNotice(null);
+      return;
+    }
+    if (normalizedText === "" && uploadedEncryptedAttachmentDraft === null) {
+      setEncryptedComposerError(
+        "Добавьте текст или готовый encrypted attachment для encrypted group send.",
       );
       setNotice(null);
       return;
@@ -1197,6 +1284,8 @@ export function GroupsPage() {
     setNotice(null);
 
     try {
+      const attachmentDrafts =
+        uploadedEncryptedAttachmentDraft === null ? [] : [uploadedEncryptedAttachmentDraft];
       const result =
         editingEncryptedEntry !== null
           ? await cryptoRuntime.sendEncryptedGroupEdit(
@@ -1210,6 +1299,7 @@ export function GroupsPage() {
               selectedState.snapshot.group.id,
               normalizedText,
               selectedEncryptedReplyEntry?.messageId ?? null,
+              attachmentDrafts,
             );
       if (result === null) {
         return;
@@ -1219,12 +1309,16 @@ export function GroupsPage() {
       setEncryptedComposerText("");
       setSelectedEncryptedReplyMessageId(null);
       setEditingEncryptedMessageId(null);
+      encryptedMediaAttachmentDraft.markSendSucceeded();
       setNotice(
         editingEncryptedEntry !== null
           ? "Encrypted group edit опубликован через local crypto runtime."
-          : "Encrypted group message отправлено через local crypto runtime.",
+          : attachmentDrafts.length > 0
+            ? "Encrypted group media message отправлено через local crypto runtime."
+            : "Encrypted group message отправлено через local crypto runtime.",
       );
     } catch (error) {
+      encryptedMediaAttachmentDraft.markSendFailed();
       setEncryptedComposerError(
         error instanceof Error && error.message.trim() !== ""
           ? error.message
@@ -1463,6 +1557,17 @@ export function GroupsPage() {
     setActionError(null);
     setNotice(null);
     await attachmentComposer.selectFile(file);
+  }
+
+  async function handleEncryptedAttachmentSelection(file: File | null) {
+    if (file === null) {
+      return;
+    }
+
+    setEncryptedComposerError(null);
+    setActionError(null);
+    setNotice(null);
+    await encryptedMediaAttachmentDraft.selectFile(file);
   }
 
   async function handleOpenAttachment(attachmentId: string) {
@@ -2204,11 +2309,107 @@ export function GroupsPage() {
                         </div>
                       )}
 
+                      <div className={styles.attachmentActions}>
+                        <input
+                          accept="*/*"
+                          className={styles.attachmentInput}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            void handleEncryptedAttachmentSelection(file);
+                            event.target.value = "";
+                          }}
+                          ref={encryptedAttachmentInputRef}
+                          type="file"
+                        />
+                        <button
+                          className={styles.secondaryButton}
+                          disabled={!canPickEncryptedAttachment}
+                          onClick={() => {
+                            encryptedAttachmentInputRef.current?.click();
+                          }}
+                          type="button"
+                        >
+                          {encryptedAttachmentDraft === null
+                            ? "Выбрать encrypted файл"
+                            : "Заменить encrypted файл"}
+                        </button>
+                        <span className={styles.attachmentHint}>
+                          Этот path reuse'ит ciphertext-only relay из ADR-065: файл шифруется до
+                          upload, descriptor уходит только внутри encrypted group payload.
+                        </span>
+                      </div>
+
+                      {encryptedAttachmentDraft && (
+                        <div className={styles.attachmentDraftCard}>
+                          <div>
+                            <p className={styles.attachmentDraftTitle}>
+                              {encryptedAttachmentDraft.fileName}
+                            </p>
+                            <p className={styles.attachmentDraftMeta}>
+                              {formatAttachmentSize(
+                                encryptedAttachmentDraft.plaintextSizeBytes,
+                              )}{" "}
+                              plaintext •{" "}
+                              {encryptedAttachmentDraft.ciphertextSizeBytes > 0 &&
+                                `${formatAttachmentSize(
+                                  encryptedAttachmentDraft.ciphertextSizeBytes,
+                                )} ciphertext • `}
+                              {describeAttachmentMimeType(encryptedAttachmentDraft.mimeType)}
+                            </p>
+                            {encryptedAttachmentDraft.status === "preparing" && (
+                              <p className={styles.attachmentDraftStatus}>
+                                Шифруем файл внутри crypto runtime перед ciphertext upload...
+                              </p>
+                            )}
+                            {encryptedAttachmentDraft.status === "uploading" && (
+                              <p className={styles.attachmentDraftStatus}>
+                                Загружаем ciphertext blob: {encryptedAttachmentDraft.progress}%
+                              </p>
+                            )}
+                            {encryptedAttachmentDraft.status === "uploaded" && (
+                              <p className={styles.attachmentDraftStatus}>
+                                Ciphertext blob загружен. Descriptor будет отправлен только через
+                                encrypted group content message.
+                              </p>
+                            )}
+                            {encryptedAttachmentDraft.status === "error" && (
+                              <p className={styles.attachmentDraftError}>
+                                {encryptedAttachmentDraft.errorMessage}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className={styles.attachmentDraftActions}>
+                            {encryptedAttachmentDraft.status === "error" && (
+                              <button
+                                className={styles.ghostButton}
+                                onClick={() => {
+                                  void encryptedMediaAttachmentDraft.retryUpload();
+                                }}
+                                type="button"
+                              >
+                                Повторить upload
+                              </button>
+                            )}
+                            <button
+                              className={styles.ghostButton}
+                              onClick={() => {
+                                encryptedMediaAttachmentDraft.removeDraft();
+                              }}
+                              type="button"
+                            >
+                              Убрать
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <label className={styles.field}>
                         <span>Encrypted text</span>
                         <textarea
                           disabled={
                             cryptoRuntime.state.isActionPending ||
+                            encryptedMediaAttachmentDraft.isUploading ||
                             !selectedState.snapshot.thread.canSendMessages
                           }
                           maxLength={4000}
@@ -2218,7 +2419,7 @@ export function GroupsPage() {
                           }}
                           placeholder={
                             selectedState.snapshot.thread.canSendMessages
-                              ? "Отправить text-only encrypted group message через local crypto runtime"
+                              ? "Отправить encrypted group message через local crypto runtime"
                               : "Текущая роль не может отправлять encrypted group messages"
                           }
                           rows={4}
@@ -2230,15 +2431,11 @@ export function GroupsPage() {
                         <div className={styles.error}>{encryptedComposerError}</div>
                       )}
 
-                      <p className={styles.helperText}>
-                        Этот composer не подключён к legacy attachment flow, не делает
-                        plaintext fallback и публикует edit/tombstone только как opaque encrypted
-                        mutations.
-                      </p>
+                      <p className={styles.helperText}>{encryptedSendHint}</p>
 
                       <div className={styles.composerFooter}>
                         <span className={styles.characterCount}>
-                          {encryptedComposerText.trim().length}/4000
+                          {normalizeComposerMessageText(encryptedComposerText).length}/4000
                         </span>
                         <button
                           className={styles.primaryButton}
@@ -2366,11 +2563,20 @@ export function GroupsPage() {
                                       <div className={styles.messageText}>
                                         <SafeMessageMarkdown text={entry.text} />
                                       </div>
-                                    ) : (
+                                    ) : entry.attachments.length === 0 ? (
                                       <p className={styles.helperText}>
                                         Bootstrap payload не содержит renderable text body.
                                       </p>
-                                    )}
+                                    ) : null}
+                                    <EncryptedMessageAttachmentList
+                                      accessToken={token}
+                                      attachments={entry.attachments}
+                                      tone={
+                                        entry.senderUserId === authState.profile.id
+                                          ? "own"
+                                          : "other"
+                                      }
+                                    />
                                   </>
                                 )
                               ) : (
@@ -2744,13 +2950,12 @@ export function GroupsPage() {
                       }}
                       type="button"
                     >
-                      {attachmentComposer.state.draft === null
-                        ? "Выбрать файл"
-                        : "Заменить файл"}
+                      {attachmentDraft === null ? "Выбрать файл" : "Заменить файл"}
                     </button>
                     <span className={styles.attachmentHint}>
-                      Single-file composer: файл, voice note или video note можно отправить и без
-                      текста после upload.
+                      Single-file composer: legacy file, voice note или video note идут через
+                      plaintext path. Encrypted media для MLS lane отправляется только отдельным
+                      encrypted composer выше.
                     </span>
                   </div>
 
@@ -2772,6 +2977,7 @@ export function GroupsPage() {
                     sendDisabled={
                       isSendingMessage ||
                       attachmentComposer.isUploading ||
+                      encryptedMediaAttachmentDraft.isUploading ||
                       !selectedState.snapshot.thread.canSendMessages
                     }
                     startDisabled={!canRecordVoiceNote}
@@ -2797,6 +3003,7 @@ export function GroupsPage() {
                     sendDisabled={
                       isSendingMessage ||
                       attachmentComposer.isUploading ||
+                      encryptedMediaAttachmentDraft.isUploading ||
                       !selectedState.snapshot.thread.canSendMessages
                     }
                     startDisabled={!canRecordVideoNote}
@@ -2804,41 +3011,40 @@ export function GroupsPage() {
                     stopDisabled={isSendingMessage}
                   />
 
-                  {attachmentComposer.state.draft && (
+                  {attachmentDraft && (
                     <div className={styles.attachmentDraftCard}>
                       <div>
                         <p className={styles.attachmentDraftTitle}>
-                          {attachmentComposer.state.draft.fileName}
+                          {attachmentDraft.fileName}
                         </p>
                         <p className={styles.attachmentDraftMeta}>
-                          {formatAttachmentSize(attachmentComposer.state.draft.sizeBytes)} •{" "}
-                          {describeAttachmentMimeType(attachmentComposer.state.draft.mimeType)}
+                          {formatAttachmentSize(attachmentDraft.sizeBytes)} •{" "}
+                          {describeAttachmentMimeType(attachmentDraft.mimeType)}
                         </p>
-                        {attachmentComposer.state.draft.status === "preparing" && (
+                        {attachmentDraft.status === "preparing" && (
                           <p className={styles.attachmentDraftStatus}>
                             Подготавливаем upload intent...
                           </p>
                         )}
-                        {attachmentComposer.state.draft.status === "uploading" && (
+                        {attachmentDraft.status === "uploading" && (
                           <p className={styles.attachmentDraftStatus}>
-                            Загружаем: {attachmentComposer.state.draft.progress}%
+                            Загружаем: {attachmentDraft.progress}%
                           </p>
                         )}
-                        {attachmentComposer.state.draft.status === "uploaded" && (
+                        {attachmentDraft.status === "uploaded" && (
                           <p className={styles.attachmentDraftStatus}>
                             Файл загружен и будет прикреплён к следующему сообщению.
                           </p>
                         )}
-                        {attachmentComposer.state.draft.status === "error" && (
+                        {attachmentDraft.status === "error" && (
                           <p className={styles.attachmentDraftError}>
-                            {attachmentComposer.state.draft.errorMessage ??
-                              "Не удалось загрузить файл."}
+                            {attachmentDraft.errorMessage ?? "Не удалось загрузить файл."}
                           </p>
                         )}
                       </div>
 
                       <div className={styles.attachmentDraftActions}>
-                        {attachmentComposer.state.draft.status === "error" && (
+                        {attachmentDraft.status === "error" && (
                           <button
                             className={styles.ghostButton}
                             onClick={() => {
@@ -3546,8 +3752,13 @@ function describeEncryptedGroupComposerReplyTarget(
   if (entry.text && entry.text.trim() !== "") {
     return entry.text.length > 140 ? `${entry.text.slice(0, 137)}...` : entry.text;
   }
+  if (entry.attachments.length > 0) {
+    return entry.attachments.length === 1
+      ? "Encrypted вложение"
+      : `Encrypted вложения: ${entry.attachments.length}`;
+  }
 
-  return "Encrypted сообщение без renderable text body.";
+  return "Encrypted сообщение без renderable content.";
 }
 
 function describeEncryptedGroupPinnedPreview(
@@ -3561,6 +3772,71 @@ function describeEncryptedGroupPinnedPreview(
   }
 
   return describeEncryptedGroupComposerReplyTarget(entry);
+}
+
+function describeEncryptedGroupBootstrapSendHint(input: {
+  groupSelected: boolean;
+  composerText: string;
+  legacyAttachmentDraftPresent: boolean;
+  encryptedAttachmentDraft: ReturnType<
+    typeof useEncryptedMediaAttachmentDraft
+  >["draft"];
+  hasPendingVoiceNote: boolean;
+  hasPendingVideoNote: boolean;
+  isEditingEncryptedMessage: boolean;
+  hasEncryptedReplyTarget: boolean;
+  cryptoRuntimeState: CryptoContextState;
+}): string {
+  if (!input.groupSelected) {
+    return "Encrypted group media bootstrap доступен только внутри открытой группы.";
+  }
+  if (input.cryptoRuntimeState.status !== "ready") {
+    return "Crypto runtime ещё не готов. Encrypted group send ждёт worker bootstrap.";
+  }
+  const snapshot = input.cryptoRuntimeState.snapshot;
+  if (
+    snapshot === null ||
+    snapshot.support !== "available" ||
+    snapshot.phase === "error" ||
+    snapshot.localDevice?.status !== "active"
+  ) {
+    return (
+      snapshot?.errorMessage ??
+      "Для encrypted group media bootstrap нужен active local crypto-device."
+    );
+  }
+  if (input.legacyAttachmentDraftPresent) {
+    return "Legacy group attachment draft отправляется только через plaintext thread. Для encrypted media используйте отдельный encrypted draft.";
+  }
+  if (input.encryptedAttachmentDraft?.status === "preparing") {
+    return "Файл шифруется внутри crypto runtime перед presigned ciphertext upload.";
+  }
+  if (input.encryptedAttachmentDraft?.status === "uploading") {
+    return "Загружаем ciphertext blob через общий relay path. Descriptor уйдёт позже внутри encrypted group payload.";
+  }
+  if (input.encryptedAttachmentDraft?.status === "error") {
+    return "Encrypted media draft не готов: исправьте ошибку upload и повторите.";
+  }
+  if (input.hasPendingVoiceNote || input.hasPendingVideoNote) {
+    return "Voice/video notes пока остаются только в legacy group attachment flow и не входят в encrypted media bootstrap.";
+  }
+  if (input.isEditingEncryptedMessage) {
+    return "Encrypted group edit в этом slice остаётся text-only. Новые вложения добавляются только в новый content message.";
+  }
+  if (input.hasEncryptedReplyTarget) {
+    return "Reply reference и media descriptor уходят только внутри ciphertext payload. Сервер не строит plaintext quote preview.";
+  }
+  if (
+    normalizeComposerMessageText(input.composerText) === "" &&
+    input.encryptedAttachmentDraft?.status !== "uploaded"
+  ) {
+    return "Введите текст или подготовьте encrypted attachment, чтобы отправить bounded encrypted group message.";
+  }
+  if (input.encryptedAttachmentDraft?.status === "uploaded") {
+    return "Ciphertext blob уже загружен. Кнопка отправит descriptor внутри encrypted group content message без второго group-only media path.";
+  }
+
+  return "Этот composer reuse'ит ADR-065 как есть: ciphertext-only relay, local decrypt/use и без plaintext shadow write в legacy group history.";
 }
 
 function jumpToMessage(elementId: string) {

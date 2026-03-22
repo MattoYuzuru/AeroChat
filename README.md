@@ -108,6 +108,12 @@ AeroChat должен поддерживать:
         - replies, edits и tombstones применяются как encrypted events c deterministic local projection convergence;
         - pin/unpin остаётся server-visible control-plane metadata по stable logical `message_id`, без plaintext preview на сервере;
         - web рендерит pinned/reply state только из локально разрешённых encrypted entries и честно показывает unresolved/tombstoned состояние, если target пока недоступен;
+      - encrypted group media bootstrap:
+        - web reuse'ит тот же ciphertext-only encrypted media relay v1 из `ADR-065`, без отдельной group-only media architecture;
+        - файл шифруется внутри crypto runtime до upload, ciphertext blob живёт в обычном attachment relay, а encrypted descriptor уходит только внутри encrypted group `content` payload;
+        - attachment linkage к logical encrypted message остаётся минимальным shared relay control-plane, чтобы участники группы могли легально получить ciphertext blob через существующий attachment access path;
+        - локальный decrypt/use path reuse'ит existing encrypted attachment list и даёт bounded open/download/inline preview для file/image/audio/video там, где это уже поддерживается;
+        - attachment-only encrypted media message usable, но encrypted search по-прежнему индексирует только локально расшифрованный text и не обещает media-content parity;
       - encrypted group unread/read recovery foundation:
         - viewer-relative unread/read для encrypted group lane считается по opaque control-plane metadata и не зависит от plaintext body;
         - `ListGroups` / `GetGroupChat`, realtime и active encrypted lane теперь умеют продвигать отдельный encrypted read progression;
@@ -116,7 +122,7 @@ AeroChat должен поддерживать:
     - coexistence остаётся bounded и честной:
       - legacy plaintext group history не переписывается и не re-encrypt'ится;
       - encrypted lane forward-only и не dual-write'ит те же сообщения в plaintext path;
-    - текущий slice не объявляет full MLS implementation, encrypted group media parity во всех сценариях или backup/recovery.
+    - текущий slice не объявляет full MLS implementation, full encrypted group media parity во всех сценариях или backup/recovery.
   - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
   - без claims о full encrypted DM/group parity, full encrypted search parity, backup/recovery или full MLS client completeness.
 - explicit group moderation/admin policy foundation:

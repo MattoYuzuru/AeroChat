@@ -7418,10 +7418,13 @@ type SendEncryptedDirectMessageV2Request struct {
 	OperationKind        EncryptedDirectMessageV2OperationKind `protobuf:"varint,4,opt,name=operation_kind,json=operationKind,proto3,enum=aerochat.chat.v1.EncryptedDirectMessageV2OperationKind" json:"operation_kind,omitempty"`
 	TargetMessageId      *string                               `protobuf:"bytes,5,opt,name=target_message_id,json=targetMessageId,proto3,oneof" json:"target_message_id,omitempty"`
 	Revision             uint32                                `protobuf:"varint,6,opt,name=revision,proto3" json:"revision,omitempty"`
+	// attachment_ids остаются server-visible control-plane linkage для relay auth/lifecycle.
+	// User-facing metadata и decrypt material по-прежнему живут только в encrypted descriptor внутри payload.
+	AttachmentIds []string `protobuf:"bytes,7,rep,name=attachment_ids,json=attachmentIds,proto3" json:"attachment_ids,omitempty"`
 	// deliveries должны покрывать весь active target roster:
 	// все active devices получателя и все active devices отправителя,
 	// включая originating sender device для server-backed self-delivery.
-	Deliveries    []*EncryptedDirectMessageV2DeliveryInput `protobuf:"bytes,7,rep,name=deliveries,proto3" json:"deliveries,omitempty"`
+	Deliveries    []*EncryptedDirectMessageV2DeliveryInput `protobuf:"bytes,8,rep,name=deliveries,proto3" json:"deliveries,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7496,6 +7499,13 @@ func (x *SendEncryptedDirectMessageV2Request) GetRevision() uint32 {
 		return x.Revision
 	}
 	return 0
+}
+
+func (x *SendEncryptedDirectMessageV2Request) GetAttachmentIds() []string {
+	if x != nil {
+		return x.AttachmentIds
+	}
+	return nil
 }
 
 func (x *SendEncryptedDirectMessageV2Request) GetDeliveries() []*EncryptedDirectMessageV2DeliveryInput {
@@ -7884,9 +7894,12 @@ type SendEncryptedGroupMessageRequest struct {
 	OperationKind        EncryptedGroupMessageOperationKind `protobuf:"varint,6,opt,name=operation_kind,json=operationKind,proto3,enum=aerochat.chat.v1.EncryptedGroupMessageOperationKind" json:"operation_kind,omitempty"`
 	TargetMessageId      *string                            `protobuf:"bytes,7,opt,name=target_message_id,json=targetMessageId,proto3,oneof" json:"target_message_id,omitempty"`
 	Revision             uint32                             `protobuf:"varint,8,opt,name=revision,proto3" json:"revision,omitempty"`
-	Ciphertext           []byte                             `protobuf:"bytes,9,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// attachment_ids остаются server-visible control-plane linkage для relay auth/lifecycle.
+	// User-facing metadata и decrypt material по-прежнему живут только в encrypted descriptor внутри payload.
+	AttachmentIds []string `protobuf:"bytes,9,rep,name=attachment_ids,json=attachmentIds,proto3" json:"attachment_ids,omitempty"`
+	Ciphertext    []byte   `protobuf:"bytes,10,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SendEncryptedGroupMessageRequest) Reset() {
@@ -7973,6 +7986,13 @@ func (x *SendEncryptedGroupMessageRequest) GetRevision() uint32 {
 		return x.Revision
 	}
 	return 0
+}
+
+func (x *SendEncryptedGroupMessageRequest) GetAttachmentIds() []string {
+	if x != nil {
+		return x.AttachmentIds
+	}
+	return nil
 }
 
 func (x *SendEncryptedGroupMessageRequest) GetCiphertext() []byte {
@@ -10604,7 +10624,7 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\x1eClearDirectChatPresenceRequest\x12\x17\n" +
 	"\achat_id\x18\x01 \x01(\tR\x06chatId\"s\n" +
 	"\x1fClearDirectChatPresenceResponse\x12P\n" +
-	"\x0epresence_state\x18\x01 \x01(\v2).aerochat.chat.v1.DirectChatPresenceStateR\rpresenceState\"\xb0\x03\n" +
+	"\x0epresence_state\x18\x01 \x01(\v2).aerochat.chat.v1.DirectChatPresenceStateR\rpresenceState\"\xd7\x03\n" +
 	"#SendEncryptedDirectMessageV2Request\x12\x17\n" +
 	"\achat_id\x18\x01 \x01(\tR\x06chatId\x12\x1d\n" +
 	"\n" +
@@ -10612,9 +10632,10 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\x17sender_crypto_device_id\x18\x03 \x01(\tR\x14senderCryptoDeviceId\x12^\n" +
 	"\x0eoperation_kind\x18\x04 \x01(\x0e27.aerochat.chat.v1.EncryptedDirectMessageV2OperationKindR\roperationKind\x12/\n" +
 	"\x11target_message_id\x18\x05 \x01(\tH\x00R\x0ftargetMessageId\x88\x01\x01\x12\x1a\n" +
-	"\brevision\x18\x06 \x01(\rR\brevision\x12W\n" +
+	"\brevision\x18\x06 \x01(\rR\brevision\x12%\n" +
+	"\x0eattachment_ids\x18\a \x03(\tR\rattachmentIds\x12W\n" +
 	"\n" +
-	"deliveries\x18\a \x03(\v27.aerochat.chat.v1.EncryptedDirectMessageV2DeliveryInputR\n" +
+	"deliveries\x18\b \x03(\v27.aerochat.chat.v1.EncryptedDirectMessageV2DeliveryInputR\n" +
 	"deliveriesB\x14\n" +
 	"\x12_target_message_id\"|\n" +
 	"$SendEncryptedDirectMessageV2Response\x12T\n" +
@@ -10638,7 +10659,7 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\"GetEncryptedGroupBootstrapResponse\x128\n" +
 	"\x04lane\x18\x01 \x01(\v2$.aerochat.chat.v1.EncryptedGroupLaneR\x04lane\x12S\n" +
 	"\x0eroster_members\x18\x02 \x03(\v2,.aerochat.chat.v1.EncryptedGroupRosterMemberR\rrosterMembers\x12S\n" +
-	"\x0eroster_devices\x18\x03 \x03(\v2,.aerochat.chat.v1.EncryptedGroupRosterDeviceR\rrosterDevices\"\xbc\x03\n" +
+	"\x0eroster_devices\x18\x03 \x03(\v2,.aerochat.chat.v1.EncryptedGroupRosterDeviceR\rrosterDevices\"\xe3\x03\n" +
 	" SendEncryptedGroupMessageRequest\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x1d\n" +
 	"\n" +
@@ -10649,9 +10670,11 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\x17sender_crypto_device_id\x18\x05 \x01(\tR\x14senderCryptoDeviceId\x12[\n" +
 	"\x0eoperation_kind\x18\x06 \x01(\x0e24.aerochat.chat.v1.EncryptedGroupMessageOperationKindR\roperationKind\x12/\n" +
 	"\x11target_message_id\x18\a \x01(\tH\x00R\x0ftargetMessageId\x88\x01\x01\x12\x1a\n" +
-	"\brevision\x18\b \x01(\rR\brevision\x12\x1e\n" +
+	"\brevision\x18\b \x01(\rR\brevision\x12%\n" +
+	"\x0eattachment_ids\x18\t \x03(\tR\rattachmentIds\x12\x1e\n" +
 	"\n" +
-	"ciphertext\x18\t \x01(\fR\n" +
+	"ciphertext\x18\n" +
+	" \x01(\fR\n" +
 	"ciphertextB\x14\n" +
 	"\x12_target_message_id\"o\n" +
 	"!SendEncryptedGroupMessageResponse\x12J\n" +

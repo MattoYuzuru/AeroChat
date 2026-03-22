@@ -105,7 +105,13 @@ export function ChatsPage() {
   const encryptedMediaAttachmentDraft = useEncryptedMediaAttachmentDraft({
     enabled: authState.status === "authenticated",
     token: sessionToken,
-    directChatId: chats.state.thread?.chat.id ?? null,
+    scope:
+      chats.state.thread?.chat.id === undefined
+        ? null
+        : {
+            kind: "direct",
+            id: chats.state.thread.chat.id,
+          },
     onUnauthenticated: () => expireSession(),
   });
   const voiceNoteRecorder = useVoiceNoteRecorder({

@@ -83,6 +83,58 @@ func (q *Queries) AttachDirectMessageAttachment(ctx context.Context, arg AttachD
 	return err
 }
 
+const attachEncryptedDirectMessageV2Attachment = `-- name: AttachEncryptedDirectMessageV2Attachment :exec
+INSERT INTO message_attachments (
+    attachment_id,
+    encrypted_direct_message_v2_id,
+    attached_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4)
+`
+
+type AttachEncryptedDirectMessageV2AttachmentParams struct {
+	AttachmentID               uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	EncryptedDirectMessageV2ID pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
+	AttachedByUserID           uuid.UUID          `db:"attached_by_user_id" json:"attached_by_user_id"`
+	CreatedAt                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) AttachEncryptedDirectMessageV2Attachment(ctx context.Context, arg AttachEncryptedDirectMessageV2AttachmentParams) error {
+	_, err := q.db.Exec(ctx, attachEncryptedDirectMessageV2Attachment,
+		arg.AttachmentID,
+		arg.EncryptedDirectMessageV2ID,
+		arg.AttachedByUserID,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const attachEncryptedGroupMessageV1Attachment = `-- name: AttachEncryptedGroupMessageV1Attachment :exec
+INSERT INTO message_attachments (
+    attachment_id,
+    encrypted_group_message_v1_id,
+    attached_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4)
+`
+
+type AttachEncryptedGroupMessageV1AttachmentParams struct {
+	AttachmentID              uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	EncryptedGroupMessageV1ID pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
+	AttachedByUserID          uuid.UUID          `db:"attached_by_user_id" json:"attached_by_user_id"`
+	CreatedAt                 pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) AttachEncryptedGroupMessageV1Attachment(ctx context.Context, arg AttachEncryptedGroupMessageV1AttachmentParams) error {
+	_, err := q.db.Exec(ctx, attachEncryptedGroupMessageV1Attachment,
+		arg.AttachmentID,
+		arg.EncryptedGroupMessageV1ID,
+		arg.AttachedByUserID,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const attachGroupMessageAttachment = `-- name: AttachGroupMessageAttachment :exec
 INSERT INTO message_attachments (
     attachment_id,
@@ -1336,7 +1388,9 @@ SELECT
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
     ma.direct_chat_message_id,
-    ma.group_message_id
+    ma.group_message_id,
+    ma.encrypted_direct_message_v2_id,
+    ma.encrypted_group_message_v1_id
 FROM attachments AS a
 LEFT JOIN attachment_upload_sessions AS s ON s.attachment_id = a.id
 LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
@@ -1344,34 +1398,36 @@ WHERE a.id = $1
 `
 
 type GetAttachmentRowByIDRow struct {
-	ID                       uuid.UUID          `db:"id" json:"id"`
-	OwnerUserID              uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
-	ScopeKind                string             `db:"scope_kind" json:"scope_kind"`
-	DirectChatID             pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
-	GroupID                  pgtype.UUID        `db:"group_id" json:"group_id"`
-	BucketName               string             `db:"bucket_name" json:"bucket_name"`
-	ObjectKey                string             `db:"object_key" json:"object_key"`
-	FileName                 string             `db:"file_name" json:"file_name"`
-	MimeType                 string             `db:"mime_type" json:"mime_type"`
-	RelaySchema              string             `db:"relay_schema" json:"relay_schema"`
-	SizeBytes                int64              `db:"size_bytes" json:"size_bytes"`
-	Status                   string             `db:"status" json:"status"`
-	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UploadedAt               pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
-	AttachedAt               pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
-	FailedAt                 pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
-	DeletedAt                pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	UploadSessionID          pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
-	UploadSessionOwnerUserID pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
-	UploadSessionStatus      pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
-	UploadSessionExpiresAt   pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
-	UploadSessionCreatedAt   pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
-	UploadSessionUpdatedAt   pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
-	UploadSessionCompletedAt pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
-	UploadSessionFailedAt    pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
-	DirectChatMessageID      pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
-	GroupMessageID           pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	ID                         uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID                uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind                  string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID               pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID                    pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName                 string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey                  string             `db:"object_key" json:"object_key"`
+	FileName                   string             `db:"file_name" json:"file_name"`
+	MimeType                   string             `db:"mime_type" json:"mime_type"`
+	RelaySchema                string             `db:"relay_schema" json:"relay_schema"`
+	SizeBytes                  int64              `db:"size_bytes" json:"size_bytes"`
+	Status                     string             `db:"status" json:"status"`
+	CreatedAt                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt                 pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt                 pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt                   pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt                  pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	UploadSessionID            pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
+	UploadSessionOwnerUserID   pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
+	UploadSessionStatus        pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
+	UploadSessionExpiresAt     pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
+	UploadSessionCreatedAt     pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
+	UploadSessionUpdatedAt     pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
+	UploadSessionCompletedAt   pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
+	UploadSessionFailedAt      pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
+	DirectChatMessageID        pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	GroupMessageID             pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	EncryptedDirectMessageV2ID pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
+	EncryptedGroupMessageV1ID  pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
 }
 
 func (q *Queries) GetAttachmentRowByID(ctx context.Context, id uuid.UUID) (GetAttachmentRowByIDRow, error) {
@@ -1406,6 +1462,8 @@ func (q *Queries) GetAttachmentRowByID(ctx context.Context, id uuid.UUID) (GetAt
 		&i.UploadSessionFailedAt,
 		&i.DirectChatMessageID,
 		&i.GroupMessageID,
+		&i.EncryptedDirectMessageV2ID,
+		&i.EncryptedGroupMessageV1ID,
 	)
 	return i, err
 }
@@ -2656,7 +2714,9 @@ SELECT
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
     ma.direct_chat_message_id,
-    ma.group_message_id
+    ma.group_message_id,
+    ma.encrypted_direct_message_v2_id,
+    ma.encrypted_group_message_v1_id
 FROM attachments AS a
 LEFT JOIN attachment_upload_sessions AS s ON s.attachment_id = a.id
 LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
@@ -2664,34 +2724,36 @@ WHERE a.id = ANY($1::uuid[])
 `
 
 type ListAttachmentRowsByIDsRow struct {
-	ID                       uuid.UUID          `db:"id" json:"id"`
-	OwnerUserID              uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
-	ScopeKind                string             `db:"scope_kind" json:"scope_kind"`
-	DirectChatID             pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
-	GroupID                  pgtype.UUID        `db:"group_id" json:"group_id"`
-	BucketName               string             `db:"bucket_name" json:"bucket_name"`
-	ObjectKey                string             `db:"object_key" json:"object_key"`
-	FileName                 string             `db:"file_name" json:"file_name"`
-	MimeType                 string             `db:"mime_type" json:"mime_type"`
-	RelaySchema              string             `db:"relay_schema" json:"relay_schema"`
-	SizeBytes                int64              `db:"size_bytes" json:"size_bytes"`
-	Status                   string             `db:"status" json:"status"`
-	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UploadedAt               pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
-	AttachedAt               pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
-	FailedAt                 pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
-	DeletedAt                pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	UploadSessionID          pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
-	UploadSessionOwnerUserID pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
-	UploadSessionStatus      pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
-	UploadSessionExpiresAt   pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
-	UploadSessionCreatedAt   pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
-	UploadSessionUpdatedAt   pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
-	UploadSessionCompletedAt pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
-	UploadSessionFailedAt    pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
-	DirectChatMessageID      pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
-	GroupMessageID           pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	ID                         uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID                uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind                  string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID               pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID                    pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName                 string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey                  string             `db:"object_key" json:"object_key"`
+	FileName                   string             `db:"file_name" json:"file_name"`
+	MimeType                   string             `db:"mime_type" json:"mime_type"`
+	RelaySchema                string             `db:"relay_schema" json:"relay_schema"`
+	SizeBytes                  int64              `db:"size_bytes" json:"size_bytes"`
+	Status                     string             `db:"status" json:"status"`
+	CreatedAt                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt                 pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt                 pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt                   pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt                  pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	UploadSessionID            pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
+	UploadSessionOwnerUserID   pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
+	UploadSessionStatus        pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
+	UploadSessionExpiresAt     pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
+	UploadSessionCreatedAt     pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
+	UploadSessionUpdatedAt     pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
+	UploadSessionCompletedAt   pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
+	UploadSessionFailedAt      pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
+	DirectChatMessageID        pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	GroupMessageID             pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	EncryptedDirectMessageV2ID pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
+	EncryptedGroupMessageV1ID  pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
 }
 
 func (q *Queries) ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListAttachmentRowsByIDsRow, error) {
@@ -2732,6 +2794,8 @@ func (q *Queries) ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.U
 			&i.UploadSessionFailedAt,
 			&i.DirectChatMessageID,
 			&i.GroupMessageID,
+			&i.EncryptedDirectMessageV2ID,
+			&i.EncryptedGroupMessageV1ID,
 		); err != nil {
 			return nil, err
 		}

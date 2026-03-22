@@ -8,7 +8,12 @@ import type { EncryptedMediaAttachmentDescriptor } from "../crypto/types";
 interface UseEncryptedMediaAttachmentDraftOptions {
   enabled: boolean;
   token: string;
-  directChatId: string | null;
+  scope:
+    | {
+        kind: "direct" | "group";
+        id: string;
+      }
+    | null;
   onUnauthenticated(): void;
 }
 
@@ -57,14 +62,14 @@ interface PreparedEncryptedUploadRefValue {
 export function useEncryptedMediaAttachmentDraft({
   enabled,
   token,
-  directChatId,
+  scope,
   onUnauthenticated,
 }: UseEncryptedMediaAttachmentDraftOptions) {
   const cryptoRuntime = useCryptoRuntime();
   const [draft, setDraft] = useState<EncryptedMediaAttachmentDraftState | null>(null);
   const preparedUploadRef = useRef<PreparedEncryptedUploadRefValue | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const directChatIdRef = useRef<string | null>(directChatId);
+  const scopeRef = useRef<UseEncryptedMediaAttachmentDraftOptions["scope"]>(scope);
   const onUnauthenticatedRef = useRef(onUnauthenticated);
 
   useEffect(() => {
@@ -72,20 +77,20 @@ export function useEncryptedMediaAttachmentDraft({
   }, [onUnauthenticated]);
 
   useEffect(() => {
-    directChatIdRef.current = directChatId;
-  }, [directChatId]);
+    scopeRef.current = scope;
+  }, [scope]);
 
   useEffect(() => {
     abortActiveUpload(abortControllerRef);
     preparedUploadRef.current = null;
     setDraft(null);
-  }, [directChatId, enabled]);
+  }, [enabled, scope]);
 
   async function selectFile(file: File): Promise<{
     draftId: string;
     attachmentId: string;
   } | null> {
-    if (!enabled || directChatIdRef.current === null) {
+    if (!enabled || scopeRef.current === null) {
       return null;
     }
 
@@ -137,7 +142,7 @@ export function useEncryptedMediaAttachmentDraft({
     draftId: string;
     attachmentId: string;
   } | null> {
-    if (!enabled || directChatIdRef.current === null || preparedUploadRef.current === null) {
+    if (!enabled || scopeRef.current === null || preparedUploadRef.current === null) {
       setDraft((current) =>
         current === null
           ? null
@@ -187,8 +192,8 @@ export function useEncryptedMediaAttachmentDraft({
     draftId: string;
     attachmentId: string;
   } | null> {
-    const activeChatId = directChatIdRef.current;
-    if (activeChatId === null) {
+    const activeScope = scopeRef.current;
+    if (activeScope === null) {
       return null;
     }
 
@@ -203,7 +208,9 @@ export function useEncryptedMediaAttachmentDraft({
       });
 
       const intent = await gatewayClient.createAttachmentUploadIntent(token, {
-        directChatId: activeChatId,
+        ...(activeScope.kind === "direct"
+          ? { directChatId: activeScope.id }
+          : { groupId: activeScope.id }),
         fileName: prepared.relayFileName,
         mimeType: prepared.relayMimeType,
         sizeBytes: prepared.attachment.ciphertextSizeBytes,

@@ -242,6 +242,7 @@ describe("createGatewayClient", () => {
           senderCryptoDeviceId: "crypto-1",
           operationKind: "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT",
           revision: 1,
+          attachmentIds: [],
           ciphertext: "Y2lwaGVydGV4dA==",
         }),
       }),
@@ -1661,6 +1662,7 @@ describe("createGatewayClient", () => {
           operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
           targetMessageId: undefined,
           revision: 1,
+          attachmentIds: [],
           deliveries: [
             {
               recipientCryptoDeviceId: "peer-device-1",

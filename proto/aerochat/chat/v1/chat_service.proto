@@ -839,10 +839,13 @@ message SendEncryptedDirectMessageV2Request {
   EncryptedDirectMessageV2OperationKind operation_kind = 4;
   optional string target_message_id = 5;
   uint32 revision = 6;
+  // attachment_ids остаются server-visible control-plane linkage для relay auth/lifecycle.
+  // User-facing metadata и decrypt material по-прежнему живут только в encrypted descriptor внутри payload.
+  repeated string attachment_ids = 7;
   // deliveries должны покрывать весь active target roster:
   // все active devices получателя и все active devices отправителя,
   // включая originating sender device для server-backed self-delivery.
-  repeated EncryptedDirectMessageV2DeliveryInput deliveries = 7;
+  repeated EncryptedDirectMessageV2DeliveryInput deliveries = 8;
 }
 
 message SendEncryptedDirectMessageV2Response {
@@ -894,7 +897,10 @@ message SendEncryptedGroupMessageRequest {
   EncryptedGroupMessageOperationKind operation_kind = 6;
   optional string target_message_id = 7;
   uint32 revision = 8;
-  bytes ciphertext = 9;
+  // attachment_ids остаются server-visible control-plane linkage для relay auth/lifecycle.
+  // User-facing metadata и decrypt material по-прежнему живут только в encrypted descriptor внутри payload.
+  repeated string attachment_ids = 9;
+  bytes ciphertext = 10;
 }
 
 message SendEncryptedGroupMessageResponse {

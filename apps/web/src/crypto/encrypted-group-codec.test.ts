@@ -36,6 +36,7 @@ describe("encrypted group codec", () => {
         message: {
           text: "group local hello",
           markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+          attachments: [],
         },
       },
     });
@@ -66,6 +67,7 @@ describe("encrypted group codec", () => {
       payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
       text: "group local hello",
       markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      attachments: [],
       editedAt: null,
       deletedAt: null,
     });
@@ -100,6 +102,7 @@ describe("encrypted group codec", () => {
         message: {
           text: "bound payload",
           markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+          attachments: [],
         },
       },
     });

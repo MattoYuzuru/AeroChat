@@ -680,6 +680,7 @@ type CreateEncryptedDirectMessageV2Params struct {
 	OperationKind        string
 	TargetMessageID      *string
 	Revision             uint32
+	AttachmentIDs        []string
 	Deliveries           []EncryptedDirectMessageV2Delivery
 	CreatedAt            time.Time
 	StoredAt             time.Time
@@ -713,6 +714,7 @@ type SendEncryptedDirectMessageV2Params struct {
 	OperationKind        string
 	TargetMessageID      *string
 	Revision             uint32
+	AttachmentIDs        []string
 	Deliveries           []EncryptedDirectMessageV2DeliveryDraft
 }
 
@@ -727,6 +729,7 @@ type CreateEncryptedGroupMessageParams struct {
 	OperationKind        string
 	TargetMessageID      *string
 	Revision             uint32
+	AttachmentIDs        []string
 	Ciphertext           []byte
 	Deliveries           []EncryptedGroupMessageDelivery
 	CreatedAt            time.Time
@@ -742,6 +745,7 @@ type SendEncryptedGroupMessageParams struct {
 	OperationKind        string
 	TargetMessageID      *string
 	Revision             uint32
+	AttachmentIDs        []string
 	Ciphertext           []byte
 }
 

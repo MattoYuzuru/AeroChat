@@ -621,6 +621,7 @@ func (h *Handler) SendEncryptedDirectMessageV2(ctx context.Context, req *connect
 		OperationKind:        fromProtoEncryptedDirectMessageV2OperationKind(req.Msg.OperationKind),
 		TargetMessageID:      req.Msg.TargetMessageId,
 		Revision:             req.Msg.Revision,
+		AttachmentIDs:        append([]string(nil), req.Msg.AttachmentIds...),
 		Deliveries:           deliveries,
 	})
 	if err != nil {
@@ -704,6 +705,7 @@ func (h *Handler) SendEncryptedGroupMessage(ctx context.Context, req *connect.Re
 		OperationKind:        fromProtoEncryptedGroupMessageOperationKind(req.Msg.OperationKind),
 		TargetMessageID:      req.Msg.TargetMessageId,
 		Revision:             req.Msg.Revision,
+		AttachmentIDs:        append([]string(nil), req.Msg.AttachmentIds...),
 		Ciphertext:           append([]byte(nil), req.Msg.Ciphertext...),
 	})
 	if err != nil {

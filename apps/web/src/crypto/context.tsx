@@ -489,7 +489,7 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
             throw error;
           }
         },
-        async sendEncryptedGroupContent(groupId, text, replyToMessageId) {
+        async sendEncryptedGroupContent(groupId, text, replyToMessageId, attachmentDrafts) {
           if (runtimeRef.current === null || currentSessionRef.current === null) {
             return null;
           }
@@ -511,6 +511,7 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
                 groupId,
                 text,
                 replyToMessageId,
+                attachmentDrafts,
               },
             );
             if (!mountedRef.current) {

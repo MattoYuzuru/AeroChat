@@ -30,6 +30,7 @@ describe("encrypted group local outbound buffer", () => {
       payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
       text: "hello group",
       markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      attachments: [],
       editedAt: null,
       deletedAt: null,
     });
@@ -72,6 +73,7 @@ describe("encrypted group local outbound buffer", () => {
       payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
       text: "late optimistic",
       markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      attachments: [],
       editedAt: null,
       deletedAt: null,
     });
