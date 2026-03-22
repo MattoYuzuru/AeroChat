@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Encrypted message mutations and pin recovery foundation
+- [x] Encrypted search recovery foundation
 
 ---
 
@@ -100,6 +100,7 @@
 - [x] Encrypted direct-message v2 sender self-delivery and convergence hardening
 - [x] Encrypted direct-message v2 reply/edit/tombstone/pin recovery foundation
 - [x] Encrypted direct-message v2 unread/read recovery foundation
+- [x] Encrypted search recovery foundation
 - [x] Safe markdown subset
 - [x] Read receipts
 - [x] Unread conversation state
@@ -149,6 +150,7 @@
 - [x] Web encrypted group outbound text bootstrap
 - [x] Encrypted group reply/edit/tombstone/pin recovery foundation
 - [x] Encrypted group unread/read recovery foundation
+- [x] Encrypted search recovery foundation
 - [ ] Encrypted media relay integration for MLS group lane
 
 ---

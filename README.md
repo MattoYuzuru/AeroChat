@@ -83,6 +83,14 @@ AeroChat должен поддерживать:
     - viewer-relative unread/read state хранится как control-plane metadata по stable logical `message_id`, без server-side plaintext preview;
     - `ListDirectChats` / `GetDirectChat` и realtime получают отдельный encrypted unread/read slice рядом с legacy plaintext read state;
     - active encrypted DM v2 lane умеет явно продвигать encrypted mark-as-read и сходиться с server-backed unread counters;
+  - encrypted search recovery foundation:
+    - `/app/search` сохраняет текущий entrypoint, но честно разделяет legacy plaintext search и local encrypted search;
+    - encrypted direct/group search работает только по локально fetched + decrypted message text внутри browser/runtime boundary;
+    - local encrypted index остаётся bounded и session-local:
+      - latest decrypted window на lane ограничен;
+      - `all direct` / `all groups` ищут только по recent encrypted lanes в рамках явного local budget;
+      - при logout/reload decrypted search index не сохраняется;
+    - jump/open для encrypted search result работает только если target уже materialized в локальной projection текущего bounded окна;
   - первый backend-first MLS-compatible foundation для encrypted groups:
     - отдельный encrypted group control-plane lane в `aero-chat` c явным `mls_group_id` и `roster_version`;
     - materialized readable roster по active trusted crypto devices current group members, включая `reader` и write-restricted участников;
@@ -108,9 +116,9 @@ AeroChat должен поддерживать:
     - coexistence остаётся bounded и честной:
       - legacy plaintext group history не переписывается и не re-encrypt'ится;
       - encrypted lane forward-only и не dual-write'ит те же сообщения в plaintext path;
-    - текущий slice не объявляет full MLS implementation, encrypted search parity, encrypted group media parity во всех сценариях или backup/recovery.
+    - текущий slice не объявляет full MLS implementation, encrypted group media parity во всех сценариях или backup/recovery.
   - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
-  - без claims о full encrypted DM/group parity, encrypted search, backup/recovery или full MLS client completeness.
+  - без claims о full encrypted DM/group parity, full encrypted search parity, backup/recovery или full MLS client completeness.
 - explicit group moderation/admin policy foundation:
   - явная policy matrix для `owner` / `admin` / `member` / `reader`;
   - durable write restriction для участников группы без потери membership;

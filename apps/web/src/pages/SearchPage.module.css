@@ -66,7 +66,7 @@
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.8rem;
   margin-top: 1rem;
 }
@@ -209,9 +209,40 @@
   gap: 1rem;
 }
 
+.pathGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.pathSection {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.pathHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pathTitle {
+  margin: 0.3rem 0 0;
+}
+
+.pathDescription {
+  margin: 0.7rem 0 0;
+  color: rgba(3, 50, 82, 0.78);
+}
+
 .metaTag,
 .scopeBadge,
-.metaBadge {
+.metaBadge,
+.pathBadge {
   align-self: start;
   padding: 0.45rem 0.72rem;
   border-radius: 999px;
@@ -223,6 +254,10 @@
 
 .scopeBadge {
   background: rgba(23, 130, 209, 0.16);
+}
+
+.pathBadge {
+  background: rgba(3, 50, 82, 0.08);
 }
 
 .resultList {
@@ -277,13 +312,15 @@
   .heroHeader,
   .resultsHeader,
   .formFooter,
-  .resultHeaderRow {
+  .resultHeaderRow,
+  .pathHeader {
     display: grid;
     grid-template-columns: 1fr;
   }
 
   .controlsGrid,
-  .metrics {
+  .metrics,
+  .pathGrid {
     grid-template-columns: 1fr;
   }
 }

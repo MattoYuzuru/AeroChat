@@ -68,6 +68,7 @@ import {
   findJumpTarget,
   readSearchJumpIntent,
 } from "../search/jump";
+import { primeEncryptedGroupLocalSearchIndex } from "../search/encrypted-local-search";
 import styles from "./GroupsPage.module.css";
 
 export function GroupsPage() {
@@ -711,31 +712,6 @@ export function GroupsPage() {
     };
   }, [expireSession, token]);
 
-  useEffect(() => {
-    if (searchJumpIntent === null || selectedState.status !== "ready") {
-      return;
-    }
-
-    if (selectedState.snapshot.group.id !== selectedGroupId) {
-      return;
-    }
-
-    const targetMessage = findJumpTarget(selectedState.messages, searchJumpIntent.messageId);
-    if (targetMessage === null) {
-      setSearchJumpNotice(
-        "Найденное сообщение пока не попало в текущую загруженную историю группы. Переход ограничен последним загруженным окном primary thread.",
-      );
-      setHighlightedMessageId(null);
-      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
-      return;
-    }
-
-    setSearchJumpNotice(null);
-    setHighlightedMessageId(targetMessage.id);
-    jumpToMessage(`group-message-${targetMessage.id}`);
-    setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
-  }, [searchJumpIntent, searchParams, selectedGroupId, selectedState, setSearchParams]);
-
   const encryptedMessageEntries = encryptedGroupLane.items.filter(
     (
       entry,
@@ -753,6 +729,86 @@ export function GroupsPage() {
     latestEncryptedGroupMessage.senderUserId !== authState.profile.id &&
     selectedState.snapshot.encryptedReadState?.selfPosition?.messageId !==
       latestEncryptedGroupMessage.messageId;
+
+  useEffect(() => {
+    if (selectedState.status !== "ready" || encryptedGroupLane.status !== "ready") {
+      return;
+    }
+
+    primeEncryptedGroupLocalSearchIndex({
+      group: selectedState.snapshot.group,
+      bootstrap: encryptedGroupLane.bootstrap,
+      items: encryptedGroupLane.items,
+    });
+  }, [encryptedGroupLane.bootstrap, encryptedGroupLane.items, encryptedGroupLane.status, selectedState]);
+
+  useEffect(() => {
+    if (searchJumpIntent === null || selectedState.status !== "ready") {
+      return;
+    }
+
+    if (selectedState.snapshot.group.id !== selectedGroupId) {
+      return;
+    }
+
+    if (searchJumpIntent.lane === "encrypted") {
+      if (encryptedGroupLane.status === "idle" || encryptedGroupLane.status === "loading") {
+        return;
+      }
+
+      if (encryptedGroupLane.status !== "ready") {
+        setSearchJumpNotice(
+          encryptedGroupLane.errorMessage ??
+            "Encrypted search result нельзя открыть: local encrypted group lane недоступен в текущем browser profile.",
+        );
+        setHighlightedMessageId(null);
+        setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+        return;
+      }
+
+      const encryptedTarget =
+        encryptedMessageEntries.find((entry) => entry.messageId === searchJumpIntent.messageId) ??
+        null;
+      if (encryptedTarget === null) {
+        setSearchJumpNotice(
+          "Найденное encrypted сообщение пока не попало в текущее локально загруженное окно group lane. Deep history backfill в этом slice не реализован.",
+        );
+        setHighlightedMessageId(null);
+        setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+        return;
+      }
+
+      setSearchJumpNotice(null);
+      setHighlightedMessageId(encryptedTarget.messageId);
+      jumpToMessage(`encrypted-group-message-${encryptedTarget.messageId}`);
+      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+      return;
+    }
+
+    const targetMessage = findJumpTarget(selectedState.messages, searchJumpIntent.messageId);
+    if (targetMessage === null) {
+      setSearchJumpNotice(
+        "Найденное сообщение пока не попало в текущую загруженную историю группы. Переход ограничен последним загруженным окном primary thread.",
+      );
+      setHighlightedMessageId(null);
+      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+      return;
+    }
+
+    setSearchJumpNotice(null);
+    setHighlightedMessageId(targetMessage.id);
+    jumpToMessage(`group-message-${targetMessage.id}`);
+    setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+  }, [
+    encryptedGroupLane.errorMessage,
+    encryptedGroupLane.status,
+    encryptedMessageEntries,
+    searchJumpIntent,
+    searchParams,
+    selectedGroupId,
+    selectedState,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     if (

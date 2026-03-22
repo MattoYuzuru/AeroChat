@@ -1,5 +1,8 @@
+import type { SearchResultLane } from "./model";
+
 export interface SearchJumpIntent {
   messageId: string;
+  lane: SearchResultLane;
 }
 
 export function readSearchJumpIntent(searchParams: URLSearchParams): SearchJumpIntent | null {
@@ -12,6 +15,7 @@ export function readSearchJumpIntent(searchParams: URLSearchParams): SearchJumpI
 
   return {
     messageId,
+    lane: searchParams.get("lane")?.trim() === "encrypted" ? "encrypted" : "plaintext",
   };
 }
 
@@ -19,6 +23,7 @@ export function clearSearchJumpParams(searchParams: URLSearchParams): URLSearchP
   const nextSearchParams = new URLSearchParams(searchParams);
   nextSearchParams.delete("from");
   nextSearchParams.delete("message");
+  nextSearchParams.delete("lane");
   return nextSearchParams;
 }
 

@@ -2,8 +2,8 @@ import type {
   ChatUser,
   DirectChat,
   Group,
-  MessageSearchResult,
   MessageSearchScopeInput,
+  MessageSearchScopeKind,
 } from "../gateway/types";
 
 export type SearchScopeSelection =
@@ -11,6 +11,21 @@ export type SearchScopeSelection =
   | "direct"
   | "all-groups"
   | "group";
+
+export type SearchResultLane = "plaintext" | "encrypted";
+
+export interface SearchResultLike {
+  scope: MessageSearchScopeKind;
+  directChatId: string | null;
+  groupId: string | null;
+  messageId: string;
+  author: ChatUser | null;
+  position: {
+    messageId: string;
+    messageCreatedAt: string;
+  } | null;
+  lane?: SearchResultLane;
+}
 
 export function buildMessageSearchScope(
   selection: SearchScopeSelection,
@@ -29,12 +44,15 @@ export function buildMessageSearchScope(
   }
 }
 
-export function buildSearchResultHref(result: MessageSearchResult): string {
+export function buildSearchResultHref(result: SearchResultLike): string {
   const messageId = result.position?.messageId.trim() || result.messageId.trim();
   const params = new URLSearchParams({
     message: messageId,
     from: "search",
   });
+  if (result.lane === "encrypted") {
+    params.set("lane", "encrypted");
+  }
 
   if (result.scope === "group") {
     if (!result.groupId) {
@@ -66,7 +84,7 @@ export function describeSearchScope(selection: SearchScopeSelection): string {
   }
 }
 
-export function describeSearchResultScope(result: MessageSearchResult): string {
+export function describeSearchResultScope(result: SearchResultLike): string {
   return result.scope === "group" ? "Группа" : "Direct";
 }
 
@@ -83,7 +101,7 @@ export function describeDirectChatLabel(
 }
 
 export function describeSearchResultContainer(
-  result: MessageSearchResult,
+  result: Pick<SearchResultLike, "scope" | "groupId" | "directChatId">,
   directChats: DirectChat[],
   groups: Group[],
   currentUserId: string,

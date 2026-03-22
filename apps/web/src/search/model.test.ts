@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type {
   DirectChat,
   Group,
-  MessageSearchResult,
 } from "../gateway/types";
 import {
   buildMessageSearchScope,
@@ -11,7 +10,15 @@ import {
   describeSearchResultAuthor,
   describeSearchResultContainer,
   describeSearchResultScope,
+  type SearchResultLike,
 } from "./model";
+
+type TestSearchResult = SearchResultLike & {
+  createdAt: string;
+  editedAt: string | null;
+  matchFragment: string;
+  groupThreadId: string | null;
+};
 
 function createDirectChat(overrides: Partial<DirectChat> = {}): DirectChat {
   return {
@@ -68,9 +75,10 @@ function createGroup(overrides: Partial<Group> = {}): Group {
   };
 }
 
-function createResult(overrides: Partial<MessageSearchResult> = {}): MessageSearchResult {
+function createResult(overrides: Partial<TestSearchResult> = {}): TestSearchResult {
   return {
     scope: "direct",
+    lane: "plaintext",
     directChatId: "chat-1",
     groupId: null,
     groupThreadId: null,
@@ -133,6 +141,16 @@ describe("buildSearchResultHref", () => {
         }),
       ),
     ).toBe("/app/groups?message=message-1&from=search&group=group-1");
+  });
+
+  it("adds encrypted lane marker for local encrypted results", () => {
+    expect(
+      buildSearchResultHref(
+        createResult({
+          lane: "encrypted",
+        }),
+      ),
+    ).toBe("/app/chats?message=message-1&from=search&lane=encrypted&chat=chat-1");
   });
 });
 

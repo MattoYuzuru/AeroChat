@@ -11,6 +11,18 @@ describe("readSearchJumpIntent", () => {
       readSearchJumpIntent(new URLSearchParams("chat=chat-1&message=msg-1&from=search")),
     ).toEqual({
       messageId: "msg-1",
+      lane: "plaintext",
+    });
+  });
+
+  it("reads explicit encrypted lane marker when it is present", () => {
+    expect(
+      readSearchJumpIntent(
+        new URLSearchParams("chat=chat-1&message=msg-1&from=search&lane=encrypted"),
+      ),
+    ).toEqual({
+      messageId: "msg-1",
+      lane: "encrypted",
     });
   });
 
@@ -23,7 +35,7 @@ describe("clearSearchJumpParams", () => {
   it("preserves container params and strips only jump markers", () => {
     expect(
       clearSearchJumpParams(
-        new URLSearchParams("chat=chat-1&message=msg-1&from=search"),
+        new URLSearchParams("chat=chat-1&message=msg-1&from=search&lane=encrypted"),
       ).toString(),
     ).toBe("chat=chat-1");
   });
