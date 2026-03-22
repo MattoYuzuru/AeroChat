@@ -304,6 +304,95 @@ describe("createCryptoRuntimeCore", () => {
       },
     );
   });
+
+  it("assembles and sends encrypted dm v2 content inside runtime boundary", async () => {
+    const keyStore = createMemoryKeyStore();
+    await keyStore.save(
+      createLocalMaterial({
+        cryptoDeviceId: "crypto-1",
+        status: "active",
+        bundleDigestBase64: "digest-1",
+        lastBundleVersion: 1,
+      }),
+    );
+    const signedPrekeyPublicBase64 = await createSignedPrekeyPublicBase64();
+    const gatewayClient = createGatewayClient({
+      getEncryptedDirectMessageV2SendBootstrap: vi.fn(async () => ({
+        chatId: "chat-1",
+        recipientUserId: "user-2",
+        recipientDevices: [
+          {
+            userId: "user-2",
+            cryptoDeviceId: "peer-device-1",
+            bundleVersion: 3,
+            cryptoSuite: "webcrypto-p256-foundation-v1",
+            identityPublicKeyBase64: "peer-identity-public",
+            signedPrekeyPublicBase64,
+            signedPrekeyId: "peer-signed-prekey-1",
+            signedPrekeySignatureBase64: "peer-signature",
+            kemPublicKeyBase64: null,
+            kemKeyId: null,
+            kemSignatureBase64: null,
+            oneTimePrekeysTotal: 0,
+            oneTimePrekeysAvailable: 0,
+            bundleDigestBase64: "peer-digest-1",
+            publishedAt: "2026-03-22T12:10:00Z",
+            expiresAt: null,
+          },
+        ],
+        senderOtherDevices: [],
+      })),
+      sendEncryptedDirectMessageV2: vi.fn(async (token, input) => ({
+        messageId: input.messageId,
+        chatId: input.chatId,
+        senderUserId: baseSession.profileId,
+        senderCryptoDeviceId: input.senderCryptoDeviceId,
+        operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
+        targetMessageId: null,
+        revision: input.revision,
+        createdAt: "2026-03-22T12:11:00Z",
+        storedAt: "2026-03-22T12:11:01Z",
+        storedDeliveryCount: input.deliveries.length,
+      })),
+    });
+    const runtime = createCryptoRuntimeCore({
+      gatewayClient,
+      keyStore,
+      materialFactory: createFakeMaterialFactory(),
+      resolveDeviceLabel: () => "Web Test",
+    });
+
+    const result = await runtime.sendEncryptedDirectMessageV2Content(baseSession, {
+      chatId: "chat-1",
+      text: "secret hello",
+    });
+
+    expect(gatewayClient.getEncryptedDirectMessageV2SendBootstrap).toHaveBeenCalledWith(
+      baseSession.token,
+      "chat-1",
+      "crypto-1",
+    );
+    expect(gatewayClient.sendEncryptedDirectMessageV2).toHaveBeenCalledTimes(1);
+    expect(gatewayClient.sendEncryptedDirectMessageV2).toHaveBeenCalledWith(
+      baseSession.token,
+      expect.objectContaining({
+        chatId: "chat-1",
+        senderCryptoDeviceId: "crypto-1",
+        operationKind: "content",
+        revision: 1,
+        deliveries: [
+          expect.objectContaining({
+            recipientCryptoDeviceId: "peer-device-1",
+            transportHeader: expect.any(String),
+            ciphertext: expect.any(String),
+          }),
+        ],
+      }),
+    );
+    expect(result.localProjection.text).toBe("secret hello");
+    expect(result.localProjection.chatId).toBe("chat-1");
+    expect(result.storedEnvelope.storedDeliveryCount).toBe(1);
+  });
 });
 
 function createMemoryKeyStore(): CryptoKeyStore {
@@ -541,6 +630,28 @@ function createBundlePublishChallenge(
   };
 }
 
+async function createSignedPrekeyPublicBase64(): Promise<string> {
+  const pair = await crypto.subtle.generateKey(
+    {
+      name: "ECDH",
+      namedCurve: "P-256",
+    },
+    true,
+    ["deriveKey", "deriveBits"],
+  );
+  const exported = await crypto.subtle.exportKey("spki", pair.publicKey);
+  return toBase64(new Uint8Array(exported));
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
 function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
   return {
     register: vi.fn(),
@@ -590,6 +701,8 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     clearDirectChatTyping: vi.fn(),
     setDirectChatPresenceHeartbeat: vi.fn(),
     clearDirectChatPresence: vi.fn(),
+    getEncryptedDirectMessageV2SendBootstrap: vi.fn(),
+    sendEncryptedDirectMessageV2: vi.fn(),
     sendTextMessage: vi.fn(),
     editDirectChatMessage: vi.fn(),
     listDirectChatMessages: vi.fn(),

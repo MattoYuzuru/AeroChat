@@ -330,6 +330,10 @@ func (h *ChatHandler) ClearDirectChatPresence(ctx context.Context, req *connect.
 	return response, nil
 }
 
+func (h *ChatHandler) GetEncryptedDirectMessageV2SendBootstrap(ctx context.Context, req *connect.Request[chatv1.GetEncryptedDirectMessageV2SendBootstrapRequest]) (*connect.Response[chatv1.GetEncryptedDirectMessageV2SendBootstrapResponse], error) {
+	return forwardUnary(ctx, req, h.client.GetEncryptedDirectMessageV2SendBootstrap)
+}
+
 func (h *ChatHandler) SendEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.SendEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.SendEncryptedDirectMessageV2Response], error) {
 	response, err := forwardUnary(ctx, req, h.client.SendEncryptedDirectMessageV2)
 	if err != nil {

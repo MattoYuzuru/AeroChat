@@ -1016,6 +1016,41 @@ func (r *Repository) ListActiveCryptoDevicesByUserIDs(ctx context.Context, userI
 	return result, nil
 }
 
+func (r *Repository) ListCurrentCryptoDeviceBundlesByDeviceIDs(ctx context.Context, deviceIDs []string) ([]chat.CryptoDeviceBundle, error) {
+	normalizedDeviceIDs := uniqueUUIDs(deviceIDs)
+	if len(normalizedDeviceIDs) == 0 {
+		return nil, nil
+	}
+
+	rows, err := r.queries.ListCurrentCryptoDeviceBundlesByDeviceIDs(ctx, normalizedDeviceIDs)
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.CryptoDeviceBundle, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, chat.CryptoDeviceBundle{
+			CryptoDeviceID:          row.CryptoDeviceID.String(),
+			BundleVersion:           uint64(row.BundleVersion),
+			CryptoSuite:             row.CryptoSuite,
+			IdentityPublicKey:       append([]byte(nil), row.IdentityPublicKey...),
+			SignedPrekeyPublic:      append([]byte(nil), row.SignedPrekeyPublic...),
+			SignedPrekeyID:          row.SignedPrekeyID,
+			SignedPrekeySignature:   append([]byte(nil), row.SignedPrekeySignature...),
+			KemPublicKey:            append([]byte(nil), row.KemPublicKey...),
+			KemKeyID:                textPointer(row.KemKeyID),
+			KemSignature:            append([]byte(nil), row.KemSignature...),
+			OneTimePrekeysTotal:     uint32(row.OneTimePrekeysTotal),
+			OneTimePrekeysAvailable: uint32(row.OneTimePrekeysAvailable),
+			BundleDigest:            append([]byte(nil), row.BundleDigest...),
+			PublishedAt:             timestampValue(row.PublishedAt),
+			ExpiresAt:               timestamptzPointer(row.ExpiresAt),
+		})
+	}
+
+	return result, nil
+}
+
 func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params chat.CreateEncryptedDirectMessageV2Params) (*chat.EncryptedDirectMessageV2StoredEnvelope, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {

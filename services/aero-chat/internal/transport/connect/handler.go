@@ -545,6 +545,20 @@ func (h *Handler) ClearDirectChatPresence(ctx context.Context, req *connect.Requ
 	}), nil
 }
 
+func (h *Handler) GetEncryptedDirectMessageV2SendBootstrap(ctx context.Context, req *connect.Request[chatv1.GetEncryptedDirectMessageV2SendBootstrapRequest]) (*connect.Response[chatv1.GetEncryptedDirectMessageV2SendBootstrapResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	bootstrap, err := h.service.GetEncryptedDirectMessageV2SendBootstrap(ctx, token, req.Msg.ChatId, req.Msg.SenderCryptoDeviceId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(toProtoEncryptedDirectMessageV2SendBootstrap(*bootstrap)), nil
+}
+
 func (h *Handler) SendEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.SendEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.SendEncryptedDirectMessageV2Response], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -1048,6 +1062,49 @@ func toProtoEncryptedDirectMessageV2StoredEnvelope(value chat.EncryptedDirectMes
 		CreatedAt:            timestamppb.New(value.CreatedAt),
 		StoredAt:             timestamppb.New(value.StoredAt),
 		StoredDeliveryCount:  value.StoredDeliveryCount,
+	}
+}
+
+func toProtoEncryptedDirectMessageV2SendBootstrap(value chat.EncryptedDirectMessageV2SendBootstrap) *chatv1.GetEncryptedDirectMessageV2SendBootstrapResponse {
+	response := &chatv1.GetEncryptedDirectMessageV2SendBootstrapResponse{
+		ChatId:             value.ChatID,
+		RecipientUserId:    value.RecipientUserID,
+		RecipientDevices:   make([]*chatv1.EncryptedDirectMessageV2SendTargetDevice, 0, len(value.RecipientDevices)),
+		SenderOtherDevices: make([]*chatv1.EncryptedDirectMessageV2SendTargetDevice, 0, len(value.SenderOtherDevices)),
+	}
+	for _, device := range value.RecipientDevices {
+		response.RecipientDevices = append(response.RecipientDevices, toProtoEncryptedDirectMessageV2SendTargetDevice(device))
+	}
+	for _, device := range value.SenderOtherDevices {
+		response.SenderOtherDevices = append(response.SenderOtherDevices, toProtoEncryptedDirectMessageV2SendTargetDevice(device))
+	}
+
+	return response
+}
+
+func toProtoEncryptedDirectMessageV2SendTargetDevice(value chat.EncryptedDirectMessageV2SendTargetDevice) *chatv1.EncryptedDirectMessageV2SendTargetDevice {
+	kemKeyID := ""
+	if value.Bundle.KemKeyID != nil {
+		kemKeyID = *value.Bundle.KemKeyID
+	}
+
+	return &chatv1.EncryptedDirectMessageV2SendTargetDevice{
+		UserId:                  value.UserID,
+		CryptoDeviceId:          value.DeviceID,
+		BundleVersion:           value.Bundle.BundleVersion,
+		CryptoSuite:             value.Bundle.CryptoSuite,
+		IdentityPublicKey:       append([]byte(nil), value.Bundle.IdentityPublicKey...),
+		SignedPrekeyPublic:      append([]byte(nil), value.Bundle.SignedPrekeyPublic...),
+		SignedPrekeyId:          value.Bundle.SignedPrekeyID,
+		SignedPrekeySignature:   append([]byte(nil), value.Bundle.SignedPrekeySignature...),
+		KemPublicKey:            append([]byte(nil), value.Bundle.KemPublicKey...),
+		KemKeyId:                kemKeyID,
+		KemSignature:            append([]byte(nil), value.Bundle.KemSignature...),
+		OneTimePrekeysTotal:     value.Bundle.OneTimePrekeysTotal,
+		OneTimePrekeysAvailable: value.Bundle.OneTimePrekeysAvailable,
+		BundleDigest:            append([]byte(nil), value.Bundle.BundleDigest...),
+		PublishedAt:             timestamppb.New(value.Bundle.PublishedAt),
+		ExpiresAt:               timestampPointer(value.Bundle.ExpiresAt),
 	}
 }
 

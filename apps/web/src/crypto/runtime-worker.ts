@@ -44,6 +44,12 @@ async function handleRequest(request: CryptoWorkerRequest) {
           request.payload.envelopes,
         );
         break;
+      case "sendEncryptedDirectMessageV2Content":
+        snapshot = await runtime.sendEncryptedDirectMessageV2Content(
+          request.payload.session,
+          request.payload.input,
+        );
+        break;
       default:
         throw new Error("Неизвестная crypto worker command.");
     }

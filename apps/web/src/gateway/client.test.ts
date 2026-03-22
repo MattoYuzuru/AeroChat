@@ -1257,6 +1257,158 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("loads encrypted dm v2 send bootstrap through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          chatId: "chat-1",
+          recipientUserId: "user-2",
+          recipientDevices: [
+            {
+              userId: "user-2",
+              cryptoDeviceId: "peer-device-1",
+              bundleVersion: 3,
+              cryptoSuite: "webcrypto-p256-foundation-v1",
+              identityPublicKey: "identity-public",
+              signedPrekeyPublic: "signed-prekey-public",
+              signedPrekeyId: "signed-prekey-1",
+              signedPrekeySignature: "signature",
+              bundleDigest: "bundle-digest",
+              publishedAt: "2026-03-22T12:00:00Z",
+            },
+          ],
+          senderOtherDevices: [],
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const bootstrap = await client.getEncryptedDirectMessageV2SendBootstrap(
+      "token-1",
+      "chat-1",
+      "crypto-1",
+    );
+
+    expect(bootstrap).toEqual({
+      chatId: "chat-1",
+      recipientUserId: "user-2",
+      recipientDevices: [
+        {
+          userId: "user-2",
+          cryptoDeviceId: "peer-device-1",
+          bundleVersion: 3,
+          cryptoSuite: "webcrypto-p256-foundation-v1",
+          identityPublicKeyBase64: "identity-public",
+          signedPrekeyPublicBase64: "signed-prekey-public",
+          signedPrekeyId: "signed-prekey-1",
+          signedPrekeySignatureBase64: "signature",
+          kemPublicKeyBase64: null,
+          kemKeyId: null,
+          kemSignatureBase64: null,
+          oneTimePrekeysTotal: 0,
+          oneTimePrekeysAvailable: 0,
+          bundleDigestBase64: "bundle-digest",
+          publishedAt: "2026-03-22T12:00:00Z",
+          expiresAt: null,
+        },
+      ],
+      senderOtherDevices: [],
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/GetEncryptedDirectMessageV2SendBootstrap",
+      expect.objectContaining({
+        body: JSON.stringify({
+          chatId: "chat-1",
+          senderCryptoDeviceId: "crypto-1",
+        }),
+      }),
+    );
+  });
+
+  it("sends encrypted dm v2 opaque deliveries through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          envelope: {
+            messageId: "message-1",
+            chatId: "chat-1",
+            senderUserId: "user-1",
+            senderCryptoDeviceId: "crypto-1",
+            operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
+            revision: 1,
+            createdAt: "2026-03-22T12:00:00Z",
+            storedAt: "2026-03-22T12:00:01Z",
+            storedDeliveryCount: 2,
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const envelope = await client.sendEncryptedDirectMessageV2("token-1", {
+      chatId: "chat-1",
+      messageId: "message-1",
+      senderCryptoDeviceId: "crypto-1",
+      operationKind: "content",
+      revision: 1,
+      deliveries: [
+        {
+          recipientCryptoDeviceId: "peer-device-1",
+          transportHeader: "header-1",
+          ciphertext: "cipher-1",
+        },
+      ],
+    });
+
+    expect(envelope).toEqual({
+      messageId: "message-1",
+      chatId: "chat-1",
+      senderUserId: "user-1",
+      senderCryptoDeviceId: "crypto-1",
+      operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
+      targetMessageId: null,
+      revision: 1,
+      createdAt: "2026-03-22T12:00:00Z",
+      storedAt: "2026-03-22T12:00:01Z",
+      storedDeliveryCount: 2,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/SendEncryptedDirectMessageV2",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          chatId: "chat-1",
+          messageId: "message-1",
+          senderCryptoDeviceId: "crypto-1",
+          operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
+          targetMessageId: undefined,
+          revision: 1,
+          deliveries: [
+            {
+              recipientCryptoDeviceId: "peer-device-1",
+              transportHeader: "header-1",
+              ciphertext: "cipher-1",
+            },
+          ],
+        }),
+      }),
+    );
+  });
+
   it("calls message action endpoints with chat and message ids", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     const client = createGatewayClient(fetchMock, "/api");

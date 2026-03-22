@@ -12,6 +12,10 @@ import {
   listBufferedEncryptedDirectMessageV2RealtimeEvents,
   subscribeEncryptedDirectMessageV2RealtimeEvents,
 } from "./encrypted-v2-realtime";
+import {
+  listBufferedLocalEncryptedDirectMessageV2Projection,
+  subscribeLocalEncryptedDirectMessageV2Projection,
+} from "./encrypted-v2-local-outbound";
 import { resolveActiveRealtimeCryptoDeviceId } from "../crypto/realtime-bridge-helpers";
 
 interface UseEncryptedDirectMessageV2LaneOptions {
@@ -160,6 +164,27 @@ export function useEncryptedDirectMessageV2Lane({
     };
   }, [cryptoRuntime, loadDescriptor]);
 
+  useEffect(() => {
+    if (loadDescriptor.kind !== "load") {
+      return;
+    }
+
+    return subscribeLocalEncryptedDirectMessageV2Projection((event) => {
+      if (event.projection.chatId !== loadDescriptor.chatId) {
+        return;
+      }
+
+      setLoadedState((current) => ({
+        requestKey: loadDescriptor.requestKey,
+        status: "ready",
+        items: mergeEncryptedDirectMessageV2Projection(current.items, [
+          event.projection,
+        ]),
+        errorMessage: current.errorMessage,
+      }));
+    });
+  }, [loadDescriptor]);
+
   if (loadDescriptor.kind === "idle") {
     return {
       status: "idle",
@@ -225,8 +250,14 @@ async function loadEncryptedLane(input: {
   const decrypted = await input.cryptoRuntime.decryptEncryptedDirectMessageV2Envelopes(
     mergedOpaqueEnvelopes,
   );
+  const localOutbound = listBufferedLocalEncryptedDirectMessageV2Projection(
+    input.chatId,
+  );
 
-  return mergeEncryptedDirectMessageV2Projection([], decrypted);
+  return mergeEncryptedDirectMessageV2Projection([], [
+    ...decrypted,
+    ...localOutbound,
+  ]);
 }
 
 function deduplicateEncryptedDirectMessageV2Envelopes(

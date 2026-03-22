@@ -86,6 +86,12 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
         envelopes,
       });
     },
+    sendEncryptedDirectMessageV2Content(session, input) {
+      return sendCommand("sendEncryptedDirectMessageV2Content", {
+        session,
+        input,
+      });
+    },
     dispose() {
       for (const request of pending.values()) {
         request.reject(new Error("Crypto runtime client disposed."));

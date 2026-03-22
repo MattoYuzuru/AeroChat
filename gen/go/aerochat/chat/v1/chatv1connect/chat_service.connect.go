@@ -118,6 +118,9 @@ const (
 	// ChatServiceClearDirectChatPresenceProcedure is the fully-qualified name of the ChatService's
 	// ClearDirectChatPresence RPC.
 	ChatServiceClearDirectChatPresenceProcedure = "/aerochat.chat.v1.ChatService/ClearDirectChatPresence"
+	// ChatServiceGetEncryptedDirectMessageV2SendBootstrapProcedure is the fully-qualified name of the
+	// ChatService's GetEncryptedDirectMessageV2SendBootstrap RPC.
+	ChatServiceGetEncryptedDirectMessageV2SendBootstrapProcedure = "/aerochat.chat.v1.ChatService/GetEncryptedDirectMessageV2SendBootstrap"
 	// ChatServiceSendEncryptedDirectMessageV2Procedure is the fully-qualified name of the ChatService's
 	// SendEncryptedDirectMessageV2 RPC.
 	ChatServiceSendEncryptedDirectMessageV2Procedure = "/aerochat.chat.v1.ChatService/SendEncryptedDirectMessageV2"
@@ -190,6 +193,7 @@ type ChatServiceClient interface {
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
 	SetDirectChatPresenceHeartbeat(context.Context, *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error)
 	ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error)
+	GetEncryptedDirectMessageV2SendBootstrap(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2SendBootstrapRequest]) (*connect.Response[v1.GetEncryptedDirectMessageV2SendBootstrapResponse], error)
 	SendEncryptedDirectMessageV2(context.Context, *connect.Request[v1.SendEncryptedDirectMessageV2Request]) (*connect.Response[v1.SendEncryptedDirectMessageV2Response], error)
 	ListEncryptedDirectMessageV2(context.Context, *connect.Request[v1.ListEncryptedDirectMessageV2Request]) (*connect.Response[v1.ListEncryptedDirectMessageV2Response], error)
 	GetEncryptedDirectMessageV2(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2Request]) (*connect.Response[v1.GetEncryptedDirectMessageV2Response], error)
@@ -396,6 +400,12 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("ClearDirectChatPresence")),
 			connect.WithClientOptions(opts...),
 		),
+		getEncryptedDirectMessageV2SendBootstrap: connect.NewClient[v1.GetEncryptedDirectMessageV2SendBootstrapRequest, v1.GetEncryptedDirectMessageV2SendBootstrapResponse](
+			httpClient,
+			baseURL+ChatServiceGetEncryptedDirectMessageV2SendBootstrapProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("GetEncryptedDirectMessageV2SendBootstrap")),
+			connect.WithClientOptions(opts...),
+		),
 		sendEncryptedDirectMessageV2: connect.NewClient[v1.SendEncryptedDirectMessageV2Request, v1.SendEncryptedDirectMessageV2Response](
 			httpClient,
 			baseURL+ChatServiceSendEncryptedDirectMessageV2Procedure,
@@ -479,49 +489,50 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 
 // chatServiceClient implements ChatServiceClient.
 type chatServiceClient struct {
-	ping                           *connect.Client[v1.PingRequest, v1.PingResponse]
-	createDirectChat               *connect.Client[v1.CreateDirectChatRequest, v1.CreateDirectChatResponse]
-	listDirectChats                *connect.Client[v1.ListDirectChatsRequest, v1.ListDirectChatsResponse]
-	getDirectChat                  *connect.Client[v1.GetDirectChatRequest, v1.GetDirectChatResponse]
-	createAttachmentUploadIntent   *connect.Client[v1.CreateAttachmentUploadIntentRequest, v1.CreateAttachmentUploadIntentResponse]
-	completeAttachmentUpload       *connect.Client[v1.CompleteAttachmentUploadRequest, v1.CompleteAttachmentUploadResponse]
-	getAttachment                  *connect.Client[v1.GetAttachmentRequest, v1.GetAttachmentResponse]
-	createGroup                    *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
-	listGroups                     *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
-	getGroup                       *connect.Client[v1.GetGroupRequest, v1.GetGroupResponse]
-	getGroupChat                   *connect.Client[v1.GetGroupChatRequest, v1.GetGroupChatResponse]
-	listGroupMembers               *connect.Client[v1.ListGroupMembersRequest, v1.ListGroupMembersResponse]
-	updateGroupMemberRole          *connect.Client[v1.UpdateGroupMemberRoleRequest, v1.UpdateGroupMemberRoleResponse]
-	transferGroupOwnership         *connect.Client[v1.TransferGroupOwnershipRequest, v1.TransferGroupOwnershipResponse]
-	removeGroupMember              *connect.Client[v1.RemoveGroupMemberRequest, v1.RemoveGroupMemberResponse]
-	leaveGroup                     *connect.Client[v1.LeaveGroupRequest, v1.LeaveGroupResponse]
-	restrictGroupMember            *connect.Client[v1.RestrictGroupMemberRequest, v1.RestrictGroupMemberResponse]
-	unrestrictGroupMember          *connect.Client[v1.UnrestrictGroupMemberRequest, v1.UnrestrictGroupMemberResponse]
-	createGroupInviteLink          *connect.Client[v1.CreateGroupInviteLinkRequest, v1.CreateGroupInviteLinkResponse]
-	listGroupInviteLinks           *connect.Client[v1.ListGroupInviteLinksRequest, v1.ListGroupInviteLinksResponse]
-	disableGroupInviteLink         *connect.Client[v1.DisableGroupInviteLinkRequest, v1.DisableGroupInviteLinkResponse]
-	joinGroupByInviteLink          *connect.Client[v1.JoinGroupByInviteLinkRequest, v1.JoinGroupByInviteLinkResponse]
-	setGroupTyping                 *connect.Client[v1.SetGroupTypingRequest, v1.SetGroupTypingResponse]
-	clearGroupTyping               *connect.Client[v1.ClearGroupTypingRequest, v1.ClearGroupTypingResponse]
-	markGroupChatRead              *connect.Client[v1.MarkGroupChatReadRequest, v1.MarkGroupChatReadResponse]
-	markDirectChatRead             *connect.Client[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse]
-	setDirectChatTyping            *connect.Client[v1.SetDirectChatTypingRequest, v1.SetDirectChatTypingResponse]
-	clearDirectChatTyping          *connect.Client[v1.ClearDirectChatTypingRequest, v1.ClearDirectChatTypingResponse]
-	setDirectChatPresenceHeartbeat *connect.Client[v1.SetDirectChatPresenceHeartbeatRequest, v1.SetDirectChatPresenceHeartbeatResponse]
-	clearDirectChatPresence        *connect.Client[v1.ClearDirectChatPresenceRequest, v1.ClearDirectChatPresenceResponse]
-	sendEncryptedDirectMessageV2   *connect.Client[v1.SendEncryptedDirectMessageV2Request, v1.SendEncryptedDirectMessageV2Response]
-	listEncryptedDirectMessageV2   *connect.Client[v1.ListEncryptedDirectMessageV2Request, v1.ListEncryptedDirectMessageV2Response]
-	getEncryptedDirectMessageV2    *connect.Client[v1.GetEncryptedDirectMessageV2Request, v1.GetEncryptedDirectMessageV2Response]
-	sendTextMessage                *connect.Client[v1.SendTextMessageRequest, v1.SendTextMessageResponse]
-	editDirectChatMessage          *connect.Client[v1.EditDirectChatMessageRequest, v1.EditDirectChatMessageResponse]
-	listDirectChatMessages         *connect.Client[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse]
-	listGroupMessages              *connect.Client[v1.ListGroupMessagesRequest, v1.ListGroupMessagesResponse]
-	searchMessages                 *connect.Client[v1.SearchMessagesRequest, v1.SearchMessagesResponse]
-	sendGroupTextMessage           *connect.Client[v1.SendGroupTextMessageRequest, v1.SendGroupTextMessageResponse]
-	editGroupMessage               *connect.Client[v1.EditGroupMessageRequest, v1.EditGroupMessageResponse]
-	deleteMessageForEveryone       *connect.Client[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse]
-	pinMessage                     *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
-	unpinMessage                   *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
+	ping                                     *connect.Client[v1.PingRequest, v1.PingResponse]
+	createDirectChat                         *connect.Client[v1.CreateDirectChatRequest, v1.CreateDirectChatResponse]
+	listDirectChats                          *connect.Client[v1.ListDirectChatsRequest, v1.ListDirectChatsResponse]
+	getDirectChat                            *connect.Client[v1.GetDirectChatRequest, v1.GetDirectChatResponse]
+	createAttachmentUploadIntent             *connect.Client[v1.CreateAttachmentUploadIntentRequest, v1.CreateAttachmentUploadIntentResponse]
+	completeAttachmentUpload                 *connect.Client[v1.CompleteAttachmentUploadRequest, v1.CompleteAttachmentUploadResponse]
+	getAttachment                            *connect.Client[v1.GetAttachmentRequest, v1.GetAttachmentResponse]
+	createGroup                              *connect.Client[v1.CreateGroupRequest, v1.CreateGroupResponse]
+	listGroups                               *connect.Client[v1.ListGroupsRequest, v1.ListGroupsResponse]
+	getGroup                                 *connect.Client[v1.GetGroupRequest, v1.GetGroupResponse]
+	getGroupChat                             *connect.Client[v1.GetGroupChatRequest, v1.GetGroupChatResponse]
+	listGroupMembers                         *connect.Client[v1.ListGroupMembersRequest, v1.ListGroupMembersResponse]
+	updateGroupMemberRole                    *connect.Client[v1.UpdateGroupMemberRoleRequest, v1.UpdateGroupMemberRoleResponse]
+	transferGroupOwnership                   *connect.Client[v1.TransferGroupOwnershipRequest, v1.TransferGroupOwnershipResponse]
+	removeGroupMember                        *connect.Client[v1.RemoveGroupMemberRequest, v1.RemoveGroupMemberResponse]
+	leaveGroup                               *connect.Client[v1.LeaveGroupRequest, v1.LeaveGroupResponse]
+	restrictGroupMember                      *connect.Client[v1.RestrictGroupMemberRequest, v1.RestrictGroupMemberResponse]
+	unrestrictGroupMember                    *connect.Client[v1.UnrestrictGroupMemberRequest, v1.UnrestrictGroupMemberResponse]
+	createGroupInviteLink                    *connect.Client[v1.CreateGroupInviteLinkRequest, v1.CreateGroupInviteLinkResponse]
+	listGroupInviteLinks                     *connect.Client[v1.ListGroupInviteLinksRequest, v1.ListGroupInviteLinksResponse]
+	disableGroupInviteLink                   *connect.Client[v1.DisableGroupInviteLinkRequest, v1.DisableGroupInviteLinkResponse]
+	joinGroupByInviteLink                    *connect.Client[v1.JoinGroupByInviteLinkRequest, v1.JoinGroupByInviteLinkResponse]
+	setGroupTyping                           *connect.Client[v1.SetGroupTypingRequest, v1.SetGroupTypingResponse]
+	clearGroupTyping                         *connect.Client[v1.ClearGroupTypingRequest, v1.ClearGroupTypingResponse]
+	markGroupChatRead                        *connect.Client[v1.MarkGroupChatReadRequest, v1.MarkGroupChatReadResponse]
+	markDirectChatRead                       *connect.Client[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse]
+	setDirectChatTyping                      *connect.Client[v1.SetDirectChatTypingRequest, v1.SetDirectChatTypingResponse]
+	clearDirectChatTyping                    *connect.Client[v1.ClearDirectChatTypingRequest, v1.ClearDirectChatTypingResponse]
+	setDirectChatPresenceHeartbeat           *connect.Client[v1.SetDirectChatPresenceHeartbeatRequest, v1.SetDirectChatPresenceHeartbeatResponse]
+	clearDirectChatPresence                  *connect.Client[v1.ClearDirectChatPresenceRequest, v1.ClearDirectChatPresenceResponse]
+	getEncryptedDirectMessageV2SendBootstrap *connect.Client[v1.GetEncryptedDirectMessageV2SendBootstrapRequest, v1.GetEncryptedDirectMessageV2SendBootstrapResponse]
+	sendEncryptedDirectMessageV2             *connect.Client[v1.SendEncryptedDirectMessageV2Request, v1.SendEncryptedDirectMessageV2Response]
+	listEncryptedDirectMessageV2             *connect.Client[v1.ListEncryptedDirectMessageV2Request, v1.ListEncryptedDirectMessageV2Response]
+	getEncryptedDirectMessageV2              *connect.Client[v1.GetEncryptedDirectMessageV2Request, v1.GetEncryptedDirectMessageV2Response]
+	sendTextMessage                          *connect.Client[v1.SendTextMessageRequest, v1.SendTextMessageResponse]
+	editDirectChatMessage                    *connect.Client[v1.EditDirectChatMessageRequest, v1.EditDirectChatMessageResponse]
+	listDirectChatMessages                   *connect.Client[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse]
+	listGroupMessages                        *connect.Client[v1.ListGroupMessagesRequest, v1.ListGroupMessagesResponse]
+	searchMessages                           *connect.Client[v1.SearchMessagesRequest, v1.SearchMessagesResponse]
+	sendGroupTextMessage                     *connect.Client[v1.SendGroupTextMessageRequest, v1.SendGroupTextMessageResponse]
+	editGroupMessage                         *connect.Client[v1.EditGroupMessageRequest, v1.EditGroupMessageResponse]
+	deleteMessageForEveryone                 *connect.Client[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse]
+	pinMessage                               *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
+	unpinMessage                             *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
 }
 
 // Ping calls aerochat.chat.v1.ChatService.Ping.
@@ -674,6 +685,12 @@ func (c *chatServiceClient) ClearDirectChatPresence(ctx context.Context, req *co
 	return c.clearDirectChatPresence.CallUnary(ctx, req)
 }
 
+// GetEncryptedDirectMessageV2SendBootstrap calls
+// aerochat.chat.v1.ChatService.GetEncryptedDirectMessageV2SendBootstrap.
+func (c *chatServiceClient) GetEncryptedDirectMessageV2SendBootstrap(ctx context.Context, req *connect.Request[v1.GetEncryptedDirectMessageV2SendBootstrapRequest]) (*connect.Response[v1.GetEncryptedDirectMessageV2SendBootstrapResponse], error) {
+	return c.getEncryptedDirectMessageV2SendBootstrap.CallUnary(ctx, req)
+}
+
 // SendEncryptedDirectMessageV2 calls aerochat.chat.v1.ChatService.SendEncryptedDirectMessageV2.
 func (c *chatServiceClient) SendEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[v1.SendEncryptedDirectMessageV2Request]) (*connect.Response[v1.SendEncryptedDirectMessageV2Response], error) {
 	return c.sendEncryptedDirectMessageV2.CallUnary(ctx, req)
@@ -771,6 +788,7 @@ type ChatServiceHandler interface {
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
 	SetDirectChatPresenceHeartbeat(context.Context, *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error)
 	ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error)
+	GetEncryptedDirectMessageV2SendBootstrap(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2SendBootstrapRequest]) (*connect.Response[v1.GetEncryptedDirectMessageV2SendBootstrapResponse], error)
 	SendEncryptedDirectMessageV2(context.Context, *connect.Request[v1.SendEncryptedDirectMessageV2Request]) (*connect.Response[v1.SendEncryptedDirectMessageV2Response], error)
 	ListEncryptedDirectMessageV2(context.Context, *connect.Request[v1.ListEncryptedDirectMessageV2Request]) (*connect.Response[v1.ListEncryptedDirectMessageV2Response], error)
 	GetEncryptedDirectMessageV2(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2Request]) (*connect.Response[v1.GetEncryptedDirectMessageV2Response], error)
@@ -973,6 +991,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceMethods.ByName("ClearDirectChatPresence")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceGetEncryptedDirectMessageV2SendBootstrapHandler := connect.NewUnaryHandler(
+		ChatServiceGetEncryptedDirectMessageV2SendBootstrapProcedure,
+		svc.GetEncryptedDirectMessageV2SendBootstrap,
+		connect.WithSchema(chatServiceMethods.ByName("GetEncryptedDirectMessageV2SendBootstrap")),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatServiceSendEncryptedDirectMessageV2Handler := connect.NewUnaryHandler(
 		ChatServiceSendEncryptedDirectMessageV2Procedure,
 		svc.SendEncryptedDirectMessageV2,
@@ -1113,6 +1137,8 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceSetDirectChatPresenceHeartbeatHandler.ServeHTTP(w, r)
 		case ChatServiceClearDirectChatPresenceProcedure:
 			chatServiceClearDirectChatPresenceHandler.ServeHTTP(w, r)
+		case ChatServiceGetEncryptedDirectMessageV2SendBootstrapProcedure:
+			chatServiceGetEncryptedDirectMessageV2SendBootstrapHandler.ServeHTTP(w, r)
 		case ChatServiceSendEncryptedDirectMessageV2Procedure:
 			chatServiceSendEncryptedDirectMessageV2Handler.ServeHTTP(w, r)
 		case ChatServiceListEncryptedDirectMessageV2Procedure:
@@ -1266,6 +1292,10 @@ func (UnimplementedChatServiceHandler) SetDirectChatPresenceHeartbeat(context.Co
 
 func (UnimplementedChatServiceHandler) ClearDirectChatPresence(context.Context, *connect.Request[v1.ClearDirectChatPresenceRequest]) (*connect.Response[v1.ClearDirectChatPresenceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ClearDirectChatPresence is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetEncryptedDirectMessageV2SendBootstrap(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2SendBootstrapRequest]) (*connect.Response[v1.GetEncryptedDirectMessageV2SendBootstrapResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetEncryptedDirectMessageV2SendBootstrap is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) SendEncryptedDirectMessageV2(context.Context, *connect.Request[v1.SendEncryptedDirectMessageV2Request]) (*connect.Response[v1.SendEncryptedDirectMessageV2Response], error) {
