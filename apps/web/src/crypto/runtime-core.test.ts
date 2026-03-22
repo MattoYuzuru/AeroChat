@@ -5,11 +5,16 @@ import type {
   CryptoDeviceBundlePublishChallenge,
   CryptoDeviceBundlePayload,
   CryptoDeviceLinkIntent,
+  EncryptedGroupEnvelope,
   GatewayClient,
 } from "../gateway/types";
 import { createCryptoRuntimeCore } from "./runtime-core";
 import type { CryptoKeyStore } from "./keystore";
-import type { CryptoMaterialFactory } from "./material";
+import {
+  createWebCryptoMaterialFactory,
+  type CryptoMaterialFactory,
+} from "./material";
+import { encryptEncryptedGroupPayloadForTest } from "./encrypted-group-codec";
 import type {
   CryptoRuntimeSession,
   LocalCryptoDeviceMaterial,
@@ -399,6 +404,77 @@ describe("createCryptoRuntimeCore", () => {
     expect(result.localProjection.chatId).toBe("chat-1");
     expect(result.storedEnvelope.storedDeliveryCount).toBe(2);
   });
+
+  it("decrypts encrypted group envelopes inside runtime boundary", async () => {
+    const keyStore = createMemoryKeyStore();
+    const localFactory = createWebCryptoMaterialFactory();
+    const { material: localMaterial } = await localFactory.createDeviceMaterial({
+      accountId: baseSession.profileId,
+      login: baseSession.login,
+      deviceLabel: "Web Test",
+      deviceId: "crypto-2",
+      status: "active",
+      bundleVersion: 1,
+      publishedAt: null,
+      linkIntentId: null,
+      linkIntentExpiresAt: null,
+    });
+    await keyStore.save(localMaterial);
+    const envelope = createEncryptedGroupEnvelope();
+    const encrypted = await encryptEncryptedGroupPayloadForTest({
+      recipientDevices: [
+        {
+          cryptoDeviceId: "crypto-2",
+          signedPrekeyPublicKey: localMaterial.signedPrekeyPublicKey,
+        },
+      ],
+      envelope,
+      payload: {
+        schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+        operation: "content",
+        message: {
+          text: "encrypted group hello",
+          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        },
+      },
+    });
+    const runtime = createCryptoRuntimeCore({
+      gatewayClient: createGatewayClient({}),
+      keyStore,
+      materialFactory: createFakeMaterialFactory(),
+      resolveDeviceLabel: () => "Web Test",
+    });
+
+    const result = await runtime.decryptEncryptedGroupEnvelopes(baseSession, [
+      {
+        ...envelope,
+        ...encrypted,
+      },
+    ]);
+
+    expect(result).toEqual([
+      {
+        status: "ready",
+        messageId: "message-1",
+        groupId: "group-1",
+        threadId: "thread-1",
+        mlsGroupId: "mls-1",
+        rosterVersion: 5,
+        senderUserId: "user-1",
+        senderCryptoDeviceId: "crypto-1",
+        operationKind: "content",
+        targetMessageId: null,
+        revision: 1,
+        createdAt: "2026-03-22T12:00:00Z",
+        storedAt: "2026-03-22T12:00:01Z",
+        payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+        text: "encrypted group hello",
+        markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        editedAt: null,
+        deletedAt: null,
+      },
+    ]);
+  });
 });
 
 function createMemoryKeyStore(): CryptoKeyStore {
@@ -716,11 +792,13 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     setDirectChatPresenceHeartbeat: vi.fn(),
     clearDirectChatPresence: vi.fn(),
     getEncryptedDirectMessageV2SendBootstrap: vi.fn(),
+    getEncryptedGroupBootstrap: vi.fn(),
     sendEncryptedDirectMessageV2: vi.fn(),
     sendTextMessage: vi.fn(),
     editDirectChatMessage: vi.fn(),
     listDirectChatMessages: vi.fn(),
     listEncryptedDirectMessageV2: vi.fn(),
+    listEncryptedGroupMessages: vi.fn(),
     searchMessages: vi.fn(),
     deleteMessageForEveryone: vi.fn(),
     pinMessage: vi.fn(),
@@ -735,5 +813,29 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     removeFriend: vi.fn(),
     updateCurrentProfile: vi.fn(),
     ...overrides,
+  };
+}
+
+function createEncryptedGroupEnvelope(): EncryptedGroupEnvelope {
+  return {
+    messageId: "message-1",
+    groupId: "group-1",
+    threadId: "thread-1",
+    mlsGroupId: "mls-1",
+    rosterVersion: 5,
+    senderUserId: "user-1",
+    senderCryptoDeviceId: "crypto-1",
+    operationKind: "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT",
+    targetMessageId: null,
+    revision: 1,
+    ciphertext: "",
+    ciphertextSizeBytes: 0,
+    createdAt: "2026-03-22T12:00:00Z",
+    storedAt: "2026-03-22T12:00:01Z",
+    viewerDelivery: {
+      recipientUserId: "user-1",
+      recipientCryptoDeviceId: "crypto-2",
+      storedAt: "2026-03-22T12:00:01Z",
+    },
   };
 }

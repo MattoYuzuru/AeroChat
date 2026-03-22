@@ -4,11 +4,15 @@ import type {
   CryptoRuntimeSession,
   CryptoRuntimeSnapshot,
   DecryptedEncryptedMediaAttachment,
+  EncryptedGroupDecryptedEnvelope,
   EncryptedDirectMessageV2DecryptedEnvelope,
   EncryptedDirectMessageV2OutboundSendResult,
   PreparedEncryptedMediaRelayUpload,
 } from "./types";
-import type { EncryptedDirectMessageV2Envelope } from "../gateway/types";
+import type {
+  EncryptedDirectMessageV2Envelope,
+  EncryptedGroupEnvelope,
+} from "../gateway/types";
 
 export type CryptoContextState =
   | {
@@ -30,6 +34,9 @@ export interface CryptoRuntimeContextValue {
   createPendingLinkedDevice(): Promise<void>;
   publishCurrentBundle(): Promise<void>;
   approveLinkIntent(linkIntentId: string): Promise<void>;
+  decryptEncryptedGroupEnvelopes(
+    envelopes: EncryptedGroupEnvelope[],
+  ): Promise<EncryptedGroupDecryptedEnvelope[]>;
   decryptEncryptedDirectMessageV2Envelopes(
     envelopes: EncryptedDirectMessageV2Envelope[],
   ): Promise<EncryptedDirectMessageV2DecryptedEnvelope[]>;

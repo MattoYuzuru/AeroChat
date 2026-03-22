@@ -38,12 +38,17 @@ import {
 import { buildGroupInviteUrl, extractGroupInviteToken } from "../groups/invite-token";
 import { parseGroupRealtimeEvent } from "../groups/realtime";
 import {
+  describeEncryptedGroupLaneIssue,
+} from "../groups/useEncryptedGroupLane";
+import type { EncryptedGroupProjectionEntry } from "../groups/encrypted-group-projection";
+import {
   applyGroupRealtimeToGroups,
   applyGroupRealtimeToSelectedState,
   createInitialGroupsSelectedState,
   shouldClearSelectedGroupOnRealtimeEvent,
   type GroupsSelectedState,
 } from "../groups/state";
+import { useEncryptedGroupLane } from "../groups/useEncryptedGroupLane";
 import {
   describeGroupTypingLabel,
   GROUP_TYPING_IDLE_TIMEOUT_MS,
@@ -106,6 +111,11 @@ export function GroupsPage() {
   const joinTokenFromRoute = searchParams.get("join")?.trim() ?? "";
   const searchJumpIntent = readSearchJumpIntent(searchParams);
   const token = authState.status === "authenticated" ? authState.token : "";
+  const encryptedGroupLane = useEncryptedGroupLane({
+    enabled: authState.status === "authenticated",
+    token,
+    groupId: selectedGroupId === "" ? null : selectedGroupId,
+  });
   const activeTypingTarget = resolveGroupTypingSessionTarget({
     enabled: authState.status === "authenticated",
     pageVisible: isPageVisible,
@@ -675,6 +685,8 @@ export function GroupsPage() {
   const requestedJoinToken = extractGroupInviteToken(joinInput || joinTokenFromRoute);
   const threadMessages =
     selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
+  const encryptedThreadMessages =
+    selectedState.status === "ready" ? [...encryptedGroupLane.items].reverse() : [];
   const typingLabel =
     selectedState.status === "ready"
       ? describeGroupTypingLabel(selectedState.snapshot.typingState, authState.profile.id)
@@ -1609,6 +1621,145 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
+                    <p className={styles.cardLabel}>Encrypted lane</p>
+                    <h2 className={styles.panelTitle}>Local decrypted projection</h2>
+                  </div>
+                  <p className={styles.panelCopy}>
+                    Эта секция показывает только client-side projection из opaque encrypted
+                    group envelopes. Legacy plaintext history ниже остаётся отдельным path.
+                  </p>
+                </div>
+
+                {encryptedGroupLane.bootstrap !== null && (
+                  <div className={styles.timelineMeta}>
+                    <span className={styles.statusPill}>
+                      mls group {encryptedGroupLane.bootstrap.lane.mlsGroupId}
+                    </span>
+                    <span className={styles.statusPill}>
+                      roster v{encryptedGroupLane.bootstrap.lane.rosterVersion}
+                    </span>
+                    <span className={styles.statusPill}>
+                      devices {encryptedGroupLane.bootstrap.rosterDevices.length}
+                    </span>
+                  </div>
+                )}
+
+                {(encryptedGroupLane.bootstrap !== null || threadMessages.length > 0) && (
+                  <div className={styles.notice}>
+                    Legacy plaintext timeline и encrypted local projection намеренно показаны
+                    раздельно. Этот slice не притворяется unified merged history.
+                  </div>
+                )}
+
+                {encryptedGroupLane.status === "loading" && (
+                  <InlineState
+                    title="Проверяем encrypted group lane"
+                    message="Читаем bootstrap/list path для active local crypto-device и пропускаем opaque envelopes через crypto runtime worker."
+                  />
+                )}
+
+                {encryptedGroupLane.status === "unavailable" && (
+                  <InlineState
+                    title="Encrypted lane пока недоступен"
+                    message={
+                      encryptedGroupLane.errorMessage ??
+                      "Encrypted group lane пока недоступен для текущего local crypto-device."
+                    }
+                  />
+                )}
+
+                {encryptedGroupLane.status === "error" && (
+                  <InlineState
+                    title="Encrypted lane не загрузился"
+                    message={
+                      encryptedGroupLane.errorMessage ??
+                      "Не удалось загрузить encrypted group local projection."
+                    }
+                    tone="error"
+                  />
+                )}
+
+                {encryptedGroupLane.status === "ready" && (
+                  <div className={styles.messagesList}>
+                    {encryptedThreadMessages.length === 0 ? (
+                      <InlineState
+                        title="Encrypted group messages пока не materialized"
+                        message="Control-plane уже может быть подготовлен, но для текущего bounded окна ещё нет decrypt-ready encrypted envelopes."
+                      />
+                    ) : (
+                      encryptedThreadMessages.map((entry) => (
+                        <article
+                          className={styles.messageCard}
+                          data-own={
+                            entry.senderUserId === authState.profile.id ? "true" : undefined
+                          }
+                          key={entry.key}
+                        >
+                          <div className={styles.messageHeader}>
+                            <div>
+                              <p className={styles.messageAuthor}>
+                                {describeEncryptedGroupAuthor(
+                                  entry,
+                                  authState.profile.id,
+                                  selectedState.members,
+                                )}
+                              </p>
+                              <p className={styles.messageMeta}>
+                                {formatDateTime(entry.createdAt)}
+                              </p>
+                            </div>
+                            <div className={styles.badgeColumn}>
+                              <span className={styles.statusPill}>encrypted</span>
+                              <span className={styles.statusPill}>
+                                {entry.kind === "message"
+                                  ? entry.isTombstone
+                                    ? "tombstone"
+                                    : entry.editedAt
+                                      ? "edited"
+                                      : "content"
+                                  : "decrypt failed"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className={styles.messageBody}>
+                            {entry.kind === "message" ? (
+                              entry.isTombstone ? (
+                                <p className={styles.helperText}>
+                                  Сообщение скрыто локальным tombstone из encrypted lane.
+                                </p>
+                              ) : entry.text && entry.text.trim() !== "" ? (
+                                <div className={styles.messageText}>
+                                  <SafeMessageMarkdown text={entry.text} />
+                                </div>
+                              ) : (
+                                <p className={styles.helperText}>
+                                  Bootstrap payload не содержит renderable text body.
+                                </p>
+                              )
+                            ) : (
+                              <div className={styles.error}>
+                                {describeEncryptedGroupLaneIssue(entry)}
+                              </div>
+                            )}
+                          </div>
+
+                          <p className={styles.editMeta}>
+                            stored {formatDateTime(entry.storedAt)}
+                            {entry.kind === "message" && entry.editedAt
+                              ? ` • edited ${formatDateTime(entry.editedAt)}`
+                              : ""}
+                          </p>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                )}
+              </section>
+
+              <section className={styles.panelCard}>
+                <div className={styles.panelHeader}>
+                  <div>
                     <p className={styles.cardLabel}>Timeline</p>
                     <h2 className={styles.panelTitle}>Primary group thread</h2>
                   </div>
@@ -2380,6 +2531,23 @@ export function GroupsPage() {
 
     return member.user.nickname || `@${member.user.login}`;
   }
+}
+
+function describeEncryptedGroupAuthor(
+  entry: EncryptedGroupProjectionEntry,
+  currentUserId: string,
+  members: GroupMember[],
+): string {
+  if (entry.senderUserId === currentUserId) {
+    return "Вы";
+  }
+
+  const member = members.find((candidate) => candidate.user.id === entry.senderUserId);
+  if (!member) {
+    return "Участник encrypted roster";
+  }
+
+  return member.user.nickname || `@${member.user.login}`;
 }
 
 interface MetricProps {

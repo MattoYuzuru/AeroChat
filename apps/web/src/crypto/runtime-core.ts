@@ -1,5 +1,6 @@
 import type {
   EncryptedDirectMessageV2Envelope,
+  EncryptedGroupEnvelope,
   GatewayClient,
 } from "../gateway/types";
 import {
@@ -10,6 +11,9 @@ import {
 } from "../gateway/types";
 import type { CryptoKeyStore } from "./keystore";
 import type { CryptoMaterialFactory } from "./material";
+import {
+  decryptEncryptedGroupEnvelope,
+} from "./encrypted-group-codec";
 import {
   decryptEncryptedDirectMessageV2Envelope,
   encryptEncryptedDirectMessageV2Payload,
@@ -23,6 +27,7 @@ import {
 } from "./encrypted-media-relay";
 import type {
   DecryptedEncryptedMediaAttachment,
+  EncryptedGroupDecryptedEnvelope,
   EncryptedDirectMessageV2DecryptedEnvelope,
   EncryptedMediaAttachmentDescriptor,
   EncryptedDirectMessageV2OutboundSendResult,
@@ -283,6 +288,55 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
             },
           }),
         ),
+      );
+    },
+
+    async decryptEncryptedGroupEnvelopes(
+      session: CryptoRuntimeSession,
+      envelopes: EncryptedGroupEnvelope[],
+    ): Promise<EncryptedGroupDecryptedEnvelope[]> {
+      const supportError = assertSupport(dependencies);
+      if (supportError !== null) {
+        return envelopes.map((envelope) => ({
+          status: "decrypt_failed",
+          messageId: envelope.messageId,
+          groupId: envelope.groupId,
+          threadId: envelope.threadId,
+          mlsGroupId: envelope.mlsGroupId,
+          rosterVersion: envelope.rosterVersion,
+          senderUserId: envelope.senderUserId,
+          senderCryptoDeviceId: envelope.senderCryptoDeviceId,
+          operationKind: envelope.operationKind,
+          targetMessageId: envelope.targetMessageId,
+          revision: envelope.revision,
+          createdAt: envelope.createdAt,
+          storedAt: envelope.storedAt,
+          failureKind: "runtime_unavailable",
+        }));
+      }
+
+      const localMaterial = await dependencies.keyStore.load(session.profileId);
+      if (localMaterial === null) {
+        return envelopes.map((envelope) => ({
+          status: "decrypt_failed",
+          messageId: envelope.messageId,
+          groupId: envelope.groupId,
+          threadId: envelope.threadId,
+          mlsGroupId: envelope.mlsGroupId,
+          rosterVersion: envelope.rosterVersion,
+          senderUserId: envelope.senderUserId,
+          senderCryptoDeviceId: envelope.senderCryptoDeviceId,
+          operationKind: envelope.operationKind,
+          targetMessageId: envelope.targetMessageId,
+          revision: envelope.revision,
+          createdAt: envelope.createdAt,
+          storedAt: envelope.storedAt,
+          failureKind: "runtime_unavailable",
+        }));
+      }
+
+      return Promise.all(
+        envelopes.map((envelope) => decryptEncryptedGroupEnvelope(localMaterial, envelope)),
       );
     },
 

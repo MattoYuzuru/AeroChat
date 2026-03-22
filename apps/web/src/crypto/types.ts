@@ -3,6 +3,7 @@ import type {
   CryptoDeviceBundle,
   CryptoDeviceLinkIntent,
   EncryptedDirectMessageV2Envelope,
+  EncryptedGroupEnvelope,
   EncryptedDirectMessageV2StoredEnvelope,
 } from "../gateway/types";
 
@@ -135,6 +136,56 @@ export type EncryptedDirectMessageV2DecryptedEnvelope =
   | EncryptedDirectMessageV2ReadyProjection
   | EncryptedDirectMessageV2DecryptFailure;
 
+export interface EncryptedGroupReadyProjection {
+  status: "ready";
+  messageId: string;
+  groupId: string;
+  threadId: string;
+  mlsGroupId: string;
+  rosterVersion: number;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: "content" | "edit" | "tombstone";
+  targetMessageId: string | null;
+  revision: number;
+  createdAt: string;
+  storedAt: string;
+  payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1";
+  text: string | null;
+  markdownPolicy: string | null;
+  editedAt: string | null;
+  deletedAt: string | null;
+}
+
+export interface EncryptedGroupDecryptFailure {
+  status: "decrypt_failed";
+  messageId: string;
+  groupId: string;
+  threadId: string;
+  mlsGroupId: string;
+  rosterVersion: number;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: string;
+  targetMessageId: string | null;
+  revision: number;
+  createdAt: string;
+  storedAt: string;
+  failureKind:
+    | "runtime_unavailable"
+    | "recipient_mismatch"
+    | "unsupported_transport_schema"
+    | "missing_recipient_key"
+    | "invalid_transport_header"
+    | "invalid_payload"
+    | "aad_mismatch"
+    | "decrypt_failed";
+}
+
+export type EncryptedGroupDecryptedEnvelope =
+  | EncryptedGroupReadyProjection
+  | EncryptedGroupDecryptFailure;
+
 export interface EncryptedDirectMessageV2OutboundSendResult {
   storedEnvelope: EncryptedDirectMessageV2StoredEnvelope;
   localProjection: EncryptedDirectMessageV2ReadyProjection;
@@ -148,6 +199,10 @@ export interface CryptoRuntimeClient {
     session: CryptoRuntimeSession,
     linkIntentId: string,
   ): Promise<CryptoRuntimeSnapshot>;
+  decryptEncryptedGroupEnvelopes(
+    session: CryptoRuntimeSession,
+    envelopes: EncryptedGroupEnvelope[],
+  ): Promise<EncryptedGroupDecryptedEnvelope[]>;
   decryptEncryptedDirectMessageV2Envelopes(
     session: CryptoRuntimeSession,
     envelopes: EncryptedDirectMessageV2Envelope[],
@@ -186,6 +241,10 @@ export interface CryptoWorkerRequestMap {
   createPendingLinkedDevice: { session: CryptoRuntimeSession };
   publishCurrentBundle: { session: CryptoRuntimeSession };
   approveLinkIntent: { session: CryptoRuntimeSession; linkIntentId: string };
+  decryptEncryptedGroupEnvelopes: {
+    session: CryptoRuntimeSession;
+    envelopes: EncryptedGroupEnvelope[];
+  };
   decryptEncryptedDirectMessageV2Envelopes: {
     session: CryptoRuntimeSession;
     envelopes: EncryptedDirectMessageV2Envelope[];
@@ -223,6 +282,7 @@ export interface CryptoWorkerResultMap {
   createPendingLinkedDevice: CryptoRuntimeSnapshot;
   publishCurrentBundle: CryptoRuntimeSnapshot;
   approveLinkIntent: CryptoRuntimeSnapshot;
+  decryptEncryptedGroupEnvelopes: EncryptedGroupDecryptedEnvelope[];
   decryptEncryptedDirectMessageV2Envelopes: EncryptedDirectMessageV2DecryptedEnvelope[];
   prepareEncryptedMediaRelayUpload: PreparedEncryptedMediaRelayUpload;
   decryptEncryptedMediaAttachment: DecryptedEncryptedMediaAttachment;
@@ -245,6 +305,11 @@ export type CryptoWorkerRequest =
       id: number;
       type: "approveLinkIntent";
       payload: CryptoWorkerRequestMap["approveLinkIntent"];
+    }
+  | {
+      id: number;
+      type: "decryptEncryptedGroupEnvelopes";
+      payload: CryptoWorkerRequestMap["decryptEncryptedGroupEnvelopes"];
     }
   | {
       id: number;

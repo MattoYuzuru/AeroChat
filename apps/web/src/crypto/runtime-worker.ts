@@ -38,6 +38,12 @@ async function handleRequest(request: CryptoWorkerRequest) {
           request.payload.linkIntentId,
         );
         break;
+      case "decryptEncryptedGroupEnvelopes":
+        snapshot = await runtime.decryptEncryptedGroupEnvelopes(
+          request.payload.session,
+          request.payload.envelopes,
+        );
+        break;
       case "decryptEncryptedDirectMessageV2Envelopes":
         snapshot = await runtime.decryptEncryptedDirectMessageV2Envelopes(
           request.payload.session,

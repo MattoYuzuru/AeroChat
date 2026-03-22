@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] MLS control-plane and opaque encrypted group envelope foundation
+- [x] Web encrypted group runtime and local projection bootstrap
 
 ---
 
@@ -143,7 +143,8 @@
 - [x] Group moderation foundation и admin policy expansion
 - [x] Max groups per user rules
 - [x] MLS control-plane and opaque encrypted group envelope foundation
-- [ ] Web encrypted group runtime, local projection и outbound text bootstrap
+- [x] Web encrypted group runtime и local projection bootstrap
+- [ ] Web encrypted group outbound text bootstrap
 - [ ] Encrypted media relay integration for MLS group lane
 
 ---

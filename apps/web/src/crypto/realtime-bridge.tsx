@@ -13,6 +13,10 @@ import {
   parseEncryptedDirectMessageV2RealtimeEvent,
   publishEncryptedDirectMessageV2RealtimeEvent,
 } from "../chats/encrypted-v2-realtime";
+import {
+  parseEncryptedGroupRealtimeEvent,
+  publishEncryptedGroupRealtimeEvent,
+} from "../groups/encrypted-group-realtime";
 
 const readyEventType = "connection.ready";
 
@@ -45,6 +49,12 @@ export function CryptoRealtimeBridge() {
       const encryptedEvent = parseEncryptedDirectMessageV2RealtimeEvent(envelope);
       if (encryptedEvent !== null) {
         publishEncryptedDirectMessageV2RealtimeEvent(encryptedEvent);
+        return;
+      }
+
+      const encryptedGroupEvent = parseEncryptedGroupRealtimeEvent(envelope);
+      if (encryptedGroupEvent !== null) {
+        publishEncryptedGroupRealtimeEvent(encryptedGroupEvent);
       }
     });
   }, []);
