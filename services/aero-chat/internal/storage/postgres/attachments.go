@@ -103,7 +103,12 @@ func (r *Repository) GetAttachment(ctx context.Context, attachmentID string) (*c
 		return nil, nil, convertError(err)
 	}
 
-	messageID := attachmentMessageID(row.DirectChatMessageID, row.GroupMessageID)
+	messageID := attachmentMessageID(
+		row.DirectChatMessageID,
+		row.GroupMessageID,
+		row.EncryptedDirectMessageV2ID,
+		row.EncryptedGroupMessageV1ID,
+	)
 	attachment := attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.RelaySchema, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, messageID)
 
 	var uploadSession *chat.AttachmentUploadSession
@@ -141,7 +146,12 @@ func (r *Repository) ListAttachments(ctx context.Context, attachmentIDs []string
 
 	result := make([]chat.Attachment, 0, len(rows))
 	for _, row := range rows {
-		messageID := attachmentMessageID(row.DirectChatMessageID, row.GroupMessageID)
+		messageID := attachmentMessageID(
+			row.DirectChatMessageID,
+			row.GroupMessageID,
+			row.EncryptedDirectMessageV2ID,
+			row.EncryptedGroupMessageV1ID,
+		)
 		result = append(result, attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.RelaySchema, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, messageID))
 	}
 
@@ -333,13 +343,26 @@ func uuidPointer(value pgtype.UUID) *string {
 	return &result
 }
 
-func attachmentMessageID(directMessageID pgtype.UUID, groupMessageID pgtype.UUID) *string {
+func attachmentMessageID(
+	directMessageID pgtype.UUID,
+	groupMessageID pgtype.UUID,
+	encryptedDirectMessageV2ID pgtype.UUID,
+	encryptedGroupMessageV1ID pgtype.UUID,
+) *string {
 	if directMessageID.Valid {
 		value := uuid.UUID(directMessageID.Bytes).String()
 		return &value
 	}
 	if groupMessageID.Valid {
 		value := uuid.UUID(groupMessageID.Bytes).String()
+		return &value
+	}
+	if encryptedDirectMessageV2ID.Valid {
+		value := uuid.UUID(encryptedDirectMessageV2ID.Bytes).String()
+		return &value
+	}
+	if encryptedGroupMessageV1ID.Valid {
+		value := uuid.UUID(encryptedGroupMessageV1ID.Bytes).String()
 		return &value
 	}
 	return nil
@@ -439,6 +462,56 @@ func attachUploadedGroupMessageAttachments(ctx context.Context, q *chatsqlc.Quer
 			GroupMessageID:   pgtype.UUID{Bytes: mustParseUUID(params.MessageID), Valid: true},
 			AttachedByUserID: mustParseUUID(params.SenderUserID),
 			CreatedAt:        timestamptzValue(params.CreatedAt),
+		}); err != nil {
+			return convertError(err)
+		}
+	}
+
+	return nil
+}
+
+func attachUploadedEncryptedDirectMessageV2Attachments(ctx context.Context, q *chatsqlc.Queries, params chat.CreateEncryptedDirectMessageV2Params) error {
+	for _, attachmentID := range params.AttachmentIDs {
+		affected, err := q.MarkAttachmentAttached(ctx, chatsqlc.MarkAttachmentAttachedParams{
+			ID:        mustParseUUID(attachmentID),
+			UpdatedAt: timestamptzValue(params.StoredAt),
+		})
+		if err != nil {
+			return convertError(err)
+		}
+		if affected == 0 {
+			return chat.ErrConflict
+		}
+		if err := q.AttachEncryptedDirectMessageV2Attachment(ctx, chatsqlc.AttachEncryptedDirectMessageV2AttachmentParams{
+			AttachmentID:               mustParseUUID(attachmentID),
+			EncryptedDirectMessageV2ID: pgtype.UUID{Bytes: mustParseUUID(params.MessageID), Valid: true},
+			AttachedByUserID:           mustParseUUID(params.SenderUserID),
+			CreatedAt:                  timestamptzValue(params.StoredAt),
+		}); err != nil {
+			return convertError(err)
+		}
+	}
+
+	return nil
+}
+
+func attachUploadedEncryptedGroupMessageAttachments(ctx context.Context, q *chatsqlc.Queries, params chat.CreateEncryptedGroupMessageParams) error {
+	for _, attachmentID := range params.AttachmentIDs {
+		affected, err := q.MarkAttachmentAttached(ctx, chatsqlc.MarkAttachmentAttachedParams{
+			ID:        mustParseUUID(attachmentID),
+			UpdatedAt: timestamptzValue(params.StoredAt),
+		})
+		if err != nil {
+			return convertError(err)
+		}
+		if affected == 0 {
+			return chat.ErrConflict
+		}
+		if err := q.AttachEncryptedGroupMessageV1Attachment(ctx, chatsqlc.AttachEncryptedGroupMessageV1AttachmentParams{
+			AttachmentID:              mustParseUUID(attachmentID),
+			EncryptedGroupMessageV1ID: pgtype.UUID{Bytes: mustParseUUID(params.MessageID), Valid: true},
+			AttachedByUserID:          mustParseUUID(params.SenderUserID),
+			CreatedAt:                 timestamptzValue(params.StoredAt),
 		}); err != nil {
 			return convertError(err)
 		}

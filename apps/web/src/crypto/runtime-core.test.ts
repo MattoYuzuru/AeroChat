@@ -393,6 +393,7 @@ describe("createCryptoRuntimeCore", () => {
         senderCryptoDeviceId: "crypto-1",
         operationKind: "content",
         revision: 1,
+        attachmentIds: [],
         deliveries: expect.arrayContaining([
           expect.objectContaining({
             recipientCryptoDeviceId: "crypto-1",
@@ -408,6 +409,7 @@ describe("createCryptoRuntimeCore", () => {
       }),
     );
     expect(result.localProjection.text).toBe("secret hello");
+    expect(result.localProjection.attachments).toEqual([]);
     expect(result.localProjection.chatId).toBe("chat-1");
     expect(result.localProjection.replyToMessageId).toBeNull();
     expect(result.storedEnvelope.storedDeliveryCount).toBe(2);
@@ -534,14 +536,140 @@ describe("createCryptoRuntimeCore", () => {
         senderCryptoDeviceId: "crypto-1",
         operationKind: "content",
         revision: 1,
+        attachmentIds: [],
         ciphertext: expect.any(String),
       }),
     );
     expect(result.localProjection.text).toBe("secret group hello");
+    expect(result.localProjection.attachments).toEqual([]);
     expect(result.localProjection.groupId).toBe("group-1");
     expect(result.localProjection.threadId).toBe("thread-1");
     expect(result.localProjection.replyToMessageId).toBeNull();
     expect(result.storedEnvelope.storedDeliveryCount).toBe(2);
+  });
+
+  it("reuses encrypted media relay drafts for encrypted group content", async () => {
+    const keyStore = createMemoryKeyStore();
+    await keyStore.save(
+      createLocalMaterial({
+        cryptoDeviceId: "crypto-1",
+        status: "active",
+        bundleDigestBase64: "digest-1",
+        lastBundleVersion: 1,
+      }),
+    );
+    const peerSignedPrekeyPublicBase64 = await createSignedPrekeyPublicBase64();
+    const gatewayClient = createGatewayClient({
+      getEncryptedGroupBootstrap: vi.fn(async () => ({
+        lane: {
+          groupId: "group-1",
+          threadId: "thread-1",
+          mlsGroupId: "mls-1",
+          rosterVersion: 7,
+          activatedAt: "2026-03-22T12:10:00Z",
+          updatedAt: "2026-03-22T12:10:00Z",
+        },
+        rosterMembers: [],
+        rosterDevices: [
+          {
+            userId: baseSession.profileId,
+            cryptoDeviceId: "crypto-1",
+            bundleVersion: 2,
+            cryptoSuite: "webcrypto-p256-foundation-v1",
+            identityPublicKeyBase64: "self-identity-public",
+            signedPrekeyPublicBase64: await createSignedPrekeyPublicBase64(),
+            signedPrekeyId: "self-signed-prekey-1",
+            signedPrekeySignatureBase64: "self-signature",
+            kemPublicKeyBase64: null,
+            kemKeyId: null,
+            kemSignatureBase64: null,
+            oneTimePrekeysTotal: 0,
+            oneTimePrekeysAvailable: 0,
+            bundleDigestBase64: "self-digest-1",
+            publishedAt: "2026-03-22T12:10:00Z",
+            expiresAt: null,
+            updatedAt: "2026-03-22T12:10:00Z",
+          },
+          {
+            userId: "user-2",
+            cryptoDeviceId: "peer-device-1",
+            bundleVersion: 3,
+            cryptoSuite: "webcrypto-p256-foundation-v1",
+            identityPublicKeyBase64: "peer-identity-public",
+            signedPrekeyPublicBase64: peerSignedPrekeyPublicBase64,
+            signedPrekeyId: "peer-signed-prekey-1",
+            signedPrekeySignatureBase64: "peer-signature",
+            kemPublicKeyBase64: null,
+            kemKeyId: null,
+            kemSignatureBase64: null,
+            oneTimePrekeysTotal: 0,
+            oneTimePrekeysAvailable: 0,
+            bundleDigestBase64: "peer-digest-1",
+            publishedAt: "2026-03-22T12:10:00Z",
+            expiresAt: null,
+            updatedAt: "2026-03-22T12:10:00Z",
+          },
+        ],
+      })),
+      sendEncryptedGroupMessage: vi.fn(async (_token, input) => ({
+        messageId: input.messageId,
+        groupId: input.groupId,
+        threadId: "thread-1",
+        mlsGroupId: input.mlsGroupId,
+        rosterVersion: input.rosterVersion,
+        senderUserId: baseSession.profileId,
+        senderCryptoDeviceId: input.senderCryptoDeviceId,
+        operationKind: "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT",
+        targetMessageId: null,
+        revision: input.revision,
+        createdAt: "2026-03-22T12:11:00Z",
+        storedAt: "2026-03-22T12:11:01Z",
+        storedDeliveryCount: 2,
+        storedDeliveries: [],
+      })),
+    });
+    const runtime = createCryptoRuntimeCore({
+      gatewayClient,
+      keyStore,
+      materialFactory: createFakeMaterialFactory(),
+      resolveDeviceLabel: () => "Web Test",
+    });
+
+    const prepared = await runtime.prepareEncryptedMediaRelayUpload(baseSession, {
+      fileName: "photo.jpg",
+      mimeType: "image/jpeg",
+      fileBytes: new TextEncoder().encode("hello").buffer,
+    });
+    const result = await runtime.sendEncryptedGroupContent(baseSession, {
+      groupId: "group-1",
+      text: "",
+      attachmentDrafts: [
+        {
+          draftId: prepared.draftId,
+          attachmentId: "attachment-1",
+        },
+      ],
+    });
+
+    expect(gatewayClient.sendEncryptedGroupMessage).toHaveBeenCalledWith(
+      baseSession.token,
+      expect.objectContaining({
+        groupId: "group-1",
+        operationKind: "content",
+        attachmentIds: ["attachment-1"],
+      }),
+    );
+    expect(result.localProjection.text).toBeNull();
+    expect(result.localProjection.attachments).toHaveLength(1);
+    expect(result.localProjection.attachments?.[0]).toEqual(
+      expect.objectContaining({
+        attachmentId: "attachment-1",
+        relaySchema: "ATTACHMENT_RELAY_SCHEMA_ENCRYPTED_BLOB_V1",
+        fileName: "photo.jpg",
+        mimeType: "image/jpeg",
+        plaintextSizeBytes: 5,
+      }),
+    );
   });
 
   it("decrypts encrypted group envelopes inside runtime boundary", async () => {
@@ -575,6 +703,7 @@ describe("createCryptoRuntimeCore", () => {
         message: {
           text: "encrypted group hello",
           markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+          attachments: [],
         },
       },
     });
@@ -611,6 +740,7 @@ describe("createCryptoRuntimeCore", () => {
         replyToMessageId: null,
         text: "encrypted group hello",
         markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        attachments: [],
         editedAt: null,
         deletedAt: null,
       },

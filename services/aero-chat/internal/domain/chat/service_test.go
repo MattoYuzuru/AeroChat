@@ -3211,6 +3211,15 @@ func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, param
 		})
 	}
 
+	for _, attachmentID := range params.AttachmentIDs {
+		attachment := r.attachments[attachmentID]
+		attachment.Status = AttachmentStatusAttached
+		attachment.UpdatedAt = params.StoredAt
+		attachment.AttachedAt = &params.StoredAt
+		attachment.MessageID = &params.MessageID
+		r.attachments[attachmentID] = attachment
+	}
+
 	r.encryptedMessagesV2[params.MessageID] = record
 	directChat.UpdatedAt = params.StoredAt
 	r.chats[params.ChatID] = directChat
@@ -3270,6 +3279,16 @@ func (r *fakeRepository) CreateEncryptedGroupMessage(_ context.Context, params C
 		Ciphertext: append([]byte(nil), params.Ciphertext...),
 		Deliveries: deliveries,
 	}
+
+	for _, attachmentID := range params.AttachmentIDs {
+		attachment := r.attachments[attachmentID]
+		attachment.Status = AttachmentStatusAttached
+		attachment.UpdatedAt = params.StoredAt
+		attachment.AttachedAt = &params.StoredAt
+		attachment.MessageID = &params.MessageID
+		r.attachments[attachmentID] = attachment
+	}
+
 	r.encryptedGroupMsgs[params.MessageID] = record
 
 	envelopeCopy := record.Envelope

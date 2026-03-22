@@ -1111,7 +1111,9 @@ SELECT
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
     ma.direct_chat_message_id,
-    ma.group_message_id
+    ma.group_message_id,
+    ma.encrypted_direct_message_v2_id,
+    ma.encrypted_group_message_v1_id
 FROM attachments AS a
 LEFT JOIN attachment_upload_sessions AS s ON s.attachment_id = a.id
 LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
@@ -1146,7 +1148,9 @@ SELECT
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
     ma.direct_chat_message_id,
-    ma.group_message_id
+    ma.group_message_id,
+    ma.encrypted_direct_message_v2_id,
+    ma.encrypted_group_message_v1_id
 FROM attachments AS a
 LEFT JOIN attachment_upload_sessions AS s ON s.attachment_id = a.id
 LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
@@ -1385,6 +1389,22 @@ INSERT INTO message_attachments (
 INSERT INTO message_attachments (
     attachment_id,
     group_message_id,
+    attached_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4);
+
+-- name: AttachEncryptedDirectMessageV2Attachment :exec
+INSERT INTO message_attachments (
+    attachment_id,
+    encrypted_direct_message_v2_id,
+    attached_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4);
+
+-- name: AttachEncryptedGroupMessageV1Attachment :exec
+INSERT INTO message_attachments (
+    attachment_id,
+    encrypted_group_message_v1_id,
     attached_by_user_id,
     created_at
 ) VALUES ($1, $2, $3, $4);

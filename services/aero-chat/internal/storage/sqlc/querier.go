@@ -14,6 +14,8 @@ type Querier interface {
 	AddDirectChatParticipant(ctx context.Context, arg AddDirectChatParticipantParams) error
 	AddGroupMembership(ctx context.Context, arg AddGroupMembershipParams) error
 	AttachDirectMessageAttachment(ctx context.Context, arg AttachDirectMessageAttachmentParams) error
+	AttachEncryptedDirectMessageV2Attachment(ctx context.Context, arg AttachEncryptedDirectMessageV2AttachmentParams) error
+	AttachEncryptedGroupMessageV1Attachment(ctx context.Context, arg AttachEncryptedGroupMessageV1AttachmentParams) error
 	AttachGroupMessageAttachment(ctx context.Context, arg AttachGroupMessageAttachmentParams) error
 	CompleteAttachmentUpload(ctx context.Context, arg CompleteAttachmentUploadParams) (int64, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (CreateAttachmentRow, error)

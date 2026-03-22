@@ -1679,6 +1679,7 @@ export function createGatewayClient(
           ),
           targetMessageId: normalizeOptionalString(input.targetMessageId ?? ""),
           revision: input.revision,
+          attachmentIds: normalizeIDs(input.attachmentIds ?? []),
           deliveries: input.deliveries.map((delivery) => ({
             recipientCryptoDeviceId: delivery.recipientCryptoDeviceId.trim(),
             transportHeader: delivery.transportHeader,
@@ -1803,6 +1804,7 @@ export function createGatewayClient(
           ),
           targetMessageId: normalizeOptionalString(input.targetMessageId ?? ""),
           revision: input.revision,
+          attachmentIds: normalizeIDs(input.attachmentIds ?? []),
           ciphertext: input.ciphertext,
         },
         token,

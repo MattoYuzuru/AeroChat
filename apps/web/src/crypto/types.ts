@@ -156,6 +156,7 @@ export interface EncryptedGroupReadyProjection {
   payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1";
   text: string | null;
   markdownPolicy: string | null;
+  attachments: EncryptedMediaAttachmentDescriptor[] | null;
   editedAt: string | null;
   deletedAt: string | null;
 }
@@ -270,6 +271,10 @@ export interface CryptoRuntimeClient {
       groupId: string;
       text: string;
       replyToMessageId?: string | null;
+      attachmentDrafts?: Array<{
+        draftId: string;
+        attachmentId: string;
+      }>;
     },
   ): Promise<EncryptedGroupOutboundSendResult>;
   sendEncryptedGroupEdit(

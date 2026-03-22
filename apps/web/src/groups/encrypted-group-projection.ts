@@ -1,6 +1,7 @@
 import type {
   EncryptedGroupDecryptFailure,
   EncryptedGroupDecryptedEnvelope,
+  EncryptedMediaAttachmentDescriptor,
   EncryptedGroupReadyProjection,
 } from "../crypto/types";
 
@@ -22,6 +23,7 @@ export interface EncryptedGroupProjectedMessageEntry {
   storedAt: string;
   text: string | null;
   markdownPolicy: string | null;
+  attachments: EncryptedMediaAttachmentDescriptor[];
   editedAt: string | null;
   deletedAt: string | null;
   isTombstone: boolean;
@@ -142,6 +144,7 @@ function applyReadyProjection(
       storedAt: update.storedAt,
       text: update.text,
       markdownPolicy: update.markdownPolicy,
+      attachments: update.attachments ?? [],
       editedAt: update.editedAt,
       deletedAt: update.deletedAt,
       isTombstone: false,
@@ -179,6 +182,7 @@ function applyReadyProjection(
       storedAt: maxTimestamp(target.storedAt, update.storedAt),
       text: update.text,
       markdownPolicy: update.markdownPolicy,
+      attachments: update.attachments ?? target.attachments,
       editedAt: update.editedAt ?? update.storedAt,
     });
     return true;
@@ -190,6 +194,7 @@ function applyReadyProjection(
     storedAt: maxTimestamp(target.storedAt, update.storedAt),
     text: null,
     markdownPolicy: null,
+    attachments: [],
     deletedAt: update.deletedAt ?? update.storedAt,
     isTombstone: true,
   });

@@ -1063,6 +1063,10 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 	if err != nil {
 		return nil, err
 	}
+	normalizedAttachmentIDs, err := normalizeAttachmentIDs(params.AttachmentIDs)
+	if err != nil {
+		return nil, err
+	}
 	normalizedDeliveries, err := normalizeEncryptedDirectMessageV2DeliveryDrafts(params.Deliveries)
 	if err != nil {
 		return nil, err
@@ -1085,6 +1089,12 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 		normalizedOperationKind,
 		normalizedTargetMessageID,
 	); err != nil {
+		return nil, err
+	}
+	if err := validateEncryptedMessageAttachmentLinkage(normalizedOperationKind, normalizedAttachmentIDs); err != nil {
+		return nil, err
+	}
+	if err := s.ensureDirectMessageAttachments(ctx, authSession.User.ID, normalizedChatID, normalizedAttachmentIDs); err != nil {
 		return nil, err
 	}
 
@@ -1117,6 +1127,7 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 		OperationKind:        normalizedOperationKind,
 		TargetMessageID:      normalizedTargetMessageID,
 		Revision:             normalizedRevision,
+		AttachmentIDs:        normalizedAttachmentIDs,
 		Deliveries:           targetDeliveries,
 		CreatedAt:            now,
 		StoredAt:             now,
@@ -1293,6 +1304,10 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 	if err != nil {
 		return nil, err
 	}
+	normalizedAttachmentIDs, err := normalizeAttachmentIDs(params.AttachmentIDs)
+	if err != nil {
+		return nil, err
+	}
 	normalizedCiphertext, err := normalizeEncryptedGroupCiphertext(params.Ciphertext)
 	if err != nil {
 		return nil, err
@@ -1317,6 +1332,12 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 	if !encryptedGroupBootstrapHasDevice(*bootstrap, authSession.User.ID, normalizedSenderCryptoDeviceID) {
 		return nil, fmt.Errorf("%w: sender crypto device must be active, owned by current user and present in encrypted group roster", ErrConflict)
 	}
+	if err := validateEncryptedMessageAttachmentLinkage(normalizedOperationKind, normalizedAttachmentIDs); err != nil {
+		return nil, err
+	}
+	if err := s.ensureGroupMessageAttachments(ctx, authSession.User.ID, group.ID, normalizedAttachmentIDs); err != nil {
+		return nil, err
+	}
 
 	deliveries, err := resolveEncryptedGroupMessageDeliveries(
 		authSession.User.ID,
@@ -1339,11 +1360,29 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 		OperationKind:        normalizedOperationKind,
 		TargetMessageID:      normalizedTargetMessageID,
 		Revision:             normalizedRevision,
+		AttachmentIDs:        normalizedAttachmentIDs,
 		Ciphertext:           normalizedCiphertext,
 		Deliveries:           deliveries,
 		CreatedAt:            now,
 		StoredAt:             now,
 	})
+}
+
+func validateEncryptedMessageAttachmentLinkage(operationKind string, attachmentIDs []string) error {
+	switch operationKind {
+	case "content", "edit":
+		return nil
+	case "tombstone", "control":
+		if len(attachmentIDs) > 0 {
+			return fmt.Errorf("%w: encrypted tombstone/control operation cannot link attachments", ErrInvalidArgument)
+		}
+		return nil
+	default:
+		if len(attachmentIDs) > 0 {
+			return fmt.Errorf("%w: attachment linkage is not supported for this encrypted operation", ErrInvalidArgument)
+		}
+		return nil
+	}
 }
 
 func (s *Service) ListEncryptedGroupMessages(ctx context.Context, token string, groupID string, viewerCryptoDeviceID string, pageSize uint32) ([]EncryptedGroupEnvelope, error) {

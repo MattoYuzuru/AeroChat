@@ -79,6 +79,10 @@ export interface CryptoRuntimeContextValue {
     groupId: string,
     text: string,
     replyToMessageId?: string | null,
+    attachmentDrafts?: Array<{
+      draftId: string;
+      attachmentId: string;
+    }>,
   ): Promise<EncryptedGroupOutboundSendResult | null>;
   sendEncryptedGroupEdit(
     groupId: string,

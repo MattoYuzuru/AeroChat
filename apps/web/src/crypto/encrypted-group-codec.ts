@@ -5,6 +5,11 @@ import type {
   EncryptedGroupReadyProjection,
   LocalCryptoDeviceMaterial,
 } from "./types";
+import {
+  parseEncryptedMediaAttachmentDescriptor,
+  toPublicEncryptedMediaAttachmentDescriptor,
+  type EncryptedMediaAttachmentDescriptorV1,
+} from "./encrypted-media-relay";
 
 const transportSchema = "aerochat.web.encrypted_group_message_v1.transport.v1";
 const payloadSchema = "aerochat.web.encrypted_group_message_v1.payload.v1";
@@ -32,6 +37,7 @@ interface EncryptedGroupContentPayloadV1 {
   message: {
     text: string | null;
     markdownPolicy: string | null;
+    attachments: EncryptedMediaAttachmentDescriptorV1[];
   };
 }
 
@@ -74,6 +80,9 @@ export interface EncryptedGroupOutboundEnvelopeMetadata {
 export async function decryptEncryptedGroupEnvelope(
   material: LocalCryptoDeviceMaterial,
   envelope: EncryptedGroupEnvelope,
+  options?: {
+    onEncryptedMediaDescriptor?(descriptor: EncryptedMediaAttachmentDescriptorV1): void;
+  },
 ): Promise<EncryptedGroupDecryptedEnvelope> {
   if (
     material.record.cryptoDeviceId !== envelope.viewerDelivery.recipientCryptoDeviceId
@@ -118,7 +127,7 @@ export async function decryptEncryptedGroupEnvelope(
       return buildFailure(envelope, "invalid_payload");
     }
 
-    return buildReadyProjection(envelope, payload);
+    return buildReadyProjection(envelope, payload, options);
   } catch (error) {
     if (error instanceof DOMException && error.name === "OperationError") {
       return buildFailure(envelope, "aad_mismatch");
@@ -432,6 +441,19 @@ function parsePayload(plaintext: string): EncryptedGroupPayloadV1 | null {
         return null;
       }
       if (parsed.operation === "content") {
+        const rawAttachments = Array.isArray(parsed.message.attachments)
+          ? parsed.message.attachments
+          : undefined;
+        const attachments = rawAttachments?.map(parseEncryptedMediaAttachmentDescriptor);
+        if (
+          attachments === undefined ||
+          attachments.some((descriptor) => descriptor === null)
+        ) {
+          return null;
+        }
+        if (text === null && attachments.length === 0) {
+          return null;
+        }
         return {
           schema: payloadSchema,
           operation: "content",
@@ -439,6 +461,10 @@ function parsePayload(plaintext: string): EncryptedGroupPayloadV1 | null {
           message: {
             text,
             markdownPolicy,
+            attachments: attachments.filter(
+              (descriptor): descriptor is EncryptedMediaAttachmentDescriptorV1 =>
+                descriptor !== null,
+            ),
           },
         };
       }
@@ -478,7 +504,16 @@ function parsePayload(plaintext: string): EncryptedGroupPayloadV1 | null {
 function buildReadyProjection(
   envelope: EncryptedGroupEnvelope,
   payload: EncryptedGroupPayloadV1,
+  options?: {
+    onEncryptedMediaDescriptor?(descriptor: EncryptedMediaAttachmentDescriptorV1): void;
+  },
 ): EncryptedGroupReadyProjection {
+  const mediaDescriptors =
+    payload.operation === "content" ? payload.message.attachments : [];
+  for (const descriptor of mediaDescriptors) {
+    options?.onEncryptedMediaDescriptor?.(descriptor);
+  }
+
   return {
     status: "ready",
     messageId: envelope.messageId,
@@ -501,6 +536,10 @@ function buildReadyProjection(
     text: payload.operation === "tombstone" ? null : payload.message.text,
     markdownPolicy:
       payload.operation === "tombstone" ? null : payload.message.markdownPolicy,
+    attachments:
+      payload.operation === "content"
+        ? mediaDescriptors.map(toPublicEncryptedMediaAttachmentDescriptor)
+        : null,
     editedAt: payload.operation === "edit" ? payload.editedAt : null,
     deletedAt: payload.operation === "tombstone" ? payload.deletedAt : null,
   };

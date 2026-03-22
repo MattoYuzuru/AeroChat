@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Encrypted search recovery foundation
+- [x] Web encrypted group media send bootstrap
 
 ---
 
@@ -151,7 +151,7 @@
 - [x] Encrypted group reply/edit/tombstone/pin recovery foundation
 - [x] Encrypted group unread/read recovery foundation
 - [x] Encrypted search recovery foundation
-- [ ] Encrypted media relay integration for MLS group lane
+- [x] Encrypted media relay integration for MLS group lane
 
 ---
 

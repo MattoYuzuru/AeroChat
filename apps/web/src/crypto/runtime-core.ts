@@ -83,6 +83,10 @@ type EncryptedGroupMutationInput =
       groupId: string;
       text: string;
       replyToMessageId?: string | null;
+      attachmentDrafts?: Array<{
+        draftId: string;
+        attachmentId: string;
+      }>;
     }
   | {
       kind: "edit";
@@ -391,7 +395,13 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
       }
 
       return Promise.all(
-        envelopes.map((envelope) => decryptEncryptedGroupEnvelope(localMaterial, envelope)),
+        envelopes.map((envelope) =>
+          decryptEncryptedGroupEnvelope(localMaterial, envelope, {
+            onEncryptedMediaDescriptor(descriptor) {
+              cacheEncryptedMediaDescriptor(encryptedMediaDescriptors, descriptor);
+            },
+          }),
+        ),
       );
     },
 
@@ -545,14 +555,25 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
         groupId: string;
         text: string;
         replyToMessageId?: string | null;
+        attachmentDrafts?: Array<{
+          draftId: string;
+          attachmentId: string;
+        }>;
       },
     ): Promise<EncryptedGroupOutboundSendResult> {
-      return sendEncryptedGroupMutation(dependencies, session, {
-        kind: "content",
-        groupId: input.groupId,
-        text: input.text,
-        replyToMessageId: input.replyToMessageId,
-      });
+      return sendEncryptedGroupMutation(
+        dependencies,
+        encryptedMediaDrafts,
+        encryptedMediaDescriptors,
+        session,
+        {
+          kind: "content",
+          groupId: input.groupId,
+          text: input.text,
+          replyToMessageId: input.replyToMessageId,
+          attachmentDrafts: input.attachmentDrafts,
+        },
+      );
     },
 
     async sendEncryptedGroupEdit(
@@ -565,14 +586,20 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
         replyToMessageId?: string | null;
       },
     ): Promise<EncryptedGroupOutboundSendResult> {
-      return sendEncryptedGroupMutation(dependencies, session, {
-        kind: "edit",
-        groupId: input.groupId,
-        targetMessageId: input.targetMessageId,
-        nextRevision: input.nextRevision,
-        text: input.text,
-        replyToMessageId: input.replyToMessageId,
-      });
+      return sendEncryptedGroupMutation(
+        dependencies,
+        encryptedMediaDrafts,
+        encryptedMediaDescriptors,
+        session,
+        {
+          kind: "edit",
+          groupId: input.groupId,
+          targetMessageId: input.targetMessageId,
+          nextRevision: input.nextRevision,
+          text: input.text,
+          replyToMessageId: input.replyToMessageId,
+        },
+      );
     },
 
     async sendEncryptedGroupTombstone(
@@ -583,12 +610,18 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
         nextRevision: number;
       },
     ): Promise<EncryptedGroupOutboundSendResult> {
-      return sendEncryptedGroupMutation(dependencies, session, {
-        kind: "tombstone",
-        groupId: input.groupId,
-        targetMessageId: input.targetMessageId,
-        nextRevision: input.nextRevision,
-      });
+      return sendEncryptedGroupMutation(
+        dependencies,
+        encryptedMediaDrafts,
+        encryptedMediaDescriptors,
+        session,
+        {
+          kind: "tombstone",
+          groupId: input.groupId,
+          targetMessageId: input.targetMessageId,
+          nextRevision: input.nextRevision,
+        },
+      );
     },
   };
 }
@@ -819,6 +852,7 @@ async function sendEncryptedDirectMessageV2Mutation(
       operationKind,
       targetMessageId,
       revision,
+      attachmentIds: attachmentDescriptors.map((descriptor) => descriptor.attachmentId),
       deliveries,
     },
   );
@@ -861,6 +895,8 @@ async function sendEncryptedDirectMessageV2Mutation(
 
 async function sendEncryptedGroupMutation(
   dependencies: RuntimeDependencies,
+  encryptedMediaDrafts: Map<string, EncryptedMediaAttachmentDescriptorV1>,
+  encryptedMediaDescriptors: Map<string, EncryptedMediaAttachmentDescriptorV1>,
   session: CryptoRuntimeSession,
   input: EncryptedGroupMutationInput,
 ): Promise<EncryptedGroupOutboundSendResult> {
@@ -928,11 +964,26 @@ async function sendEncryptedGroupMutation(
     input.kind === "tombstone"
       ? null
       : normalizeOptionalMessageId(input.replyToMessageId ?? null);
+  const normalizedAttachmentDrafts =
+    input.kind === "content"
+      ? normalizeEncryptedAttachmentDraftInputs(input.attachmentDrafts)
+      : [];
+  const attachmentDescriptors =
+    input.kind === "content"
+      ? resolveEncryptedMediaAttachmentDescriptors(
+          encryptedMediaDrafts,
+          normalizedAttachmentDrafts,
+        )
+      : [];
   const normalizedText =
     input.kind === "tombstone" ? "" : normalizeEncryptedMutationText(input.text);
-  if (input.kind !== "tombstone" && normalizedText === "") {
+  if (
+    input.kind !== "tombstone" &&
+    normalizedText === "" &&
+    attachmentDescriptors.length === 0
+  ) {
     throw new Error(
-      "Encrypted group mutation требует text payload внутри crypto runtime.",
+      "Encrypted group mutation требует text payload или хотя бы один encrypted attachment descriptor.",
     );
   }
 
@@ -973,8 +1024,10 @@ async function sendEncryptedGroupMutation(
       operation: "content",
       replyToMessageId: normalizedReplyToMessageId,
       message: {
-        text: normalizedText,
-        markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        text: normalizedText === "" ? null : normalizedText,
+        markdownPolicy:
+          normalizedText === "" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        attachments: attachmentDescriptors,
       },
     };
   }
@@ -1008,9 +1061,19 @@ async function sendEncryptedGroupMutation(
       operationKind,
       targetMessageId,
       revision,
+      attachmentIds: attachmentDescriptors.map((descriptor) => descriptor.attachmentId),
       ciphertext: encrypted.ciphertext,
     },
   );
+
+  for (const descriptor of attachmentDescriptors) {
+    cacheEncryptedMediaDescriptor(encryptedMediaDescriptors, descriptor);
+    encryptedMediaDrafts.delete(
+      normalizedAttachmentDrafts.find(
+        (draft) => draft.attachmentId === descriptor.attachmentId,
+      )?.draftId ?? "",
+    );
+  }
 
   return {
     storedEnvelope,
@@ -1030,9 +1093,15 @@ async function sendEncryptedGroupMutation(
       createdAt: storedEnvelope.createdAt,
       storedAt: storedEnvelope.storedAt,
       payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
-      text: input.kind === "tombstone" ? null : normalizedText,
+      text: input.kind === "tombstone" ? null : normalizedText === "" ? null : normalizedText,
       markdownPolicy:
-        input.kind === "tombstone" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        input.kind === "tombstone" || normalizedText === ""
+          ? null
+          : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      attachments:
+        input.kind === "content"
+          ? attachmentDescriptors.map(stripEncryptedMediaAttachmentDescriptor)
+          : null,
       editedAt: input.kind === "edit" ? createdAt : null,
       deletedAt: input.kind === "tombstone" ? createdAt : null,
     },
