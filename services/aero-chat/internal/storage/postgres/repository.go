@@ -1265,6 +1265,38 @@ func (r *Repository) ListEncryptedDirectMessageV2(ctx context.Context, userID st
 	return result, nil
 }
 
+func (r *Repository) GetEncryptedDirectMessageV2(ctx context.Context, userID string, chatID string, messageID string, viewerCryptoDeviceID string) (*chat.EncryptedDirectMessageV2Envelope, error) {
+	row, err := r.queries.GetDirectChatEncryptedMessageV2ByDevice(ctx, chatsqlc.GetDirectChatEncryptedMessageV2ByDeviceParams{
+		UserID:                  mustParseUUID(userID),
+		ChatID:                  mustParseUUID(chatID),
+		ID:                      mustParseUUID(messageID),
+		RecipientCryptoDeviceID: mustParseUUID(viewerCryptoDeviceID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	return &chat.EncryptedDirectMessageV2Envelope{
+		MessageID:            row.ID.String(),
+		ChatID:               row.ChatID.String(),
+		SenderUserID:         row.SenderUserID.String(),
+		SenderCryptoDeviceID: row.SenderCryptoDeviceID.String(),
+		OperationKind:        row.OperationKind,
+		TargetMessageID:      uuidPointerString(row.TargetMessageID),
+		Revision:             uint32(row.Revision),
+		CreatedAt:            timestampValue(row.CreatedAt),
+		StoredAt:             timestampValue(row.StoredAt),
+		ViewerDelivery: chat.EncryptedDirectMessageV2Delivery{
+			RecipientUserID:         row.RecipientUserID.String(),
+			RecipientCryptoDeviceID: row.RecipientCryptoDeviceID.String(),
+			TransportHeader:         append([]byte(nil), row.TransportHeader...),
+			Ciphertext:              append([]byte(nil), row.Ciphertext...),
+			CiphertextSizeBytes:     row.CiphertextSizeBytes,
+			StoredAt:                timestampValue(row.DeliveryStoredAt),
+		},
+	}, nil
+}
+
 func (r *Repository) SearchDirectMessages(ctx context.Context, userID string, params chat.SearchDirectMessagesParams) ([]chat.MessageSearchResult, error) {
 	rows, err := r.queries.SearchDirectMessages(ctx, chatsqlc.SearchDirectMessagesParams{
 		UserID:          mustParseUUID(userID),

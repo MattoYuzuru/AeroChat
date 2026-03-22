@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -330,11 +331,22 @@ func (h *ChatHandler) ClearDirectChatPresence(ctx context.Context, req *connect.
 }
 
 func (h *ChatHandler) SendEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.SendEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.SendEncryptedDirectMessageV2Response], error) {
-	return forwardUnary(ctx, req, h.client.SendEncryptedDirectMessageV2)
+	response, err := forwardUnary(ctx, req, h.client.SendEncryptedDirectMessageV2)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishEncryptedDirectMessageV2Deliveries(req.Msg, response.Msg.Envelope)
+
+	return response, nil
 }
 
 func (h *ChatHandler) ListEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.ListEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.ListEncryptedDirectMessageV2Response], error) {
 	return forwardUnary(ctx, req, h.client.ListEncryptedDirectMessageV2)
+}
+
+func (h *ChatHandler) GetEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.GetEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.GetEncryptedDirectMessageV2Response], error) {
+	return forwardUnary(ctx, req, h.client.GetEncryptedDirectMessageV2)
 }
 
 func (h *ChatHandler) SendTextMessage(ctx context.Context, req *connect.Request[chatv1.SendTextMessageRequest]) (*connect.Response[chatv1.SendTextMessageResponse], error) {
@@ -455,6 +467,37 @@ func (h *ChatHandler) publishMessageUpdate(
 		}
 
 		h.realtimeHub.PublishToUser(participant.GetId(), envelope)
+	}
+}
+
+func (h *ChatHandler) publishEncryptedDirectMessageV2Deliveries(
+	request *chatv1.SendEncryptedDirectMessageV2Request,
+	envelope *chatv1.EncryptedDirectMessageV2StoredEnvelope,
+) {
+	if h.realtimeHub == nil || request == nil || envelope == nil {
+		return
+	}
+
+	for _, delivery := range request.GetDeliveries() {
+		if delivery == nil || strings.TrimSpace(delivery.GetRecipientCryptoDeviceId()) == "" {
+			continue
+		}
+
+		delivered := h.realtimeHub.PublishToCryptoDevice(
+			delivery.GetRecipientCryptoDeviceId(),
+			realtime.NewEncryptedDirectMessageV2DeliveredEnvelope(envelope, delivery),
+		)
+		if delivered == 0 {
+			continue
+		}
+
+		h.logger.Info(
+			"доставлен encrypted dm v2 realtime envelope",
+			slog.String("message_id", envelope.GetMessageId()),
+			slog.String("chat_id", envelope.GetChatId()),
+			slog.String("recipient_crypto_device_id", delivery.GetRecipientCryptoDeviceId()),
+			slog.Int("realtime_session_count", delivered),
+		)
 	}
 }
 

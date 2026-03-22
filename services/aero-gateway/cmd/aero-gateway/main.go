@@ -41,7 +41,12 @@ func run() error {
 
 	downstreamClient := downstream.NewHTTPClient(cfg.DownstreamTimeout)
 	clients := downstream.NewClients(downstreamClient, cfg.IdentityBaseURL, cfg.ChatBaseURL)
-	realtimeHub := realtime.NewHub(logger, cfg.RealtimePingInterval, cfg.RealtimeWriteTimeout)
+	realtimeHub := realtime.NewHub(
+		logger,
+		cfg.RealtimePingInterval,
+		cfg.RealtimeWriteTimeout,
+		realtime.NewIdentityCryptoDeviceAuthorizer(clients.Identity),
+	)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

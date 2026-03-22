@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] encrypted direct-message envelope and storage v2 foundation
+- [x] device-aware gateway transport for encrypted direct-message v2
 
 ---
 
@@ -94,6 +94,7 @@
 - [x] Chat creation
 - [x] Message model
 - [x] Encrypted direct-message v2 intake and opaque storage foundation
+- [x] Device-aware gateway transport for encrypted direct-message v2
 - [x] Safe markdown subset
 - [x] Read receipts
 - [x] Unread conversation state

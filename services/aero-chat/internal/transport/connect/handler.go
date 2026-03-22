@@ -602,6 +602,28 @@ func (h *Handler) ListEncryptedDirectMessageV2(ctx context.Context, req *connect
 	return connect.NewResponse(response), nil
 }
 
+func (h *Handler) GetEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.GetEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.GetEncryptedDirectMessageV2Response], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	envelope, err := h.service.GetEncryptedDirectMessageV2(
+		ctx,
+		token,
+		req.Msg.ChatId,
+		req.Msg.MessageId,
+		req.Msg.ViewerCryptoDeviceId,
+	)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.GetEncryptedDirectMessageV2Response{
+		Envelope: toProtoEncryptedDirectMessageV2Envelope(*envelope),
+	}), nil
+}
+
 func (h *Handler) SendTextMessage(ctx context.Context, req *connect.Request[chatv1.SendTextMessageRequest]) (*connect.Response[chatv1.SendTextMessageResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {

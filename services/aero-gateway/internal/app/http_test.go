@@ -529,6 +529,111 @@ func TestNewHTTPHandlerPublishesViewerRelativePresenceUpdates(t *testing.T) {
 	}
 }
 
+func TestNewHTTPHandlerPublishesEncryptedDirectMessageV2ToBoundCryptoDevices(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-1", newTestProfile("user-1", "alice", "Alice"))
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-2", newTestProfile("user-2", "bob", "Bob"))
+	identityDownstream.SetCryptoDevice(&identityv1.CryptoDevice{
+		Id:        "crypto-user-1-primary",
+		UserId:    "user-1",
+		Label:     "Alice primary",
+		Status:    identityv1.CryptoDeviceStatus_CRYPTO_DEVICE_STATUS_ACTIVE,
+		CreatedAt: timestamppb.Now(),
+	})
+	identityDownstream.SetCryptoDevice(&identityv1.CryptoDevice{
+		Id:          "crypto-user-1-secondary",
+		UserId:      "user-1",
+		Label:       "Alice secondary",
+		Status:      identityv1.CryptoDeviceStatus_CRYPTO_DEVICE_STATUS_ACTIVE,
+		CreatedAt:   timestamppb.Now(),
+		ActivatedAt: timestamppb.Now(),
+	})
+	identityDownstream.SetCryptoDevice(&identityv1.CryptoDevice{
+		Id:          "crypto-user-2-primary",
+		UserId:      "user-2",
+		Label:       "Bob primary",
+		Status:      identityv1.CryptoDeviceStatus_CRYPTO_DEVICE_STATUS_ACTIVE,
+		CreatedAt:   timestamppb.Now(),
+		ActivatedAt: timestamppb.Now(),
+	})
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	connSenderOrigin := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connSenderOrigin.CloseNow() }()
+	readReadyEnvelope(t, ctx, connSenderOrigin)
+	bindRealtimeCryptoDevice(t, ctx, connSenderOrigin, "crypto-user-1-primary")
+
+	connSenderSecondary := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-1")
+	defer func() { _ = connSenderSecondary.CloseNow() }()
+	readReadyEnvelope(t, ctx, connSenderSecondary)
+	bindRealtimeCryptoDevice(t, ctx, connSenderSecondary, "crypto-user-1-secondary")
+
+	connRecipient := dialRealtimeConnection(t, ctx, gatewayServer.URL, "v1.user-2")
+	defer func() { _ = connRecipient.CloseNow() }()
+	readReadyEnvelope(t, ctx, connRecipient)
+	bindRealtimeCryptoDevice(t, ctx, connRecipient, "crypto-user-2-primary")
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&chatv1.SendEncryptedDirectMessageV2Request{
+		ChatId:               "chat-1",
+		MessageId:            "encrypted-message-1",
+		SenderCryptoDeviceId: "crypto-user-1-primary",
+		OperationKind:        chatv1.EncryptedDirectMessageV2OperationKind_ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT,
+		Revision:             1,
+		Deliveries: []*chatv1.EncryptedDirectMessageV2DeliveryInput{
+			{
+				RecipientCryptoDeviceId: "crypto-user-1-secondary",
+				TransportHeader:         []byte("sender-secondary-header"),
+				Ciphertext:              []byte("sender-secondary-ciphertext"),
+			},
+			{
+				RecipientCryptoDeviceId: "crypto-user-2-primary",
+				TransportHeader:         []byte("recipient-header"),
+				Ciphertext:              []byte("recipient-ciphertext"),
+			},
+		},
+	})
+	request.Header().Set("Authorization", "Bearer v1.user-1")
+
+	response, err := chatClient.SendEncryptedDirectMessageV2(ctx, request)
+	if err != nil {
+		t.Fatalf("send encrypted direct message v2 через gateway: %v", err)
+	}
+	if response.Msg.GetEnvelope().GetStoredDeliveryCount() != 2 {
+		t.Fatalf("ожидалось 2 stored deliveries, получено %d", response.Msg.GetEnvelope().GetStoredDeliveryCount())
+	}
+
+	senderSecondaryEvent := readEncryptedDirectMessageV2Envelope(t, ctx, connSenderSecondary)
+	recipientEvent := readEncryptedDirectMessageV2Envelope(t, ctx, connRecipient)
+	assertNoRealtimeEvent(t, connSenderOrigin, 250*time.Millisecond)
+
+	if senderSecondaryEvent.Type != realtime.EncryptedDirectMessageV2EventTypeDelivered {
+		t.Fatalf("sender secondary: ожидался тип %q, получен %q", realtime.EncryptedDirectMessageV2EventTypeDelivered, senderSecondaryEvent.Type)
+	}
+	if senderSecondaryEvent.Payload.Envelope.ViewerDelivery.RecipientCryptoDeviceID != "crypto-user-1-secondary" {
+		t.Fatalf("sender secondary: ожидался target device %q, получен %q", "crypto-user-1-secondary", senderSecondaryEvent.Payload.Envelope.ViewerDelivery.RecipientCryptoDeviceID)
+	}
+	if string(senderSecondaryEvent.Payload.Envelope.ViewerDelivery.Ciphertext) != "sender-secondary-ciphertext" {
+		t.Fatalf("sender secondary: ожидался ciphertext %q, получен %q", "sender-secondary-ciphertext", string(senderSecondaryEvent.Payload.Envelope.ViewerDelivery.Ciphertext))
+	}
+
+	if recipientEvent.Payload.Envelope.MessageID != "encrypted-message-1" {
+		t.Fatalf("recipient: ожидался message id %q, получен %q", "encrypted-message-1", recipientEvent.Payload.Envelope.MessageID)
+	}
+	if recipientEvent.Payload.Envelope.ViewerDelivery.RecipientCryptoDeviceID != "crypto-user-2-primary" {
+		t.Fatalf("recipient: ожидался target device %q, получен %q", "crypto-user-2-primary", recipientEvent.Payload.Envelope.ViewerDelivery.RecipientCryptoDeviceID)
+	}
+	if string(recipientEvent.Payload.Envelope.ViewerDelivery.TransportHeader) != "recipient-header" {
+		t.Fatalf("recipient: ожидался transport header %q, получен %q", "recipient-header", string(recipientEvent.Payload.Envelope.ViewerDelivery.TransportHeader))
+	}
+}
+
 func TestNewHTTPHandlerPublishesGroupMessageUpdatesToCurrentMembers(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
@@ -1143,6 +1248,7 @@ type testIdentityHandler struct {
 	profileErr        error
 	profilesByAuth    map[string]*identityv1.Profile
 	profilesByLogin   map[string]*identityv1.Profile
+	cryptoDevicesByID map[string]*identityv1.CryptoDevice
 	friendRequests    map[string]testFriendRequestRecord
 	friendships       map[string]*timestamppb.Timestamp
 }
@@ -1186,6 +1292,23 @@ func (h *testIdentityHandler) GetCurrentProfile(_ context.Context, req *connect.
 
 	return connect.NewResponse(&identityv1.GetCurrentProfileResponse{
 		Profile: newTestProfile("user-1", "alice", "Alice"),
+	}), nil
+}
+
+func (h *testIdentityHandler) GetCryptoDevice(_ context.Context, req *connect.Request[identityv1.GetCryptoDeviceRequest]) (*connect.Response[identityv1.GetCryptoDeviceResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actor := h.requireActorProfile(req.Header().Get("Authorization"))
+	device := h.cryptoDeviceByID(req.Msg.CryptoDeviceId)
+	if device == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("crypto device not found"))
+	}
+	if device.GetUserId() != actor.GetId() {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("crypto device does not belong to actor"))
+	}
+
+	return connect.NewResponse(&identityv1.GetCryptoDeviceResponse{
+		Device: cloneCryptoDevice(device),
 	}), nil
 }
 
@@ -1415,6 +1538,16 @@ func (h *testIdentityHandler) SetProfileForAuthorization(value string, profile *
 	h.profilesByLogin[cloned.GetLogin()] = cloned
 }
 
+func (h *testIdentityHandler) SetCryptoDevice(device *identityv1.CryptoDevice) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.cryptoDevicesByID == nil {
+		h.cryptoDevicesByID = make(map[string]*identityv1.CryptoDevice)
+	}
+	h.cryptoDevicesByID[device.GetId()] = cloneCryptoDevice(device)
+}
+
 func (h *testIdentityHandler) profileForAuthorization(value string) *identityv1.Profile {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -1463,12 +1596,31 @@ func (h *testIdentityHandler) ensureSocialStateLocked() {
 	if h.profilesByLogin == nil {
 		h.profilesByLogin = make(map[string]*identityv1.Profile)
 	}
+	if h.cryptoDevicesByID == nil {
+		h.cryptoDevicesByID = make(map[string]*identityv1.CryptoDevice)
+	}
 	if h.friendRequests == nil {
 		h.friendRequests = make(map[string]testFriendRequestRecord)
 	}
 	if h.friendships == nil {
 		h.friendships = make(map[string]*timestamppb.Timestamp)
 	}
+}
+
+func (h *testIdentityHandler) cryptoDeviceByID(cryptoDeviceID string) *identityv1.CryptoDevice {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.cryptoDevicesByID == nil {
+		return nil
+	}
+
+	device, ok := h.cryptoDevicesByID[cryptoDeviceID]
+	if !ok {
+		return nil
+	}
+
+	return cloneCryptoDevice(device)
 }
 
 type testChatHandler struct {
@@ -1478,6 +1630,7 @@ type testChatHandler struct {
 	lastAuthorization string
 	pingErr           error
 	messageSeq        int
+	encryptedMessages map[string]*testEncryptedDirectMessageRecord
 	chat              *chatv1.DirectChat
 	group             *chatv1.Group
 	groupThread       *chatv1.GroupChatThread
@@ -1492,11 +1645,17 @@ type testGroupInvite struct {
 	role    chatv1.GroupMemberRole
 }
 
+type testEncryptedDirectMessageRecord struct {
+	envelope   *chatv1.EncryptedDirectMessageV2StoredEnvelope
+	deliveries map[string]*chatv1.EncryptedDirectMessageV2DeliveryInput
+}
+
 func newTestChatHandler() *testChatHandler {
 	return &testChatHandler{
-		chat:        defaultTestDirectChat(),
-		group:       defaultTestGroup(),
-		groupThread: defaultTestGroupThread(),
+		encryptedMessages: make(map[string]*testEncryptedDirectMessageRecord),
+		chat:              defaultTestDirectChat(),
+		group:             defaultTestGroup(),
+		groupThread:       defaultTestGroupThread(),
 		groupTypingState: &chatv1.GroupTypingState{
 			ThreadId: "group-thread-1",
 			Typers:   []*chatv1.GroupTypingIndicator{},
@@ -1746,6 +1905,85 @@ func (h *testChatHandler) EditDirectChatMessage(_ context.Context, req *connect.
 			CreatedAt: now,
 			UpdatedAt: now,
 			EditedAt:  now,
+		},
+	}), nil
+}
+
+func (h *testChatHandler) SendEncryptedDirectMessageV2(_ context.Context, req *connect.Request[chatv1.SendEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.SendEncryptedDirectMessageV2Response], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	now := timestamppb.Now()
+	stored := &chatv1.EncryptedDirectMessageV2StoredEnvelope{
+		MessageId:            req.Msg.MessageId,
+		ChatId:               req.Msg.ChatId,
+		SenderUserId:         userIDFromAuthorization(req.Header().Get("Authorization")),
+		SenderCryptoDeviceId: req.Msg.SenderCryptoDeviceId,
+		OperationKind:        req.Msg.OperationKind,
+		TargetMessageId:      req.Msg.TargetMessageId,
+		Revision:             req.Msg.Revision,
+		CreatedAt:            now,
+		StoredAt:             now,
+		StoredDeliveryCount:  uint32(len(req.Msg.Deliveries)),
+	}
+	record := &testEncryptedDirectMessageRecord{
+		envelope:   stored,
+		deliveries: make(map[string]*chatv1.EncryptedDirectMessageV2DeliveryInput, len(req.Msg.Deliveries)),
+	}
+	for _, delivery := range req.Msg.Deliveries {
+		if delivery == nil {
+			continue
+		}
+		record.deliveries[delivery.GetRecipientCryptoDeviceId()] = &chatv1.EncryptedDirectMessageV2DeliveryInput{
+			RecipientCryptoDeviceId: delivery.GetRecipientCryptoDeviceId(),
+			TransportHeader:         append([]byte(nil), delivery.GetTransportHeader()...),
+			Ciphertext:              append([]byte(nil), delivery.GetCiphertext()...),
+		}
+	}
+	h.encryptedMessages[req.Msg.MessageId] = record
+	if h.chat == nil {
+		h.chat = defaultTestDirectChat()
+	}
+	h.chat.UpdatedAt = now
+
+	return connect.NewResponse(&chatv1.SendEncryptedDirectMessageV2Response{
+		Envelope: cloneEncryptedDirectMessageV2StoredEnvelope(stored),
+	}), nil
+}
+
+func (h *testChatHandler) GetEncryptedDirectMessageV2(_ context.Context, req *connect.Request[chatv1.GetEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.GetEncryptedDirectMessageV2Response], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	record, ok := h.encryptedMessages[req.Msg.MessageId]
+	if !ok {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("encrypted message not found"))
+	}
+	delivery, ok := record.deliveries[req.Msg.ViewerCryptoDeviceId]
+	if !ok {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("encrypted delivery not found"))
+	}
+
+	return connect.NewResponse(&chatv1.GetEncryptedDirectMessageV2Response{
+		Envelope: &chatv1.EncryptedDirectMessageV2Envelope{
+			MessageId:            record.envelope.GetMessageId(),
+			ChatId:               record.envelope.GetChatId(),
+			SenderUserId:         record.envelope.GetSenderUserId(),
+			SenderCryptoDeviceId: record.envelope.GetSenderCryptoDeviceId(),
+			OperationKind:        record.envelope.GetOperationKind(),
+			TargetMessageId:      optionalStringPointer(record.envelope.GetTargetMessageId()),
+			Revision:             record.envelope.GetRevision(),
+			CreatedAt:            record.envelope.GetCreatedAt(),
+			StoredAt:             record.envelope.GetStoredAt(),
+			ViewerDelivery: &chatv1.EncryptedDirectMessageV2Delivery{
+				RecipientCryptoDeviceId: delivery.GetRecipientCryptoDeviceId(),
+				TransportHeader:         append([]byte(nil), delivery.GetTransportHeader()...),
+				Ciphertext:              append([]byte(nil), delivery.GetCiphertext()...),
+				CiphertextSizeBytes:     uint64(len(delivery.GetCiphertext())),
+				StoredAt:                record.envelope.GetStoredAt(),
+			},
 		},
 	}), nil
 }
@@ -2220,7 +2458,7 @@ func cloneGroupMessageMessage(message *chatv1.GroupMessage) *chatv1.GroupMessage
 func newTestRealtimeHub(t *testing.T, logger *slog.Logger) *realtime.Hub {
 	t.Helper()
 
-	hub := realtime.NewHub(logger, time.Minute, time.Second)
+	hub := realtime.NewHub(logger, time.Minute, time.Second, nil)
 	t.Cleanup(hub.Close)
 
 	return hub
@@ -2256,13 +2494,22 @@ func newGatewayTestServer(
 	chatServer := httptest.NewServer(chatHTTPHandler(chatDownstream))
 	t.Cleanup(chatServer.Close)
 
-	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{
-		CORSAllowedOrigins: []string{"http://app.aerochat.local"},
-	}, downstream.NewClients(
+	clients := downstream.NewClients(
 		&http.Client{Timeout: time.Second},
 		identityServer.URL,
 		chatServer.URL,
-	), newTestRealtimeHub(t, logger))
+	)
+	realtimeHub := realtime.NewHub(
+		logger,
+		time.Minute,
+		time.Second,
+		realtime.NewIdentityCryptoDeviceAuthorizer(clients.Identity),
+	)
+	t.Cleanup(realtimeHub.Close)
+
+	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{
+		CORSAllowedOrigins: []string{"http://app.aerochat.local"},
+	}, clients, realtimeHub)
 
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
@@ -2298,6 +2545,35 @@ func readReadyEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) 
 	}
 }
 
+func bindRealtimeCryptoDevice(t *testing.T, ctx context.Context, conn *websocket.Conn, cryptoDeviceID string) {
+	t.Helper()
+
+	if err := wsjson.Write(ctx, conn, map[string]any{
+		"type": realtime.ClientEventTypeBindCryptoDevice,
+		"payload": map[string]string{
+			"cryptoDeviceId": cryptoDeviceID,
+		},
+	}); err != nil {
+		t.Fatalf("не удалось отправить bind crypto-device event: %v", err)
+	}
+
+	var envelope struct {
+		Type    string `json:"type"`
+		Payload struct {
+			CryptoDeviceID string `json:"cryptoDeviceId"`
+		} `json:"payload"`
+	}
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("не удалось прочитать bind ack envelope: %v", err)
+	}
+	if envelope.Type != realtime.EventTypeCryptoDeviceBound {
+		t.Fatalf("ожидался тип %q, получен %q", realtime.EventTypeCryptoDeviceBound, envelope.Type)
+	}
+	if envelope.Payload.CryptoDeviceID != cryptoDeviceID {
+		t.Fatalf("ожидался crypto device id %q, получен %q", cryptoDeviceID, envelope.Payload.CryptoDeviceID)
+	}
+}
+
 type directChatMessageEnvelope struct {
 	Type    string `json:"type"`
 	Payload struct {
@@ -2316,12 +2592,41 @@ type directChatMessageEnvelope struct {
 	} `json:"payload"`
 }
 
+type encryptedDirectMessageV2Envelope struct {
+	Type    string `json:"type"`
+	Payload struct {
+		Envelope struct {
+			MessageID      string `json:"messageId"`
+			ChatID         string `json:"chatId"`
+			ViewerDelivery struct {
+				RecipientCryptoDeviceID string `json:"recipientCryptoDeviceId"`
+				TransportHeader         []byte `json:"transportHeader"`
+				Ciphertext              []byte `json:"ciphertext"`
+			} `json:"viewerDelivery"`
+		} `json:"envelope"`
+	} `json:"payload"`
+}
+
 func readDirectChatMessageEnvelope(t *testing.T, ctx context.Context, conn *websocket.Conn) directChatMessageEnvelope {
 	t.Helper()
 
 	var envelope directChatMessageEnvelope
 	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
 		t.Fatalf("чтение direct chat message envelope: %v", err)
+	}
+
+	return envelope
+}
+
+func readEncryptedDirectMessageV2Envelope(t *testing.T, ctx context.Context, conn *websocket.Conn) encryptedDirectMessageV2Envelope {
+	t.Helper()
+
+	var envelope encryptedDirectMessageV2Envelope
+	if err := wsjson.Read(ctx, conn, &envelope); err != nil {
+		t.Fatalf("чтение encrypted direct message v2 envelope: %v", err)
+	}
+	if envelope.Type != realtime.EncryptedDirectMessageV2EventTypeDelivered {
+		t.Fatalf("ожидался тип %q, получен %q", realtime.EncryptedDirectMessageV2EventTypeDelivered, envelope.Type)
 	}
 
 	return envelope
@@ -2681,6 +2986,55 @@ func cloneProfile(profile *identityv1.Profile) *identityv1.Profile {
 		CreatedAt:               profile.GetCreatedAt(),
 		UpdatedAt:               profile.GetUpdatedAt(),
 	}
+}
+
+func cloneCryptoDevice(device *identityv1.CryptoDevice) *identityv1.CryptoDevice {
+	if device == nil {
+		return nil
+	}
+
+	return &identityv1.CryptoDevice{
+		Id:                     device.GetId(),
+		UserId:                 device.GetUserId(),
+		Label:                  device.GetLabel(),
+		Status:                 device.GetStatus(),
+		LinkedByCryptoDeviceId: optionalStringPointer(device.GetLinkedByCryptoDeviceId()),
+		LastBundleVersion:      device.LastBundleVersion,
+		LastBundlePublishedAt:  device.LastBundlePublishedAt,
+		CreatedAt:              device.GetCreatedAt(),
+		ActivatedAt:            device.ActivatedAt,
+		RevokedAt:              device.RevokedAt,
+		RevocationReason:       device.RevocationReason,
+		RevokedByActor:         device.RevokedByActor,
+	}
+}
+
+func cloneEncryptedDirectMessageV2StoredEnvelope(value *chatv1.EncryptedDirectMessageV2StoredEnvelope) *chatv1.EncryptedDirectMessageV2StoredEnvelope {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.EncryptedDirectMessageV2StoredEnvelope{
+		MessageId:            value.GetMessageId(),
+		ChatId:               value.GetChatId(),
+		SenderUserId:         value.GetSenderUserId(),
+		SenderCryptoDeviceId: value.GetSenderCryptoDeviceId(),
+		OperationKind:        value.GetOperationKind(),
+		TargetMessageId:      optionalStringPointer(value.GetTargetMessageId()),
+		Revision:             value.GetRevision(),
+		CreatedAt:            value.GetCreatedAt(),
+		StoredAt:             value.GetStoredAt(),
+		StoredDeliveryCount:  value.GetStoredDeliveryCount(),
+	}
+}
+
+func optionalStringPointer(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+
+	return &trimmed
 }
 
 func userIDFromAuthorization(value string) string {

@@ -68,6 +68,7 @@ type Repository interface {
 	UpdateGroupMessageText(context.Context, EditGroupMessageParams) (bool, error)
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
 	ListEncryptedDirectMessageV2(context.Context, string, string, string, int32) ([]EncryptedDirectMessageV2Envelope, error)
+	GetEncryptedDirectMessageV2(context.Context, string, string, string, string) (*EncryptedDirectMessageV2Envelope, error)
 	ListGroupMessages(context.Context, string, string, int32) ([]GroupMessage, error)
 	SearchDirectMessages(context.Context, string, SearchDirectMessagesParams) ([]MessageSearchResult, error)
 	SearchGroupMessages(context.Context, string, SearchGroupMessagesParams) ([]MessageSearchResult, error)
@@ -1042,6 +1043,45 @@ func (s *Service) ListEncryptedDirectMessageV2(ctx context.Context, token string
 	}
 
 	return s.repo.ListEncryptedDirectMessageV2(ctx, authSession.User.ID, normalizedChatID, normalizedViewerCryptoDeviceID, limit)
+}
+
+func (s *Service) GetEncryptedDirectMessageV2(ctx context.Context, token string, chatID string, messageID string, viewerCryptoDeviceID string) (*EncryptedDirectMessageV2Envelope, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedViewerCryptoDeviceID, err := normalizeID(viewerCryptoDeviceID, "viewer_crypto_device_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, err
+	}
+
+	activeDevices, err := s.repo.ListActiveCryptoDevicesByUserIDs(ctx, []string{authSession.User.ID})
+	if err != nil {
+		return nil, err
+	}
+	if !hasActiveCryptoDevice(activeDevices, authSession.User.ID, normalizedViewerCryptoDeviceID) {
+		return nil, fmt.Errorf("%w: viewer crypto device must be active and owned by current user", ErrConflict)
+	}
+
+	return s.repo.GetEncryptedDirectMessageV2(
+		ctx,
+		authSession.User.ID,
+		normalizedChatID,
+		normalizedMessageID,
+		normalizedViewerCryptoDeviceID,
+	)
 }
 
 func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string, attachmentIDs []string, replyToMessageIDInput ...string) (*DirectChatMessage, error) {

@@ -5994,6 +5994,111 @@ func (x *ListEncryptedDirectMessageV2Response) GetEnvelopes() []*EncryptedDirect
 	return nil
 }
 
+type GetEncryptedDirectMessageV2Request struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ChatId    string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	MessageId string                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	// viewer_crypto_device_id фиксирует, для какого локального active crypto device нужно вернуть opaque delivery.
+	ViewerCryptoDeviceId string `protobuf:"bytes,3,opt,name=viewer_crypto_device_id,json=viewerCryptoDeviceId,proto3" json:"viewer_crypto_device_id,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *GetEncryptedDirectMessageV2Request) Reset() {
+	*x = GetEncryptedDirectMessageV2Request{}
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[94]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetEncryptedDirectMessageV2Request) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetEncryptedDirectMessageV2Request) ProtoMessage() {}
+
+func (x *GetEncryptedDirectMessageV2Request) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[94]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetEncryptedDirectMessageV2Request.ProtoReflect.Descriptor instead.
+func (*GetEncryptedDirectMessageV2Request) Descriptor() ([]byte, []int) {
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{94}
+}
+
+func (x *GetEncryptedDirectMessageV2Request) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
+}
+
+func (x *GetEncryptedDirectMessageV2Request) GetMessageId() string {
+	if x != nil {
+		return x.MessageId
+	}
+	return ""
+}
+
+func (x *GetEncryptedDirectMessageV2Request) GetViewerCryptoDeviceId() string {
+	if x != nil {
+		return x.ViewerCryptoDeviceId
+	}
+	return ""
+}
+
+type GetEncryptedDirectMessageV2Response struct {
+	state         protoimpl.MessageState            `protogen:"open.v1"`
+	Envelope      *EncryptedDirectMessageV2Envelope `protobuf:"bytes,1,opt,name=envelope,proto3" json:"envelope,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetEncryptedDirectMessageV2Response) Reset() {
+	*x = GetEncryptedDirectMessageV2Response{}
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[95]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetEncryptedDirectMessageV2Response) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetEncryptedDirectMessageV2Response) ProtoMessage() {}
+
+func (x *GetEncryptedDirectMessageV2Response) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[95]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetEncryptedDirectMessageV2Response.ProtoReflect.Descriptor instead.
+func (*GetEncryptedDirectMessageV2Response) Descriptor() ([]byte, []int) {
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{95}
+}
+
+func (x *GetEncryptedDirectMessageV2Response) GetEnvelope() *EncryptedDirectMessageV2Envelope {
+	if x != nil {
+		return x.Envelope
+	}
+	return nil
+}
+
 type SendTextMessageRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	ChatId string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
@@ -6008,7 +6113,7 @@ type SendTextMessageRequest struct {
 
 func (x *SendTextMessageRequest) Reset() {
 	*x = SendTextMessageRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[94]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6020,7 +6125,7 @@ func (x *SendTextMessageRequest) String() string {
 func (*SendTextMessageRequest) ProtoMessage() {}
 
 func (x *SendTextMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[94]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6033,7 +6138,7 @@ func (x *SendTextMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendTextMessageRequest.ProtoReflect.Descriptor instead.
 func (*SendTextMessageRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{94}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *SendTextMessageRequest) GetChatId() string {
@@ -6073,7 +6178,7 @@ type SendTextMessageResponse struct {
 
 func (x *SendTextMessageResponse) Reset() {
 	*x = SendTextMessageResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[95]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6085,7 +6190,7 @@ func (x *SendTextMessageResponse) String() string {
 func (*SendTextMessageResponse) ProtoMessage() {}
 
 func (x *SendTextMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[95]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6098,7 +6203,7 @@ func (x *SendTextMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendTextMessageResponse.ProtoReflect.Descriptor instead.
 func (*SendTextMessageResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{95}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *SendTextMessageResponse) GetMessage() *DirectChatMessage {
@@ -6120,7 +6225,7 @@ type EditDirectChatMessageRequest struct {
 
 func (x *EditDirectChatMessageRequest) Reset() {
 	*x = EditDirectChatMessageRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[96]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6132,7 +6237,7 @@ func (x *EditDirectChatMessageRequest) String() string {
 func (*EditDirectChatMessageRequest) ProtoMessage() {}
 
 func (x *EditDirectChatMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[96]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6145,7 +6250,7 @@ func (x *EditDirectChatMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditDirectChatMessageRequest.ProtoReflect.Descriptor instead.
 func (*EditDirectChatMessageRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{96}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *EditDirectChatMessageRequest) GetChatId() string {
@@ -6178,7 +6283,7 @@ type EditDirectChatMessageResponse struct {
 
 func (x *EditDirectChatMessageResponse) Reset() {
 	*x = EditDirectChatMessageResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[97]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6190,7 +6295,7 @@ func (x *EditDirectChatMessageResponse) String() string {
 func (*EditDirectChatMessageResponse) ProtoMessage() {}
 
 func (x *EditDirectChatMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[97]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6203,7 +6308,7 @@ func (x *EditDirectChatMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditDirectChatMessageResponse.ProtoReflect.Descriptor instead.
 func (*EditDirectChatMessageResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{97}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *EditDirectChatMessageResponse) GetMessage() *DirectChatMessage {
@@ -6223,7 +6328,7 @@ type ListDirectChatMessagesRequest struct {
 
 func (x *ListDirectChatMessagesRequest) Reset() {
 	*x = ListDirectChatMessagesRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[98]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6235,7 +6340,7 @@ func (x *ListDirectChatMessagesRequest) String() string {
 func (*ListDirectChatMessagesRequest) ProtoMessage() {}
 
 func (x *ListDirectChatMessagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[98]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6248,7 +6353,7 @@ func (x *ListDirectChatMessagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDirectChatMessagesRequest.ProtoReflect.Descriptor instead.
 func (*ListDirectChatMessagesRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{98}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *ListDirectChatMessagesRequest) GetChatId() string {
@@ -6274,7 +6379,7 @@ type ListDirectChatMessagesResponse struct {
 
 func (x *ListDirectChatMessagesResponse) Reset() {
 	*x = ListDirectChatMessagesResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[99]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6286,7 +6391,7 @@ func (x *ListDirectChatMessagesResponse) String() string {
 func (*ListDirectChatMessagesResponse) ProtoMessage() {}
 
 func (x *ListDirectChatMessagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[99]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6299,7 +6404,7 @@ func (x *ListDirectChatMessagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDirectChatMessagesResponse.ProtoReflect.Descriptor instead.
 func (*ListDirectChatMessagesResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{99}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *ListDirectChatMessagesResponse) GetMessages() []*DirectChatMessage {
@@ -6319,7 +6424,7 @@ type ListGroupMessagesRequest struct {
 
 func (x *ListGroupMessagesRequest) Reset() {
 	*x = ListGroupMessagesRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[100]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6331,7 +6436,7 @@ func (x *ListGroupMessagesRequest) String() string {
 func (*ListGroupMessagesRequest) ProtoMessage() {}
 
 func (x *ListGroupMessagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[100]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6344,7 +6449,7 @@ func (x *ListGroupMessagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGroupMessagesRequest.ProtoReflect.Descriptor instead.
 func (*ListGroupMessagesRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{100}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *ListGroupMessagesRequest) GetGroupId() string {
@@ -6370,7 +6475,7 @@ type ListGroupMessagesResponse struct {
 
 func (x *ListGroupMessagesResponse) Reset() {
 	*x = ListGroupMessagesResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[101]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6382,7 +6487,7 @@ func (x *ListGroupMessagesResponse) String() string {
 func (*ListGroupMessagesResponse) ProtoMessage() {}
 
 func (x *ListGroupMessagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[101]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6395,7 +6500,7 @@ func (x *ListGroupMessagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGroupMessagesResponse.ProtoReflect.Descriptor instead.
 func (*ListGroupMessagesResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{101}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *ListGroupMessagesResponse) GetMessages() []*GroupMessage {
@@ -6415,7 +6520,7 @@ type SearchDirectMessagesScope struct {
 
 func (x *SearchDirectMessagesScope) Reset() {
 	*x = SearchDirectMessagesScope{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[102]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6427,7 +6532,7 @@ func (x *SearchDirectMessagesScope) String() string {
 func (*SearchDirectMessagesScope) ProtoMessage() {}
 
 func (x *SearchDirectMessagesScope) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[102]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6440,7 +6545,7 @@ func (x *SearchDirectMessagesScope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchDirectMessagesScope.ProtoReflect.Descriptor instead.
 func (*SearchDirectMessagesScope) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{102}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *SearchDirectMessagesScope) GetChatId() string {
@@ -6460,7 +6565,7 @@ type SearchGroupMessagesScope struct {
 
 func (x *SearchGroupMessagesScope) Reset() {
 	*x = SearchGroupMessagesScope{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[103]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6472,7 +6577,7 @@ func (x *SearchGroupMessagesScope) String() string {
 func (*SearchGroupMessagesScope) ProtoMessage() {}
 
 func (x *SearchGroupMessagesScope) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[103]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6485,7 +6590,7 @@ func (x *SearchGroupMessagesScope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchGroupMessagesScope.ProtoReflect.Descriptor instead.
 func (*SearchGroupMessagesScope) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{103}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *SearchGroupMessagesScope) GetGroupId() string {
@@ -6505,7 +6610,7 @@ type MessageSearchCursor struct {
 
 func (x *MessageSearchCursor) Reset() {
 	*x = MessageSearchCursor{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[104]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6517,7 +6622,7 @@ func (x *MessageSearchCursor) String() string {
 func (*MessageSearchCursor) ProtoMessage() {}
 
 func (x *MessageSearchCursor) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[104]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6530,7 +6635,7 @@ func (x *MessageSearchCursor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageSearchCursor.ProtoReflect.Descriptor instead.
 func (*MessageSearchCursor) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{104}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *MessageSearchCursor) GetMessageCreatedAt() *timestamppb.Timestamp {
@@ -6557,7 +6662,7 @@ type MessageSearchPosition struct {
 
 func (x *MessageSearchPosition) Reset() {
 	*x = MessageSearchPosition{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[105]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6569,7 +6674,7 @@ func (x *MessageSearchPosition) String() string {
 func (*MessageSearchPosition) ProtoMessage() {}
 
 func (x *MessageSearchPosition) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[105]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6582,7 +6687,7 @@ func (x *MessageSearchPosition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageSearchPosition.ProtoReflect.Descriptor instead.
 func (*MessageSearchPosition) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{105}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{107}
 }
 
 func (x *MessageSearchPosition) GetMessageId() string {
@@ -6617,7 +6722,7 @@ type MessageSearchResult struct {
 
 func (x *MessageSearchResult) Reset() {
 	*x = MessageSearchResult{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[106]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6629,7 +6734,7 @@ func (x *MessageSearchResult) String() string {
 func (*MessageSearchResult) ProtoMessage() {}
 
 func (x *MessageSearchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[106]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6642,7 +6747,7 @@ func (x *MessageSearchResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageSearchResult.ProtoReflect.Descriptor instead.
 func (*MessageSearchResult) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{106}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *MessageSearchResult) GetScope() MessageSearchScopeKind {
@@ -6731,7 +6836,7 @@ type SearchMessagesRequest struct {
 
 func (x *SearchMessagesRequest) Reset() {
 	*x = SearchMessagesRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[107]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6743,7 +6848,7 @@ func (x *SearchMessagesRequest) String() string {
 func (*SearchMessagesRequest) ProtoMessage() {}
 
 func (x *SearchMessagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[107]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6756,7 +6861,7 @@ func (x *SearchMessagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchMessagesRequest.ProtoReflect.Descriptor instead.
 func (*SearchMessagesRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{107}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *SearchMessagesRequest) GetQuery() string {
@@ -6832,7 +6937,7 @@ type SearchMessagesResponse struct {
 
 func (x *SearchMessagesResponse) Reset() {
 	*x = SearchMessagesResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[108]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6844,7 +6949,7 @@ func (x *SearchMessagesResponse) String() string {
 func (*SearchMessagesResponse) ProtoMessage() {}
 
 func (x *SearchMessagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[108]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6857,7 +6962,7 @@ func (x *SearchMessagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchMessagesResponse.ProtoReflect.Descriptor instead.
 func (*SearchMessagesResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{108}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *SearchMessagesResponse) GetResults() []*MessageSearchResult {
@@ -6895,7 +7000,7 @@ type SendGroupTextMessageRequest struct {
 
 func (x *SendGroupTextMessageRequest) Reset() {
 	*x = SendGroupTextMessageRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[109]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6907,7 +7012,7 @@ func (x *SendGroupTextMessageRequest) String() string {
 func (*SendGroupTextMessageRequest) ProtoMessage() {}
 
 func (x *SendGroupTextMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[109]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6920,7 +7025,7 @@ func (x *SendGroupTextMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendGroupTextMessageRequest.ProtoReflect.Descriptor instead.
 func (*SendGroupTextMessageRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{109}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *SendGroupTextMessageRequest) GetGroupId() string {
@@ -6960,7 +7065,7 @@ type SendGroupTextMessageResponse struct {
 
 func (x *SendGroupTextMessageResponse) Reset() {
 	*x = SendGroupTextMessageResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[110]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6972,7 +7077,7 @@ func (x *SendGroupTextMessageResponse) String() string {
 func (*SendGroupTextMessageResponse) ProtoMessage() {}
 
 func (x *SendGroupTextMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[110]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6985,7 +7090,7 @@ func (x *SendGroupTextMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendGroupTextMessageResponse.ProtoReflect.Descriptor instead.
 func (*SendGroupTextMessageResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{110}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *SendGroupTextMessageResponse) GetMessage() *GroupMessage {
@@ -7007,7 +7112,7 @@ type EditGroupMessageRequest struct {
 
 func (x *EditGroupMessageRequest) Reset() {
 	*x = EditGroupMessageRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[111]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7019,7 +7124,7 @@ func (x *EditGroupMessageRequest) String() string {
 func (*EditGroupMessageRequest) ProtoMessage() {}
 
 func (x *EditGroupMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[111]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7032,7 +7137,7 @@ func (x *EditGroupMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditGroupMessageRequest.ProtoReflect.Descriptor instead.
 func (*EditGroupMessageRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{111}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *EditGroupMessageRequest) GetGroupId() string {
@@ -7065,7 +7170,7 @@ type EditGroupMessageResponse struct {
 
 func (x *EditGroupMessageResponse) Reset() {
 	*x = EditGroupMessageResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[112]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7077,7 +7182,7 @@ func (x *EditGroupMessageResponse) String() string {
 func (*EditGroupMessageResponse) ProtoMessage() {}
 
 func (x *EditGroupMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[112]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7090,7 +7195,7 @@ func (x *EditGroupMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditGroupMessageResponse.ProtoReflect.Descriptor instead.
 func (*EditGroupMessageResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{112}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *EditGroupMessageResponse) GetMessage() *GroupMessage {
@@ -7110,7 +7215,7 @@ type DeleteMessageForEveryoneRequest struct {
 
 func (x *DeleteMessageForEveryoneRequest) Reset() {
 	*x = DeleteMessageForEveryoneRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[113]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7122,7 +7227,7 @@ func (x *DeleteMessageForEveryoneRequest) String() string {
 func (*DeleteMessageForEveryoneRequest) ProtoMessage() {}
 
 func (x *DeleteMessageForEveryoneRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[113]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7135,7 +7240,7 @@ func (x *DeleteMessageForEveryoneRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMessageForEveryoneRequest.ProtoReflect.Descriptor instead.
 func (*DeleteMessageForEveryoneRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{113}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *DeleteMessageForEveryoneRequest) GetChatId() string {
@@ -7161,7 +7266,7 @@ type DeleteMessageForEveryoneResponse struct {
 
 func (x *DeleteMessageForEveryoneResponse) Reset() {
 	*x = DeleteMessageForEveryoneResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[114]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7173,7 +7278,7 @@ func (x *DeleteMessageForEveryoneResponse) String() string {
 func (*DeleteMessageForEveryoneResponse) ProtoMessage() {}
 
 func (x *DeleteMessageForEveryoneResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[114]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7186,7 +7291,7 @@ func (x *DeleteMessageForEveryoneResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMessageForEveryoneResponse.ProtoReflect.Descriptor instead.
 func (*DeleteMessageForEveryoneResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{114}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *DeleteMessageForEveryoneResponse) GetMessage() *DirectChatMessage {
@@ -7206,7 +7311,7 @@ type PinMessageRequest struct {
 
 func (x *PinMessageRequest) Reset() {
 	*x = PinMessageRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[115]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7218,7 +7323,7 @@ func (x *PinMessageRequest) String() string {
 func (*PinMessageRequest) ProtoMessage() {}
 
 func (x *PinMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[115]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7231,7 +7336,7 @@ func (x *PinMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PinMessageRequest.ProtoReflect.Descriptor instead.
 func (*PinMessageRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{115}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *PinMessageRequest) GetChatId() string {
@@ -7257,7 +7362,7 @@ type PinMessageResponse struct {
 
 func (x *PinMessageResponse) Reset() {
 	*x = PinMessageResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[116]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7269,7 +7374,7 @@ func (x *PinMessageResponse) String() string {
 func (*PinMessageResponse) ProtoMessage() {}
 
 func (x *PinMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[116]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7282,7 +7387,7 @@ func (x *PinMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PinMessageResponse.ProtoReflect.Descriptor instead.
 func (*PinMessageResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{116}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *PinMessageResponse) GetMessage() *DirectChatMessage {
@@ -7302,7 +7407,7 @@ type UnpinMessageRequest struct {
 
 func (x *UnpinMessageRequest) Reset() {
 	*x = UnpinMessageRequest{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[117]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7314,7 +7419,7 @@ func (x *UnpinMessageRequest) String() string {
 func (*UnpinMessageRequest) ProtoMessage() {}
 
 func (x *UnpinMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[117]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7327,7 +7432,7 @@ func (x *UnpinMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnpinMessageRequest.ProtoReflect.Descriptor instead.
 func (*UnpinMessageRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{117}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *UnpinMessageRequest) GetChatId() string {
@@ -7353,7 +7458,7 @@ type UnpinMessageResponse struct {
 
 func (x *UnpinMessageResponse) Reset() {
 	*x = UnpinMessageResponse{}
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[118]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7365,7 +7470,7 @@ func (x *UnpinMessageResponse) String() string {
 func (*UnpinMessageResponse) ProtoMessage() {}
 
 func (x *UnpinMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[118]
+	mi := &file_aerochat_chat_v1_chat_service_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7378,7 +7483,7 @@ func (x *UnpinMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnpinMessageResponse.ProtoReflect.Descriptor instead.
 func (*UnpinMessageResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{118}
+	return file_aerochat_chat_v1_chat_service_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *UnpinMessageResponse) GetMessage() *DirectChatMessage {
@@ -7838,7 +7943,14 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\x17viewer_crypto_device_id\x18\x02 \x01(\tR\x14viewerCryptoDeviceId\x12\x1b\n" +
 	"\tpage_size\x18\x03 \x01(\rR\bpageSize\"x\n" +
 	"$ListEncryptedDirectMessageV2Response\x12P\n" +
-	"\tenvelopes\x18\x01 \x03(\v22.aerochat.chat.v1.EncryptedDirectMessageV2EnvelopeR\tenvelopes\"\xb8\x01\n" +
+	"\tenvelopes\x18\x01 \x03(\v22.aerochat.chat.v1.EncryptedDirectMessageV2EnvelopeR\tenvelopes\"\x93\x01\n" +
+	"\"GetEncryptedDirectMessageV2Request\x12\x17\n" +
+	"\achat_id\x18\x01 \x01(\tR\x06chatId\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x02 \x01(\tR\tmessageId\x125\n" +
+	"\x17viewer_crypto_device_id\x18\x03 \x01(\tR\x14viewerCryptoDeviceId\"u\n" +
+	"#GetEncryptedDirectMessageV2Response\x12N\n" +
+	"\benvelope\x18\x01 \x01(\v22.aerochat.chat.v1.EncryptedDirectMessageV2EnvelopeR\benvelope\"\xb8\x01\n" +
 	"\x16SendTextMessageRequest\x12\x17\n" +
 	"\achat_id\x18\x01 \x01(\tR\x06chatId\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12%\n" +
@@ -7979,7 +8091,7 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\x16MessageSearchScopeKind\x12)\n" +
 	"%MESSAGE_SEARCH_SCOPE_KIND_UNSPECIFIED\x10\x00\x12$\n" +
 	" MESSAGE_SEARCH_SCOPE_KIND_DIRECT\x10\x01\x12#\n" +
-	"\x1fMESSAGE_SEARCH_SCOPE_KIND_GROUP\x10\x022\x88%\n" +
+	"\x1fMESSAGE_SEARCH_SCOPE_KIND_GROUP\x10\x022\x95&\n" +
 	"\vChatService\x12E\n" +
 	"\x04Ping\x12\x1d.aerochat.chat.v1.PingRequest\x1a\x1e.aerochat.chat.v1.PingResponse\x12i\n" +
 	"\x10CreateDirectChat\x12).aerochat.chat.v1.CreateDirectChatRequest\x1a*.aerochat.chat.v1.CreateDirectChatResponse\x12f\n" +
@@ -8014,7 +8126,8 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\x1eSetDirectChatPresenceHeartbeat\x127.aerochat.chat.v1.SetDirectChatPresenceHeartbeatRequest\x1a8.aerochat.chat.v1.SetDirectChatPresenceHeartbeatResponse\x12~\n" +
 	"\x17ClearDirectChatPresence\x120.aerochat.chat.v1.ClearDirectChatPresenceRequest\x1a1.aerochat.chat.v1.ClearDirectChatPresenceResponse\x12\x8d\x01\n" +
 	"\x1cSendEncryptedDirectMessageV2\x125.aerochat.chat.v1.SendEncryptedDirectMessageV2Request\x1a6.aerochat.chat.v1.SendEncryptedDirectMessageV2Response\x12\x8d\x01\n" +
-	"\x1cListEncryptedDirectMessageV2\x125.aerochat.chat.v1.ListEncryptedDirectMessageV2Request\x1a6.aerochat.chat.v1.ListEncryptedDirectMessageV2Response\x12f\n" +
+	"\x1cListEncryptedDirectMessageV2\x125.aerochat.chat.v1.ListEncryptedDirectMessageV2Request\x1a6.aerochat.chat.v1.ListEncryptedDirectMessageV2Response\x12\x8a\x01\n" +
+	"\x1bGetEncryptedDirectMessageV2\x124.aerochat.chat.v1.GetEncryptedDirectMessageV2Request\x1a5.aerochat.chat.v1.GetEncryptedDirectMessageV2Response\x12f\n" +
 	"\x0fSendTextMessage\x12(.aerochat.chat.v1.SendTextMessageRequest\x1a).aerochat.chat.v1.SendTextMessageResponse\x12x\n" +
 	"\x15EditDirectChatMessage\x12..aerochat.chat.v1.EditDirectChatMessageRequest\x1a/.aerochat.chat.v1.EditDirectChatMessageResponse\x12{\n" +
 	"\x16ListDirectChatMessages\x12/.aerochat.chat.v1.ListDirectChatMessagesRequest\x1a0.aerochat.chat.v1.ListDirectChatMessagesResponse\x12l\n" +
@@ -8040,7 +8153,7 @@ func file_aerochat_chat_v1_chat_service_proto_rawDescGZIP() []byte {
 }
 
 var file_aerochat_chat_v1_chat_service_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_aerochat_chat_v1_chat_service_proto_msgTypes = make([]protoimpl.MessageInfo, 120)
+var file_aerochat_chat_v1_chat_service_proto_msgTypes = make([]protoimpl.MessageInfo, 122)
 var file_aerochat_chat_v1_chat_service_proto_goTypes = []any{
 	(ChatKind)(0),    // 0: aerochat.chat.v1.ChatKind
 	(MessageKind)(0), // 1: aerochat.chat.v1.MessageKind
@@ -8145,45 +8258,47 @@ var file_aerochat_chat_v1_chat_service_proto_goTypes = []any{
 	(*SendEncryptedDirectMessageV2Response)(nil),   // 100: aerochat.chat.v1.SendEncryptedDirectMessageV2Response
 	(*ListEncryptedDirectMessageV2Request)(nil),    // 101: aerochat.chat.v1.ListEncryptedDirectMessageV2Request
 	(*ListEncryptedDirectMessageV2Response)(nil),   // 102: aerochat.chat.v1.ListEncryptedDirectMessageV2Response
-	(*SendTextMessageRequest)(nil),                 // 103: aerochat.chat.v1.SendTextMessageRequest
-	(*SendTextMessageResponse)(nil),                // 104: aerochat.chat.v1.SendTextMessageResponse
-	(*EditDirectChatMessageRequest)(nil),           // 105: aerochat.chat.v1.EditDirectChatMessageRequest
-	(*EditDirectChatMessageResponse)(nil),          // 106: aerochat.chat.v1.EditDirectChatMessageResponse
-	(*ListDirectChatMessagesRequest)(nil),          // 107: aerochat.chat.v1.ListDirectChatMessagesRequest
-	(*ListDirectChatMessagesResponse)(nil),         // 108: aerochat.chat.v1.ListDirectChatMessagesResponse
-	(*ListGroupMessagesRequest)(nil),               // 109: aerochat.chat.v1.ListGroupMessagesRequest
-	(*ListGroupMessagesResponse)(nil),              // 110: aerochat.chat.v1.ListGroupMessagesResponse
-	(*SearchDirectMessagesScope)(nil),              // 111: aerochat.chat.v1.SearchDirectMessagesScope
-	(*SearchGroupMessagesScope)(nil),               // 112: aerochat.chat.v1.SearchGroupMessagesScope
-	(*MessageSearchCursor)(nil),                    // 113: aerochat.chat.v1.MessageSearchCursor
-	(*MessageSearchPosition)(nil),                  // 114: aerochat.chat.v1.MessageSearchPosition
-	(*MessageSearchResult)(nil),                    // 115: aerochat.chat.v1.MessageSearchResult
-	(*SearchMessagesRequest)(nil),                  // 116: aerochat.chat.v1.SearchMessagesRequest
-	(*SearchMessagesResponse)(nil),                 // 117: aerochat.chat.v1.SearchMessagesResponse
-	(*SendGroupTextMessageRequest)(nil),            // 118: aerochat.chat.v1.SendGroupTextMessageRequest
-	(*SendGroupTextMessageResponse)(nil),           // 119: aerochat.chat.v1.SendGroupTextMessageResponse
-	(*EditGroupMessageRequest)(nil),                // 120: aerochat.chat.v1.EditGroupMessageRequest
-	(*EditGroupMessageResponse)(nil),               // 121: aerochat.chat.v1.EditGroupMessageResponse
-	(*DeleteMessageForEveryoneRequest)(nil),        // 122: aerochat.chat.v1.DeleteMessageForEveryoneRequest
-	(*DeleteMessageForEveryoneResponse)(nil),       // 123: aerochat.chat.v1.DeleteMessageForEveryoneResponse
-	(*PinMessageRequest)(nil),                      // 124: aerochat.chat.v1.PinMessageRequest
-	(*PinMessageResponse)(nil),                     // 125: aerochat.chat.v1.PinMessageResponse
-	(*UnpinMessageRequest)(nil),                    // 126: aerochat.chat.v1.UnpinMessageRequest
-	(*UnpinMessageResponse)(nil),                   // 127: aerochat.chat.v1.UnpinMessageResponse
-	nil,                                            // 128: aerochat.chat.v1.AttachmentUploadSession.HeadersEntry
-	(*timestamppb.Timestamp)(nil),                  // 129: google.protobuf.Timestamp
-	(*v1.ServiceMeta)(nil),                         // 130: aerochat.common.v1.ServiceMeta
+	(*GetEncryptedDirectMessageV2Request)(nil),     // 103: aerochat.chat.v1.GetEncryptedDirectMessageV2Request
+	(*GetEncryptedDirectMessageV2Response)(nil),    // 104: aerochat.chat.v1.GetEncryptedDirectMessageV2Response
+	(*SendTextMessageRequest)(nil),                 // 105: aerochat.chat.v1.SendTextMessageRequest
+	(*SendTextMessageResponse)(nil),                // 106: aerochat.chat.v1.SendTextMessageResponse
+	(*EditDirectChatMessageRequest)(nil),           // 107: aerochat.chat.v1.EditDirectChatMessageRequest
+	(*EditDirectChatMessageResponse)(nil),          // 108: aerochat.chat.v1.EditDirectChatMessageResponse
+	(*ListDirectChatMessagesRequest)(nil),          // 109: aerochat.chat.v1.ListDirectChatMessagesRequest
+	(*ListDirectChatMessagesResponse)(nil),         // 110: aerochat.chat.v1.ListDirectChatMessagesResponse
+	(*ListGroupMessagesRequest)(nil),               // 111: aerochat.chat.v1.ListGroupMessagesRequest
+	(*ListGroupMessagesResponse)(nil),              // 112: aerochat.chat.v1.ListGroupMessagesResponse
+	(*SearchDirectMessagesScope)(nil),              // 113: aerochat.chat.v1.SearchDirectMessagesScope
+	(*SearchGroupMessagesScope)(nil),               // 114: aerochat.chat.v1.SearchGroupMessagesScope
+	(*MessageSearchCursor)(nil),                    // 115: aerochat.chat.v1.MessageSearchCursor
+	(*MessageSearchPosition)(nil),                  // 116: aerochat.chat.v1.MessageSearchPosition
+	(*MessageSearchResult)(nil),                    // 117: aerochat.chat.v1.MessageSearchResult
+	(*SearchMessagesRequest)(nil),                  // 118: aerochat.chat.v1.SearchMessagesRequest
+	(*SearchMessagesResponse)(nil),                 // 119: aerochat.chat.v1.SearchMessagesResponse
+	(*SendGroupTextMessageRequest)(nil),            // 120: aerochat.chat.v1.SendGroupTextMessageRequest
+	(*SendGroupTextMessageResponse)(nil),           // 121: aerochat.chat.v1.SendGroupTextMessageResponse
+	(*EditGroupMessageRequest)(nil),                // 122: aerochat.chat.v1.EditGroupMessageRequest
+	(*EditGroupMessageResponse)(nil),               // 123: aerochat.chat.v1.EditGroupMessageResponse
+	(*DeleteMessageForEveryoneRequest)(nil),        // 124: aerochat.chat.v1.DeleteMessageForEveryoneRequest
+	(*DeleteMessageForEveryoneResponse)(nil),       // 125: aerochat.chat.v1.DeleteMessageForEveryoneResponse
+	(*PinMessageRequest)(nil),                      // 126: aerochat.chat.v1.PinMessageRequest
+	(*PinMessageResponse)(nil),                     // 127: aerochat.chat.v1.PinMessageResponse
+	(*UnpinMessageRequest)(nil),                    // 128: aerochat.chat.v1.UnpinMessageRequest
+	(*UnpinMessageResponse)(nil),                   // 129: aerochat.chat.v1.UnpinMessageResponse
+	nil,                                            // 130: aerochat.chat.v1.AttachmentUploadSession.HeadersEntry
+	(*timestamppb.Timestamp)(nil),                  // 131: google.protobuf.Timestamp
+	(*v1.ServiceMeta)(nil),                         // 132: aerochat.common.v1.ServiceMeta
 }
 var file_aerochat_chat_v1_chat_service_proto_depIdxs = []int32{
 	0,   // 0: aerochat.chat.v1.DirectChat.kind:type_name -> aerochat.chat.v1.ChatKind
 	9,   // 1: aerochat.chat.v1.DirectChat.participants:type_name -> aerochat.chat.v1.ChatUser
-	129, // 2: aerochat.chat.v1.DirectChat.created_at:type_name -> google.protobuf.Timestamp
-	129, // 3: aerochat.chat.v1.DirectChat.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 2: aerochat.chat.v1.DirectChat.created_at:type_name -> google.protobuf.Timestamp
+	131, // 3: aerochat.chat.v1.DirectChat.updated_at:type_name -> google.protobuf.Timestamp
 	31,  // 4: aerochat.chat.v1.DirectChat.unread_state:type_name -> aerochat.chat.v1.DirectChatUnreadState
 	0,   // 5: aerochat.chat.v1.Group.kind:type_name -> aerochat.chat.v1.ChatKind
 	7,   // 6: aerochat.chat.v1.Group.self_role:type_name -> aerochat.chat.v1.GroupMemberRole
-	129, // 7: aerochat.chat.v1.Group.created_at:type_name -> google.protobuf.Timestamp
-	129, // 8: aerochat.chat.v1.Group.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 7: aerochat.chat.v1.Group.created_at:type_name -> google.protobuf.Timestamp
+	131, // 8: aerochat.chat.v1.Group.updated_at:type_name -> google.protobuf.Timestamp
 	32,  // 9: aerochat.chat.v1.Group.unread_state:type_name -> aerochat.chat.v1.GroupUnreadState
 	12,  // 10: aerochat.chat.v1.Group.permissions:type_name -> aerochat.chat.v1.GroupPermissions
 	7,   // 11: aerochat.chat.v1.GroupPermissions.creatable_invite_roles:type_name -> aerochat.chat.v1.GroupMemberRole
@@ -8193,76 +8308,76 @@ var file_aerochat_chat_v1_chat_service_proto_depIdxs = []int32{
 	7,   // 15: aerochat.chat.v1.GroupPermissions.restrictable_member_roles:type_name -> aerochat.chat.v1.GroupMemberRole
 	9,   // 16: aerochat.chat.v1.GroupMember.user:type_name -> aerochat.chat.v1.ChatUser
 	7,   // 17: aerochat.chat.v1.GroupMember.role:type_name -> aerochat.chat.v1.GroupMemberRole
-	129, // 18: aerochat.chat.v1.GroupMember.joined_at:type_name -> google.protobuf.Timestamp
-	129, // 19: aerochat.chat.v1.GroupMember.write_restricted_at:type_name -> google.protobuf.Timestamp
+	131, // 18: aerochat.chat.v1.GroupMember.joined_at:type_name -> google.protobuf.Timestamp
+	131, // 19: aerochat.chat.v1.GroupMember.write_restricted_at:type_name -> google.protobuf.Timestamp
 	7,   // 20: aerochat.chat.v1.GroupInviteLink.role:type_name -> aerochat.chat.v1.GroupMemberRole
-	129, // 21: aerochat.chat.v1.GroupInviteLink.created_at:type_name -> google.protobuf.Timestamp
-	129, // 22: aerochat.chat.v1.GroupInviteLink.updated_at:type_name -> google.protobuf.Timestamp
-	129, // 23: aerochat.chat.v1.GroupInviteLink.disabled_at:type_name -> google.protobuf.Timestamp
-	129, // 24: aerochat.chat.v1.GroupInviteLink.last_joined_at:type_name -> google.protobuf.Timestamp
-	129, // 25: aerochat.chat.v1.GroupChatThread.created_at:type_name -> google.protobuf.Timestamp
-	129, // 26: aerochat.chat.v1.GroupChatThread.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 21: aerochat.chat.v1.GroupInviteLink.created_at:type_name -> google.protobuf.Timestamp
+	131, // 22: aerochat.chat.v1.GroupInviteLink.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 23: aerochat.chat.v1.GroupInviteLink.disabled_at:type_name -> google.protobuf.Timestamp
+	131, // 24: aerochat.chat.v1.GroupInviteLink.last_joined_at:type_name -> google.protobuf.Timestamp
+	131, // 25: aerochat.chat.v1.GroupChatThread.created_at:type_name -> google.protobuf.Timestamp
+	131, // 26: aerochat.chat.v1.GroupChatThread.updated_at:type_name -> google.protobuf.Timestamp
 	9,   // 27: aerochat.chat.v1.GroupTypingIndicator.user:type_name -> aerochat.chat.v1.ChatUser
-	129, // 28: aerochat.chat.v1.GroupTypingIndicator.updated_at:type_name -> google.protobuf.Timestamp
-	129, // 29: aerochat.chat.v1.GroupTypingIndicator.expires_at:type_name -> google.protobuf.Timestamp
+	131, // 28: aerochat.chat.v1.GroupTypingIndicator.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 29: aerochat.chat.v1.GroupTypingIndicator.expires_at:type_name -> google.protobuf.Timestamp
 	16,  // 30: aerochat.chat.v1.GroupTypingState.typers:type_name -> aerochat.chat.v1.GroupTypingIndicator
 	3,   // 31: aerochat.chat.v1.TextMessageContent.markdown_policy:type_name -> aerochat.chat.v1.MarkdownPolicy
 	9,   // 32: aerochat.chat.v1.ReplyPreview.author:type_name -> aerochat.chat.v1.ChatUser
 	4,   // 33: aerochat.chat.v1.Attachment.scope:type_name -> aerochat.chat.v1.AttachmentScope
 	5,   // 34: aerochat.chat.v1.Attachment.status:type_name -> aerochat.chat.v1.AttachmentStatus
-	129, // 35: aerochat.chat.v1.Attachment.created_at:type_name -> google.protobuf.Timestamp
-	129, // 36: aerochat.chat.v1.Attachment.updated_at:type_name -> google.protobuf.Timestamp
-	129, // 37: aerochat.chat.v1.Attachment.uploaded_at:type_name -> google.protobuf.Timestamp
-	129, // 38: aerochat.chat.v1.Attachment.attached_at:type_name -> google.protobuf.Timestamp
-	129, // 39: aerochat.chat.v1.Attachment.failed_at:type_name -> google.protobuf.Timestamp
-	129, // 40: aerochat.chat.v1.Attachment.deleted_at:type_name -> google.protobuf.Timestamp
+	131, // 35: aerochat.chat.v1.Attachment.created_at:type_name -> google.protobuf.Timestamp
+	131, // 36: aerochat.chat.v1.Attachment.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 37: aerochat.chat.v1.Attachment.uploaded_at:type_name -> google.protobuf.Timestamp
+	131, // 38: aerochat.chat.v1.Attachment.attached_at:type_name -> google.protobuf.Timestamp
+	131, // 39: aerochat.chat.v1.Attachment.failed_at:type_name -> google.protobuf.Timestamp
+	131, // 40: aerochat.chat.v1.Attachment.deleted_at:type_name -> google.protobuf.Timestamp
 	6,   // 41: aerochat.chat.v1.AttachmentUploadSession.status:type_name -> aerochat.chat.v1.AttachmentUploadSessionStatus
-	128, // 42: aerochat.chat.v1.AttachmentUploadSession.headers:type_name -> aerochat.chat.v1.AttachmentUploadSession.HeadersEntry
-	129, // 43: aerochat.chat.v1.AttachmentUploadSession.created_at:type_name -> google.protobuf.Timestamp
-	129, // 44: aerochat.chat.v1.AttachmentUploadSession.updated_at:type_name -> google.protobuf.Timestamp
-	129, // 45: aerochat.chat.v1.AttachmentUploadSession.expires_at:type_name -> google.protobuf.Timestamp
-	129, // 46: aerochat.chat.v1.AttachmentUploadSession.completed_at:type_name -> google.protobuf.Timestamp
-	129, // 47: aerochat.chat.v1.AttachmentUploadSession.failed_at:type_name -> google.protobuf.Timestamp
-	129, // 48: aerochat.chat.v1.MessageTombstone.deleted_at:type_name -> google.protobuf.Timestamp
+	130, // 42: aerochat.chat.v1.AttachmentUploadSession.headers:type_name -> aerochat.chat.v1.AttachmentUploadSession.HeadersEntry
+	131, // 43: aerochat.chat.v1.AttachmentUploadSession.created_at:type_name -> google.protobuf.Timestamp
+	131, // 44: aerochat.chat.v1.AttachmentUploadSession.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 45: aerochat.chat.v1.AttachmentUploadSession.expires_at:type_name -> google.protobuf.Timestamp
+	131, // 46: aerochat.chat.v1.AttachmentUploadSession.completed_at:type_name -> google.protobuf.Timestamp
+	131, // 47: aerochat.chat.v1.AttachmentUploadSession.failed_at:type_name -> google.protobuf.Timestamp
+	131, // 48: aerochat.chat.v1.MessageTombstone.deleted_at:type_name -> google.protobuf.Timestamp
 	1,   // 49: aerochat.chat.v1.DirectChatMessage.kind:type_name -> aerochat.chat.v1.MessageKind
 	18,  // 50: aerochat.chat.v1.DirectChatMessage.text:type_name -> aerochat.chat.v1.TextMessageContent
 	22,  // 51: aerochat.chat.v1.DirectChatMessage.tombstone:type_name -> aerochat.chat.v1.MessageTombstone
 	20,  // 52: aerochat.chat.v1.DirectChatMessage.attachments:type_name -> aerochat.chat.v1.Attachment
-	129, // 53: aerochat.chat.v1.DirectChatMessage.created_at:type_name -> google.protobuf.Timestamp
-	129, // 54: aerochat.chat.v1.DirectChatMessage.updated_at:type_name -> google.protobuf.Timestamp
-	129, // 55: aerochat.chat.v1.DirectChatMessage.edited_at:type_name -> google.protobuf.Timestamp
+	131, // 53: aerochat.chat.v1.DirectChatMessage.created_at:type_name -> google.protobuf.Timestamp
+	131, // 54: aerochat.chat.v1.DirectChatMessage.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 55: aerochat.chat.v1.DirectChatMessage.edited_at:type_name -> google.protobuf.Timestamp
 	19,  // 56: aerochat.chat.v1.DirectChatMessage.reply_preview:type_name -> aerochat.chat.v1.ReplyPreview
 	1,   // 57: aerochat.chat.v1.GroupMessage.kind:type_name -> aerochat.chat.v1.MessageKind
 	18,  // 58: aerochat.chat.v1.GroupMessage.text:type_name -> aerochat.chat.v1.TextMessageContent
 	20,  // 59: aerochat.chat.v1.GroupMessage.attachments:type_name -> aerochat.chat.v1.Attachment
-	129, // 60: aerochat.chat.v1.GroupMessage.created_at:type_name -> google.protobuf.Timestamp
-	129, // 61: aerochat.chat.v1.GroupMessage.updated_at:type_name -> google.protobuf.Timestamp
-	129, // 62: aerochat.chat.v1.GroupMessage.edited_at:type_name -> google.protobuf.Timestamp
+	131, // 60: aerochat.chat.v1.GroupMessage.created_at:type_name -> google.protobuf.Timestamp
+	131, // 61: aerochat.chat.v1.GroupMessage.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 62: aerochat.chat.v1.GroupMessage.edited_at:type_name -> google.protobuf.Timestamp
 	19,  // 63: aerochat.chat.v1.GroupMessage.reply_preview:type_name -> aerochat.chat.v1.ReplyPreview
-	129, // 64: aerochat.chat.v1.EncryptedDirectMessageV2Delivery.stored_at:type_name -> google.protobuf.Timestamp
+	131, // 64: aerochat.chat.v1.EncryptedDirectMessageV2Delivery.stored_at:type_name -> google.protobuf.Timestamp
 	2,   // 65: aerochat.chat.v1.EncryptedDirectMessageV2Envelope.operation_kind:type_name -> aerochat.chat.v1.EncryptedDirectMessageV2OperationKind
-	129, // 66: aerochat.chat.v1.EncryptedDirectMessageV2Envelope.created_at:type_name -> google.protobuf.Timestamp
-	129, // 67: aerochat.chat.v1.EncryptedDirectMessageV2Envelope.stored_at:type_name -> google.protobuf.Timestamp
+	131, // 66: aerochat.chat.v1.EncryptedDirectMessageV2Envelope.created_at:type_name -> google.protobuf.Timestamp
+	131, // 67: aerochat.chat.v1.EncryptedDirectMessageV2Envelope.stored_at:type_name -> google.protobuf.Timestamp
 	26,  // 68: aerochat.chat.v1.EncryptedDirectMessageV2Envelope.viewer_delivery:type_name -> aerochat.chat.v1.EncryptedDirectMessageV2Delivery
 	2,   // 69: aerochat.chat.v1.EncryptedDirectMessageV2StoredEnvelope.operation_kind:type_name -> aerochat.chat.v1.EncryptedDirectMessageV2OperationKind
-	129, // 70: aerochat.chat.v1.EncryptedDirectMessageV2StoredEnvelope.created_at:type_name -> google.protobuf.Timestamp
-	129, // 71: aerochat.chat.v1.EncryptedDirectMessageV2StoredEnvelope.stored_at:type_name -> google.protobuf.Timestamp
-	129, // 72: aerochat.chat.v1.DirectChatReadPosition.message_created_at:type_name -> google.protobuf.Timestamp
-	129, // 73: aerochat.chat.v1.DirectChatReadPosition.updated_at:type_name -> google.protobuf.Timestamp
-	129, // 74: aerochat.chat.v1.GroupReadPosition.message_created_at:type_name -> google.protobuf.Timestamp
-	129, // 75: aerochat.chat.v1.GroupReadPosition.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 70: aerochat.chat.v1.EncryptedDirectMessageV2StoredEnvelope.created_at:type_name -> google.protobuf.Timestamp
+	131, // 71: aerochat.chat.v1.EncryptedDirectMessageV2StoredEnvelope.stored_at:type_name -> google.protobuf.Timestamp
+	131, // 72: aerochat.chat.v1.DirectChatReadPosition.message_created_at:type_name -> google.protobuf.Timestamp
+	131, // 73: aerochat.chat.v1.DirectChatReadPosition.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 74: aerochat.chat.v1.GroupReadPosition.message_created_at:type_name -> google.protobuf.Timestamp
+	131, // 75: aerochat.chat.v1.GroupReadPosition.updated_at:type_name -> google.protobuf.Timestamp
 	29,  // 76: aerochat.chat.v1.DirectChatReadState.self_position:type_name -> aerochat.chat.v1.DirectChatReadPosition
 	29,  // 77: aerochat.chat.v1.DirectChatReadState.peer_position:type_name -> aerochat.chat.v1.DirectChatReadPosition
 	30,  // 78: aerochat.chat.v1.GroupReadState.self_position:type_name -> aerochat.chat.v1.GroupReadPosition
-	129, // 79: aerochat.chat.v1.DirectChatTypingIndicator.updated_at:type_name -> google.protobuf.Timestamp
-	129, // 80: aerochat.chat.v1.DirectChatTypingIndicator.expires_at:type_name -> google.protobuf.Timestamp
+	131, // 79: aerochat.chat.v1.DirectChatTypingIndicator.updated_at:type_name -> google.protobuf.Timestamp
+	131, // 80: aerochat.chat.v1.DirectChatTypingIndicator.expires_at:type_name -> google.protobuf.Timestamp
 	35,  // 81: aerochat.chat.v1.DirectChatTypingState.self_typing:type_name -> aerochat.chat.v1.DirectChatTypingIndicator
 	35,  // 82: aerochat.chat.v1.DirectChatTypingState.peer_typing:type_name -> aerochat.chat.v1.DirectChatTypingIndicator
-	129, // 83: aerochat.chat.v1.DirectChatPresenceIndicator.heartbeat_at:type_name -> google.protobuf.Timestamp
-	129, // 84: aerochat.chat.v1.DirectChatPresenceIndicator.expires_at:type_name -> google.protobuf.Timestamp
+	131, // 83: aerochat.chat.v1.DirectChatPresenceIndicator.heartbeat_at:type_name -> google.protobuf.Timestamp
+	131, // 84: aerochat.chat.v1.DirectChatPresenceIndicator.expires_at:type_name -> google.protobuf.Timestamp
 	37,  // 85: aerochat.chat.v1.DirectChatPresenceState.self_presence:type_name -> aerochat.chat.v1.DirectChatPresenceIndicator
 	37,  // 86: aerochat.chat.v1.DirectChatPresenceState.peer_presence:type_name -> aerochat.chat.v1.DirectChatPresenceIndicator
-	130, // 87: aerochat.chat.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
+	132, // 87: aerochat.chat.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
 	10,  // 88: aerochat.chat.v1.CreateDirectChatResponse.chat:type_name -> aerochat.chat.v1.DirectChat
 	10,  // 89: aerochat.chat.v1.ListDirectChatsResponse.chats:type_name -> aerochat.chat.v1.DirectChat
 	10,  // 90: aerochat.chat.v1.GetDirectChatResponse.chat:type_name -> aerochat.chat.v1.DirectChat
@@ -8273,7 +8388,7 @@ var file_aerochat_chat_v1_chat_service_proto_depIdxs = []int32{
 	21,  // 95: aerochat.chat.v1.CreateAttachmentUploadIntentResponse.upload_session:type_name -> aerochat.chat.v1.AttachmentUploadSession
 	20,  // 96: aerochat.chat.v1.CompleteAttachmentUploadResponse.attachment:type_name -> aerochat.chat.v1.Attachment
 	20,  // 97: aerochat.chat.v1.GetAttachmentResponse.attachment:type_name -> aerochat.chat.v1.Attachment
-	129, // 98: aerochat.chat.v1.GetAttachmentResponse.download_expires_at:type_name -> google.protobuf.Timestamp
+	131, // 98: aerochat.chat.v1.GetAttachmentResponse.download_expires_at:type_name -> google.protobuf.Timestamp
 	11,  // 99: aerochat.chat.v1.CreateGroupResponse.group:type_name -> aerochat.chat.v1.Group
 	11,  // 100: aerochat.chat.v1.ListGroupsResponse.groups:type_name -> aerochat.chat.v1.Group
 	11,  // 101: aerochat.chat.v1.GetGroupResponse.group:type_name -> aerochat.chat.v1.Group
@@ -8306,116 +8421,119 @@ var file_aerochat_chat_v1_chat_service_proto_depIdxs = []int32{
 	25,  // 128: aerochat.chat.v1.SendEncryptedDirectMessageV2Request.deliveries:type_name -> aerochat.chat.v1.EncryptedDirectMessageV2DeliveryInput
 	28,  // 129: aerochat.chat.v1.SendEncryptedDirectMessageV2Response.envelope:type_name -> aerochat.chat.v1.EncryptedDirectMessageV2StoredEnvelope
 	27,  // 130: aerochat.chat.v1.ListEncryptedDirectMessageV2Response.envelopes:type_name -> aerochat.chat.v1.EncryptedDirectMessageV2Envelope
-	23,  // 131: aerochat.chat.v1.SendTextMessageResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
-	23,  // 132: aerochat.chat.v1.EditDirectChatMessageResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
-	23,  // 133: aerochat.chat.v1.ListDirectChatMessagesResponse.messages:type_name -> aerochat.chat.v1.DirectChatMessage
-	24,  // 134: aerochat.chat.v1.ListGroupMessagesResponse.messages:type_name -> aerochat.chat.v1.GroupMessage
-	129, // 135: aerochat.chat.v1.MessageSearchCursor.message_created_at:type_name -> google.protobuf.Timestamp
-	129, // 136: aerochat.chat.v1.MessageSearchPosition.message_created_at:type_name -> google.protobuf.Timestamp
-	8,   // 137: aerochat.chat.v1.MessageSearchResult.scope:type_name -> aerochat.chat.v1.MessageSearchScopeKind
-	9,   // 138: aerochat.chat.v1.MessageSearchResult.author:type_name -> aerochat.chat.v1.ChatUser
-	129, // 139: aerochat.chat.v1.MessageSearchResult.created_at:type_name -> google.protobuf.Timestamp
-	129, // 140: aerochat.chat.v1.MessageSearchResult.edited_at:type_name -> google.protobuf.Timestamp
-	114, // 141: aerochat.chat.v1.MessageSearchResult.position:type_name -> aerochat.chat.v1.MessageSearchPosition
-	111, // 142: aerochat.chat.v1.SearchMessagesRequest.direct_scope:type_name -> aerochat.chat.v1.SearchDirectMessagesScope
-	112, // 143: aerochat.chat.v1.SearchMessagesRequest.group_scope:type_name -> aerochat.chat.v1.SearchGroupMessagesScope
-	113, // 144: aerochat.chat.v1.SearchMessagesRequest.page_cursor:type_name -> aerochat.chat.v1.MessageSearchCursor
-	115, // 145: aerochat.chat.v1.SearchMessagesResponse.results:type_name -> aerochat.chat.v1.MessageSearchResult
-	113, // 146: aerochat.chat.v1.SearchMessagesResponse.next_page_cursor:type_name -> aerochat.chat.v1.MessageSearchCursor
-	24,  // 147: aerochat.chat.v1.SendGroupTextMessageResponse.message:type_name -> aerochat.chat.v1.GroupMessage
-	24,  // 148: aerochat.chat.v1.EditGroupMessageResponse.message:type_name -> aerochat.chat.v1.GroupMessage
-	23,  // 149: aerochat.chat.v1.DeleteMessageForEveryoneResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
-	23,  // 150: aerochat.chat.v1.PinMessageResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
-	23,  // 151: aerochat.chat.v1.UnpinMessageResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
-	39,  // 152: aerochat.chat.v1.ChatService.Ping:input_type -> aerochat.chat.v1.PingRequest
-	41,  // 153: aerochat.chat.v1.ChatService.CreateDirectChat:input_type -> aerochat.chat.v1.CreateDirectChatRequest
-	43,  // 154: aerochat.chat.v1.ChatService.ListDirectChats:input_type -> aerochat.chat.v1.ListDirectChatsRequest
-	45,  // 155: aerochat.chat.v1.ChatService.GetDirectChat:input_type -> aerochat.chat.v1.GetDirectChatRequest
-	47,  // 156: aerochat.chat.v1.ChatService.CreateAttachmentUploadIntent:input_type -> aerochat.chat.v1.CreateAttachmentUploadIntentRequest
-	49,  // 157: aerochat.chat.v1.ChatService.CompleteAttachmentUpload:input_type -> aerochat.chat.v1.CompleteAttachmentUploadRequest
-	51,  // 158: aerochat.chat.v1.ChatService.GetAttachment:input_type -> aerochat.chat.v1.GetAttachmentRequest
-	53,  // 159: aerochat.chat.v1.ChatService.CreateGroup:input_type -> aerochat.chat.v1.CreateGroupRequest
-	55,  // 160: aerochat.chat.v1.ChatService.ListGroups:input_type -> aerochat.chat.v1.ListGroupsRequest
-	57,  // 161: aerochat.chat.v1.ChatService.GetGroup:input_type -> aerochat.chat.v1.GetGroupRequest
-	59,  // 162: aerochat.chat.v1.ChatService.GetGroupChat:input_type -> aerochat.chat.v1.GetGroupChatRequest
-	61,  // 163: aerochat.chat.v1.ChatService.ListGroupMembers:input_type -> aerochat.chat.v1.ListGroupMembersRequest
-	63,  // 164: aerochat.chat.v1.ChatService.UpdateGroupMemberRole:input_type -> aerochat.chat.v1.UpdateGroupMemberRoleRequest
-	65,  // 165: aerochat.chat.v1.ChatService.TransferGroupOwnership:input_type -> aerochat.chat.v1.TransferGroupOwnershipRequest
-	67,  // 166: aerochat.chat.v1.ChatService.RemoveGroupMember:input_type -> aerochat.chat.v1.RemoveGroupMemberRequest
-	69,  // 167: aerochat.chat.v1.ChatService.LeaveGroup:input_type -> aerochat.chat.v1.LeaveGroupRequest
-	71,  // 168: aerochat.chat.v1.ChatService.RestrictGroupMember:input_type -> aerochat.chat.v1.RestrictGroupMemberRequest
-	73,  // 169: aerochat.chat.v1.ChatService.UnrestrictGroupMember:input_type -> aerochat.chat.v1.UnrestrictGroupMemberRequest
-	75,  // 170: aerochat.chat.v1.ChatService.CreateGroupInviteLink:input_type -> aerochat.chat.v1.CreateGroupInviteLinkRequest
-	77,  // 171: aerochat.chat.v1.ChatService.ListGroupInviteLinks:input_type -> aerochat.chat.v1.ListGroupInviteLinksRequest
-	79,  // 172: aerochat.chat.v1.ChatService.DisableGroupInviteLink:input_type -> aerochat.chat.v1.DisableGroupInviteLinkRequest
-	81,  // 173: aerochat.chat.v1.ChatService.JoinGroupByInviteLink:input_type -> aerochat.chat.v1.JoinGroupByInviteLinkRequest
-	83,  // 174: aerochat.chat.v1.ChatService.SetGroupTyping:input_type -> aerochat.chat.v1.SetGroupTypingRequest
-	85,  // 175: aerochat.chat.v1.ChatService.ClearGroupTyping:input_type -> aerochat.chat.v1.ClearGroupTypingRequest
-	87,  // 176: aerochat.chat.v1.ChatService.MarkGroupChatRead:input_type -> aerochat.chat.v1.MarkGroupChatReadRequest
-	89,  // 177: aerochat.chat.v1.ChatService.MarkDirectChatRead:input_type -> aerochat.chat.v1.MarkDirectChatReadRequest
-	91,  // 178: aerochat.chat.v1.ChatService.SetDirectChatTyping:input_type -> aerochat.chat.v1.SetDirectChatTypingRequest
-	93,  // 179: aerochat.chat.v1.ChatService.ClearDirectChatTyping:input_type -> aerochat.chat.v1.ClearDirectChatTypingRequest
-	95,  // 180: aerochat.chat.v1.ChatService.SetDirectChatPresenceHeartbeat:input_type -> aerochat.chat.v1.SetDirectChatPresenceHeartbeatRequest
-	97,  // 181: aerochat.chat.v1.ChatService.ClearDirectChatPresence:input_type -> aerochat.chat.v1.ClearDirectChatPresenceRequest
-	99,  // 182: aerochat.chat.v1.ChatService.SendEncryptedDirectMessageV2:input_type -> aerochat.chat.v1.SendEncryptedDirectMessageV2Request
-	101, // 183: aerochat.chat.v1.ChatService.ListEncryptedDirectMessageV2:input_type -> aerochat.chat.v1.ListEncryptedDirectMessageV2Request
-	103, // 184: aerochat.chat.v1.ChatService.SendTextMessage:input_type -> aerochat.chat.v1.SendTextMessageRequest
-	105, // 185: aerochat.chat.v1.ChatService.EditDirectChatMessage:input_type -> aerochat.chat.v1.EditDirectChatMessageRequest
-	107, // 186: aerochat.chat.v1.ChatService.ListDirectChatMessages:input_type -> aerochat.chat.v1.ListDirectChatMessagesRequest
-	109, // 187: aerochat.chat.v1.ChatService.ListGroupMessages:input_type -> aerochat.chat.v1.ListGroupMessagesRequest
-	116, // 188: aerochat.chat.v1.ChatService.SearchMessages:input_type -> aerochat.chat.v1.SearchMessagesRequest
-	118, // 189: aerochat.chat.v1.ChatService.SendGroupTextMessage:input_type -> aerochat.chat.v1.SendGroupTextMessageRequest
-	120, // 190: aerochat.chat.v1.ChatService.EditGroupMessage:input_type -> aerochat.chat.v1.EditGroupMessageRequest
-	122, // 191: aerochat.chat.v1.ChatService.DeleteMessageForEveryone:input_type -> aerochat.chat.v1.DeleteMessageForEveryoneRequest
-	124, // 192: aerochat.chat.v1.ChatService.PinMessage:input_type -> aerochat.chat.v1.PinMessageRequest
-	126, // 193: aerochat.chat.v1.ChatService.UnpinMessage:input_type -> aerochat.chat.v1.UnpinMessageRequest
-	40,  // 194: aerochat.chat.v1.ChatService.Ping:output_type -> aerochat.chat.v1.PingResponse
-	42,  // 195: aerochat.chat.v1.ChatService.CreateDirectChat:output_type -> aerochat.chat.v1.CreateDirectChatResponse
-	44,  // 196: aerochat.chat.v1.ChatService.ListDirectChats:output_type -> aerochat.chat.v1.ListDirectChatsResponse
-	46,  // 197: aerochat.chat.v1.ChatService.GetDirectChat:output_type -> aerochat.chat.v1.GetDirectChatResponse
-	48,  // 198: aerochat.chat.v1.ChatService.CreateAttachmentUploadIntent:output_type -> aerochat.chat.v1.CreateAttachmentUploadIntentResponse
-	50,  // 199: aerochat.chat.v1.ChatService.CompleteAttachmentUpload:output_type -> aerochat.chat.v1.CompleteAttachmentUploadResponse
-	52,  // 200: aerochat.chat.v1.ChatService.GetAttachment:output_type -> aerochat.chat.v1.GetAttachmentResponse
-	54,  // 201: aerochat.chat.v1.ChatService.CreateGroup:output_type -> aerochat.chat.v1.CreateGroupResponse
-	56,  // 202: aerochat.chat.v1.ChatService.ListGroups:output_type -> aerochat.chat.v1.ListGroupsResponse
-	58,  // 203: aerochat.chat.v1.ChatService.GetGroup:output_type -> aerochat.chat.v1.GetGroupResponse
-	60,  // 204: aerochat.chat.v1.ChatService.GetGroupChat:output_type -> aerochat.chat.v1.GetGroupChatResponse
-	62,  // 205: aerochat.chat.v1.ChatService.ListGroupMembers:output_type -> aerochat.chat.v1.ListGroupMembersResponse
-	64,  // 206: aerochat.chat.v1.ChatService.UpdateGroupMemberRole:output_type -> aerochat.chat.v1.UpdateGroupMemberRoleResponse
-	66,  // 207: aerochat.chat.v1.ChatService.TransferGroupOwnership:output_type -> aerochat.chat.v1.TransferGroupOwnershipResponse
-	68,  // 208: aerochat.chat.v1.ChatService.RemoveGroupMember:output_type -> aerochat.chat.v1.RemoveGroupMemberResponse
-	70,  // 209: aerochat.chat.v1.ChatService.LeaveGroup:output_type -> aerochat.chat.v1.LeaveGroupResponse
-	72,  // 210: aerochat.chat.v1.ChatService.RestrictGroupMember:output_type -> aerochat.chat.v1.RestrictGroupMemberResponse
-	74,  // 211: aerochat.chat.v1.ChatService.UnrestrictGroupMember:output_type -> aerochat.chat.v1.UnrestrictGroupMemberResponse
-	76,  // 212: aerochat.chat.v1.ChatService.CreateGroupInviteLink:output_type -> aerochat.chat.v1.CreateGroupInviteLinkResponse
-	78,  // 213: aerochat.chat.v1.ChatService.ListGroupInviteLinks:output_type -> aerochat.chat.v1.ListGroupInviteLinksResponse
-	80,  // 214: aerochat.chat.v1.ChatService.DisableGroupInviteLink:output_type -> aerochat.chat.v1.DisableGroupInviteLinkResponse
-	82,  // 215: aerochat.chat.v1.ChatService.JoinGroupByInviteLink:output_type -> aerochat.chat.v1.JoinGroupByInviteLinkResponse
-	84,  // 216: aerochat.chat.v1.ChatService.SetGroupTyping:output_type -> aerochat.chat.v1.SetGroupTypingResponse
-	86,  // 217: aerochat.chat.v1.ChatService.ClearGroupTyping:output_type -> aerochat.chat.v1.ClearGroupTypingResponse
-	88,  // 218: aerochat.chat.v1.ChatService.MarkGroupChatRead:output_type -> aerochat.chat.v1.MarkGroupChatReadResponse
-	90,  // 219: aerochat.chat.v1.ChatService.MarkDirectChatRead:output_type -> aerochat.chat.v1.MarkDirectChatReadResponse
-	92,  // 220: aerochat.chat.v1.ChatService.SetDirectChatTyping:output_type -> aerochat.chat.v1.SetDirectChatTypingResponse
-	94,  // 221: aerochat.chat.v1.ChatService.ClearDirectChatTyping:output_type -> aerochat.chat.v1.ClearDirectChatTypingResponse
-	96,  // 222: aerochat.chat.v1.ChatService.SetDirectChatPresenceHeartbeat:output_type -> aerochat.chat.v1.SetDirectChatPresenceHeartbeatResponse
-	98,  // 223: aerochat.chat.v1.ChatService.ClearDirectChatPresence:output_type -> aerochat.chat.v1.ClearDirectChatPresenceResponse
-	100, // 224: aerochat.chat.v1.ChatService.SendEncryptedDirectMessageV2:output_type -> aerochat.chat.v1.SendEncryptedDirectMessageV2Response
-	102, // 225: aerochat.chat.v1.ChatService.ListEncryptedDirectMessageV2:output_type -> aerochat.chat.v1.ListEncryptedDirectMessageV2Response
-	104, // 226: aerochat.chat.v1.ChatService.SendTextMessage:output_type -> aerochat.chat.v1.SendTextMessageResponse
-	106, // 227: aerochat.chat.v1.ChatService.EditDirectChatMessage:output_type -> aerochat.chat.v1.EditDirectChatMessageResponse
-	108, // 228: aerochat.chat.v1.ChatService.ListDirectChatMessages:output_type -> aerochat.chat.v1.ListDirectChatMessagesResponse
-	110, // 229: aerochat.chat.v1.ChatService.ListGroupMessages:output_type -> aerochat.chat.v1.ListGroupMessagesResponse
-	117, // 230: aerochat.chat.v1.ChatService.SearchMessages:output_type -> aerochat.chat.v1.SearchMessagesResponse
-	119, // 231: aerochat.chat.v1.ChatService.SendGroupTextMessage:output_type -> aerochat.chat.v1.SendGroupTextMessageResponse
-	121, // 232: aerochat.chat.v1.ChatService.EditGroupMessage:output_type -> aerochat.chat.v1.EditGroupMessageResponse
-	123, // 233: aerochat.chat.v1.ChatService.DeleteMessageForEveryone:output_type -> aerochat.chat.v1.DeleteMessageForEveryoneResponse
-	125, // 234: aerochat.chat.v1.ChatService.PinMessage:output_type -> aerochat.chat.v1.PinMessageResponse
-	127, // 235: aerochat.chat.v1.ChatService.UnpinMessage:output_type -> aerochat.chat.v1.UnpinMessageResponse
-	194, // [194:236] is the sub-list for method output_type
-	152, // [152:194] is the sub-list for method input_type
-	152, // [152:152] is the sub-list for extension type_name
-	152, // [152:152] is the sub-list for extension extendee
-	0,   // [0:152] is the sub-list for field type_name
+	27,  // 131: aerochat.chat.v1.GetEncryptedDirectMessageV2Response.envelope:type_name -> aerochat.chat.v1.EncryptedDirectMessageV2Envelope
+	23,  // 132: aerochat.chat.v1.SendTextMessageResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
+	23,  // 133: aerochat.chat.v1.EditDirectChatMessageResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
+	23,  // 134: aerochat.chat.v1.ListDirectChatMessagesResponse.messages:type_name -> aerochat.chat.v1.DirectChatMessage
+	24,  // 135: aerochat.chat.v1.ListGroupMessagesResponse.messages:type_name -> aerochat.chat.v1.GroupMessage
+	131, // 136: aerochat.chat.v1.MessageSearchCursor.message_created_at:type_name -> google.protobuf.Timestamp
+	131, // 137: aerochat.chat.v1.MessageSearchPosition.message_created_at:type_name -> google.protobuf.Timestamp
+	8,   // 138: aerochat.chat.v1.MessageSearchResult.scope:type_name -> aerochat.chat.v1.MessageSearchScopeKind
+	9,   // 139: aerochat.chat.v1.MessageSearchResult.author:type_name -> aerochat.chat.v1.ChatUser
+	131, // 140: aerochat.chat.v1.MessageSearchResult.created_at:type_name -> google.protobuf.Timestamp
+	131, // 141: aerochat.chat.v1.MessageSearchResult.edited_at:type_name -> google.protobuf.Timestamp
+	116, // 142: aerochat.chat.v1.MessageSearchResult.position:type_name -> aerochat.chat.v1.MessageSearchPosition
+	113, // 143: aerochat.chat.v1.SearchMessagesRequest.direct_scope:type_name -> aerochat.chat.v1.SearchDirectMessagesScope
+	114, // 144: aerochat.chat.v1.SearchMessagesRequest.group_scope:type_name -> aerochat.chat.v1.SearchGroupMessagesScope
+	115, // 145: aerochat.chat.v1.SearchMessagesRequest.page_cursor:type_name -> aerochat.chat.v1.MessageSearchCursor
+	117, // 146: aerochat.chat.v1.SearchMessagesResponse.results:type_name -> aerochat.chat.v1.MessageSearchResult
+	115, // 147: aerochat.chat.v1.SearchMessagesResponse.next_page_cursor:type_name -> aerochat.chat.v1.MessageSearchCursor
+	24,  // 148: aerochat.chat.v1.SendGroupTextMessageResponse.message:type_name -> aerochat.chat.v1.GroupMessage
+	24,  // 149: aerochat.chat.v1.EditGroupMessageResponse.message:type_name -> aerochat.chat.v1.GroupMessage
+	23,  // 150: aerochat.chat.v1.DeleteMessageForEveryoneResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
+	23,  // 151: aerochat.chat.v1.PinMessageResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
+	23,  // 152: aerochat.chat.v1.UnpinMessageResponse.message:type_name -> aerochat.chat.v1.DirectChatMessage
+	39,  // 153: aerochat.chat.v1.ChatService.Ping:input_type -> aerochat.chat.v1.PingRequest
+	41,  // 154: aerochat.chat.v1.ChatService.CreateDirectChat:input_type -> aerochat.chat.v1.CreateDirectChatRequest
+	43,  // 155: aerochat.chat.v1.ChatService.ListDirectChats:input_type -> aerochat.chat.v1.ListDirectChatsRequest
+	45,  // 156: aerochat.chat.v1.ChatService.GetDirectChat:input_type -> aerochat.chat.v1.GetDirectChatRequest
+	47,  // 157: aerochat.chat.v1.ChatService.CreateAttachmentUploadIntent:input_type -> aerochat.chat.v1.CreateAttachmentUploadIntentRequest
+	49,  // 158: aerochat.chat.v1.ChatService.CompleteAttachmentUpload:input_type -> aerochat.chat.v1.CompleteAttachmentUploadRequest
+	51,  // 159: aerochat.chat.v1.ChatService.GetAttachment:input_type -> aerochat.chat.v1.GetAttachmentRequest
+	53,  // 160: aerochat.chat.v1.ChatService.CreateGroup:input_type -> aerochat.chat.v1.CreateGroupRequest
+	55,  // 161: aerochat.chat.v1.ChatService.ListGroups:input_type -> aerochat.chat.v1.ListGroupsRequest
+	57,  // 162: aerochat.chat.v1.ChatService.GetGroup:input_type -> aerochat.chat.v1.GetGroupRequest
+	59,  // 163: aerochat.chat.v1.ChatService.GetGroupChat:input_type -> aerochat.chat.v1.GetGroupChatRequest
+	61,  // 164: aerochat.chat.v1.ChatService.ListGroupMembers:input_type -> aerochat.chat.v1.ListGroupMembersRequest
+	63,  // 165: aerochat.chat.v1.ChatService.UpdateGroupMemberRole:input_type -> aerochat.chat.v1.UpdateGroupMemberRoleRequest
+	65,  // 166: aerochat.chat.v1.ChatService.TransferGroupOwnership:input_type -> aerochat.chat.v1.TransferGroupOwnershipRequest
+	67,  // 167: aerochat.chat.v1.ChatService.RemoveGroupMember:input_type -> aerochat.chat.v1.RemoveGroupMemberRequest
+	69,  // 168: aerochat.chat.v1.ChatService.LeaveGroup:input_type -> aerochat.chat.v1.LeaveGroupRequest
+	71,  // 169: aerochat.chat.v1.ChatService.RestrictGroupMember:input_type -> aerochat.chat.v1.RestrictGroupMemberRequest
+	73,  // 170: aerochat.chat.v1.ChatService.UnrestrictGroupMember:input_type -> aerochat.chat.v1.UnrestrictGroupMemberRequest
+	75,  // 171: aerochat.chat.v1.ChatService.CreateGroupInviteLink:input_type -> aerochat.chat.v1.CreateGroupInviteLinkRequest
+	77,  // 172: aerochat.chat.v1.ChatService.ListGroupInviteLinks:input_type -> aerochat.chat.v1.ListGroupInviteLinksRequest
+	79,  // 173: aerochat.chat.v1.ChatService.DisableGroupInviteLink:input_type -> aerochat.chat.v1.DisableGroupInviteLinkRequest
+	81,  // 174: aerochat.chat.v1.ChatService.JoinGroupByInviteLink:input_type -> aerochat.chat.v1.JoinGroupByInviteLinkRequest
+	83,  // 175: aerochat.chat.v1.ChatService.SetGroupTyping:input_type -> aerochat.chat.v1.SetGroupTypingRequest
+	85,  // 176: aerochat.chat.v1.ChatService.ClearGroupTyping:input_type -> aerochat.chat.v1.ClearGroupTypingRequest
+	87,  // 177: aerochat.chat.v1.ChatService.MarkGroupChatRead:input_type -> aerochat.chat.v1.MarkGroupChatReadRequest
+	89,  // 178: aerochat.chat.v1.ChatService.MarkDirectChatRead:input_type -> aerochat.chat.v1.MarkDirectChatReadRequest
+	91,  // 179: aerochat.chat.v1.ChatService.SetDirectChatTyping:input_type -> aerochat.chat.v1.SetDirectChatTypingRequest
+	93,  // 180: aerochat.chat.v1.ChatService.ClearDirectChatTyping:input_type -> aerochat.chat.v1.ClearDirectChatTypingRequest
+	95,  // 181: aerochat.chat.v1.ChatService.SetDirectChatPresenceHeartbeat:input_type -> aerochat.chat.v1.SetDirectChatPresenceHeartbeatRequest
+	97,  // 182: aerochat.chat.v1.ChatService.ClearDirectChatPresence:input_type -> aerochat.chat.v1.ClearDirectChatPresenceRequest
+	99,  // 183: aerochat.chat.v1.ChatService.SendEncryptedDirectMessageV2:input_type -> aerochat.chat.v1.SendEncryptedDirectMessageV2Request
+	101, // 184: aerochat.chat.v1.ChatService.ListEncryptedDirectMessageV2:input_type -> aerochat.chat.v1.ListEncryptedDirectMessageV2Request
+	103, // 185: aerochat.chat.v1.ChatService.GetEncryptedDirectMessageV2:input_type -> aerochat.chat.v1.GetEncryptedDirectMessageV2Request
+	105, // 186: aerochat.chat.v1.ChatService.SendTextMessage:input_type -> aerochat.chat.v1.SendTextMessageRequest
+	107, // 187: aerochat.chat.v1.ChatService.EditDirectChatMessage:input_type -> aerochat.chat.v1.EditDirectChatMessageRequest
+	109, // 188: aerochat.chat.v1.ChatService.ListDirectChatMessages:input_type -> aerochat.chat.v1.ListDirectChatMessagesRequest
+	111, // 189: aerochat.chat.v1.ChatService.ListGroupMessages:input_type -> aerochat.chat.v1.ListGroupMessagesRequest
+	118, // 190: aerochat.chat.v1.ChatService.SearchMessages:input_type -> aerochat.chat.v1.SearchMessagesRequest
+	120, // 191: aerochat.chat.v1.ChatService.SendGroupTextMessage:input_type -> aerochat.chat.v1.SendGroupTextMessageRequest
+	122, // 192: aerochat.chat.v1.ChatService.EditGroupMessage:input_type -> aerochat.chat.v1.EditGroupMessageRequest
+	124, // 193: aerochat.chat.v1.ChatService.DeleteMessageForEveryone:input_type -> aerochat.chat.v1.DeleteMessageForEveryoneRequest
+	126, // 194: aerochat.chat.v1.ChatService.PinMessage:input_type -> aerochat.chat.v1.PinMessageRequest
+	128, // 195: aerochat.chat.v1.ChatService.UnpinMessage:input_type -> aerochat.chat.v1.UnpinMessageRequest
+	40,  // 196: aerochat.chat.v1.ChatService.Ping:output_type -> aerochat.chat.v1.PingResponse
+	42,  // 197: aerochat.chat.v1.ChatService.CreateDirectChat:output_type -> aerochat.chat.v1.CreateDirectChatResponse
+	44,  // 198: aerochat.chat.v1.ChatService.ListDirectChats:output_type -> aerochat.chat.v1.ListDirectChatsResponse
+	46,  // 199: aerochat.chat.v1.ChatService.GetDirectChat:output_type -> aerochat.chat.v1.GetDirectChatResponse
+	48,  // 200: aerochat.chat.v1.ChatService.CreateAttachmentUploadIntent:output_type -> aerochat.chat.v1.CreateAttachmentUploadIntentResponse
+	50,  // 201: aerochat.chat.v1.ChatService.CompleteAttachmentUpload:output_type -> aerochat.chat.v1.CompleteAttachmentUploadResponse
+	52,  // 202: aerochat.chat.v1.ChatService.GetAttachment:output_type -> aerochat.chat.v1.GetAttachmentResponse
+	54,  // 203: aerochat.chat.v1.ChatService.CreateGroup:output_type -> aerochat.chat.v1.CreateGroupResponse
+	56,  // 204: aerochat.chat.v1.ChatService.ListGroups:output_type -> aerochat.chat.v1.ListGroupsResponse
+	58,  // 205: aerochat.chat.v1.ChatService.GetGroup:output_type -> aerochat.chat.v1.GetGroupResponse
+	60,  // 206: aerochat.chat.v1.ChatService.GetGroupChat:output_type -> aerochat.chat.v1.GetGroupChatResponse
+	62,  // 207: aerochat.chat.v1.ChatService.ListGroupMembers:output_type -> aerochat.chat.v1.ListGroupMembersResponse
+	64,  // 208: aerochat.chat.v1.ChatService.UpdateGroupMemberRole:output_type -> aerochat.chat.v1.UpdateGroupMemberRoleResponse
+	66,  // 209: aerochat.chat.v1.ChatService.TransferGroupOwnership:output_type -> aerochat.chat.v1.TransferGroupOwnershipResponse
+	68,  // 210: aerochat.chat.v1.ChatService.RemoveGroupMember:output_type -> aerochat.chat.v1.RemoveGroupMemberResponse
+	70,  // 211: aerochat.chat.v1.ChatService.LeaveGroup:output_type -> aerochat.chat.v1.LeaveGroupResponse
+	72,  // 212: aerochat.chat.v1.ChatService.RestrictGroupMember:output_type -> aerochat.chat.v1.RestrictGroupMemberResponse
+	74,  // 213: aerochat.chat.v1.ChatService.UnrestrictGroupMember:output_type -> aerochat.chat.v1.UnrestrictGroupMemberResponse
+	76,  // 214: aerochat.chat.v1.ChatService.CreateGroupInviteLink:output_type -> aerochat.chat.v1.CreateGroupInviteLinkResponse
+	78,  // 215: aerochat.chat.v1.ChatService.ListGroupInviteLinks:output_type -> aerochat.chat.v1.ListGroupInviteLinksResponse
+	80,  // 216: aerochat.chat.v1.ChatService.DisableGroupInviteLink:output_type -> aerochat.chat.v1.DisableGroupInviteLinkResponse
+	82,  // 217: aerochat.chat.v1.ChatService.JoinGroupByInviteLink:output_type -> aerochat.chat.v1.JoinGroupByInviteLinkResponse
+	84,  // 218: aerochat.chat.v1.ChatService.SetGroupTyping:output_type -> aerochat.chat.v1.SetGroupTypingResponse
+	86,  // 219: aerochat.chat.v1.ChatService.ClearGroupTyping:output_type -> aerochat.chat.v1.ClearGroupTypingResponse
+	88,  // 220: aerochat.chat.v1.ChatService.MarkGroupChatRead:output_type -> aerochat.chat.v1.MarkGroupChatReadResponse
+	90,  // 221: aerochat.chat.v1.ChatService.MarkDirectChatRead:output_type -> aerochat.chat.v1.MarkDirectChatReadResponse
+	92,  // 222: aerochat.chat.v1.ChatService.SetDirectChatTyping:output_type -> aerochat.chat.v1.SetDirectChatTypingResponse
+	94,  // 223: aerochat.chat.v1.ChatService.ClearDirectChatTyping:output_type -> aerochat.chat.v1.ClearDirectChatTypingResponse
+	96,  // 224: aerochat.chat.v1.ChatService.SetDirectChatPresenceHeartbeat:output_type -> aerochat.chat.v1.SetDirectChatPresenceHeartbeatResponse
+	98,  // 225: aerochat.chat.v1.ChatService.ClearDirectChatPresence:output_type -> aerochat.chat.v1.ClearDirectChatPresenceResponse
+	100, // 226: aerochat.chat.v1.ChatService.SendEncryptedDirectMessageV2:output_type -> aerochat.chat.v1.SendEncryptedDirectMessageV2Response
+	102, // 227: aerochat.chat.v1.ChatService.ListEncryptedDirectMessageV2:output_type -> aerochat.chat.v1.ListEncryptedDirectMessageV2Response
+	104, // 228: aerochat.chat.v1.ChatService.GetEncryptedDirectMessageV2:output_type -> aerochat.chat.v1.GetEncryptedDirectMessageV2Response
+	106, // 229: aerochat.chat.v1.ChatService.SendTextMessage:output_type -> aerochat.chat.v1.SendTextMessageResponse
+	108, // 230: aerochat.chat.v1.ChatService.EditDirectChatMessage:output_type -> aerochat.chat.v1.EditDirectChatMessageResponse
+	110, // 231: aerochat.chat.v1.ChatService.ListDirectChatMessages:output_type -> aerochat.chat.v1.ListDirectChatMessagesResponse
+	112, // 232: aerochat.chat.v1.ChatService.ListGroupMessages:output_type -> aerochat.chat.v1.ListGroupMessagesResponse
+	119, // 233: aerochat.chat.v1.ChatService.SearchMessages:output_type -> aerochat.chat.v1.SearchMessagesResponse
+	121, // 234: aerochat.chat.v1.ChatService.SendGroupTextMessage:output_type -> aerochat.chat.v1.SendGroupTextMessageResponse
+	123, // 235: aerochat.chat.v1.ChatService.EditGroupMessage:output_type -> aerochat.chat.v1.EditGroupMessageResponse
+	125, // 236: aerochat.chat.v1.ChatService.DeleteMessageForEveryone:output_type -> aerochat.chat.v1.DeleteMessageForEveryoneResponse
+	127, // 237: aerochat.chat.v1.ChatService.PinMessage:output_type -> aerochat.chat.v1.PinMessageResponse
+	129, // 238: aerochat.chat.v1.ChatService.UnpinMessage:output_type -> aerochat.chat.v1.UnpinMessageResponse
+	196, // [196:239] is the sub-list for method output_type
+	153, // [153:196] is the sub-list for method input_type
+	153, // [153:153] is the sub-list for extension type_name
+	153, // [153:153] is the sub-list for extension extendee
+	0,   // [0:153] is the sub-list for field type_name
 }
 
 func init() { file_aerochat_chat_v1_chat_service_proto_init() }
@@ -8433,19 +8551,19 @@ func file_aerochat_chat_v1_chat_service_proto_init() {
 		(*CreateAttachmentUploadIntentRequest_GroupId)(nil),
 	}
 	file_aerochat_chat_v1_chat_service_proto_msgTypes[90].OneofWrappers = []any{}
-	file_aerochat_chat_v1_chat_service_proto_msgTypes[94].OneofWrappers = []any{}
-	file_aerochat_chat_v1_chat_service_proto_msgTypes[107].OneofWrappers = []any{
+	file_aerochat_chat_v1_chat_service_proto_msgTypes[96].OneofWrappers = []any{}
+	file_aerochat_chat_v1_chat_service_proto_msgTypes[109].OneofWrappers = []any{
 		(*SearchMessagesRequest_DirectScope)(nil),
 		(*SearchMessagesRequest_GroupScope)(nil),
 	}
-	file_aerochat_chat_v1_chat_service_proto_msgTypes[109].OneofWrappers = []any{}
+	file_aerochat_chat_v1_chat_service_proto_msgTypes[111].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aerochat_chat_v1_chat_service_proto_rawDesc), len(file_aerochat_chat_v1_chat_service_proto_rawDesc)),
 			NumEnums:      9,
-			NumMessages:   120,
+			NumMessages:   122,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

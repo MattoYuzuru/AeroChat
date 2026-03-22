@@ -18,9 +18,11 @@ const (
 
 var readyCapabilities = []string{
 	"direct_chats",
+	"encrypted_direct_message_v2",
 	"groups",
 	"people",
 	"presence",
+	"crypto_device_binding",
 }
 
 // Envelope задаёт минимальный контракт realtime-события для клиента.

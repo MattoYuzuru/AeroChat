@@ -787,6 +787,57 @@ func TestListEncryptedDirectMessageV2RequiresActiveViewerDevice(t *testing.T) {
 	}
 }
 
+func TestGetEncryptedDirectMessageV2ReturnsViewerScopedEnvelope(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	aliceOther := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
+		ChatID:               directChat.ID,
+		MessageID:            testUUID(703),
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedDirectMessageV2OperationContent,
+		Revision:             1,
+		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: aliceOther.ID,
+				TransportHeader:         []byte("alice-other-header"),
+				Ciphertext:              []byte("alice-other-ciphertext"),
+			},
+			{
+				RecipientCryptoDeviceID: bobFirst.ID,
+				TransportHeader:         []byte("bob-first-header"),
+				Ciphertext:              []byte("bob-first-ciphertext"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("prepare encrypted direct message v2: %v", err)
+	}
+
+	envelope, err := service.GetEncryptedDirectMessageV2(context.Background(), bob.Token, directChat.ID, receipt.MessageID, bobFirst.ID)
+	if err != nil {
+		t.Fatalf("get encrypted direct message v2: %v", err)
+	}
+	if envelope.MessageID != receipt.MessageID {
+		t.Fatalf("ожидался message id %q, получен %q", receipt.MessageID, envelope.MessageID)
+	}
+	if envelope.ViewerDelivery.RecipientCryptoDeviceID != bobFirst.ID {
+		t.Fatalf("ожидался viewer device %q, получен %q", bobFirst.ID, envelope.ViewerDelivery.RecipientCryptoDeviceID)
+	}
+	if string(envelope.ViewerDelivery.Ciphertext) != "bob-first-ciphertext" {
+		t.Fatalf("ожидался ciphertext %q, получен %q", "bob-first-ciphertext", string(envelope.ViewerDelivery.Ciphertext))
+	}
+}
+
 func TestDeleteMessageUsesTombstoneAndAuthorRule(t *testing.T) {
 	t.Parallel()
 
@@ -2560,6 +2611,22 @@ func (r *fakeRepository) ListEncryptedDirectMessageV2(_ context.Context, userID 
 	}
 
 	return result, nil
+}
+
+func (r *fakeRepository) GetEncryptedDirectMessageV2(_ context.Context, userID string, chatID string, messageID string, viewerCryptoDeviceID string) (*EncryptedDirectMessageV2Envelope, error) {
+	result, err := r.ListEncryptedDirectMessageV2(context.Background(), userID, chatID, viewerCryptoDeviceID, 1<<30)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, envelope := range result {
+		if envelope.MessageID == messageID {
+			value := envelope
+			return &value, nil
+		}
+	}
+
+	return nil, ErrNotFound
 }
 
 func (r *fakeRepository) SearchDirectMessages(_ context.Context, userID string, params SearchDirectMessagesParams) ([]MessageSearchResult, error) {

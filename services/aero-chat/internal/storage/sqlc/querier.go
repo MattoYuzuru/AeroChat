@@ -40,6 +40,7 @@ type Querier interface {
 	GetActiveGroupMembershipCountByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
 	GetAttachmentQuotaUsageByOwner(ctx context.Context, ownerUserID uuid.UUID) (int64, error)
 	GetAttachmentRowByID(ctx context.Context, id uuid.UUID) (GetAttachmentRowByIDRow, error)
+	GetDirectChatEncryptedMessageV2ByDevice(ctx context.Context, arg GetDirectChatEncryptedMessageV2ByDeviceParams) (GetDirectChatEncryptedMessageV2ByDeviceRow, error)
 	GetDirectChatMessageByID(ctx context.Context, arg GetDirectChatMessageByIDParams) (GetDirectChatMessageByIDRow, error)
 	GetDirectChatRelationshipState(ctx context.Context, arg GetDirectChatRelationshipStateParams) (GetDirectChatRelationshipStateRow, error)
 	GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDirectChatRowsByIDAndUserIDParams) ([]GetDirectChatRowsByIDAndUserIDRow, error)
