@@ -79,6 +79,10 @@ AeroChat должен поддерживать:
     - reply reference, edit revision и tombstone/delete-for-everyone больше не зависят от plaintext server projection;
     - reply preview собирается только client-side после decrypt и честно деградирует, если target message ещё не попал в локальное bounded окно или уже tombstoned;
     - pin/unpin для encrypted DM v2 живёт как отдельная control-plane ссылка на stable logical `message_id` без доступа сервера к message body;
+  - encrypted direct-message v2 unread/read recovery foundation:
+    - viewer-relative unread/read state хранится как control-plane metadata по stable logical `message_id`, без server-side plaintext preview;
+    - `ListDirectChats` / `GetDirectChat` и realtime получают отдельный encrypted unread/read slice рядом с legacy plaintext read state;
+    - active encrypted DM v2 lane умеет явно продвигать encrypted mark-as-read и сходиться с server-backed unread counters;
   - первый backend-first MLS-compatible foundation для encrypted groups:
     - отдельный encrypted group control-plane lane в `aero-chat` c явным `mls_group_id` и `roster_version`;
     - materialized readable roster по active trusted crypto devices current group members, включая `reader` и write-restricted участников;
@@ -96,11 +100,15 @@ AeroChat должен поддерживать:
         - replies, edits и tombstones применяются как encrypted events c deterministic local projection convergence;
         - pin/unpin остаётся server-visible control-plane metadata по stable logical `message_id`, без plaintext preview на сервере;
         - web рендерит pinned/reply state только из локально разрешённых encrypted entries и честно показывает unresolved/tombstoned состояние, если target пока недоступен;
+      - encrypted group unread/read recovery foundation:
+        - viewer-relative unread/read для encrypted group lane считается по opaque control-plane metadata и не зависит от plaintext body;
+        - `ListGroups` / `GetGroupChat`, realtime и active encrypted lane теперь умеют продвигать отдельный encrypted read progression;
+        - legacy group read state и encrypted group read state остаются честно раздельными;
       - coexistence остаётся честным: encrypted lane не притворяется unified timeline поверх legacy plaintext history;
     - coexistence остаётся bounded и честной:
       - legacy plaintext group history не переписывается и не re-encrypt'ится;
       - encrypted lane forward-only и не dual-write'ит те же сообщения в plaintext path;
-    - текущий slice не объявляет full MLS implementation, unread/search parity, encrypted group media parity во всех сценариях или backup/recovery.
+    - текущий slice не объявляет full MLS implementation, encrypted search parity, encrypted group media parity во всех сценариях или backup/recovery.
   - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
   - без claims о full encrypted DM/group parity, encrypted search, backup/recovery или full MLS client completeness.
 - explicit group moderation/admin policy foundation:

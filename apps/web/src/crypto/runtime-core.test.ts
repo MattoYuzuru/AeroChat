@@ -358,6 +358,13 @@ describe("createCryptoRuntimeCore", () => {
         createdAt: "2026-03-22T12:11:00Z",
         storedAt: "2026-03-22T12:11:01Z",
         storedDeliveryCount: input.deliveries.length,
+        storedDeliveries: input.deliveries.map((delivery: (typeof input.deliveries)[number]) => ({
+          recipientUserId:
+            delivery.recipientUserId ?? baseSession.profileId,
+          recipientCryptoDeviceId: delivery.recipientCryptoDeviceId,
+          storedAt: "2026-03-22T12:11:01Z",
+          unreadState: null,
+        })),
       })),
     });
     const runtime = createCryptoRuntimeCore({
@@ -489,11 +496,13 @@ describe("createCryptoRuntimeCore", () => {
             recipientUserId: baseSession.profileId,
             recipientCryptoDeviceId: "crypto-1",
             storedAt: "2026-03-22T12:11:01Z",
+            unreadState: null,
           },
           {
             recipientUserId: "user-2",
             recipientCryptoDeviceId: "peer-device-1",
             storedAt: "2026-03-22T12:11:01Z",
+            unreadState: null,
           },
         ],
       })),
@@ -896,6 +905,7 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     getGroup: vi.fn(),
     getGroupChat: vi.fn(),
     markGroupChatRead: vi.fn(),
+    markEncryptedGroupChatRead: vi.fn(),
     createAttachmentUploadIntent: vi.fn(),
     completeAttachmentUpload: vi.fn(),
     getAttachment: vi.fn(),
@@ -919,6 +929,7 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     listDirectChats: vi.fn(),
     getDirectChat: vi.fn(),
     markDirectChatRead: vi.fn(),
+    markEncryptedDirectChatRead: vi.fn(),
     setDirectChatTyping: vi.fn(),
     clearDirectChatTyping: vi.fn(),
     setDirectChatPresenceHeartbeat: vi.fn(),
@@ -973,6 +984,7 @@ function createEncryptedGroupEnvelope(): EncryptedGroupEnvelope {
       recipientUserId: "user-1",
       recipientCryptoDeviceId: "crypto-2",
       storedAt: "2026-03-22T12:00:01Z",
+      unreadState: null,
     },
   };
 }

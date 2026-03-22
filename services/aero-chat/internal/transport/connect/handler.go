@@ -79,16 +79,17 @@ func (h *Handler) GetDirectChat(ctx context.Context, req *connect.Request[chatv1
 		return nil, err
 	}
 
-	directChat, readState, typingState, presenceState, err := h.service.GetDirectChat(ctx, token, req.Msg.ChatId)
+	directChat, readState, encryptedReadState, typingState, presenceState, err := h.service.GetDirectChat(ctx, token, req.Msg.ChatId)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
 	return connect.NewResponse(&chatv1.GetDirectChatResponse{
-		Chat:          toProtoDirectChat(*directChat),
-		ReadState:     toProtoDirectChatReadState(readState),
-		TypingState:   toProtoDirectChatTypingState(typingState),
-		PresenceState: toProtoDirectChatPresenceState(presenceState),
+		Chat:               toProtoDirectChat(*directChat),
+		ReadState:          toProtoDirectChatReadState(readState),
+		EncryptedReadState: toProtoEncryptedDirectChatReadState(encryptedReadState),
+		TypingState:        toProtoDirectChatTypingState(typingState),
+		PresenceState:      toProtoDirectChatPresenceState(presenceState),
 	}), nil
 }
 
@@ -211,16 +212,17 @@ func (h *Handler) GetGroupChat(ctx context.Context, req *connect.Request[chatv1.
 		return nil, err
 	}
 
-	group, thread, readState, typingState, err := h.service.GetGroupChat(ctx, token, req.Msg.GroupId)
+	group, thread, readState, encryptedReadState, typingState, err := h.service.GetGroupChat(ctx, token, req.Msg.GroupId)
 	if err != nil {
 		return nil, mapError(err)
 	}
 
 	return connect.NewResponse(&chatv1.GetGroupChatResponse{
-		Group:       toProtoGroup(*group),
-		Thread:      toProtoGroupChatThread(*thread),
-		TypingState: toProtoGroupTypingState(typingState),
-		ReadState:   toProtoGroupReadState(readState),
+		Group:              toProtoGroup(*group),
+		Thread:             toProtoGroupChatThread(*thread),
+		TypingState:        toProtoGroupTypingState(typingState),
+		ReadState:          toProtoGroupReadState(readState),
+		EncryptedReadState: toProtoEncryptedGroupReadState(encryptedReadState),
 	}), nil
 }
 
@@ -465,6 +467,23 @@ func (h *Handler) MarkGroupChatRead(ctx context.Context, req *connect.Request[ch
 	}), nil
 }
 
+func (h *Handler) MarkEncryptedGroupChatRead(ctx context.Context, req *connect.Request[chatv1.MarkEncryptedGroupChatReadRequest]) (*connect.Response[chatv1.MarkEncryptedGroupChatReadResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	readState, unreadCount, err := h.service.MarkEncryptedGroupChatRead(ctx, token, req.Msg.GroupId, req.Msg.MessageId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.MarkEncryptedGroupChatReadResponse{
+		ReadState:   toProtoEncryptedGroupReadState(readState),
+		UnreadState: toProtoEncryptedUnreadState(unreadCount),
+	}), nil
+}
+
 func (h *Handler) MarkDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkDirectChatReadRequest]) (*connect.Response[chatv1.MarkDirectChatReadResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -479,6 +498,23 @@ func (h *Handler) MarkDirectChatRead(ctx context.Context, req *connect.Request[c
 	return connect.NewResponse(&chatv1.MarkDirectChatReadResponse{
 		ReadState:   toProtoDirectChatReadState(readState),
 		UnreadState: toProtoDirectChatUnreadState(unreadCount),
+	}), nil
+}
+
+func (h *Handler) MarkEncryptedDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkEncryptedDirectChatReadRequest]) (*connect.Response[chatv1.MarkEncryptedDirectChatReadResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	readState, unreadCount, err := h.service.MarkEncryptedDirectChatRead(ctx, token, req.Msg.ChatId, req.Msg.MessageId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.MarkEncryptedDirectChatReadResponse{
+		ReadState:   toProtoEncryptedDirectChatReadState(readState),
+		UnreadState: toProtoEncryptedUnreadState(unreadCount),
 	}), nil
 }
 
@@ -1036,6 +1072,7 @@ func toProtoDirectChat(value chat.DirectChat) *chatv1.DirectChat {
 		UpdatedAt:                 timestamppb.New(value.UpdatedAt),
 		UnreadState:               toProtoDirectChatUnreadState(value.UnreadCount),
 		EncryptedPinnedMessageIds: append([]string(nil), value.EncryptedPinnedMessageIDs...),
+		EncryptedUnreadState:      toProtoEncryptedUnreadState(value.EncryptedUnreadCount),
 	}
 	for _, participant := range value.Participants {
 		result.Participants = append(result.Participants, toProtoChatUser(participant))
@@ -1056,6 +1093,7 @@ func toProtoGroup(value chat.Group) *chatv1.Group {
 		UnreadState:               toProtoGroupUnreadState(value.UnreadCount),
 		Permissions:               toProtoGroupPermissions(value.SelfPermissions),
 		EncryptedPinnedMessageIds: append([]string(nil), value.EncryptedPinnedMessageIDs...),
+		EncryptedUnreadState:      toProtoEncryptedUnreadState(value.EncryptedUnreadCount),
 	}
 }
 
@@ -1201,7 +1239,7 @@ func toProtoEncryptedDirectMessageV2Envelope(value chat.EncryptedDirectMessageV2
 }
 
 func toProtoEncryptedDirectMessageV2StoredEnvelope(value chat.EncryptedDirectMessageV2StoredEnvelope) *chatv1.EncryptedDirectMessageV2StoredEnvelope {
-	return &chatv1.EncryptedDirectMessageV2StoredEnvelope{
+	result := &chatv1.EncryptedDirectMessageV2StoredEnvelope{
 		MessageId:            value.MessageID,
 		ChatId:               value.ChatID,
 		SenderUserId:         value.SenderUserID,
@@ -1213,6 +1251,11 @@ func toProtoEncryptedDirectMessageV2StoredEnvelope(value chat.EncryptedDirectMes
 		StoredAt:             timestamppb.New(value.StoredAt),
 		StoredDeliveryCount:  value.StoredDeliveryCount,
 	}
+	for _, delivery := range value.StoredDeliveries {
+		result.StoredDeliveries = append(result.StoredDeliveries, toProtoEncryptedDirectMessageV2StoredDelivery(delivery))
+	}
+
+	return result
 }
 
 func toProtoEncryptedDirectMessageV2SendBootstrap(value chat.EncryptedDirectMessageV2SendBootstrap) *chatv1.GetEncryptedDirectMessageV2SendBootstrapResponse {
@@ -1266,6 +1309,16 @@ func toProtoEncryptedDirectMessageV2Delivery(value chat.EncryptedDirectMessageV2
 		Ciphertext:              append([]byte(nil), value.Ciphertext...),
 		CiphertextSizeBytes:     uint64(max(value.CiphertextSizeBytes, 0)),
 		StoredAt:                timestamppb.New(value.StoredAt),
+		UnreadState:             toProtoEncryptedUnreadState(value.UnreadCount),
+	}
+}
+
+func toProtoEncryptedDirectMessageV2StoredDelivery(value chat.EncryptedDirectMessageV2StoredDelivery) *chatv1.EncryptedDirectMessageV2StoredDelivery {
+	return &chatv1.EncryptedDirectMessageV2StoredDelivery{
+		RecipientUserId:         value.RecipientUserID,
+		RecipientCryptoDeviceId: value.RecipientCryptoDeviceID,
+		StoredAt:                timestamppb.New(value.StoredAt),
+		UnreadState:             toProtoEncryptedUnreadState(value.UnreadCount),
 	}
 }
 
@@ -1382,6 +1435,7 @@ func toProtoEncryptedGroupMessageDelivery(value chat.EncryptedGroupMessageDelive
 		RecipientUserId:         value.RecipientUserID,
 		RecipientCryptoDeviceId: value.RecipientCryptoDeviceID,
 		StoredAt:                timestamppb.New(value.StoredAt),
+		UnreadState:             toProtoEncryptedUnreadState(value.UnreadCount),
 	}
 }
 
@@ -1499,12 +1553,45 @@ func toProtoGroupReadState(value *chat.GroupReadState) *chatv1.GroupReadState {
 	}
 }
 
+func toProtoEncryptedDirectChatReadState(value *chat.EncryptedDirectChatReadState) *chatv1.EncryptedDirectChatReadState {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.EncryptedDirectChatReadState{
+		SelfPosition: toProtoEncryptedConversationReadPosition(value.SelfPosition),
+		PeerPosition: toProtoEncryptedConversationReadPosition(value.PeerPosition),
+	}
+}
+
+func toProtoEncryptedGroupReadState(value *chat.EncryptedGroupReadState) *chatv1.EncryptedGroupReadState {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.EncryptedGroupReadState{
+		SelfPosition: toProtoEncryptedConversationReadPosition(value.SelfPosition),
+	}
+}
+
 func toProtoGroupReadPosition(value *chat.GroupReadPosition) *chatv1.GroupReadPosition {
 	if value == nil {
 		return nil
 	}
 
 	return &chatv1.GroupReadPosition{
+		MessageId:        value.MessageID,
+		MessageCreatedAt: timestamppb.New(value.MessageCreatedAt),
+		UpdatedAt:        timestamppb.New(value.UpdatedAt),
+	}
+}
+
+func toProtoEncryptedConversationReadPosition(value *chat.EncryptedConversationReadPosition) *chatv1.EncryptedConversationReadPosition {
+	if value == nil {
+		return nil
+	}
+
+	return &chatv1.EncryptedConversationReadPosition{
 		MessageId:        value.MessageID,
 		MessageCreatedAt: timestamppb.New(value.MessageCreatedAt),
 		UpdatedAt:        timestamppb.New(value.UpdatedAt),
@@ -1519,6 +1606,12 @@ func toProtoDirectChatUnreadState(value int32) *chatv1.DirectChatUnreadState {
 
 func toProtoGroupUnreadState(value int32) *chatv1.GroupUnreadState {
 	return &chatv1.GroupUnreadState{
+		UnreadCount: uint32(max(value, 0)),
+	}
+}
+
+func toProtoEncryptedUnreadState(value int32) *chatv1.EncryptedUnreadState {
+	return &chatv1.EncryptedUnreadState{
 		UnreadCount: uint32(max(value, 0)),
 	}
 }

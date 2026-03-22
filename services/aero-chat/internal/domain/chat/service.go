@@ -43,6 +43,7 @@ type Repository interface {
 	GetGroup(context.Context, string, string) (*Group, error)
 	GetGroupChatThread(context.Context, string, string) (*GroupChatThread, error)
 	GetGroupReadStateEntry(context.Context, string, string) (*GroupReadStateEntry, error)
+	GetEncryptedGroupReadStateEntry(context.Context, string, string) (*EncryptedGroupReadStateEntry, error)
 	ListGroupMembers(context.Context, string, string) ([]GroupMember, error)
 	ListGroupTypingStateEntries(context.Context, string, string) ([]GroupTypingStateEntry, error)
 	GetGroupMember(context.Context, string, string) (*GroupMember, error)
@@ -57,6 +58,7 @@ type Repository interface {
 	GetGroupInviteLinkForJoin(context.Context, string) (*GroupInviteLinkJoinTarget, error)
 	JoinGroupByInviteLink(context.Context, JoinGroupByInviteLinkParams) (bool, error)
 	ListDirectChatReadStateEntries(context.Context, string, string) ([]DirectChatReadStateEntry, error)
+	ListEncryptedDirectChatReadStateEntries(context.Context, string, string) ([]EncryptedDirectChatReadStateEntry, error)
 	ListDirectChatPresenceStateEntries(context.Context, string, string) ([]DirectChatPresenceStateEntry, error)
 	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
 	ListActiveCryptoDevicesByUserIDs(context.Context, []string) ([]CryptoDevice, error)
@@ -65,6 +67,8 @@ type Repository interface {
 	SyncEncryptedGroupControlPlane(context.Context, SyncEncryptedGroupControlPlaneParams) (*EncryptedGroupLane, error)
 	UpsertDirectChatReadReceipt(context.Context, UpsertDirectChatReadReceiptParams) (bool, error)
 	UpsertGroupChatReadState(context.Context, UpsertGroupChatReadStateParams) (bool, error)
+	UpsertEncryptedDirectChatReadState(context.Context, UpsertEncryptedDirectChatReadStateParams) (bool, error)
+	UpsertEncryptedGroupReadState(context.Context, UpsertEncryptedGroupReadStateParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
 	CreateEncryptedDirectMessageV2(context.Context, CreateEncryptedDirectMessageV2Params) (*EncryptedDirectMessageV2StoredEnvelope, error)
 	CreateEncryptedGroupMessage(context.Context, CreateEncryptedGroupMessageParams) (*EncryptedGroupStoredEnvelope, error)
@@ -256,38 +260,43 @@ func (s *Service) ListDirectChats(ctx context.Context, token string) ([]DirectCh
 	return s.repo.ListDirectChats(ctx, authSession.User.ID)
 }
 
-func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string) (*DirectChat, *DirectChatReadState, *DirectChatTypingState, *DirectChatPresenceState, error) {
+func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string) (*DirectChat, *DirectChatReadState, *EncryptedDirectChatReadState, *DirectChatTypingState, *DirectChatPresenceState, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	normalizedChatID, err := normalizeID(chatID, "chat_id")
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	readState, err := s.getDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
+	}
+
+	encryptedReadState, err := s.getEncryptedDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
 	}
 
 	typingState, err := s.getDirectChatTypingState(ctx, authSession.User.ID, normalizedChatID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	presenceState, err := s.getDirectChatPresenceState(ctx, authSession.User.ID, normalizedChatID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
-	return directChat, readState, typingState, presenceState, nil
+	return directChat, readState, encryptedReadState, typingState, presenceState, nil
 }
 
 func (s *Service) CreateGroup(ctx context.Context, token string, name string) (*Group, error) {
@@ -354,28 +363,33 @@ func (s *Service) GetGroup(ctx context.Context, token string, groupID string) (*
 	return enrichGroupPolicy(group), nil
 }
 
-func (s *Service) GetGroupChat(ctx context.Context, token string, groupID string) (*Group, *GroupChatThread, *GroupReadState, *GroupTypingState, error) {
+func (s *Service) GetGroupChat(ctx context.Context, token string, groupID string) (*Group, *GroupChatThread, *GroupReadState, *EncryptedGroupReadState, *GroupTypingState, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	group, thread, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	readState, err := s.getGroupReadState(ctx, authSession.User.ID, group.ID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
+	}
+
+	encryptedReadState, err := s.getEncryptedGroupReadState(ctx, authSession.User.ID, group.ID)
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
 	}
 
 	typingState, err := s.getGroupTypingState(ctx, authSession.User.ID, group.ID, thread.ID)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
-	return group, thread, readState, typingState, nil
+	return group, thread, readState, encryptedReadState, typingState, nil
 }
 
 func (s *Service) ListGroupMembers(ctx context.Context, token string, groupID string) ([]GroupMember, error) {
@@ -1778,6 +1792,53 @@ func (s *Service) MarkDirectChatRead(ctx context.Context, token string, chatID s
 	return readState, directChat.UnreadCount, nil
 }
 
+func (s *Service) MarkEncryptedDirectChatRead(ctx context.Context, token string, chatID string, messageID string) (*EncryptedDirectChatReadState, int32, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, 0, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, 0, err
+	}
+
+	message, err := s.repo.GetEncryptedDirectMessageV2Stored(ctx, normalizedChatID, normalizedMessageID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if _, err := s.repo.UpsertEncryptedDirectChatReadState(ctx, UpsertEncryptedDirectChatReadStateParams{
+		ChatID:            normalizedChatID,
+		UserID:            authSession.User.ID,
+		LastReadMessageID: message.MessageID,
+		LastReadMessageAt: message.CreatedAt,
+		UpdatedAt:         s.now(),
+	}); err != nil {
+		return nil, 0, err
+	}
+
+	readState, err := s.getEncryptedDirectChatReadState(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return readState, directChat.EncryptedUnreadCount, nil
+}
+
 func (s *Service) MarkGroupChatRead(ctx context.Context, token string, groupID string, messageID string) (*GroupReadState, int32, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
@@ -1819,6 +1880,53 @@ func (s *Service) MarkGroupChatRead(ctx context.Context, token string, groupID s
 	}
 
 	return readState, group.UnreadCount, nil
+}
+
+func (s *Service) MarkEncryptedGroupChatRead(ctx context.Context, token string, groupID string, messageID string) (*EncryptedGroupReadState, int32, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, 0, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if _, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID); err != nil {
+		return nil, 0, err
+	}
+
+	message, err := s.repo.GetEncryptedGroupStoredMessage(ctx, normalizedGroupID, normalizedMessageID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if _, err := s.repo.UpsertEncryptedGroupReadState(ctx, UpsertEncryptedGroupReadStateParams{
+		GroupID:           normalizedGroupID,
+		UserID:            authSession.User.ID,
+		LastReadMessageID: message.MessageID,
+		LastReadMessageAt: message.CreatedAt,
+		UpdatedAt:         s.now(),
+	}); err != nil {
+		return nil, 0, err
+	}
+
+	readState, err := s.getEncryptedGroupReadState(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return readState, group.EncryptedUnreadCount, nil
 }
 
 func (s *Service) SetGroupTyping(ctx context.Context, token string, groupID string, threadID string) (*GroupTypingState, error) {
@@ -3176,6 +3284,37 @@ func (s *Service) getDirectChatReadState(ctx context.Context, viewerUserID strin
 	return state, nil
 }
 
+func (s *Service) getEncryptedDirectChatReadState(ctx context.Context, viewerUserID string, chatID string) (*EncryptedDirectChatReadState, error) {
+	entries, err := s.repo.ListEncryptedDirectChatReadStateEntries(ctx, viewerUserID, chatID)
+	if err != nil {
+		return nil, err
+	}
+	if len(entries) == 0 {
+		return nil, ErrNotFound
+	}
+
+	state := &EncryptedDirectChatReadState{}
+	for _, entry := range entries {
+		if entry.LastReadPosition == nil {
+			continue
+		}
+
+		position := *entry.LastReadPosition
+		if entry.UserID == viewerUserID {
+			state.SelfPosition = &position
+			continue
+		}
+
+		if !entry.ReadReceiptsEnabled {
+			continue
+		}
+
+		state.PeerPosition = &position
+	}
+
+	return state, nil
+}
+
 func (s *Service) getGroupReadState(ctx context.Context, userID string, groupID string) (*GroupReadState, error) {
 	entry, err := s.repo.GetGroupReadStateEntry(ctx, userID, groupID)
 	if err != nil {
@@ -3187,6 +3326,21 @@ func (s *Service) getGroupReadState(ctx context.Context, userID string, groupID 
 
 	position := *entry.LastReadPosition
 	return &GroupReadState{
+		SelfPosition: &position,
+	}, nil
+}
+
+func (s *Service) getEncryptedGroupReadState(ctx context.Context, userID string, groupID string) (*EncryptedGroupReadState, error) {
+	entry, err := s.repo.GetEncryptedGroupReadStateEntry(ctx, userID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if entry == nil || entry.LastReadPosition == nil {
+		return nil, nil
+	}
+
+	position := *entry.LastReadPosition
+	return &EncryptedGroupReadState{
 		SelfPosition: &position,
 	}, nil
 }

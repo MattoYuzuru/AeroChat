@@ -41,6 +41,7 @@ import { parseGroupRealtimeEvent } from "../groups/realtime";
 import {
   describeEncryptedGroupLaneIssue,
 } from "../groups/useEncryptedGroupLane";
+import { subscribeEncryptedGroupRealtimeEvents } from "../groups/encrypted-group-realtime";
 import type {
   EncryptedGroupProjectionEntry,
   EncryptedGroupProjectedMessageEntry,
@@ -328,6 +329,7 @@ export function GroupsPage() {
         }
 
         let readState = snapshot.readState;
+        const encryptedReadState = snapshot.encryptedReadState;
         let group = snapshot.group;
         const latestMessage = messages[0] ?? null;
         if (latestMessage) {
@@ -352,6 +354,7 @@ export function GroupsPage() {
             ...snapshot,
             group,
             readState,
+            encryptedReadState,
           },
           members,
           inviteLinks,
@@ -438,6 +441,66 @@ export function GroupsPage() {
     });
   }, [authState.status, authenticatedUserId, setSearchParams]);
 
+  useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
+    return subscribeEncryptedGroupRealtimeEvents((event) => {
+      const unreadCount = event.envelope.viewerDelivery.unreadState?.unreadCount ?? null;
+
+      setGroups((current) =>
+        [...current]
+          .map((group) =>
+            group.id !== event.envelope.groupId
+              ? group
+              : {
+                  ...group,
+                  updatedAt:
+                    event.envelope.storedAt > group.updatedAt
+                      ? event.envelope.storedAt
+                      : group.updatedAt,
+                  encryptedUnreadCount:
+                    unreadCount === null ? group.encryptedUnreadCount : unreadCount,
+                },
+          )
+          .sort((left, right) => {
+            if (left.updatedAt === right.updatedAt) {
+              return right.id.localeCompare(left.id);
+            }
+
+            return right.updatedAt.localeCompare(left.updatedAt);
+          }),
+      );
+
+      setSelectedState((current) => {
+        if (current.status !== "ready" || current.snapshot.group.id !== event.envelope.groupId) {
+          return current;
+        }
+
+        const nextState = {
+          ...current,
+          snapshot: {
+            ...current.snapshot,
+            group: {
+              ...current.snapshot.group,
+              updatedAt:
+                event.envelope.storedAt > current.snapshot.group.updatedAt
+                  ? event.envelope.storedAt
+                  : current.snapshot.group.updatedAt,
+              encryptedUnreadCount:
+                unreadCount === null
+                  ? current.snapshot.group.encryptedUnreadCount
+                  : unreadCount,
+            },
+          },
+        };
+        selectedStateRef.current = nextState;
+        return nextState;
+      });
+    });
+  }, [authState.status]);
+
   const latestSelectedMessage =
     selectedState.status === "ready" ? selectedState.messages[0] ?? null : null;
   const shouldAutoMarkGroupRead =
@@ -472,7 +535,7 @@ export function GroupsPage() {
             return current;
           }
 
-          return {
+          const nextState = {
             ...current,
             snapshot: {
               ...current.snapshot,
@@ -483,6 +546,8 @@ export function GroupsPage() {
               readState: readUpdate.readState,
             },
           };
+          selectedStateRef.current = nextState;
+          return nextState;
         });
       })
       .catch((error) => {
@@ -671,6 +736,92 @@ export function GroupsPage() {
     setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
   }, [searchJumpIntent, searchParams, selectedGroupId, selectedState, setSearchParams]);
 
+  const encryptedMessageEntries = encryptedGroupLane.items.filter(
+    (
+      entry,
+    ): entry is EncryptedGroupProjectedMessageEntry => entry.kind === "message",
+  );
+  const latestEncryptedGroupMessage = encryptedMessageEntries.at(-1) ?? null;
+  const activeEncryptedGroupId =
+    selectedState.status === "ready" ? selectedState.snapshot.group.id : null;
+  const shouldAutoMarkEncryptedGroupRead =
+    authState.status === "authenticated" &&
+    isPageVisible &&
+    selectedState.status === "ready" &&
+    encryptedGroupLane.status === "ready" &&
+    latestEncryptedGroupMessage !== null &&
+    latestEncryptedGroupMessage.senderUserId !== authState.profile.id &&
+    selectedState.snapshot.encryptedReadState?.selfPosition?.messageId !==
+      latestEncryptedGroupMessage.messageId;
+
+  useEffect(() => {
+    if (
+      !shouldAutoMarkEncryptedGroupRead ||
+      activeEncryptedGroupId === null ||
+      latestEncryptedGroupMessage === null
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void gatewayClient
+      .markEncryptedGroupChatRead(token, activeEncryptedGroupId, latestEncryptedGroupMessage.messageId)
+      .then((readUpdate) => {
+        if (cancelled) {
+          return;
+        }
+
+        setSelectedState((current) => {
+          if (current.status !== "ready" || current.snapshot.group.id !== activeEncryptedGroupId) {
+            return current;
+          }
+
+          const nextState = {
+            ...current,
+            snapshot: {
+              ...current.snapshot,
+              group: {
+                ...current.snapshot.group,
+                encryptedUnreadCount: readUpdate.unreadCount,
+              },
+              encryptedReadState: readUpdate.readState,
+            },
+          };
+          selectedStateRef.current = nextState;
+          return nextState;
+        });
+
+        setGroups((current) =>
+          current.map((group) =>
+            group.id !== activeEncryptedGroupId
+              ? group
+              : {
+                  ...group,
+                  encryptedUnreadCount: readUpdate.unreadCount,
+                },
+          ),
+        );
+      })
+      .catch((error) => {
+        resolveProtectedError(
+          error,
+          "Не удалось обновить encrypted group read state через gateway.",
+          expireSession,
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeEncryptedGroupId,
+    expireSession,
+    latestEncryptedGroupMessage,
+    shouldAutoMarkEncryptedGroupRead,
+    token,
+  ]);
+
   const selectedGroupPermissions =
     selectedState.status === "ready" ? selectedState.snapshot.group.permissions : null;
   useEffect(() => {
@@ -706,11 +857,6 @@ export function GroupsPage() {
     selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
   const encryptedThreadMessages =
     selectedState.status === "ready" ? [...encryptedGroupLane.items].reverse() : [];
-  const encryptedMessageEntries = encryptedGroupLane.items.filter(
-    (
-      entry,
-    ): entry is EncryptedGroupProjectedMessageEntry => entry.kind === "message",
-  );
   const encryptedMessageIndex = new Map(
     encryptedMessageEntries.map((entry) => [entry.messageId, entry] as const),
   );
@@ -740,6 +886,7 @@ export function GroupsPage() {
     selectedState.status === "ready"
       ? describeGroupTypingLabel(selectedState.snapshot.typingState, authState.profile.id)
       : null;
+
   async function reloadGroups() {
     if (groupsStatus === "loading") {
       return;
@@ -1732,6 +1879,11 @@ export function GroupsPage() {
                               Непрочитано: {group.unreadCount}
                             </span>
                           )}
+                          {group.encryptedUnreadCount > 0 && (
+                            <span className={styles.unreadPill}>
+                              Encrypted unread: {group.encryptedUnreadCount}
+                            </span>
+                          )}
                           <span className={styles.rolePill}>{roleLabel(group.selfRole)}</span>
                         </div>
                       </div>
@@ -1830,6 +1982,14 @@ export function GroupsPage() {
                     group envelopes. Legacy plaintext history ниже остаётся отдельным path.
                   </p>
                 </div>
+
+                {selectedState.snapshot.group.encryptedUnreadCount > 0 && (
+                  <div className={styles.timelineMeta}>
+                    <span className={styles.statusPill}>
+                      Encrypted unread {selectedState.snapshot.group.encryptedUnreadCount}
+                    </span>
+                  </div>
+                )}
 
                 {encryptedGroupLane.bootstrap !== null && (
                   <div className={styles.timelineMeta}>

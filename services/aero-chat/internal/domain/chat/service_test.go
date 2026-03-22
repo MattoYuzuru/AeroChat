@@ -71,7 +71,7 @@ func TestListAndGetDirectChatsAreParticipantScoped(t *testing.T) {
 		t.Fatal("ожидался один чат для Bob")
 	}
 
-	if _, _, _, _, err := service.GetDirectChat(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
+	if _, _, _, _, _, err := service.GetDirectChat(context.Background(), charlie.Token, directChat.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ожидалась ошибка доступа для неучастника, получено %v", err)
 	}
 }
@@ -99,7 +99,7 @@ func TestGetDirectChatReturnsPrivacyAwareReadState(t *testing.T) {
 		t.Fatalf("ожидалось отсутствие непрочитанных после чтения второго сообщения, получено %d", unreadCount)
 	}
 
-	_, fetchedReadState, _, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, fetchedReadState, _, _, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestMarkDirectChatReadHonorsPrivacyFlag(t *testing.T) {
 		t.Fatalf("ожидалось отсутствие непрочитанных после чтения, получено %d", unreadCount)
 	}
 
-	bobChat, bobReadState, _, _, err := service.GetDirectChat(context.Background(), bob.Token, directChat.ID)
+	bobChat, bobReadState, _, _, _, err := service.GetDirectChat(context.Background(), bob.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat as Bob: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestMarkDirectChatReadHonorsPrivacyFlag(t *testing.T) {
 		t.Fatal("Bob должен видеть собственную read position независимо от privacy flag")
 	}
 
-	_, fetchedReadState, _, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, fetchedReadState, _, _, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestDirectUnreadCountIsViewerRelativeAndExcludesSelfMessages(t *testing.T) 
 		t.Fatalf("ожидалось 2 непрочитанных для Bob, получено %d", chats[0].UnreadCount)
 	}
 
-	chatSnapshot, _, _, _, err := service.GetDirectChat(context.Background(), bob.Token, directChat.ID)
+	chatSnapshot, _, _, _, _, err := service.GetDirectChat(context.Background(), bob.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat: %v", err)
 	}
@@ -228,6 +228,88 @@ func TestDirectUnreadCountIsViewerRelativeAndExcludesSelfMessages(t *testing.T) 
 	}
 }
 
+func TestEncryptedDirectUnreadCountAndReadProgressionAreViewerRelative(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
+		ChatID:               directChat.ID,
+		MessageID:            testUUID(701),
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedDirectMessageV2OperationContent,
+		Revision:             1,
+		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: aliceSender.ID,
+				TransportHeader:         []byte("self-header"),
+				Ciphertext:              []byte("self-ciphertext"),
+			},
+			{
+				RecipientCryptoDeviceID: bobFirst.ID,
+				TransportHeader:         []byte("bob-header"),
+				Ciphertext:              []byte("bob-ciphertext"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("send encrypted direct message: %v", err)
+	}
+
+	bobChats, err := service.ListDirectChats(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list direct chats as Bob: %v", err)
+	}
+	if len(bobChats) != 1 || bobChats[0].EncryptedUnreadCount != 1 {
+		t.Fatalf("ожидался один encrypted unread у Bob, получено %+v", bobChats)
+	}
+
+	bobChat, _, encryptedReadState, _, _, err := service.GetDirectChat(context.Background(), bob.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat as Bob: %v", err)
+	}
+	if bobChat.EncryptedUnreadCount != 1 {
+		t.Fatalf("ожидался encrypted unread count 1 в snapshot, получено %d", bobChat.EncryptedUnreadCount)
+	}
+	if encryptedReadState != nil && encryptedReadState.SelfPosition != nil {
+		t.Fatalf("до mark read не ожидалась encrypted self position, получено %+v", encryptedReadState)
+	}
+
+	bobView, err := service.ListEncryptedDirectMessageV2(context.Background(), bob.Token, directChat.ID, bobFirst.ID, 0)
+	if err != nil {
+		t.Fatalf("list encrypted direct messages as Bob: %v", err)
+	}
+	if len(bobView) != 1 || bobView[0].ViewerDelivery.UnreadCount != 1 {
+		t.Fatalf("ожидался один viewer delivery с unread=1, получено %+v", bobView)
+	}
+
+	encryptedReadState, unreadCount, err := service.MarkEncryptedDirectChatRead(context.Background(), bob.Token, directChat.ID, receipt.MessageID)
+	if err != nil {
+		t.Fatalf("mark encrypted direct chat read: %v", err)
+	}
+	if encryptedReadState == nil || encryptedReadState.SelfPosition == nil || encryptedReadState.SelfPosition.MessageID != receipt.MessageID {
+		t.Fatalf("ожидалась encrypted self position на message %q, получено %+v", receipt.MessageID, encryptedReadState)
+	}
+	if unreadCount != 0 {
+		t.Fatalf("ожидалось отсутствие encrypted unread после mark read, получено %d", unreadCount)
+	}
+
+	_, _, aliceEncryptedReadState, _, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	if err != nil {
+		t.Fatalf("get direct chat as Alice: %v", err)
+	}
+	if aliceEncryptedReadState == nil || aliceEncryptedReadState.PeerPosition == nil || aliceEncryptedReadState.PeerPosition.MessageID != receipt.MessageID {
+		t.Fatalf("ожидалась peer encrypted read position Bob, получено %+v", aliceEncryptedReadState)
+	}
+}
+
 func TestSetAndClearDirectChatTypingUsesTTL(t *testing.T) {
 	t.Parallel()
 
@@ -252,7 +334,7 @@ func TestSetAndClearDirectChatTypingUsesTTL(t *testing.T) {
 		t.Fatal("ожидался собственный typing state после set")
 	}
 
-	_, _, fetchedTypingState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, _, _, fetchedTypingState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat with typing state: %v", err)
 	}
@@ -262,7 +344,7 @@ func TestSetAndClearDirectChatTypingUsesTTL(t *testing.T) {
 
 	currentTime = currentTime.Add(6 * time.Second)
 
-	_, _, expiredTypingState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, _, _, expiredTypingState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat after typing ttl: %v", err)
 	}
@@ -305,7 +387,7 @@ func TestSetDirectChatTypingHonorsPrivacyFlag(t *testing.T) {
 		t.Fatal("собственный typing state не должен раскрываться при отключённой typing visibility")
 	}
 
-	_, _, fetchedTypingState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, _, _, fetchedTypingState, _, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat after privacy change: %v", err)
 	}
@@ -371,7 +453,7 @@ func TestSetAndClearDirectChatPresenceUsesTTLAndRefresh(t *testing.T) {
 		t.Fatal("refresh heartbeat должен продлевать expires_at")
 	}
 
-	_, _, _, fetchedPresenceState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, _, _, _, fetchedPresenceState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat with presence state: %v", err)
 	}
@@ -381,7 +463,7 @@ func TestSetAndClearDirectChatPresenceUsesTTLAndRefresh(t *testing.T) {
 
 	currentTime = currentTime.Add(31 * time.Second)
 
-	_, _, _, expiredPresenceState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, _, _, _, expiredPresenceState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat after presence ttl: %v", err)
 	}
@@ -424,7 +506,7 @@ func TestSetDirectChatPresenceHeartbeatHonorsPrivacyFlag(t *testing.T) {
 		t.Fatal("собственный presence state не должен раскрываться при отключённой presence visibility")
 	}
 
-	_, _, _, fetchedPresenceState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
+	_, _, _, _, fetchedPresenceState, err := service.GetDirectChat(context.Background(), alice.Token, directChat.ID)
 	if err != nil {
 		t.Fatalf("get direct chat after presence privacy change: %v", err)
 	}
@@ -1105,6 +1187,83 @@ func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *tes
 	}
 }
 
+func TestEncryptedGroupUnreadCountAndReadProgressionAreViewerRelative(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	group := mustCreateGroup(t, service, alice.Token, "Encrypted unread")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	bootstrap, err := service.GetEncryptedGroupBootstrap(context.Background(), alice.Token, group.ID, aliceSender.ID)
+	if err != nil {
+		t.Fatalf("bootstrap encrypted group: %v", err)
+	}
+
+	receipt, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
+		GroupID:              group.ID,
+		MessageID:            testUUID(705),
+		MLSGroupID:           bootstrap.Lane.MLSGroupID,
+		RosterVersion:        bootstrap.Lane.RosterVersion,
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedGroupMessageOperationContent,
+		Revision:             1,
+		Ciphertext:           []byte("group-unread"),
+	})
+	if err != nil {
+		t.Fatalf("send encrypted group message: %v", err)
+	}
+
+	bobGroups, err := service.ListGroups(context.Background(), bob.Token)
+	if err != nil {
+		t.Fatalf("list groups as Bob: %v", err)
+	}
+	if len(bobGroups) != 1 || bobGroups[0].EncryptedUnreadCount != 1 {
+		t.Fatalf("ожидался один encrypted unread у Bob, получено %+v", bobGroups)
+	}
+
+	groupSnapshot, _, _, encryptedReadState, _, err := service.GetGroupChat(context.Background(), bob.Token, group.ID)
+	if err != nil {
+		t.Fatalf("get group chat as Bob: %v", err)
+	}
+	if groupSnapshot.EncryptedUnreadCount != 1 {
+		t.Fatalf("ожидался encrypted unread count 1 в group snapshot, получено %d", groupSnapshot.EncryptedUnreadCount)
+	}
+	if encryptedReadState != nil && encryptedReadState.SelfPosition != nil {
+		t.Fatalf("до mark read не ожидалась encrypted group self position, получено %+v", encryptedReadState)
+	}
+
+	bobView, err := service.ListEncryptedGroupMessages(context.Background(), bob.Token, group.ID, bobFirst.ID, 0)
+	if err != nil {
+		t.Fatalf("list encrypted group messages as Bob: %v", err)
+	}
+	if len(bobView) != 1 || bobView[0].ViewerDelivery.UnreadCount != 1 {
+		t.Fatalf("ожидался один group delivery с unread=1, получено %+v", bobView)
+	}
+
+	encryptedReadState, unreadCount, err := service.MarkEncryptedGroupChatRead(context.Background(), bob.Token, group.ID, receipt.MessageID)
+	if err != nil {
+		t.Fatalf("mark encrypted group read: %v", err)
+	}
+	if encryptedReadState == nil || encryptedReadState.SelfPosition == nil || encryptedReadState.SelfPosition.MessageID != receipt.MessageID {
+		t.Fatalf("ожидалась encrypted group self position на message %q, получено %+v", receipt.MessageID, encryptedReadState)
+	}
+	if unreadCount != 0 {
+		t.Fatalf("ожидалось отсутствие encrypted unread после mark read, получено %d", unreadCount)
+	}
+}
+
 func TestSendEncryptedGroupMessageRejectsStaleRosterVersion(t *testing.T) {
 	t.Parallel()
 
@@ -1663,6 +1822,25 @@ func copyEncryptedGroupMessageDeliveriesForTest(values []EncryptedGroupMessageDe
 			RecipientUserID:         value.RecipientUserID,
 			RecipientCryptoDeviceID: value.RecipientCryptoDeviceID,
 			StoredAt:                value.StoredAt,
+			UnreadCount:             value.UnreadCount,
+		})
+	}
+
+	return result
+}
+
+func copyEncryptedDirectMessageStoredDeliveriesForTest(values []EncryptedDirectMessageV2StoredDelivery) []EncryptedDirectMessageV2StoredDelivery {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]EncryptedDirectMessageV2StoredDelivery, 0, len(values))
+	for _, value := range values {
+		result = append(result, EncryptedDirectMessageV2StoredDelivery{
+			RecipientUserID:         value.RecipientUserID,
+			RecipientCryptoDeviceID: value.RecipientCryptoDeviceID,
+			StoredAt:                value.StoredAt,
+			UnreadCount:             value.UnreadCount,
 		})
 	}
 
@@ -1693,63 +1871,67 @@ type fakeEncryptedGroupMessageRecord struct {
 }
 
 type fakeRepository struct {
-	tokenManager        *libauth.SessionTokenManager
-	sessions            map[string]SessionAuth
-	users               map[string]UserSummary
-	cryptoDevices       map[string]CryptoDevice
-	cryptoBundles       map[string]CryptoDeviceBundle
-	friendships         map[string]bool
-	blocks              map[string]map[string]bool
-	groups              map[string]Group
-	groupThreads        map[string]GroupChatThread
-	groupMembers        map[string]map[string]GroupMember
-	groupInvites        map[string]GroupInviteLink
-	inviteHashes        map[string]string
-	inviteByHash        map[string]string
-	chats               map[string]DirectChat
-	groupMessages       map[string]GroupMessage
-	messages            map[string]DirectChatMessage
-	encryptedMessagesV2 map[string]fakeEncryptedDirectMessageV2Record
-	encryptedGroupLanes map[string]fakeEncryptedGroupLaneRecord
-	encryptedGroupMsgs  map[string]fakeEncryptedGroupMessageRecord
-	readPositions       map[string]DirectChatReadPosition
-	groupReadPositions  map[string]GroupReadPosition
-	typingStore         *fakeTypingStore
-	presenceStore       *fakePresenceStore
-	objectStorage       *fakeObjectStorage
-	attachments         map[string]Attachment
-	uploadSessions      map[string]AttachmentUploadSession
-	touchCalls          int
+	tokenManager                *libauth.SessionTokenManager
+	sessions                    map[string]SessionAuth
+	users                       map[string]UserSummary
+	cryptoDevices               map[string]CryptoDevice
+	cryptoBundles               map[string]CryptoDeviceBundle
+	friendships                 map[string]bool
+	blocks                      map[string]map[string]bool
+	groups                      map[string]Group
+	groupThreads                map[string]GroupChatThread
+	groupMembers                map[string]map[string]GroupMember
+	groupInvites                map[string]GroupInviteLink
+	inviteHashes                map[string]string
+	inviteByHash                map[string]string
+	chats                       map[string]DirectChat
+	groupMessages               map[string]GroupMessage
+	messages                    map[string]DirectChatMessage
+	encryptedMessagesV2         map[string]fakeEncryptedDirectMessageV2Record
+	encryptedGroupLanes         map[string]fakeEncryptedGroupLaneRecord
+	encryptedGroupMsgs          map[string]fakeEncryptedGroupMessageRecord
+	readPositions               map[string]DirectChatReadPosition
+	encryptedReadPositions      map[string]EncryptedConversationReadPosition
+	groupReadPositions          map[string]GroupReadPosition
+	encryptedGroupReadPositions map[string]EncryptedConversationReadPosition
+	typingStore                 *fakeTypingStore
+	presenceStore               *fakePresenceStore
+	objectStorage               *fakeObjectStorage
+	attachments                 map[string]Attachment
+	uploadSessions              map[string]AttachmentUploadSession
+	touchCalls                  int
 }
 
 func newFakeRepository() *fakeRepository {
 	return &fakeRepository{
-		tokenManager:        libauth.NewSessionTokenManager(),
-		sessions:            make(map[string]SessionAuth),
-		users:               make(map[string]UserSummary),
-		cryptoDevices:       make(map[string]CryptoDevice),
-		cryptoBundles:       make(map[string]CryptoDeviceBundle),
-		friendships:         make(map[string]bool),
-		blocks:              make(map[string]map[string]bool),
-		groups:              make(map[string]Group),
-		groupThreads:        make(map[string]GroupChatThread),
-		groupMembers:        make(map[string]map[string]GroupMember),
-		groupInvites:        make(map[string]GroupInviteLink),
-		inviteHashes:        make(map[string]string),
-		inviteByHash:        make(map[string]string),
-		chats:               make(map[string]DirectChat),
-		groupMessages:       make(map[string]GroupMessage),
-		messages:            make(map[string]DirectChatMessage),
-		encryptedMessagesV2: make(map[string]fakeEncryptedDirectMessageV2Record),
-		encryptedGroupLanes: make(map[string]fakeEncryptedGroupLaneRecord),
-		encryptedGroupMsgs:  make(map[string]fakeEncryptedGroupMessageRecord),
-		readPositions:       make(map[string]DirectChatReadPosition),
-		groupReadPositions:  make(map[string]GroupReadPosition),
-		typingStore:         newFakeTypingStore(),
-		presenceStore:       newFakePresenceStore(),
-		objectStorage:       newFakeObjectStorage(),
-		attachments:         make(map[string]Attachment),
-		uploadSessions:      make(map[string]AttachmentUploadSession),
+		tokenManager:                libauth.NewSessionTokenManager(),
+		sessions:                    make(map[string]SessionAuth),
+		users:                       make(map[string]UserSummary),
+		cryptoDevices:               make(map[string]CryptoDevice),
+		cryptoBundles:               make(map[string]CryptoDeviceBundle),
+		friendships:                 make(map[string]bool),
+		blocks:                      make(map[string]map[string]bool),
+		groups:                      make(map[string]Group),
+		groupThreads:                make(map[string]GroupChatThread),
+		groupMembers:                make(map[string]map[string]GroupMember),
+		groupInvites:                make(map[string]GroupInviteLink),
+		inviteHashes:                make(map[string]string),
+		inviteByHash:                make(map[string]string),
+		chats:                       make(map[string]DirectChat),
+		groupMessages:               make(map[string]GroupMessage),
+		messages:                    make(map[string]DirectChatMessage),
+		encryptedMessagesV2:         make(map[string]fakeEncryptedDirectMessageV2Record),
+		encryptedGroupLanes:         make(map[string]fakeEncryptedGroupLaneRecord),
+		encryptedGroupMsgs:          make(map[string]fakeEncryptedGroupMessageRecord),
+		readPositions:               make(map[string]DirectChatReadPosition),
+		encryptedReadPositions:      make(map[string]EncryptedConversationReadPosition),
+		groupReadPositions:          make(map[string]GroupReadPosition),
+		encryptedGroupReadPositions: make(map[string]EncryptedConversationReadPosition),
+		typingStore:                 newFakeTypingStore(),
+		presenceStore:               newFakePresenceStore(),
+		objectStorage:               newFakeObjectStorage(),
+		attachments:                 make(map[string]Attachment),
+		uploadSessions:              make(map[string]AttachmentUploadSession),
 	}
 }
 
@@ -1864,6 +2046,28 @@ func (r *fakeRepository) ListDirectChatReadStateEntries(_ context.Context, userI
 			ReadReceiptsEnabled: participant.ReadReceiptsEnabled,
 		}
 		if position, ok := r.readPositions[readPositionKey(chatID, participant.ID)]; ok {
+			copy := position
+			entry.LastReadPosition = &copy
+		}
+		result = append(result, entry)
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) ListEncryptedDirectChatReadStateEntries(_ context.Context, userID string, chatID string) ([]EncryptedDirectChatReadStateEntry, error) {
+	directChat, ok := r.chats[chatID]
+	if !ok || !isParticipant(directChat, userID) {
+		return nil, ErrNotFound
+	}
+
+	result := make([]EncryptedDirectChatReadStateEntry, 0, len(directChat.Participants))
+	for _, participant := range directChat.Participants {
+		entry := EncryptedDirectChatReadStateEntry{
+			UserID:              participant.ID,
+			ReadReceiptsEnabled: participant.ReadReceiptsEnabled,
+		}
+		if position, ok := r.encryptedReadPositions[readPositionKey(chatID, participant.ID)]; ok {
 			copy := position
 			entry.LastReadPosition = &copy
 		}
@@ -2057,6 +2261,57 @@ func (r *fakeRepository) UpsertGroupChatReadState(_ context.Context, params Upse
 	return true, nil
 }
 
+func (r *fakeRepository) UpsertEncryptedDirectChatReadState(_ context.Context, params UpsertEncryptedDirectChatReadStateParams) (bool, error) {
+	directChat, ok := r.chats[params.ChatID]
+	if !ok || !isParticipant(directChat, params.UserID) {
+		return false, ErrNotFound
+	}
+
+	key := readPositionKey(params.ChatID, params.UserID)
+	position := EncryptedConversationReadPosition{
+		MessageID:        params.LastReadMessageID,
+		MessageCreatedAt: params.LastReadMessageAt,
+		UpdatedAt:        params.UpdatedAt,
+	}
+	current, ok := r.encryptedReadPositions[key]
+	if ok {
+		if current.MessageCreatedAt.After(position.MessageCreatedAt) {
+			return false, nil
+		}
+		if current.MessageCreatedAt.Equal(position.MessageCreatedAt) && strings.Compare(current.MessageID, position.MessageID) >= 0 {
+			return false, nil
+		}
+	}
+
+	r.encryptedReadPositions[key] = position
+	return true, nil
+}
+
+func (r *fakeRepository) UpsertEncryptedGroupReadState(_ context.Context, params UpsertEncryptedGroupReadStateParams) (bool, error) {
+	if _, ok := r.groupMembers[params.GroupID][params.UserID]; !ok {
+		return false, ErrNotFound
+	}
+
+	key := groupReadPositionKey(params.GroupID, params.UserID)
+	position := EncryptedConversationReadPosition{
+		MessageID:        params.LastReadMessageID,
+		MessageCreatedAt: params.LastReadMessageAt,
+		UpdatedAt:        params.UpdatedAt,
+	}
+	current, ok := r.encryptedGroupReadPositions[key]
+	if ok {
+		if current.MessageCreatedAt.After(position.MessageCreatedAt) {
+			return false, nil
+		}
+		if current.MessageCreatedAt.Equal(position.MessageCreatedAt) && strings.Compare(current.MessageID, position.MessageID) >= 0 {
+			return false, nil
+		}
+	}
+
+	r.encryptedGroupReadPositions[key] = position
+	return true, nil
+}
+
 func (r *fakeRepository) CreateDirectChat(_ context.Context, params CreateDirectChatParams) (*DirectChat, error) {
 	key := pairKey(params.FirstUserID, params.SecondUserID)
 	for _, directChat := range r.chats {
@@ -2086,6 +2341,7 @@ func (r *fakeRepository) ListDirectChats(_ context.Context, userID string) ([]Di
 	for _, directChat := range r.chats {
 		if isParticipant(directChat, userID) {
 			directChat.UnreadCount = r.directUnreadCount(directChat.ID, userID)
+			directChat.EncryptedUnreadCount = r.encryptedDirectUnreadCount(directChat.ID, userID)
 			result = append(result, directChat)
 		}
 	}
@@ -2101,6 +2357,7 @@ func (r *fakeRepository) GetDirectChat(_ context.Context, userID string, chatID 
 
 	copy := directChat
 	copy.UnreadCount = r.directUnreadCount(chatID, userID)
+	copy.EncryptedUnreadCount = r.encryptedDirectUnreadCount(chatID, userID)
 	return &copy, nil
 }
 
@@ -2412,6 +2669,7 @@ func (r *fakeRepository) ListGroups(_ context.Context, userID string) ([]Group, 
 		group.SelfWriteRestricted = member.IsWriteRestricted
 		group.MemberCount = int32(len(memberships))
 		group.UnreadCount = r.groupUnreadCount(groupID, userID)
+		group.EncryptedUnreadCount = r.encryptedGroupUnreadCount(groupID, userID)
 		result = append(result, group)
 	}
 
@@ -2432,6 +2690,7 @@ func (r *fakeRepository) GetGroup(_ context.Context, userID string, groupID stri
 	group.SelfWriteRestricted = member.IsWriteRestricted
 	group.MemberCount = int32(len(r.groupMembers[groupID]))
 	group.UnreadCount = r.groupUnreadCount(groupID, userID)
+	group.EncryptedUnreadCount = r.encryptedGroupUnreadCount(groupID, userID)
 	copy := group
 	return &copy, nil
 }
@@ -2460,6 +2719,23 @@ func (r *fakeRepository) GetGroupReadStateEntry(_ context.Context, userID string
 		UserID:  userID,
 	}
 	if position, ok := r.groupReadPositions[groupReadPositionKey(groupID, userID)]; ok {
+		copy := position
+		entry.LastReadPosition = &copy
+	}
+
+	return entry, nil
+}
+
+func (r *fakeRepository) GetEncryptedGroupReadStateEntry(_ context.Context, userID string, groupID string) (*EncryptedGroupReadStateEntry, error) {
+	if _, ok := r.groupMembers[groupID][userID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	entry := &EncryptedGroupReadStateEntry{
+		GroupID: groupID,
+		UserID:  userID,
+	}
+	if position, ok := r.encryptedGroupReadPositions[groupReadPositionKey(groupID, userID)]; ok {
 		copy := position
 		entry.LastReadPosition = &copy
 	}
@@ -2904,10 +3180,19 @@ func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, param
 			CreatedAt:            params.CreatedAt,
 			StoredAt:             params.StoredAt,
 			StoredDeliveryCount:  uint32(len(params.Deliveries)),
+			StoredDeliveries:     make([]EncryptedDirectMessageV2StoredDelivery, 0, len(params.Deliveries)),
 		},
 		Deliveries: make(map[string]EncryptedDirectMessageV2Delivery, len(params.Deliveries)),
 	}
 	for _, delivery := range params.Deliveries {
+		unreadCount := r.encryptedDirectUnreadCountForDelivery(
+			params.ChatID,
+			delivery.RecipientUserID,
+			delivery.RecipientUserID != params.SenderUserID,
+			params.CreatedAt,
+			params.MessageID,
+			params.OperationKind,
+		)
 		storedDelivery := EncryptedDirectMessageV2Delivery{
 			RecipientUserID:         delivery.RecipientUserID,
 			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
@@ -2915,8 +3200,15 @@ func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, param
 			Ciphertext:              append([]byte(nil), delivery.Ciphertext...),
 			CiphertextSizeBytes:     delivery.CiphertextSizeBytes,
 			StoredAt:                params.StoredAt,
+			UnreadCount:             unreadCount,
 		}
 		record.Deliveries[delivery.RecipientCryptoDeviceID] = storedDelivery
+		record.Envelope.StoredDeliveries = append(record.Envelope.StoredDeliveries, EncryptedDirectMessageV2StoredDelivery{
+			RecipientUserID:         delivery.RecipientUserID,
+			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
+			StoredAt:                params.StoredAt,
+			UnreadCount:             unreadCount,
+		})
 	}
 
 	r.encryptedMessagesV2[params.MessageID] = record
@@ -2925,6 +3217,7 @@ func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, param
 
 	envelopeCopy := record.Envelope
 	envelopeCopy.TargetMessageID = cloneStringPointerForTest(record.Envelope.TargetMessageID)
+	envelopeCopy.StoredDeliveries = copyEncryptedDirectMessageStoredDeliveriesForTest(record.Envelope.StoredDeliveries)
 	return &envelopeCopy, nil
 }
 
@@ -2939,10 +3232,19 @@ func (r *fakeRepository) CreateEncryptedGroupMessage(_ context.Context, params C
 	storedDeliveries := make([]EncryptedGroupMessageDelivery, 0, len(params.Deliveries))
 	deliveries := make(map[string]EncryptedGroupMessageDelivery, len(params.Deliveries))
 	for _, delivery := range params.Deliveries {
+		unreadCount := r.encryptedGroupUnreadCountForDelivery(
+			params.GroupID,
+			delivery.RecipientUserID,
+			delivery.RecipientUserID != params.SenderUserID,
+			params.CreatedAt,
+			params.MessageID,
+			params.OperationKind,
+		)
 		storedDelivery := EncryptedGroupMessageDelivery{
 			RecipientUserID:         delivery.RecipientUserID,
 			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
 			StoredAt:                params.StoredAt,
+			UnreadCount:             unreadCount,
 		}
 		deliveries[delivery.RecipientCryptoDeviceID] = storedDelivery
 		storedDeliveries = append(storedDeliveries, storedDelivery)
@@ -3079,6 +3381,7 @@ func (r *fakeRepository) ListEncryptedDirectMessageV2(_ context.Context, userID 
 				Ciphertext:              append([]byte(nil), delivery.Ciphertext...),
 				CiphertextSizeBytes:     delivery.CiphertextSizeBytes,
 				StoredAt:                delivery.StoredAt,
+				UnreadCount:             delivery.UnreadCount,
 			},
 		})
 	}
@@ -3119,6 +3422,7 @@ func (r *fakeRepository) GetEncryptedDirectMessageV2Stored(_ context.Context, ch
 	}
 
 	copy := record.Envelope
+	copy.StoredDeliveries = copyEncryptedDirectMessageStoredDeliveriesForTest(record.Envelope.StoredDeliveries)
 	return &copy, nil
 }
 
@@ -3156,6 +3460,7 @@ func (r *fakeRepository) ListEncryptedGroupMessages(_ context.Context, userID st
 				RecipientUserID:         delivery.RecipientUserID,
 				RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
 				StoredAt:                delivery.StoredAt,
+				UnreadCount:             delivery.UnreadCount,
 			},
 		})
 	}
@@ -3712,6 +4017,84 @@ func (r *fakeRepository) groupUnreadCount(groupID string, userID string) int32 {
 	return count
 }
 
+func (r *fakeRepository) encryptedDirectUnreadCount(chatID string, userID string) int32 {
+	var readPosition *EncryptedConversationReadPosition
+	if position, ok := r.encryptedReadPositions[readPositionKey(chatID, userID)]; ok {
+		copy := position
+		readPosition = &copy
+	}
+
+	var count int32
+	for _, record := range r.encryptedMessagesV2 {
+		if record.Envelope.ChatID != chatID || record.Envelope.SenderUserID == userID {
+			continue
+		}
+		if !isEncryptedDirectContentOperation(record.Envelope.OperationKind) {
+			continue
+		}
+		if isEncryptedMessageNewerThanReadPosition(record.Envelope.MessageID, record.Envelope.CreatedAt, readPosition) {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (r *fakeRepository) encryptedGroupUnreadCount(groupID string, userID string) int32 {
+	var readPosition *EncryptedConversationReadPosition
+	if position, ok := r.encryptedGroupReadPositions[groupReadPositionKey(groupID, userID)]; ok {
+		copy := position
+		readPosition = &copy
+	}
+
+	var count int32
+	for _, record := range r.encryptedGroupMsgs {
+		if record.Envelope.GroupID != groupID || record.Envelope.SenderUserID == userID {
+			continue
+		}
+		if !isEncryptedGroupContentOperation(record.Envelope.OperationKind) {
+			continue
+		}
+		if isEncryptedMessageNewerThanReadPosition(record.Envelope.MessageID, record.Envelope.CreatedAt, readPosition) {
+			count++
+		}
+	}
+
+	return count
+}
+
+func (r *fakeRepository) encryptedDirectUnreadCountForDelivery(
+	chatID string,
+	userID string,
+	shouldIncrement bool,
+	createdAt time.Time,
+	messageID string,
+	operation string,
+) int32 {
+	count := r.encryptedDirectUnreadCount(chatID, userID)
+	if shouldIncrement && operation == EncryptedDirectMessageV2OperationContent && isEncryptedMessageNewerThanReadPosition(messageID, createdAt, encryptedReadPositionForTest(r.encryptedReadPositions, readPositionKey(chatID, userID))) {
+		count++
+	}
+
+	return count
+}
+
+func (r *fakeRepository) encryptedGroupUnreadCountForDelivery(
+	groupID string,
+	userID string,
+	shouldIncrement bool,
+	createdAt time.Time,
+	messageID string,
+	operation string,
+) int32 {
+	count := r.encryptedGroupUnreadCount(groupID, userID)
+	if shouldIncrement && operation == EncryptedGroupMessageOperationContent && isEncryptedMessageNewerThanReadPosition(messageID, createdAt, encryptedReadPositionForTest(r.encryptedGroupReadPositions, groupReadPositionKey(groupID, userID))) {
+		count++
+	}
+
+	return count
+}
+
 func (r *fakeRepository) countActiveGroupMemberships(userID string) int {
 	count := 0
 	for _, memberships := range r.groupMembers {
@@ -3749,6 +4132,45 @@ func isGroupMessageNewerThanReadPosition(message GroupMessage, readPosition *Gro
 	}
 
 	return false
+}
+
+func encryptedReadPositionForTest(
+	store map[string]EncryptedConversationReadPosition,
+	key string,
+) *EncryptedConversationReadPosition {
+	position, ok := store[key]
+	if !ok {
+		return nil
+	}
+
+	copy := position
+	return &copy
+}
+
+func isEncryptedMessageNewerThanReadPosition(
+	messageID string,
+	createdAt time.Time,
+	readPosition *EncryptedConversationReadPosition,
+) bool {
+	if readPosition == nil {
+		return true
+	}
+	if createdAt.After(readPosition.MessageCreatedAt) {
+		return true
+	}
+	if createdAt.Equal(readPosition.MessageCreatedAt) && strings.Compare(messageID, readPosition.MessageID) > 0 {
+		return true
+	}
+
+	return false
+}
+
+func isEncryptedDirectContentOperation(operation string) bool {
+	return operation == EncryptedDirectMessageV2OperationContent
+}
+
+func isEncryptedGroupContentOperation(operation string) bool {
+	return operation == EncryptedGroupMessageOperationContent
 }
 
 type fakeTypingStore struct {

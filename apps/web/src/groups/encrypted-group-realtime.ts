@@ -24,6 +24,9 @@ export interface EncryptedGroupRealtimeEvent {
       recipientUserId: string;
       recipientCryptoDeviceId: string;
       storedAt: string;
+      unreadState: {
+        unreadCount: number;
+      } | null;
     };
   };
 }
@@ -105,6 +108,7 @@ export function parseEncryptedGroupRealtimeEvent(
         recipientUserId,
         recipientCryptoDeviceId,
         storedAt: viewerStoredAt,
+        unreadState: readUnreadState(payload.envelope.viewerDelivery.unreadState),
       },
     },
   };
@@ -161,4 +165,17 @@ function readRequiredNumber(value: unknown): number | null {
   }
 
   return value;
+}
+
+function readUnreadState(value: unknown): { unreadCount: number } | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const unreadCount = readRequiredNumber(value.unreadCount);
+  if (unreadCount === null) {
+    return null;
+  }
+
+  return { unreadCount };
 }

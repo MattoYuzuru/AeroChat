@@ -1308,6 +1308,7 @@ describe("createGatewayClient", () => {
           ciphertext: "cipher-1",
           ciphertextSizeBytes: 8,
           storedAt: "2026-03-22T12:00:01Z",
+          unreadState: null,
         },
       },
     ]);
@@ -1577,6 +1578,7 @@ describe("createGatewayClient", () => {
           recipientUserId: "user-2",
           recipientCryptoDeviceId: "crypto-2",
           storedAt: "2026-03-22T12:00:01Z",
+          unreadState: null,
         },
       },
     ]);
@@ -1644,6 +1646,7 @@ describe("createGatewayClient", () => {
       createdAt: "2026-03-22T12:00:00Z",
       storedAt: "2026-03-22T12:00:01Z",
       storedDeliveryCount: 2,
+      storedDeliveries: [],
     });
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/aerochat.chat.v1.ChatService/SendEncryptedDirectMessageV2",

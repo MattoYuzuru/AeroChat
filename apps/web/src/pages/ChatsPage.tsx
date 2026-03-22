@@ -41,13 +41,16 @@ import type { CryptoContextState } from "../crypto/runtime-context";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { useChats } from "../chats/useChats";
 import { gatewayClient } from "../gateway/runtime";
-import type {
-  ChatUser,
-  DirectChat,
-  DirectChatMessage,
-  DirectChatPresenceState,
-  DirectChatReadState,
-  DirectChatTypingState,
+import {
+  describeGatewayError,
+  isGatewayErrorCode,
+  type ChatUser,
+  type DirectChat,
+  type DirectChatMessage,
+  type DirectChatPresenceState,
+  type DirectChatReadState,
+  type DirectChatTypingState,
+  type EncryptedDirectChatReadState,
 } from "../gateway/types";
 import {
   clearSearchJumpParams,
@@ -76,6 +79,7 @@ export function ChatsPage() {
   const pendingPeerRef = useRef<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const isPageVisible = usePageVisibility();
   const sessionToken =
     authState.status === "authenticated" ? authState.token : "";
   const chats = useChats({
@@ -115,6 +119,15 @@ export function ChatsPage() {
   const discardVideoNoteRecording = useEffectEvent(() => {
     videoNoteRecorder.discardRecording();
   });
+  const applyEncryptedReadState = useEffectEvent(
+    (
+      chatId: string,
+      readState: EncryptedDirectChatReadState | null,
+      unreadCount: number,
+    ) => {
+      chats.replaceEncryptedReadState(chatId, readState, unreadCount);
+    },
+  );
 
   const requestedChatId = searchParams.get("chat")?.trim() ?? "";
   const requestedPeerUserId = searchParams.get("peer")?.trim() ?? "";
@@ -227,6 +240,74 @@ export function ChatsPage() {
     token: sessionToken,
     chatId: selectedThread?.chat.id ?? null,
   });
+  const encryptedMessageEntries = encryptedLane.items.filter(
+    (
+      item,
+    ): item is EncryptedDirectMessageV2ProjectedMessageEntry => item.kind === "message",
+  );
+  const latestEncryptedMessage = encryptedMessageEntries.at(-1) ?? null;
+  const activeEncryptedDirectChatId = selectedThread?.chat.id ?? null;
+  const shouldAutoMarkEncryptedRead =
+    authState.status === "authenticated" &&
+    isThreadRouteActive &&
+    isPageVisible &&
+    selectedThread !== null &&
+    encryptedLane.status === "ready" &&
+    latestEncryptedMessage !== null &&
+    latestEncryptedMessage.senderUserId !== authState.profile.id &&
+    selectedThread.encryptedReadState?.selfPosition?.messageId !== latestEncryptedMessage.messageId;
+
+  useEffect(() => {
+    if (
+      !shouldAutoMarkEncryptedRead ||
+      activeEncryptedDirectChatId === null ||
+      latestEncryptedMessage === null
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void gatewayClient
+      .markEncryptedDirectChatRead(
+        sessionToken,
+        activeEncryptedDirectChatId,
+        latestEncryptedMessage.messageId,
+      )
+      .then((readUpdate) => {
+        if (cancelled) {
+          return;
+        }
+
+        applyEncryptedReadState(
+          activeEncryptedDirectChatId,
+          readUpdate.readState,
+          readUpdate.unreadCount,
+        );
+      })
+      .catch((error) => {
+        const message = describeGatewayError(
+          error,
+          "Не удалось обновить encrypted read state через gateway.",
+        );
+        if (isGatewayErrorCode(error, "unauthenticated")) {
+          expireSession();
+          return;
+        }
+
+        setComposerError(message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeEncryptedDirectChatId,
+    expireSession,
+    latestEncryptedMessage,
+    sessionToken,
+    shouldAutoMarkEncryptedRead,
+  ]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -248,11 +329,6 @@ export function ChatsPage() {
   const encryptedMessageCount = encryptedLane.items.filter(
     (item) => item.kind === "message",
   ).length;
-  const encryptedMessageEntries = encryptedLane.items.filter(
-    (
-      item,
-    ): item is EncryptedDirectMessageV2ProjectedMessageEntry => item.kind === "message",
-  );
   const encryptedMessageIndex = new Map(
     encryptedMessageEntries.map((item) => [item.messageId, item] as const),
   );
@@ -351,7 +427,6 @@ export function ChatsPage() {
     isEditingEncryptedMessage: editingEncryptedEntry !== null,
     cryptoRuntimeState: cryptoRuntime.state,
   });
-
   async function submitComposer() {
     if (selectedEncryptedReplyEntry !== null || editingEncryptedEntry !== null) {
       setComposerError(
@@ -765,6 +840,7 @@ export function ChatsPage() {
         <div className={styles.metrics}>
           <Metric label="Чаты" value={chats.state.chats.length} />
           <Metric label="В thread" value={selectedThread?.messages.length ?? 0} />
+          <Metric label="Encrypted unread" value={selectedThread?.chat.encryptedUnreadCount ?? 0} />
           <Metric label="Закреплено" value={pinnedMessages.length} />
         </div>
 
@@ -883,6 +959,11 @@ export function ChatsPage() {
                           {chat.unreadCount > 0 && (
                             <span className={styles.statusBadge} data-tone="accent">
                               Непрочитано: {chat.unreadCount}
+                            </span>
+                          )}
+                          {chat.encryptedUnreadCount > 0 && (
+                            <span className={styles.statusBadge} data-tone="accent">
+                              Encrypted unread: {chat.encryptedUnreadCount}
                             </span>
                           )}
                           {chat.pinnedMessageIds.length > 0 && (
@@ -1094,13 +1175,20 @@ export function ChatsPage() {
                       <p className={styles.cardLabel}>Encrypted DM v2</p>
                       <h3 className={styles.blockTitle}>Локальная decrypted projection</h3>
                     </div>
-                    <span className={styles.metaTag}>
-                      {encryptedLane.status === "ready"
-                        ? `${encryptedMessageCount} msg / ${encryptedFailureCount} fail`
-                        : encryptedLane.status === "unavailable"
-                          ? "Недоступно"
-                          : "Подготавливаем"}
-                    </span>
+                    <div className={styles.headerActions}>
+                      {selectedThread.chat.encryptedUnreadCount > 0 && (
+                        <span className={styles.statusBadge} data-tone="accent">
+                          Encrypted unread: {selectedThread.chat.encryptedUnreadCount}
+                        </span>
+                      )}
+                      <span className={styles.metaTag}>
+                        {encryptedLane.status === "ready"
+                          ? `${encryptedMessageCount} msg / ${encryptedFailureCount} fail`
+                          : encryptedLane.status === "unavailable"
+                            ? "Недоступно"
+                            : "Подготавливаем"}
+                      </span>
+                    </div>
                   </div>
 
                   <p className={styles.encryptedLaneDescription}>
@@ -2412,4 +2500,31 @@ function formatDateTime(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function usePageVisibility(): boolean {
+  const [isPageVisible, setIsPageVisible] = useState(() => {
+    if (typeof document === "undefined") {
+      return true;
+    }
+
+    return document.visibilityState !== "hidden";
+  });
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState !== "hidden");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  return isPageVisible;
 }

@@ -104,6 +104,23 @@ SELECT
               )
           )
     ), 0)::INT AS unread_count,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM direct_chat_encrypted_messages_v2 AS m
+        LEFT JOIN direct_chat_encrypted_read_states_v1 AS self_read
+            ON self_read.chat_id = c.id AND self_read.user_id = self.user_id
+        WHERE m.chat_id = c.id
+          AND m.operation_kind = 'content'
+          AND m.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR m.created_at > self_read.last_read_message_created_at
+              OR (
+                  m.created_at = self_read.last_read_message_created_at
+                  AND m.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS encrypted_unread_count,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
@@ -141,6 +158,23 @@ SELECT
               )
           )
     ), 0)::INT AS unread_count,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM direct_chat_encrypted_messages_v2 AS m
+        LEFT JOIN direct_chat_encrypted_read_states_v1 AS self_read
+            ON self_read.chat_id = c.id AND self_read.user_id = self.user_id
+        WHERE m.chat_id = c.id
+          AND m.operation_kind = 'content'
+          AND m.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR m.created_at > self_read.last_read_message_created_at
+              OR (
+                  m.created_at = self_read.last_read_message_created_at
+                  AND m.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS encrypted_unread_count,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
@@ -235,6 +269,23 @@ SELECT
     ), 0)::INT AS unread_count,
     COALESCE((
         SELECT COUNT(*)::INT
+        FROM group_encrypted_messages_v1 AS gm
+        LEFT JOIN group_encrypted_read_states_v1 AS self_read
+            ON self_read.group_id = g.id AND self_read.user_id = self.user_id
+        WHERE gm.group_id = g.id
+          AND gm.operation_kind = 'content'
+          AND gm.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR gm.created_at > self_read.last_read_message_created_at
+              OR (
+                  gm.created_at = self_read.last_read_message_created_at
+                  AND gm.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS encrypted_unread_count,
+    COALESCE((
+        SELECT COUNT(*)::INT
         FROM group_memberships AS members
         WHERE members.group_id = g.id
     ), 0)::INT AS member_count
@@ -270,6 +321,23 @@ SELECT
               )
           )
     ), 0)::INT AS unread_count,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM group_encrypted_messages_v1 AS gm
+        LEFT JOIN group_encrypted_read_states_v1 AS self_read
+            ON self_read.group_id = g.id AND self_read.user_id = self.user_id
+        WHERE gm.group_id = g.id
+          AND gm.operation_kind = 'content'
+          AND gm.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR gm.created_at > self_read.last_read_message_created_at
+              OR (
+                  gm.created_at = self_read.last_read_message_created_at
+                  AND gm.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS encrypted_unread_count,
     COALESCE((
         SELECT COUNT(*)::INT
         FROM group_memberships AS members
@@ -569,6 +637,18 @@ LEFT JOIN group_chat_read_states AS r
     ON r.group_id = self.group_id AND r.user_id = self.user_id
 WHERE self.user_id = $1 AND self.group_id = $2;
 
+-- name: GetEncryptedGroupReadStateEntryByGroupIDAndUserID :one
+SELECT
+    self.group_id,
+    self.user_id,
+    r.last_read_message_id,
+    r.last_read_message_created_at,
+    r.updated_at
+FROM group_memberships AS self
+LEFT JOIN group_encrypted_read_states_v1 AS r
+    ON r.group_id = self.group_id AND r.user_id = self.user_id
+WHERE self.user_id = $1 AND self.group_id = $2;
+
 -- name: ListDirectChatReadStateEntries :many
 SELECT
     p.user_id,
@@ -580,6 +660,20 @@ FROM direct_chat_participants AS self
 JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
 JOIN users AS u ON u.id = p.user_id
 LEFT JOIN direct_chat_read_receipts AS r ON r.chat_id = p.chat_id AND r.user_id = p.user_id
+WHERE self.user_id = $1 AND self.chat_id = $2
+ORDER BY p.joined_at ASC, p.user_id ASC;
+
+-- name: ListEncryptedDirectChatReadStateEntries :many
+SELECT
+    p.user_id,
+    u.read_receipts_enabled,
+    r.last_read_message_id,
+    r.last_read_message_created_at,
+    r.updated_at
+FROM direct_chat_participants AS self
+JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
+JOIN users AS u ON u.id = p.user_id
+LEFT JOIN direct_chat_encrypted_read_states_v1 AS r ON r.chat_id = p.chat_id AND r.user_id = p.user_id
 WHERE self.user_id = $1 AND self.chat_id = $2
 ORDER BY p.joined_at ASC, p.user_id ASC;
 
@@ -1445,6 +1539,25 @@ WHERE direct_chat_read_receipts.last_read_message_created_at < EXCLUDED.last_rea
         AND direct_chat_read_receipts.last_read_message_id < EXCLUDED.last_read_message_id
    );
 
+-- name: UpsertEncryptedDirectChatReadState :execrows
+INSERT INTO direct_chat_encrypted_read_states_v1 (
+    chat_id,
+    user_id,
+    last_read_message_id,
+    last_read_message_created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (chat_id, user_id) DO UPDATE
+SET
+    last_read_message_id = EXCLUDED.last_read_message_id,
+    last_read_message_created_at = EXCLUDED.last_read_message_created_at,
+    updated_at = EXCLUDED.updated_at
+WHERE direct_chat_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
+   OR (
+        direct_chat_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
+        AND direct_chat_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
+   );
+
 -- name: ListDirectChatEncryptedMessageV2ByDevice :many
 SELECT
     m.id,
@@ -1603,6 +1716,25 @@ WHERE group_chat_read_states.last_read_message_created_at < EXCLUDED.last_read_m
    OR (
         group_chat_read_states.last_read_message_created_at = EXCLUDED.last_read_message_created_at
         AND group_chat_read_states.last_read_message_id < EXCLUDED.last_read_message_id
+   );
+
+-- name: UpsertEncryptedGroupReadState :execrows
+INSERT INTO group_encrypted_read_states_v1 (
+    group_id,
+    user_id,
+    last_read_message_id,
+    last_read_message_created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+    last_read_message_id = EXCLUDED.last_read_message_id,
+    last_read_message_created_at = EXCLUDED.last_read_message_created_at,
+    updated_at = EXCLUDED.updated_at
+WHERE group_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
+   OR (
+        group_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
+        AND group_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
    );
 
 -- name: CreateDirectChatMessageTombstone :execrows

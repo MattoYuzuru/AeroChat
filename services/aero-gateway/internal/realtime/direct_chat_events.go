@@ -29,9 +29,11 @@ type DirectChatMessageUpdatedPayload struct {
 
 // DirectChatReadUpdatedPayload доставляет viewer-relative read state для конкретного пользователя.
 type DirectChatReadUpdatedPayload struct {
-	ChatID    string                     `json:"chatId"`
-	ReadState *directChatReadStateWire   `json:"readState,omitempty"`
-	Unread    *directChatUnreadStateWire `json:"unread,omitempty"`
+	ChatID             string                     `json:"chatId"`
+	ReadState          *directChatReadStateWire   `json:"readState,omitempty"`
+	Unread             *directChatUnreadStateWire `json:"unread,omitempty"`
+	EncryptedReadState *directChatReadStateWire   `json:"encryptedReadState,omitempty"`
+	EncryptedUnread    *encryptedUnreadStateWire  `json:"encryptedUnread,omitempty"`
 }
 
 // DirectChatTypingUpdatedPayload доставляет viewer-relative typing state для конкретного пользователя.
@@ -54,11 +56,19 @@ func NewDirectChatMessageUpdatedEnvelope(reason string, chat *chatv1.DirectChat,
 	})
 }
 
-func NewDirectChatReadUpdatedEnvelope(chatID string, readState *chatv1.DirectChatReadState, unreadState *chatv1.DirectChatUnreadState) Envelope {
+func NewDirectChatReadUpdatedEnvelope(
+	chatID string,
+	readState *chatv1.DirectChatReadState,
+	unreadState *chatv1.DirectChatUnreadState,
+	encryptedReadState *chatv1.EncryptedDirectChatReadState,
+	encryptedUnreadState *chatv1.EncryptedUnreadState,
+) Envelope {
 	return newEnvelope(EventTypeDirectChatReadUpdated, DirectChatReadUpdatedPayload{
-		ChatID:    chatID,
-		ReadState: toDirectChatReadStateWire(readState),
-		Unread:    toDirectChatUnreadStateWire(unreadState),
+		ChatID:             chatID,
+		ReadState:          toDirectChatReadStateWire(readState),
+		Unread:             toDirectChatUnreadStateWire(unreadState),
+		EncryptedReadState: toEncryptedDirectChatReadStateWire(encryptedReadState),
+		EncryptedUnread:    toEncryptedUnreadStateWire(encryptedUnreadState),
 	})
 }
 
@@ -160,6 +170,10 @@ type directChatReadStateWire struct {
 }
 
 type directChatUnreadStateWire struct {
+	UnreadCount uint32 `json:"unreadCount"`
+}
+
+type encryptedUnreadStateWire struct {
 	UnreadCount uint32 `json:"unreadCount"`
 }
 
@@ -337,6 +351,39 @@ func toDirectChatUnreadStateWire(unreadState *chatv1.DirectChatUnreadState) *dir
 	}
 
 	return &directChatUnreadStateWire{
+		UnreadCount: unreadState.GetUnreadCount(),
+	}
+}
+
+func toEncryptedDirectChatReadStateWire(readState *chatv1.EncryptedDirectChatReadState) *directChatReadStateWire {
+	if readState == nil {
+		return nil
+	}
+
+	return &directChatReadStateWire{
+		SelfPosition: toEncryptedConversationReadPositionWire(readState.GetSelfPosition()),
+		PeerPosition: toEncryptedConversationReadPositionWire(readState.GetPeerPosition()),
+	}
+}
+
+func toEncryptedConversationReadPositionWire(position *chatv1.EncryptedConversationReadPosition) *directChatReadPositionWire {
+	if position == nil {
+		return nil
+	}
+
+	return &directChatReadPositionWire{
+		MessageID:        position.GetMessageId(),
+		MessageCreatedAt: formatProtoTimestamp(position.GetMessageCreatedAt()),
+		UpdatedAt:        formatProtoTimestamp(position.GetUpdatedAt()),
+	}
+}
+
+func toEncryptedUnreadStateWire(unreadState *chatv1.EncryptedUnreadState) *encryptedUnreadStateWire {
+	if unreadState == nil {
+		return nil
+	}
+
+	return &encryptedUnreadStateWire{
 		UnreadCount: unreadState.GetUnreadCount(),
 	}
 }

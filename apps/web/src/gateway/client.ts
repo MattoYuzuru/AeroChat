@@ -32,7 +32,9 @@ import type {
   DirectChatTypingState,
   Device,
   DeviceWithSessions,
+  EncryptedConversationReadPosition,
   ChatUser,
+  EncryptedDirectChatReadState,
   Friend,
   FriendRequest,
   GatewayClient,
@@ -44,6 +46,9 @@ import type {
   GroupMessage,
   GroupMember,
   GroupMemberRole,
+  EncryptedUnreadState,
+  EncryptedDirectMessageV2StoredDelivery,
+  EncryptedGroupReadState,
   GroupReadPosition,
   GroupReadState,
   GroupTypingIndicator,
@@ -263,6 +268,7 @@ interface DirectChatWire extends TimestampedWire {
   pinnedMessageIds?: string[];
   encryptedPinnedMessageIds?: string[];
   unreadState?: UnreadStateWire;
+  encryptedUnreadState?: UnreadStateWire;
 }
 
 interface GroupWire extends TimestampedWire {
@@ -273,6 +279,7 @@ interface GroupWire extends TimestampedWire {
   memberCount?: number;
   encryptedPinnedMessageIds?: string[];
   unreadState?: UnreadStateWire;
+  encryptedUnreadState?: UnreadStateWire;
   permissions?: GroupPermissionsWire;
 }
 
@@ -420,6 +427,20 @@ interface DirectChatReadStateWire {
   peerPosition?: DirectChatReadPositionWire;
 }
 
+interface EncryptedConversationReadPositionWire extends TimestampedWire {
+  messageId?: string;
+  messageCreatedAt?: string;
+}
+
+interface EncryptedDirectChatReadStateWire {
+  selfPosition?: EncryptedConversationReadPositionWire;
+  peerPosition?: EncryptedConversationReadPositionWire;
+}
+
+interface EncryptedGroupReadStateWire {
+  selfPosition?: EncryptedConversationReadPositionWire;
+}
+
 interface EncryptedDirectMessageV2DeliveryWire {
   recipientUserId?: string;
   recipientCryptoDeviceId?: string;
@@ -427,6 +448,7 @@ interface EncryptedDirectMessageV2DeliveryWire {
   ciphertext?: string;
   ciphertextSizeBytes?: number | string;
   storedAt?: string;
+  unreadState?: UnreadStateWire;
 }
 
 interface EncryptedDirectMessageV2EnvelopeWire {
@@ -453,6 +475,14 @@ interface EncryptedDirectMessageV2StoredEnvelopeWire {
   createdAt?: string;
   storedAt?: string;
   storedDeliveryCount?: number | string;
+  storedDeliveries?: EncryptedDirectMessageV2StoredDeliveryWire[];
+}
+
+interface EncryptedDirectMessageV2StoredDeliveryWire {
+  recipientUserId?: string;
+  recipientCryptoDeviceId?: string;
+  storedAt?: string;
+  unreadState?: UnreadStateWire;
 }
 
 interface EncryptedDirectMessageV2SendTargetDeviceWire {
@@ -515,6 +545,7 @@ interface EncryptedGroupMessageDeliveryWire {
   recipientUserId?: string;
   recipientCryptoDeviceId?: string;
   storedAt?: string;
+  unreadState?: UnreadStateWire;
 }
 
 interface EncryptedGroupEnvelopeWire {
@@ -604,6 +635,7 @@ interface ListDirectChatsResponseWire {
 interface GetDirectChatResponseWire {
   chat?: DirectChatWire;
   readState?: DirectChatReadStateWire;
+  encryptedReadState?: EncryptedDirectChatReadStateWire;
   typingState?: DirectChatTypingStateWire;
   presenceState?: DirectChatPresenceStateWire;
 }
@@ -624,6 +656,7 @@ interface GetGroupChatResponseWire {
   group?: GroupWire;
   thread?: GroupChatThreadWire;
   readState?: GroupReadStateWire;
+  encryptedReadState?: EncryptedGroupReadStateWire;
   typingState?: GroupTypingStateWire;
 }
 
@@ -652,6 +685,11 @@ interface ClearGroupTypingResponseWire {
 
 interface MarkGroupChatReadResponseWire {
   readState?: GroupReadStateWire;
+  unreadState?: UnreadStateWire;
+}
+
+interface MarkEncryptedGroupChatReadResponseWire {
+  readState?: EncryptedGroupReadStateWire;
   unreadState?: UnreadStateWire;
 }
 
@@ -706,6 +744,11 @@ interface EditGroupMessageResponseWire {
 
 interface MarkDirectChatReadResponseWire {
   readState?: DirectChatReadStateWire;
+  unreadState?: UnreadStateWire;
+}
+
+interface MarkEncryptedDirectChatReadResponseWire {
+  readState?: EncryptedDirectChatReadStateWire;
   unreadState?: UnreadStateWire;
 }
 
@@ -1122,6 +1165,25 @@ export function createGatewayClient(
       };
     },
 
+    async markEncryptedGroupChatRead(token, groupId, messageId) {
+      const response = await unaryCall<MarkEncryptedGroupChatReadResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "MarkEncryptedGroupChatRead",
+        {
+          groupId: groupId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return {
+        readState: normalizeEncryptedGroupReadState(response.readState),
+        unreadCount: normalizeUnreadCount(response.unreadState),
+      };
+    },
+
     async createAttachmentUploadIntent(token, input) {
       const response = await unaryCall<CreateAttachmentUploadIntentResponseWire>(
         fetchImpl,
@@ -1503,6 +1565,25 @@ export function createGatewayClient(
 
       return {
         readState: normalizeDirectChatReadState(response.readState),
+        unreadCount: normalizeUnreadCount(response.unreadState),
+      };
+    },
+
+    async markEncryptedDirectChatRead(token, chatId, messageId) {
+      const response = await unaryCall<MarkEncryptedDirectChatReadResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "MarkEncryptedDirectChatRead",
+        {
+          chatId: chatId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return {
+        readState: normalizeEncryptedDirectChatReadState(response.readState),
         unreadCount: normalizeUnreadCount(response.unreadState),
       };
     },
@@ -2389,6 +2470,7 @@ function normalizeGroup(input: GroupWire | undefined): Group {
       (value): value is string => typeof value === "string" && value.trim() !== "",
     ),
     unreadCount: normalizeUnreadCount(input?.unreadState),
+    encryptedUnreadCount: normalizeUnreadCount(input?.encryptedUnreadState),
     permissions: normalizeGroupPermissions(input?.permissions),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
@@ -2499,11 +2581,50 @@ function normalizeGroupReadState(
   };
 }
 
+function normalizeEncryptedConversationReadPosition(
+  input: EncryptedConversationReadPositionWire | undefined,
+): EncryptedConversationReadPosition | null {
+  if (!input) {
+    return null;
+  }
+
+  const messageId = input.messageId ?? "";
+  const messageCreatedAt = input.messageCreatedAt ?? "";
+  const updatedAt = input.updatedAt ?? "";
+  if (messageId === "" && messageCreatedAt === "" && updatedAt === "") {
+    return null;
+  }
+
+  return {
+    messageId,
+    messageCreatedAt,
+    updatedAt,
+  };
+}
+
+function normalizeEncryptedGroupReadState(
+  input: EncryptedGroupReadStateWire | undefined,
+): EncryptedGroupReadState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfPosition = normalizeEncryptedConversationReadPosition(input.selfPosition);
+  if (!selfPosition) {
+    return null;
+  }
+
+  return {
+    selfPosition,
+  };
+}
+
 function normalizeGroupChatSnapshot(input: GetGroupChatResponseWire): GroupChatSnapshot {
   return {
     group: normalizeGroup(input.group),
     thread: normalizeGroupChatThread(input.thread),
     readState: normalizeGroupReadState(input.readState),
+    encryptedReadState: normalizeEncryptedGroupReadState(input.encryptedReadState),
     typingState: normalizeGroupTypingState(input.typingState),
   };
 }
@@ -2611,6 +2732,7 @@ function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
       (value): value is string => typeof value === "string" && value.trim() !== "",
     ),
     unreadCount: normalizeUnreadCount(input?.unreadState),
+    encryptedUnreadCount: normalizeUnreadCount(input?.encryptedUnreadState),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
   };
@@ -2736,6 +2858,18 @@ function normalizeEncryptedDirectMessageV2Delivery(
     ciphertext: input?.ciphertext ?? "",
     ciphertextSizeBytes: normalizeCount(input?.ciphertextSizeBytes),
     storedAt: input?.storedAt ?? "",
+    unreadState: normalizeEncryptedUnreadState(input?.unreadState),
+  };
+}
+
+function normalizeEncryptedDirectMessageV2StoredDelivery(
+  input: EncryptedDirectMessageV2StoredDeliveryWire | undefined,
+): EncryptedDirectMessageV2StoredDelivery {
+  return {
+    recipientUserId: input?.recipientUserId ?? "",
+    recipientCryptoDeviceId: input?.recipientCryptoDeviceId ?? "",
+    storedAt: input?.storedAt ?? "",
+    unreadState: normalizeEncryptedUnreadState(input?.unreadState),
   };
 }
 
@@ -2753,6 +2887,9 @@ function normalizeEncryptedDirectMessageV2StoredEnvelope(
     createdAt: input?.createdAt ?? "",
     storedAt: input?.storedAt ?? "",
     storedDeliveryCount: normalizeCount(input?.storedDeliveryCount),
+    storedDeliveries: (input?.storedDeliveries ?? []).map(
+      normalizeEncryptedDirectMessageV2StoredDelivery,
+    ),
   };
 }
 
@@ -2867,6 +3004,7 @@ function normalizeEncryptedGroupMessageDelivery(
     recipientUserId: input?.recipientUserId ?? "",
     recipientCryptoDeviceId: input?.recipientCryptoDeviceId ?? "",
     storedAt: input?.storedAt ?? "",
+    unreadState: normalizeEncryptedUnreadState(input?.unreadState),
   };
 }
 
@@ -3063,6 +3201,25 @@ function normalizeDirectChatReadState(
   };
 }
 
+function normalizeEncryptedDirectChatReadState(
+  input: EncryptedDirectChatReadStateWire | undefined,
+): EncryptedDirectChatReadState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfPosition = normalizeEncryptedConversationReadPosition(input.selfPosition);
+  const peerPosition = normalizeEncryptedConversationReadPosition(input.peerPosition);
+  if (!selfPosition && !peerPosition) {
+    return null;
+  }
+
+  return {
+    selfPosition,
+    peerPosition,
+  };
+}
+
 function normalizeDirectChatTypingIndicator(
   input: DirectChatTypingIndicatorWire | undefined,
 ): DirectChatTypingIndicator | null {
@@ -3145,8 +3302,21 @@ function normalizeDirectChatSnapshot(
   return {
     chat: normalizeDirectChat(input.chat),
     readState: normalizeDirectChatReadState(input.readState),
+    encryptedReadState: normalizeEncryptedDirectChatReadState(input.encryptedReadState),
     typingState: normalizeDirectChatTypingState(input.typingState),
     presenceState: normalizeDirectChatPresenceState(input.presenceState),
+  };
+}
+
+function normalizeEncryptedUnreadState(
+  value: UnreadStateWire | undefined,
+): EncryptedUnreadState | null {
+  if (!value) {
+    return null;
+  }
+
+  return {
+    unreadCount: normalizeUnreadCount(value),
   };
 }
 

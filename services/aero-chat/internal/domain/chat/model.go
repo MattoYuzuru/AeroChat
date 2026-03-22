@@ -157,6 +157,7 @@ type DirectChat struct {
 	PinnedMessageIDs          []string
 	EncryptedPinnedMessageIDs []string
 	UnreadCount               int32
+	EncryptedUnreadCount      int32
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 }
@@ -172,6 +173,7 @@ type Group struct {
 	MemberCount               int32
 	EncryptedPinnedMessageIDs []string
 	UnreadCount               int32
+	EncryptedUnreadCount      int32
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 }
@@ -355,6 +357,14 @@ type EncryptedDirectMessageV2Delivery struct {
 	Ciphertext              []byte
 	CiphertextSizeBytes     int64
 	StoredAt                time.Time
+	UnreadCount             int32
+}
+
+type EncryptedDirectMessageV2StoredDelivery struct {
+	RecipientUserID         string
+	RecipientCryptoDeviceID string
+	StoredAt                time.Time
+	UnreadCount             int32
 }
 
 type EncryptedDirectMessageV2Envelope struct {
@@ -381,12 +391,14 @@ type EncryptedDirectMessageV2StoredEnvelope struct {
 	CreatedAt            time.Time
 	StoredAt             time.Time
 	StoredDeliveryCount  uint32
+	StoredDeliveries     []EncryptedDirectMessageV2StoredDelivery
 }
 
 type EncryptedGroupMessageDelivery struct {
 	RecipientUserID         string
 	RecipientCryptoDeviceID string
 	StoredAt                time.Time
+	UnreadCount             int32
 }
 
 type EncryptedGroupEnvelope struct {
@@ -504,6 +516,12 @@ type GroupReadPosition struct {
 	UpdatedAt        time.Time
 }
 
+type EncryptedConversationReadPosition struct {
+	MessageID        string
+	MessageCreatedAt time.Time
+	UpdatedAt        time.Time
+}
+
 type DirectChatReadState struct {
 	SelfPosition *DirectChatReadPosition
 	PeerPosition *DirectChatReadPosition
@@ -511,6 +529,15 @@ type DirectChatReadState struct {
 
 type GroupReadState struct {
 	SelfPosition *GroupReadPosition
+}
+
+type EncryptedDirectChatReadState struct {
+	SelfPosition *EncryptedConversationReadPosition
+	PeerPosition *EncryptedConversationReadPosition
+}
+
+type EncryptedGroupReadState struct {
+	SelfPosition *EncryptedConversationReadPosition
 }
 
 type DirectChatTypingIndicator struct {
@@ -543,6 +570,18 @@ type GroupReadStateEntry struct {
 	GroupID          string
 	UserID           string
 	LastReadPosition *GroupReadPosition
+}
+
+type EncryptedDirectChatReadStateEntry struct {
+	UserID              string
+	ReadReceiptsEnabled bool
+	LastReadPosition    *EncryptedConversationReadPosition
+}
+
+type EncryptedGroupReadStateEntry struct {
+	GroupID          string
+	UserID           string
+	LastReadPosition *EncryptedConversationReadPosition
 }
 
 type DirectChatPresenceStateEntry struct {
@@ -780,7 +819,23 @@ type UpsertDirectChatReadReceiptParams struct {
 	UpdatedAt         time.Time
 }
 
+type UpsertEncryptedDirectChatReadStateParams struct {
+	ChatID            string
+	UserID            string
+	LastReadMessageID string
+	LastReadMessageAt time.Time
+	UpdatedAt         time.Time
+}
+
 type UpsertGroupChatReadStateParams struct {
+	GroupID           string
+	UserID            string
+	LastReadMessageID string
+	LastReadMessageAt time.Time
+	UpdatedAt         time.Time
+}
+
+type UpsertEncryptedGroupReadStateParams struct {
 	GroupID           string
 	UserID            string
 	LastReadMessageID string

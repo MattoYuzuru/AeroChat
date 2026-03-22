@@ -79,9 +79,11 @@ type GroupTypingUpdatedPayload struct {
 
 // GroupReadUpdatedPayload доставляет self-scoped group read/unread state для синхронизации активных сессий одного пользователя.
 type GroupReadUpdatedPayload struct {
-	GroupID     string                `json:"groupId"`
-	ReadState   *groupReadStateWire   `json:"readState,omitempty"`
-	UnreadState *groupUnreadStateWire `json:"unreadState,omitempty"`
+	GroupID              string                    `json:"groupId"`
+	ReadState            *groupReadStateWire       `json:"readState,omitempty"`
+	UnreadState          *groupUnreadStateWire     `json:"unreadState,omitempty"`
+	EncryptedReadState   *groupReadStateWire       `json:"encryptedReadState,omitempty"`
+	EncryptedUnreadState *encryptedUnreadStateWire `json:"encryptedUnreadState,omitempty"`
 }
 
 type groupWire struct {
@@ -261,11 +263,19 @@ func NewGroupTypingUpdatedEnvelope(groupID string, threadID string, typingState 
 	})
 }
 
-func NewGroupReadUpdatedEnvelope(groupID string, readState *chatv1.GroupReadState, unreadState *chatv1.GroupUnreadState) Envelope {
+func NewGroupReadUpdatedEnvelope(
+	groupID string,
+	readState *chatv1.GroupReadState,
+	unreadState *chatv1.GroupUnreadState,
+	encryptedReadState *chatv1.EncryptedGroupReadState,
+	encryptedUnreadState *chatv1.EncryptedUnreadState,
+) Envelope {
 	return newEnvelope(EventTypeGroupReadUpdated, GroupReadUpdatedPayload{
-		GroupID:     groupID,
-		ReadState:   toGroupReadStateWire(readState),
-		UnreadState: toGroupUnreadStateWire(unreadState),
+		GroupID:              groupID,
+		ReadState:            toGroupReadStateWire(readState),
+		UnreadState:          toGroupUnreadStateWire(unreadState),
+		EncryptedReadState:   toEncryptedGroupReadStateWire(encryptedReadState),
+		EncryptedUnreadState: toEncryptedUnreadStateWire(encryptedUnreadState),
 	})
 }
 
@@ -427,5 +437,27 @@ func toGroupUnreadStateWire(unreadState *chatv1.GroupUnreadState) *groupUnreadSt
 
 	return &groupUnreadStateWire{
 		UnreadCount: unreadState.GetUnreadCount(),
+	}
+}
+
+func toEncryptedGroupReadStateWire(readState *chatv1.EncryptedGroupReadState) *groupReadStateWire {
+	if readState == nil {
+		return nil
+	}
+
+	return &groupReadStateWire{
+		SelfPosition: toEncryptedGroupReadPositionWire(readState.GetSelfPosition()),
+	}
+}
+
+func toEncryptedGroupReadPositionWire(position *chatv1.EncryptedConversationReadPosition) *groupReadPositionWire {
+	if position == nil {
+		return nil
+	}
+
+	return &groupReadPositionWire{
+		MessageID:        position.GetMessageId(),
+		MessageCreatedAt: formatProtoTimestamp(position.GetMessageCreatedAt()),
+		UpdatedAt:        formatProtoTimestamp(position.GetUpdatedAt()),
 	}
 }

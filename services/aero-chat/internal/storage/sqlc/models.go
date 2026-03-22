@@ -137,6 +137,14 @@ type DirectChatEncryptedMessagesV2 struct {
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
 }
 
+type DirectChatEncryptedReadStatesV1 struct {
+	ChatID                   uuid.UUID          `db:"chat_id" json:"chat_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type DirectChatMessage struct {
 	ID               uuid.UUID          `db:"id" json:"id"`
 	ChatID           uuid.UUID          `db:"chat_id" json:"chat_id"`
@@ -233,6 +241,14 @@ type GroupEncryptedMessagesV1 struct {
 	CiphertextSizeBytes  int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+type GroupEncryptedReadStatesV1 struct {
+	GroupID                  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type GroupEncryptedRosterDevicesV1 struct {

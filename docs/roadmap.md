@@ -99,6 +99,7 @@
 - [x] Web encrypted direct-message v2 outbound bootstrap send foundation
 - [x] Encrypted direct-message v2 sender self-delivery and convergence hardening
 - [x] Encrypted direct-message v2 reply/edit/tombstone/pin recovery foundation
+- [x] Encrypted direct-message v2 unread/read recovery foundation
 - [x] Safe markdown subset
 - [x] Read receipts
 - [x] Unread conversation state
@@ -147,6 +148,7 @@
 - [x] Web encrypted group runtime и local projection bootstrap
 - [x] Web encrypted group outbound text bootstrap
 - [x] Encrypted group reply/edit/tombstone/pin recovery foundation
+- [x] Encrypted group unread/read recovery foundation
 - [ ] Encrypted media relay integration for MLS group lane
 
 ---

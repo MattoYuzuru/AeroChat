@@ -25,6 +25,7 @@ const directChat = {
   pinnedMessageIds: [],
   encryptedPinnedMessageIds: [],
   unreadCount: 0,
+  encryptedUnreadCount: 0,
   createdAt: "2026-03-25T10:00:00Z",
   updatedAt: "2026-03-25T10:10:00Z",
 };
@@ -50,6 +51,7 @@ const threadSnapshot: ChatThreadSnapshot = {
     },
   ],
   readState: null,
+  encryptedReadState: null,
   typingState: null,
   presenceState: null,
 };
@@ -237,6 +239,34 @@ describe("chatsReducer", () => {
     });
 
     expect(nextState.thread?.readState?.peerPosition?.messageId).toBe("message-1");
+  });
+
+  it("replaces encrypted read state and unread count for the active thread", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const threadState = chatsReducer(readyState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+
+    const nextState = chatsReducer(threadState, {
+      type: "encrypted_read_state_replaced",
+      chatId: "chat-1",
+      readState: {
+        selfPosition: {
+          messageId: "encrypted-1",
+          messageCreatedAt: "2026-04-06T12:03:30Z",
+          updatedAt: "2026-04-06T12:04:00Z",
+        },
+        peerPosition: null,
+      },
+      unreadCount: 0,
+    });
+
+    expect(nextState.thread?.encryptedReadState?.selfPosition?.messageId).toBe("encrypted-1");
+    expect(nextState.thread?.chat.encryptedUnreadCount).toBe(0);
   });
 
   it("replaces active thread typing state from realtime update", () => {

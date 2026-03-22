@@ -88,7 +88,12 @@ export function applyGroupRealtimeToGroups(
         upsertGroup(groups, mergeGroupPreservingUnread(findGroupByID(groups, event.group.id), event.group)),
       );
     case "group.read.updated":
-      return replaceGroupUnreadCount(groups, event.groupId, event.unreadCount);
+      return replaceGroupReadStateCounts(
+        groups,
+        event.groupId,
+        event.unreadCount,
+        event.encryptedUnreadCount,
+      );
     default:
       return groups;
   }
@@ -113,16 +118,17 @@ export function applyGroupRealtimeToSelectedState(
 
     return {
       status: "ready",
-        snapshot: {
-          group: patchGroupFromMessage(
-            state.snapshot.group,
-            event.message,
-            event.reason,
-            currentUserId,
-          ),
-          thread: state.snapshot.thread,
-          readState: state.snapshot.readState,
-          typingState: state.snapshot.typingState,
+      snapshot: {
+        group: patchGroupFromMessage(
+          state.snapshot.group,
+          event.message,
+          event.reason,
+          currentUserId,
+        ),
+        thread: state.snapshot.thread,
+        readState: state.snapshot.readState,
+        encryptedReadState: state.snapshot.encryptedReadState,
+        typingState: state.snapshot.typingState,
       },
       members: state.members,
       inviteLinks: filterInviteLinks(state.inviteLinks, event.group.selfRole),
@@ -142,6 +148,7 @@ export function applyGroupRealtimeToSelectedState(
         group: state.snapshot.group,
         thread: state.snapshot.thread,
         readState: state.snapshot.readState,
+        encryptedReadState: state.snapshot.encryptedReadState,
         typingState: event.typingState,
       },
       members: state.members,
@@ -162,9 +169,13 @@ export function applyGroupRealtimeToSelectedState(
         group: {
           ...state.snapshot.group,
           unreadCount: event.unreadCount,
+          encryptedUnreadCount:
+            event.encryptedUnreadCount ?? state.snapshot.group.encryptedUnreadCount,
         },
         thread: state.snapshot.thread,
         readState: event.readState,
+        encryptedReadState:
+          event.encryptedReadState ?? state.snapshot.encryptedReadState,
         typingState: state.snapshot.typingState,
       },
       members: state.members,
@@ -193,6 +204,7 @@ export function applyGroupRealtimeToSelectedState(
         group: mergeGroupPreservingUnread(state.snapshot.group, event.group),
         thread: event.thread,
         readState: state.snapshot.readState,
+        encryptedReadState: state.snapshot.encryptedReadState,
         typingState: state.snapshot.typingState,
       },
       members: sortMembers(members),
@@ -209,6 +221,7 @@ export function applyGroupRealtimeToSelectedState(
         group: mergeGroupPreservingUnread(state.snapshot.group, event.group),
         thread: event.thread,
         readState: state.snapshot.readState,
+        encryptedReadState: state.snapshot.encryptedReadState,
         typingState: state.snapshot.typingState,
       },
       members: sortMembers(
@@ -230,6 +243,7 @@ export function applyGroupRealtimeToSelectedState(
         group: mergeGroupPreservingUnread(state.snapshot.group, event.group),
         thread: event.thread ?? state.snapshot.thread,
         readState: state.snapshot.readState,
+        encryptedReadState: state.snapshot.encryptedReadState,
         typingState: state.snapshot.typingState,
       },
       members: sortMembers(
@@ -250,6 +264,7 @@ export function applyGroupRealtimeToSelectedState(
       group: mergeGroupPreservingUnread(state.snapshot.group, event.group),
       thread: event.thread,
       readState: state.snapshot.readState,
+      encryptedReadState: state.snapshot.encryptedReadState,
       typingState: state.snapshot.typingState,
     },
     members: sortMembers(
@@ -349,6 +364,7 @@ function patchGroupFromMessage(
       encryptedPinnedMessageIds: [],
       unreadCount:
         reason === "message_created" && message.senderUserId !== currentUserId ? 1 : 0,
+      encryptedUnreadCount: 0,
       permissions: {
         canManageInviteLinks: false,
         creatableInviteRoles: [],
@@ -385,16 +401,24 @@ function mergeGroupPreservingUnread(current: Group | null, next: Group): Group {
   return {
     ...next,
     unreadCount: current?.unreadCount ?? next.unreadCount,
+    encryptedUnreadCount: current?.encryptedUnreadCount ?? next.encryptedUnreadCount,
   };
 }
 
-function replaceGroupUnreadCount(groups: Group[], groupId: string, unreadCount: number): Group[] {
+function replaceGroupReadStateCounts(
+  groups: Group[],
+  groupId: string,
+  unreadCount: number,
+  encryptedUnreadCount: number | null,
+): Group[] {
   return groups.map((group) =>
     group.id !== groupId
       ? group
       : {
           ...group,
           unreadCount,
+          encryptedUnreadCount:
+            encryptedUnreadCount === null ? group.encryptedUnreadCount : encryptedUnreadCount,
         },
   );
 }

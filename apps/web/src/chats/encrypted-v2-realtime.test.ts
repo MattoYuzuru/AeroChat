@@ -33,6 +33,9 @@ describe("encrypted direct message v2 realtime helpers", () => {
             ciphertext: "Y2lwaGVydGV4dA==",
             ciphertextSizeBytes: 10,
             storedAt: "2026-03-22T10:00:01Z",
+            unreadState: {
+              unreadCount: 3,
+            },
           },
         },
       },
@@ -56,6 +59,9 @@ describe("encrypted direct message v2 realtime helpers", () => {
           ciphertext: "Y2lwaGVydGV4dA==",
           ciphertextSizeBytes: 10,
           storedAt: "2026-03-22T10:00:01Z",
+          unreadState: {
+            unreadCount: 3,
+          },
         },
       },
     });

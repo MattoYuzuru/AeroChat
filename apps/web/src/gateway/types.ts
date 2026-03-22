@@ -214,6 +214,7 @@ export interface Group {
   memberCount: number;
   encryptedPinnedMessageIds: string[];
   unreadCount: number;
+  encryptedUnreadCount: number;
   permissions: GroupPermissions;
   createdAt: string;
   updatedAt: string;
@@ -271,6 +272,7 @@ export interface DirectChat {
   pinnedMessageIds: string[];
   encryptedPinnedMessageIds: string[];
   unreadCount: number;
+  encryptedUnreadCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -392,6 +394,25 @@ export interface GroupReadState {
   selfPosition: GroupReadPosition | null;
 }
 
+export interface EncryptedConversationReadPosition {
+  messageId: string;
+  messageCreatedAt: string;
+  updatedAt: string;
+}
+
+export interface EncryptedUnreadState {
+  unreadCount: number;
+}
+
+export interface EncryptedDirectChatReadState {
+  selfPosition: EncryptedConversationReadPosition | null;
+  peerPosition: EncryptedConversationReadPosition | null;
+}
+
+export interface EncryptedGroupReadState {
+  selfPosition: EncryptedConversationReadPosition | null;
+}
+
 export interface DirectChatTypingIndicator {
   updatedAt: string;
   expiresAt: string;
@@ -419,6 +440,7 @@ export interface EncryptedDirectMessageV2Delivery {
   ciphertext: string;
   ciphertextSizeBytes: number;
   storedAt: string;
+  unreadState: EncryptedUnreadState | null;
 }
 
 export interface EncryptedGroupLane {
@@ -462,6 +484,7 @@ export interface EncryptedGroupMessageDelivery {
   recipientUserId: string;
   recipientCryptoDeviceId: string;
   storedAt: string;
+  unreadState: EncryptedUnreadState | null;
 }
 
 export interface EncryptedGroupEnvelope {
@@ -516,6 +539,14 @@ export interface EncryptedDirectMessageV2StoredEnvelope {
   createdAt: string;
   storedAt: string;
   storedDeliveryCount: number;
+  storedDeliveries: EncryptedDirectMessageV2StoredDelivery[];
+}
+
+export interface EncryptedDirectMessageV2StoredDelivery {
+  recipientUserId: string;
+  recipientCryptoDeviceId: string;
+  storedAt: string;
+  unreadState: EncryptedUnreadState | null;
 }
 
 export interface EncryptedDirectMessageV2Envelope {
@@ -560,6 +591,7 @@ export interface EncryptedDirectMessageV2SendBootstrap {
 export interface DirectChatSnapshot {
   chat: DirectChat;
   readState: DirectChatReadState | null;
+  encryptedReadState: EncryptedDirectChatReadState | null;
   typingState: DirectChatTypingState | null;
   presenceState: DirectChatPresenceState | null;
 }
@@ -568,6 +600,7 @@ export interface GroupChatSnapshot {
   group: Group;
   thread: GroupChatThread;
   readState: GroupReadState | null;
+  encryptedReadState: EncryptedGroupReadState | null;
   typingState: GroupTypingState | null;
 }
 
@@ -578,6 +611,16 @@ export interface DirectChatReadUpdate {
 
 export interface GroupReadUpdate {
   readState: GroupReadState | null;
+  unreadCount: number;
+}
+
+export interface EncryptedDirectChatReadUpdate {
+  readState: EncryptedDirectChatReadState | null;
+  unreadCount: number;
+}
+
+export interface EncryptedGroupReadUpdate {
+  readState: EncryptedGroupReadState | null;
   unreadCount: number;
 }
 
@@ -741,6 +784,11 @@ export interface GatewayClient {
     groupId: string,
     messageId: string,
   ): Promise<GroupReadUpdate>;
+  markEncryptedGroupChatRead(
+    token: string,
+    groupId: string,
+    messageId: string,
+  ): Promise<EncryptedGroupReadUpdate>;
   createAttachmentUploadIntent(
     token: string,
     input:
@@ -827,6 +875,11 @@ export interface GatewayClient {
     chatId: string,
     messageId: string,
   ): Promise<DirectChatReadUpdate>;
+  markEncryptedDirectChatRead(
+    token: string,
+    chatId: string,
+    messageId: string,
+  ): Promise<EncryptedDirectChatReadUpdate>;
   setDirectChatTyping(
     token: string,
     chatId: string,

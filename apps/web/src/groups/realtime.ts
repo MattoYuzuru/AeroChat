@@ -1,5 +1,7 @@
 import type {
   Attachment,
+  EncryptedConversationReadPosition,
+  EncryptedGroupReadState,
   Group,
   GroupChatThread,
   GroupMember,
@@ -20,6 +22,7 @@ interface GroupWire {
   selfRole?: string;
   memberCount?: number;
   encryptedPinnedMessageIds?: string[];
+  encryptedUnreadState?: UnreadStateWire;
   permissions?: GroupPermissionsWire;
   createdAt?: string;
   updatedAt?: string;
@@ -176,6 +179,16 @@ interface GroupReadStateWire {
   selfPosition?: GroupReadPositionWire;
 }
 
+interface EncryptedConversationReadPositionWire {
+  messageId?: string;
+  messageCreatedAt?: string;
+  updatedAt?: string;
+}
+
+interface EncryptedGroupReadStateWire {
+  selfPosition?: EncryptedConversationReadPositionWire;
+}
+
 interface UnreadStateWire {
   unreadCount?: number | string;
 }
@@ -190,6 +203,8 @@ interface GroupReadUpdatedPayloadWire {
   groupId?: string;
   readState?: GroupReadStateWire;
   unreadState?: UnreadStateWire;
+  encryptedReadState?: EncryptedGroupReadStateWire;
+  encryptedUnreadState?: UnreadStateWire;
 }
 
 export type GroupMembershipReason =
@@ -253,6 +268,8 @@ export type GroupRealtimeEvent =
       groupId: string;
       readState: GroupReadState | null;
       unreadCount: number;
+      encryptedReadState: EncryptedGroupReadState | null;
+      encryptedUnreadCount: number | null;
     };
 
 export function parseGroupRealtimeEvent(
@@ -367,6 +384,8 @@ export function parseGroupRealtimeEvent(
       groupId: payload.groupId,
       readState: payload.readState,
       unreadCount: payload.unreadCount,
+      encryptedReadState: payload.encryptedReadState,
+      encryptedUnreadCount: payload.encryptedUnreadCount,
     };
   }
 
@@ -569,6 +588,8 @@ function normalizeReadUpdatedPayload(
   groupId: string;
   readState: GroupReadState | null;
   unreadCount: number;
+  encryptedReadState: EncryptedGroupReadState | null;
+  encryptedUnreadCount: number | null;
 } | null {
   if (!input || typeof input !== "object") {
     return null;
@@ -584,6 +605,8 @@ function normalizeReadUpdatedPayload(
     groupId,
     readState: normalizeGroupReadState(payload.readState),
     unreadCount: normalizeUnreadCount(payload.unreadState),
+    encryptedReadState: normalizeEncryptedGroupReadState(payload.encryptedReadState),
+    encryptedUnreadCount: normalizeUnreadCountOrNull(payload.encryptedUnreadState),
   };
 }
 
@@ -603,6 +626,7 @@ function normalizeGroup(input: GroupWire | undefined): Group {
       (value): value is string => typeof value === "string" && value.trim() !== "",
     ),
     unreadCount: 0,
+    encryptedUnreadCount: normalizeUnreadCount(input?.encryptedUnreadState),
     permissions: normalizeGroupPermissions(input?.permissions),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
@@ -824,6 +848,23 @@ function normalizeGroupReadState(
   };
 }
 
+function normalizeEncryptedGroupReadState(
+  input: EncryptedGroupReadStateWire | undefined,
+): EncryptedGroupReadState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfPosition = normalizeEncryptedConversationReadPosition(input.selfPosition);
+  if (!selfPosition) {
+    return null;
+  }
+
+  return {
+    selfPosition,
+  };
+}
+
 function normalizeUnreadCount(input: UnreadStateWire | undefined): number {
   const rawValue = input?.unreadCount;
   if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
@@ -837,6 +878,35 @@ function normalizeUnreadCount(input: UnreadStateWire | undefined): number {
   }
 
   return 0;
+}
+
+function normalizeUnreadCountOrNull(input: UnreadStateWire | undefined): number | null {
+  if (!input) {
+    return null;
+  }
+
+  return normalizeUnreadCount(input);
+}
+
+function normalizeEncryptedConversationReadPosition(
+  input: EncryptedConversationReadPositionWire | undefined,
+): EncryptedConversationReadPosition | null {
+  if (!input) {
+    return null;
+  }
+
+  const messageId = input.messageId ?? "";
+  const messageCreatedAt = input.messageCreatedAt ?? "";
+  const updatedAt = input.updatedAt ?? "";
+  if (messageId === "" && messageCreatedAt === "" && updatedAt === "") {
+    return null;
+  }
+
+  return {
+    messageId,
+    messageCreatedAt,
+    updatedAt,
+  };
 }
 
 function normalizeTextMessageContent(

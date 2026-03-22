@@ -25,9 +25,10 @@ type encryptedGroupMessageV1EnvelopeWire struct {
 }
 
 type encryptedGroupMessageV1DeliveryWire struct {
-	RecipientUserID         string `json:"recipientUserId"`
-	RecipientCryptoDeviceID string `json:"recipientCryptoDeviceId"`
-	StoredAt                string `json:"storedAt"`
+	RecipientUserID         string                    `json:"recipientUserId"`
+	RecipientCryptoDeviceID string                    `json:"recipientCryptoDeviceId"`
+	StoredAt                string                    `json:"storedAt"`
+	UnreadState             *encryptedUnreadStateWire `json:"unreadState,omitempty"`
 }
 
 func NewEncryptedGroupMessageV1DeliveredEnvelope(
@@ -77,5 +78,6 @@ func toEncryptedGroupMessageV1DeliveryWire(delivery *chatv1.EncryptedGroupMessag
 		RecipientUserID:         delivery.GetRecipientUserId(),
 		RecipientCryptoDeviceID: delivery.GetRecipientCryptoDeviceId(),
 		StoredAt:                formatProtoTimestamp(delivery.GetStoredAt()),
+		UnreadState:             toEncryptedUnreadStateWire(delivery.GetUnreadState()),
 	}
 }
