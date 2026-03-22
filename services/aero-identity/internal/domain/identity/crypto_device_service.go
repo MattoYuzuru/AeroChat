@@ -220,6 +220,11 @@ func (s *Service) CreateCryptoDeviceLinkIntent(ctx context.Context, token string
 		return nil, fmt.Errorf("%w: pending crypto device has no current bundle", ErrConflict)
 	}
 
+	approvalChallenge, err := s.newCryptoLinkApprovalChallenge()
+	if err != nil {
+		return nil, err
+	}
+
 	now := s.now()
 	return s.repo.CreateCryptoDeviceLinkIntent(ctx, CreateCryptoDeviceLinkIntentParams{
 		LinkIntent: CryptoDeviceLinkIntent{
@@ -230,6 +235,7 @@ func (s *Service) CreateCryptoDeviceLinkIntent(ctx context.Context, token string
 			BundleDigest:          cloneBytes(details.CurrentBundle.BundleDigest),
 			CreatedAt:             now,
 			ExpiresAt:             now.Add(s.cryptoLinkIntentTTL),
+			ApprovalChallenge:     approvalChallenge,
 		},
 	})
 }
@@ -243,7 +249,7 @@ func (s *Service) ListCryptoDeviceLinkIntents(ctx context.Context, token string)
 	return s.repo.ListCryptoDeviceLinkIntents(ctx, authSession.User.ID, s.now())
 }
 
-func (s *Service) ApproveCryptoDeviceLinkIntent(ctx context.Context, token string, linkIntentID string, approverCryptoDeviceID string) (*CryptoDeviceLinkIntent, *CryptoDevice, error) {
+func (s *Service) ApproveCryptoDeviceLinkIntent(ctx context.Context, token string, linkIntentID string, approverCryptoDeviceID string, proof CryptoDeviceLinkApprovalProof) (*CryptoDeviceLinkIntent, *CryptoDevice, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
 		return nil, nil, err
@@ -259,10 +265,16 @@ func (s *Service) ApproveCryptoDeviceLinkIntent(ctx context.Context, token strin
 		return nil, nil, err
 	}
 
+	normalizedProof, err := normalizeCryptoDeviceLinkApprovalProof(proof)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return s.repo.ApproveCryptoDeviceLinkIntent(ctx, ApproveCryptoDeviceLinkIntentParams{
 		UserID:                 authSession.User.ID,
 		LinkIntentID:           intentID,
 		ApproverCryptoDeviceID: approverID,
+		Proof:                  normalizedProof,
 		ApprovedAt:             s.now(),
 	})
 }
@@ -368,6 +380,14 @@ func normalizeCryptoDeviceBundleInput(input CryptoDeviceBundleInput, now time.Ti
 	}, nil
 }
 
+func cloneBytes(value []byte) []byte {
+	if len(value) == 0 {
+		return nil
+	}
+
+	return append([]byte(nil), value...)
+}
+
 func normalizeRequiredID(value string, fieldName string) (string, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
@@ -375,16 +395,6 @@ func normalizeRequiredID(value string, fieldName string) (string, error) {
 	}
 
 	return trimmed, nil
-}
-
-func cloneBytes(value []byte) []byte {
-	if len(value) == 0 {
-		return nil
-	}
-
-	cloned := make([]byte, len(value))
-	copy(cloned, value)
-	return cloned
 }
 
 func cloneTime(value *time.Time) *time.Time {

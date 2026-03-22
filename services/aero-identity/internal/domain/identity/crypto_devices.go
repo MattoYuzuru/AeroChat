@@ -66,11 +66,28 @@ type CryptoDeviceLinkIntent struct {
 	ApprovedAt             *time.Time
 	ExpiredAt              *time.Time
 	ApproverCryptoDeviceID *string
+	ApprovalChallenge      []byte
 }
 
 type CryptoDeviceDetails struct {
 	Device        CryptoDevice
 	CurrentBundle *CryptoDeviceBundle
+}
+
+type CryptoDeviceLinkApprovalPayload struct {
+	Version                uint32
+	LinkIntentID           string
+	ApproverCryptoDeviceID string
+	PendingCryptoDeviceID  string
+	PendingBundleDigest    []byte
+	ApprovalChallenge      []byte
+	ChallengeExpiresAt     time.Time
+	IssuedAt               time.Time
+}
+
+type CryptoDeviceLinkApprovalProof struct {
+	Payload   CryptoDeviceLinkApprovalPayload
+	Signature []byte
 }
 
 type CryptoDeviceBundleInput struct {
@@ -111,6 +128,7 @@ type ApproveCryptoDeviceLinkIntentParams struct {
 	UserID                 string
 	LinkIntentID           string
 	ApproverCryptoDeviceID string
+	Proof                  CryptoDeviceLinkApprovalProof
 	ApprovedAt             time.Time
 }
 

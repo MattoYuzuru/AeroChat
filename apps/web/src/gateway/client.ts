@@ -2,6 +2,7 @@ import type {
   Attachment,
   AttachmentUploadSession,
   CryptoDevice,
+  CryptoDeviceLinkApprovalProof,
   CryptoDeviceBundle,
   CryptoDeviceBundlePayload,
   CryptoDeviceLinkIntent,
@@ -164,6 +165,7 @@ interface CryptoDeviceLinkIntentWire {
   pendingCryptoDeviceId?: string;
   status?: string;
   bundleDigest?: string;
+  approvalChallenge?: string;
   createdAt?: string;
   expiresAt?: string;
   approvedAt?: string;
@@ -774,7 +776,7 @@ export function createGatewayClient(
       return (response.linkIntents ?? []).map(normalizeCryptoDeviceLinkIntent);
     },
 
-    async approveCryptoDeviceLinkIntent(token, linkIntentId, approverCryptoDeviceId) {
+    async approveCryptoDeviceLinkIntent(token, linkIntentId, approverCryptoDeviceId, proof) {
       const response = await unaryCall<ApproveCryptoDeviceLinkIntentResponseWire>(
         fetchImpl,
         baseUrl,
@@ -783,6 +785,7 @@ export function createGatewayClient(
         {
           linkIntentId: linkIntentId.trim(),
           approverCryptoDeviceId: approverCryptoDeviceId.trim(),
+          proof: normalizeCryptoDeviceLinkApprovalProofForWire(proof),
         },
         token,
       );
@@ -1824,11 +1827,30 @@ function normalizeCryptoDeviceLinkIntent(
     pendingCryptoDeviceId: input?.pendingCryptoDeviceId ?? "",
     status: normalizeCryptoDeviceLinkIntentStatus(input?.status),
     bundleDigestBase64: input?.bundleDigest ?? "",
+    approvalChallengeBase64: input?.approvalChallenge ?? "",
     createdAt: input?.createdAt ?? "",
     expiresAt: input?.expiresAt ?? "",
     approvedAt: normalizeNullableString(input?.approvedAt),
     expiredAt: normalizeNullableString(input?.expiredAt),
     approverCryptoDeviceId: normalizeNullableString(input?.approverCryptoDeviceId),
+  };
+}
+
+function normalizeCryptoDeviceLinkApprovalProofForWire(
+  proof: CryptoDeviceLinkApprovalProof,
+) {
+  return {
+    payload: {
+      version: proof.payload.version,
+      linkIntentId: proof.payload.linkIntentId,
+      approverCryptoDeviceId: proof.payload.approverCryptoDeviceId,
+      pendingCryptoDeviceId: proof.payload.pendingCryptoDeviceId,
+      pendingBundleDigest: proof.payload.pendingBundleDigestBase64,
+      approvalChallenge: proof.payload.approvalChallengeBase64,
+      challengeExpiresAt: proof.payload.challengeExpiresAt,
+      issuedAt: proof.payload.issuedAt,
+    },
+    signature: proof.signatureBase64,
   };
 }
 

@@ -1404,6 +1404,7 @@ describe("createGatewayClient", () => {
               pendingCryptoDeviceId: "crypto-pending",
               status: "CRYPTO_DEVICE_LINK_INTENT_STATUS_PENDING",
               bundleDigest: "digest-1",
+              approvalChallenge: "challenge-1",
               createdAt: "2026-03-22T12:00:00Z",
               expiresAt: "2026-03-22T13:00:00Z",
             },
@@ -1428,6 +1429,7 @@ describe("createGatewayClient", () => {
         pendingCryptoDeviceId: "crypto-pending",
         status: "pending",
         bundleDigestBase64: "digest-1",
+        approvalChallengeBase64: "challenge-1",
         createdAt: "2026-03-22T12:00:00Z",
         expiresAt: "2026-03-22T13:00:00Z",
         approvedAt: null,
@@ -1442,6 +1444,82 @@ describe("createGatewayClient", () => {
           Authorization: "Bearer token-1",
         }),
         body: JSON.stringify({}),
+      }),
+    );
+  });
+
+  it("sends signed approval proof through gateway identity endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          linkIntent: {
+            id: "intent-1",
+            userId: "user-1",
+            pendingCryptoDeviceId: "crypto-pending",
+            status: "CRYPTO_DEVICE_LINK_INTENT_STATUS_APPROVED",
+            bundleDigest: "digest-1",
+            approvalChallenge: "challenge-1",
+            createdAt: "2026-03-22T12:00:00Z",
+            expiresAt: "2026-03-22T13:00:00Z",
+            approvedAt: "2026-03-22T12:05:00Z",
+            approverCryptoDeviceId: "crypto-1",
+          },
+          device: {
+            id: "crypto-pending",
+            userId: "user-1",
+            label: "Web Linux",
+            status: "CRYPTO_DEVICE_STATUS_ACTIVE",
+            createdAt: "2026-03-22T12:00:00Z",
+            activatedAt: "2026-03-22T12:05:00Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    await client.approveCryptoDeviceLinkIntent("token-1", "intent-1", "crypto-1", {
+      payload: {
+        version: 1,
+        linkIntentId: "intent-1",
+        approverCryptoDeviceId: "crypto-1",
+        pendingCryptoDeviceId: "crypto-pending",
+        pendingBundleDigestBase64: "digest-1",
+        approvalChallengeBase64: "challenge-1",
+        challengeExpiresAt: "2026-03-22T13:00:00Z",
+        issuedAt: "2026-03-22T12:04:00Z",
+      },
+      signatureBase64: "signature-1",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.identity.v1.IdentityService/ApproveCryptoDeviceLinkIntent",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          linkIntentId: "intent-1",
+          approverCryptoDeviceId: "crypto-1",
+          proof: {
+            payload: {
+              version: 1,
+              linkIntentId: "intent-1",
+              approverCryptoDeviceId: "crypto-1",
+              pendingCryptoDeviceId: "crypto-pending",
+              pendingBundleDigest: "digest-1",
+              approvalChallenge: "challenge-1",
+              challengeExpiresAt: "2026-03-22T13:00:00Z",
+              issuedAt: "2026-03-22T12:04:00Z",
+            },
+            signature: "signature-1",
+          },
+        }),
       }),
     );
   });

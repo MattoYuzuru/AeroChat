@@ -119,11 +119,28 @@ export interface CryptoDeviceLinkIntent {
   pendingCryptoDeviceId: string;
   status: CryptoDeviceLinkIntentStatus;
   bundleDigestBase64: string;
+  approvalChallengeBase64: string;
   createdAt: string;
   expiresAt: string;
   approvedAt: string | null;
   expiredAt: string | null;
   approverCryptoDeviceId: string | null;
+}
+
+export interface CryptoDeviceLinkApprovalPayload {
+  version: number;
+  linkIntentId: string;
+  approverCryptoDeviceId: string;
+  pendingCryptoDeviceId: string;
+  pendingBundleDigestBase64: string;
+  approvalChallengeBase64: string;
+  challengeExpiresAt: string;
+  issuedAt: string;
+}
+
+export interface CryptoDeviceLinkApprovalProof {
+  payload: CryptoDeviceLinkApprovalPayload;
+  signatureBase64: string;
 }
 
 export interface CurrentAuth {
@@ -527,6 +544,7 @@ export interface GatewayClient {
     token: string,
     linkIntentId: string,
     approverCryptoDeviceId: string,
+    proof: CryptoDeviceLinkApprovalProof,
   ): Promise<{
     linkIntent: CryptoDeviceLinkIntent;
     device: CryptoDevice;

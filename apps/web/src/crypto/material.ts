@@ -1,3 +1,4 @@
+import type { CryptoDeviceLinkApprovalProof } from "../gateway/types";
 import type {
   CryptoBundleMaterial,
   LocalCryptoDeviceMaterial,
@@ -23,6 +24,18 @@ export interface CryptoMaterialFactory {
     bundle: CryptoBundleMaterial;
   }>;
   buildBundle(material: LocalCryptoDeviceMaterial): Promise<CryptoBundleMaterial>;
+  buildLinkApprovalProof(
+    material: LocalCryptoDeviceMaterial,
+    input: {
+      linkIntentId: string;
+      approverCryptoDeviceId: string;
+      pendingCryptoDeviceId: string;
+      pendingBundleDigestBase64: string;
+      approvalChallengeBase64: string;
+      challengeExpiresAt: string;
+      issuedAt: string;
+    },
+  ): Promise<CryptoDeviceLinkApprovalProof>;
   syncRecordFromServer(
     material: LocalCryptoDeviceMaterial,
     input: {
@@ -98,6 +111,32 @@ export function createWebCryptoMaterialFactory(): CryptoMaterialFactory {
 
     buildBundle(material) {
       return buildBundleFromMaterial(material);
+    },
+
+    async buildLinkApprovalProof(material, input) {
+      const payload: CryptoDeviceLinkApprovalProof["payload"] = {
+        version: 1,
+        linkIntentId: input.linkIntentId,
+        approverCryptoDeviceId: input.approverCryptoDeviceId,
+        pendingCryptoDeviceId: input.pendingCryptoDeviceId,
+        pendingBundleDigestBase64: input.pendingBundleDigestBase64,
+        approvalChallengeBase64: input.approvalChallengeBase64,
+        challengeExpiresAt: input.challengeExpiresAt,
+        issuedAt: input.issuedAt,
+      };
+      const signature = await crypto.subtle.sign(
+        {
+          name: "ECDSA",
+          hash: "SHA-256",
+        },
+        material.identityPrivateKey,
+        cloneBuffer(buildCryptoDeviceLinkApprovalSigningMessage(payload)),
+      );
+
+      return {
+        payload,
+        signatureBase64: toBase64(new Uint8Array(signature)),
+      };
     },
 
     syncRecordFromServer(material, input) {
@@ -208,6 +247,25 @@ function createRandomID(): string {
   const buffer = new Uint8Array(16);
   crypto.getRandomValues(buffer);
   return Array.from(buffer, (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+function buildCryptoDeviceLinkApprovalSigningMessage(
+  payload: CryptoDeviceLinkApprovalProof["payload"],
+): Uint8Array {
+  const lines = [
+    "aerochat.crypto_device_link_approval.v1",
+    `version=${payload.version}`,
+    `link_intent_id=${payload.linkIntentId}`,
+    `approver_crypto_device_id=${payload.approverCryptoDeviceId}`,
+    `pending_crypto_device_id=${payload.pendingCryptoDeviceId}`,
+    `pending_bundle_digest=${payload.pendingBundleDigestBase64}`,
+    `approval_challenge=${payload.approvalChallengeBase64}`,
+    `challenge_expires_at=${payload.challengeExpiresAt}`,
+    `issued_at=${payload.issuedAt}`,
+    "",
+  ];
+
+  return new TextEncoder().encode(lines.join("\n"));
 }
 
 export function toBase64(bytes: Uint8Array): string {

@@ -182,6 +182,23 @@ message CryptoDeviceLinkIntent {
   google.protobuf.Timestamp approved_at = 8;
   google.protobuf.Timestamp expired_at = 9;
   optional string approver_crypto_device_id = 10;
+  bytes approval_challenge = 11;
+}
+
+message CryptoDeviceLinkApprovalPayload {
+  uint32 version = 1;
+  string link_intent_id = 2;
+  string approver_crypto_device_id = 3;
+  string pending_crypto_device_id = 4;
+  bytes pending_bundle_digest = 5;
+  bytes approval_challenge = 6;
+  google.protobuf.Timestamp challenge_expires_at = 7;
+  google.protobuf.Timestamp issued_at = 8;
+}
+
+message CryptoDeviceLinkApprovalProof {
+  CryptoDeviceLinkApprovalPayload payload = 1;
+  bytes signature = 2;
 }
 
 message PingRequest {}
@@ -380,11 +397,10 @@ message ListCryptoDeviceLinkIntentsResponse {
   repeated CryptoDeviceLinkIntent link_intents = 1;
 }
 
-// Этот approval path пока фиксирует только backend state machine и ownership boundaries.
-// Полноценное криптографическое доказательство trusted-device approval будет добавлено отдельно.
 message ApproveCryptoDeviceLinkIntentRequest {
   string link_intent_id = 1;
   string approver_crypto_device_id = 2;
+  CryptoDeviceLinkApprovalProof proof = 3;
 }
 
 message ApproveCryptoDeviceLinkIntentResponse {

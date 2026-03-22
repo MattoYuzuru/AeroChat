@@ -166,15 +166,42 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
       }
 
       try {
+        const linkIntents = await dependencies.gatewayClient.listCryptoDeviceLinkIntents(
+          session.token,
+        );
+        const targetIntent = linkIntents.find(
+          (intent) => intent.id === linkIntentId && intent.status === "pending",
+        );
+        if (targetIntent === undefined) {
+          return synchronizeSession(
+            session,
+            dependencies,
+            "Pending link intent не найден или уже не ждёт одобрения.",
+          );
+        }
+
+        const proof = await dependencies.materialFactory.buildLinkApprovalProof(
+          localMaterial,
+          {
+            linkIntentId: targetIntent.id,
+            approverCryptoDeviceId: localMaterial.record.cryptoDeviceId,
+            pendingCryptoDeviceId: targetIntent.pendingCryptoDeviceId,
+            pendingBundleDigestBase64: targetIntent.bundleDigestBase64,
+            approvalChallengeBase64: targetIntent.approvalChallengeBase64,
+            challengeExpiresAt: targetIntent.expiresAt,
+            issuedAt: new Date().toISOString(),
+          },
+        );
         await dependencies.gatewayClient.approveCryptoDeviceLinkIntent(
           session.token,
           linkIntentId,
           localMaterial.record.cryptoDeviceId,
+          proof,
         );
         return synchronizeSession(
           session,
           dependencies,
-          "Pending link intent одобрен через текущий backend control-plane path.",
+          "Pending link intent одобрен через signed proof текущего active crypto-device.",
         );
       } catch (error) {
         return runtimeError(

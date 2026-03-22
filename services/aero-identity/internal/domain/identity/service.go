@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/subtle"
 	"errors"
 	"fmt"
@@ -68,13 +69,14 @@ type Repository interface {
 }
 
 type Service struct {
-	repo                 Repository
-	passwords            *identityauth.PasswordHasher
-	sessionToken         *libauth.SessionTokenManager
-	sessionTouchInterval time.Duration
-	cryptoLinkIntentTTL  time.Duration
-	now                  func() time.Time
-	newID                func() string
+	repo                           Repository
+	passwords                      *identityauth.PasswordHasher
+	sessionToken                   *libauth.SessionTokenManager
+	sessionTouchInterval           time.Duration
+	cryptoLinkIntentTTL            time.Duration
+	newCryptoLinkApprovalChallenge func() ([]byte, error)
+	now                            func() time.Time
+	newID                          func() string
 }
 
 func NewService(repo Repository, passwords *identityauth.PasswordHasher, sessionToken *libauth.SessionTokenManager) *Service {
@@ -84,6 +86,14 @@ func NewService(repo Repository, passwords *identityauth.PasswordHasher, session
 		sessionToken:         sessionToken,
 		sessionTouchInterval: defaultSessionTouchInterval,
 		cryptoLinkIntentTTL:  defaultCryptoLinkIntentTTL,
+		newCryptoLinkApprovalChallenge: func() ([]byte, error) {
+			challenge := make([]byte, 32)
+			if _, err := rand.Read(challenge); err != nil {
+				return nil, fmt.Errorf("read crypto link approval challenge: %w", err)
+			}
+
+			return challenge, nil
+		},
 		now: func() time.Time {
 			return time.Now().UTC()
 		},

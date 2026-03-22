@@ -86,6 +86,7 @@ type CryptoDeviceLinkIntent struct {
 	ApprovedAt               pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
 	ExpiredAt                pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
 	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
+	ApprovalChallenge        []byte             `db:"approval_challenge" json:"approval_challenge"`
 }
 
 type DirectChat struct {
