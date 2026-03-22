@@ -1448,6 +1448,161 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("loads bundle publish challenge through gateway identity endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          challenge: {
+            cryptoDeviceId: "crypto-1",
+            currentBundleVersion: 7,
+            currentBundleDigest: "digest-7",
+            publishChallenge: "publish-challenge-1",
+            createdAt: "2026-03-22T12:00:00Z",
+            expiresAt: "2026-03-22T12:10:00Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const challenge = await client.createCryptoDeviceBundlePublishChallenge(
+      "token-1",
+      "crypto-1",
+    );
+
+    expect(challenge).toEqual({
+      cryptoDeviceId: "crypto-1",
+      currentBundleVersion: 7,
+      currentBundleDigestBase64: "digest-7",
+      publishChallengeBase64: "publish-challenge-1",
+      createdAt: "2026-03-22T12:00:00Z",
+      expiresAt: "2026-03-22T12:10:00Z",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.identity.v1.IdentityService/CreateCryptoDeviceBundlePublishChallenge",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          cryptoDeviceId: "crypto-1",
+        }),
+      }),
+    );
+  });
+
+  it("sends signed bundle publish proof through gateway identity endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          device: {
+            id: "crypto-1",
+            userId: "user-1",
+            label: "Web Linux",
+            status: "CRYPTO_DEVICE_STATUS_ACTIVE",
+            createdAt: "2026-03-22T12:00:00Z",
+            activatedAt: "2026-03-22T12:00:00Z",
+            lastBundleVersion: 8,
+            lastBundlePublishedAt: "2026-03-22T12:05:00Z",
+          },
+          currentBundle: {
+            cryptoDeviceId: "crypto-1",
+            bundleVersion: 8,
+            cryptoSuite: "webcrypto-p256-foundation-v1",
+            identityPublicKey: "identity-public",
+            signedPrekeyPublic: "signed-prekey-public",
+            signedPrekeyId: "signed-prekey-8",
+            signedPrekeySignature: "signature-8",
+            oneTimePrekeysTotal: 0,
+            oneTimePrekeysAvailable: 0,
+            bundleDigest: "digest-8",
+            publishedAt: "2026-03-22T12:05:00Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    await client.publishCryptoDeviceBundle(
+      "token-1",
+      "crypto-1",
+      {
+        cryptoSuite: "webcrypto-p256-foundation-v1",
+        identityPublicKeyBase64: "identity-public",
+        signedPrekeyPublicBase64: "signed-prekey-public",
+        signedPrekeyId: "signed-prekey-8",
+        signedPrekeySignatureBase64: "signature-8",
+        kemPublicKeyBase64: null,
+        kemKeyId: null,
+        kemSignatureBase64: null,
+        oneTimePrekeysTotal: 0,
+        oneTimePrekeysAvailable: 0,
+        bundleDigestBase64: "digest-8",
+        expiresAt: null,
+      },
+      {
+        payload: {
+          version: 1,
+          cryptoDeviceId: "crypto-1",
+          previousBundleVersion: 7,
+          previousBundleDigestBase64: "digest-7",
+          newBundleDigestBase64: "digest-8",
+          publishChallengeBase64: "publish-challenge-1",
+          challengeExpiresAt: "2026-03-22T12:10:00Z",
+          issuedAt: "2026-03-22T12:04:00Z",
+        },
+        signatureBase64: "publish-signature-1",
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.identity.v1.IdentityService/PublishCryptoDeviceBundle",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          cryptoDeviceId: "crypto-1",
+          bundle: {
+            cryptoSuite: "webcrypto-p256-foundation-v1",
+            identityPublicKey: "identity-public",
+            signedPrekeyPublic: "signed-prekey-public",
+            signedPrekeyId: "signed-prekey-8",
+            signedPrekeySignature: "signature-8",
+            oneTimePrekeysTotal: 0,
+            oneTimePrekeysAvailable: 0,
+            bundleDigest: "digest-8",
+          },
+          proof: {
+            payload: {
+              version: 1,
+              cryptoDeviceId: "crypto-1",
+              previousBundleVersion: 7,
+              previousBundleDigest: "digest-7",
+              newBundleDigest: "digest-8",
+              publishChallenge: "publish-challenge-1",
+              challengeExpiresAt: "2026-03-22T12:10:00Z",
+              issuedAt: "2026-03-22T12:04:00Z",
+            },
+            signature: "publish-signature-1",
+          },
+        }),
+      }),
+    );
+  });
+
   it("sends signed approval proof through gateway identity endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

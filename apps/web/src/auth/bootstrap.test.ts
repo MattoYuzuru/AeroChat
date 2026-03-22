@@ -29,6 +29,7 @@ function createClient(overrides: Partial<GatewayClient>): GatewayClient {
     registerPendingLinkedCryptoDevice: vi.fn(),
     listCryptoDevices: vi.fn(),
     getCryptoDevice: vi.fn(),
+    createCryptoDeviceBundlePublishChallenge: vi.fn(),
     publishCryptoDeviceBundle: vi.fn(),
     createCryptoDeviceLinkIntent: vi.fn(),
     listCryptoDeviceLinkIntents: vi.fn(),

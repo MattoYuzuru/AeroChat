@@ -437,6 +437,19 @@ func (q *Queries) CreateCryptoDeviceLinkIntent(ctx context.Context, arg CreateCr
 	return i, err
 }
 
+const deleteCryptoDeviceBundlePublishChallengeByDeviceID = `-- name: DeleteCryptoDeviceBundlePublishChallengeByDeviceID :execrows
+DELETE FROM crypto_device_bundle_publish_challenges
+WHERE crypto_device_id = $1
+`
+
+func (q *Queries) DeleteCryptoDeviceBundlePublishChallengeByDeviceID(ctx context.Context, cryptoDeviceID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteCryptoDeviceBundlePublishChallengeByDeviceID, cryptoDeviceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const expireCryptoDeviceLinkIntentByIDAndUserID = `-- name: ExpireCryptoDeviceLinkIntentByIDAndUserID :one
 UPDATE crypto_device_link_intents
 SET
@@ -536,6 +549,32 @@ func (q *Queries) ExpireStaleCryptoDeviceLinkIntentsByUserID(ctx context.Context
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getCryptoDeviceBundlePublishChallengeByDeviceID = `-- name: GetCryptoDeviceBundlePublishChallengeByDeviceID :one
+SELECT
+    crypto_device_id,
+    current_bundle_version,
+    current_bundle_digest,
+    publish_challenge,
+    created_at,
+    expires_at
+FROM crypto_device_bundle_publish_challenges
+WHERE crypto_device_id = $1
+`
+
+func (q *Queries) GetCryptoDeviceBundlePublishChallengeByDeviceID(ctx context.Context, cryptoDeviceID uuid.UUID) (CryptoDeviceBundlePublishChallenge, error) {
+	row := q.db.QueryRow(ctx, getCryptoDeviceBundlePublishChallengeByDeviceID, cryptoDeviceID)
+	var i CryptoDeviceBundlePublishChallenge
+	err := row.Scan(
+		&i.CryptoDeviceID,
+		&i.CurrentBundleVersion,
+		&i.CurrentBundleDigest,
+		&i.PublishChallenge,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
 }
 
 const getCryptoDeviceByIDAndUserID = `-- name: GetCryptoDeviceByIDAndUserID :one
@@ -1047,6 +1086,68 @@ func (q *Queries) UpdateCryptoDeviceBundleTracking(ctx context.Context, arg Upda
 		&i.RevokedAt,
 		&i.RevocationReason,
 		&i.RevokedByActor,
+	)
+	return i, err
+}
+
+const upsertCryptoDeviceBundlePublishChallenge = `-- name: UpsertCryptoDeviceBundlePublishChallenge :one
+INSERT INTO crypto_device_bundle_publish_challenges (
+    crypto_device_id,
+    current_bundle_version,
+    current_bundle_digest,
+    publish_challenge,
+    created_at,
+    expires_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6
+)
+ON CONFLICT (crypto_device_id) DO UPDATE
+SET
+    current_bundle_version = EXCLUDED.current_bundle_version,
+    current_bundle_digest = EXCLUDED.current_bundle_digest,
+    publish_challenge = EXCLUDED.publish_challenge,
+    created_at = EXCLUDED.created_at,
+    expires_at = EXCLUDED.expires_at
+RETURNING
+    crypto_device_id,
+    current_bundle_version,
+    current_bundle_digest,
+    publish_challenge,
+    created_at,
+    expires_at
+`
+
+type UpsertCryptoDeviceBundlePublishChallengeParams struct {
+	CryptoDeviceID       uuid.UUID          `db:"crypto_device_id" json:"crypto_device_id"`
+	CurrentBundleVersion int64              `db:"current_bundle_version" json:"current_bundle_version"`
+	CurrentBundleDigest  []byte             `db:"current_bundle_digest" json:"current_bundle_digest"`
+	PublishChallenge     []byte             `db:"publish_challenge" json:"publish_challenge"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt            pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+}
+
+func (q *Queries) UpsertCryptoDeviceBundlePublishChallenge(ctx context.Context, arg UpsertCryptoDeviceBundlePublishChallengeParams) (CryptoDeviceBundlePublishChallenge, error) {
+	row := q.db.QueryRow(ctx, upsertCryptoDeviceBundlePublishChallenge,
+		arg.CryptoDeviceID,
+		arg.CurrentBundleVersion,
+		arg.CurrentBundleDigest,
+		arg.PublishChallenge,
+		arg.CreatedAt,
+		arg.ExpiresAt,
+	)
+	var i CryptoDeviceBundlePublishChallenge
+	err := row.Scan(
+		&i.CryptoDeviceID,
+		&i.CurrentBundleVersion,
+		&i.CurrentBundleDigest,
+		&i.PublishChallenge,
+		&i.CreatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }

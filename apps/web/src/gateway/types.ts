@@ -113,6 +113,15 @@ export interface CryptoDeviceBundle {
   supersededAt: string | null;
 }
 
+export interface CryptoDeviceBundlePublishChallenge {
+  cryptoDeviceId: string;
+  currentBundleVersion: number;
+  currentBundleDigestBase64: string;
+  publishChallengeBase64: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
 export interface CryptoDeviceLinkIntent {
   id: string;
   userId: string;
@@ -140,6 +149,22 @@ export interface CryptoDeviceLinkApprovalPayload {
 
 export interface CryptoDeviceLinkApprovalProof {
   payload: CryptoDeviceLinkApprovalPayload;
+  signatureBase64: string;
+}
+
+export interface CryptoDeviceBundlePublishProofPayload {
+  version: number;
+  cryptoDeviceId: string;
+  previousBundleVersion: number;
+  previousBundleDigestBase64: string;
+  newBundleDigestBase64: string;
+  publishChallengeBase64: string;
+  challengeExpiresAt: string;
+  issuedAt: string;
+}
+
+export interface CryptoDeviceBundlePublishProof {
+  payload: CryptoDeviceBundlePublishProofPayload;
   signatureBase64: string;
 }
 
@@ -527,10 +552,15 @@ export interface GatewayClient {
     device: CryptoDevice;
     currentBundle: CryptoDeviceBundle | null;
   }>;
+  createCryptoDeviceBundlePublishChallenge(
+    token: string,
+    cryptoDeviceId: string,
+  ): Promise<CryptoDeviceBundlePublishChallenge>;
   publishCryptoDeviceBundle(
     token: string,
     cryptoDeviceId: string,
     bundle: CryptoDeviceBundlePayload,
+    proof?: CryptoDeviceBundlePublishProof,
   ): Promise<{
     device: CryptoDevice;
     currentBundle: CryptoDeviceBundle;

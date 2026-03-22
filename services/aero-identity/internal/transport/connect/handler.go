@@ -423,15 +423,38 @@ func (h *Handler) GetCryptoDevice(ctx context.Context, req *connect.Request[iden
 	}), nil
 }
 
+func (h *Handler) CreateCryptoDeviceBundlePublishChallenge(ctx context.Context, req *connect.Request[identityv1.CreateCryptoDeviceBundlePublishChallengeRequest]) (*connect.Response[identityv1.CreateCryptoDeviceBundlePublishChallengeResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	challenge, err := h.service.CreateCryptoDeviceBundlePublishChallenge(ctx, token, req.Msg.CryptoDeviceId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.CreateCryptoDeviceBundlePublishChallengeResponse{
+		Challenge: toProtoCryptoDeviceBundlePublishChallenge(challenge),
+	}), nil
+}
+
 func (h *Handler) PublishCryptoDeviceBundle(ctx context.Context, req *connect.Request[identityv1.PublishCryptoDeviceBundleRequest]) (*connect.Response[identityv1.PublishCryptoDeviceBundleResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
 		return nil, err
 	}
 
+	var proof *identity.CryptoDeviceBundlePublishProof
+	if req.Msg.Proof != nil {
+		value := fromProtoCryptoDeviceBundlePublishProof(req.Msg.Proof)
+		proof = &value
+	}
+
 	details, err := h.service.PublishCryptoDeviceBundle(ctx, token, identity.PublishCryptoDeviceBundleInput{
 		CryptoDeviceID: req.Msg.CryptoDeviceId,
 		Bundle:         fromProtoCryptoDeviceBundlePayload(req.Msg.Bundle),
+		Proof:          proof,
 	})
 	if err != nil {
 		return nil, mapError(err)
@@ -680,6 +703,35 @@ func fromProtoCryptoDeviceLinkApprovalProof(value *identityv1.CryptoDeviceLinkAp
 	}
 }
 
+func fromProtoCryptoDeviceBundlePublishProof(value *identityv1.CryptoDeviceBundlePublishProof) identity.CryptoDeviceBundlePublishProof {
+	if value == nil {
+		return identity.CryptoDeviceBundlePublishProof{}
+	}
+
+	payload := identity.CryptoDeviceBundlePublishProofPayload{}
+	if value.GetPayload() != nil {
+		payload = identity.CryptoDeviceBundlePublishProofPayload{
+			Version:               value.GetPayload().GetVersion(),
+			CryptoDeviceID:        value.GetPayload().GetCryptoDeviceId(),
+			PreviousBundleVersion: int64(value.GetPayload().GetPreviousBundleVersion()),
+			PreviousBundleDigest:  append([]byte(nil), value.GetPayload().GetPreviousBundleDigest()...),
+			NewBundleDigest:       append([]byte(nil), value.GetPayload().GetNewBundleDigest()...),
+			PublishChallenge:      append([]byte(nil), value.GetPayload().GetPublishChallenge()...),
+		}
+		if value.GetPayload().GetChallengeExpiresAt() != nil {
+			payload.ChallengeExpiresAt = value.GetPayload().GetChallengeExpiresAt().AsTime().UTC()
+		}
+		if value.GetPayload().GetIssuedAt() != nil {
+			payload.IssuedAt = value.GetPayload().GetIssuedAt().AsTime().UTC()
+		}
+	}
+
+	return identity.CryptoDeviceBundlePublishProof{
+		Payload:   payload,
+		Signature: append([]byte(nil), value.GetSignature()...),
+	}
+}
+
 func toProtoCryptoDevice(value identity.CryptoDevice) *identityv1.CryptoDevice {
 	device := &identityv1.CryptoDevice{
 		Id:        value.ID,
@@ -745,6 +797,21 @@ func toProtoCryptoDeviceBundle(value *identity.CryptoDeviceBundle) *identityv1.C
 	}
 
 	return bundle
+}
+
+func toProtoCryptoDeviceBundlePublishChallenge(value *identity.CryptoDeviceBundlePublishChallenge) *identityv1.CryptoDeviceBundlePublishChallenge {
+	if value == nil {
+		return nil
+	}
+
+	return &identityv1.CryptoDeviceBundlePublishChallenge{
+		CryptoDeviceId:       value.CryptoDeviceID,
+		CurrentBundleVersion: uint64(value.CurrentBundleVersion),
+		CurrentBundleDigest:  append([]byte(nil), value.CurrentBundleDigest...),
+		PublishChallenge:     append([]byte(nil), value.PublishChallenge...),
+		CreatedAt:            timestamppb.New(value.CreatedAt),
+		ExpiresAt:            timestamppb.New(value.ExpiresAt),
+	}
 }
 
 func toProtoCryptoDeviceLinkIntent(value *identity.CryptoDeviceLinkIntent) *identityv1.CryptoDeviceLinkIntent {

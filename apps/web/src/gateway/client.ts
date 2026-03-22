@@ -3,6 +3,8 @@ import type {
   AttachmentUploadSession,
   CryptoDevice,
   CryptoDeviceLinkApprovalProof,
+  CryptoDeviceBundlePublishChallenge,
+  CryptoDeviceBundlePublishProof,
   CryptoDeviceBundle,
   CryptoDeviceBundlePayload,
   CryptoDeviceLinkIntent,
@@ -173,6 +175,15 @@ interface CryptoDeviceLinkIntentWire {
   approverCryptoDeviceId?: string;
 }
 
+interface CryptoDeviceBundlePublishChallengeWire {
+  cryptoDeviceId?: string;
+  currentBundleVersion?: number | string;
+  currentBundleDigest?: string;
+  publishChallenge?: string;
+  createdAt?: string;
+  expiresAt?: string;
+}
+
 interface RegisterCryptoDeviceResponseWire {
   device?: CryptoDeviceWire;
   currentBundle?: CryptoDeviceBundleWire;
@@ -185,6 +196,10 @@ interface ListCryptoDevicesResponseWire {
 interface GetCryptoDeviceResponseWire {
   device?: CryptoDeviceWire;
   currentBundle?: CryptoDeviceBundleWire;
+}
+
+interface CreateCryptoDeviceBundlePublishChallengeResponseWire {
+  challenge?: CryptoDeviceBundlePublishChallengeWire;
 }
 
 interface CreateCryptoDeviceLinkIntentResponseWire {
@@ -729,7 +744,22 @@ export function createGatewayClient(
       };
     },
 
-    async publishCryptoDeviceBundle(token, cryptoDeviceId, bundle) {
+    async createCryptoDeviceBundlePublishChallenge(token, cryptoDeviceId) {
+      const response = await unaryCall<CreateCryptoDeviceBundlePublishChallengeResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "CreateCryptoDeviceBundlePublishChallenge",
+        {
+          cryptoDeviceId: cryptoDeviceId.trim(),
+        },
+        token,
+      );
+
+      return normalizeCryptoDeviceBundlePublishChallenge(response.challenge);
+    },
+
+    async publishCryptoDeviceBundle(token, cryptoDeviceId, bundle, proof) {
       const response = await unaryCall<RegisterCryptoDeviceResponseWire>(
         fetchImpl,
         baseUrl,
@@ -738,6 +768,9 @@ export function createGatewayClient(
         {
           cryptoDeviceId: cryptoDeviceId.trim(),
           bundle: normalizeCryptoDeviceBundlePayloadForWire(bundle),
+          proof: proof
+            ? normalizeCryptoDeviceBundlePublishProofForWire(proof)
+            : undefined,
         },
         token,
       );
@@ -1818,6 +1851,19 @@ function normalizeCryptoDeviceBundleOrNull(
   return normalizeCryptoDeviceBundle(input);
 }
 
+function normalizeCryptoDeviceBundlePublishChallenge(
+  input: CryptoDeviceBundlePublishChallengeWire | undefined,
+): CryptoDeviceBundlePublishChallenge {
+  return {
+    cryptoDeviceId: input?.cryptoDeviceId ?? "",
+    currentBundleVersion: normalizeCount(input?.currentBundleVersion),
+    currentBundleDigestBase64: input?.currentBundleDigest ?? "",
+    publishChallengeBase64: input?.publishChallenge ?? "",
+    createdAt: input?.createdAt ?? "",
+    expiresAt: input?.expiresAt ?? "",
+  };
+}
+
 function normalizeCryptoDeviceLinkIntent(
   input: CryptoDeviceLinkIntentWire | undefined,
 ): CryptoDeviceLinkIntent {
@@ -1833,6 +1879,24 @@ function normalizeCryptoDeviceLinkIntent(
     approvedAt: normalizeNullableString(input?.approvedAt),
     expiredAt: normalizeNullableString(input?.expiredAt),
     approverCryptoDeviceId: normalizeNullableString(input?.approverCryptoDeviceId),
+  };
+}
+
+function normalizeCryptoDeviceBundlePublishProofForWire(
+  proof: CryptoDeviceBundlePublishProof,
+) {
+  return {
+    payload: {
+      version: proof.payload.version,
+      cryptoDeviceId: proof.payload.cryptoDeviceId,
+      previousBundleVersion: proof.payload.previousBundleVersion,
+      previousBundleDigest: proof.payload.previousBundleDigestBase64,
+      newBundleDigest: proof.payload.newBundleDigestBase64,
+      publishChallenge: proof.payload.publishChallengeBase64,
+      challengeExpiresAt: proof.payload.challengeExpiresAt,
+      issuedAt: proof.payload.issuedAt,
+    },
+    signature: proof.signatureBase64,
   };
 }
 

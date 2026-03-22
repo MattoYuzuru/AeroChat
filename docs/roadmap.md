@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] proof-bound linked-device approval hardening
+- [x] proof-bound crypto bundle update and rotation hardening
 
 ---
 
@@ -61,6 +61,7 @@
 - [x] Linked-device control-plane foundation
 - [x] Web secure key storage and crypto worker foundation
 - [x] Proof-bound linked-device approval hardening
+- [x] Proof-bound crypto bundle update and rotation hardening
 - [ ] Block list
 - [ ] Key backup status
 

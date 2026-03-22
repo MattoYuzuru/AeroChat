@@ -31,6 +31,7 @@ service IdentityService {
   rpc RegisterPendingLinkedCryptoDevice(RegisterPendingLinkedCryptoDeviceRequest) returns (RegisterPendingLinkedCryptoDeviceResponse);
   rpc ListCryptoDevices(ListCryptoDevicesRequest) returns (ListCryptoDevicesResponse);
   rpc GetCryptoDevice(GetCryptoDeviceRequest) returns (GetCryptoDeviceResponse);
+  rpc CreateCryptoDeviceBundlePublishChallenge(CreateCryptoDeviceBundlePublishChallengeRequest) returns (CreateCryptoDeviceBundlePublishChallengeResponse);
   rpc PublishCryptoDeviceBundle(PublishCryptoDeviceBundleRequest) returns (PublishCryptoDeviceBundleResponse);
   rpc CreateCryptoDeviceLinkIntent(CreateCryptoDeviceLinkIntentRequest) returns (CreateCryptoDeviceLinkIntentResponse);
   rpc ListCryptoDeviceLinkIntents(ListCryptoDeviceLinkIntentsRequest) returns (ListCryptoDeviceLinkIntentsResponse);
@@ -169,6 +170,31 @@ message CryptoDeviceBundle {
   google.protobuf.Timestamp published_at = 14;
   google.protobuf.Timestamp expires_at = 15;
   google.protobuf.Timestamp superseded_at = 16;
+}
+
+message CryptoDeviceBundlePublishChallenge {
+  string crypto_device_id = 1;
+  uint64 current_bundle_version = 2;
+  bytes current_bundle_digest = 3;
+  bytes publish_challenge = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp expires_at = 6;
+}
+
+message CryptoDeviceBundlePublishProofPayload {
+  uint32 version = 1;
+  string crypto_device_id = 2;
+  uint64 previous_bundle_version = 3;
+  bytes previous_bundle_digest = 4;
+  bytes new_bundle_digest = 5;
+  bytes publish_challenge = 6;
+  google.protobuf.Timestamp challenge_expires_at = 7;
+  google.protobuf.Timestamp issued_at = 8;
+}
+
+message CryptoDeviceBundlePublishProof {
+  CryptoDeviceBundlePublishProofPayload payload = 1;
+  bytes signature = 2;
 }
 
 message CryptoDeviceLinkIntent {
@@ -373,9 +399,18 @@ message GetCryptoDeviceResponse {
   CryptoDeviceBundle current_bundle = 2;
 }
 
+message CreateCryptoDeviceBundlePublishChallengeRequest {
+  string crypto_device_id = 1;
+}
+
+message CreateCryptoDeviceBundlePublishChallengeResponse {
+  CryptoDeviceBundlePublishChallenge challenge = 1;
+}
+
 message PublishCryptoDeviceBundleRequest {
   string crypto_device_id = 1;
   CryptoDeviceBundlePayload bundle = 2;
+  CryptoDeviceBundlePublishProof proof = 3;
 }
 
 message PublishCryptoDeviceBundleResponse {

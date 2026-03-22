@@ -420,6 +420,11 @@ func newTestService() *Service {
 		challengeSequence++
 		return []byte("approval-challenge-" + testUUID(10_000+challengeSequence)), nil
 	}
+	publishChallengeSequence := 0
+	service.newCryptoBundlePublishChallenge = func() ([]byte, error) {
+		publishChallengeSequence++
+		return []byte("bundle-publish-challenge-" + testUUID(20_000+publishChallengeSequence)), nil
+	}
 
 	return service
 }
@@ -440,33 +445,35 @@ func mustRegister(t *testing.T, service *Service, login string, nickname string)
 }
 
 type fakeRepository struct {
-	users         map[string]User
-	usersByLogin  map[string]string
-	passwords     map[string]string
-	devices       map[string]Device
-	sessions      map[string]SessionAuth
-	cryptoDevices map[string]CryptoDevice
-	cryptoBundles map[string]CryptoDeviceBundle
-	linkIntents   map[string]CryptoDeviceLinkIntent
-	blocks        map[string]map[string]time.Time
-	friendReqs    map[string]PendingFriendRequest
-	friendships   map[string]time.Time
-	touchCalls    int
+	users                   map[string]User
+	usersByLogin            map[string]string
+	passwords               map[string]string
+	devices                 map[string]Device
+	sessions                map[string]SessionAuth
+	cryptoDevices           map[string]CryptoDevice
+	cryptoBundles           map[string]CryptoDeviceBundle
+	bundlePublishChallenges map[string]CryptoDeviceBundlePublishChallenge
+	linkIntents             map[string]CryptoDeviceLinkIntent
+	blocks                  map[string]map[string]time.Time
+	friendReqs              map[string]PendingFriendRequest
+	friendships             map[string]time.Time
+	touchCalls              int
 }
 
 func newFakeRepository() *fakeRepository {
 	return &fakeRepository{
-		users:         make(map[string]User),
-		usersByLogin:  make(map[string]string),
-		passwords:     make(map[string]string),
-		devices:       make(map[string]Device),
-		sessions:      make(map[string]SessionAuth),
-		cryptoDevices: make(map[string]CryptoDevice),
-		cryptoBundles: make(map[string]CryptoDeviceBundle),
-		linkIntents:   make(map[string]CryptoDeviceLinkIntent),
-		blocks:        make(map[string]map[string]time.Time),
-		friendReqs:    make(map[string]PendingFriendRequest),
-		friendships:   make(map[string]time.Time),
+		users:                   make(map[string]User),
+		usersByLogin:            make(map[string]string),
+		passwords:               make(map[string]string),
+		devices:                 make(map[string]Device),
+		sessions:                make(map[string]SessionAuth),
+		cryptoDevices:           make(map[string]CryptoDevice),
+		cryptoBundles:           make(map[string]CryptoDeviceBundle),
+		bundlePublishChallenges: make(map[string]CryptoDeviceBundlePublishChallenge),
+		linkIntents:             make(map[string]CryptoDeviceLinkIntent),
+		blocks:                  make(map[string]map[string]time.Time),
+		friendReqs:              make(map[string]PendingFriendRequest),
+		friendships:             make(map[string]time.Time),
 	}
 }
 
@@ -836,6 +843,18 @@ func (r *fakeRepository) GetCryptoDeviceDetails(_ context.Context, userID string
 	}, nil
 }
 
+func (r *fakeRepository) CreateCryptoDeviceBundlePublishChallenge(_ context.Context, params CreateCryptoDeviceBundlePublishChallengeParams) (*CryptoDeviceBundlePublishChallenge, error) {
+	challenge := params.Challenge
+	challenge.CurrentBundleDigest = cloneBytes(challenge.CurrentBundleDigest)
+	challenge.PublishChallenge = cloneBytes(challenge.PublishChallenge)
+	r.bundlePublishChallenges[challenge.CryptoDeviceID] = challenge
+
+	challengeCopy := challenge
+	challengeCopy.CurrentBundleDigest = cloneBytes(challenge.CurrentBundleDigest)
+	challengeCopy.PublishChallenge = cloneBytes(challenge.PublishChallenge)
+	return &challengeCopy, nil
+}
+
 func (r *fakeRepository) PublishCryptoDeviceBundle(_ context.Context, userID string, input PublishCryptoDeviceBundleInput, publishedAt time.Time) (*CryptoDevice, *CryptoDeviceBundle, error) {
 	device, ok := r.cryptoDevices[input.CryptoDeviceID]
 	if !ok || device.UserID != userID {
@@ -851,6 +870,33 @@ func (r *fakeRepository) PublishCryptoDeviceBundle(_ context.Context, userID str
 	}
 	if string(currentBundle.IdentityPublicKey) != string(input.Bundle.IdentityPublicKey) {
 		return nil, nil, ErrConflict
+	}
+	if device.Status == CryptoDeviceStatusActive {
+		if input.Proof == nil {
+			return nil, nil, ErrConflict
+		}
+		challenge, ok := r.bundlePublishChallenges[input.CryptoDeviceID]
+		if !ok || !challenge.ExpiresAt.After(publishedAt) {
+			delete(r.bundlePublishChallenges, input.CryptoDeviceID)
+			return nil, nil, ErrConflict
+		}
+		if challenge.CurrentBundleVersion != currentBundle.BundleVersion || string(challenge.CurrentBundleDigest) != string(currentBundle.BundleDigest) {
+			delete(r.bundlePublishChallenges, input.CryptoDeviceID)
+			return nil, nil, ErrConflict
+		}
+		if input.Proof.Payload.CryptoDeviceID != input.CryptoDeviceID ||
+			input.Proof.Payload.PreviousBundleVersion != currentBundle.BundleVersion ||
+			string(input.Proof.Payload.PreviousBundleDigest) != string(currentBundle.BundleDigest) ||
+			string(input.Proof.Payload.NewBundleDigest) != string(input.Bundle.BundleDigest) ||
+			string(input.Proof.Payload.PublishChallenge) != string(challenge.PublishChallenge) ||
+			!input.Proof.Payload.ChallengeExpiresAt.Equal(challenge.ExpiresAt) ||
+			input.Proof.Payload.IssuedAt.Before(challenge.CreatedAt) ||
+			input.Proof.Payload.IssuedAt.After(publishedAt) {
+			return nil, nil, ErrConflict
+		}
+		if err := VerifyCryptoDeviceBundlePublishSignature(currentBundle.IdentityPublicKey, *input.Proof); err != nil {
+			return nil, nil, ErrConflict
+		}
 	}
 
 	nextVersion := currentBundle.BundleVersion + 1
@@ -887,6 +933,7 @@ func (r *fakeRepository) PublishCryptoDeviceBundle(_ context.Context, userID str
 			r.linkIntents[intentID] = intent
 		}
 	}
+	delete(r.bundlePublishChallenges, input.CryptoDeviceID)
 
 	deviceCopy := device
 	bundleCopy := cloneCryptoBundle(newBundle)
@@ -1058,6 +1105,7 @@ func (r *fakeRepository) RevokeCryptoDevice(_ context.Context, params RevokeCryp
 	actor := params.RevokedByActor
 	device.RevokedByActor = &actor
 	r.cryptoDevices[params.CryptoDeviceID] = device
+	delete(r.bundlePublishChallenges, params.CryptoDeviceID)
 
 	for intentID, intent := range r.linkIntents {
 		if intent.PendingCryptoDeviceID != params.CryptoDeviceID || intent.Status != CryptoDeviceLinkIntentStatusPending {
