@@ -100,6 +100,9 @@ const (
 	// IdentityServiceGetCryptoDeviceProcedure is the fully-qualified name of the IdentityService's
 	// GetCryptoDevice RPC.
 	IdentityServiceGetCryptoDeviceProcedure = "/aerochat.identity.v1.IdentityService/GetCryptoDevice"
+	// IdentityServiceCreateCryptoDeviceBundlePublishChallengeProcedure is the fully-qualified name of
+	// the IdentityService's CreateCryptoDeviceBundlePublishChallenge RPC.
+	IdentityServiceCreateCryptoDeviceBundlePublishChallengeProcedure = "/aerochat.identity.v1.IdentityService/CreateCryptoDeviceBundlePublishChallenge"
 	// IdentityServicePublishCryptoDeviceBundleProcedure is the fully-qualified name of the
 	// IdentityService's PublishCryptoDeviceBundle RPC.
 	IdentityServicePublishCryptoDeviceBundleProcedure = "/aerochat.identity.v1.IdentityService/PublishCryptoDeviceBundle"
@@ -145,6 +148,7 @@ type IdentityServiceClient interface {
 	RegisterPendingLinkedCryptoDevice(context.Context, *connect.Request[v1.RegisterPendingLinkedCryptoDeviceRequest]) (*connect.Response[v1.RegisterPendingLinkedCryptoDeviceResponse], error)
 	ListCryptoDevices(context.Context, *connect.Request[v1.ListCryptoDevicesRequest]) (*connect.Response[v1.ListCryptoDevicesResponse], error)
 	GetCryptoDevice(context.Context, *connect.Request[v1.GetCryptoDeviceRequest]) (*connect.Response[v1.GetCryptoDeviceResponse], error)
+	CreateCryptoDeviceBundlePublishChallenge(context.Context, *connect.Request[v1.CreateCryptoDeviceBundlePublishChallengeRequest]) (*connect.Response[v1.CreateCryptoDeviceBundlePublishChallengeResponse], error)
 	PublishCryptoDeviceBundle(context.Context, *connect.Request[v1.PublishCryptoDeviceBundleRequest]) (*connect.Response[v1.PublishCryptoDeviceBundleResponse], error)
 	CreateCryptoDeviceLinkIntent(context.Context, *connect.Request[v1.CreateCryptoDeviceLinkIntentRequest]) (*connect.Response[v1.CreateCryptoDeviceLinkIntentResponse], error)
 	ListCryptoDeviceLinkIntents(context.Context, *connect.Request[v1.ListCryptoDeviceLinkIntentsRequest]) (*connect.Response[v1.ListCryptoDeviceLinkIntentsResponse], error)
@@ -302,6 +306,12 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(identityServiceMethods.ByName("GetCryptoDevice")),
 			connect.WithClientOptions(opts...),
 		),
+		createCryptoDeviceBundlePublishChallenge: connect.NewClient[v1.CreateCryptoDeviceBundlePublishChallengeRequest, v1.CreateCryptoDeviceBundlePublishChallengeResponse](
+			httpClient,
+			baseURL+IdentityServiceCreateCryptoDeviceBundlePublishChallengeProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("CreateCryptoDeviceBundlePublishChallenge")),
+			connect.WithClientOptions(opts...),
+		),
 		publishCryptoDeviceBundle: connect.NewClient[v1.PublishCryptoDeviceBundleRequest, v1.PublishCryptoDeviceBundleResponse](
 			httpClient,
 			baseURL+IdentityServicePublishCryptoDeviceBundleProcedure,
@@ -343,35 +353,36 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // identityServiceClient implements IdentityServiceClient.
 type identityServiceClient struct {
-	ping                              *connect.Client[v1.PingRequest, v1.PingResponse]
-	register                          *connect.Client[v1.RegisterRequest, v1.RegisterResponse]
-	login                             *connect.Client[v1.LoginRequest, v1.LoginResponse]
-	logoutCurrentSession              *connect.Client[v1.LogoutCurrentSessionRequest, v1.LogoutCurrentSessionResponse]
-	getCurrentProfile                 *connect.Client[v1.GetCurrentProfileRequest, v1.GetCurrentProfileResponse]
-	updateCurrentProfile              *connect.Client[v1.UpdateCurrentProfileRequest, v1.UpdateCurrentProfileResponse]
-	listDevices                       *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
-	revokeSessionOrDevice             *connect.Client[v1.RevokeSessionOrDeviceRequest, v1.RevokeSessionOrDeviceResponse]
-	listBlockedUsers                  *connect.Client[v1.ListBlockedUsersRequest, v1.ListBlockedUsersResponse]
-	blockUser                         *connect.Client[v1.BlockUserRequest, v1.BlockUserResponse]
-	unblockUser                       *connect.Client[v1.UnblockUserRequest, v1.UnblockUserResponse]
-	sendFriendRequest                 *connect.Client[v1.SendFriendRequestRequest, v1.SendFriendRequestResponse]
-	acceptFriendRequest               *connect.Client[v1.AcceptFriendRequestRequest, v1.AcceptFriendRequestResponse]
-	declineFriendRequest              *connect.Client[v1.DeclineFriendRequestRequest, v1.DeclineFriendRequestResponse]
-	cancelOutgoingFriendRequest       *connect.Client[v1.CancelOutgoingFriendRequestRequest, v1.CancelOutgoingFriendRequestResponse]
-	listIncomingFriendRequests        *connect.Client[v1.ListIncomingFriendRequestsRequest, v1.ListIncomingFriendRequestsResponse]
-	listOutgoingFriendRequests        *connect.Client[v1.ListOutgoingFriendRequestsRequest, v1.ListOutgoingFriendRequestsResponse]
-	listFriends                       *connect.Client[v1.ListFriendsRequest, v1.ListFriendsResponse]
-	removeFriend                      *connect.Client[v1.RemoveFriendRequest, v1.RemoveFriendResponse]
-	registerFirstCryptoDevice         *connect.Client[v1.RegisterFirstCryptoDeviceRequest, v1.RegisterFirstCryptoDeviceResponse]
-	registerPendingLinkedCryptoDevice *connect.Client[v1.RegisterPendingLinkedCryptoDeviceRequest, v1.RegisterPendingLinkedCryptoDeviceResponse]
-	listCryptoDevices                 *connect.Client[v1.ListCryptoDevicesRequest, v1.ListCryptoDevicesResponse]
-	getCryptoDevice                   *connect.Client[v1.GetCryptoDeviceRequest, v1.GetCryptoDeviceResponse]
-	publishCryptoDeviceBundle         *connect.Client[v1.PublishCryptoDeviceBundleRequest, v1.PublishCryptoDeviceBundleResponse]
-	createCryptoDeviceLinkIntent      *connect.Client[v1.CreateCryptoDeviceLinkIntentRequest, v1.CreateCryptoDeviceLinkIntentResponse]
-	listCryptoDeviceLinkIntents       *connect.Client[v1.ListCryptoDeviceLinkIntentsRequest, v1.ListCryptoDeviceLinkIntentsResponse]
-	approveCryptoDeviceLinkIntent     *connect.Client[v1.ApproveCryptoDeviceLinkIntentRequest, v1.ApproveCryptoDeviceLinkIntentResponse]
-	expireCryptoDeviceLinkIntent      *connect.Client[v1.ExpireCryptoDeviceLinkIntentRequest, v1.ExpireCryptoDeviceLinkIntentResponse]
-	revokeCryptoDevice                *connect.Client[v1.RevokeCryptoDeviceRequest, v1.RevokeCryptoDeviceResponse]
+	ping                                     *connect.Client[v1.PingRequest, v1.PingResponse]
+	register                                 *connect.Client[v1.RegisterRequest, v1.RegisterResponse]
+	login                                    *connect.Client[v1.LoginRequest, v1.LoginResponse]
+	logoutCurrentSession                     *connect.Client[v1.LogoutCurrentSessionRequest, v1.LogoutCurrentSessionResponse]
+	getCurrentProfile                        *connect.Client[v1.GetCurrentProfileRequest, v1.GetCurrentProfileResponse]
+	updateCurrentProfile                     *connect.Client[v1.UpdateCurrentProfileRequest, v1.UpdateCurrentProfileResponse]
+	listDevices                              *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
+	revokeSessionOrDevice                    *connect.Client[v1.RevokeSessionOrDeviceRequest, v1.RevokeSessionOrDeviceResponse]
+	listBlockedUsers                         *connect.Client[v1.ListBlockedUsersRequest, v1.ListBlockedUsersResponse]
+	blockUser                                *connect.Client[v1.BlockUserRequest, v1.BlockUserResponse]
+	unblockUser                              *connect.Client[v1.UnblockUserRequest, v1.UnblockUserResponse]
+	sendFriendRequest                        *connect.Client[v1.SendFriendRequestRequest, v1.SendFriendRequestResponse]
+	acceptFriendRequest                      *connect.Client[v1.AcceptFriendRequestRequest, v1.AcceptFriendRequestResponse]
+	declineFriendRequest                     *connect.Client[v1.DeclineFriendRequestRequest, v1.DeclineFriendRequestResponse]
+	cancelOutgoingFriendRequest              *connect.Client[v1.CancelOutgoingFriendRequestRequest, v1.CancelOutgoingFriendRequestResponse]
+	listIncomingFriendRequests               *connect.Client[v1.ListIncomingFriendRequestsRequest, v1.ListIncomingFriendRequestsResponse]
+	listOutgoingFriendRequests               *connect.Client[v1.ListOutgoingFriendRequestsRequest, v1.ListOutgoingFriendRequestsResponse]
+	listFriends                              *connect.Client[v1.ListFriendsRequest, v1.ListFriendsResponse]
+	removeFriend                             *connect.Client[v1.RemoveFriendRequest, v1.RemoveFriendResponse]
+	registerFirstCryptoDevice                *connect.Client[v1.RegisterFirstCryptoDeviceRequest, v1.RegisterFirstCryptoDeviceResponse]
+	registerPendingLinkedCryptoDevice        *connect.Client[v1.RegisterPendingLinkedCryptoDeviceRequest, v1.RegisterPendingLinkedCryptoDeviceResponse]
+	listCryptoDevices                        *connect.Client[v1.ListCryptoDevicesRequest, v1.ListCryptoDevicesResponse]
+	getCryptoDevice                          *connect.Client[v1.GetCryptoDeviceRequest, v1.GetCryptoDeviceResponse]
+	createCryptoDeviceBundlePublishChallenge *connect.Client[v1.CreateCryptoDeviceBundlePublishChallengeRequest, v1.CreateCryptoDeviceBundlePublishChallengeResponse]
+	publishCryptoDeviceBundle                *connect.Client[v1.PublishCryptoDeviceBundleRequest, v1.PublishCryptoDeviceBundleResponse]
+	createCryptoDeviceLinkIntent             *connect.Client[v1.CreateCryptoDeviceLinkIntentRequest, v1.CreateCryptoDeviceLinkIntentResponse]
+	listCryptoDeviceLinkIntents              *connect.Client[v1.ListCryptoDeviceLinkIntentsRequest, v1.ListCryptoDeviceLinkIntentsResponse]
+	approveCryptoDeviceLinkIntent            *connect.Client[v1.ApproveCryptoDeviceLinkIntentRequest, v1.ApproveCryptoDeviceLinkIntentResponse]
+	expireCryptoDeviceLinkIntent             *connect.Client[v1.ExpireCryptoDeviceLinkIntentRequest, v1.ExpireCryptoDeviceLinkIntentResponse]
+	revokeCryptoDevice                       *connect.Client[v1.RevokeCryptoDeviceRequest, v1.RevokeCryptoDeviceResponse]
 }
 
 // Ping calls aerochat.identity.v1.IdentityService.Ping.
@@ -491,6 +502,12 @@ func (c *identityServiceClient) GetCryptoDevice(ctx context.Context, req *connec
 	return c.getCryptoDevice.CallUnary(ctx, req)
 }
 
+// CreateCryptoDeviceBundlePublishChallenge calls
+// aerochat.identity.v1.IdentityService.CreateCryptoDeviceBundlePublishChallenge.
+func (c *identityServiceClient) CreateCryptoDeviceBundlePublishChallenge(ctx context.Context, req *connect.Request[v1.CreateCryptoDeviceBundlePublishChallengeRequest]) (*connect.Response[v1.CreateCryptoDeviceBundlePublishChallengeResponse], error) {
+	return c.createCryptoDeviceBundlePublishChallenge.CallUnary(ctx, req)
+}
+
 // PublishCryptoDeviceBundle calls aerochat.identity.v1.IdentityService.PublishCryptoDeviceBundle.
 func (c *identityServiceClient) PublishCryptoDeviceBundle(ctx context.Context, req *connect.Request[v1.PublishCryptoDeviceBundleRequest]) (*connect.Response[v1.PublishCryptoDeviceBundleResponse], error) {
 	return c.publishCryptoDeviceBundle.CallUnary(ctx, req)
@@ -550,6 +567,7 @@ type IdentityServiceHandler interface {
 	RegisterPendingLinkedCryptoDevice(context.Context, *connect.Request[v1.RegisterPendingLinkedCryptoDeviceRequest]) (*connect.Response[v1.RegisterPendingLinkedCryptoDeviceResponse], error)
 	ListCryptoDevices(context.Context, *connect.Request[v1.ListCryptoDevicesRequest]) (*connect.Response[v1.ListCryptoDevicesResponse], error)
 	GetCryptoDevice(context.Context, *connect.Request[v1.GetCryptoDeviceRequest]) (*connect.Response[v1.GetCryptoDeviceResponse], error)
+	CreateCryptoDeviceBundlePublishChallenge(context.Context, *connect.Request[v1.CreateCryptoDeviceBundlePublishChallengeRequest]) (*connect.Response[v1.CreateCryptoDeviceBundlePublishChallengeResponse], error)
 	PublishCryptoDeviceBundle(context.Context, *connect.Request[v1.PublishCryptoDeviceBundleRequest]) (*connect.Response[v1.PublishCryptoDeviceBundleResponse], error)
 	CreateCryptoDeviceLinkIntent(context.Context, *connect.Request[v1.CreateCryptoDeviceLinkIntentRequest]) (*connect.Response[v1.CreateCryptoDeviceLinkIntentResponse], error)
 	ListCryptoDeviceLinkIntents(context.Context, *connect.Request[v1.ListCryptoDeviceLinkIntentsRequest]) (*connect.Response[v1.ListCryptoDeviceLinkIntentsResponse], error)
@@ -703,6 +721,12 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 		connect.WithSchema(identityServiceMethods.ByName("GetCryptoDevice")),
 		connect.WithHandlerOptions(opts...),
 	)
+	identityServiceCreateCryptoDeviceBundlePublishChallengeHandler := connect.NewUnaryHandler(
+		IdentityServiceCreateCryptoDeviceBundlePublishChallengeProcedure,
+		svc.CreateCryptoDeviceBundlePublishChallenge,
+		connect.WithSchema(identityServiceMethods.ByName("CreateCryptoDeviceBundlePublishChallenge")),
+		connect.WithHandlerOptions(opts...),
+	)
 	identityServicePublishCryptoDeviceBundleHandler := connect.NewUnaryHandler(
 		IdentityServicePublishCryptoDeviceBundleProcedure,
 		svc.PublishCryptoDeviceBundle,
@@ -787,6 +811,8 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 			identityServiceListCryptoDevicesHandler.ServeHTTP(w, r)
 		case IdentityServiceGetCryptoDeviceProcedure:
 			identityServiceGetCryptoDeviceHandler.ServeHTTP(w, r)
+		case IdentityServiceCreateCryptoDeviceBundlePublishChallengeProcedure:
+			identityServiceCreateCryptoDeviceBundlePublishChallengeHandler.ServeHTTP(w, r)
 		case IdentityServicePublishCryptoDeviceBundleProcedure:
 			identityServicePublishCryptoDeviceBundleHandler.ServeHTTP(w, r)
 		case IdentityServiceCreateCryptoDeviceLinkIntentProcedure:
@@ -898,6 +924,10 @@ func (UnimplementedIdentityServiceHandler) ListCryptoDevices(context.Context, *c
 
 func (UnimplementedIdentityServiceHandler) GetCryptoDevice(context.Context, *connect.Request[v1.GetCryptoDeviceRequest]) (*connect.Response[v1.GetCryptoDeviceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.GetCryptoDevice is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) CreateCryptoDeviceBundlePublishChallenge(context.Context, *connect.Request[v1.CreateCryptoDeviceBundlePublishChallengeRequest]) (*connect.Response[v1.CreateCryptoDeviceBundlePublishChallengeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.CreateCryptoDeviceBundlePublishChallenge is not implemented"))
 }
 
 func (UnimplementedIdentityServiceHandler) PublishCryptoDeviceBundle(context.Context, *connect.Request[v1.PublishCryptoDeviceBundleRequest]) (*connect.Response[v1.PublishCryptoDeviceBundleResponse], error) {

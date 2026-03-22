@@ -1,4 +1,7 @@
-import type { CryptoDeviceLinkApprovalProof } from "../gateway/types";
+import type {
+  CryptoDeviceBundlePublishProof,
+  CryptoDeviceLinkApprovalProof,
+} from "../gateway/types";
 import type {
   CryptoBundleMaterial,
   LocalCryptoDeviceMaterial,
@@ -36,6 +39,18 @@ export interface CryptoMaterialFactory {
       issuedAt: string;
     },
   ): Promise<CryptoDeviceLinkApprovalProof>;
+  buildBundlePublishProof(
+    material: LocalCryptoDeviceMaterial,
+    input: {
+      cryptoDeviceId: string;
+      previousBundleVersion: number;
+      previousBundleDigestBase64: string;
+      newBundleDigestBase64: string;
+      publishChallengeBase64: string;
+      challengeExpiresAt: string;
+      issuedAt: string;
+    },
+  ): Promise<CryptoDeviceBundlePublishProof>;
   syncRecordFromServer(
     material: LocalCryptoDeviceMaterial,
     input: {
@@ -131,6 +146,32 @@ export function createWebCryptoMaterialFactory(): CryptoMaterialFactory {
         },
         material.identityPrivateKey,
         cloneBuffer(buildCryptoDeviceLinkApprovalSigningMessage(payload)),
+      );
+
+      return {
+        payload,
+        signatureBase64: toBase64(new Uint8Array(signature)),
+      };
+    },
+
+    async buildBundlePublishProof(material, input) {
+      const payload: CryptoDeviceBundlePublishProof["payload"] = {
+        version: 1,
+        cryptoDeviceId: input.cryptoDeviceId,
+        previousBundleVersion: input.previousBundleVersion,
+        previousBundleDigestBase64: input.previousBundleDigestBase64,
+        newBundleDigestBase64: input.newBundleDigestBase64,
+        publishChallengeBase64: input.publishChallengeBase64,
+        challengeExpiresAt: input.challengeExpiresAt,
+        issuedAt: input.issuedAt,
+      };
+      const signature = await crypto.subtle.sign(
+        {
+          name: "ECDSA",
+          hash: "SHA-256",
+        },
+        material.identityPrivateKey,
+        cloneBuffer(buildCryptoDeviceBundlePublishSigningMessage(payload)),
       );
 
       return {
@@ -260,6 +301,25 @@ function buildCryptoDeviceLinkApprovalSigningMessage(
     `pending_crypto_device_id=${payload.pendingCryptoDeviceId}`,
     `pending_bundle_digest=${payload.pendingBundleDigestBase64}`,
     `approval_challenge=${payload.approvalChallengeBase64}`,
+    `challenge_expires_at=${payload.challengeExpiresAt}`,
+    `issued_at=${payload.issuedAt}`,
+    "",
+  ];
+
+  return new TextEncoder().encode(lines.join("\n"));
+}
+
+function buildCryptoDeviceBundlePublishSigningMessage(
+  payload: CryptoDeviceBundlePublishProof["payload"],
+): Uint8Array {
+  const lines = [
+    "aerochat.crypto_device_bundle_publish.v1",
+    `version=${payload.version}`,
+    `crypto_device_id=${payload.cryptoDeviceId}`,
+    `previous_bundle_version=${payload.previousBundleVersion}`,
+    `previous_bundle_digest=${payload.previousBundleDigestBase64}`,
+    `new_bundle_digest=${payload.newBundleDigestBase64}`,
+    `publish_challenge=${payload.publishChallengeBase64}`,
     `challenge_expires_at=${payload.challengeExpiresAt}`,
     `issued_at=${payload.issuedAt}`,
     "",

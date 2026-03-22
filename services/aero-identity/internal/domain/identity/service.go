@@ -18,20 +18,21 @@ import (
 var loginPattern = regexp.MustCompile(`^[a-z0-9._-]{3,32}$`)
 
 const (
-	minPasswordLength           = 8
-	maxPasswordLength           = 128
-	maxAvatarURLLen             = 2048
-	maxBioLen                   = 500
-	maxTimezoneLen              = 64
-	maxAccentLen                = 64
-	maxStatusTextLen            = 140
-	maxCountryLen               = 64
-	maxCityLen                  = 64
-	maxDeviceLabelLen           = 120
-	maxNicknameLen              = 64
-	defaultDeviceName           = "Текущее устройство"
-	defaultSessionTouchInterval = 15 * time.Second
-	defaultCryptoLinkIntentTTL  = 15 * time.Minute
+	minPasswordLength                      = 8
+	maxPasswordLength                      = 128
+	maxAvatarURLLen                        = 2048
+	maxBioLen                              = 500
+	maxTimezoneLen                         = 64
+	maxAccentLen                           = 64
+	maxStatusTextLen                       = 140
+	maxCountryLen                          = 64
+	maxCityLen                             = 64
+	maxDeviceLabelLen                      = 120
+	maxNicknameLen                         = 64
+	defaultDeviceName                      = "Текущее устройство"
+	defaultSessionTouchInterval            = 15 * time.Second
+	defaultCryptoLinkIntentTTL             = 15 * time.Minute
+	defaultCryptoBundlePublishChallengeTTL = 10 * time.Minute
 )
 
 type Repository interface {
@@ -60,6 +61,7 @@ type Repository interface {
 	CreateCryptoDevice(context.Context, CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error)
 	ListCryptoDevices(context.Context, string) ([]CryptoDevice, error)
 	GetCryptoDeviceDetails(context.Context, string, string) (*CryptoDeviceDetails, error)
+	CreateCryptoDeviceBundlePublishChallenge(context.Context, CreateCryptoDeviceBundlePublishChallengeParams) (*CryptoDeviceBundlePublishChallenge, error)
 	PublishCryptoDeviceBundle(context.Context, string, PublishCryptoDeviceBundleInput, time.Time) (*CryptoDevice, *CryptoDeviceBundle, error)
 	CreateCryptoDeviceLinkIntent(context.Context, CreateCryptoDeviceLinkIntentParams) (*CryptoDeviceLinkIntent, error)
 	ListCryptoDeviceLinkIntents(context.Context, string, time.Time) ([]CryptoDeviceLinkIntent, error)
@@ -69,27 +71,38 @@ type Repository interface {
 }
 
 type Service struct {
-	repo                           Repository
-	passwords                      *identityauth.PasswordHasher
-	sessionToken                   *libauth.SessionTokenManager
-	sessionTouchInterval           time.Duration
-	cryptoLinkIntentTTL            time.Duration
-	newCryptoLinkApprovalChallenge func() ([]byte, error)
-	now                            func() time.Time
-	newID                          func() string
+	repo                            Repository
+	passwords                       *identityauth.PasswordHasher
+	sessionToken                    *libauth.SessionTokenManager
+	sessionTouchInterval            time.Duration
+	cryptoLinkIntentTTL             time.Duration
+	cryptoBundlePublishChallengeTTL time.Duration
+	newCryptoLinkApprovalChallenge  func() ([]byte, error)
+	newCryptoBundlePublishChallenge func() ([]byte, error)
+	now                             func() time.Time
+	newID                           func() string
 }
 
 func NewService(repo Repository, passwords *identityauth.PasswordHasher, sessionToken *libauth.SessionTokenManager) *Service {
 	return &Service{
-		repo:                 repo,
-		passwords:            passwords,
-		sessionToken:         sessionToken,
-		sessionTouchInterval: defaultSessionTouchInterval,
-		cryptoLinkIntentTTL:  defaultCryptoLinkIntentTTL,
+		repo:                            repo,
+		passwords:                       passwords,
+		sessionToken:                    sessionToken,
+		sessionTouchInterval:            defaultSessionTouchInterval,
+		cryptoLinkIntentTTL:             defaultCryptoLinkIntentTTL,
+		cryptoBundlePublishChallengeTTL: defaultCryptoBundlePublishChallengeTTL,
 		newCryptoLinkApprovalChallenge: func() ([]byte, error) {
 			challenge := make([]byte, 32)
 			if _, err := rand.Read(challenge); err != nil {
 				return nil, fmt.Errorf("read crypto link approval challenge: %w", err)
+			}
+
+			return challenge, nil
+		},
+		newCryptoBundlePublishChallenge: func() ([]byte, error) {
+			challenge := make([]byte, 32)
+			if _, err := rand.Read(challenge); err != nil {
+				return nil, fmt.Errorf("read crypto bundle publish challenge: %w", err)
 			}
 
 			return challenge, nil

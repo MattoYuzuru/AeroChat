@@ -248,6 +248,52 @@ FROM crypto_device_bundles AS b
 JOIN crypto_devices AS d ON d.id = b.crypto_device_id
 WHERE b.crypto_device_id = $1 AND d.user_id = $2 AND b.superseded_at IS NULL;
 
+-- name: UpsertCryptoDeviceBundlePublishChallenge :one
+INSERT INTO crypto_device_bundle_publish_challenges (
+    crypto_device_id,
+    current_bundle_version,
+    current_bundle_digest,
+    publish_challenge,
+    created_at,
+    expires_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6
+)
+ON CONFLICT (crypto_device_id) DO UPDATE
+SET
+    current_bundle_version = EXCLUDED.current_bundle_version,
+    current_bundle_digest = EXCLUDED.current_bundle_digest,
+    publish_challenge = EXCLUDED.publish_challenge,
+    created_at = EXCLUDED.created_at,
+    expires_at = EXCLUDED.expires_at
+RETURNING
+    crypto_device_id,
+    current_bundle_version,
+    current_bundle_digest,
+    publish_challenge,
+    created_at,
+    expires_at;
+
+-- name: GetCryptoDeviceBundlePublishChallengeByDeviceID :one
+SELECT
+    crypto_device_id,
+    current_bundle_version,
+    current_bundle_digest,
+    publish_challenge,
+    created_at,
+    expires_at
+FROM crypto_device_bundle_publish_challenges
+WHERE crypto_device_id = $1;
+
+-- name: DeleteCryptoDeviceBundlePublishChallengeByDeviceID :execrows
+DELETE FROM crypto_device_bundle_publish_challenges
+WHERE crypto_device_id = $1;
+
 -- name: ExpireStaleCryptoDeviceLinkIntentsByUserID :execrows
 UPDATE crypto_device_link_intents
 SET

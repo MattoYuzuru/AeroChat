@@ -127,6 +127,23 @@ func (r *Repository) GetCryptoDeviceDetails(ctx context.Context, userID string, 
 	}, nil
 }
 
+func (r *Repository) CreateCryptoDeviceBundlePublishChallenge(ctx context.Context, params identity.CreateCryptoDeviceBundlePublishChallengeParams) (*identity.CryptoDeviceBundlePublishChallenge, error) {
+	row, err := r.queries.UpsertCryptoDeviceBundlePublishChallenge(ctx, identitysqlc.UpsertCryptoDeviceBundlePublishChallengeParams{
+		CryptoDeviceID:       mustParseUUID(params.Challenge.CryptoDeviceID),
+		CurrentBundleVersion: params.Challenge.CurrentBundleVersion,
+		CurrentBundleDigest:  params.Challenge.CurrentBundleDigest,
+		PublishChallenge:     params.Challenge.PublishChallenge,
+		CreatedAt:            timestampValue(params.Challenge.CreatedAt),
+		ExpiresAt:            timestampValue(params.Challenge.ExpiresAt),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	challenge := toDomainCryptoDeviceBundlePublishChallenge(row)
+	return &challenge, nil
+}
+
 func (r *Repository) PublishCryptoDeviceBundle(ctx context.Context, userID string, input identity.PublishCryptoDeviceBundleInput, publishedAt time.Time) (*identity.CryptoDevice, *identity.CryptoDeviceBundle, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -154,6 +171,46 @@ func (r *Repository) PublishCryptoDeviceBundle(ctx context.Context, userID strin
 	}
 	if !bytes.Equal(currentBundleRow.IdentityPublicKey, input.Bundle.IdentityPublicKey) {
 		return nil, nil, fmt.Errorf("%w: crypto device identity_public_key is immutable across bundle publish", identity.ErrConflict)
+	}
+
+	if deviceRow.Status == identity.CryptoDeviceStatusActive {
+		if input.Proof == nil {
+			return nil, nil, fmt.Errorf("%w: active crypto device bundle publish requires proof", identity.ErrConflict)
+		}
+
+		challengeRow, challengeErr := q.GetCryptoDeviceBundlePublishChallengeByDeviceID(ctx, mustParseUUID(input.CryptoDeviceID))
+		if challengeErr != nil {
+			if errors.Is(challengeErr, pgx.ErrNoRows) {
+				return nil, nil, fmt.Errorf("%w: active crypto device bundle publish requires a fresh publish challenge", identity.ErrConflict)
+			}
+			return nil, nil, convertError(challengeErr)
+		}
+
+		if !challengeRow.ExpiresAt.Time.After(publishedAt) {
+			if _, err := q.DeleteCryptoDeviceBundlePublishChallengeByDeviceID(ctx, mustParseUUID(input.CryptoDeviceID)); err != nil {
+				return nil, nil, convertError(err)
+			}
+			return nil, nil, fmt.Errorf("%w: active crypto device bundle publish challenge is stale", identity.ErrConflict)
+		}
+		if challengeRow.CurrentBundleVersion != currentBundleRow.BundleVersion || !bytes.Equal(challengeRow.CurrentBundleDigest, currentBundleRow.BundleDigest) {
+			if _, err := q.DeleteCryptoDeviceBundlePublishChallengeByDeviceID(ctx, mustParseUUID(input.CryptoDeviceID)); err != nil {
+				return nil, nil, convertError(err)
+			}
+			return nil, nil, fmt.Errorf("%w: bundle publish challenge no longer matches the current bundle state", identity.ErrConflict)
+		}
+		if input.Proof.Payload.CryptoDeviceID != input.CryptoDeviceID ||
+			input.Proof.Payload.PreviousBundleVersion != currentBundleRow.BundleVersion ||
+			!bytes.Equal(input.Proof.Payload.PreviousBundleDigest, currentBundleRow.BundleDigest) ||
+			!bytes.Equal(input.Proof.Payload.NewBundleDigest, input.Bundle.BundleDigest) ||
+			!bytes.Equal(input.Proof.Payload.PublishChallenge, challengeRow.PublishChallenge) ||
+			!input.Proof.Payload.ChallengeExpiresAt.Equal(challengeRow.ExpiresAt.Time.UTC()) ||
+			input.Proof.Payload.IssuedAt.Before(challengeRow.CreatedAt.Time.UTC()) ||
+			input.Proof.Payload.IssuedAt.After(publishedAt) {
+			return nil, nil, fmt.Errorf("%w: bundle publish proof payload does not match the current mutation", identity.ErrConflict)
+		}
+		if err := identity.VerifyCryptoDeviceBundlePublishSignature(currentBundleRow.IdentityPublicKey, *input.Proof); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	if _, err := q.SupersedeCurrentCryptoDeviceBundle(ctx, identitysqlc.SupersedeCurrentCryptoDeviceBundleParams{
@@ -203,6 +260,9 @@ func (r *Repository) PublishCryptoDeviceBundle(ctx context.Context, userID strin
 		}); err != nil {
 			return nil, nil, convertError(err)
 		}
+	}
+	if _, err := q.DeleteCryptoDeviceBundlePublishChallengeByDeviceID(ctx, mustParseUUID(input.CryptoDeviceID)); err != nil {
+		return nil, nil, convertError(err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -574,6 +634,40 @@ func toDomainCryptoDeviceBundle(row identitysqlc.CryptoDeviceBundle) identity.Cr
 		PublishedAt:             timestampPointer(row.PublishedAt),
 		ExpiresAt:               timestamptzPointer(row.ExpiresAt),
 		SupersededAt:            timestamptzPointer(row.SupersededAt),
+	}
+}
+
+func toDomainCryptoDeviceBundlePublishChallenge(row any) identity.CryptoDeviceBundlePublishChallenge {
+	switch value := row.(type) {
+	case identitysqlc.CryptoDeviceBundlePublishChallenge:
+		return toDomainCryptoDeviceBundlePublishChallengeFields(
+			value.CryptoDeviceID,
+			value.CurrentBundleVersion,
+			value.CurrentBundleDigest,
+			value.PublishChallenge,
+			value.CreatedAt,
+			value.ExpiresAt,
+		)
+	default:
+		panic(fmt.Sprintf("unsupported crypto device bundle publish challenge row type %T", row))
+	}
+}
+
+func toDomainCryptoDeviceBundlePublishChallengeFields(
+	cryptoDeviceID uuid.UUID,
+	currentBundleVersion int64,
+	currentBundleDigest []byte,
+	publishChallenge []byte,
+	createdAt pgtype.Timestamptz,
+	expiresAt pgtype.Timestamptz,
+) identity.CryptoDeviceBundlePublishChallenge {
+	return identity.CryptoDeviceBundlePublishChallenge{
+		CryptoDeviceID:       cryptoDeviceID.String(),
+		CurrentBundleVersion: currentBundleVersion,
+		CurrentBundleDigest:  cloneByteSlice(currentBundleDigest),
+		PublishChallenge:     cloneByteSlice(publishChallenge),
+		CreatedAt:            timestampPointer(createdAt),
+		ExpiresAt:            timestampPointer(expiresAt),
 	}
 }
 

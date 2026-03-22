@@ -433,10 +433,31 @@ async function publishBundleForLocalMaterial(
   currentBundle: CryptoDeviceBundle;
 }> {
   const bundle = await dependencies.materialFactory.buildBundle(localMaterial);
+  let publishProof;
+  if (localMaterial.record.status === "active") {
+    const challenge =
+      await dependencies.gatewayClient.createCryptoDeviceBundlePublishChallenge(
+        session.token,
+        localMaterial.record.cryptoDeviceId,
+      );
+    publishProof = await dependencies.materialFactory.buildBundlePublishProof(
+      localMaterial,
+      {
+        cryptoDeviceId: localMaterial.record.cryptoDeviceId,
+        previousBundleVersion: challenge.currentBundleVersion,
+        previousBundleDigestBase64: challenge.currentBundleDigestBase64,
+        newBundleDigestBase64: bundle.bundleDigestBase64,
+        publishChallengeBase64: challenge.publishChallengeBase64,
+        challengeExpiresAt: challenge.expiresAt,
+        issuedAt: new Date().toISOString(),
+      },
+    );
+  }
   const published = await dependencies.gatewayClient.publishCryptoDeviceBundle(
     session.token,
     localMaterial.record.cryptoDeviceId,
     bundle,
+    publishProof,
   );
   const syncedMaterial = dependencies.materialFactory.syncRecordFromServer(
     localMaterial,

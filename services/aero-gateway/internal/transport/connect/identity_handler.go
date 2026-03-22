@@ -184,6 +184,10 @@ func (h *IdentityHandler) GetCryptoDevice(ctx context.Context, req *connect.Requ
 	return forwardUnary(ctx, req, h.client.GetCryptoDevice)
 }
 
+func (h *IdentityHandler) CreateCryptoDeviceBundlePublishChallenge(ctx context.Context, req *connect.Request[identityv1.CreateCryptoDeviceBundlePublishChallengeRequest]) (*connect.Response[identityv1.CreateCryptoDeviceBundlePublishChallengeResponse], error) {
+	return forwardUnary(ctx, req, h.client.CreateCryptoDeviceBundlePublishChallenge)
+}
+
 func (h *IdentityHandler) PublishCryptoDeviceBundle(ctx context.Context, req *connect.Request[identityv1.PublishCryptoDeviceBundleRequest]) (*connect.Response[identityv1.PublishCryptoDeviceBundleResponse], error) {
 	return forwardUnary(ctx, req, h.client.PublishCryptoDeviceBundle)
 }

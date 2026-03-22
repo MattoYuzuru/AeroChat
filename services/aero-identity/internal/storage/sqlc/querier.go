@@ -23,6 +23,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserBlock(ctx context.Context, arg CreateUserBlockParams) error
 	CreateUserPasswordCredential(ctx context.Context, arg CreateUserPasswordCredentialParams) error
+	DeleteCryptoDeviceBundlePublishChallengeByDeviceID(ctx context.Context, cryptoDeviceID uuid.UUID) (int64, error)
 	DeleteFriendRequest(ctx context.Context, arg DeleteFriendRequestParams) (int64, error)
 	DeleteFriendRequestsByPair(ctx context.Context, arg DeleteFriendRequestsByPairParams) error
 	DeleteFriendshipByPair(ctx context.Context, arg DeleteFriendshipByPairParams) (int64, error)
@@ -30,6 +31,7 @@ type Querier interface {
 	ExpireCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg ExpireCryptoDeviceLinkIntentByIDAndUserIDParams) (ExpireCryptoDeviceLinkIntentByIDAndUserIDRow, error)
 	ExpirePendingCryptoDeviceLinkIntentsByDeviceID(ctx context.Context, arg ExpirePendingCryptoDeviceLinkIntentsByDeviceIDParams) (int64, error)
 	ExpireStaleCryptoDeviceLinkIntentsByUserID(ctx context.Context, arg ExpireStaleCryptoDeviceLinkIntentsByUserIDParams) (int64, error)
+	GetCryptoDeviceBundlePublishChallengeByDeviceID(ctx context.Context, cryptoDeviceID uuid.UUID) (CryptoDeviceBundlePublishChallenge, error)
 	GetCryptoDeviceByIDAndUserID(ctx context.Context, arg GetCryptoDeviceByIDAndUserIDParams) (CryptoDevice, error)
 	GetCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg GetCryptoDeviceLinkIntentByIDAndUserIDParams) (GetCryptoDeviceLinkIntentByIDAndUserIDRow, error)
 	GetCryptoDeviceRegistryStatsByUserID(ctx context.Context, userID uuid.UUID) (GetCryptoDeviceRegistryStatsByUserIDRow, error)
@@ -57,6 +59,7 @@ type Querier interface {
 	TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error
 	UpdateCryptoDeviceBundleTracking(ctx context.Context, arg UpdateCryptoDeviceBundleTrackingParams) (CryptoDevice, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	UpsertCryptoDeviceBundlePublishChallenge(ctx context.Context, arg UpsertCryptoDeviceBundlePublishChallengeParams) (CryptoDeviceBundlePublishChallenge, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -55,6 +55,15 @@ type CryptoDeviceBundle struct {
 	SupersededAt            *time.Time
 }
 
+type CryptoDeviceBundlePublishChallenge struct {
+	CryptoDeviceID       string
+	CurrentBundleVersion int64
+	CurrentBundleDigest  []byte
+	PublishChallenge     []byte
+	CreatedAt            time.Time
+	ExpiresAt            time.Time
+}
+
 type CryptoDeviceLinkIntent struct {
 	ID                     string
 	UserID                 string
@@ -90,6 +99,22 @@ type CryptoDeviceLinkApprovalProof struct {
 	Signature []byte
 }
 
+type CryptoDeviceBundlePublishProofPayload struct {
+	Version               uint32
+	CryptoDeviceID        string
+	PreviousBundleVersion int64
+	PreviousBundleDigest  []byte
+	NewBundleDigest       []byte
+	PublishChallenge      []byte
+	ChallengeExpiresAt    time.Time
+	IssuedAt              time.Time
+}
+
+type CryptoDeviceBundlePublishProof struct {
+	Payload   CryptoDeviceBundlePublishProofPayload
+	Signature []byte
+}
+
 type CryptoDeviceBundleInput struct {
 	CryptoSuite             string
 	IdentityPublicKey       []byte
@@ -113,6 +138,7 @@ type RegisterCryptoDeviceInput struct {
 type PublishCryptoDeviceBundleInput struct {
 	CryptoDeviceID string
 	Bundle         CryptoDeviceBundleInput
+	Proof          *CryptoDeviceBundlePublishProof
 }
 
 type CreateCryptoDeviceParams struct {
@@ -122,6 +148,10 @@ type CreateCryptoDeviceParams struct {
 
 type CreateCryptoDeviceLinkIntentParams struct {
 	LinkIntent CryptoDeviceLinkIntent
+}
+
+type CreateCryptoDeviceBundlePublishChallengeParams struct {
+	Challenge CryptoDeviceBundlePublishChallenge
 }
 
 type ApproveCryptoDeviceLinkIntentParams struct {

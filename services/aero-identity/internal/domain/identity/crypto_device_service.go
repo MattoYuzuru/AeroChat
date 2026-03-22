@@ -168,6 +168,46 @@ func (s *Service) GetCryptoDevice(ctx context.Context, token string, cryptoDevic
 	return s.repo.GetCryptoDeviceDetails(ctx, authSession.User.ID, deviceID)
 }
 
+func (s *Service) CreateCryptoDeviceBundlePublishChallenge(ctx context.Context, token string, cryptoDeviceID string) (*CryptoDeviceBundlePublishChallenge, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	deviceID, err := normalizeRequiredID(cryptoDeviceID, "crypto_device_id")
+	if err != nil {
+		return nil, err
+	}
+
+	details, err := s.repo.GetCryptoDeviceDetails(ctx, authSession.User.ID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	if details.Device.Status != CryptoDeviceStatusActive {
+		return nil, fmt.Errorf("%w: bundle publish challenge is available only for active crypto devices", ErrConflict)
+	}
+	if details.CurrentBundle == nil {
+		return nil, fmt.Errorf("%w: active crypto device has no current bundle", ErrConflict)
+	}
+
+	publishChallenge, err := s.newCryptoBundlePublishChallenge()
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	return s.repo.CreateCryptoDeviceBundlePublishChallenge(ctx, CreateCryptoDeviceBundlePublishChallengeParams{
+		Challenge: CryptoDeviceBundlePublishChallenge{
+			CryptoDeviceID:       details.Device.ID,
+			CurrentBundleVersion: details.CurrentBundle.BundleVersion,
+			CurrentBundleDigest:  cloneBytes(details.CurrentBundle.BundleDigest),
+			PublishChallenge:     publishChallenge,
+			CreatedAt:            now,
+			ExpiresAt:            now.Add(s.cryptoBundlePublishChallengeTTL),
+		},
+	})
+}
+
 func (s *Service) PublishCryptoDeviceBundle(ctx context.Context, token string, input PublishCryptoDeviceBundleInput) (*CryptoDeviceDetails, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
@@ -179,15 +219,40 @@ func (s *Service) PublishCryptoDeviceBundle(ctx context.Context, token string, i
 		return nil, err
 	}
 
-	bundle, err := normalizeCryptoDeviceBundleInput(input.Bundle, s.now())
+	now := s.now()
+	bundle, err := normalizeCryptoDeviceBundleInput(input.Bundle, now)
 	if err != nil {
 		return nil, err
+	}
+
+	details, err := s.repo.GetCryptoDeviceDetails(ctx, authSession.User.ID, deviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	var proof *CryptoDeviceBundlePublishProof
+	switch details.Device.Status {
+	case CryptoDeviceStatusActive:
+		if input.Proof == nil {
+			return nil, fmt.Errorf("%w: active crypto device bundle publish requires proof", ErrConflict)
+		}
+
+		normalizedProof, normalizeErr := normalizeCryptoDeviceBundlePublishProof(*input.Proof)
+		if normalizeErr != nil {
+			return nil, normalizeErr
+		}
+		proof = &normalizedProof
+	case CryptoDeviceStatusPendingLink:
+		proof = nil
+	default:
+		return nil, fmt.Errorf("%w: bundle publish is not available for the current crypto device state", ErrConflict)
 	}
 
 	device, currentBundle, err := s.repo.PublishCryptoDeviceBundle(ctx, authSession.User.ID, PublishCryptoDeviceBundleInput{
 		CryptoDeviceID: deviceID,
 		Bundle:         bundle,
-	}, s.now())
+		Proof:          proof,
+	}, now)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +429,7 @@ func normalizeCryptoDeviceBundleInput(input CryptoDeviceBundleInput, now time.Ti
 		return CryptoDeviceBundleInput{}, fmt.Errorf("%w: expires_at must be in the future", ErrInvalidArgument)
 	}
 
-	return CryptoDeviceBundleInput{
+	normalized := CryptoDeviceBundleInput{
 		CryptoSuite:             cryptoSuite,
 		IdentityPublicKey:       cloneBytes(input.IdentityPublicKey),
 		SignedPrekeyPublic:      cloneBytes(input.SignedPrekeyPublic),
@@ -377,7 +442,12 @@ func normalizeCryptoDeviceBundleInput(input CryptoDeviceBundleInput, now time.Ti
 		OneTimePrekeysAvailable: input.OneTimePrekeysAvailable,
 		BundleDigest:            cloneBytes(input.BundleDigest),
 		ExpiresAt:               cloneTime(input.ExpiresAt),
-	}, nil
+	}
+	if err := validateCryptoDeviceBundleConsistency(normalized); err != nil {
+		return CryptoDeviceBundleInput{}, err
+	}
+
+	return normalized, nil
 }
 
 func cloneBytes(value []byte) []byte {

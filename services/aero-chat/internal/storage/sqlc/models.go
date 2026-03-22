@@ -75,6 +75,15 @@ type CryptoDeviceBundle struct {
 	SupersededAt            pgtype.Timestamptz `db:"superseded_at" json:"superseded_at"`
 }
 
+type CryptoDeviceBundlePublishChallenge struct {
+	CryptoDeviceID       uuid.UUID          `db:"crypto_device_id" json:"crypto_device_id"`
+	CurrentBundleVersion int64              `db:"current_bundle_version" json:"current_bundle_version"`
+	CurrentBundleDigest  []byte             `db:"current_bundle_digest" json:"current_bundle_digest"`
+	PublishChallenge     []byte             `db:"publish_challenge" json:"publish_challenge"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt            pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+}
+
 type CryptoDeviceLinkIntent struct {
 	ID                       uuid.UUID          `db:"id" json:"id"`
 	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`

@@ -1204,6 +1204,242 @@ func (x *CryptoDeviceBundle) GetSupersededAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type CryptoDeviceBundlePublishChallenge struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	CryptoDeviceId       string                 `protobuf:"bytes,1,opt,name=crypto_device_id,json=cryptoDeviceId,proto3" json:"crypto_device_id,omitempty"`
+	CurrentBundleVersion uint64                 `protobuf:"varint,2,opt,name=current_bundle_version,json=currentBundleVersion,proto3" json:"current_bundle_version,omitempty"`
+	CurrentBundleDigest  []byte                 `protobuf:"bytes,3,opt,name=current_bundle_digest,json=currentBundleDigest,proto3" json:"current_bundle_digest,omitempty"`
+	PublishChallenge     []byte                 `protobuf:"bytes,4,opt,name=publish_challenge,json=publishChallenge,proto3" json:"publish_challenge,omitempty"`
+	CreatedAt            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	ExpiresAt            *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *CryptoDeviceBundlePublishChallenge) Reset() {
+	*x = CryptoDeviceBundlePublishChallenge{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CryptoDeviceBundlePublishChallenge) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CryptoDeviceBundlePublishChallenge) ProtoMessage() {}
+
+func (x *CryptoDeviceBundlePublishChallenge) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CryptoDeviceBundlePublishChallenge.ProtoReflect.Descriptor instead.
+func (*CryptoDeviceBundlePublishChallenge) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *CryptoDeviceBundlePublishChallenge) GetCryptoDeviceId() string {
+	if x != nil {
+		return x.CryptoDeviceId
+	}
+	return ""
+}
+
+func (x *CryptoDeviceBundlePublishChallenge) GetCurrentBundleVersion() uint64 {
+	if x != nil {
+		return x.CurrentBundleVersion
+	}
+	return 0
+}
+
+func (x *CryptoDeviceBundlePublishChallenge) GetCurrentBundleDigest() []byte {
+	if x != nil {
+		return x.CurrentBundleDigest
+	}
+	return nil
+}
+
+func (x *CryptoDeviceBundlePublishChallenge) GetPublishChallenge() []byte {
+	if x != nil {
+		return x.PublishChallenge
+	}
+	return nil
+}
+
+func (x *CryptoDeviceBundlePublishChallenge) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *CryptoDeviceBundlePublishChallenge) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+type CryptoDeviceBundlePublishProofPayload struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Version               uint32                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	CryptoDeviceId        string                 `protobuf:"bytes,2,opt,name=crypto_device_id,json=cryptoDeviceId,proto3" json:"crypto_device_id,omitempty"`
+	PreviousBundleVersion uint64                 `protobuf:"varint,3,opt,name=previous_bundle_version,json=previousBundleVersion,proto3" json:"previous_bundle_version,omitempty"`
+	PreviousBundleDigest  []byte                 `protobuf:"bytes,4,opt,name=previous_bundle_digest,json=previousBundleDigest,proto3" json:"previous_bundle_digest,omitempty"`
+	NewBundleDigest       []byte                 `protobuf:"bytes,5,opt,name=new_bundle_digest,json=newBundleDigest,proto3" json:"new_bundle_digest,omitempty"`
+	PublishChallenge      []byte                 `protobuf:"bytes,6,opt,name=publish_challenge,json=publishChallenge,proto3" json:"publish_challenge,omitempty"`
+	ChallengeExpiresAt    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=challenge_expires_at,json=challengeExpiresAt,proto3" json:"challenge_expires_at,omitempty"`
+	IssuedAt              *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=issued_at,json=issuedAt,proto3" json:"issued_at,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) Reset() {
+	*x = CryptoDeviceBundlePublishProofPayload{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CryptoDeviceBundlePublishProofPayload) ProtoMessage() {}
+
+func (x *CryptoDeviceBundlePublishProofPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CryptoDeviceBundlePublishProofPayload.ProtoReflect.Descriptor instead.
+func (*CryptoDeviceBundlePublishProofPayload) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) GetVersion() uint32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) GetCryptoDeviceId() string {
+	if x != nil {
+		return x.CryptoDeviceId
+	}
+	return ""
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) GetPreviousBundleVersion() uint64 {
+	if x != nil {
+		return x.PreviousBundleVersion
+	}
+	return 0
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) GetPreviousBundleDigest() []byte {
+	if x != nil {
+		return x.PreviousBundleDigest
+	}
+	return nil
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) GetNewBundleDigest() []byte {
+	if x != nil {
+		return x.NewBundleDigest
+	}
+	return nil
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) GetPublishChallenge() []byte {
+	if x != nil {
+		return x.PublishChallenge
+	}
+	return nil
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) GetChallengeExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ChallengeExpiresAt
+	}
+	return nil
+}
+
+func (x *CryptoDeviceBundlePublishProofPayload) GetIssuedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.IssuedAt
+	}
+	return nil
+}
+
+type CryptoDeviceBundlePublishProof struct {
+	state         protoimpl.MessageState                 `protogen:"open.v1"`
+	Payload       *CryptoDeviceBundlePublishProofPayload `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
+	Signature     []byte                                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CryptoDeviceBundlePublishProof) Reset() {
+	*x = CryptoDeviceBundlePublishProof{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CryptoDeviceBundlePublishProof) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CryptoDeviceBundlePublishProof) ProtoMessage() {}
+
+func (x *CryptoDeviceBundlePublishProof) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CryptoDeviceBundlePublishProof.ProtoReflect.Descriptor instead.
+func (*CryptoDeviceBundlePublishProof) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *CryptoDeviceBundlePublishProof) GetPayload() *CryptoDeviceBundlePublishProofPayload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *CryptoDeviceBundlePublishProof) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
 type CryptoDeviceLinkIntent struct {
 	state                  protoimpl.MessageState       `protogen:"open.v1"`
 	Id                     string                       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1223,7 +1459,7 @@ type CryptoDeviceLinkIntent struct {
 
 func (x *CryptoDeviceLinkIntent) Reset() {
 	*x = CryptoDeviceLinkIntent{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[11]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1235,7 +1471,7 @@ func (x *CryptoDeviceLinkIntent) String() string {
 func (*CryptoDeviceLinkIntent) ProtoMessage() {}
 
 func (x *CryptoDeviceLinkIntent) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[11]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1248,7 +1484,7 @@ func (x *CryptoDeviceLinkIntent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CryptoDeviceLinkIntent.ProtoReflect.Descriptor instead.
 func (*CryptoDeviceLinkIntent) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{11}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CryptoDeviceLinkIntent) GetId() string {
@@ -1344,7 +1580,7 @@ type CryptoDeviceLinkApprovalPayload struct {
 
 func (x *CryptoDeviceLinkApprovalPayload) Reset() {
 	*x = CryptoDeviceLinkApprovalPayload{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[12]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1356,7 +1592,7 @@ func (x *CryptoDeviceLinkApprovalPayload) String() string {
 func (*CryptoDeviceLinkApprovalPayload) ProtoMessage() {}
 
 func (x *CryptoDeviceLinkApprovalPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[12]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1369,7 +1605,7 @@ func (x *CryptoDeviceLinkApprovalPayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CryptoDeviceLinkApprovalPayload.ProtoReflect.Descriptor instead.
 func (*CryptoDeviceLinkApprovalPayload) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{12}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *CryptoDeviceLinkApprovalPayload) GetVersion() uint32 {
@@ -1438,7 +1674,7 @@ type CryptoDeviceLinkApprovalProof struct {
 
 func (x *CryptoDeviceLinkApprovalProof) Reset() {
 	*x = CryptoDeviceLinkApprovalProof{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[13]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1450,7 +1686,7 @@ func (x *CryptoDeviceLinkApprovalProof) String() string {
 func (*CryptoDeviceLinkApprovalProof) ProtoMessage() {}
 
 func (x *CryptoDeviceLinkApprovalProof) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[13]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1463,7 +1699,7 @@ func (x *CryptoDeviceLinkApprovalProof) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CryptoDeviceLinkApprovalProof.ProtoReflect.Descriptor instead.
 func (*CryptoDeviceLinkApprovalProof) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{13}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CryptoDeviceLinkApprovalProof) GetPayload() *CryptoDeviceLinkApprovalPayload {
@@ -1488,7 +1724,7 @@ type PingRequest struct {
 
 func (x *PingRequest) Reset() {
 	*x = PingRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[14]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1500,7 +1736,7 @@ func (x *PingRequest) String() string {
 func (*PingRequest) ProtoMessage() {}
 
 func (x *PingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[14]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1513,7 +1749,7 @@ func (x *PingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingRequest.ProtoReflect.Descriptor instead.
 func (*PingRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{14}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{17}
 }
 
 type PingResponse struct {
@@ -1525,7 +1761,7 @@ type PingResponse struct {
 
 func (x *PingResponse) Reset() {
 	*x = PingResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[15]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1537,7 +1773,7 @@ func (x *PingResponse) String() string {
 func (*PingResponse) ProtoMessage() {}
 
 func (x *PingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[15]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1550,7 +1786,7 @@ func (x *PingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingResponse.ProtoReflect.Descriptor instead.
 func (*PingResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{15}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PingResponse) GetService() *v1.ServiceMeta {
@@ -1572,7 +1808,7 @@ type RegisterRequest struct {
 
 func (x *RegisterRequest) Reset() {
 	*x = RegisterRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[16]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1584,7 +1820,7 @@ func (x *RegisterRequest) String() string {
 func (*RegisterRequest) ProtoMessage() {}
 
 func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[16]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1597,7 +1833,7 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{16}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RegisterRequest) GetLogin() string {
@@ -1637,7 +1873,7 @@ type RegisterResponse struct {
 
 func (x *RegisterResponse) Reset() {
 	*x = RegisterResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[17]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1649,7 +1885,7 @@ func (x *RegisterResponse) String() string {
 func (*RegisterResponse) ProtoMessage() {}
 
 func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[17]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1662,7 +1898,7 @@ func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
 func (*RegisterResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{17}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RegisterResponse) GetAuth() *CurrentAuth {
@@ -1683,7 +1919,7 @@ type LoginRequest struct {
 
 func (x *LoginRequest) Reset() {
 	*x = LoginRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[18]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1695,7 +1931,7 @@ func (x *LoginRequest) String() string {
 func (*LoginRequest) ProtoMessage() {}
 
 func (x *LoginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[18]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1708,7 +1944,7 @@ func (x *LoginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginRequest.ProtoReflect.Descriptor instead.
 func (*LoginRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{18}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *LoginRequest) GetLogin() string {
@@ -1741,7 +1977,7 @@ type LoginResponse struct {
 
 func (x *LoginResponse) Reset() {
 	*x = LoginResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[19]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1753,7 +1989,7 @@ func (x *LoginResponse) String() string {
 func (*LoginResponse) ProtoMessage() {}
 
 func (x *LoginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[19]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1766,7 +2002,7 @@ func (x *LoginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginResponse.ProtoReflect.Descriptor instead.
 func (*LoginResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{19}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *LoginResponse) GetAuth() *CurrentAuth {
@@ -1784,7 +2020,7 @@ type LogoutCurrentSessionRequest struct {
 
 func (x *LogoutCurrentSessionRequest) Reset() {
 	*x = LogoutCurrentSessionRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[20]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1796,7 +2032,7 @@ func (x *LogoutCurrentSessionRequest) String() string {
 func (*LogoutCurrentSessionRequest) ProtoMessage() {}
 
 func (x *LogoutCurrentSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[20]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1809,7 +2045,7 @@ func (x *LogoutCurrentSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutCurrentSessionRequest.ProtoReflect.Descriptor instead.
 func (*LogoutCurrentSessionRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{20}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{23}
 }
 
 type LogoutCurrentSessionResponse struct {
@@ -1820,7 +2056,7 @@ type LogoutCurrentSessionResponse struct {
 
 func (x *LogoutCurrentSessionResponse) Reset() {
 	*x = LogoutCurrentSessionResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[21]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1832,7 +2068,7 @@ func (x *LogoutCurrentSessionResponse) String() string {
 func (*LogoutCurrentSessionResponse) ProtoMessage() {}
 
 func (x *LogoutCurrentSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[21]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1845,7 +2081,7 @@ func (x *LogoutCurrentSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutCurrentSessionResponse.ProtoReflect.Descriptor instead.
 func (*LogoutCurrentSessionResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{21}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{24}
 }
 
 type GetCurrentProfileRequest struct {
@@ -1856,7 +2092,7 @@ type GetCurrentProfileRequest struct {
 
 func (x *GetCurrentProfileRequest) Reset() {
 	*x = GetCurrentProfileRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[22]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1868,7 +2104,7 @@ func (x *GetCurrentProfileRequest) String() string {
 func (*GetCurrentProfileRequest) ProtoMessage() {}
 
 func (x *GetCurrentProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[22]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1881,7 +2117,7 @@ func (x *GetCurrentProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCurrentProfileRequest.ProtoReflect.Descriptor instead.
 func (*GetCurrentProfileRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{22}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{25}
 }
 
 type GetCurrentProfileResponse struct {
@@ -1893,7 +2129,7 @@ type GetCurrentProfileResponse struct {
 
 func (x *GetCurrentProfileResponse) Reset() {
 	*x = GetCurrentProfileResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[23]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1905,7 +2141,7 @@ func (x *GetCurrentProfileResponse) String() string {
 func (*GetCurrentProfileResponse) ProtoMessage() {}
 
 func (x *GetCurrentProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[23]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1918,7 +2154,7 @@ func (x *GetCurrentProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCurrentProfileResponse.ProtoReflect.Descriptor instead.
 func (*GetCurrentProfileResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{23}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetCurrentProfileResponse) GetProfile() *Profile {
@@ -1948,7 +2184,7 @@ type UpdateCurrentProfileRequest struct {
 
 func (x *UpdateCurrentProfileRequest) Reset() {
 	*x = UpdateCurrentProfileRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[24]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1960,7 +2196,7 @@ func (x *UpdateCurrentProfileRequest) String() string {
 func (*UpdateCurrentProfileRequest) ProtoMessage() {}
 
 func (x *UpdateCurrentProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[24]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1973,7 +2209,7 @@ func (x *UpdateCurrentProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCurrentProfileRequest.ProtoReflect.Descriptor instead.
 func (*UpdateCurrentProfileRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{24}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *UpdateCurrentProfileRequest) GetNickname() string {
@@ -2069,7 +2305,7 @@ type UpdateCurrentProfileResponse struct {
 
 func (x *UpdateCurrentProfileResponse) Reset() {
 	*x = UpdateCurrentProfileResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[25]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2081,7 +2317,7 @@ func (x *UpdateCurrentProfileResponse) String() string {
 func (*UpdateCurrentProfileResponse) ProtoMessage() {}
 
 func (x *UpdateCurrentProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[25]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2094,7 +2330,7 @@ func (x *UpdateCurrentProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCurrentProfileResponse.ProtoReflect.Descriptor instead.
 func (*UpdateCurrentProfileResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{25}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *UpdateCurrentProfileResponse) GetProfile() *Profile {
@@ -2112,7 +2348,7 @@ type ListDevicesRequest struct {
 
 func (x *ListDevicesRequest) Reset() {
 	*x = ListDevicesRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[26]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2124,7 +2360,7 @@ func (x *ListDevicesRequest) String() string {
 func (*ListDevicesRequest) ProtoMessage() {}
 
 func (x *ListDevicesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[26]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2137,7 +2373,7 @@ func (x *ListDevicesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevicesRequest.ProtoReflect.Descriptor instead.
 func (*ListDevicesRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{26}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{29}
 }
 
 type ListDevicesResponse struct {
@@ -2149,7 +2385,7 @@ type ListDevicesResponse struct {
 
 func (x *ListDevicesResponse) Reset() {
 	*x = ListDevicesResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[27]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2161,7 +2397,7 @@ func (x *ListDevicesResponse) String() string {
 func (*ListDevicesResponse) ProtoMessage() {}
 
 func (x *ListDevicesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[27]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2174,7 +2410,7 @@ func (x *ListDevicesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevicesResponse.ProtoReflect.Descriptor instead.
 func (*ListDevicesResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{27}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListDevicesResponse) GetDevices() []*DeviceWithSessions {
@@ -2197,7 +2433,7 @@ type RevokeSessionOrDeviceRequest struct {
 
 func (x *RevokeSessionOrDeviceRequest) Reset() {
 	*x = RevokeSessionOrDeviceRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[28]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2209,7 +2445,7 @@ func (x *RevokeSessionOrDeviceRequest) String() string {
 func (*RevokeSessionOrDeviceRequest) ProtoMessage() {}
 
 func (x *RevokeSessionOrDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[28]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2222,7 +2458,7 @@ func (x *RevokeSessionOrDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSessionOrDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RevokeSessionOrDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{28}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *RevokeSessionOrDeviceRequest) GetTarget() isRevokeSessionOrDeviceRequest_Target {
@@ -2274,7 +2510,7 @@ type RevokeSessionOrDeviceResponse struct {
 
 func (x *RevokeSessionOrDeviceResponse) Reset() {
 	*x = RevokeSessionOrDeviceResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[29]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2286,7 +2522,7 @@ func (x *RevokeSessionOrDeviceResponse) String() string {
 func (*RevokeSessionOrDeviceResponse) ProtoMessage() {}
 
 func (x *RevokeSessionOrDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[29]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2299,7 +2535,7 @@ func (x *RevokeSessionOrDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeSessionOrDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RevokeSessionOrDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{29}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{32}
 }
 
 type ListBlockedUsersRequest struct {
@@ -2310,7 +2546,7 @@ type ListBlockedUsersRequest struct {
 
 func (x *ListBlockedUsersRequest) Reset() {
 	*x = ListBlockedUsersRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[30]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2322,7 +2558,7 @@ func (x *ListBlockedUsersRequest) String() string {
 func (*ListBlockedUsersRequest) ProtoMessage() {}
 
 func (x *ListBlockedUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[30]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2335,7 +2571,7 @@ func (x *ListBlockedUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBlockedUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListBlockedUsersRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{30}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{33}
 }
 
 type ListBlockedUsersResponse struct {
@@ -2347,7 +2583,7 @@ type ListBlockedUsersResponse struct {
 
 func (x *ListBlockedUsersResponse) Reset() {
 	*x = ListBlockedUsersResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[31]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2359,7 +2595,7 @@ func (x *ListBlockedUsersResponse) String() string {
 func (*ListBlockedUsersResponse) ProtoMessage() {}
 
 func (x *ListBlockedUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[31]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2372,7 +2608,7 @@ func (x *ListBlockedUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBlockedUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListBlockedUsersResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{31}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ListBlockedUsersResponse) GetBlockedUsers() []*BlockedUser {
@@ -2391,7 +2627,7 @@ type BlockUserRequest struct {
 
 func (x *BlockUserRequest) Reset() {
 	*x = BlockUserRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[32]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2403,7 +2639,7 @@ func (x *BlockUserRequest) String() string {
 func (*BlockUserRequest) ProtoMessage() {}
 
 func (x *BlockUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[32]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2416,7 +2652,7 @@ func (x *BlockUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockUserRequest.ProtoReflect.Descriptor instead.
 func (*BlockUserRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{32}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *BlockUserRequest) GetLogin() string {
@@ -2434,7 +2670,7 @@ type BlockUserResponse struct {
 
 func (x *BlockUserResponse) Reset() {
 	*x = BlockUserResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[33]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2446,7 +2682,7 @@ func (x *BlockUserResponse) String() string {
 func (*BlockUserResponse) ProtoMessage() {}
 
 func (x *BlockUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[33]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2459,7 +2695,7 @@ func (x *BlockUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockUserResponse.ProtoReflect.Descriptor instead.
 func (*BlockUserResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{33}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{36}
 }
 
 type UnblockUserRequest struct {
@@ -2471,7 +2707,7 @@ type UnblockUserRequest struct {
 
 func (x *UnblockUserRequest) Reset() {
 	*x = UnblockUserRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[34]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2483,7 +2719,7 @@ func (x *UnblockUserRequest) String() string {
 func (*UnblockUserRequest) ProtoMessage() {}
 
 func (x *UnblockUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[34]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2496,7 +2732,7 @@ func (x *UnblockUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockUserRequest.ProtoReflect.Descriptor instead.
 func (*UnblockUserRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{34}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *UnblockUserRequest) GetLogin() string {
@@ -2514,7 +2750,7 @@ type UnblockUserResponse struct {
 
 func (x *UnblockUserResponse) Reset() {
 	*x = UnblockUserResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[35]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2526,7 +2762,7 @@ func (x *UnblockUserResponse) String() string {
 func (*UnblockUserResponse) ProtoMessage() {}
 
 func (x *UnblockUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[35]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2539,7 +2775,7 @@ func (x *UnblockUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnblockUserResponse.ProtoReflect.Descriptor instead.
 func (*UnblockUserResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{35}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{38}
 }
 
 type SendFriendRequestRequest struct {
@@ -2551,7 +2787,7 @@ type SendFriendRequestRequest struct {
 
 func (x *SendFriendRequestRequest) Reset() {
 	*x = SendFriendRequestRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[36]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2563,7 +2799,7 @@ func (x *SendFriendRequestRequest) String() string {
 func (*SendFriendRequestRequest) ProtoMessage() {}
 
 func (x *SendFriendRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[36]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2576,7 +2812,7 @@ func (x *SendFriendRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendFriendRequestRequest.ProtoReflect.Descriptor instead.
 func (*SendFriendRequestRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{36}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *SendFriendRequestRequest) GetLogin() string {
@@ -2594,7 +2830,7 @@ type SendFriendRequestResponse struct {
 
 func (x *SendFriendRequestResponse) Reset() {
 	*x = SendFriendRequestResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[37]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2606,7 +2842,7 @@ func (x *SendFriendRequestResponse) String() string {
 func (*SendFriendRequestResponse) ProtoMessage() {}
 
 func (x *SendFriendRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[37]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2619,7 +2855,7 @@ func (x *SendFriendRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendFriendRequestResponse.ProtoReflect.Descriptor instead.
 func (*SendFriendRequestResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{37}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{40}
 }
 
 type AcceptFriendRequestRequest struct {
@@ -2631,7 +2867,7 @@ type AcceptFriendRequestRequest struct {
 
 func (x *AcceptFriendRequestRequest) Reset() {
 	*x = AcceptFriendRequestRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[38]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2643,7 +2879,7 @@ func (x *AcceptFriendRequestRequest) String() string {
 func (*AcceptFriendRequestRequest) ProtoMessage() {}
 
 func (x *AcceptFriendRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[38]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2656,7 +2892,7 @@ func (x *AcceptFriendRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptFriendRequestRequest.ProtoReflect.Descriptor instead.
 func (*AcceptFriendRequestRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{38}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *AcceptFriendRequestRequest) GetLogin() string {
@@ -2674,7 +2910,7 @@ type AcceptFriendRequestResponse struct {
 
 func (x *AcceptFriendRequestResponse) Reset() {
 	*x = AcceptFriendRequestResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[39]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2686,7 +2922,7 @@ func (x *AcceptFriendRequestResponse) String() string {
 func (*AcceptFriendRequestResponse) ProtoMessage() {}
 
 func (x *AcceptFriendRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[39]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2699,7 +2935,7 @@ func (x *AcceptFriendRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptFriendRequestResponse.ProtoReflect.Descriptor instead.
 func (*AcceptFriendRequestResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{39}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{42}
 }
 
 type DeclineFriendRequestRequest struct {
@@ -2711,7 +2947,7 @@ type DeclineFriendRequestRequest struct {
 
 func (x *DeclineFriendRequestRequest) Reset() {
 	*x = DeclineFriendRequestRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[40]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2723,7 +2959,7 @@ func (x *DeclineFriendRequestRequest) String() string {
 func (*DeclineFriendRequestRequest) ProtoMessage() {}
 
 func (x *DeclineFriendRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[40]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2736,7 +2972,7 @@ func (x *DeclineFriendRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeclineFriendRequestRequest.ProtoReflect.Descriptor instead.
 func (*DeclineFriendRequestRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{40}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *DeclineFriendRequestRequest) GetLogin() string {
@@ -2754,7 +2990,7 @@ type DeclineFriendRequestResponse struct {
 
 func (x *DeclineFriendRequestResponse) Reset() {
 	*x = DeclineFriendRequestResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[41]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2766,7 +3002,7 @@ func (x *DeclineFriendRequestResponse) String() string {
 func (*DeclineFriendRequestResponse) ProtoMessage() {}
 
 func (x *DeclineFriendRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[41]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2779,7 +3015,7 @@ func (x *DeclineFriendRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeclineFriendRequestResponse.ProtoReflect.Descriptor instead.
 func (*DeclineFriendRequestResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{41}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{44}
 }
 
 type CancelOutgoingFriendRequestRequest struct {
@@ -2791,7 +3027,7 @@ type CancelOutgoingFriendRequestRequest struct {
 
 func (x *CancelOutgoingFriendRequestRequest) Reset() {
 	*x = CancelOutgoingFriendRequestRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[42]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2803,7 +3039,7 @@ func (x *CancelOutgoingFriendRequestRequest) String() string {
 func (*CancelOutgoingFriendRequestRequest) ProtoMessage() {}
 
 func (x *CancelOutgoingFriendRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[42]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2816,7 +3052,7 @@ func (x *CancelOutgoingFriendRequestRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use CancelOutgoingFriendRequestRequest.ProtoReflect.Descriptor instead.
 func (*CancelOutgoingFriendRequestRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{42}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *CancelOutgoingFriendRequestRequest) GetLogin() string {
@@ -2834,7 +3070,7 @@ type CancelOutgoingFriendRequestResponse struct {
 
 func (x *CancelOutgoingFriendRequestResponse) Reset() {
 	*x = CancelOutgoingFriendRequestResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[43]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2846,7 +3082,7 @@ func (x *CancelOutgoingFriendRequestResponse) String() string {
 func (*CancelOutgoingFriendRequestResponse) ProtoMessage() {}
 
 func (x *CancelOutgoingFriendRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[43]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2859,7 +3095,7 @@ func (x *CancelOutgoingFriendRequestResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use CancelOutgoingFriendRequestResponse.ProtoReflect.Descriptor instead.
 func (*CancelOutgoingFriendRequestResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{43}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{46}
 }
 
 type ListIncomingFriendRequestsRequest struct {
@@ -2870,7 +3106,7 @@ type ListIncomingFriendRequestsRequest struct {
 
 func (x *ListIncomingFriendRequestsRequest) Reset() {
 	*x = ListIncomingFriendRequestsRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[44]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2882,7 +3118,7 @@ func (x *ListIncomingFriendRequestsRequest) String() string {
 func (*ListIncomingFriendRequestsRequest) ProtoMessage() {}
 
 func (x *ListIncomingFriendRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[44]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2895,7 +3131,7 @@ func (x *ListIncomingFriendRequestsRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListIncomingFriendRequestsRequest.ProtoReflect.Descriptor instead.
 func (*ListIncomingFriendRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{44}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{47}
 }
 
 type ListIncomingFriendRequestsResponse struct {
@@ -2907,7 +3143,7 @@ type ListIncomingFriendRequestsResponse struct {
 
 func (x *ListIncomingFriendRequestsResponse) Reset() {
 	*x = ListIncomingFriendRequestsResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[45]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2919,7 +3155,7 @@ func (x *ListIncomingFriendRequestsResponse) String() string {
 func (*ListIncomingFriendRequestsResponse) ProtoMessage() {}
 
 func (x *ListIncomingFriendRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[45]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2932,7 +3168,7 @@ func (x *ListIncomingFriendRequestsResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ListIncomingFriendRequestsResponse.ProtoReflect.Descriptor instead.
 func (*ListIncomingFriendRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{45}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *ListIncomingFriendRequestsResponse) GetFriendRequests() []*FriendRequest {
@@ -2950,7 +3186,7 @@ type ListOutgoingFriendRequestsRequest struct {
 
 func (x *ListOutgoingFriendRequestsRequest) Reset() {
 	*x = ListOutgoingFriendRequestsRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[46]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2962,7 +3198,7 @@ func (x *ListOutgoingFriendRequestsRequest) String() string {
 func (*ListOutgoingFriendRequestsRequest) ProtoMessage() {}
 
 func (x *ListOutgoingFriendRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[46]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2975,7 +3211,7 @@ func (x *ListOutgoingFriendRequestsRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListOutgoingFriendRequestsRequest.ProtoReflect.Descriptor instead.
 func (*ListOutgoingFriendRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{46}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{49}
 }
 
 type ListOutgoingFriendRequestsResponse struct {
@@ -2987,7 +3223,7 @@ type ListOutgoingFriendRequestsResponse struct {
 
 func (x *ListOutgoingFriendRequestsResponse) Reset() {
 	*x = ListOutgoingFriendRequestsResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[47]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2999,7 +3235,7 @@ func (x *ListOutgoingFriendRequestsResponse) String() string {
 func (*ListOutgoingFriendRequestsResponse) ProtoMessage() {}
 
 func (x *ListOutgoingFriendRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[47]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3012,7 +3248,7 @@ func (x *ListOutgoingFriendRequestsResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ListOutgoingFriendRequestsResponse.ProtoReflect.Descriptor instead.
 func (*ListOutgoingFriendRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{47}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *ListOutgoingFriendRequestsResponse) GetFriendRequests() []*FriendRequest {
@@ -3030,7 +3266,7 @@ type ListFriendsRequest struct {
 
 func (x *ListFriendsRequest) Reset() {
 	*x = ListFriendsRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[48]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3042,7 +3278,7 @@ func (x *ListFriendsRequest) String() string {
 func (*ListFriendsRequest) ProtoMessage() {}
 
 func (x *ListFriendsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[48]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3055,7 +3291,7 @@ func (x *ListFriendsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFriendsRequest.ProtoReflect.Descriptor instead.
 func (*ListFriendsRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{48}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{51}
 }
 
 type ListFriendsResponse struct {
@@ -3067,7 +3303,7 @@ type ListFriendsResponse struct {
 
 func (x *ListFriendsResponse) Reset() {
 	*x = ListFriendsResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[49]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3079,7 +3315,7 @@ func (x *ListFriendsResponse) String() string {
 func (*ListFriendsResponse) ProtoMessage() {}
 
 func (x *ListFriendsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[49]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3092,7 +3328,7 @@ func (x *ListFriendsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFriendsResponse.ProtoReflect.Descriptor instead.
 func (*ListFriendsResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{49}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *ListFriendsResponse) GetFriends() []*Friend {
@@ -3111,7 +3347,7 @@ type RemoveFriendRequest struct {
 
 func (x *RemoveFriendRequest) Reset() {
 	*x = RemoveFriendRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[50]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3123,7 +3359,7 @@ func (x *RemoveFriendRequest) String() string {
 func (*RemoveFriendRequest) ProtoMessage() {}
 
 func (x *RemoveFriendRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[50]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3136,7 +3372,7 @@ func (x *RemoveFriendRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveFriendRequest.ProtoReflect.Descriptor instead.
 func (*RemoveFriendRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{50}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *RemoveFriendRequest) GetLogin() string {
@@ -3154,7 +3390,7 @@ type RemoveFriendResponse struct {
 
 func (x *RemoveFriendResponse) Reset() {
 	*x = RemoveFriendResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[51]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3166,7 +3402,7 @@ func (x *RemoveFriendResponse) String() string {
 func (*RemoveFriendResponse) ProtoMessage() {}
 
 func (x *RemoveFriendResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[51]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3179,7 +3415,7 @@ func (x *RemoveFriendResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveFriendResponse.ProtoReflect.Descriptor instead.
 func (*RemoveFriendResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{51}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{54}
 }
 
 type RegisterFirstCryptoDeviceRequest struct {
@@ -3192,7 +3428,7 @@ type RegisterFirstCryptoDeviceRequest struct {
 
 func (x *RegisterFirstCryptoDeviceRequest) Reset() {
 	*x = RegisterFirstCryptoDeviceRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[52]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3204,7 +3440,7 @@ func (x *RegisterFirstCryptoDeviceRequest) String() string {
 func (*RegisterFirstCryptoDeviceRequest) ProtoMessage() {}
 
 func (x *RegisterFirstCryptoDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[52]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3217,7 +3453,7 @@ func (x *RegisterFirstCryptoDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterFirstCryptoDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RegisterFirstCryptoDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{52}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *RegisterFirstCryptoDeviceRequest) GetDeviceLabel() string {
@@ -3244,7 +3480,7 @@ type RegisterFirstCryptoDeviceResponse struct {
 
 func (x *RegisterFirstCryptoDeviceResponse) Reset() {
 	*x = RegisterFirstCryptoDeviceResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[53]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3256,7 +3492,7 @@ func (x *RegisterFirstCryptoDeviceResponse) String() string {
 func (*RegisterFirstCryptoDeviceResponse) ProtoMessage() {}
 
 func (x *RegisterFirstCryptoDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[53]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3269,7 +3505,7 @@ func (x *RegisterFirstCryptoDeviceResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use RegisterFirstCryptoDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RegisterFirstCryptoDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{53}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *RegisterFirstCryptoDeviceResponse) GetDevice() *CryptoDevice {
@@ -3296,7 +3532,7 @@ type RegisterPendingLinkedCryptoDeviceRequest struct {
 
 func (x *RegisterPendingLinkedCryptoDeviceRequest) Reset() {
 	*x = RegisterPendingLinkedCryptoDeviceRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[54]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3308,7 +3544,7 @@ func (x *RegisterPendingLinkedCryptoDeviceRequest) String() string {
 func (*RegisterPendingLinkedCryptoDeviceRequest) ProtoMessage() {}
 
 func (x *RegisterPendingLinkedCryptoDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[54]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3321,7 +3557,7 @@ func (x *RegisterPendingLinkedCryptoDeviceRequest) ProtoReflect() protoreflect.M
 
 // Deprecated: Use RegisterPendingLinkedCryptoDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RegisterPendingLinkedCryptoDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{54}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *RegisterPendingLinkedCryptoDeviceRequest) GetDeviceLabel() string {
@@ -3348,7 +3584,7 @@ type RegisterPendingLinkedCryptoDeviceResponse struct {
 
 func (x *RegisterPendingLinkedCryptoDeviceResponse) Reset() {
 	*x = RegisterPendingLinkedCryptoDeviceResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[55]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3360,7 +3596,7 @@ func (x *RegisterPendingLinkedCryptoDeviceResponse) String() string {
 func (*RegisterPendingLinkedCryptoDeviceResponse) ProtoMessage() {}
 
 func (x *RegisterPendingLinkedCryptoDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[55]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3373,7 +3609,7 @@ func (x *RegisterPendingLinkedCryptoDeviceResponse) ProtoReflect() protoreflect.
 
 // Deprecated: Use RegisterPendingLinkedCryptoDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RegisterPendingLinkedCryptoDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{55}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *RegisterPendingLinkedCryptoDeviceResponse) GetDevice() *CryptoDevice {
@@ -3398,7 +3634,7 @@ type ListCryptoDevicesRequest struct {
 
 func (x *ListCryptoDevicesRequest) Reset() {
 	*x = ListCryptoDevicesRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[56]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3410,7 +3646,7 @@ func (x *ListCryptoDevicesRequest) String() string {
 func (*ListCryptoDevicesRequest) ProtoMessage() {}
 
 func (x *ListCryptoDevicesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[56]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3423,7 +3659,7 @@ func (x *ListCryptoDevicesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCryptoDevicesRequest.ProtoReflect.Descriptor instead.
 func (*ListCryptoDevicesRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{56}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{59}
 }
 
 type ListCryptoDevicesResponse struct {
@@ -3435,7 +3671,7 @@ type ListCryptoDevicesResponse struct {
 
 func (x *ListCryptoDevicesResponse) Reset() {
 	*x = ListCryptoDevicesResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[57]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3447,7 +3683,7 @@ func (x *ListCryptoDevicesResponse) String() string {
 func (*ListCryptoDevicesResponse) ProtoMessage() {}
 
 func (x *ListCryptoDevicesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[57]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3460,7 +3696,7 @@ func (x *ListCryptoDevicesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCryptoDevicesResponse.ProtoReflect.Descriptor instead.
 func (*ListCryptoDevicesResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{57}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *ListCryptoDevicesResponse) GetDevices() []*CryptoDevice {
@@ -3479,7 +3715,7 @@ type GetCryptoDeviceRequest struct {
 
 func (x *GetCryptoDeviceRequest) Reset() {
 	*x = GetCryptoDeviceRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[58]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3491,7 +3727,7 @@ func (x *GetCryptoDeviceRequest) String() string {
 func (*GetCryptoDeviceRequest) ProtoMessage() {}
 
 func (x *GetCryptoDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[58]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3504,7 +3740,7 @@ func (x *GetCryptoDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCryptoDeviceRequest.ProtoReflect.Descriptor instead.
 func (*GetCryptoDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{58}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *GetCryptoDeviceRequest) GetCryptoDeviceId() string {
@@ -3524,7 +3760,7 @@ type GetCryptoDeviceResponse struct {
 
 func (x *GetCryptoDeviceResponse) Reset() {
 	*x = GetCryptoDeviceResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[59]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3536,7 +3772,7 @@ func (x *GetCryptoDeviceResponse) String() string {
 func (*GetCryptoDeviceResponse) ProtoMessage() {}
 
 func (x *GetCryptoDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[59]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3549,7 +3785,7 @@ func (x *GetCryptoDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCryptoDeviceResponse.ProtoReflect.Descriptor instead.
 func (*GetCryptoDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{59}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *GetCryptoDeviceResponse) GetDevice() *CryptoDevice {
@@ -3566,17 +3802,106 @@ func (x *GetCryptoDeviceResponse) GetCurrentBundle() *CryptoDeviceBundle {
 	return nil
 }
 
+type CreateCryptoDeviceBundlePublishChallengeRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CryptoDeviceId string                 `protobuf:"bytes,1,opt,name=crypto_device_id,json=cryptoDeviceId,proto3" json:"crypto_device_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreateCryptoDeviceBundlePublishChallengeRequest) Reset() {
+	*x = CreateCryptoDeviceBundlePublishChallengeRequest{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateCryptoDeviceBundlePublishChallengeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateCryptoDeviceBundlePublishChallengeRequest) ProtoMessage() {}
+
+func (x *CreateCryptoDeviceBundlePublishChallengeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateCryptoDeviceBundlePublishChallengeRequest.ProtoReflect.Descriptor instead.
+func (*CreateCryptoDeviceBundlePublishChallengeRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *CreateCryptoDeviceBundlePublishChallengeRequest) GetCryptoDeviceId() string {
+	if x != nil {
+		return x.CryptoDeviceId
+	}
+	return ""
+}
+
+type CreateCryptoDeviceBundlePublishChallengeResponse struct {
+	state         protoimpl.MessageState              `protogen:"open.v1"`
+	Challenge     *CryptoDeviceBundlePublishChallenge `protobuf:"bytes,1,opt,name=challenge,proto3" json:"challenge,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateCryptoDeviceBundlePublishChallengeResponse) Reset() {
+	*x = CreateCryptoDeviceBundlePublishChallengeResponse{}
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateCryptoDeviceBundlePublishChallengeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateCryptoDeviceBundlePublishChallengeResponse) ProtoMessage() {}
+
+func (x *CreateCryptoDeviceBundlePublishChallengeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateCryptoDeviceBundlePublishChallengeResponse.ProtoReflect.Descriptor instead.
+func (*CreateCryptoDeviceBundlePublishChallengeResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *CreateCryptoDeviceBundlePublishChallengeResponse) GetChallenge() *CryptoDeviceBundlePublishChallenge {
+	if x != nil {
+		return x.Challenge
+	}
+	return nil
+}
+
 type PublishCryptoDeviceBundleRequest struct {
-	state          protoimpl.MessageState     `protogen:"open.v1"`
-	CryptoDeviceId string                     `protobuf:"bytes,1,opt,name=crypto_device_id,json=cryptoDeviceId,proto3" json:"crypto_device_id,omitempty"`
-	Bundle         *CryptoDeviceBundlePayload `protobuf:"bytes,2,opt,name=bundle,proto3" json:"bundle,omitempty"`
+	state          protoimpl.MessageState          `protogen:"open.v1"`
+	CryptoDeviceId string                          `protobuf:"bytes,1,opt,name=crypto_device_id,json=cryptoDeviceId,proto3" json:"crypto_device_id,omitempty"`
+	Bundle         *CryptoDeviceBundlePayload      `protobuf:"bytes,2,opt,name=bundle,proto3" json:"bundle,omitempty"`
+	Proof          *CryptoDeviceBundlePublishProof `protobuf:"bytes,3,opt,name=proof,proto3" json:"proof,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *PublishCryptoDeviceBundleRequest) Reset() {
 	*x = PublishCryptoDeviceBundleRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[60]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3588,7 +3913,7 @@ func (x *PublishCryptoDeviceBundleRequest) String() string {
 func (*PublishCryptoDeviceBundleRequest) ProtoMessage() {}
 
 func (x *PublishCryptoDeviceBundleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[60]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3601,7 +3926,7 @@ func (x *PublishCryptoDeviceBundleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishCryptoDeviceBundleRequest.ProtoReflect.Descriptor instead.
 func (*PublishCryptoDeviceBundleRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{60}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *PublishCryptoDeviceBundleRequest) GetCryptoDeviceId() string {
@@ -3618,6 +3943,13 @@ func (x *PublishCryptoDeviceBundleRequest) GetBundle() *CryptoDeviceBundlePayloa
 	return nil
 }
 
+func (x *PublishCryptoDeviceBundleRequest) GetProof() *CryptoDeviceBundlePublishProof {
+	if x != nil {
+		return x.Proof
+	}
+	return nil
+}
+
 type PublishCryptoDeviceBundleResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Device        *CryptoDevice          `protobuf:"bytes,1,opt,name=device,proto3" json:"device,omitempty"`
@@ -3628,7 +3960,7 @@ type PublishCryptoDeviceBundleResponse struct {
 
 func (x *PublishCryptoDeviceBundleResponse) Reset() {
 	*x = PublishCryptoDeviceBundleResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[61]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3640,7 +3972,7 @@ func (x *PublishCryptoDeviceBundleResponse) String() string {
 func (*PublishCryptoDeviceBundleResponse) ProtoMessage() {}
 
 func (x *PublishCryptoDeviceBundleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[61]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3653,7 +3985,7 @@ func (x *PublishCryptoDeviceBundleResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use PublishCryptoDeviceBundleResponse.ProtoReflect.Descriptor instead.
 func (*PublishCryptoDeviceBundleResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{61}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *PublishCryptoDeviceBundleResponse) GetDevice() *CryptoDevice {
@@ -3679,7 +4011,7 @@ type CreateCryptoDeviceLinkIntentRequest struct {
 
 func (x *CreateCryptoDeviceLinkIntentRequest) Reset() {
 	*x = CreateCryptoDeviceLinkIntentRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[62]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3691,7 +4023,7 @@ func (x *CreateCryptoDeviceLinkIntentRequest) String() string {
 func (*CreateCryptoDeviceLinkIntentRequest) ProtoMessage() {}
 
 func (x *CreateCryptoDeviceLinkIntentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[62]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3704,7 +4036,7 @@ func (x *CreateCryptoDeviceLinkIntentRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use CreateCryptoDeviceLinkIntentRequest.ProtoReflect.Descriptor instead.
 func (*CreateCryptoDeviceLinkIntentRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{62}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *CreateCryptoDeviceLinkIntentRequest) GetPendingCryptoDeviceId() string {
@@ -3723,7 +4055,7 @@ type CreateCryptoDeviceLinkIntentResponse struct {
 
 func (x *CreateCryptoDeviceLinkIntentResponse) Reset() {
 	*x = CreateCryptoDeviceLinkIntentResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[63]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3735,7 +4067,7 @@ func (x *CreateCryptoDeviceLinkIntentResponse) String() string {
 func (*CreateCryptoDeviceLinkIntentResponse) ProtoMessage() {}
 
 func (x *CreateCryptoDeviceLinkIntentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[63]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3748,7 +4080,7 @@ func (x *CreateCryptoDeviceLinkIntentResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use CreateCryptoDeviceLinkIntentResponse.ProtoReflect.Descriptor instead.
 func (*CreateCryptoDeviceLinkIntentResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{63}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *CreateCryptoDeviceLinkIntentResponse) GetLinkIntent() *CryptoDeviceLinkIntent {
@@ -3766,7 +4098,7 @@ type ListCryptoDeviceLinkIntentsRequest struct {
 
 func (x *ListCryptoDeviceLinkIntentsRequest) Reset() {
 	*x = ListCryptoDeviceLinkIntentsRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[64]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3778,7 +4110,7 @@ func (x *ListCryptoDeviceLinkIntentsRequest) String() string {
 func (*ListCryptoDeviceLinkIntentsRequest) ProtoMessage() {}
 
 func (x *ListCryptoDeviceLinkIntentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[64]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3791,7 +4123,7 @@ func (x *ListCryptoDeviceLinkIntentsRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ListCryptoDeviceLinkIntentsRequest.ProtoReflect.Descriptor instead.
 func (*ListCryptoDeviceLinkIntentsRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{64}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{69}
 }
 
 type ListCryptoDeviceLinkIntentsResponse struct {
@@ -3803,7 +4135,7 @@ type ListCryptoDeviceLinkIntentsResponse struct {
 
 func (x *ListCryptoDeviceLinkIntentsResponse) Reset() {
 	*x = ListCryptoDeviceLinkIntentsResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[65]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3815,7 +4147,7 @@ func (x *ListCryptoDeviceLinkIntentsResponse) String() string {
 func (*ListCryptoDeviceLinkIntentsResponse) ProtoMessage() {}
 
 func (x *ListCryptoDeviceLinkIntentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[65]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3828,7 +4160,7 @@ func (x *ListCryptoDeviceLinkIntentsResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use ListCryptoDeviceLinkIntentsResponse.ProtoReflect.Descriptor instead.
 func (*ListCryptoDeviceLinkIntentsResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{65}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *ListCryptoDeviceLinkIntentsResponse) GetLinkIntents() []*CryptoDeviceLinkIntent {
@@ -3849,7 +4181,7 @@ type ApproveCryptoDeviceLinkIntentRequest struct {
 
 func (x *ApproveCryptoDeviceLinkIntentRequest) Reset() {
 	*x = ApproveCryptoDeviceLinkIntentRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[66]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3861,7 +4193,7 @@ func (x *ApproveCryptoDeviceLinkIntentRequest) String() string {
 func (*ApproveCryptoDeviceLinkIntentRequest) ProtoMessage() {}
 
 func (x *ApproveCryptoDeviceLinkIntentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[66]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3874,7 +4206,7 @@ func (x *ApproveCryptoDeviceLinkIntentRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ApproveCryptoDeviceLinkIntentRequest.ProtoReflect.Descriptor instead.
 func (*ApproveCryptoDeviceLinkIntentRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{66}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *ApproveCryptoDeviceLinkIntentRequest) GetLinkIntentId() string {
@@ -3908,7 +4240,7 @@ type ApproveCryptoDeviceLinkIntentResponse struct {
 
 func (x *ApproveCryptoDeviceLinkIntentResponse) Reset() {
 	*x = ApproveCryptoDeviceLinkIntentResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[67]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3920,7 +4252,7 @@ func (x *ApproveCryptoDeviceLinkIntentResponse) String() string {
 func (*ApproveCryptoDeviceLinkIntentResponse) ProtoMessage() {}
 
 func (x *ApproveCryptoDeviceLinkIntentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[67]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3933,7 +4265,7 @@ func (x *ApproveCryptoDeviceLinkIntentResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use ApproveCryptoDeviceLinkIntentResponse.ProtoReflect.Descriptor instead.
 func (*ApproveCryptoDeviceLinkIntentResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{67}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *ApproveCryptoDeviceLinkIntentResponse) GetLinkIntent() *CryptoDeviceLinkIntent {
@@ -3959,7 +4291,7 @@ type ExpireCryptoDeviceLinkIntentRequest struct {
 
 func (x *ExpireCryptoDeviceLinkIntentRequest) Reset() {
 	*x = ExpireCryptoDeviceLinkIntentRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[68]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3971,7 +4303,7 @@ func (x *ExpireCryptoDeviceLinkIntentRequest) String() string {
 func (*ExpireCryptoDeviceLinkIntentRequest) ProtoMessage() {}
 
 func (x *ExpireCryptoDeviceLinkIntentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[68]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3984,7 +4316,7 @@ func (x *ExpireCryptoDeviceLinkIntentRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use ExpireCryptoDeviceLinkIntentRequest.ProtoReflect.Descriptor instead.
 func (*ExpireCryptoDeviceLinkIntentRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{68}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *ExpireCryptoDeviceLinkIntentRequest) GetLinkIntentId() string {
@@ -4003,7 +4335,7 @@ type ExpireCryptoDeviceLinkIntentResponse struct {
 
 func (x *ExpireCryptoDeviceLinkIntentResponse) Reset() {
 	*x = ExpireCryptoDeviceLinkIntentResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[69]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4015,7 +4347,7 @@ func (x *ExpireCryptoDeviceLinkIntentResponse) String() string {
 func (*ExpireCryptoDeviceLinkIntentResponse) ProtoMessage() {}
 
 func (x *ExpireCryptoDeviceLinkIntentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[69]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4028,7 +4360,7 @@ func (x *ExpireCryptoDeviceLinkIntentResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ExpireCryptoDeviceLinkIntentResponse.ProtoReflect.Descriptor instead.
 func (*ExpireCryptoDeviceLinkIntentResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{69}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *ExpireCryptoDeviceLinkIntentResponse) GetLinkIntent() *CryptoDeviceLinkIntent {
@@ -4048,7 +4380,7 @@ type RevokeCryptoDeviceRequest struct {
 
 func (x *RevokeCryptoDeviceRequest) Reset() {
 	*x = RevokeCryptoDeviceRequest{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[70]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4060,7 +4392,7 @@ func (x *RevokeCryptoDeviceRequest) String() string {
 func (*RevokeCryptoDeviceRequest) ProtoMessage() {}
 
 func (x *RevokeCryptoDeviceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[70]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4073,7 +4405,7 @@ func (x *RevokeCryptoDeviceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeCryptoDeviceRequest.ProtoReflect.Descriptor instead.
 func (*RevokeCryptoDeviceRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{70}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *RevokeCryptoDeviceRequest) GetCryptoDeviceId() string {
@@ -4099,7 +4431,7 @@ type RevokeCryptoDeviceResponse struct {
 
 func (x *RevokeCryptoDeviceResponse) Reset() {
 	*x = RevokeCryptoDeviceResponse{}
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[71]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4111,7 +4443,7 @@ func (x *RevokeCryptoDeviceResponse) String() string {
 func (*RevokeCryptoDeviceResponse) ProtoMessage() {}
 
 func (x *RevokeCryptoDeviceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[71]
+	mi := &file_aerochat_identity_v1_identity_service_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4124,7 +4456,7 @@ func (x *RevokeCryptoDeviceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeCryptoDeviceResponse.ProtoReflect.Descriptor instead.
 func (*RevokeCryptoDeviceResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{71}
+	return file_aerochat_identity_v1_identity_service_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *RevokeCryptoDeviceResponse) GetDevice() *CryptoDevice {
@@ -4267,7 +4599,28 @@ const file_aerochat_identity_v1_identity_service_proto_rawDesc = "" +
 	"\fpublished_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\vpublishedAt\x129\n" +
 	"\n" +
 	"expires_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12?\n" +
-	"\rsuperseded_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\fsupersededAt\"\xe6\x04\n" +
+	"\rsuperseded_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\fsupersededAt\"\xdb\x02\n" +
+	"\"CryptoDeviceBundlePublishChallenge\x12(\n" +
+	"\x10crypto_device_id\x18\x01 \x01(\tR\x0ecryptoDeviceId\x124\n" +
+	"\x16current_bundle_version\x18\x02 \x01(\x04R\x14currentBundleVersion\x122\n" +
+	"\x15current_bundle_digest\x18\x03 \x01(\fR\x13currentBundleDigest\x12+\n" +
+	"\x11publish_challenge\x18\x04 \x01(\fR\x10publishChallenge\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xb9\x03\n" +
+	"%CryptoDeviceBundlePublishProofPayload\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\rR\aversion\x12(\n" +
+	"\x10crypto_device_id\x18\x02 \x01(\tR\x0ecryptoDeviceId\x126\n" +
+	"\x17previous_bundle_version\x18\x03 \x01(\x04R\x15previousBundleVersion\x124\n" +
+	"\x16previous_bundle_digest\x18\x04 \x01(\fR\x14previousBundleDigest\x12*\n" +
+	"\x11new_bundle_digest\x18\x05 \x01(\fR\x0fnewBundleDigest\x12+\n" +
+	"\x11publish_challenge\x18\x06 \x01(\fR\x10publishChallenge\x12L\n" +
+	"\x14challenge_expires_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\x12challengeExpiresAt\x127\n" +
+	"\tissued_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\bissuedAt\"\x95\x01\n" +
+	"\x1eCryptoDeviceBundlePublishProof\x12U\n" +
+	"\apayload\x18\x01 \x01(\v2;.aerochat.identity.v1.CryptoDeviceBundlePublishProofPayloadR\apayload\x12\x1c\n" +
+	"\tsignature\x18\x02 \x01(\fR\tsignature\"\xe6\x04\n" +
 	"\x16CryptoDeviceLinkIntent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x127\n" +
@@ -4416,10 +4769,15 @@ const file_aerochat_identity_v1_identity_service_proto_rawDesc = "" +
 	"\x10crypto_device_id\x18\x01 \x01(\tR\x0ecryptoDeviceId\"\xa6\x01\n" +
 	"\x17GetCryptoDeviceResponse\x12:\n" +
 	"\x06device\x18\x01 \x01(\v2\".aerochat.identity.v1.CryptoDeviceR\x06device\x12O\n" +
-	"\x0ecurrent_bundle\x18\x02 \x01(\v2(.aerochat.identity.v1.CryptoDeviceBundleR\rcurrentBundle\"\x95\x01\n" +
+	"\x0ecurrent_bundle\x18\x02 \x01(\v2(.aerochat.identity.v1.CryptoDeviceBundleR\rcurrentBundle\"[\n" +
+	"/CreateCryptoDeviceBundlePublishChallengeRequest\x12(\n" +
+	"\x10crypto_device_id\x18\x01 \x01(\tR\x0ecryptoDeviceId\"\x8a\x01\n" +
+	"0CreateCryptoDeviceBundlePublishChallengeResponse\x12V\n" +
+	"\tchallenge\x18\x01 \x01(\v28.aerochat.identity.v1.CryptoDeviceBundlePublishChallengeR\tchallenge\"\xe1\x01\n" +
 	" PublishCryptoDeviceBundleRequest\x12(\n" +
 	"\x10crypto_device_id\x18\x01 \x01(\tR\x0ecryptoDeviceId\x12G\n" +
-	"\x06bundle\x18\x02 \x01(\v2/.aerochat.identity.v1.CryptoDeviceBundlePayloadR\x06bundle\"\xb0\x01\n" +
+	"\x06bundle\x18\x02 \x01(\v2/.aerochat.identity.v1.CryptoDeviceBundlePayloadR\x06bundle\x12J\n" +
+	"\x05proof\x18\x03 \x01(\v24.aerochat.identity.v1.CryptoDeviceBundlePublishProofR\x05proof\"\xb0\x01\n" +
 	"!PublishCryptoDeviceBundleResponse\x12:\n" +
 	"\x06device\x18\x01 \x01(\v2\".aerochat.identity.v1.CryptoDeviceR\x06device\x12O\n" +
 	"\x0ecurrent_bundle\x18\x02 \x01(\v2(.aerochat.identity.v1.CryptoDeviceBundleR\rcurrentBundle\"^\n" +
@@ -4463,7 +4821,7 @@ const file_aerochat_identity_v1_identity_service_proto_rawDesc = "" +
 	",CRYPTO_DEVICE_LINK_INTENT_STATUS_UNSPECIFIED\x10\x00\x12,\n" +
 	"(CRYPTO_DEVICE_LINK_INTENT_STATUS_PENDING\x10\x01\x12-\n" +
 	")CRYPTO_DEVICE_LINK_INTENT_STATUS_APPROVED\x10\x02\x12,\n" +
-	"(CRYPTO_DEVICE_LINK_INTENT_STATUS_EXPIRED\x10\x032\x96\x1c\n" +
+	"(CRYPTO_DEVICE_LINK_INTENT_STATUS_EXPIRED\x10\x032\xd2\x1d\n" +
 	"\x0fIdentityService\x12M\n" +
 	"\x04Ping\x12!.aerochat.identity.v1.PingRequest\x1a\".aerochat.identity.v1.PingResponse\x12Y\n" +
 	"\bRegister\x12%.aerochat.identity.v1.RegisterRequest\x1a&.aerochat.identity.v1.RegisterResponse\x12P\n" +
@@ -4487,7 +4845,8 @@ const file_aerochat_identity_v1_identity_service_proto_rawDesc = "" +
 	"\x19RegisterFirstCryptoDevice\x126.aerochat.identity.v1.RegisterFirstCryptoDeviceRequest\x1a7.aerochat.identity.v1.RegisterFirstCryptoDeviceResponse\x12\xa4\x01\n" +
 	"!RegisterPendingLinkedCryptoDevice\x12>.aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceRequest\x1a?.aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceResponse\x12t\n" +
 	"\x11ListCryptoDevices\x12..aerochat.identity.v1.ListCryptoDevicesRequest\x1a/.aerochat.identity.v1.ListCryptoDevicesResponse\x12n\n" +
-	"\x0fGetCryptoDevice\x12,.aerochat.identity.v1.GetCryptoDeviceRequest\x1a-.aerochat.identity.v1.GetCryptoDeviceResponse\x12\x8c\x01\n" +
+	"\x0fGetCryptoDevice\x12,.aerochat.identity.v1.GetCryptoDeviceRequest\x1a-.aerochat.identity.v1.GetCryptoDeviceResponse\x12\xb9\x01\n" +
+	"(CreateCryptoDeviceBundlePublishChallenge\x12E.aerochat.identity.v1.CreateCryptoDeviceBundlePublishChallengeRequest\x1aF.aerochat.identity.v1.CreateCryptoDeviceBundlePublishChallengeResponse\x12\x8c\x01\n" +
 	"\x19PublishCryptoDeviceBundle\x126.aerochat.identity.v1.PublishCryptoDeviceBundleRequest\x1a7.aerochat.identity.v1.PublishCryptoDeviceBundleResponse\x12\x95\x01\n" +
 	"\x1cCreateCryptoDeviceLinkIntent\x129.aerochat.identity.v1.CreateCryptoDeviceLinkIntentRequest\x1a:.aerochat.identity.v1.CreateCryptoDeviceLinkIntentResponse\x12\x92\x01\n" +
 	"\x1bListCryptoDeviceLinkIntents\x128.aerochat.identity.v1.ListCryptoDeviceLinkIntentsRequest\x1a9.aerochat.identity.v1.ListCryptoDeviceLinkIntentsResponse\x12\x98\x01\n" +
@@ -4508,216 +4867,230 @@ func file_aerochat_identity_v1_identity_service_proto_rawDescGZIP() []byte {
 }
 
 var file_aerochat_identity_v1_identity_service_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_aerochat_identity_v1_identity_service_proto_msgTypes = make([]protoimpl.MessageInfo, 72)
+var file_aerochat_identity_v1_identity_service_proto_msgTypes = make([]protoimpl.MessageInfo, 77)
 var file_aerochat_identity_v1_identity_service_proto_goTypes = []any{
-	(KeyBackupStatus)(0),                              // 0: aerochat.identity.v1.KeyBackupStatus
-	(CryptoDeviceStatus)(0),                           // 1: aerochat.identity.v1.CryptoDeviceStatus
-	(CryptoDeviceLinkIntentStatus)(0),                 // 2: aerochat.identity.v1.CryptoDeviceLinkIntentStatus
-	(*Profile)(nil),                                   // 3: aerochat.identity.v1.Profile
-	(*Device)(nil),                                    // 4: aerochat.identity.v1.Device
-	(*Session)(nil),                                   // 5: aerochat.identity.v1.Session
-	(*DeviceWithSessions)(nil),                        // 6: aerochat.identity.v1.DeviceWithSessions
-	(*BlockedUser)(nil),                               // 7: aerochat.identity.v1.BlockedUser
-	(*FriendRequest)(nil),                             // 8: aerochat.identity.v1.FriendRequest
-	(*Friend)(nil),                                    // 9: aerochat.identity.v1.Friend
-	(*CurrentAuth)(nil),                               // 10: aerochat.identity.v1.CurrentAuth
-	(*CryptoDevice)(nil),                              // 11: aerochat.identity.v1.CryptoDevice
-	(*CryptoDeviceBundlePayload)(nil),                 // 12: aerochat.identity.v1.CryptoDeviceBundlePayload
-	(*CryptoDeviceBundle)(nil),                        // 13: aerochat.identity.v1.CryptoDeviceBundle
-	(*CryptoDeviceLinkIntent)(nil),                    // 14: aerochat.identity.v1.CryptoDeviceLinkIntent
-	(*CryptoDeviceLinkApprovalPayload)(nil),           // 15: aerochat.identity.v1.CryptoDeviceLinkApprovalPayload
-	(*CryptoDeviceLinkApprovalProof)(nil),             // 16: aerochat.identity.v1.CryptoDeviceLinkApprovalProof
-	(*PingRequest)(nil),                               // 17: aerochat.identity.v1.PingRequest
-	(*PingResponse)(nil),                              // 18: aerochat.identity.v1.PingResponse
-	(*RegisterRequest)(nil),                           // 19: aerochat.identity.v1.RegisterRequest
-	(*RegisterResponse)(nil),                          // 20: aerochat.identity.v1.RegisterResponse
-	(*LoginRequest)(nil),                              // 21: aerochat.identity.v1.LoginRequest
-	(*LoginResponse)(nil),                             // 22: aerochat.identity.v1.LoginResponse
-	(*LogoutCurrentSessionRequest)(nil),               // 23: aerochat.identity.v1.LogoutCurrentSessionRequest
-	(*LogoutCurrentSessionResponse)(nil),              // 24: aerochat.identity.v1.LogoutCurrentSessionResponse
-	(*GetCurrentProfileRequest)(nil),                  // 25: aerochat.identity.v1.GetCurrentProfileRequest
-	(*GetCurrentProfileResponse)(nil),                 // 26: aerochat.identity.v1.GetCurrentProfileResponse
-	(*UpdateCurrentProfileRequest)(nil),               // 27: aerochat.identity.v1.UpdateCurrentProfileRequest
-	(*UpdateCurrentProfileResponse)(nil),              // 28: aerochat.identity.v1.UpdateCurrentProfileResponse
-	(*ListDevicesRequest)(nil),                        // 29: aerochat.identity.v1.ListDevicesRequest
-	(*ListDevicesResponse)(nil),                       // 30: aerochat.identity.v1.ListDevicesResponse
-	(*RevokeSessionOrDeviceRequest)(nil),              // 31: aerochat.identity.v1.RevokeSessionOrDeviceRequest
-	(*RevokeSessionOrDeviceResponse)(nil),             // 32: aerochat.identity.v1.RevokeSessionOrDeviceResponse
-	(*ListBlockedUsersRequest)(nil),                   // 33: aerochat.identity.v1.ListBlockedUsersRequest
-	(*ListBlockedUsersResponse)(nil),                  // 34: aerochat.identity.v1.ListBlockedUsersResponse
-	(*BlockUserRequest)(nil),                          // 35: aerochat.identity.v1.BlockUserRequest
-	(*BlockUserResponse)(nil),                         // 36: aerochat.identity.v1.BlockUserResponse
-	(*UnblockUserRequest)(nil),                        // 37: aerochat.identity.v1.UnblockUserRequest
-	(*UnblockUserResponse)(nil),                       // 38: aerochat.identity.v1.UnblockUserResponse
-	(*SendFriendRequestRequest)(nil),                  // 39: aerochat.identity.v1.SendFriendRequestRequest
-	(*SendFriendRequestResponse)(nil),                 // 40: aerochat.identity.v1.SendFriendRequestResponse
-	(*AcceptFriendRequestRequest)(nil),                // 41: aerochat.identity.v1.AcceptFriendRequestRequest
-	(*AcceptFriendRequestResponse)(nil),               // 42: aerochat.identity.v1.AcceptFriendRequestResponse
-	(*DeclineFriendRequestRequest)(nil),               // 43: aerochat.identity.v1.DeclineFriendRequestRequest
-	(*DeclineFriendRequestResponse)(nil),              // 44: aerochat.identity.v1.DeclineFriendRequestResponse
-	(*CancelOutgoingFriendRequestRequest)(nil),        // 45: aerochat.identity.v1.CancelOutgoingFriendRequestRequest
-	(*CancelOutgoingFriendRequestResponse)(nil),       // 46: aerochat.identity.v1.CancelOutgoingFriendRequestResponse
-	(*ListIncomingFriendRequestsRequest)(nil),         // 47: aerochat.identity.v1.ListIncomingFriendRequestsRequest
-	(*ListIncomingFriendRequestsResponse)(nil),        // 48: aerochat.identity.v1.ListIncomingFriendRequestsResponse
-	(*ListOutgoingFriendRequestsRequest)(nil),         // 49: aerochat.identity.v1.ListOutgoingFriendRequestsRequest
-	(*ListOutgoingFriendRequestsResponse)(nil),        // 50: aerochat.identity.v1.ListOutgoingFriendRequestsResponse
-	(*ListFriendsRequest)(nil),                        // 51: aerochat.identity.v1.ListFriendsRequest
-	(*ListFriendsResponse)(nil),                       // 52: aerochat.identity.v1.ListFriendsResponse
-	(*RemoveFriendRequest)(nil),                       // 53: aerochat.identity.v1.RemoveFriendRequest
-	(*RemoveFriendResponse)(nil),                      // 54: aerochat.identity.v1.RemoveFriendResponse
-	(*RegisterFirstCryptoDeviceRequest)(nil),          // 55: aerochat.identity.v1.RegisterFirstCryptoDeviceRequest
-	(*RegisterFirstCryptoDeviceResponse)(nil),         // 56: aerochat.identity.v1.RegisterFirstCryptoDeviceResponse
-	(*RegisterPendingLinkedCryptoDeviceRequest)(nil),  // 57: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceRequest
-	(*RegisterPendingLinkedCryptoDeviceResponse)(nil), // 58: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceResponse
-	(*ListCryptoDevicesRequest)(nil),                  // 59: aerochat.identity.v1.ListCryptoDevicesRequest
-	(*ListCryptoDevicesResponse)(nil),                 // 60: aerochat.identity.v1.ListCryptoDevicesResponse
-	(*GetCryptoDeviceRequest)(nil),                    // 61: aerochat.identity.v1.GetCryptoDeviceRequest
-	(*GetCryptoDeviceResponse)(nil),                   // 62: aerochat.identity.v1.GetCryptoDeviceResponse
-	(*PublishCryptoDeviceBundleRequest)(nil),          // 63: aerochat.identity.v1.PublishCryptoDeviceBundleRequest
-	(*PublishCryptoDeviceBundleResponse)(nil),         // 64: aerochat.identity.v1.PublishCryptoDeviceBundleResponse
-	(*CreateCryptoDeviceLinkIntentRequest)(nil),       // 65: aerochat.identity.v1.CreateCryptoDeviceLinkIntentRequest
-	(*CreateCryptoDeviceLinkIntentResponse)(nil),      // 66: aerochat.identity.v1.CreateCryptoDeviceLinkIntentResponse
-	(*ListCryptoDeviceLinkIntentsRequest)(nil),        // 67: aerochat.identity.v1.ListCryptoDeviceLinkIntentsRequest
-	(*ListCryptoDeviceLinkIntentsResponse)(nil),       // 68: aerochat.identity.v1.ListCryptoDeviceLinkIntentsResponse
-	(*ApproveCryptoDeviceLinkIntentRequest)(nil),      // 69: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentRequest
-	(*ApproveCryptoDeviceLinkIntentResponse)(nil),     // 70: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentResponse
-	(*ExpireCryptoDeviceLinkIntentRequest)(nil),       // 71: aerochat.identity.v1.ExpireCryptoDeviceLinkIntentRequest
-	(*ExpireCryptoDeviceLinkIntentResponse)(nil),      // 72: aerochat.identity.v1.ExpireCryptoDeviceLinkIntentResponse
-	(*RevokeCryptoDeviceRequest)(nil),                 // 73: aerochat.identity.v1.RevokeCryptoDeviceRequest
-	(*RevokeCryptoDeviceResponse)(nil),                // 74: aerochat.identity.v1.RevokeCryptoDeviceResponse
-	(*timestamppb.Timestamp)(nil),                     // 75: google.protobuf.Timestamp
-	(*v1.ServiceMeta)(nil),                            // 76: aerochat.common.v1.ServiceMeta
+	(KeyBackupStatus)(0),                                     // 0: aerochat.identity.v1.KeyBackupStatus
+	(CryptoDeviceStatus)(0),                                  // 1: aerochat.identity.v1.CryptoDeviceStatus
+	(CryptoDeviceLinkIntentStatus)(0),                        // 2: aerochat.identity.v1.CryptoDeviceLinkIntentStatus
+	(*Profile)(nil),                                          // 3: aerochat.identity.v1.Profile
+	(*Device)(nil),                                           // 4: aerochat.identity.v1.Device
+	(*Session)(nil),                                          // 5: aerochat.identity.v1.Session
+	(*DeviceWithSessions)(nil),                               // 6: aerochat.identity.v1.DeviceWithSessions
+	(*BlockedUser)(nil),                                      // 7: aerochat.identity.v1.BlockedUser
+	(*FriendRequest)(nil),                                    // 8: aerochat.identity.v1.FriendRequest
+	(*Friend)(nil),                                           // 9: aerochat.identity.v1.Friend
+	(*CurrentAuth)(nil),                                      // 10: aerochat.identity.v1.CurrentAuth
+	(*CryptoDevice)(nil),                                     // 11: aerochat.identity.v1.CryptoDevice
+	(*CryptoDeviceBundlePayload)(nil),                        // 12: aerochat.identity.v1.CryptoDeviceBundlePayload
+	(*CryptoDeviceBundle)(nil),                               // 13: aerochat.identity.v1.CryptoDeviceBundle
+	(*CryptoDeviceBundlePublishChallenge)(nil),               // 14: aerochat.identity.v1.CryptoDeviceBundlePublishChallenge
+	(*CryptoDeviceBundlePublishProofPayload)(nil),            // 15: aerochat.identity.v1.CryptoDeviceBundlePublishProofPayload
+	(*CryptoDeviceBundlePublishProof)(nil),                   // 16: aerochat.identity.v1.CryptoDeviceBundlePublishProof
+	(*CryptoDeviceLinkIntent)(nil),                           // 17: aerochat.identity.v1.CryptoDeviceLinkIntent
+	(*CryptoDeviceLinkApprovalPayload)(nil),                  // 18: aerochat.identity.v1.CryptoDeviceLinkApprovalPayload
+	(*CryptoDeviceLinkApprovalProof)(nil),                    // 19: aerochat.identity.v1.CryptoDeviceLinkApprovalProof
+	(*PingRequest)(nil),                                      // 20: aerochat.identity.v1.PingRequest
+	(*PingResponse)(nil),                                     // 21: aerochat.identity.v1.PingResponse
+	(*RegisterRequest)(nil),                                  // 22: aerochat.identity.v1.RegisterRequest
+	(*RegisterResponse)(nil),                                 // 23: aerochat.identity.v1.RegisterResponse
+	(*LoginRequest)(nil),                                     // 24: aerochat.identity.v1.LoginRequest
+	(*LoginResponse)(nil),                                    // 25: aerochat.identity.v1.LoginResponse
+	(*LogoutCurrentSessionRequest)(nil),                      // 26: aerochat.identity.v1.LogoutCurrentSessionRequest
+	(*LogoutCurrentSessionResponse)(nil),                     // 27: aerochat.identity.v1.LogoutCurrentSessionResponse
+	(*GetCurrentProfileRequest)(nil),                         // 28: aerochat.identity.v1.GetCurrentProfileRequest
+	(*GetCurrentProfileResponse)(nil),                        // 29: aerochat.identity.v1.GetCurrentProfileResponse
+	(*UpdateCurrentProfileRequest)(nil),                      // 30: aerochat.identity.v1.UpdateCurrentProfileRequest
+	(*UpdateCurrentProfileResponse)(nil),                     // 31: aerochat.identity.v1.UpdateCurrentProfileResponse
+	(*ListDevicesRequest)(nil),                               // 32: aerochat.identity.v1.ListDevicesRequest
+	(*ListDevicesResponse)(nil),                              // 33: aerochat.identity.v1.ListDevicesResponse
+	(*RevokeSessionOrDeviceRequest)(nil),                     // 34: aerochat.identity.v1.RevokeSessionOrDeviceRequest
+	(*RevokeSessionOrDeviceResponse)(nil),                    // 35: aerochat.identity.v1.RevokeSessionOrDeviceResponse
+	(*ListBlockedUsersRequest)(nil),                          // 36: aerochat.identity.v1.ListBlockedUsersRequest
+	(*ListBlockedUsersResponse)(nil),                         // 37: aerochat.identity.v1.ListBlockedUsersResponse
+	(*BlockUserRequest)(nil),                                 // 38: aerochat.identity.v1.BlockUserRequest
+	(*BlockUserResponse)(nil),                                // 39: aerochat.identity.v1.BlockUserResponse
+	(*UnblockUserRequest)(nil),                               // 40: aerochat.identity.v1.UnblockUserRequest
+	(*UnblockUserResponse)(nil),                              // 41: aerochat.identity.v1.UnblockUserResponse
+	(*SendFriendRequestRequest)(nil),                         // 42: aerochat.identity.v1.SendFriendRequestRequest
+	(*SendFriendRequestResponse)(nil),                        // 43: aerochat.identity.v1.SendFriendRequestResponse
+	(*AcceptFriendRequestRequest)(nil),                       // 44: aerochat.identity.v1.AcceptFriendRequestRequest
+	(*AcceptFriendRequestResponse)(nil),                      // 45: aerochat.identity.v1.AcceptFriendRequestResponse
+	(*DeclineFriendRequestRequest)(nil),                      // 46: aerochat.identity.v1.DeclineFriendRequestRequest
+	(*DeclineFriendRequestResponse)(nil),                     // 47: aerochat.identity.v1.DeclineFriendRequestResponse
+	(*CancelOutgoingFriendRequestRequest)(nil),               // 48: aerochat.identity.v1.CancelOutgoingFriendRequestRequest
+	(*CancelOutgoingFriendRequestResponse)(nil),              // 49: aerochat.identity.v1.CancelOutgoingFriendRequestResponse
+	(*ListIncomingFriendRequestsRequest)(nil),                // 50: aerochat.identity.v1.ListIncomingFriendRequestsRequest
+	(*ListIncomingFriendRequestsResponse)(nil),               // 51: aerochat.identity.v1.ListIncomingFriendRequestsResponse
+	(*ListOutgoingFriendRequestsRequest)(nil),                // 52: aerochat.identity.v1.ListOutgoingFriendRequestsRequest
+	(*ListOutgoingFriendRequestsResponse)(nil),               // 53: aerochat.identity.v1.ListOutgoingFriendRequestsResponse
+	(*ListFriendsRequest)(nil),                               // 54: aerochat.identity.v1.ListFriendsRequest
+	(*ListFriendsResponse)(nil),                              // 55: aerochat.identity.v1.ListFriendsResponse
+	(*RemoveFriendRequest)(nil),                              // 56: aerochat.identity.v1.RemoveFriendRequest
+	(*RemoveFriendResponse)(nil),                             // 57: aerochat.identity.v1.RemoveFriendResponse
+	(*RegisterFirstCryptoDeviceRequest)(nil),                 // 58: aerochat.identity.v1.RegisterFirstCryptoDeviceRequest
+	(*RegisterFirstCryptoDeviceResponse)(nil),                // 59: aerochat.identity.v1.RegisterFirstCryptoDeviceResponse
+	(*RegisterPendingLinkedCryptoDeviceRequest)(nil),         // 60: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceRequest
+	(*RegisterPendingLinkedCryptoDeviceResponse)(nil),        // 61: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceResponse
+	(*ListCryptoDevicesRequest)(nil),                         // 62: aerochat.identity.v1.ListCryptoDevicesRequest
+	(*ListCryptoDevicesResponse)(nil),                        // 63: aerochat.identity.v1.ListCryptoDevicesResponse
+	(*GetCryptoDeviceRequest)(nil),                           // 64: aerochat.identity.v1.GetCryptoDeviceRequest
+	(*GetCryptoDeviceResponse)(nil),                          // 65: aerochat.identity.v1.GetCryptoDeviceResponse
+	(*CreateCryptoDeviceBundlePublishChallengeRequest)(nil),  // 66: aerochat.identity.v1.CreateCryptoDeviceBundlePublishChallengeRequest
+	(*CreateCryptoDeviceBundlePublishChallengeResponse)(nil), // 67: aerochat.identity.v1.CreateCryptoDeviceBundlePublishChallengeResponse
+	(*PublishCryptoDeviceBundleRequest)(nil),                 // 68: aerochat.identity.v1.PublishCryptoDeviceBundleRequest
+	(*PublishCryptoDeviceBundleResponse)(nil),                // 69: aerochat.identity.v1.PublishCryptoDeviceBundleResponse
+	(*CreateCryptoDeviceLinkIntentRequest)(nil),              // 70: aerochat.identity.v1.CreateCryptoDeviceLinkIntentRequest
+	(*CreateCryptoDeviceLinkIntentResponse)(nil),             // 71: aerochat.identity.v1.CreateCryptoDeviceLinkIntentResponse
+	(*ListCryptoDeviceLinkIntentsRequest)(nil),               // 72: aerochat.identity.v1.ListCryptoDeviceLinkIntentsRequest
+	(*ListCryptoDeviceLinkIntentsResponse)(nil),              // 73: aerochat.identity.v1.ListCryptoDeviceLinkIntentsResponse
+	(*ApproveCryptoDeviceLinkIntentRequest)(nil),             // 74: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentRequest
+	(*ApproveCryptoDeviceLinkIntentResponse)(nil),            // 75: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentResponse
+	(*ExpireCryptoDeviceLinkIntentRequest)(nil),              // 76: aerochat.identity.v1.ExpireCryptoDeviceLinkIntentRequest
+	(*ExpireCryptoDeviceLinkIntentResponse)(nil),             // 77: aerochat.identity.v1.ExpireCryptoDeviceLinkIntentResponse
+	(*RevokeCryptoDeviceRequest)(nil),                        // 78: aerochat.identity.v1.RevokeCryptoDeviceRequest
+	(*RevokeCryptoDeviceResponse)(nil),                       // 79: aerochat.identity.v1.RevokeCryptoDeviceResponse
+	(*timestamppb.Timestamp)(nil),                            // 80: google.protobuf.Timestamp
+	(*v1.ServiceMeta)(nil),                                   // 81: aerochat.common.v1.ServiceMeta
 }
 var file_aerochat_identity_v1_identity_service_proto_depIdxs = []int32{
-	0,  // 0: aerochat.identity.v1.Profile.key_backup_status:type_name -> aerochat.identity.v1.KeyBackupStatus
-	75, // 1: aerochat.identity.v1.Profile.created_at:type_name -> google.protobuf.Timestamp
-	75, // 2: aerochat.identity.v1.Profile.updated_at:type_name -> google.protobuf.Timestamp
-	75, // 3: aerochat.identity.v1.Device.created_at:type_name -> google.protobuf.Timestamp
-	75, // 4: aerochat.identity.v1.Device.last_seen_at:type_name -> google.protobuf.Timestamp
-	75, // 5: aerochat.identity.v1.Device.revoked_at:type_name -> google.protobuf.Timestamp
-	75, // 6: aerochat.identity.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	75, // 7: aerochat.identity.v1.Session.last_seen_at:type_name -> google.protobuf.Timestamp
-	75, // 8: aerochat.identity.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
-	4,  // 9: aerochat.identity.v1.DeviceWithSessions.device:type_name -> aerochat.identity.v1.Device
-	5,  // 10: aerochat.identity.v1.DeviceWithSessions.sessions:type_name -> aerochat.identity.v1.Session
-	3,  // 11: aerochat.identity.v1.BlockedUser.profile:type_name -> aerochat.identity.v1.Profile
-	75, // 12: aerochat.identity.v1.BlockedUser.blocked_at:type_name -> google.protobuf.Timestamp
-	3,  // 13: aerochat.identity.v1.FriendRequest.profile:type_name -> aerochat.identity.v1.Profile
-	75, // 14: aerochat.identity.v1.FriendRequest.requested_at:type_name -> google.protobuf.Timestamp
-	3,  // 15: aerochat.identity.v1.Friend.profile:type_name -> aerochat.identity.v1.Profile
-	75, // 16: aerochat.identity.v1.Friend.friends_since:type_name -> google.protobuf.Timestamp
-	3,  // 17: aerochat.identity.v1.CurrentAuth.profile:type_name -> aerochat.identity.v1.Profile
-	4,  // 18: aerochat.identity.v1.CurrentAuth.device:type_name -> aerochat.identity.v1.Device
-	5,  // 19: aerochat.identity.v1.CurrentAuth.session:type_name -> aerochat.identity.v1.Session
-	1,  // 20: aerochat.identity.v1.CryptoDevice.status:type_name -> aerochat.identity.v1.CryptoDeviceStatus
-	75, // 21: aerochat.identity.v1.CryptoDevice.last_bundle_published_at:type_name -> google.protobuf.Timestamp
-	75, // 22: aerochat.identity.v1.CryptoDevice.created_at:type_name -> google.protobuf.Timestamp
-	75, // 23: aerochat.identity.v1.CryptoDevice.activated_at:type_name -> google.protobuf.Timestamp
-	75, // 24: aerochat.identity.v1.CryptoDevice.revoked_at:type_name -> google.protobuf.Timestamp
-	75, // 25: aerochat.identity.v1.CryptoDeviceBundlePayload.expires_at:type_name -> google.protobuf.Timestamp
-	75, // 26: aerochat.identity.v1.CryptoDeviceBundle.published_at:type_name -> google.protobuf.Timestamp
-	75, // 27: aerochat.identity.v1.CryptoDeviceBundle.expires_at:type_name -> google.protobuf.Timestamp
-	75, // 28: aerochat.identity.v1.CryptoDeviceBundle.superseded_at:type_name -> google.protobuf.Timestamp
-	2,  // 29: aerochat.identity.v1.CryptoDeviceLinkIntent.status:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntentStatus
-	75, // 30: aerochat.identity.v1.CryptoDeviceLinkIntent.created_at:type_name -> google.protobuf.Timestamp
-	75, // 31: aerochat.identity.v1.CryptoDeviceLinkIntent.expires_at:type_name -> google.protobuf.Timestamp
-	75, // 32: aerochat.identity.v1.CryptoDeviceLinkIntent.approved_at:type_name -> google.protobuf.Timestamp
-	75, // 33: aerochat.identity.v1.CryptoDeviceLinkIntent.expired_at:type_name -> google.protobuf.Timestamp
-	75, // 34: aerochat.identity.v1.CryptoDeviceLinkApprovalPayload.challenge_expires_at:type_name -> google.protobuf.Timestamp
-	75, // 35: aerochat.identity.v1.CryptoDeviceLinkApprovalPayload.issued_at:type_name -> google.protobuf.Timestamp
-	15, // 36: aerochat.identity.v1.CryptoDeviceLinkApprovalProof.payload:type_name -> aerochat.identity.v1.CryptoDeviceLinkApprovalPayload
-	76, // 37: aerochat.identity.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
-	10, // 38: aerochat.identity.v1.RegisterResponse.auth:type_name -> aerochat.identity.v1.CurrentAuth
-	10, // 39: aerochat.identity.v1.LoginResponse.auth:type_name -> aerochat.identity.v1.CurrentAuth
-	3,  // 40: aerochat.identity.v1.GetCurrentProfileResponse.profile:type_name -> aerochat.identity.v1.Profile
-	3,  // 41: aerochat.identity.v1.UpdateCurrentProfileResponse.profile:type_name -> aerochat.identity.v1.Profile
-	6,  // 42: aerochat.identity.v1.ListDevicesResponse.devices:type_name -> aerochat.identity.v1.DeviceWithSessions
-	7,  // 43: aerochat.identity.v1.ListBlockedUsersResponse.blocked_users:type_name -> aerochat.identity.v1.BlockedUser
-	8,  // 44: aerochat.identity.v1.ListIncomingFriendRequestsResponse.friend_requests:type_name -> aerochat.identity.v1.FriendRequest
-	8,  // 45: aerochat.identity.v1.ListOutgoingFriendRequestsResponse.friend_requests:type_name -> aerochat.identity.v1.FriendRequest
-	9,  // 46: aerochat.identity.v1.ListFriendsResponse.friends:type_name -> aerochat.identity.v1.Friend
-	12, // 47: aerochat.identity.v1.RegisterFirstCryptoDeviceRequest.bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundlePayload
-	11, // 48: aerochat.identity.v1.RegisterFirstCryptoDeviceResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
-	13, // 49: aerochat.identity.v1.RegisterFirstCryptoDeviceResponse.current_bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundle
-	12, // 50: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceRequest.bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundlePayload
-	11, // 51: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
-	13, // 52: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceResponse.current_bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundle
-	11, // 53: aerochat.identity.v1.ListCryptoDevicesResponse.devices:type_name -> aerochat.identity.v1.CryptoDevice
-	11, // 54: aerochat.identity.v1.GetCryptoDeviceResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
-	13, // 55: aerochat.identity.v1.GetCryptoDeviceResponse.current_bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundle
-	12, // 56: aerochat.identity.v1.PublishCryptoDeviceBundleRequest.bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundlePayload
-	11, // 57: aerochat.identity.v1.PublishCryptoDeviceBundleResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
-	13, // 58: aerochat.identity.v1.PublishCryptoDeviceBundleResponse.current_bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundle
-	14, // 59: aerochat.identity.v1.CreateCryptoDeviceLinkIntentResponse.link_intent:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntent
-	14, // 60: aerochat.identity.v1.ListCryptoDeviceLinkIntentsResponse.link_intents:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntent
-	16, // 61: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentRequest.proof:type_name -> aerochat.identity.v1.CryptoDeviceLinkApprovalProof
-	14, // 62: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentResponse.link_intent:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntent
-	11, // 63: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
-	14, // 64: aerochat.identity.v1.ExpireCryptoDeviceLinkIntentResponse.link_intent:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntent
-	11, // 65: aerochat.identity.v1.RevokeCryptoDeviceResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
-	17, // 66: aerochat.identity.v1.IdentityService.Ping:input_type -> aerochat.identity.v1.PingRequest
-	19, // 67: aerochat.identity.v1.IdentityService.Register:input_type -> aerochat.identity.v1.RegisterRequest
-	21, // 68: aerochat.identity.v1.IdentityService.Login:input_type -> aerochat.identity.v1.LoginRequest
-	23, // 69: aerochat.identity.v1.IdentityService.LogoutCurrentSession:input_type -> aerochat.identity.v1.LogoutCurrentSessionRequest
-	25, // 70: aerochat.identity.v1.IdentityService.GetCurrentProfile:input_type -> aerochat.identity.v1.GetCurrentProfileRequest
-	27, // 71: aerochat.identity.v1.IdentityService.UpdateCurrentProfile:input_type -> aerochat.identity.v1.UpdateCurrentProfileRequest
-	29, // 72: aerochat.identity.v1.IdentityService.ListDevices:input_type -> aerochat.identity.v1.ListDevicesRequest
-	31, // 73: aerochat.identity.v1.IdentityService.RevokeSessionOrDevice:input_type -> aerochat.identity.v1.RevokeSessionOrDeviceRequest
-	33, // 74: aerochat.identity.v1.IdentityService.ListBlockedUsers:input_type -> aerochat.identity.v1.ListBlockedUsersRequest
-	35, // 75: aerochat.identity.v1.IdentityService.BlockUser:input_type -> aerochat.identity.v1.BlockUserRequest
-	37, // 76: aerochat.identity.v1.IdentityService.UnblockUser:input_type -> aerochat.identity.v1.UnblockUserRequest
-	39, // 77: aerochat.identity.v1.IdentityService.SendFriendRequest:input_type -> aerochat.identity.v1.SendFriendRequestRequest
-	41, // 78: aerochat.identity.v1.IdentityService.AcceptFriendRequest:input_type -> aerochat.identity.v1.AcceptFriendRequestRequest
-	43, // 79: aerochat.identity.v1.IdentityService.DeclineFriendRequest:input_type -> aerochat.identity.v1.DeclineFriendRequestRequest
-	45, // 80: aerochat.identity.v1.IdentityService.CancelOutgoingFriendRequest:input_type -> aerochat.identity.v1.CancelOutgoingFriendRequestRequest
-	47, // 81: aerochat.identity.v1.IdentityService.ListIncomingFriendRequests:input_type -> aerochat.identity.v1.ListIncomingFriendRequestsRequest
-	49, // 82: aerochat.identity.v1.IdentityService.ListOutgoingFriendRequests:input_type -> aerochat.identity.v1.ListOutgoingFriendRequestsRequest
-	51, // 83: aerochat.identity.v1.IdentityService.ListFriends:input_type -> aerochat.identity.v1.ListFriendsRequest
-	53, // 84: aerochat.identity.v1.IdentityService.RemoveFriend:input_type -> aerochat.identity.v1.RemoveFriendRequest
-	55, // 85: aerochat.identity.v1.IdentityService.RegisterFirstCryptoDevice:input_type -> aerochat.identity.v1.RegisterFirstCryptoDeviceRequest
-	57, // 86: aerochat.identity.v1.IdentityService.RegisterPendingLinkedCryptoDevice:input_type -> aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceRequest
-	59, // 87: aerochat.identity.v1.IdentityService.ListCryptoDevices:input_type -> aerochat.identity.v1.ListCryptoDevicesRequest
-	61, // 88: aerochat.identity.v1.IdentityService.GetCryptoDevice:input_type -> aerochat.identity.v1.GetCryptoDeviceRequest
-	63, // 89: aerochat.identity.v1.IdentityService.PublishCryptoDeviceBundle:input_type -> aerochat.identity.v1.PublishCryptoDeviceBundleRequest
-	65, // 90: aerochat.identity.v1.IdentityService.CreateCryptoDeviceLinkIntent:input_type -> aerochat.identity.v1.CreateCryptoDeviceLinkIntentRequest
-	67, // 91: aerochat.identity.v1.IdentityService.ListCryptoDeviceLinkIntents:input_type -> aerochat.identity.v1.ListCryptoDeviceLinkIntentsRequest
-	69, // 92: aerochat.identity.v1.IdentityService.ApproveCryptoDeviceLinkIntent:input_type -> aerochat.identity.v1.ApproveCryptoDeviceLinkIntentRequest
-	71, // 93: aerochat.identity.v1.IdentityService.ExpireCryptoDeviceLinkIntent:input_type -> aerochat.identity.v1.ExpireCryptoDeviceLinkIntentRequest
-	73, // 94: aerochat.identity.v1.IdentityService.RevokeCryptoDevice:input_type -> aerochat.identity.v1.RevokeCryptoDeviceRequest
-	18, // 95: aerochat.identity.v1.IdentityService.Ping:output_type -> aerochat.identity.v1.PingResponse
-	20, // 96: aerochat.identity.v1.IdentityService.Register:output_type -> aerochat.identity.v1.RegisterResponse
-	22, // 97: aerochat.identity.v1.IdentityService.Login:output_type -> aerochat.identity.v1.LoginResponse
-	24, // 98: aerochat.identity.v1.IdentityService.LogoutCurrentSession:output_type -> aerochat.identity.v1.LogoutCurrentSessionResponse
-	26, // 99: aerochat.identity.v1.IdentityService.GetCurrentProfile:output_type -> aerochat.identity.v1.GetCurrentProfileResponse
-	28, // 100: aerochat.identity.v1.IdentityService.UpdateCurrentProfile:output_type -> aerochat.identity.v1.UpdateCurrentProfileResponse
-	30, // 101: aerochat.identity.v1.IdentityService.ListDevices:output_type -> aerochat.identity.v1.ListDevicesResponse
-	32, // 102: aerochat.identity.v1.IdentityService.RevokeSessionOrDevice:output_type -> aerochat.identity.v1.RevokeSessionOrDeviceResponse
-	34, // 103: aerochat.identity.v1.IdentityService.ListBlockedUsers:output_type -> aerochat.identity.v1.ListBlockedUsersResponse
-	36, // 104: aerochat.identity.v1.IdentityService.BlockUser:output_type -> aerochat.identity.v1.BlockUserResponse
-	38, // 105: aerochat.identity.v1.IdentityService.UnblockUser:output_type -> aerochat.identity.v1.UnblockUserResponse
-	40, // 106: aerochat.identity.v1.IdentityService.SendFriendRequest:output_type -> aerochat.identity.v1.SendFriendRequestResponse
-	42, // 107: aerochat.identity.v1.IdentityService.AcceptFriendRequest:output_type -> aerochat.identity.v1.AcceptFriendRequestResponse
-	44, // 108: aerochat.identity.v1.IdentityService.DeclineFriendRequest:output_type -> aerochat.identity.v1.DeclineFriendRequestResponse
-	46, // 109: aerochat.identity.v1.IdentityService.CancelOutgoingFriendRequest:output_type -> aerochat.identity.v1.CancelOutgoingFriendRequestResponse
-	48, // 110: aerochat.identity.v1.IdentityService.ListIncomingFriendRequests:output_type -> aerochat.identity.v1.ListIncomingFriendRequestsResponse
-	50, // 111: aerochat.identity.v1.IdentityService.ListOutgoingFriendRequests:output_type -> aerochat.identity.v1.ListOutgoingFriendRequestsResponse
-	52, // 112: aerochat.identity.v1.IdentityService.ListFriends:output_type -> aerochat.identity.v1.ListFriendsResponse
-	54, // 113: aerochat.identity.v1.IdentityService.RemoveFriend:output_type -> aerochat.identity.v1.RemoveFriendResponse
-	56, // 114: aerochat.identity.v1.IdentityService.RegisterFirstCryptoDevice:output_type -> aerochat.identity.v1.RegisterFirstCryptoDeviceResponse
-	58, // 115: aerochat.identity.v1.IdentityService.RegisterPendingLinkedCryptoDevice:output_type -> aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceResponse
-	60, // 116: aerochat.identity.v1.IdentityService.ListCryptoDevices:output_type -> aerochat.identity.v1.ListCryptoDevicesResponse
-	62, // 117: aerochat.identity.v1.IdentityService.GetCryptoDevice:output_type -> aerochat.identity.v1.GetCryptoDeviceResponse
-	64, // 118: aerochat.identity.v1.IdentityService.PublishCryptoDeviceBundle:output_type -> aerochat.identity.v1.PublishCryptoDeviceBundleResponse
-	66, // 119: aerochat.identity.v1.IdentityService.CreateCryptoDeviceLinkIntent:output_type -> aerochat.identity.v1.CreateCryptoDeviceLinkIntentResponse
-	68, // 120: aerochat.identity.v1.IdentityService.ListCryptoDeviceLinkIntents:output_type -> aerochat.identity.v1.ListCryptoDeviceLinkIntentsResponse
-	70, // 121: aerochat.identity.v1.IdentityService.ApproveCryptoDeviceLinkIntent:output_type -> aerochat.identity.v1.ApproveCryptoDeviceLinkIntentResponse
-	72, // 122: aerochat.identity.v1.IdentityService.ExpireCryptoDeviceLinkIntent:output_type -> aerochat.identity.v1.ExpireCryptoDeviceLinkIntentResponse
-	74, // 123: aerochat.identity.v1.IdentityService.RevokeCryptoDevice:output_type -> aerochat.identity.v1.RevokeCryptoDeviceResponse
-	95, // [95:124] is the sub-list for method output_type
-	66, // [66:95] is the sub-list for method input_type
-	66, // [66:66] is the sub-list for extension type_name
-	66, // [66:66] is the sub-list for extension extendee
-	0,  // [0:66] is the sub-list for field type_name
+	0,   // 0: aerochat.identity.v1.Profile.key_backup_status:type_name -> aerochat.identity.v1.KeyBackupStatus
+	80,  // 1: aerochat.identity.v1.Profile.created_at:type_name -> google.protobuf.Timestamp
+	80,  // 2: aerochat.identity.v1.Profile.updated_at:type_name -> google.protobuf.Timestamp
+	80,  // 3: aerochat.identity.v1.Device.created_at:type_name -> google.protobuf.Timestamp
+	80,  // 4: aerochat.identity.v1.Device.last_seen_at:type_name -> google.protobuf.Timestamp
+	80,  // 5: aerochat.identity.v1.Device.revoked_at:type_name -> google.protobuf.Timestamp
+	80,  // 6: aerochat.identity.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	80,  // 7: aerochat.identity.v1.Session.last_seen_at:type_name -> google.protobuf.Timestamp
+	80,  // 8: aerochat.identity.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
+	4,   // 9: aerochat.identity.v1.DeviceWithSessions.device:type_name -> aerochat.identity.v1.Device
+	5,   // 10: aerochat.identity.v1.DeviceWithSessions.sessions:type_name -> aerochat.identity.v1.Session
+	3,   // 11: aerochat.identity.v1.BlockedUser.profile:type_name -> aerochat.identity.v1.Profile
+	80,  // 12: aerochat.identity.v1.BlockedUser.blocked_at:type_name -> google.protobuf.Timestamp
+	3,   // 13: aerochat.identity.v1.FriendRequest.profile:type_name -> aerochat.identity.v1.Profile
+	80,  // 14: aerochat.identity.v1.FriendRequest.requested_at:type_name -> google.protobuf.Timestamp
+	3,   // 15: aerochat.identity.v1.Friend.profile:type_name -> aerochat.identity.v1.Profile
+	80,  // 16: aerochat.identity.v1.Friend.friends_since:type_name -> google.protobuf.Timestamp
+	3,   // 17: aerochat.identity.v1.CurrentAuth.profile:type_name -> aerochat.identity.v1.Profile
+	4,   // 18: aerochat.identity.v1.CurrentAuth.device:type_name -> aerochat.identity.v1.Device
+	5,   // 19: aerochat.identity.v1.CurrentAuth.session:type_name -> aerochat.identity.v1.Session
+	1,   // 20: aerochat.identity.v1.CryptoDevice.status:type_name -> aerochat.identity.v1.CryptoDeviceStatus
+	80,  // 21: aerochat.identity.v1.CryptoDevice.last_bundle_published_at:type_name -> google.protobuf.Timestamp
+	80,  // 22: aerochat.identity.v1.CryptoDevice.created_at:type_name -> google.protobuf.Timestamp
+	80,  // 23: aerochat.identity.v1.CryptoDevice.activated_at:type_name -> google.protobuf.Timestamp
+	80,  // 24: aerochat.identity.v1.CryptoDevice.revoked_at:type_name -> google.protobuf.Timestamp
+	80,  // 25: aerochat.identity.v1.CryptoDeviceBundlePayload.expires_at:type_name -> google.protobuf.Timestamp
+	80,  // 26: aerochat.identity.v1.CryptoDeviceBundle.published_at:type_name -> google.protobuf.Timestamp
+	80,  // 27: aerochat.identity.v1.CryptoDeviceBundle.expires_at:type_name -> google.protobuf.Timestamp
+	80,  // 28: aerochat.identity.v1.CryptoDeviceBundle.superseded_at:type_name -> google.protobuf.Timestamp
+	80,  // 29: aerochat.identity.v1.CryptoDeviceBundlePublishChallenge.created_at:type_name -> google.protobuf.Timestamp
+	80,  // 30: aerochat.identity.v1.CryptoDeviceBundlePublishChallenge.expires_at:type_name -> google.protobuf.Timestamp
+	80,  // 31: aerochat.identity.v1.CryptoDeviceBundlePublishProofPayload.challenge_expires_at:type_name -> google.protobuf.Timestamp
+	80,  // 32: aerochat.identity.v1.CryptoDeviceBundlePublishProofPayload.issued_at:type_name -> google.protobuf.Timestamp
+	15,  // 33: aerochat.identity.v1.CryptoDeviceBundlePublishProof.payload:type_name -> aerochat.identity.v1.CryptoDeviceBundlePublishProofPayload
+	2,   // 34: aerochat.identity.v1.CryptoDeviceLinkIntent.status:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntentStatus
+	80,  // 35: aerochat.identity.v1.CryptoDeviceLinkIntent.created_at:type_name -> google.protobuf.Timestamp
+	80,  // 36: aerochat.identity.v1.CryptoDeviceLinkIntent.expires_at:type_name -> google.protobuf.Timestamp
+	80,  // 37: aerochat.identity.v1.CryptoDeviceLinkIntent.approved_at:type_name -> google.protobuf.Timestamp
+	80,  // 38: aerochat.identity.v1.CryptoDeviceLinkIntent.expired_at:type_name -> google.protobuf.Timestamp
+	80,  // 39: aerochat.identity.v1.CryptoDeviceLinkApprovalPayload.challenge_expires_at:type_name -> google.protobuf.Timestamp
+	80,  // 40: aerochat.identity.v1.CryptoDeviceLinkApprovalPayload.issued_at:type_name -> google.protobuf.Timestamp
+	18,  // 41: aerochat.identity.v1.CryptoDeviceLinkApprovalProof.payload:type_name -> aerochat.identity.v1.CryptoDeviceLinkApprovalPayload
+	81,  // 42: aerochat.identity.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
+	10,  // 43: aerochat.identity.v1.RegisterResponse.auth:type_name -> aerochat.identity.v1.CurrentAuth
+	10,  // 44: aerochat.identity.v1.LoginResponse.auth:type_name -> aerochat.identity.v1.CurrentAuth
+	3,   // 45: aerochat.identity.v1.GetCurrentProfileResponse.profile:type_name -> aerochat.identity.v1.Profile
+	3,   // 46: aerochat.identity.v1.UpdateCurrentProfileResponse.profile:type_name -> aerochat.identity.v1.Profile
+	6,   // 47: aerochat.identity.v1.ListDevicesResponse.devices:type_name -> aerochat.identity.v1.DeviceWithSessions
+	7,   // 48: aerochat.identity.v1.ListBlockedUsersResponse.blocked_users:type_name -> aerochat.identity.v1.BlockedUser
+	8,   // 49: aerochat.identity.v1.ListIncomingFriendRequestsResponse.friend_requests:type_name -> aerochat.identity.v1.FriendRequest
+	8,   // 50: aerochat.identity.v1.ListOutgoingFriendRequestsResponse.friend_requests:type_name -> aerochat.identity.v1.FriendRequest
+	9,   // 51: aerochat.identity.v1.ListFriendsResponse.friends:type_name -> aerochat.identity.v1.Friend
+	12,  // 52: aerochat.identity.v1.RegisterFirstCryptoDeviceRequest.bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundlePayload
+	11,  // 53: aerochat.identity.v1.RegisterFirstCryptoDeviceResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
+	13,  // 54: aerochat.identity.v1.RegisterFirstCryptoDeviceResponse.current_bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundle
+	12,  // 55: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceRequest.bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundlePayload
+	11,  // 56: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
+	13,  // 57: aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceResponse.current_bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundle
+	11,  // 58: aerochat.identity.v1.ListCryptoDevicesResponse.devices:type_name -> aerochat.identity.v1.CryptoDevice
+	11,  // 59: aerochat.identity.v1.GetCryptoDeviceResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
+	13,  // 60: aerochat.identity.v1.GetCryptoDeviceResponse.current_bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundle
+	14,  // 61: aerochat.identity.v1.CreateCryptoDeviceBundlePublishChallengeResponse.challenge:type_name -> aerochat.identity.v1.CryptoDeviceBundlePublishChallenge
+	12,  // 62: aerochat.identity.v1.PublishCryptoDeviceBundleRequest.bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundlePayload
+	16,  // 63: aerochat.identity.v1.PublishCryptoDeviceBundleRequest.proof:type_name -> aerochat.identity.v1.CryptoDeviceBundlePublishProof
+	11,  // 64: aerochat.identity.v1.PublishCryptoDeviceBundleResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
+	13,  // 65: aerochat.identity.v1.PublishCryptoDeviceBundleResponse.current_bundle:type_name -> aerochat.identity.v1.CryptoDeviceBundle
+	17,  // 66: aerochat.identity.v1.CreateCryptoDeviceLinkIntentResponse.link_intent:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntent
+	17,  // 67: aerochat.identity.v1.ListCryptoDeviceLinkIntentsResponse.link_intents:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntent
+	19,  // 68: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentRequest.proof:type_name -> aerochat.identity.v1.CryptoDeviceLinkApprovalProof
+	17,  // 69: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentResponse.link_intent:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntent
+	11,  // 70: aerochat.identity.v1.ApproveCryptoDeviceLinkIntentResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
+	17,  // 71: aerochat.identity.v1.ExpireCryptoDeviceLinkIntentResponse.link_intent:type_name -> aerochat.identity.v1.CryptoDeviceLinkIntent
+	11,  // 72: aerochat.identity.v1.RevokeCryptoDeviceResponse.device:type_name -> aerochat.identity.v1.CryptoDevice
+	20,  // 73: aerochat.identity.v1.IdentityService.Ping:input_type -> aerochat.identity.v1.PingRequest
+	22,  // 74: aerochat.identity.v1.IdentityService.Register:input_type -> aerochat.identity.v1.RegisterRequest
+	24,  // 75: aerochat.identity.v1.IdentityService.Login:input_type -> aerochat.identity.v1.LoginRequest
+	26,  // 76: aerochat.identity.v1.IdentityService.LogoutCurrentSession:input_type -> aerochat.identity.v1.LogoutCurrentSessionRequest
+	28,  // 77: aerochat.identity.v1.IdentityService.GetCurrentProfile:input_type -> aerochat.identity.v1.GetCurrentProfileRequest
+	30,  // 78: aerochat.identity.v1.IdentityService.UpdateCurrentProfile:input_type -> aerochat.identity.v1.UpdateCurrentProfileRequest
+	32,  // 79: aerochat.identity.v1.IdentityService.ListDevices:input_type -> aerochat.identity.v1.ListDevicesRequest
+	34,  // 80: aerochat.identity.v1.IdentityService.RevokeSessionOrDevice:input_type -> aerochat.identity.v1.RevokeSessionOrDeviceRequest
+	36,  // 81: aerochat.identity.v1.IdentityService.ListBlockedUsers:input_type -> aerochat.identity.v1.ListBlockedUsersRequest
+	38,  // 82: aerochat.identity.v1.IdentityService.BlockUser:input_type -> aerochat.identity.v1.BlockUserRequest
+	40,  // 83: aerochat.identity.v1.IdentityService.UnblockUser:input_type -> aerochat.identity.v1.UnblockUserRequest
+	42,  // 84: aerochat.identity.v1.IdentityService.SendFriendRequest:input_type -> aerochat.identity.v1.SendFriendRequestRequest
+	44,  // 85: aerochat.identity.v1.IdentityService.AcceptFriendRequest:input_type -> aerochat.identity.v1.AcceptFriendRequestRequest
+	46,  // 86: aerochat.identity.v1.IdentityService.DeclineFriendRequest:input_type -> aerochat.identity.v1.DeclineFriendRequestRequest
+	48,  // 87: aerochat.identity.v1.IdentityService.CancelOutgoingFriendRequest:input_type -> aerochat.identity.v1.CancelOutgoingFriendRequestRequest
+	50,  // 88: aerochat.identity.v1.IdentityService.ListIncomingFriendRequests:input_type -> aerochat.identity.v1.ListIncomingFriendRequestsRequest
+	52,  // 89: aerochat.identity.v1.IdentityService.ListOutgoingFriendRequests:input_type -> aerochat.identity.v1.ListOutgoingFriendRequestsRequest
+	54,  // 90: aerochat.identity.v1.IdentityService.ListFriends:input_type -> aerochat.identity.v1.ListFriendsRequest
+	56,  // 91: aerochat.identity.v1.IdentityService.RemoveFriend:input_type -> aerochat.identity.v1.RemoveFriendRequest
+	58,  // 92: aerochat.identity.v1.IdentityService.RegisterFirstCryptoDevice:input_type -> aerochat.identity.v1.RegisterFirstCryptoDeviceRequest
+	60,  // 93: aerochat.identity.v1.IdentityService.RegisterPendingLinkedCryptoDevice:input_type -> aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceRequest
+	62,  // 94: aerochat.identity.v1.IdentityService.ListCryptoDevices:input_type -> aerochat.identity.v1.ListCryptoDevicesRequest
+	64,  // 95: aerochat.identity.v1.IdentityService.GetCryptoDevice:input_type -> aerochat.identity.v1.GetCryptoDeviceRequest
+	66,  // 96: aerochat.identity.v1.IdentityService.CreateCryptoDeviceBundlePublishChallenge:input_type -> aerochat.identity.v1.CreateCryptoDeviceBundlePublishChallengeRequest
+	68,  // 97: aerochat.identity.v1.IdentityService.PublishCryptoDeviceBundle:input_type -> aerochat.identity.v1.PublishCryptoDeviceBundleRequest
+	70,  // 98: aerochat.identity.v1.IdentityService.CreateCryptoDeviceLinkIntent:input_type -> aerochat.identity.v1.CreateCryptoDeviceLinkIntentRequest
+	72,  // 99: aerochat.identity.v1.IdentityService.ListCryptoDeviceLinkIntents:input_type -> aerochat.identity.v1.ListCryptoDeviceLinkIntentsRequest
+	74,  // 100: aerochat.identity.v1.IdentityService.ApproveCryptoDeviceLinkIntent:input_type -> aerochat.identity.v1.ApproveCryptoDeviceLinkIntentRequest
+	76,  // 101: aerochat.identity.v1.IdentityService.ExpireCryptoDeviceLinkIntent:input_type -> aerochat.identity.v1.ExpireCryptoDeviceLinkIntentRequest
+	78,  // 102: aerochat.identity.v1.IdentityService.RevokeCryptoDevice:input_type -> aerochat.identity.v1.RevokeCryptoDeviceRequest
+	21,  // 103: aerochat.identity.v1.IdentityService.Ping:output_type -> aerochat.identity.v1.PingResponse
+	23,  // 104: aerochat.identity.v1.IdentityService.Register:output_type -> aerochat.identity.v1.RegisterResponse
+	25,  // 105: aerochat.identity.v1.IdentityService.Login:output_type -> aerochat.identity.v1.LoginResponse
+	27,  // 106: aerochat.identity.v1.IdentityService.LogoutCurrentSession:output_type -> aerochat.identity.v1.LogoutCurrentSessionResponse
+	29,  // 107: aerochat.identity.v1.IdentityService.GetCurrentProfile:output_type -> aerochat.identity.v1.GetCurrentProfileResponse
+	31,  // 108: aerochat.identity.v1.IdentityService.UpdateCurrentProfile:output_type -> aerochat.identity.v1.UpdateCurrentProfileResponse
+	33,  // 109: aerochat.identity.v1.IdentityService.ListDevices:output_type -> aerochat.identity.v1.ListDevicesResponse
+	35,  // 110: aerochat.identity.v1.IdentityService.RevokeSessionOrDevice:output_type -> aerochat.identity.v1.RevokeSessionOrDeviceResponse
+	37,  // 111: aerochat.identity.v1.IdentityService.ListBlockedUsers:output_type -> aerochat.identity.v1.ListBlockedUsersResponse
+	39,  // 112: aerochat.identity.v1.IdentityService.BlockUser:output_type -> aerochat.identity.v1.BlockUserResponse
+	41,  // 113: aerochat.identity.v1.IdentityService.UnblockUser:output_type -> aerochat.identity.v1.UnblockUserResponse
+	43,  // 114: aerochat.identity.v1.IdentityService.SendFriendRequest:output_type -> aerochat.identity.v1.SendFriendRequestResponse
+	45,  // 115: aerochat.identity.v1.IdentityService.AcceptFriendRequest:output_type -> aerochat.identity.v1.AcceptFriendRequestResponse
+	47,  // 116: aerochat.identity.v1.IdentityService.DeclineFriendRequest:output_type -> aerochat.identity.v1.DeclineFriendRequestResponse
+	49,  // 117: aerochat.identity.v1.IdentityService.CancelOutgoingFriendRequest:output_type -> aerochat.identity.v1.CancelOutgoingFriendRequestResponse
+	51,  // 118: aerochat.identity.v1.IdentityService.ListIncomingFriendRequests:output_type -> aerochat.identity.v1.ListIncomingFriendRequestsResponse
+	53,  // 119: aerochat.identity.v1.IdentityService.ListOutgoingFriendRequests:output_type -> aerochat.identity.v1.ListOutgoingFriendRequestsResponse
+	55,  // 120: aerochat.identity.v1.IdentityService.ListFriends:output_type -> aerochat.identity.v1.ListFriendsResponse
+	57,  // 121: aerochat.identity.v1.IdentityService.RemoveFriend:output_type -> aerochat.identity.v1.RemoveFriendResponse
+	59,  // 122: aerochat.identity.v1.IdentityService.RegisterFirstCryptoDevice:output_type -> aerochat.identity.v1.RegisterFirstCryptoDeviceResponse
+	61,  // 123: aerochat.identity.v1.IdentityService.RegisterPendingLinkedCryptoDevice:output_type -> aerochat.identity.v1.RegisterPendingLinkedCryptoDeviceResponse
+	63,  // 124: aerochat.identity.v1.IdentityService.ListCryptoDevices:output_type -> aerochat.identity.v1.ListCryptoDevicesResponse
+	65,  // 125: aerochat.identity.v1.IdentityService.GetCryptoDevice:output_type -> aerochat.identity.v1.GetCryptoDeviceResponse
+	67,  // 126: aerochat.identity.v1.IdentityService.CreateCryptoDeviceBundlePublishChallenge:output_type -> aerochat.identity.v1.CreateCryptoDeviceBundlePublishChallengeResponse
+	69,  // 127: aerochat.identity.v1.IdentityService.PublishCryptoDeviceBundle:output_type -> aerochat.identity.v1.PublishCryptoDeviceBundleResponse
+	71,  // 128: aerochat.identity.v1.IdentityService.CreateCryptoDeviceLinkIntent:output_type -> aerochat.identity.v1.CreateCryptoDeviceLinkIntentResponse
+	73,  // 129: aerochat.identity.v1.IdentityService.ListCryptoDeviceLinkIntents:output_type -> aerochat.identity.v1.ListCryptoDeviceLinkIntentsResponse
+	75,  // 130: aerochat.identity.v1.IdentityService.ApproveCryptoDeviceLinkIntent:output_type -> aerochat.identity.v1.ApproveCryptoDeviceLinkIntentResponse
+	77,  // 131: aerochat.identity.v1.IdentityService.ExpireCryptoDeviceLinkIntent:output_type -> aerochat.identity.v1.ExpireCryptoDeviceLinkIntentResponse
+	79,  // 132: aerochat.identity.v1.IdentityService.RevokeCryptoDevice:output_type -> aerochat.identity.v1.RevokeCryptoDeviceResponse
+	103, // [103:133] is the sub-list for method output_type
+	73,  // [73:103] is the sub-list for method input_type
+	73,  // [73:73] is the sub-list for extension type_name
+	73,  // [73:73] is the sub-list for extension extendee
+	0,   // [0:73] is the sub-list for field type_name
 }
 
 func init() { file_aerochat_identity_v1_identity_service_proto_init() }
@@ -4729,24 +5102,24 @@ func file_aerochat_identity_v1_identity_service_proto_init() {
 	file_aerochat_identity_v1_identity_service_proto_msgTypes[1].OneofWrappers = []any{}
 	file_aerochat_identity_v1_identity_service_proto_msgTypes[2].OneofWrappers = []any{}
 	file_aerochat_identity_v1_identity_service_proto_msgTypes[8].OneofWrappers = []any{}
-	file_aerochat_identity_v1_identity_service_proto_msgTypes[11].OneofWrappers = []any{}
-	file_aerochat_identity_v1_identity_service_proto_msgTypes[16].OneofWrappers = []any{}
-	file_aerochat_identity_v1_identity_service_proto_msgTypes[18].OneofWrappers = []any{}
-	file_aerochat_identity_v1_identity_service_proto_msgTypes[24].OneofWrappers = []any{}
-	file_aerochat_identity_v1_identity_service_proto_msgTypes[28].OneofWrappers = []any{
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[14].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[19].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[21].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[27].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[31].OneofWrappers = []any{
 		(*RevokeSessionOrDeviceRequest_SessionId)(nil),
 		(*RevokeSessionOrDeviceRequest_DeviceId)(nil),
 	}
-	file_aerochat_identity_v1_identity_service_proto_msgTypes[52].OneofWrappers = []any{}
-	file_aerochat_identity_v1_identity_service_proto_msgTypes[54].OneofWrappers = []any{}
-	file_aerochat_identity_v1_identity_service_proto_msgTypes[70].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[55].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[57].OneofWrappers = []any{}
+	file_aerochat_identity_v1_identity_service_proto_msgTypes[75].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aerochat_identity_v1_identity_service_proto_rawDesc), len(file_aerochat_identity_v1_identity_service_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   72,
+			NumMessages:   77,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

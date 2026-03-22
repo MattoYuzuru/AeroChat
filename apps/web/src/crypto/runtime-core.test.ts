@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   CryptoDevice,
   CryptoDeviceBundle,
+  CryptoDeviceBundlePublishChallenge,
   CryptoDeviceBundlePayload,
   CryptoDeviceLinkIntent,
   GatewayClient,
@@ -104,6 +105,13 @@ describe("createCryptoRuntimeCore", () => {
         device,
         currentBundle: remoteBundle,
       })),
+      createCryptoDeviceBundlePublishChallenge: vi.fn(async () =>
+        createBundlePublishChallenge({
+          cryptoDeviceId: "crypto-1",
+          currentBundleVersion: 1,
+          currentBundleDigestBase64: "remote-digest",
+        }),
+      ),
       publishCryptoDeviceBundle: vi.fn(async () => ({
         device: {
           ...device,
@@ -126,7 +134,31 @@ describe("createCryptoRuntimeCore", () => {
     expect(snapshot.phase).toBe("ready");
     expect(snapshot.localDevice?.cryptoDeviceId).toBe("crypto-1");
     expect(snapshot.notice).toContain("заново опубликован");
+    expect(gatewayClient.createCryptoDeviceBundlePublishChallenge).toHaveBeenCalledWith(
+      baseSession.token,
+      "crypto-1",
+    );
     expect(gatewayClient.publishCryptoDeviceBundle).toHaveBeenCalledTimes(1);
+    expect(gatewayClient.publishCryptoDeviceBundle).toHaveBeenCalledWith(
+      baseSession.token,
+      "crypto-1",
+      expect.objectContaining({
+        bundleDigestBase64: "local-digest",
+      }),
+      {
+        payload: {
+          version: 1,
+          cryptoDeviceId: "crypto-1",
+          previousBundleVersion: 1,
+          previousBundleDigestBase64: "remote-digest",
+          newBundleDigestBase64: "local-digest",
+          publishChallengeBase64: "publish-challenge-1",
+          challengeExpiresAt: "2026-03-22T13:00:00Z",
+          issuedAt: expect.any(String),
+        },
+        signatureBase64: "publish-signature",
+      },
+    );
     expect(stored?.record.lastBundleVersion).toBe(2);
     expect(stored?.record.bundleDigestBase64).toBe("local-digest");
   });
@@ -338,6 +370,21 @@ function createFakeMaterialFactory(): CryptoMaterialFactory {
         signatureBase64: "approval-signature",
       };
     },
+    async buildBundlePublishProof(_material, input) {
+      return {
+        payload: {
+          version: 1,
+          cryptoDeviceId: input.cryptoDeviceId,
+          previousBundleVersion: input.previousBundleVersion,
+          previousBundleDigestBase64: input.previousBundleDigestBase64,
+          newBundleDigestBase64: input.newBundleDigestBase64,
+          publishChallengeBase64: input.publishChallengeBase64,
+          challengeExpiresAt: input.challengeExpiresAt,
+          issuedAt: input.issuedAt,
+        },
+        signatureBase64: "publish-signature",
+      };
+    },
     syncRecordFromServer(material, input) {
       return {
         ...material,
@@ -477,6 +524,23 @@ function createCryptoDeviceLinkIntent(
   };
 }
 
+function createBundlePublishChallenge(
+  overrides: Partial<CryptoDeviceBundlePublishChallenge> & {
+    cryptoDeviceId: string;
+    currentBundleVersion: number;
+    currentBundleDigestBase64: string;
+  },
+): CryptoDeviceBundlePublishChallenge {
+  return {
+    cryptoDeviceId: overrides.cryptoDeviceId,
+    currentBundleVersion: overrides.currentBundleVersion,
+    currentBundleDigestBase64: overrides.currentBundleDigestBase64,
+    publishChallengeBase64: overrides.publishChallengeBase64 ?? "publish-challenge-1",
+    createdAt: overrides.createdAt ?? "2026-03-22T12:00:00Z",
+    expiresAt: overrides.expiresAt ?? "2026-03-22T13:00:00Z",
+  };
+}
+
 function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
   return {
     register: vi.fn(),
@@ -487,6 +551,7 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     registerPendingLinkedCryptoDevice: vi.fn(),
     listCryptoDevices: vi.fn(),
     getCryptoDevice: vi.fn(),
+    createCryptoDeviceBundlePublishChallenge: vi.fn(),
     publishCryptoDeviceBundle: vi.fn(),
     createCryptoDeviceLinkIntent: vi.fn(),
     listCryptoDeviceLinkIntents: vi.fn(),
