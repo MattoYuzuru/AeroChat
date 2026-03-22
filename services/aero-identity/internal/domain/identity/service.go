@@ -30,6 +30,7 @@ const (
 	maxNicknameLen              = 64
 	defaultDeviceName           = "Текущее устройство"
 	defaultSessionTouchInterval = 15 * time.Second
+	defaultCryptoLinkIntentTTL  = 15 * time.Minute
 )
 
 type Repository interface {
@@ -54,6 +55,16 @@ type Repository interface {
 	DeleteFriendship(context.Context, string, string) (bool, error)
 	BlockUser(context.Context, string, string, time.Time) error
 	UnblockUser(context.Context, string, string) (bool, error)
+	GetCryptoDeviceRegistryStatsByUserID(context.Context, string) (int64, int64, int64, error)
+	CreateCryptoDevice(context.Context, CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error)
+	ListCryptoDevices(context.Context, string) ([]CryptoDevice, error)
+	GetCryptoDeviceDetails(context.Context, string, string) (*CryptoDeviceDetails, error)
+	PublishCryptoDeviceBundle(context.Context, string, PublishCryptoDeviceBundleInput, time.Time) (*CryptoDevice, *CryptoDeviceBundle, error)
+	CreateCryptoDeviceLinkIntent(context.Context, CreateCryptoDeviceLinkIntentParams) (*CryptoDeviceLinkIntent, error)
+	ListCryptoDeviceLinkIntents(context.Context, string, time.Time) ([]CryptoDeviceLinkIntent, error)
+	ApproveCryptoDeviceLinkIntent(context.Context, ApproveCryptoDeviceLinkIntentParams) (*CryptoDeviceLinkIntent, *CryptoDevice, error)
+	ExpireCryptoDeviceLinkIntent(context.Context, string, string, time.Time) (*CryptoDeviceLinkIntent, error)
+	RevokeCryptoDevice(context.Context, RevokeCryptoDeviceParams) (*CryptoDevice, error)
 }
 
 type Service struct {
@@ -61,6 +72,7 @@ type Service struct {
 	passwords            *identityauth.PasswordHasher
 	sessionToken         *libauth.SessionTokenManager
 	sessionTouchInterval time.Duration
+	cryptoLinkIntentTTL  time.Duration
 	now                  func() time.Time
 	newID                func() string
 }
@@ -71,6 +83,7 @@ func NewService(repo Repository, passwords *identityauth.PasswordHasher, session
 		passwords:            passwords,
 		sessionToken:         sessionToken,
 		sessionTouchInterval: defaultSessionTouchInterval,
+		cryptoLinkIntentTTL:  defaultCryptoLinkIntentTTL,
 		now: func() time.Time {
 			return time.Now().UTC()
 		},

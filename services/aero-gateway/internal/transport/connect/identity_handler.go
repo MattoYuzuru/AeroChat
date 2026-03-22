@@ -168,6 +168,46 @@ func (h *IdentityHandler) RemoveFriend(ctx context.Context, req *connect.Request
 	return response, nil
 }
 
+func (h *IdentityHandler) RegisterFirstCryptoDevice(ctx context.Context, req *connect.Request[identityv1.RegisterFirstCryptoDeviceRequest]) (*connect.Response[identityv1.RegisterFirstCryptoDeviceResponse], error) {
+	return forwardUnary(ctx, req, h.client.RegisterFirstCryptoDevice)
+}
+
+func (h *IdentityHandler) RegisterPendingLinkedCryptoDevice(ctx context.Context, req *connect.Request[identityv1.RegisterPendingLinkedCryptoDeviceRequest]) (*connect.Response[identityv1.RegisterPendingLinkedCryptoDeviceResponse], error) {
+	return forwardUnary(ctx, req, h.client.RegisterPendingLinkedCryptoDevice)
+}
+
+func (h *IdentityHandler) ListCryptoDevices(ctx context.Context, req *connect.Request[identityv1.ListCryptoDevicesRequest]) (*connect.Response[identityv1.ListCryptoDevicesResponse], error) {
+	return forwardUnary(ctx, req, h.client.ListCryptoDevices)
+}
+
+func (h *IdentityHandler) GetCryptoDevice(ctx context.Context, req *connect.Request[identityv1.GetCryptoDeviceRequest]) (*connect.Response[identityv1.GetCryptoDeviceResponse], error) {
+	return forwardUnary(ctx, req, h.client.GetCryptoDevice)
+}
+
+func (h *IdentityHandler) PublishCryptoDeviceBundle(ctx context.Context, req *connect.Request[identityv1.PublishCryptoDeviceBundleRequest]) (*connect.Response[identityv1.PublishCryptoDeviceBundleResponse], error) {
+	return forwardUnary(ctx, req, h.client.PublishCryptoDeviceBundle)
+}
+
+func (h *IdentityHandler) CreateCryptoDeviceLinkIntent(ctx context.Context, req *connect.Request[identityv1.CreateCryptoDeviceLinkIntentRequest]) (*connect.Response[identityv1.CreateCryptoDeviceLinkIntentResponse], error) {
+	return forwardUnary(ctx, req, h.client.CreateCryptoDeviceLinkIntent)
+}
+
+func (h *IdentityHandler) ListCryptoDeviceLinkIntents(ctx context.Context, req *connect.Request[identityv1.ListCryptoDeviceLinkIntentsRequest]) (*connect.Response[identityv1.ListCryptoDeviceLinkIntentsResponse], error) {
+	return forwardUnary(ctx, req, h.client.ListCryptoDeviceLinkIntents)
+}
+
+func (h *IdentityHandler) ApproveCryptoDeviceLinkIntent(ctx context.Context, req *connect.Request[identityv1.ApproveCryptoDeviceLinkIntentRequest]) (*connect.Response[identityv1.ApproveCryptoDeviceLinkIntentResponse], error) {
+	return forwardUnary(ctx, req, h.client.ApproveCryptoDeviceLinkIntent)
+}
+
+func (h *IdentityHandler) ExpireCryptoDeviceLinkIntent(ctx context.Context, req *connect.Request[identityv1.ExpireCryptoDeviceLinkIntentRequest]) (*connect.Response[identityv1.ExpireCryptoDeviceLinkIntentResponse], error) {
+	return forwardUnary(ctx, req, h.client.ExpireCryptoDeviceLinkIntent)
+}
+
+func (h *IdentityHandler) RevokeCryptoDevice(ctx context.Context, req *connect.Request[identityv1.RevokeCryptoDeviceRequest]) (*connect.Response[identityv1.RevokeCryptoDeviceResponse], error) {
+	return forwardUnary(ctx, req, h.client.RevokeCryptoDevice)
+}
+
 func (h *IdentityHandler) publishFriendRequestSent(ctx context.Context, headers http.Header, targetLogin string) {
 	if h.realtimeHub == nil {
 		return

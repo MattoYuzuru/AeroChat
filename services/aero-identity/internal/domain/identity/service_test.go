@@ -435,27 +435,33 @@ func mustRegister(t *testing.T, service *Service, login string, nickname string)
 }
 
 type fakeRepository struct {
-	users        map[string]User
-	usersByLogin map[string]string
-	passwords    map[string]string
-	devices      map[string]Device
-	sessions     map[string]SessionAuth
-	blocks       map[string]map[string]time.Time
-	friendReqs   map[string]PendingFriendRequest
-	friendships  map[string]time.Time
-	touchCalls   int
+	users         map[string]User
+	usersByLogin  map[string]string
+	passwords     map[string]string
+	devices       map[string]Device
+	sessions      map[string]SessionAuth
+	cryptoDevices map[string]CryptoDevice
+	cryptoBundles map[string]CryptoDeviceBundle
+	linkIntents   map[string]CryptoDeviceLinkIntent
+	blocks        map[string]map[string]time.Time
+	friendReqs    map[string]PendingFriendRequest
+	friendships   map[string]time.Time
+	touchCalls    int
 }
 
 func newFakeRepository() *fakeRepository {
 	return &fakeRepository{
-		users:        make(map[string]User),
-		usersByLogin: make(map[string]string),
-		passwords:    make(map[string]string),
-		devices:      make(map[string]Device),
-		sessions:     make(map[string]SessionAuth),
-		blocks:       make(map[string]map[string]time.Time),
-		friendReqs:   make(map[string]PendingFriendRequest),
-		friendships:  make(map[string]time.Time),
+		users:         make(map[string]User),
+		usersByLogin:  make(map[string]string),
+		passwords:     make(map[string]string),
+		devices:       make(map[string]Device),
+		sessions:      make(map[string]SessionAuth),
+		cryptoDevices: make(map[string]CryptoDevice),
+		cryptoBundles: make(map[string]CryptoDeviceBundle),
+		linkIntents:   make(map[string]CryptoDeviceLinkIntent),
+		blocks:        make(map[string]map[string]time.Time),
+		friendReqs:    make(map[string]PendingFriendRequest),
+		friendships:   make(map[string]time.Time),
 	}
 }
 
@@ -757,6 +763,341 @@ func (r *fakeRepository) UnblockUser(_ context.Context, blockerID string, blocke
 
 	delete(blockedSet, blockedID)
 	return true, nil
+}
+
+func (r *fakeRepository) GetCryptoDeviceRegistryStatsByUserID(_ context.Context, userID string) (int64, int64, int64, error) {
+	var totalCount int64
+	var activeCount int64
+	var pendingCount int64
+	for _, device := range r.cryptoDevices {
+		if device.UserID != userID {
+			continue
+		}
+		totalCount++
+		switch device.Status {
+		case CryptoDeviceStatusActive:
+			activeCount++
+		case CryptoDeviceStatusPendingLink:
+			pendingCount++
+		}
+	}
+
+	return totalCount, activeCount, pendingCount, nil
+}
+
+func (r *fakeRepository) CreateCryptoDevice(_ context.Context, params CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error) {
+	if _, exists := r.cryptoDevices[params.Device.ID]; exists {
+		return nil, nil, ErrConflict
+	}
+
+	device := params.Device
+	bundle := params.Bundle
+	bundle.CryptoDeviceID = device.ID
+	r.cryptoDevices[device.ID] = device
+	r.cryptoBundles[device.ID] = cloneCryptoBundle(bundle)
+
+	deviceCopy := device
+	bundleCopy := cloneCryptoBundle(bundle)
+	return &deviceCopy, &bundleCopy, nil
+}
+
+func (r *fakeRepository) ListCryptoDevices(_ context.Context, userID string) ([]CryptoDevice, error) {
+	items := make([]CryptoDevice, 0)
+	for _, device := range r.cryptoDevices {
+		if device.UserID != userID {
+			continue
+		}
+		items = append(items, device)
+	}
+
+	return items, nil
+}
+
+func (r *fakeRepository) GetCryptoDeviceDetails(_ context.Context, userID string, cryptoDeviceID string) (*CryptoDeviceDetails, error) {
+	device, ok := r.cryptoDevices[cryptoDeviceID]
+	if !ok || device.UserID != userID {
+		return nil, ErrNotFound
+	}
+
+	var currentBundle *CryptoDeviceBundle
+	if bundle, ok := r.cryptoBundles[cryptoDeviceID]; ok {
+		bundleCopy := cloneCryptoBundle(bundle)
+		currentBundle = &bundleCopy
+	}
+
+	return &CryptoDeviceDetails{
+		Device:        device,
+		CurrentBundle: currentBundle,
+	}, nil
+}
+
+func (r *fakeRepository) PublishCryptoDeviceBundle(_ context.Context, userID string, input PublishCryptoDeviceBundleInput, publishedAt time.Time) (*CryptoDevice, *CryptoDeviceBundle, error) {
+	device, ok := r.cryptoDevices[input.CryptoDeviceID]
+	if !ok || device.UserID != userID {
+		return nil, nil, ErrNotFound
+	}
+	if device.Status == CryptoDeviceStatusRevoked {
+		return nil, nil, ErrConflict
+	}
+
+	currentBundle, ok := r.cryptoBundles[input.CryptoDeviceID]
+	if !ok {
+		return nil, nil, ErrNotFound
+	}
+
+	nextVersion := currentBundle.BundleVersion + 1
+	device.LastBundleVersion = int64Ptr(nextVersion)
+	device.LastBundlePublishedAt = &publishedAt
+	r.cryptoDevices[input.CryptoDeviceID] = device
+
+	newBundle := CryptoDeviceBundle{
+		CryptoDeviceID:          input.CryptoDeviceID,
+		BundleVersion:           nextVersion,
+		CryptoSuite:             input.Bundle.CryptoSuite,
+		IdentityPublicKey:       append([]byte(nil), input.Bundle.IdentityPublicKey...),
+		SignedPrekeyPublic:      append([]byte(nil), input.Bundle.SignedPrekeyPublic...),
+		SignedPrekeyID:          input.Bundle.SignedPrekeyID,
+		SignedPrekeySignature:   append([]byte(nil), input.Bundle.SignedPrekeySignature...),
+		KEMPublicKey:            append([]byte(nil), input.Bundle.KEMPublicKey...),
+		KEMKeyID:                cloneStringPtr(input.Bundle.KEMKeyID),
+		KEMSignature:            append([]byte(nil), input.Bundle.KEMSignature...),
+		OneTimePrekeysTotal:     input.Bundle.OneTimePrekeysTotal,
+		OneTimePrekeysAvailable: input.Bundle.OneTimePrekeysAvailable,
+		BundleDigest:            append([]byte(nil), input.Bundle.BundleDigest...),
+		PublishedAt:             publishedAt,
+		ExpiresAt:               cloneTimePtr(input.Bundle.ExpiresAt),
+	}
+	r.cryptoBundles[input.CryptoDeviceID] = newBundle
+
+	if device.Status == CryptoDeviceStatusPendingLink {
+		for intentID, intent := range r.linkIntents {
+			if intent.PendingCryptoDeviceID != input.CryptoDeviceID || intent.Status != CryptoDeviceLinkIntentStatusPending {
+				continue
+			}
+			intent.Status = CryptoDeviceLinkIntentStatusExpired
+			intent.ExpiredAt = &publishedAt
+			r.linkIntents[intentID] = intent
+		}
+	}
+
+	deviceCopy := device
+	bundleCopy := cloneCryptoBundle(newBundle)
+	return &deviceCopy, &bundleCopy, nil
+}
+
+func (r *fakeRepository) CreateCryptoDeviceLinkIntent(_ context.Context, params CreateCryptoDeviceLinkIntentParams) (*CryptoDeviceLinkIntent, error) {
+	device, ok := r.cryptoDevices[params.LinkIntent.PendingCryptoDeviceID]
+	if !ok || device.UserID != params.LinkIntent.UserID {
+		return nil, ErrNotFound
+	}
+	if device.Status != CryptoDeviceStatusPendingLink {
+		return nil, ErrConflict
+	}
+
+	for intentID, intent := range r.linkIntents {
+		if intent.UserID != params.LinkIntent.UserID || intent.Status != CryptoDeviceLinkIntentStatusPending {
+			continue
+		}
+		if !intent.ExpiresAt.After(params.LinkIntent.CreatedAt) {
+			intent.Status = CryptoDeviceLinkIntentStatusExpired
+			intent.ExpiredAt = &params.LinkIntent.CreatedAt
+			r.linkIntents[intentID] = intent
+		}
+	}
+
+	for _, intent := range r.linkIntents {
+		if intent.PendingCryptoDeviceID == params.LinkIntent.PendingCryptoDeviceID && intent.Status == CryptoDeviceLinkIntentStatusPending {
+			return nil, ErrConflict
+		}
+	}
+
+	if bundle, ok := r.cryptoBundles[params.LinkIntent.PendingCryptoDeviceID]; !ok || string(bundle.BundleDigest) != string(params.LinkIntent.BundleDigest) {
+		return nil, ErrConflict
+	}
+
+	linkIntent := params.LinkIntent
+	r.linkIntents[linkIntent.ID] = linkIntent
+	linkIntentCopy := cloneLinkIntent(linkIntent)
+	return &linkIntentCopy, nil
+}
+
+func (r *fakeRepository) ListCryptoDeviceLinkIntents(_ context.Context, userID string, now time.Time) ([]CryptoDeviceLinkIntent, error) {
+	for intentID, intent := range r.linkIntents {
+		if intent.UserID != userID || intent.Status != CryptoDeviceLinkIntentStatusPending {
+			continue
+		}
+		if !intent.ExpiresAt.After(now) {
+			intent.Status = CryptoDeviceLinkIntentStatusExpired
+			intent.ExpiredAt = &now
+			r.linkIntents[intentID] = intent
+		}
+	}
+
+	items := make([]CryptoDeviceLinkIntent, 0)
+	for _, intent := range r.linkIntents {
+		if intent.UserID != userID {
+			continue
+		}
+		items = append(items, cloneLinkIntent(intent))
+	}
+
+	return items, nil
+}
+
+func (r *fakeRepository) ApproveCryptoDeviceLinkIntent(_ context.Context, params ApproveCryptoDeviceLinkIntentParams) (*CryptoDeviceLinkIntent, *CryptoDevice, error) {
+	intent, ok := r.linkIntents[params.LinkIntentID]
+	if !ok || intent.UserID != params.UserID {
+		return nil, nil, ErrNotFound
+	}
+	if intent.Status != CryptoDeviceLinkIntentStatusPending {
+		return nil, nil, ErrConflict
+	}
+	if !intent.ExpiresAt.After(params.ApprovedAt) {
+		intent.Status = CryptoDeviceLinkIntentStatusExpired
+		intent.ExpiredAt = &params.ApprovedAt
+		r.linkIntents[intent.ID] = intent
+		return nil, nil, ErrConflict
+	}
+
+	pendingDevice, ok := r.cryptoDevices[intent.PendingCryptoDeviceID]
+	if !ok || pendingDevice.UserID != params.UserID || pendingDevice.Status != CryptoDeviceStatusPendingLink {
+		return nil, nil, ErrConflict
+	}
+	bundle, ok := r.cryptoBundles[intent.PendingCryptoDeviceID]
+	if !ok || string(bundle.BundleDigest) != string(intent.BundleDigest) {
+		intent.Status = CryptoDeviceLinkIntentStatusExpired
+		intent.ExpiredAt = &params.ApprovedAt
+		r.linkIntents[intent.ID] = intent
+		return nil, nil, ErrConflict
+	}
+
+	approverDevice, ok := r.cryptoDevices[params.ApproverCryptoDeviceID]
+	if !ok || approverDevice.UserID != params.UserID || approverDevice.Status != CryptoDeviceStatusActive {
+		return nil, nil, ErrConflict
+	}
+
+	intent.Status = CryptoDeviceLinkIntentStatusApproved
+	intent.ApprovedAt = &params.ApprovedAt
+	intent.ApproverCryptoDeviceID = &params.ApproverCryptoDeviceID
+	r.linkIntents[intent.ID] = intent
+
+	pendingDevice.Status = CryptoDeviceStatusActive
+	pendingDevice.ActivatedAt = &params.ApprovedAt
+	pendingDevice.LinkedByCryptoDeviceID = &params.ApproverCryptoDeviceID
+	r.cryptoDevices[pendingDevice.ID] = pendingDevice
+
+	intentCopy := cloneLinkIntent(intent)
+	deviceCopy := pendingDevice
+	return &intentCopy, &deviceCopy, nil
+}
+
+func (r *fakeRepository) ExpireCryptoDeviceLinkIntent(_ context.Context, userID string, linkIntentID string, now time.Time) (*CryptoDeviceLinkIntent, error) {
+	intent, ok := r.linkIntents[linkIntentID]
+	if !ok || intent.UserID != userID {
+		return nil, ErrNotFound
+	}
+	if intent.Status == CryptoDeviceLinkIntentStatusApproved {
+		return nil, ErrConflict
+	}
+	if intent.Status == CryptoDeviceLinkIntentStatusExpired {
+		intentCopy := cloneLinkIntent(intent)
+		return &intentCopy, nil
+	}
+
+	intent.Status = CryptoDeviceLinkIntentStatusExpired
+	intent.ExpiredAt = &now
+	r.linkIntents[linkIntentID] = intent
+
+	intentCopy := cloneLinkIntent(intent)
+	return &intentCopy, nil
+}
+
+func (r *fakeRepository) RevokeCryptoDevice(_ context.Context, params RevokeCryptoDeviceParams) (*CryptoDevice, error) {
+	device, ok := r.cryptoDevices[params.CryptoDeviceID]
+	if !ok || device.UserID != params.UserID {
+		return nil, ErrNotFound
+	}
+	if device.Status == CryptoDeviceStatusRevoked {
+		deviceCopy := device
+		return &deviceCopy, nil
+	}
+
+	device.Status = CryptoDeviceStatusRevoked
+	device.RevokedAt = &params.RevokedAt
+	device.RevocationReason = cloneStringPtr(params.RevocationReason)
+	actor := params.RevokedByActor
+	device.RevokedByActor = &actor
+	r.cryptoDevices[params.CryptoDeviceID] = device
+
+	for intentID, intent := range r.linkIntents {
+		if intent.PendingCryptoDeviceID != params.CryptoDeviceID || intent.Status != CryptoDeviceLinkIntentStatusPending {
+			continue
+		}
+		intent.Status = CryptoDeviceLinkIntentStatusExpired
+		intent.ExpiredAt = &params.RevokedAt
+		r.linkIntents[intentID] = intent
+	}
+
+	deviceCopy := device
+	return &deviceCopy, nil
+}
+
+func cloneCryptoBundle(value CryptoDeviceBundle) CryptoDeviceBundle {
+	return CryptoDeviceBundle{
+		CryptoDeviceID:          value.CryptoDeviceID,
+		BundleVersion:           value.BundleVersion,
+		CryptoSuite:             value.CryptoSuite,
+		IdentityPublicKey:       append([]byte(nil), value.IdentityPublicKey...),
+		SignedPrekeyPublic:      append([]byte(nil), value.SignedPrekeyPublic...),
+		SignedPrekeyID:          value.SignedPrekeyID,
+		SignedPrekeySignature:   append([]byte(nil), value.SignedPrekeySignature...),
+		KEMPublicKey:            append([]byte(nil), value.KEMPublicKey...),
+		KEMKeyID:                cloneStringPtr(value.KEMKeyID),
+		KEMSignature:            append([]byte(nil), value.KEMSignature...),
+		OneTimePrekeysTotal:     value.OneTimePrekeysTotal,
+		OneTimePrekeysAvailable: value.OneTimePrekeysAvailable,
+		BundleDigest:            append([]byte(nil), value.BundleDigest...),
+		PublishedAt:             value.PublishedAt,
+		ExpiresAt:               cloneTimePtr(value.ExpiresAt),
+		SupersededAt:            cloneTimePtr(value.SupersededAt),
+	}
+}
+
+func cloneLinkIntent(value CryptoDeviceLinkIntent) CryptoDeviceLinkIntent {
+	return CryptoDeviceLinkIntent{
+		ID:                     value.ID,
+		UserID:                 value.UserID,
+		PendingCryptoDeviceID:  value.PendingCryptoDeviceID,
+		Status:                 value.Status,
+		BundleDigest:           append([]byte(nil), value.BundleDigest...),
+		CreatedAt:              value.CreatedAt,
+		ExpiresAt:              value.ExpiresAt,
+		ApprovedAt:             cloneTimePtr(value.ApprovedAt),
+		ExpiredAt:              cloneTimePtr(value.ExpiredAt),
+		ApproverCryptoDeviceID: cloneStringPtr(value.ApproverCryptoDeviceID),
+	}
+}
+
+func cloneStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	cloned := *value
+	return &cloned
+}
+
+func cloneTimePtr(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+
+	cloned := value.UTC()
+	return &cloned
+}
+
+func int64Ptr(value int64) *int64 {
+	return &value
 }
 
 func strPtr(value string) *string {

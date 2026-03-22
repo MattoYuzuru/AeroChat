@@ -27,12 +27,36 @@ service IdentityService {
   rpc ListOutgoingFriendRequests(ListOutgoingFriendRequestsRequest) returns (ListOutgoingFriendRequestsResponse);
   rpc ListFriends(ListFriendsRequest) returns (ListFriendsResponse);
   rpc RemoveFriend(RemoveFriendRequest) returns (RemoveFriendResponse);
+  rpc RegisterFirstCryptoDevice(RegisterFirstCryptoDeviceRequest) returns (RegisterFirstCryptoDeviceResponse);
+  rpc RegisterPendingLinkedCryptoDevice(RegisterPendingLinkedCryptoDeviceRequest) returns (RegisterPendingLinkedCryptoDeviceResponse);
+  rpc ListCryptoDevices(ListCryptoDevicesRequest) returns (ListCryptoDevicesResponse);
+  rpc GetCryptoDevice(GetCryptoDeviceRequest) returns (GetCryptoDeviceResponse);
+  rpc PublishCryptoDeviceBundle(PublishCryptoDeviceBundleRequest) returns (PublishCryptoDeviceBundleResponse);
+  rpc CreateCryptoDeviceLinkIntent(CreateCryptoDeviceLinkIntentRequest) returns (CreateCryptoDeviceLinkIntentResponse);
+  rpc ListCryptoDeviceLinkIntents(ListCryptoDeviceLinkIntentsRequest) returns (ListCryptoDeviceLinkIntentsResponse);
+  rpc ApproveCryptoDeviceLinkIntent(ApproveCryptoDeviceLinkIntentRequest) returns (ApproveCryptoDeviceLinkIntentResponse);
+  rpc ExpireCryptoDeviceLinkIntent(ExpireCryptoDeviceLinkIntentRequest) returns (ExpireCryptoDeviceLinkIntentResponse);
+  rpc RevokeCryptoDevice(RevokeCryptoDeviceRequest) returns (RevokeCryptoDeviceResponse);
 }
 
 enum KeyBackupStatus {
   KEY_BACKUP_STATUS_UNSPECIFIED = 0;
   KEY_BACKUP_STATUS_NOT_CONFIGURED = 1;
   KEY_BACKUP_STATUS_CONFIGURED = 2;
+}
+
+enum CryptoDeviceStatus {
+  CRYPTO_DEVICE_STATUS_UNSPECIFIED = 0;
+  CRYPTO_DEVICE_STATUS_PENDING_LINK = 1;
+  CRYPTO_DEVICE_STATUS_ACTIVE = 2;
+  CRYPTO_DEVICE_STATUS_REVOKED = 3;
+}
+
+enum CryptoDeviceLinkIntentStatus {
+  CRYPTO_DEVICE_LINK_INTENT_STATUS_UNSPECIFIED = 0;
+  CRYPTO_DEVICE_LINK_INTENT_STATUS_PENDING = 1;
+  CRYPTO_DEVICE_LINK_INTENT_STATUS_APPROVED = 2;
+  CRYPTO_DEVICE_LINK_INTENT_STATUS_EXPIRED = 3;
 }
 
 message Profile {
@@ -96,6 +120,68 @@ message CurrentAuth {
   Device device = 2;
   Session session = 3;
   string session_token = 4;
+}
+
+message CryptoDevice {
+  string id = 1;
+  string user_id = 2;
+  string label = 3;
+  CryptoDeviceStatus status = 4;
+  optional string linked_by_crypto_device_id = 5;
+  optional uint64 last_bundle_version = 6;
+  optional google.protobuf.Timestamp last_bundle_published_at = 7;
+  google.protobuf.Timestamp created_at = 8;
+  optional google.protobuf.Timestamp activated_at = 9;
+  optional google.protobuf.Timestamp revoked_at = 10;
+  optional string revocation_reason = 11;
+  optional string revoked_by_actor = 12;
+}
+
+message CryptoDeviceBundlePayload {
+  string crypto_suite = 1;
+  bytes identity_public_key = 2;
+  bytes signed_prekey_public = 3;
+  string signed_prekey_id = 4;
+  bytes signed_prekey_signature = 5;
+  bytes kem_public_key = 6;
+  string kem_key_id = 7;
+  bytes kem_signature = 8;
+  uint32 one_time_prekeys_total = 9;
+  uint32 one_time_prekeys_available = 10;
+  bytes bundle_digest = 11;
+  google.protobuf.Timestamp expires_at = 12;
+}
+
+message CryptoDeviceBundle {
+  string crypto_device_id = 1;
+  uint64 bundle_version = 2;
+  string crypto_suite = 3;
+  bytes identity_public_key = 4;
+  bytes signed_prekey_public = 5;
+  string signed_prekey_id = 6;
+  bytes signed_prekey_signature = 7;
+  bytes kem_public_key = 8;
+  string kem_key_id = 9;
+  bytes kem_signature = 10;
+  uint32 one_time_prekeys_total = 11;
+  uint32 one_time_prekeys_available = 12;
+  bytes bundle_digest = 13;
+  google.protobuf.Timestamp published_at = 14;
+  google.protobuf.Timestamp expires_at = 15;
+  google.protobuf.Timestamp superseded_at = 16;
+}
+
+message CryptoDeviceLinkIntent {
+  string id = 1;
+  string user_id = 2;
+  string pending_crypto_device_id = 3;
+  CryptoDeviceLinkIntentStatus status = 4;
+  bytes bundle_digest = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  google.protobuf.Timestamp approved_at = 8;
+  google.protobuf.Timestamp expired_at = 9;
+  optional string approver_crypto_device_id = 10;
 }
 
 message PingRequest {}
@@ -234,3 +320,91 @@ message RemoveFriendRequest {
 }
 
 message RemoveFriendResponse {}
+
+message RegisterFirstCryptoDeviceRequest {
+  optional string device_label = 1;
+  CryptoDeviceBundlePayload bundle = 2;
+}
+
+message RegisterFirstCryptoDeviceResponse {
+  CryptoDevice device = 1;
+  CryptoDeviceBundle current_bundle = 2;
+}
+
+message RegisterPendingLinkedCryptoDeviceRequest {
+  optional string device_label = 1;
+  CryptoDeviceBundlePayload bundle = 2;
+}
+
+message RegisterPendingLinkedCryptoDeviceResponse {
+  CryptoDevice device = 1;
+  CryptoDeviceBundle current_bundle = 2;
+}
+
+message ListCryptoDevicesRequest {}
+
+message ListCryptoDevicesResponse {
+  repeated CryptoDevice devices = 1;
+}
+
+message GetCryptoDeviceRequest {
+  string crypto_device_id = 1;
+}
+
+message GetCryptoDeviceResponse {
+  CryptoDevice device = 1;
+  CryptoDeviceBundle current_bundle = 2;
+}
+
+message PublishCryptoDeviceBundleRequest {
+  string crypto_device_id = 1;
+  CryptoDeviceBundlePayload bundle = 2;
+}
+
+message PublishCryptoDeviceBundleResponse {
+  CryptoDevice device = 1;
+  CryptoDeviceBundle current_bundle = 2;
+}
+
+message CreateCryptoDeviceLinkIntentRequest {
+  string pending_crypto_device_id = 1;
+}
+
+message CreateCryptoDeviceLinkIntentResponse {
+  CryptoDeviceLinkIntent link_intent = 1;
+}
+
+message ListCryptoDeviceLinkIntentsRequest {}
+
+message ListCryptoDeviceLinkIntentsResponse {
+  repeated CryptoDeviceLinkIntent link_intents = 1;
+}
+
+// Этот approval path пока фиксирует только backend state machine и ownership boundaries.
+// Полноценное криптографическое доказательство trusted-device approval будет добавлено отдельно.
+message ApproveCryptoDeviceLinkIntentRequest {
+  string link_intent_id = 1;
+  string approver_crypto_device_id = 2;
+}
+
+message ApproveCryptoDeviceLinkIntentResponse {
+  CryptoDeviceLinkIntent link_intent = 1;
+  CryptoDevice device = 2;
+}
+
+message ExpireCryptoDeviceLinkIntentRequest {
+  string link_intent_id = 1;
+}
+
+message ExpireCryptoDeviceLinkIntentResponse {
+  CryptoDeviceLinkIntent link_intent = 1;
+}
+
+message RevokeCryptoDeviceRequest {
+  string crypto_device_id = 1;
+  optional string revocation_reason = 2;
+}
+
+message RevokeCryptoDeviceResponse {
+  CryptoDevice device = 1;
+}
