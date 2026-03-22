@@ -609,6 +609,18 @@ FROM direct_chat_pins
 WHERE chat_id = $1
 ORDER BY created_at DESC, message_id DESC;
 
+-- name: ListEncryptedPinnedMessageIDsByChatID :many
+SELECT message_id
+FROM direct_chat_encrypted_message_pins_v2
+WHERE chat_id = $1
+ORDER BY created_at DESC, message_id DESC;
+
+-- name: ListEncryptedPinnedMessageIDsByGroupID :many
+SELECT message_id
+FROM group_encrypted_message_pins_v1
+WHERE group_id = $1
+ORDER BY created_at DESC, message_id DESC;
+
 -- name: ListDirectReplyPreviewRows :many
 SELECT
     m.id,
@@ -1486,6 +1498,20 @@ WHERE self.user_id = $1
   AND d.recipient_user_id = $1
   AND d.recipient_crypto_device_id = $4;
 
+-- name: GetDirectChatEncryptedMessageV2Stored :one
+SELECT
+    id,
+    chat_id,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    created_at,
+    stored_at
+FROM direct_chat_encrypted_messages_v2
+WHERE chat_id = $1 AND id = $2;
+
 -- name: ListEncryptedGroupMessagesByDevice :many
 SELECT
     m.id,
@@ -1543,6 +1569,23 @@ WHERE self.user_id = $1
   AND d.recipient_user_id = $1
   AND d.recipient_crypto_device_id = $4;
 
+-- name: GetEncryptedGroupStoredMessage :one
+SELECT
+    id,
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    created_at,
+    stored_at
+FROM group_encrypted_messages_v1
+WHERE group_id = $1 AND id = $2;
+
 -- name: UpsertGroupChatReadState :execrows
 INSERT INTO group_chat_read_states (
     group_id,
@@ -1583,3 +1626,29 @@ ON CONFLICT (chat_id, message_id) DO NOTHING;
 -- name: UnpinDirectChatMessage :execrows
 DELETE FROM direct_chat_pins
 WHERE chat_id = $1 AND message_id = $2;
+
+-- name: PinEncryptedDirectMessageV2 :execrows
+INSERT INTO direct_chat_encrypted_message_pins_v2 (
+    chat_id,
+    message_id,
+    pinned_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (chat_id, message_id) DO NOTHING;
+
+-- name: UnpinEncryptedDirectMessageV2 :execrows
+DELETE FROM direct_chat_encrypted_message_pins_v2
+WHERE chat_id = $1 AND message_id = $2;
+
+-- name: PinEncryptedGroupMessage :execrows
+INSERT INTO group_encrypted_message_pins_v1 (
+    group_id,
+    message_id,
+    pinned_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (group_id, message_id) DO NOTHING;
+
+-- name: UnpinEncryptedGroupMessage :execrows
+DELETE FROM group_encrypted_message_pins_v1
+WHERE group_id = $1 AND message_id = $2;

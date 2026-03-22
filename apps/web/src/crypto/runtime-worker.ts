@@ -68,8 +68,32 @@ async function handleRequest(request: CryptoWorkerRequest) {
           request.payload.input,
         );
         break;
+      case "sendEncryptedDirectMessageV2Edit":
+        snapshot = await runtime.sendEncryptedDirectMessageV2Edit(
+          request.payload.session,
+          request.payload.input,
+        );
+        break;
+      case "sendEncryptedDirectMessageV2Tombstone":
+        snapshot = await runtime.sendEncryptedDirectMessageV2Tombstone(
+          request.payload.session,
+          request.payload.input,
+        );
+        break;
       case "sendEncryptedGroupContent":
         snapshot = await runtime.sendEncryptedGroupContent(
+          request.payload.session,
+          request.payload.input,
+        );
+        break;
+      case "sendEncryptedGroupEdit":
+        snapshot = await runtime.sendEncryptedGroupEdit(
+          request.payload.session,
+          request.payload.input,
+        );
+        break;
+      case "sendEncryptedGroupTombstone":
+        snapshot = await runtime.sendEncryptedGroupTombstone(
           request.payload.session,
           request.payload.input,
         );

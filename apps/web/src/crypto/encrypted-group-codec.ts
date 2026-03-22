@@ -28,6 +28,7 @@ interface EncryptedGroupTransportEnvelopeV1 {
 interface EncryptedGroupContentPayloadV1 {
   schema: typeof payloadSchema;
   operation: "content";
+  replyToMessageId: string | null;
   message: {
     text: string | null;
     markdownPolicy: string | null;
@@ -37,6 +38,7 @@ interface EncryptedGroupContentPayloadV1 {
 interface EncryptedGroupEditPayloadV1 {
   schema: typeof payloadSchema;
   operation: "edit";
+  replyToMessageId: string | null;
   message: {
     text: string | null;
     markdownPolicy: string | null;
@@ -63,7 +65,7 @@ export interface EncryptedGroupOutboundEnvelopeMetadata {
   rosterVersion: number;
   senderUserId: string;
   senderCryptoDeviceId: string;
-  operationKind: "content" | "control";
+  operationKind: "content" | "control" | "edit" | "tombstone";
   targetMessageId: string | null;
   revision: number;
   createdAt: string;
@@ -108,14 +110,11 @@ export async function decryptEncryptedGroupEnvelope(
       return buildFailure(envelope, "invalid_payload");
     }
 
-    if (operationKind === "content" && payload.operation !== "content") {
-      return buildFailure(envelope, "invalid_payload");
-    }
-    if (
-      operationKind === "control" &&
-      payload.operation !== "edit" &&
-      payload.operation !== "tombstone"
-    ) {
+    if (operationKind === "control") {
+      if (payload.operation !== "edit" && payload.operation !== "tombstone") {
+        return buildFailure(envelope, "invalid_payload");
+      }
+    } else if (payload.operation !== operationKind) {
       return buildFailure(envelope, "invalid_payload");
     }
 
@@ -423,12 +422,20 @@ function parsePayload(plaintext: string): EncryptedGroupPayloadV1 | null {
       if (!isRecord(parsed.message)) {
         return null;
       }
+      const replyToMessageId =
+        parsed.replyToMessageId === null || typeof parsed.replyToMessageId === "string"
+          ? normalizeNullableMessageID(parsed.replyToMessageId)
+          : undefined;
       const text = normalizeNullableString(parsed.message.text);
       const markdownPolicy = normalizeNullableString(parsed.message.markdownPolicy);
+      if (replyToMessageId === undefined) {
+        return null;
+      }
       if (parsed.operation === "content") {
         return {
           schema: payloadSchema,
           operation: "content",
+          replyToMessageId,
           message: {
             text,
             markdownPolicy,
@@ -441,6 +448,7 @@ function parsePayload(plaintext: string): EncryptedGroupPayloadV1 | null {
       return {
         schema: payloadSchema,
         operation: "edit",
+        replyToMessageId,
         message: {
           text,
           markdownPolicy,
@@ -482,6 +490,10 @@ function buildReadyProjection(
     senderCryptoDeviceId: envelope.senderCryptoDeviceId,
     operationKind: payload.operation,
     targetMessageId: envelope.targetMessageId,
+    replyToMessageId:
+      payload.operation === "content" || payload.operation === "edit"
+        ? payload.replyToMessageId
+        : null,
     revision: envelope.revision,
     createdAt: envelope.createdAt,
     storedAt: envelope.storedAt,
@@ -588,12 +600,16 @@ function buildPayloadAAD(
 
 function normalizeEnvelopeOperationKind(
   operationKind: string,
-): "content" | "control" | null {
+): "content" | "control" | "edit" | "tombstone" | null {
   switch (operationKind) {
     case "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT":
       return "content";
     case "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTROL":
       return "control";
+    case "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_EDIT":
+      return "edit";
+    case "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_TOMBSTONE":
+      return "tombstone";
     default:
       return null;
   }
@@ -601,6 +617,18 @@ function normalizeEnvelopeOperationKind(
 
 function normalizeNullableString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+function normalizeNullableMessageID(value: unknown): string | null | undefined {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized === "" ? null : normalized;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

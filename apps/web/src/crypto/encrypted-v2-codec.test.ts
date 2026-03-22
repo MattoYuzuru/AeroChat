@@ -27,6 +27,7 @@ describe("encrypted direct message v2 codec", () => {
       payload: {
         schema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
         operation: "content",
+        replyToMessageId: null,
         message: {
           text: "local encrypted hello",
           markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
@@ -51,6 +52,7 @@ describe("encrypted direct message v2 codec", () => {
       senderCryptoDeviceId: "crypto-1",
       operationKind: "content",
       targetMessageId: null,
+      replyToMessageId: null,
       revision: 1,
       createdAt: "2026-03-22T12:00:00Z",
       storedAt: "2026-03-22T12:00:01Z",
@@ -83,6 +85,7 @@ describe("encrypted direct message v2 codec", () => {
       payload: {
         schema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
         operation: "content",
+        replyToMessageId: null,
         message: {
           text: "bound payload",
           markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",

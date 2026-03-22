@@ -53,14 +53,44 @@ export interface CryptoRuntimeContextValue {
   sendEncryptedDirectMessageV2Content(
     chatId: string,
     text: string,
+    replyToMessageId?: string | null,
     attachmentDrafts?: Array<{
       draftId: string;
       attachmentId: string;
     }>,
   ): Promise<EncryptedDirectMessageV2OutboundSendResult | null>;
+  sendEncryptedDirectMessageV2Edit(
+    chatId: string,
+    targetMessageId: string,
+    nextRevision: number,
+    text: string,
+    replyToMessageId?: string | null,
+    attachmentDrafts?: Array<{
+      draftId: string;
+      attachmentId: string;
+    }>,
+  ): Promise<EncryptedDirectMessageV2OutboundSendResult | null>;
+  sendEncryptedDirectMessageV2Tombstone(
+    chatId: string,
+    targetMessageId: string,
+    nextRevision: number,
+  ): Promise<EncryptedDirectMessageV2OutboundSendResult | null>;
   sendEncryptedGroupContent(
     groupId: string,
     text: string,
+    replyToMessageId?: string | null,
+  ): Promise<EncryptedGroupOutboundSendResult | null>;
+  sendEncryptedGroupEdit(
+    groupId: string,
+    targetMessageId: string,
+    nextRevision: number,
+    text: string,
+    replyToMessageId?: string | null,
+  ): Promise<EncryptedGroupOutboundSendResult | null>;
+  sendEncryptedGroupTombstone(
+    groupId: string,
+    targetMessageId: string,
+    nextRevision: number,
   ): Promise<EncryptedGroupOutboundSendResult | null>;
 }
 

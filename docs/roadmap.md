@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Web encrypted group outbound text bootstrap
+- [x] Encrypted message mutations and pin recovery foundation
 
 ---
 
@@ -98,6 +98,7 @@
 - [x] Web encrypted direct-message v2 local projection foundation
 - [x] Web encrypted direct-message v2 outbound bootstrap send foundation
 - [x] Encrypted direct-message v2 sender self-delivery and convergence hardening
+- [x] Encrypted direct-message v2 reply/edit/tombstone/pin recovery foundation
 - [x] Safe markdown subset
 - [x] Read receipts
 - [x] Unread conversation state
@@ -145,6 +146,7 @@
 - [x] MLS control-plane and opaque encrypted group envelope foundation
 - [x] Web encrypted group runtime и local projection bootstrap
 - [x] Web encrypted group outbound text bootstrap
+- [x] Encrypted group reply/edit/tombstone/pin recovery foundation
 - [ ] Encrypted media relay integration for MLS group lane
 
 ---

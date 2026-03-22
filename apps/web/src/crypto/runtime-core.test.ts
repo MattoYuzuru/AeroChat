@@ -402,6 +402,7 @@ describe("createCryptoRuntimeCore", () => {
     );
     expect(result.localProjection.text).toBe("secret hello");
     expect(result.localProjection.chatId).toBe("chat-1");
+    expect(result.localProjection.replyToMessageId).toBeNull();
     expect(result.storedEnvelope.storedDeliveryCount).toBe(2);
   });
 
@@ -530,6 +531,7 @@ describe("createCryptoRuntimeCore", () => {
     expect(result.localProjection.text).toBe("secret group hello");
     expect(result.localProjection.groupId).toBe("group-1");
     expect(result.localProjection.threadId).toBe("thread-1");
+    expect(result.localProjection.replyToMessageId).toBeNull();
     expect(result.storedEnvelope.storedDeliveryCount).toBe(2);
   });
 
@@ -560,6 +562,7 @@ describe("createCryptoRuntimeCore", () => {
       payload: {
         schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
         operation: "content",
+        replyToMessageId: null,
         message: {
           text: "encrypted group hello",
           markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
@@ -596,6 +599,7 @@ describe("createCryptoRuntimeCore", () => {
         createdAt: "2026-03-22T12:00:00Z",
         storedAt: "2026-03-22T12:00:01Z",
         payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+        replyToMessageId: null,
         text: "encrypted group hello",
         markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
         editedAt: null,
@@ -932,6 +936,10 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     deleteMessageForEveryone: vi.fn(),
     pinMessage: vi.fn(),
     unpinMessage: vi.fn(),
+    pinEncryptedDirectMessageV2: vi.fn(),
+    unpinEncryptedDirectMessageV2: vi.fn(),
+    pinEncryptedGroupMessage: vi.fn(),
+    unpinEncryptedGroupMessage: vi.fn(),
     sendFriendRequest: vi.fn(),
     acceptFriendRequest: vi.fn(),
     declineFriendRequest: vi.fn(),

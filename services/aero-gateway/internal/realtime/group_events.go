@@ -85,14 +85,15 @@ type GroupReadUpdatedPayload struct {
 }
 
 type groupWire struct {
-	ID          string                `json:"id"`
-	Name        string                `json:"name"`
-	Kind        string                `json:"kind"`
-	SelfRole    string                `json:"selfRole"`
-	MemberCount uint32                `json:"memberCount"`
-	Permissions *groupPermissionsWire `json:"permissions,omitempty"`
-	CreatedAt   string                `json:"createdAt"`
-	UpdatedAt   string                `json:"updatedAt"`
+	ID                        string                `json:"id"`
+	Name                      string                `json:"name"`
+	Kind                      string                `json:"kind"`
+	SelfRole                  string                `json:"selfRole"`
+	MemberCount               uint32                `json:"memberCount"`
+	Permissions               *groupPermissionsWire `json:"permissions,omitempty"`
+	EncryptedPinnedMessageIDs []string              `json:"encryptedPinnedMessageIds"`
+	CreatedAt                 string                `json:"createdAt"`
+	UpdatedAt                 string                `json:"updatedAt"`
 }
 
 type groupPermissionsWire struct {
@@ -274,14 +275,15 @@ func toGroupWire(group *chatv1.Group) *groupWire {
 	}
 
 	return &groupWire{
-		ID:          group.GetId(),
-		Name:        group.GetName(),
-		Kind:        group.GetKind().String(),
-		SelfRole:    group.GetSelfRole().String(),
-		MemberCount: group.GetMemberCount(),
-		Permissions: toGroupPermissionsWire(group.GetPermissions()),
-		CreatedAt:   formatProtoTimestamp(group.GetCreatedAt()),
-		UpdatedAt:   formatProtoTimestamp(group.GetUpdatedAt()),
+		ID:                        group.GetId(),
+		Name:                      group.GetName(),
+		Kind:                      group.GetKind().String(),
+		SelfRole:                  group.GetSelfRole().String(),
+		MemberCount:               group.GetMemberCount(),
+		Permissions:               toGroupPermissionsWire(group.GetPermissions()),
+		EncryptedPinnedMessageIDs: append([]string(nil), group.GetEncryptedPinnedMessageIds()...),
+		CreatedAt:                 formatProtoTimestamp(group.GetCreatedAt()),
+		UpdatedAt:                 formatProtoTimestamp(group.GetUpdatedAt()),
 	}
 }
 

@@ -36,6 +36,7 @@ function createDirectChat(overrides: Partial<DirectChat> = {}): DirectChat {
     createdAt: "2026-03-21T10:00:00Z",
     updatedAt: "2026-03-21T10:00:00Z",
     ...overrides,
+    encryptedPinnedMessageIds: overrides.encryptedPinnedMessageIds ?? [],
   };
 }
 
@@ -61,6 +62,7 @@ function createGroup(overrides: Partial<Group> = {}): Group {
     createdAt: "2026-03-21T10:00:00Z",
     updatedAt: "2026-03-21T10:00:00Z",
     ...overrides,
+    encryptedPinnedMessageIds: overrides.encryptedPinnedMessageIds ?? [],
   };
 }
 

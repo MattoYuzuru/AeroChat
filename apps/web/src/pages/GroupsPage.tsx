@@ -41,7 +41,10 @@ import { parseGroupRealtimeEvent } from "../groups/realtime";
 import {
   describeEncryptedGroupLaneIssue,
 } from "../groups/useEncryptedGroupLane";
-import type { EncryptedGroupProjectionEntry } from "../groups/encrypted-group-projection";
+import type {
+  EncryptedGroupProjectionEntry,
+  EncryptedGroupProjectedMessageEntry,
+} from "../groups/encrypted-group-projection";
 import { publishLocalEncryptedGroupProjection } from "../groups/encrypted-group-local-outbound";
 import {
   applyGroupRealtimeToGroups,
@@ -85,7 +88,10 @@ export function GroupsPage() {
   const [encryptedComposerError, setEncryptedComposerError] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState("");
+  const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
   const [selectedReplyMessage, setSelectedReplyMessage] = useState<GroupMessage | null>(null);
+  const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
+    useState<string | null>(null);
   const [inviteRole, setInviteRole] = useState<GroupMemberRole>("member");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -205,7 +211,9 @@ export function GroupsPage() {
     setEditingMessageId(null);
     setEditingMessageText("");
     setPendingEditMessageId(null);
+    setEditingEncryptedMessageId(null);
     setSelectedReplyMessage(null);
+    setSelectedEncryptedReplyMessageId(null);
     setEncryptedComposerText("");
     setEncryptedComposerError(null);
     setSearchJumpNotice(null);
@@ -284,6 +292,10 @@ export function GroupsPage() {
       setEditingMessageText("");
       setPendingEditMessageId(null);
       setSelectedReplyMessage(null);
+      setEditingEncryptedMessageId(null);
+      setSelectedEncryptedReplyMessageId(null);
+      setEncryptedComposerText("");
+      setEncryptedComposerError(null);
       setMemberRoleDrafts({});
       return;
     }
@@ -694,6 +706,29 @@ export function GroupsPage() {
     selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
   const encryptedThreadMessages =
     selectedState.status === "ready" ? [...encryptedGroupLane.items].reverse() : [];
+  const encryptedMessageEntries = encryptedGroupLane.items.filter(
+    (
+      entry,
+    ): entry is EncryptedGroupProjectedMessageEntry => entry.kind === "message",
+  );
+  const encryptedMessageIndex = new Map(
+    encryptedMessageEntries.map((entry) => [entry.messageId, entry] as const),
+  );
+  const selectedEncryptedReplyEntry =
+    selectedEncryptedReplyMessageId === null
+      ? null
+      : encryptedMessageIndex.get(selectedEncryptedReplyMessageId) ?? null;
+  const editingEncryptedEntry =
+    editingEncryptedMessageId === null
+      ? null
+      : encryptedMessageIndex.get(editingEncryptedMessageId) ?? null;
+  const encryptedPinnedMessages =
+    selectedState.status !== "ready"
+      ? []
+      : selectedState.snapshot.group.encryptedPinnedMessageIds.map((messageId) => ({
+          messageId,
+          entry: encryptedMessageIndex.get(messageId) ?? null,
+        }));
   const canSendEncryptedGroupText =
     selectedState.status === "ready" &&
     encryptedGroupLane.status === "ready" &&
@@ -959,23 +994,117 @@ export function GroupsPage() {
     setNotice(null);
 
     try {
-      const result = await cryptoRuntime.sendEncryptedGroupContent(
-        selectedState.snapshot.group.id,
-        normalizedText,
-      );
+      const result =
+        editingEncryptedEntry !== null
+          ? await cryptoRuntime.sendEncryptedGroupEdit(
+              selectedState.snapshot.group.id,
+              editingEncryptedEntry.messageId,
+              editingEncryptedEntry.revision + 1,
+              normalizedText,
+              selectedEncryptedReplyEntry?.messageId ?? null,
+            )
+          : await cryptoRuntime.sendEncryptedGroupContent(
+              selectedState.snapshot.group.id,
+              normalizedText,
+              selectedEncryptedReplyEntry?.messageId ?? null,
+            );
       if (result === null) {
         return;
       }
 
       publishLocalEncryptedGroupProjection(result.localProjection);
       setEncryptedComposerText("");
-      setNotice("Encrypted group message отправлено через local crypto runtime.");
+      setSelectedEncryptedReplyMessageId(null);
+      setEditingEncryptedMessageId(null);
+      setNotice(
+        editingEncryptedEntry !== null
+          ? "Encrypted group edit опубликован через local crypto runtime."
+          : "Encrypted group message отправлено через local crypto runtime.",
+      );
     } catch (error) {
       setEncryptedComposerError(
         error instanceof Error && error.message.trim() !== ""
           ? error.message
           : "Не удалось отправить encrypted group message через crypto runtime.",
       );
+    }
+  }
+
+  async function handleDeleteEncryptedGroupMessage(
+    message: EncryptedGroupProjectedMessageEntry,
+  ) {
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    setEncryptedComposerError(null);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      const result = await cryptoRuntime.sendEncryptedGroupTombstone(
+        selectedState.snapshot.group.id,
+        message.messageId,
+        message.revision + 1,
+      );
+      if (result === null) {
+        return;
+      }
+
+      publishLocalEncryptedGroupProjection(result.localProjection);
+      if (editingEncryptedMessageId === message.messageId) {
+        setEditingEncryptedMessageId(null);
+        setEncryptedComposerText("");
+      }
+      if (selectedEncryptedReplyMessageId === message.messageId) {
+        setSelectedEncryptedReplyMessageId(null);
+      }
+      setNotice("Encrypted tombstone опубликован.");
+    } catch (error) {
+      setEncryptedComposerError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось опубликовать encrypted tombstone.",
+      );
+    }
+  }
+
+  async function handleToggleEncryptedGroupPin(messageId: string, pinned: boolean) {
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    setEncryptedComposerError(null);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      if (pinned) {
+        await gatewayClient.unpinEncryptedGroupMessage(
+          token,
+          selectedState.snapshot.group.id,
+          messageId,
+        );
+      } else {
+        await gatewayClient.pinEncryptedGroupMessage(
+          token,
+          selectedState.snapshot.group.id,
+          messageId,
+        );
+      }
+      await reloadSelectedGroup(selectedState.snapshot.group.id, true);
+      await reloadGroups();
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        pinned
+          ? "Не удалось снять encrypted pin."
+          : "Не удалось закрепить encrypted group message.",
+        expireSession,
+      );
+      if (message !== null) {
+        setActionError(message);
+      }
     }
   }
 
@@ -1754,9 +1883,9 @@ export function GroupsPage() {
                 {encryptedGroupLane.status === "ready" && (
                   <>
                     <div className={styles.notice}>
-                      Encrypted outbound bootstrap в этом PR ограничен text-only send.
-                      Media, reply, edit recovery, search и unread parity остаются отдельными
-                      later slices.
+                      Encrypted lane в этом slice уже восстанавливает replies, edits, tombstones и
+                      pins без server-side plaintext preview. Search, unread parity, backup и RTC
+                      по-прежнему остаются отдельными slices.
                     </div>
 
                     {!selectedState.snapshot.thread.canSendMessages && (
@@ -1767,10 +1896,98 @@ export function GroupsPage() {
                       </div>
                     )}
 
+                    {selectedState.snapshot.group.encryptedPinnedMessageIds.length > 0 && (
+                      <div className={styles.messagesList}>
+                        {encryptedPinnedMessages.map(({ messageId, entry }) => (
+                          <article className={styles.messageCard} key={messageId}>
+                            <div className={styles.messageHeader}>
+                              <div>
+                                <p className={styles.messageAuthor}>
+                                  {entry === null
+                                    ? "Encrypted message"
+                                    : describeEncryptedGroupAuthor(
+                                        entry,
+                                        authState.profile.id,
+                                        selectedState.members,
+                                      )}
+                                </p>
+                                <p className={styles.messageMeta}>
+                                  {entry === null
+                                    ? "Локально не разрешено"
+                                    : formatDateTime(entry.createdAt)}
+                                </p>
+                              </div>
+                              <div className={styles.badgeColumn}>
+                                <span className={styles.statusPill}>encrypted pin</span>
+                              </div>
+                            </div>
+                            <div className={styles.messageBody}>
+                              <p className={styles.helperText}>
+                                {describeEncryptedGroupPinnedPreview(entry)}
+                              </p>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+
                     <form
                       className={styles.composer}
                       onSubmit={handleSendEncryptedGroupMessage}
                     >
+                      {selectedEncryptedReplyEntry && (
+                        <div className={styles.replyComposerCard}>
+                          <div>
+                            <p className={styles.replyPreviewAuthor}>
+                              Encrypted reply на{" "}
+                              {describeEncryptedGroupAuthor(
+                                selectedEncryptedReplyEntry,
+                                authState.profile.id,
+                                selectedState.members,
+                              )}
+                            </p>
+                            <p className={styles.replyPreviewText}>
+                              {describeEncryptedGroupComposerReplyTarget(
+                                selectedEncryptedReplyEntry,
+                              )}
+                            </p>
+                          </div>
+                          <button
+                            className={styles.ghostButton}
+                            onClick={() => {
+                              setSelectedEncryptedReplyMessageId(null);
+                            }}
+                            type="button"
+                          >
+                            Отменить encrypted reply
+                          </button>
+                        </div>
+                      )}
+
+                      {editingEncryptedEntry && (
+                        <div className={styles.replyComposerCard}>
+                          <div>
+                            <p className={styles.replyPreviewAuthor}>
+                              Encrypted edit revision {editingEncryptedEntry.revision + 1}
+                            </p>
+                            <p className={styles.replyPreviewText}>
+                              {describeEncryptedGroupComposerReplyTarget(editingEncryptedEntry)}
+                            </p>
+                          </div>
+                          <button
+                            className={styles.ghostButton}
+                            onClick={() => {
+                              setEditingEncryptedMessageId(null);
+                              setSelectedEncryptedReplyMessageId(null);
+                              setEncryptedComposerText("");
+                            }}
+                            type="button"
+                          >
+                            Отменить encrypted edit
+                          </button>
+                        </div>
+                      )}
+
                       <label className={styles.field}>
                         <span>Encrypted text</span>
                         <textarea
@@ -1798,8 +2015,9 @@ export function GroupsPage() {
                       )}
 
                       <p className={styles.helperText}>
-                        Этот composer не подключён к legacy attachment flow и не делает
-                        plaintext fallback.
+                        Этот composer не подключён к legacy attachment flow, не делает
+                        plaintext fallback и публикует edit/tombstone только как opaque encrypted
+                        mutations.
                       </p>
 
                       <div className={styles.composerFooter}>
@@ -1813,7 +2031,9 @@ export function GroupsPage() {
                         >
                           {cryptoRuntime.state.isActionPending
                             ? "Собираем..."
-                            : "Отправить encrypted text"}
+                            : editingEncryptedEntry !== null
+                              ? "Сохранить encrypted edit"
+                              : "Отправить encrypted text"}
                         </button>
                       </div>
                     </form>
@@ -1830,6 +2050,11 @@ export function GroupsPage() {
                             className={styles.messageCard}
                             data-own={
                               entry.senderUserId === authState.profile.id ? "true" : undefined
+                            }
+                            id={
+                              entry.kind === "message"
+                                ? `encrypted-group-message-${entry.messageId}`
+                                : undefined
                             }
                             key={entry.key}
                           >
@@ -1848,6 +2073,10 @@ export function GroupsPage() {
                               </div>
                               <div className={styles.badgeColumn}>
                                 <span className={styles.statusPill}>encrypted</span>
+                                {entry.kind === "message" &&
+                                  selectedState.snapshot.group.encryptedPinnedMessageIds.includes(
+                                    entry.messageId,
+                                  ) && <span className={styles.statusPill}>pin</span>}
                                 <span className={styles.statusPill}>
                                   {entry.kind === "message"
                                     ? entry.isTombstone
@@ -1866,14 +2095,67 @@ export function GroupsPage() {
                                   <p className={styles.helperText}>
                                     Сообщение скрыто локальным tombstone из encrypted lane.
                                   </p>
-                                ) : entry.text && entry.text.trim() !== "" ? (
-                                  <div className={styles.messageText}>
-                                    <SafeMessageMarkdown text={entry.text} />
-                                  </div>
                                 ) : (
-                                  <p className={styles.helperText}>
-                                    Bootstrap payload не содержит renderable text body.
-                                  </p>
+                                  <>
+                                    {resolveEncryptedGroupReplyTarget(
+                                      encryptedMessageIndex,
+                                      entry.replyToMessageId,
+                                      authState.profile.id,
+                                      selectedState.members,
+                                    ) && (
+                                      <button
+                                        className={styles.replyPreviewCard}
+                                        disabled={
+                                          resolveEncryptedGroupReplyTarget(
+                                            encryptedMessageIndex,
+                                            entry.replyToMessageId,
+                                            authState.profile.id,
+                                            selectedState.members,
+                                          )?.messageId === null
+                                        }
+                                        onClick={() => {
+                                          const target = resolveEncryptedGroupReplyTarget(
+                                            encryptedMessageIndex,
+                                            entry.replyToMessageId,
+                                            authState.profile.id,
+                                            selectedState.members,
+                                          );
+                                          if (target !== null && target.messageId !== null) {
+                                            jumpToMessage(
+                                              `encrypted-group-message-${target.messageId}`,
+                                            );
+                                          }
+                                        }}
+                                        type="button"
+                                      >
+                                        <span className={styles.replyPreviewAuthor}>
+                                          {resolveEncryptedGroupReplyTarget(
+                                            encryptedMessageIndex,
+                                            entry.replyToMessageId,
+                                            authState.profile.id,
+                                            selectedState.members,
+                                          )?.authorLabel ?? "Ответ"}
+                                        </span>
+                                        <span className={styles.replyPreviewText}>
+                                          {resolveEncryptedGroupReplyTarget(
+                                            encryptedMessageIndex,
+                                            entry.replyToMessageId,
+                                            authState.profile.id,
+                                            selectedState.members,
+                                          )?.previewText ?? ""}
+                                        </span>
+                                      </button>
+                                    )}
+                                    {entry.text && entry.text.trim() !== "" ? (
+                                      <div className={styles.messageText}>
+                                        <SafeMessageMarkdown text={entry.text} />
+                                      </div>
+                                    ) : (
+                                      <p className={styles.helperText}>
+                                        Bootstrap payload не содержит renderable text body.
+                                      </p>
+                                    )}
+                                  </>
                                 )
                               ) : (
                                 <div className={styles.error}>
@@ -1882,10 +2164,76 @@ export function GroupsPage() {
                               )}
                             </div>
 
+                            {entry.kind === "message" && !entry.isTombstone && (
+                              <div className={styles.actions}>
+                                <button
+                                  className={styles.secondaryButton}
+                                  onClick={() => {
+                                    setSelectedEncryptedReplyMessageId(entry.messageId);
+                                    setEditingEncryptedMessageId(null);
+                                    setEncryptedComposerError(null);
+                                    setActionError(null);
+                                    setNotice(null);
+                                  }}
+                                  type="button"
+                                >
+                                  Ответить
+                                </button>
+                                {entry.senderUserId === authState.profile.id && (
+                                  <button
+                                    className={styles.secondaryButton}
+                                    onClick={() => {
+                                      setEditingEncryptedMessageId(entry.messageId);
+                                      setSelectedEncryptedReplyMessageId(entry.replyToMessageId);
+                                      setEncryptedComposerText(entry.text ?? "");
+                                      setEncryptedComposerError(null);
+                                      setActionError(null);
+                                      setNotice(null);
+                                    }}
+                                    type="button"
+                                  >
+                                    Редактировать
+                                  </button>
+                                )}
+                                <button
+                                  className={styles.secondaryButton}
+                                  onClick={() => {
+                                    void handleToggleEncryptedGroupPin(
+                                      entry.messageId,
+                                      selectedState.snapshot.group.encryptedPinnedMessageIds.includes(
+                                        entry.messageId,
+                                      ),
+                                    );
+                                  }}
+                                  type="button"
+                                >
+                                  {selectedState.snapshot.group.encryptedPinnedMessageIds.includes(
+                                    entry.messageId,
+                                  )
+                                    ? "Снять encrypted pin"
+                                    : "Закрепить"}
+                                </button>
+                                {entry.senderUserId === authState.profile.id && (
+                                  <button
+                                    className={styles.secondaryButton}
+                                    onClick={() => {
+                                      void handleDeleteEncryptedGroupMessage(entry);
+                                    }}
+                                    type="button"
+                                  >
+                                    Удалить для всех
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
                             <p className={styles.editMeta}>
                               stored {formatDateTime(entry.storedAt)}
                               {entry.kind === "message" && entry.editedAt
                                 ? ` • edited ${formatDateTime(entry.editedAt)}`
+                                : ""}
+                              {entry.kind === "message" && entry.deletedAt
+                                ? ` • tombstone ${formatDateTime(entry.deletedAt)}`
                                 : ""}
                             </p>
                           </article>
@@ -2069,6 +2417,8 @@ export function GroupsPage() {
                                   <button
                                     className={styles.secondaryButton}
                                     onClick={() => {
+                                      setEditingEncryptedMessageId(null);
+                                      setSelectedEncryptedReplyMessageId(null);
                                       setEditingMessageId(message.id);
                                       setEditingMessageText(message.text?.text ?? "");
                                       setActionError(null);
@@ -2083,6 +2433,8 @@ export function GroupsPage() {
                                 <button
                                   className={styles.ghostButton}
                                   onClick={() => {
+                                    setEditingEncryptedMessageId(null);
+                                    setSelectedEncryptedReplyMessageId(null);
                                     setSelectedReplyMessage(message);
                                     setActionError(null);
                                     setNotice(null);
@@ -2927,6 +3279,72 @@ function describeGroupComposerReplyTarget(message: GroupMessage): string {
       : `Вложения: ${message.attachments.length}`;
   }
   return "Сообщение без текста";
+}
+
+interface EncryptedGroupReplyTargetDescriptor {
+  messageId: string | null;
+  authorLabel: string;
+  previewText: string;
+}
+
+function resolveEncryptedGroupReplyTarget(
+  entries: Map<string, EncryptedGroupProjectedMessageEntry>,
+  messageId: string | null,
+  currentUserId: string,
+  members: GroupMember[],
+): EncryptedGroupReplyTargetDescriptor | null {
+  if (messageId === null) {
+    return null;
+  }
+
+  const target = entries.get(messageId);
+  if (target === undefined) {
+    return {
+      messageId: null,
+      authorLabel: "Недоступное encrypted сообщение",
+      previewText: "Reply target пока не разрешён в текущем локальном bounded окне.",
+    };
+  }
+
+  if (target.isTombstone) {
+    return {
+      messageId: target.messageId,
+      authorLabel: "Удалённое encrypted сообщение",
+      previewText: "Сообщение удалено для всех локальным tombstone.",
+    };
+  }
+
+  return {
+    messageId: target.messageId,
+    authorLabel: describeEncryptedGroupAuthor(target, currentUserId, members),
+    previewText: describeEncryptedGroupComposerReplyTarget(target),
+  };
+}
+
+function describeEncryptedGroupComposerReplyTarget(
+  entry: EncryptedGroupProjectedMessageEntry,
+): string {
+  if (entry.isTombstone) {
+    return "Сообщение удалено для всех.";
+  }
+  if (entry.text && entry.text.trim() !== "") {
+    return entry.text.length > 140 ? `${entry.text.slice(0, 137)}...` : entry.text;
+  }
+
+  return "Encrypted сообщение без renderable text body.";
+}
+
+function describeEncryptedGroupPinnedPreview(
+  entry: EncryptedGroupProjectedMessageEntry | null,
+): string {
+  if (entry === null) {
+    return "Серверный pin уже сохранён, но содержимое сообщения ещё не разрешено локальной encrypted projection.";
+  }
+  if (entry.isTombstone) {
+    return "Сообщение закреплено по logical id, но его текущее состояние tombstone.";
+  }
+
+  return describeEncryptedGroupComposerReplyTarget(entry);
 }
 
 function jumpToMessage(elementId: string) {

@@ -927,6 +927,70 @@ func (h *Handler) UnpinMessage(ctx context.Context, req *connect.Request[chatv1.
 	}), nil
 }
 
+func (h *Handler) PinEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.PinEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.PinEncryptedDirectMessageV2Response], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	directChat, err := h.service.PinEncryptedDirectMessageV2(ctx, token, req.Msg.ChatId, req.Msg.MessageId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.PinEncryptedDirectMessageV2Response{
+		Chat: toProtoDirectChat(*directChat),
+	}), nil
+}
+
+func (h *Handler) UnpinEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.UnpinEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.UnpinEncryptedDirectMessageV2Response], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	directChat, err := h.service.UnpinEncryptedDirectMessageV2(ctx, token, req.Msg.ChatId, req.Msg.MessageId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.UnpinEncryptedDirectMessageV2Response{
+		Chat: toProtoDirectChat(*directChat),
+	}), nil
+}
+
+func (h *Handler) PinEncryptedGroupMessage(ctx context.Context, req *connect.Request[chatv1.PinEncryptedGroupMessageRequest]) (*connect.Response[chatv1.PinEncryptedGroupMessageResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := h.service.PinEncryptedGroupMessage(ctx, token, req.Msg.GroupId, req.Msg.MessageId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.PinEncryptedGroupMessageResponse{
+		Group: toProtoGroup(*group),
+	}), nil
+}
+
+func (h *Handler) UnpinEncryptedGroupMessage(ctx context.Context, req *connect.Request[chatv1.UnpinEncryptedGroupMessageRequest]) (*connect.Response[chatv1.UnpinEncryptedGroupMessageResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := h.service.UnpinEncryptedGroupMessage(ctx, token, req.Msg.GroupId, req.Msg.MessageId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.UnpinEncryptedGroupMessageResponse{
+		Group: toProtoGroup(*group),
+	}), nil
+}
+
 func bearerToken[T any](req *connect.Request[T]) (string, error) {
 	const prefix = "Bearer "
 
@@ -964,13 +1028,14 @@ func mapError(err error) error {
 
 func toProtoDirectChat(value chat.DirectChat) *chatv1.DirectChat {
 	result := &chatv1.DirectChat{
-		Id:               value.ID,
-		Kind:             toProtoChatKind(value.Kind),
-		Participants:     make([]*chatv1.ChatUser, 0, len(value.Participants)),
-		PinnedMessageIds: append([]string(nil), value.PinnedMessageIDs...),
-		CreatedAt:        timestamppb.New(value.CreatedAt),
-		UpdatedAt:        timestamppb.New(value.UpdatedAt),
-		UnreadState:      toProtoDirectChatUnreadState(value.UnreadCount),
+		Id:                        value.ID,
+		Kind:                      toProtoChatKind(value.Kind),
+		Participants:              make([]*chatv1.ChatUser, 0, len(value.Participants)),
+		PinnedMessageIds:          append([]string(nil), value.PinnedMessageIDs...),
+		CreatedAt:                 timestamppb.New(value.CreatedAt),
+		UpdatedAt:                 timestamppb.New(value.UpdatedAt),
+		UnreadState:               toProtoDirectChatUnreadState(value.UnreadCount),
+		EncryptedPinnedMessageIds: append([]string(nil), value.EncryptedPinnedMessageIDs...),
 	}
 	for _, participant := range value.Participants {
 		result.Participants = append(result.Participants, toProtoChatUser(participant))
@@ -981,15 +1046,16 @@ func toProtoDirectChat(value chat.DirectChat) *chatv1.DirectChat {
 
 func toProtoGroup(value chat.Group) *chatv1.Group {
 	return &chatv1.Group{
-		Id:          value.ID,
-		Name:        value.Name,
-		Kind:        toProtoChatKind(value.Kind),
-		SelfRole:    toProtoGroupMemberRole(value.SelfRole),
-		MemberCount: uint32(value.MemberCount),
-		CreatedAt:   timestamppb.New(value.CreatedAt),
-		UpdatedAt:   timestamppb.New(value.UpdatedAt),
-		UnreadState: toProtoGroupUnreadState(value.UnreadCount),
-		Permissions: toProtoGroupPermissions(value.SelfPermissions),
+		Id:                        value.ID,
+		Name:                      value.Name,
+		Kind:                      toProtoChatKind(value.Kind),
+		SelfRole:                  toProtoGroupMemberRole(value.SelfRole),
+		MemberCount:               uint32(value.MemberCount),
+		CreatedAt:                 timestamppb.New(value.CreatedAt),
+		UpdatedAt:                 timestamppb.New(value.UpdatedAt),
+		UnreadState:               toProtoGroupUnreadState(value.UnreadCount),
+		Permissions:               toProtoGroupPermissions(value.SelfPermissions),
+		EncryptedPinnedMessageIds: append([]string(nil), value.EncryptedPinnedMessageIDs...),
 	}
 }
 
@@ -1623,6 +1689,10 @@ func toProtoEncryptedGroupMessageOperationKind(value string) chatv1.EncryptedGro
 		return chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT
 	case chat.EncryptedGroupMessageOperationControl:
 		return chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTROL
+	case chat.EncryptedGroupMessageOperationEdit:
+		return chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_EDIT
+	case chat.EncryptedGroupMessageOperationTombstone:
+		return chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_TOMBSTONE
 	default:
 		return chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_UNSPECIFIED
 	}
@@ -1634,6 +1704,10 @@ func fromProtoEncryptedGroupMessageOperationKind(value chatv1.EncryptedGroupMess
 		return chat.EncryptedGroupMessageOperationContent
 	case chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTROL:
 		return chat.EncryptedGroupMessageOperationControl
+	case chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_EDIT:
+		return chat.EncryptedGroupMessageOperationEdit
+	case chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_TOMBSTONE:
+		return chat.EncryptedGroupMessageOperationTombstone
 	default:
 		return ""
 	}

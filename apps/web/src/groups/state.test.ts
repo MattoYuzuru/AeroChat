@@ -43,6 +43,7 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
         kind: "CHAT_KIND_GROUP",
         selfRole: "owner",
         memberCount: 2,
+        encryptedPinnedMessageIds: [],
         unreadCount: 0,
         permissions: ownerPermissions,
         createdAt: "2026-04-09T09:00:00Z",

@@ -47,6 +47,58 @@ interface RuntimeDependencies {
   resolveDeviceLabel(): string;
 }
 
+type EncryptedDirectMessageV2MutationInput =
+  | {
+      kind: "content";
+      chatId: string;
+      text: string;
+      replyToMessageId?: string | null;
+      attachmentDrafts?: Array<{
+        draftId: string;
+        attachmentId: string;
+      }>;
+    }
+  | {
+      kind: "edit";
+      chatId: string;
+      targetMessageId: string;
+      nextRevision: number;
+      text: string;
+      replyToMessageId?: string | null;
+      attachmentDrafts?: Array<{
+        draftId: string;
+        attachmentId: string;
+      }>;
+    }
+  | {
+      kind: "tombstone";
+      chatId: string;
+      targetMessageId: string;
+      nextRevision: number;
+    };
+
+type EncryptedGroupMutationInput =
+  | {
+      kind: "content";
+      groupId: string;
+      text: string;
+      replyToMessageId?: string | null;
+    }
+  | {
+      kind: "edit";
+      groupId: string;
+      targetMessageId: string;
+      nextRevision: number;
+      text: string;
+      replyToMessageId?: string | null;
+    }
+  | {
+      kind: "tombstone";
+      groupId: string;
+      targetMessageId: string;
+      nextRevision: number;
+    };
+
 export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
   const encryptedMediaDrafts = new Map<string, EncryptedMediaAttachmentDescriptorV1>();
   const encryptedMediaDescriptors = new Map<string, EncryptedMediaAttachmentDescriptorV1>();
@@ -412,163 +464,79 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
       input: {
         chatId: string;
         text: string;
+        replyToMessageId?: string | null;
         attachmentDrafts?: Array<{
           draftId: string;
           attachmentId: string;
         }>;
       },
     ): Promise<EncryptedDirectMessageV2OutboundSendResult> {
-      const supportError = assertSupport(dependencies);
-      if (supportError !== null) {
-        throw new Error(
-          supportError.errorMessage ??
-            "Текущий browser runtime не поддерживает encrypted DM v2 bootstrap send.",
-        );
-      }
-
-      const normalizedChatId = input.chatId.trim();
-      const normalizedText = input.text.trim();
-      const normalizedAttachmentDrafts = normalizeEncryptedAttachmentDraftInputs(
-        input.attachmentDrafts,
-      );
-      if (normalizedChatId === "") {
-        throw new Error("Не выбран direct chat для encrypted DM v2 send.");
-      }
-      if (normalizedText === "" && normalizedAttachmentDrafts.length === 0) {
-        throw new Error(
-          "Encrypted DM v2 send требует text payload или хотя бы один encrypted attachment descriptor.",
-        );
-      }
-
-      const localMaterial = await dependencies.keyStore.load(session.profileId);
-      if (localMaterial === null || localMaterial.record.status !== "active") {
-        throw new Error(
-          "Encrypted DM v2 send доступен только для browser profile с active local crypto-device.",
-        );
-      }
-      const localBundle = await dependencies.materialFactory.buildBundle(localMaterial);
-      if (localBundle.signedPrekeyPublicBase64.trim() === "") {
-        throw new Error(
-          "Текущий local crypto-device не имеет signed prekey для server-backed self-delivery.",
-        );
-      }
-
-      const sendBootstrap =
-        await dependencies.gatewayClient.getEncryptedDirectMessageV2SendBootstrap(
-          session.token,
-          normalizedChatId,
-          localMaterial.record.cryptoDeviceId,
-        );
-      const targetDevices = [
-        {
-          cryptoDeviceId: localMaterial.record.cryptoDeviceId,
-          signedPrekeyPublicBase64: localBundle.signedPrekeyPublicBase64,
-        },
-        ...sendBootstrap.senderOtherDevices.map((device) => ({
-          cryptoDeviceId: device.cryptoDeviceId,
-          signedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
-        })),
-        ...sendBootstrap.recipientDevices.map((device) => ({
-          cryptoDeviceId: device.cryptoDeviceId,
-          signedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
-        })),
-      ];
-      if (targetDevices.length === 0) {
-        throw new Error("Encrypted DM v2 send bootstrap не вернул target crypto-device roster.");
-      }
-
-      const messageId = createLogicalMessageId();
-      const createdAt = new Date().toISOString();
-      const attachmentDescriptors = resolveEncryptedMediaAttachmentDescriptors(
+      return sendEncryptedDirectMessageV2Mutation(
+        dependencies,
         encryptedMediaDrafts,
-        normalizedAttachmentDrafts,
-      );
-      const payload: EncryptedDirectMessageV2PayloadV1 = {
-        schema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
-        operation: "content",
-        message: {
-          text: normalizedText === "" ? null : normalizedText,
-          markdownPolicy:
-            normalizedText === "" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
-          attachments: attachmentDescriptors,
-        },
-      };
-
-      const deliveries = await Promise.all(
-        targetDevices.map(async (device) => {
-          if (device.signedPrekeyPublicBase64.trim() === "") {
-            throw new Error(
-              `Active target crypto-device ${device.cryptoDeviceId} не имеет public signed prekey для bootstrap send.`,
-            );
-          }
-
-          const encrypted = await encryptEncryptedDirectMessageV2Payload({
-            recipientSignedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
-            metadata: {
-              messageId,
-              chatId: normalizedChatId,
-              senderUserId: session.profileId,
-              senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
-              operationKind: "content",
-              targetMessageId: null,
-              revision: 1,
-              createdAt,
-              recipientCryptoDeviceId: device.cryptoDeviceId,
-            },
-            payload,
-          });
-
-          return {
-            recipientCryptoDeviceId: device.cryptoDeviceId,
-            transportHeader: encrypted.transportHeader,
-            ciphertext: encrypted.ciphertext,
-          };
-        }),
-      );
-
-      const storedEnvelope = await dependencies.gatewayClient.sendEncryptedDirectMessageV2(
-        session.token,
+        encryptedMediaDescriptors,
+        session,
         {
-          chatId: normalizedChatId,
-          messageId,
-          senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
-          operationKind: "content",
-          targetMessageId: null,
-          revision: 1,
-          deliveries,
+          kind: "content",
+          chatId: input.chatId,
+          text: input.text,
+          replyToMessageId: input.replyToMessageId,
+          attachmentDrafts: input.attachmentDrafts,
         },
       );
-      for (const descriptor of attachmentDescriptors) {
-        cacheEncryptedMediaDescriptor(encryptedMediaDescriptors, descriptor);
-        encryptedMediaDrafts.delete(
-          normalizedAttachmentDrafts.find(
-            (draft) => draft.attachmentId === descriptor.attachmentId,
-          )?.draftId ?? "",
-        );
-      }
+    },
 
-      return {
-        storedEnvelope,
-        localProjection: {
-          status: "ready",
-          messageId: storedEnvelope.messageId,
-          chatId: storedEnvelope.chatId,
-          senderUserId: storedEnvelope.senderUserId,
-          senderCryptoDeviceId: storedEnvelope.senderCryptoDeviceId,
-          operationKind: "content",
-          targetMessageId: null,
-          revision: storedEnvelope.revision,
-          createdAt: storedEnvelope.createdAt,
-          storedAt: storedEnvelope.storedAt,
-          payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
-          text: normalizedText === "" ? null : normalizedText,
-          markdownPolicy:
-            normalizedText === "" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
-          attachments: attachmentDescriptors.map(stripEncryptedMediaAttachmentDescriptor),
-          editedAt: null,
-          deletedAt: null,
+    async sendEncryptedDirectMessageV2Edit(
+      session: CryptoRuntimeSession,
+      input: {
+        chatId: string;
+        targetMessageId: string;
+        nextRevision: number;
+        text: string;
+        replyToMessageId?: string | null;
+        attachmentDrafts?: Array<{
+          draftId: string;
+          attachmentId: string;
+        }>;
+      },
+    ): Promise<EncryptedDirectMessageV2OutboundSendResult> {
+      return sendEncryptedDirectMessageV2Mutation(
+        dependencies,
+        encryptedMediaDrafts,
+        encryptedMediaDescriptors,
+        session,
+        {
+          kind: "edit",
+          chatId: input.chatId,
+          targetMessageId: input.targetMessageId,
+          nextRevision: input.nextRevision,
+          text: input.text,
+          replyToMessageId: input.replyToMessageId,
+          attachmentDrafts: input.attachmentDrafts,
         },
-      };
+      );
+    },
+
+    async sendEncryptedDirectMessageV2Tombstone(
+      session: CryptoRuntimeSession,
+      input: {
+        chatId: string;
+        targetMessageId: string;
+        nextRevision: number;
+      },
+    ): Promise<EncryptedDirectMessageV2OutboundSendResult> {
+      return sendEncryptedDirectMessageV2Mutation(
+        dependencies,
+        encryptedMediaDrafts,
+        encryptedMediaDescriptors,
+        session,
+        {
+          kind: "tombstone",
+          chatId: input.chatId,
+          targetMessageId: input.targetMessageId,
+          nextRevision: input.nextRevision,
+        },
+      );
     },
 
     async sendEncryptedGroupContent(
@@ -576,140 +544,51 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
       input: {
         groupId: string;
         text: string;
+        replyToMessageId?: string | null;
       },
     ): Promise<EncryptedGroupOutboundSendResult> {
-      const supportError = assertSupport(dependencies);
-      if (supportError !== null) {
-        throw new Error(
-          supportError.errorMessage ??
-            "Текущий browser runtime не поддерживает encrypted group bootstrap send.",
-        );
-      }
-
-      const normalizedGroupId = input.groupId.trim();
-      const normalizedText = input.text.trim();
-      if (normalizedGroupId === "") {
-        throw new Error("Не выбрана группа для encrypted group send.");
-      }
-      if (normalizedText === "") {
-        throw new Error(
-          "Encrypted group bootstrap send требует text payload внутри crypto runtime.",
-        );
-      }
-
-      const localMaterial = await dependencies.keyStore.load(session.profileId);
-      if (localMaterial === null || localMaterial.record.status !== "active") {
-        throw new Error(
-          "Encrypted group send доступен только для browser profile с active local crypto-device.",
-        );
-      }
-
-      const bootstrap = await dependencies.gatewayClient.getEncryptedGroupBootstrap(
-        session.token,
-        normalizedGroupId,
-        localMaterial.record.cryptoDeviceId,
-      );
-      if (
-        bootstrap.lane.threadId.trim() === "" ||
-        bootstrap.lane.mlsGroupId.trim() === "" ||
-        bootstrap.lane.rosterVersion <= 0
-      ) {
-        throw new Error(
-          "Encrypted group bootstrap вернул неполный control-plane state для outbound send.",
-        );
-      }
-      const targetDevices = bootstrap.rosterDevices.map((device) => ({
-        cryptoDeviceId: device.cryptoDeviceId,
-        signedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
-      }));
-      if (targetDevices.length === 0) {
-        throw new Error(
-          "Encrypted group bootstrap не вернул eligible crypto-device roster для send.",
-        );
-      }
-      if (
-        !targetDevices.some(
-          (device) => device.cryptoDeviceId === localMaterial.record.cryptoDeviceId,
-        )
-      ) {
-        throw new Error(
-          "Текущий local crypto-device не попал в encrypted group roster и не может отправить bootstrap payload.",
-        );
-      }
-      for (const targetDevice of targetDevices) {
-        if (targetDevice.signedPrekeyPublicBase64.trim() === "") {
-          throw new Error(
-            `Active group crypto-device ${targetDevice.cryptoDeviceId} не имеет signed prekey для bootstrap send.`,
-          );
-        }
-      }
-
-      const messageId = createLogicalMessageId();
-      const createdAt = new Date().toISOString();
-      const payload: EncryptedGroupPayloadV1 = {
-        schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
-        operation: "content",
-        message: {
-          text: normalizedText,
-          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
-        },
-      };
-      const encrypted = await encryptEncryptedGroupPayload({
-        recipientDevices: targetDevices,
-        metadata: {
-          messageId,
-          groupId: normalizedGroupId,
-          threadId: bootstrap.lane.threadId,
-          mlsGroupId: bootstrap.lane.mlsGroupId,
-          rosterVersion: bootstrap.lane.rosterVersion,
-          senderUserId: session.profileId,
-          senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
-          operationKind: "content",
-          targetMessageId: null,
-          revision: 1,
-          createdAt,
-        },
-        payload,
+      return sendEncryptedGroupMutation(dependencies, session, {
+        kind: "content",
+        groupId: input.groupId,
+        text: input.text,
+        replyToMessageId: input.replyToMessageId,
       });
+    },
 
-      const storedEnvelope = await dependencies.gatewayClient.sendEncryptedGroupMessage(
-        session.token,
-        {
-          groupId: normalizedGroupId,
-          messageId,
-          mlsGroupId: bootstrap.lane.mlsGroupId,
-          rosterVersion: bootstrap.lane.rosterVersion,
-          senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
-          operationKind: "content",
-          targetMessageId: null,
-          revision: 1,
-          ciphertext: encrypted.ciphertext,
-        },
-      );
+    async sendEncryptedGroupEdit(
+      session: CryptoRuntimeSession,
+      input: {
+        groupId: string;
+        targetMessageId: string;
+        nextRevision: number;
+        text: string;
+        replyToMessageId?: string | null;
+      },
+    ): Promise<EncryptedGroupOutboundSendResult> {
+      return sendEncryptedGroupMutation(dependencies, session, {
+        kind: "edit",
+        groupId: input.groupId,
+        targetMessageId: input.targetMessageId,
+        nextRevision: input.nextRevision,
+        text: input.text,
+        replyToMessageId: input.replyToMessageId,
+      });
+    },
 
-      return {
-        storedEnvelope,
-        localProjection: {
-          status: "ready",
-          messageId: storedEnvelope.messageId,
-          groupId: storedEnvelope.groupId,
-          threadId: storedEnvelope.threadId,
-          mlsGroupId: storedEnvelope.mlsGroupId,
-          rosterVersion: storedEnvelope.rosterVersion,
-          senderUserId: storedEnvelope.senderUserId,
-          senderCryptoDeviceId: storedEnvelope.senderCryptoDeviceId,
-          operationKind: "content",
-          targetMessageId: null,
-          revision: storedEnvelope.revision,
-          createdAt: storedEnvelope.createdAt,
-          storedAt: storedEnvelope.storedAt,
-          payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
-          text: normalizedText,
-          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
-          editedAt: null,
-          deletedAt: null,
-        },
-      };
+    async sendEncryptedGroupTombstone(
+      session: CryptoRuntimeSession,
+      input: {
+        groupId: string;
+        targetMessageId: string;
+        nextRevision: number;
+      },
+    ): Promise<EncryptedGroupOutboundSendResult> {
+      return sendEncryptedGroupMutation(dependencies, session, {
+        kind: "tombstone",
+        groupId: input.groupId,
+        targetMessageId: input.targetMessageId,
+        nextRevision: input.nextRevision,
+      });
     },
   };
 }
@@ -765,6 +644,429 @@ function resolveEncryptedMediaAttachmentDescriptors(
       selectedDraft.attachmentId,
     );
   });
+}
+
+async function sendEncryptedDirectMessageV2Mutation(
+  dependencies: RuntimeDependencies,
+  encryptedMediaDrafts: Map<string, EncryptedMediaAttachmentDescriptorV1>,
+  encryptedMediaDescriptors: Map<string, EncryptedMediaAttachmentDescriptorV1>,
+  session: CryptoRuntimeSession,
+  input: EncryptedDirectMessageV2MutationInput,
+): Promise<EncryptedDirectMessageV2OutboundSendResult> {
+  const supportError = assertSupport(dependencies);
+  if (supportError !== null) {
+    throw new Error(
+      supportError.errorMessage ??
+        "Текущий browser runtime не поддерживает encrypted DM v2 mutation send.",
+    );
+  }
+
+  const normalizedChatId = input.chatId.trim();
+  if (normalizedChatId === "") {
+    throw new Error("Не выбран direct chat для encrypted DM v2 mutation.");
+  }
+
+  const localMaterial = await dependencies.keyStore.load(session.profileId);
+  if (localMaterial === null || localMaterial.record.status !== "active") {
+    throw new Error(
+      "Encrypted DM v2 mutation доступен только для browser profile с active local crypto-device.",
+    );
+  }
+  const localBundle = await dependencies.materialFactory.buildBundle(localMaterial);
+  if (localBundle.signedPrekeyPublicBase64.trim() === "") {
+    throw new Error(
+      "Текущий local crypto-device не имеет signed prekey для server-backed self-delivery.",
+    );
+  }
+
+  const sendBootstrap =
+    await dependencies.gatewayClient.getEncryptedDirectMessageV2SendBootstrap(
+      session.token,
+      normalizedChatId,
+      localMaterial.record.cryptoDeviceId,
+    );
+  const targetDevices = [
+    {
+      cryptoDeviceId: localMaterial.record.cryptoDeviceId,
+      signedPrekeyPublicBase64: localBundle.signedPrekeyPublicBase64,
+    },
+    ...sendBootstrap.senderOtherDevices.map((device) => ({
+      cryptoDeviceId: device.cryptoDeviceId,
+      signedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
+    })),
+    ...sendBootstrap.recipientDevices.map((device) => ({
+      cryptoDeviceId: device.cryptoDeviceId,
+      signedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
+    })),
+  ];
+  if (targetDevices.length === 0) {
+    throw new Error("Encrypted DM v2 send bootstrap не вернул target crypto-device roster.");
+  }
+
+  const normalizedReplyToMessageId =
+    input.kind === "tombstone"
+      ? null
+      : normalizeOptionalMessageId(input.replyToMessageId ?? null);
+  const normalizedAttachmentDrafts =
+    input.kind === "tombstone"
+      ? []
+      : normalizeEncryptedAttachmentDraftInputs(input.attachmentDrafts);
+  const attachmentDescriptors =
+    input.kind === "tombstone"
+      ? []
+      : resolveEncryptedMediaAttachmentDescriptors(
+          encryptedMediaDrafts,
+          normalizedAttachmentDrafts,
+        );
+  const normalizedText =
+    input.kind === "tombstone" ? "" : normalizeEncryptedMutationText(input.text);
+  if (
+    input.kind !== "tombstone" &&
+    normalizedText === "" &&
+    attachmentDescriptors.length === 0
+  ) {
+    throw new Error(
+      "Encrypted DM v2 mutation требует text payload или хотя бы один encrypted attachment descriptor.",
+    );
+  }
+
+  const operationKind =
+    input.kind === "content"
+      ? "content"
+      : input.kind === "edit"
+        ? "edit"
+        : "tombstone";
+  const targetMessageId =
+    input.kind === "content"
+      ? null
+      : normalizeRequiredMessageId(input.targetMessageId, "target encrypted DM v2 message");
+  const revision = input.kind === "content" ? 1 : normalizeNextRevision(input.nextRevision);
+  const messageId = createLogicalMessageId();
+  const createdAt = new Date().toISOString();
+
+  let payload: EncryptedDirectMessageV2PayloadV1;
+  if (input.kind === "tombstone") {
+    payload = {
+      schema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
+      operation: "tombstone",
+      deletedAt: createdAt,
+    };
+  } else if (input.kind === "edit") {
+    payload = {
+      schema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
+      operation: "edit",
+      replyToMessageId: normalizedReplyToMessageId,
+      message: {
+        text: normalizedText === "" ? null : normalizedText,
+        markdownPolicy:
+          normalizedText === "" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        attachments: attachmentDescriptors,
+      },
+      editedAt: createdAt,
+    };
+  } else {
+    payload = {
+      schema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
+      operation: "content",
+      replyToMessageId: normalizedReplyToMessageId,
+      message: {
+        text: normalizedText === "" ? null : normalizedText,
+        markdownPolicy:
+          normalizedText === "" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        attachments: attachmentDescriptors,
+      },
+    };
+  }
+
+  const deliveries = await Promise.all(
+    targetDevices.map(async (device) => {
+      if (device.signedPrekeyPublicBase64.trim() === "") {
+        throw new Error(
+          `Active target crypto-device ${device.cryptoDeviceId} не имеет public signed prekey для bootstrap send.`,
+        );
+      }
+
+      const encrypted = await encryptEncryptedDirectMessageV2Payload({
+        recipientSignedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
+        metadata: {
+          messageId,
+          chatId: normalizedChatId,
+          senderUserId: session.profileId,
+          senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
+          operationKind,
+          targetMessageId,
+          revision,
+          createdAt,
+          recipientCryptoDeviceId: device.cryptoDeviceId,
+        },
+        payload,
+      });
+
+      return {
+        recipientCryptoDeviceId: device.cryptoDeviceId,
+        transportHeader: encrypted.transportHeader,
+        ciphertext: encrypted.ciphertext,
+      };
+    }),
+  );
+
+  const storedEnvelope = await dependencies.gatewayClient.sendEncryptedDirectMessageV2(
+    session.token,
+    {
+      chatId: normalizedChatId,
+      messageId,
+      senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
+      operationKind,
+      targetMessageId,
+      revision,
+      deliveries,
+    },
+  );
+
+  for (const descriptor of attachmentDescriptors) {
+    cacheEncryptedMediaDescriptor(encryptedMediaDescriptors, descriptor);
+    encryptedMediaDrafts.delete(
+      normalizedAttachmentDrafts.find(
+        (draft) => draft.attachmentId === descriptor.attachmentId,
+      )?.draftId ?? "",
+    );
+  }
+
+  return {
+    storedEnvelope,
+    localProjection: {
+      status: "ready",
+      messageId: storedEnvelope.messageId,
+      chatId: storedEnvelope.chatId,
+      senderUserId: storedEnvelope.senderUserId,
+      senderCryptoDeviceId: storedEnvelope.senderCryptoDeviceId,
+      operationKind,
+      targetMessageId,
+      replyToMessageId: normalizedReplyToMessageId,
+      revision: storedEnvelope.revision,
+      createdAt: storedEnvelope.createdAt,
+      storedAt: storedEnvelope.storedAt,
+      payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
+      text: input.kind === "tombstone" ? null : normalizedText === "" ? null : normalizedText,
+      markdownPolicy:
+        input.kind === "tombstone" || normalizedText === ""
+          ? null
+          : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      attachments: attachmentDescriptors.map(stripEncryptedMediaAttachmentDescriptor),
+      editedAt: input.kind === "edit" ? createdAt : null,
+      deletedAt: input.kind === "tombstone" ? createdAt : null,
+    },
+  };
+}
+
+async function sendEncryptedGroupMutation(
+  dependencies: RuntimeDependencies,
+  session: CryptoRuntimeSession,
+  input: EncryptedGroupMutationInput,
+): Promise<EncryptedGroupOutboundSendResult> {
+  const supportError = assertSupport(dependencies);
+  if (supportError !== null) {
+    throw new Error(
+      supportError.errorMessage ??
+        "Текущий browser runtime не поддерживает encrypted group mutation send.",
+    );
+  }
+
+  const normalizedGroupId = input.groupId.trim();
+  if (normalizedGroupId === "") {
+    throw new Error("Не выбрана группа для encrypted group mutation.");
+  }
+
+  const localMaterial = await dependencies.keyStore.load(session.profileId);
+  if (localMaterial === null || localMaterial.record.status !== "active") {
+    throw new Error(
+      "Encrypted group mutation доступен только для browser profile с active local crypto-device.",
+    );
+  }
+
+  const bootstrap = await dependencies.gatewayClient.getEncryptedGroupBootstrap(
+    session.token,
+    normalizedGroupId,
+    localMaterial.record.cryptoDeviceId,
+  );
+  if (
+    bootstrap.lane.threadId.trim() === "" ||
+    bootstrap.lane.mlsGroupId.trim() === "" ||
+    bootstrap.lane.rosterVersion <= 0
+  ) {
+    throw new Error(
+      "Encrypted group bootstrap вернул неполный control-plane state для outbound mutation.",
+    );
+  }
+  const targetDevices = bootstrap.rosterDevices.map((device) => ({
+    cryptoDeviceId: device.cryptoDeviceId,
+    signedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
+  }));
+  if (targetDevices.length === 0) {
+    throw new Error(
+      "Encrypted group bootstrap не вернул eligible crypto-device roster для send.",
+    );
+  }
+  if (
+    !targetDevices.some(
+      (device) => device.cryptoDeviceId === localMaterial.record.cryptoDeviceId,
+    )
+  ) {
+    throw new Error(
+      "Текущий local crypto-device не попал в encrypted group roster и не может отправить bootstrap payload.",
+    );
+  }
+  for (const targetDevice of targetDevices) {
+    if (targetDevice.signedPrekeyPublicBase64.trim() === "") {
+      throw new Error(
+        `Active group crypto-device ${targetDevice.cryptoDeviceId} не имеет signed prekey для bootstrap send.`,
+      );
+    }
+  }
+
+  const normalizedReplyToMessageId =
+    input.kind === "tombstone"
+      ? null
+      : normalizeOptionalMessageId(input.replyToMessageId ?? null);
+  const normalizedText =
+    input.kind === "tombstone" ? "" : normalizeEncryptedMutationText(input.text);
+  if (input.kind !== "tombstone" && normalizedText === "") {
+    throw new Error(
+      "Encrypted group mutation требует text payload внутри crypto runtime.",
+    );
+  }
+
+  const operationKind =
+    input.kind === "content"
+      ? "content"
+      : input.kind === "edit"
+        ? "edit"
+        : "tombstone";
+  const targetMessageId =
+    input.kind === "content"
+      ? null
+      : normalizeRequiredMessageId(input.targetMessageId, "target encrypted group message");
+  const revision = input.kind === "content" ? 1 : normalizeNextRevision(input.nextRevision);
+  const messageId = createLogicalMessageId();
+  const createdAt = new Date().toISOString();
+  let payload: EncryptedGroupPayloadV1;
+  if (input.kind === "tombstone") {
+    payload = {
+      schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+      operation: "tombstone",
+      deletedAt: createdAt,
+    };
+  } else if (input.kind === "edit") {
+    payload = {
+      schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+      operation: "edit",
+      replyToMessageId: normalizedReplyToMessageId,
+      message: {
+        text: normalizedText,
+        markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      },
+      editedAt: createdAt,
+    };
+  } else {
+    payload = {
+      schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+      operation: "content",
+      replyToMessageId: normalizedReplyToMessageId,
+      message: {
+        text: normalizedText,
+        markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      },
+    };
+  }
+
+  const encrypted = await encryptEncryptedGroupPayload({
+    recipientDevices: targetDevices,
+    metadata: {
+      messageId,
+      groupId: normalizedGroupId,
+      threadId: bootstrap.lane.threadId,
+      mlsGroupId: bootstrap.lane.mlsGroupId,
+      rosterVersion: bootstrap.lane.rosterVersion,
+      senderUserId: session.profileId,
+      senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
+      operationKind,
+      targetMessageId,
+      revision,
+      createdAt,
+    },
+    payload,
+  });
+
+  const storedEnvelope = await dependencies.gatewayClient.sendEncryptedGroupMessage(
+    session.token,
+    {
+      groupId: normalizedGroupId,
+      messageId,
+      mlsGroupId: bootstrap.lane.mlsGroupId,
+      rosterVersion: bootstrap.lane.rosterVersion,
+      senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
+      operationKind,
+      targetMessageId,
+      revision,
+      ciphertext: encrypted.ciphertext,
+    },
+  );
+
+  return {
+    storedEnvelope,
+    localProjection: {
+      status: "ready",
+      messageId: storedEnvelope.messageId,
+      groupId: storedEnvelope.groupId,
+      threadId: storedEnvelope.threadId,
+      mlsGroupId: storedEnvelope.mlsGroupId,
+      rosterVersion: storedEnvelope.rosterVersion,
+      senderUserId: storedEnvelope.senderUserId,
+      senderCryptoDeviceId: storedEnvelope.senderCryptoDeviceId,
+      operationKind,
+      targetMessageId,
+      replyToMessageId: normalizedReplyToMessageId,
+      revision: storedEnvelope.revision,
+      createdAt: storedEnvelope.createdAt,
+      storedAt: storedEnvelope.storedAt,
+      payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+      text: input.kind === "tombstone" ? null : normalizedText,
+      markdownPolicy:
+        input.kind === "tombstone" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      editedAt: input.kind === "edit" ? createdAt : null,
+      deletedAt: input.kind === "tombstone" ? createdAt : null,
+    },
+  };
+}
+
+function normalizeEncryptedMutationText(value: string): string {
+  return value.trim();
+}
+
+function normalizeOptionalMessageId(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized === "" ? null : normalized;
+}
+
+function normalizeRequiredMessageId(value: string, label: string): string {
+  const normalized = value.trim();
+  if (normalized === "") {
+    throw new Error(`${label} обязателен для encrypted mutation.`);
+  }
+
+  return normalized;
+}
+
+function normalizeNextRevision(value: number): number {
+  if (!Number.isInteger(value) || value <= 1) {
+    throw new Error("Encrypted mutation должна публиковаться с next revision больше 1.");
+  }
+
+  return value;
 }
 
 function stripEncryptedMediaAttachmentDescriptor(

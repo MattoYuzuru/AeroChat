@@ -346,6 +346,7 @@ function patchGroupFromMessage(
       kind: "CHAT_KIND_GROUP",
       selfRole: "member",
       memberCount: 0,
+      encryptedPinnedMessageIds: [],
       unreadCount:
         reason === "message_created" && message.senderUserId !== currentUserId ? 1 : 0,
       permissions: {

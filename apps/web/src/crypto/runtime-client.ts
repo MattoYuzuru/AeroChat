@@ -110,8 +110,32 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
         input,
       });
     },
+    sendEncryptedDirectMessageV2Edit(session, input) {
+      return sendCommand("sendEncryptedDirectMessageV2Edit", {
+        session,
+        input,
+      });
+    },
+    sendEncryptedDirectMessageV2Tombstone(session, input) {
+      return sendCommand("sendEncryptedDirectMessageV2Tombstone", {
+        session,
+        input,
+      });
+    },
     sendEncryptedGroupContent(session, input) {
       return sendCommand("sendEncryptedGroupContent", {
+        session,
+        input,
+      });
+    },
+    sendEncryptedGroupEdit(session, input) {
+      return sendCommand("sendEncryptedGroupEdit", {
+        session,
+        input,
+      });
+    },
+    sendEncryptedGroupTombstone(session, input) {
+      return sendCommand("sendEncryptedGroupTombstone", {
         session,
         input,
       });

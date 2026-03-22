@@ -100,6 +100,7 @@ export interface EncryptedDirectMessageV2ReadyProjection {
   senderCryptoDeviceId: string;
   operationKind: "content" | "edit" | "tombstone";
   targetMessageId: string | null;
+  replyToMessageId: string | null;
   revision: number;
   createdAt: string;
   storedAt: string;
@@ -148,6 +149,7 @@ export interface EncryptedGroupReadyProjection {
   senderCryptoDeviceId: string;
   operationKind: "content" | "edit" | "tombstone";
   targetMessageId: string | null;
+  replyToMessageId: string | null;
   revision: number;
   createdAt: string;
   storedAt: string;
@@ -233,10 +235,33 @@ export interface CryptoRuntimeClient {
     input: {
       chatId: string;
       text: string;
+      replyToMessageId?: string | null;
       attachmentDrafts?: Array<{
         draftId: string;
         attachmentId: string;
       }>;
+    },
+  ): Promise<EncryptedDirectMessageV2OutboundSendResult>;
+  sendEncryptedDirectMessageV2Edit(
+    session: CryptoRuntimeSession,
+    input: {
+      chatId: string;
+      targetMessageId: string;
+      nextRevision: number;
+      text: string;
+      replyToMessageId?: string | null;
+      attachmentDrafts?: Array<{
+        draftId: string;
+        attachmentId: string;
+      }>;
+    },
+  ): Promise<EncryptedDirectMessageV2OutboundSendResult>;
+  sendEncryptedDirectMessageV2Tombstone(
+    session: CryptoRuntimeSession,
+    input: {
+      chatId: string;
+      targetMessageId: string;
+      nextRevision: number;
     },
   ): Promise<EncryptedDirectMessageV2OutboundSendResult>;
   sendEncryptedGroupContent(
@@ -244,6 +269,25 @@ export interface CryptoRuntimeClient {
     input: {
       groupId: string;
       text: string;
+      replyToMessageId?: string | null;
+    },
+  ): Promise<EncryptedGroupOutboundSendResult>;
+  sendEncryptedGroupEdit(
+    session: CryptoRuntimeSession,
+    input: {
+      groupId: string;
+      targetMessageId: string;
+      nextRevision: number;
+      text: string;
+      replyToMessageId?: string | null;
+    },
+  ): Promise<EncryptedGroupOutboundSendResult>;
+  sendEncryptedGroupTombstone(
+    session: CryptoRuntimeSession,
+    input: {
+      groupId: string;
+      targetMessageId: string;
+      nextRevision: number;
     },
   ): Promise<EncryptedGroupOutboundSendResult>;
   dispose(): void;
@@ -282,10 +326,33 @@ export interface CryptoWorkerRequestMap {
     input: {
       chatId: string;
       text: string;
+      replyToMessageId?: string | null;
       attachmentDrafts?: Array<{
         draftId: string;
         attachmentId: string;
       }>;
+    };
+  };
+  sendEncryptedDirectMessageV2Edit: {
+    session: CryptoRuntimeSession;
+    input: {
+      chatId: string;
+      targetMessageId: string;
+      nextRevision: number;
+      text: string;
+      replyToMessageId?: string | null;
+      attachmentDrafts?: Array<{
+        draftId: string;
+        attachmentId: string;
+      }>;
+    };
+  };
+  sendEncryptedDirectMessageV2Tombstone: {
+    session: CryptoRuntimeSession;
+    input: {
+      chatId: string;
+      targetMessageId: string;
+      nextRevision: number;
     };
   };
   sendEncryptedGroupContent: {
@@ -293,6 +360,25 @@ export interface CryptoWorkerRequestMap {
     input: {
       groupId: string;
       text: string;
+      replyToMessageId?: string | null;
+    };
+  };
+  sendEncryptedGroupEdit: {
+    session: CryptoRuntimeSession;
+    input: {
+      groupId: string;
+      targetMessageId: string;
+      nextRevision: number;
+      text: string;
+      replyToMessageId?: string | null;
+    };
+  };
+  sendEncryptedGroupTombstone: {
+    session: CryptoRuntimeSession;
+    input: {
+      groupId: string;
+      targetMessageId: string;
+      nextRevision: number;
     };
   };
 }
@@ -307,7 +393,11 @@ export interface CryptoWorkerResultMap {
   prepareEncryptedMediaRelayUpload: PreparedEncryptedMediaRelayUpload;
   decryptEncryptedMediaAttachment: DecryptedEncryptedMediaAttachment;
   sendEncryptedDirectMessageV2Content: EncryptedDirectMessageV2OutboundSendResult;
+  sendEncryptedDirectMessageV2Edit: EncryptedDirectMessageV2OutboundSendResult;
+  sendEncryptedDirectMessageV2Tombstone: EncryptedDirectMessageV2OutboundSendResult;
   sendEncryptedGroupContent: EncryptedGroupOutboundSendResult;
+  sendEncryptedGroupEdit: EncryptedGroupOutboundSendResult;
+  sendEncryptedGroupTombstone: EncryptedGroupOutboundSendResult;
 }
 
 export type CryptoWorkerRequest =
@@ -354,8 +444,28 @@ export type CryptoWorkerRequest =
     }
   | {
       id: number;
+      type: "sendEncryptedDirectMessageV2Edit";
+      payload: CryptoWorkerRequestMap["sendEncryptedDirectMessageV2Edit"];
+    }
+  | {
+      id: number;
+      type: "sendEncryptedDirectMessageV2Tombstone";
+      payload: CryptoWorkerRequestMap["sendEncryptedDirectMessageV2Tombstone"];
+    }
+  | {
+      id: number;
       type: "sendEncryptedGroupContent";
       payload: CryptoWorkerRequestMap["sendEncryptedGroupContent"];
+    }
+  | {
+      id: number;
+      type: "sendEncryptedGroupEdit";
+      payload: CryptoWorkerRequestMap["sendEncryptedGroupEdit"];
+    }
+  | {
+      id: number;
+      type: "sendEncryptedGroupTombstone";
+      payload: CryptoWorkerRequestMap["sendEncryptedGroupTombstone"];
     };
 
 export type CryptoWorkerResponse =

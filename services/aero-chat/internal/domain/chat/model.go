@@ -13,6 +13,8 @@ const (
 	EncryptedDirectMessageV2OperationTombstone       = "tombstone"
 	EncryptedGroupMessageOperationContent            = "content"
 	EncryptedGroupMessageOperationControl            = "control"
+	EncryptedGroupMessageOperationEdit               = "edit"
+	EncryptedGroupMessageOperationTombstone          = "tombstone"
 	MarkdownPolicySafeSubsetV1                       = "safe_subset_v1"
 	AttachmentScopeDirect                            = "direct"
 	AttachmentScopeGroup                             = "group"
@@ -149,27 +151,29 @@ type SessionAuth struct {
 }
 
 type DirectChat struct {
-	ID               string
-	Kind             string
-	Participants     []UserSummary
-	PinnedMessageIDs []string
-	UnreadCount      int32
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                        string
+	Kind                      string
+	Participants              []UserSummary
+	PinnedMessageIDs          []string
+	EncryptedPinnedMessageIDs []string
+	UnreadCount               int32
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 }
 
 type Group struct {
-	ID                  string
-	Name                string
-	Kind                string
-	CreatedByUserID     string
-	SelfRole            string
-	SelfPermissions     GroupPermissions
-	SelfWriteRestricted bool
-	MemberCount         int32
-	UnreadCount         int32
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID                        string
+	Name                      string
+	Kind                      string
+	CreatedByUserID           string
+	SelfRole                  string
+	SelfPermissions           GroupPermissions
+	SelfWriteRestricted       bool
+	MemberCount               int32
+	EncryptedPinnedMessageIDs []string
+	UnreadCount               int32
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 }
 
 type GroupPermissions struct {

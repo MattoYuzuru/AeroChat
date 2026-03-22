@@ -252,17 +252,22 @@ func (r *Repository) ListGroups(ctx context.Context, userID string) ([]chat.Grou
 
 	result := make([]chat.Group, 0, len(rows))
 	for _, row := range rows {
+		encryptedPinnedIDs, err := r.queries.ListEncryptedPinnedMessageIDsByGroupID(ctx, row.ID)
+		if err != nil {
+			return nil, convertError(err)
+		}
 		result = append(result, chat.Group{
-			ID:                  row.ID.String(),
-			Name:                row.Name,
-			Kind:                chat.ChatKindGroup,
-			CreatedByUserID:     row.CreatedByUserID.String(),
-			SelfRole:            row.SelfRole,
-			SelfWriteRestricted: row.SelfIsWriteRestricted,
-			MemberCount:         row.MemberCount,
-			UnreadCount:         row.UnreadCount,
-			CreatedAt:           timestampValue(row.CreatedAt),
-			UpdatedAt:           timestampValue(row.UpdatedAt),
+			ID:                        row.ID.String(),
+			Name:                      row.Name,
+			Kind:                      chat.ChatKindGroup,
+			CreatedByUserID:           row.CreatedByUserID.String(),
+			SelfRole:                  row.SelfRole,
+			SelfWriteRestricted:       row.SelfIsWriteRestricted,
+			MemberCount:               row.MemberCount,
+			EncryptedPinnedMessageIDs: uuidSliceToStrings(encryptedPinnedIDs),
+			UnreadCount:               row.UnreadCount,
+			CreatedAt:                 timestampValue(row.CreatedAt),
+			UpdatedAt:                 timestampValue(row.UpdatedAt),
 		})
 	}
 
@@ -277,18 +282,23 @@ func (r *Repository) GetGroup(ctx context.Context, userID string, groupID string
 	if err != nil {
 		return nil, convertError(err)
 	}
+	encryptedPinnedIDs, err := r.queries.ListEncryptedPinnedMessageIDsByGroupID(ctx, row.ID)
+	if err != nil {
+		return nil, convertError(err)
+	}
 
 	group := &chat.Group{
-		ID:                  row.ID.String(),
-		Name:                row.Name,
-		Kind:                chat.ChatKindGroup,
-		CreatedByUserID:     row.CreatedByUserID.String(),
-		SelfRole:            row.SelfRole,
-		SelfWriteRestricted: row.SelfIsWriteRestricted,
-		MemberCount:         row.MemberCount,
-		UnreadCount:         row.UnreadCount,
-		CreatedAt:           timestampValue(row.CreatedAt),
-		UpdatedAt:           timestampValue(row.UpdatedAt),
+		ID:                        row.ID.String(),
+		Name:                      row.Name,
+		Kind:                      chat.ChatKindGroup,
+		CreatedByUserID:           row.CreatedByUserID.String(),
+		SelfRole:                  row.SelfRole,
+		SelfWriteRestricted:       row.SelfIsWriteRestricted,
+		MemberCount:               row.MemberCount,
+		EncryptedPinnedMessageIDs: uuidSliceToStrings(encryptedPinnedIDs),
+		UnreadCount:               row.UnreadCount,
+		CreatedAt:                 timestampValue(row.CreatedAt),
+		UpdatedAt:                 timestampValue(row.UpdatedAt),
 	}
 	return group, nil
 }
@@ -1556,6 +1566,28 @@ func (r *Repository) GetEncryptedDirectMessageV2(ctx context.Context, userID str
 	}, nil
 }
 
+func (r *Repository) GetEncryptedDirectMessageV2Stored(ctx context.Context, chatID string, messageID string) (*chat.EncryptedDirectMessageV2StoredEnvelope, error) {
+	row, err := r.queries.GetDirectChatEncryptedMessageV2Stored(ctx, chatsqlc.GetDirectChatEncryptedMessageV2StoredParams{
+		ChatID: mustParseUUID(chatID),
+		ID:     mustParseUUID(messageID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	return &chat.EncryptedDirectMessageV2StoredEnvelope{
+		MessageID:            row.ID.String(),
+		ChatID:               row.ChatID.String(),
+		SenderUserID:         row.SenderUserID.String(),
+		SenderCryptoDeviceID: row.SenderCryptoDeviceID.String(),
+		OperationKind:        row.OperationKind,
+		TargetMessageID:      uuidPointerString(row.TargetMessageID),
+		Revision:             uint32(row.Revision),
+		CreatedAt:            timestampValue(row.CreatedAt),
+		StoredAt:             timestampValue(row.StoredAt),
+	}, nil
+}
+
 func (r *Repository) ListEncryptedGroupMessages(ctx context.Context, userID string, groupID string, viewerCryptoDeviceID string, limit int32) ([]chat.EncryptedGroupEnvelope, error) {
 	rows, err := r.queries.ListEncryptedGroupMessagesByDevice(ctx, chatsqlc.ListEncryptedGroupMessagesByDeviceParams{
 		UserID:                  mustParseUUID(userID),
@@ -1588,6 +1620,31 @@ func (r *Repository) GetEncryptedGroupMessage(ctx context.Context, userID string
 
 	envelope := toDomainEncryptedGroupEnvelopeFromGet(row)
 	return &envelope, nil
+}
+
+func (r *Repository) GetEncryptedGroupStoredMessage(ctx context.Context, groupID string, messageID string) (*chat.EncryptedGroupStoredEnvelope, error) {
+	row, err := r.queries.GetEncryptedGroupStoredMessage(ctx, chatsqlc.GetEncryptedGroupStoredMessageParams{
+		GroupID: mustParseUUID(groupID),
+		ID:      mustParseUUID(messageID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	return &chat.EncryptedGroupStoredEnvelope{
+		MessageID:            row.ID.String(),
+		GroupID:              row.GroupID.String(),
+		ThreadID:             row.ThreadID.String(),
+		MLSGroupID:           row.MlsGroupID.String(),
+		RosterVersion:        uint64(row.RosterVersion),
+		SenderUserID:         row.SenderUserID.String(),
+		SenderCryptoDeviceID: row.SenderCryptoDeviceID.String(),
+		OperationKind:        row.OperationKind,
+		TargetMessageID:      uuidPointerString(row.TargetMessageID),
+		Revision:             uint32(row.Revision),
+		CreatedAt:            timestampValue(row.CreatedAt),
+		StoredAt:             timestampValue(row.StoredAt),
+	}, nil
 }
 
 func (r *Repository) SearchDirectMessages(ctx context.Context, userID string, params chat.SearchDirectMessagesParams) ([]chat.MessageSearchResult, error) {
@@ -1928,6 +1985,190 @@ func (r *Repository) UnpinDirectChatMessage(ctx context.Context, chatID string, 
 	return true, nil
 }
 
+func (r *Repository) PinEncryptedDirectMessageV2(ctx context.Context, chatID string, messageID string, pinnedByUserID string, at time.Time) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	affected, err := q.PinEncryptedDirectMessageV2(ctx, chatsqlc.PinEncryptedDirectMessageV2Params{
+		ChatID:         mustParseUUID(chatID),
+		MessageID:      mustParseUUID(messageID),
+		PinnedByUserID: mustParseUUID(pinnedByUserID),
+		CreatedAt:      timestamptzValue(at),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchDirectChatUpdatedAt(ctx, chatsqlc.TouchDirectChatUpdatedAtParams{
+		ID:        mustParseUUID(chatID),
+		UpdatedAt: timestamptzValue(at),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return true, nil
+}
+
+func (r *Repository) UnpinEncryptedDirectMessageV2(ctx context.Context, chatID string, messageID string) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	affected, err := q.UnpinEncryptedDirectMessageV2(ctx, chatsqlc.UnpinEncryptedDirectMessageV2Params{
+		ChatID:    mustParseUUID(chatID),
+		MessageID: mustParseUUID(messageID),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	now := time.Now().UTC()
+	if err := q.TouchDirectChatUpdatedAt(ctx, chatsqlc.TouchDirectChatUpdatedAtParams{
+		ID:        mustParseUUID(chatID),
+		UpdatedAt: timestamptzValue(now),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return true, nil
+}
+
+func (r *Repository) PinEncryptedGroupMessage(ctx context.Context, groupID string, messageID string, pinnedByUserID string, at time.Time) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	messageRow, err := q.GetEncryptedGroupStoredMessage(ctx, chatsqlc.GetEncryptedGroupStoredMessageParams{
+		GroupID: mustParseUUID(groupID),
+		ID:      mustParseUUID(messageID),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	affected, err := q.PinEncryptedGroupMessage(ctx, chatsqlc.PinEncryptedGroupMessageParams{
+		GroupID:        mustParseUUID(groupID),
+		MessageID:      mustParseUUID(messageID),
+		PinnedByUserID: mustParseUUID(pinnedByUserID),
+		CreatedAt:      timestamptzValue(at),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	if err := q.TouchGroupThreadUpdatedAt(ctx, chatsqlc.TouchGroupThreadUpdatedAtParams{
+		ID:        messageRow.ThreadID,
+		UpdatedAt: timestamptzValue(at),
+	}); err != nil {
+		return false, convertError(err)
+	}
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(groupID),
+		UpdatedAt: timestamptzValue(at),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return true, nil
+}
+
+func (r *Repository) UnpinEncryptedGroupMessage(ctx context.Context, groupID string, messageID string) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	messageRow, err := q.GetEncryptedGroupStoredMessage(ctx, chatsqlc.GetEncryptedGroupStoredMessageParams{
+		GroupID: mustParseUUID(groupID),
+		ID:      mustParseUUID(messageID),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	affected, err := q.UnpinEncryptedGroupMessage(ctx, chatsqlc.UnpinEncryptedGroupMessageParams{
+		GroupID:   mustParseUUID(groupID),
+		MessageID: mustParseUUID(messageID),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected == 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return false, fmt.Errorf("commit tx: %w", err)
+		}
+		return false, nil
+	}
+
+	now := time.Now().UTC()
+	if err := q.TouchGroupThreadUpdatedAt(ctx, chatsqlc.TouchGroupThreadUpdatedAtParams{
+		ID:        messageRow.ThreadID,
+		UpdatedAt: timestamptzValue(now),
+	}); err != nil {
+		return false, convertError(err)
+	}
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(groupID),
+		UpdatedAt: timestamptzValue(now),
+	}); err != nil {
+		return false, convertError(err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return true, nil
+}
+
 type listChatRow struct {
 	ChatID               uuid.UUID
 	ChatCreatedAt        pgtype.Timestamptz
@@ -1989,15 +2230,21 @@ func (r *Repository) collectChats(ctx context.Context, rows []listChatRow) ([]ch
 				return nil, convertError(err)
 			}
 			result = append(result, chat.DirectChat{
-				ID:               chatID,
-				Kind:             chat.ChatKindDirect,
-				Participants:     make([]chat.UserSummary, 0, 2),
-				PinnedMessageIDs: uuidSliceToStrings(pinnedIDs),
-				UnreadCount:      row.UnreadCount,
-				CreatedAt:        timestampValue(row.ChatCreatedAt),
-				UpdatedAt:        timestampValue(row.ChatUpdatedAt),
+				ID:                        chatID,
+				Kind:                      chat.ChatKindDirect,
+				Participants:              make([]chat.UserSummary, 0, 2),
+				PinnedMessageIDs:          uuidSliceToStrings(pinnedIDs),
+				EncryptedPinnedMessageIDs: nil,
+				UnreadCount:               row.UnreadCount,
+				CreatedAt:                 timestampValue(row.ChatCreatedAt),
+				UpdatedAt:                 timestampValue(row.ChatUpdatedAt),
 			})
 			index = len(result) - 1
+			encryptedPinnedIDs, err := r.queries.ListEncryptedPinnedMessageIDsByChatID(ctx, row.ChatID)
+			if err != nil {
+				return nil, convertError(err)
+			}
+			result[index].EncryptedPinnedMessageIDs = uuidSliceToStrings(encryptedPinnedIDs)
 			byID[chatID] = index
 		}
 

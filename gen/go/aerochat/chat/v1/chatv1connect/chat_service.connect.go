@@ -171,6 +171,18 @@ const (
 	// ChatServiceUnpinMessageProcedure is the fully-qualified name of the ChatService's UnpinMessage
 	// RPC.
 	ChatServiceUnpinMessageProcedure = "/aerochat.chat.v1.ChatService/UnpinMessage"
+	// ChatServicePinEncryptedDirectMessageV2Procedure is the fully-qualified name of the ChatService's
+	// PinEncryptedDirectMessageV2 RPC.
+	ChatServicePinEncryptedDirectMessageV2Procedure = "/aerochat.chat.v1.ChatService/PinEncryptedDirectMessageV2"
+	// ChatServiceUnpinEncryptedDirectMessageV2Procedure is the fully-qualified name of the
+	// ChatService's UnpinEncryptedDirectMessageV2 RPC.
+	ChatServiceUnpinEncryptedDirectMessageV2Procedure = "/aerochat.chat.v1.ChatService/UnpinEncryptedDirectMessageV2"
+	// ChatServicePinEncryptedGroupMessageProcedure is the fully-qualified name of the ChatService's
+	// PinEncryptedGroupMessage RPC.
+	ChatServicePinEncryptedGroupMessageProcedure = "/aerochat.chat.v1.ChatService/PinEncryptedGroupMessage"
+	// ChatServiceUnpinEncryptedGroupMessageProcedure is the fully-qualified name of the ChatService's
+	// UnpinEncryptedGroupMessage RPC.
+	ChatServiceUnpinEncryptedGroupMessageProcedure = "/aerochat.chat.v1.ChatService/UnpinEncryptedGroupMessage"
 )
 
 // ChatServiceClient is a client for the aerochat.chat.v1.ChatService service.
@@ -223,6 +235,10 @@ type ChatServiceClient interface {
 	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
 	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
 	UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error)
+	PinEncryptedDirectMessageV2(context.Context, *connect.Request[v1.PinEncryptedDirectMessageV2Request]) (*connect.Response[v1.PinEncryptedDirectMessageV2Response], error)
+	UnpinEncryptedDirectMessageV2(context.Context, *connect.Request[v1.UnpinEncryptedDirectMessageV2Request]) (*connect.Response[v1.UnpinEncryptedDirectMessageV2Response], error)
+	PinEncryptedGroupMessage(context.Context, *connect.Request[v1.PinEncryptedGroupMessageRequest]) (*connect.Response[v1.PinEncryptedGroupMessageResponse], error)
+	UnpinEncryptedGroupMessage(context.Context, *connect.Request[v1.UnpinEncryptedGroupMessageRequest]) (*connect.Response[v1.UnpinEncryptedGroupMessageResponse], error)
 }
 
 // NewChatServiceClient constructs a client for the aerochat.chat.v1.ChatService service. By
@@ -524,6 +540,30 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("UnpinMessage")),
 			connect.WithClientOptions(opts...),
 		),
+		pinEncryptedDirectMessageV2: connect.NewClient[v1.PinEncryptedDirectMessageV2Request, v1.PinEncryptedDirectMessageV2Response](
+			httpClient,
+			baseURL+ChatServicePinEncryptedDirectMessageV2Procedure,
+			connect.WithSchema(chatServiceMethods.ByName("PinEncryptedDirectMessageV2")),
+			connect.WithClientOptions(opts...),
+		),
+		unpinEncryptedDirectMessageV2: connect.NewClient[v1.UnpinEncryptedDirectMessageV2Request, v1.UnpinEncryptedDirectMessageV2Response](
+			httpClient,
+			baseURL+ChatServiceUnpinEncryptedDirectMessageV2Procedure,
+			connect.WithSchema(chatServiceMethods.ByName("UnpinEncryptedDirectMessageV2")),
+			connect.WithClientOptions(opts...),
+		),
+		pinEncryptedGroupMessage: connect.NewClient[v1.PinEncryptedGroupMessageRequest, v1.PinEncryptedGroupMessageResponse](
+			httpClient,
+			baseURL+ChatServicePinEncryptedGroupMessageProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("PinEncryptedGroupMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		unpinEncryptedGroupMessage: connect.NewClient[v1.UnpinEncryptedGroupMessageRequest, v1.UnpinEncryptedGroupMessageResponse](
+			httpClient,
+			baseURL+ChatServiceUnpinEncryptedGroupMessageProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("UnpinEncryptedGroupMessage")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -577,6 +617,10 @@ type chatServiceClient struct {
 	deleteMessageForEveryone                 *connect.Client[v1.DeleteMessageForEveryoneRequest, v1.DeleteMessageForEveryoneResponse]
 	pinMessage                               *connect.Client[v1.PinMessageRequest, v1.PinMessageResponse]
 	unpinMessage                             *connect.Client[v1.UnpinMessageRequest, v1.UnpinMessageResponse]
+	pinEncryptedDirectMessageV2              *connect.Client[v1.PinEncryptedDirectMessageV2Request, v1.PinEncryptedDirectMessageV2Response]
+	unpinEncryptedDirectMessageV2            *connect.Client[v1.UnpinEncryptedDirectMessageV2Request, v1.UnpinEncryptedDirectMessageV2Response]
+	pinEncryptedGroupMessage                 *connect.Client[v1.PinEncryptedGroupMessageRequest, v1.PinEncryptedGroupMessageResponse]
+	unpinEncryptedGroupMessage               *connect.Client[v1.UnpinEncryptedGroupMessageRequest, v1.UnpinEncryptedGroupMessageResponse]
 }
 
 // Ping calls aerochat.chat.v1.ChatService.Ping.
@@ -820,6 +864,26 @@ func (c *chatServiceClient) UnpinMessage(ctx context.Context, req *connect.Reque
 	return c.unpinMessage.CallUnary(ctx, req)
 }
 
+// PinEncryptedDirectMessageV2 calls aerochat.chat.v1.ChatService.PinEncryptedDirectMessageV2.
+func (c *chatServiceClient) PinEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[v1.PinEncryptedDirectMessageV2Request]) (*connect.Response[v1.PinEncryptedDirectMessageV2Response], error) {
+	return c.pinEncryptedDirectMessageV2.CallUnary(ctx, req)
+}
+
+// UnpinEncryptedDirectMessageV2 calls aerochat.chat.v1.ChatService.UnpinEncryptedDirectMessageV2.
+func (c *chatServiceClient) UnpinEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[v1.UnpinEncryptedDirectMessageV2Request]) (*connect.Response[v1.UnpinEncryptedDirectMessageV2Response], error) {
+	return c.unpinEncryptedDirectMessageV2.CallUnary(ctx, req)
+}
+
+// PinEncryptedGroupMessage calls aerochat.chat.v1.ChatService.PinEncryptedGroupMessage.
+func (c *chatServiceClient) PinEncryptedGroupMessage(ctx context.Context, req *connect.Request[v1.PinEncryptedGroupMessageRequest]) (*connect.Response[v1.PinEncryptedGroupMessageResponse], error) {
+	return c.pinEncryptedGroupMessage.CallUnary(ctx, req)
+}
+
+// UnpinEncryptedGroupMessage calls aerochat.chat.v1.ChatService.UnpinEncryptedGroupMessage.
+func (c *chatServiceClient) UnpinEncryptedGroupMessage(ctx context.Context, req *connect.Request[v1.UnpinEncryptedGroupMessageRequest]) (*connect.Response[v1.UnpinEncryptedGroupMessageResponse], error) {
+	return c.unpinEncryptedGroupMessage.CallUnary(ctx, req)
+}
+
 // ChatServiceHandler is an implementation of the aerochat.chat.v1.ChatService service.
 type ChatServiceHandler interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
@@ -870,6 +934,10 @@ type ChatServiceHandler interface {
 	DeleteMessageForEveryone(context.Context, *connect.Request[v1.DeleteMessageForEveryoneRequest]) (*connect.Response[v1.DeleteMessageForEveryoneResponse], error)
 	PinMessage(context.Context, *connect.Request[v1.PinMessageRequest]) (*connect.Response[v1.PinMessageResponse], error)
 	UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error)
+	PinEncryptedDirectMessageV2(context.Context, *connect.Request[v1.PinEncryptedDirectMessageV2Request]) (*connect.Response[v1.PinEncryptedDirectMessageV2Response], error)
+	UnpinEncryptedDirectMessageV2(context.Context, *connect.Request[v1.UnpinEncryptedDirectMessageV2Request]) (*connect.Response[v1.UnpinEncryptedDirectMessageV2Response], error)
+	PinEncryptedGroupMessage(context.Context, *connect.Request[v1.PinEncryptedGroupMessageRequest]) (*connect.Response[v1.PinEncryptedGroupMessageResponse], error)
+	UnpinEncryptedGroupMessage(context.Context, *connect.Request[v1.UnpinEncryptedGroupMessageRequest]) (*connect.Response[v1.UnpinEncryptedGroupMessageResponse], error)
 }
 
 // NewChatServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -1167,6 +1235,30 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceMethods.ByName("UnpinMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServicePinEncryptedDirectMessageV2Handler := connect.NewUnaryHandler(
+		ChatServicePinEncryptedDirectMessageV2Procedure,
+		svc.PinEncryptedDirectMessageV2,
+		connect.WithSchema(chatServiceMethods.ByName("PinEncryptedDirectMessageV2")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceUnpinEncryptedDirectMessageV2Handler := connect.NewUnaryHandler(
+		ChatServiceUnpinEncryptedDirectMessageV2Procedure,
+		svc.UnpinEncryptedDirectMessageV2,
+		connect.WithSchema(chatServiceMethods.ByName("UnpinEncryptedDirectMessageV2")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServicePinEncryptedGroupMessageHandler := connect.NewUnaryHandler(
+		ChatServicePinEncryptedGroupMessageProcedure,
+		svc.PinEncryptedGroupMessage,
+		connect.WithSchema(chatServiceMethods.ByName("PinEncryptedGroupMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceUnpinEncryptedGroupMessageHandler := connect.NewUnaryHandler(
+		ChatServiceUnpinEncryptedGroupMessageProcedure,
+		svc.UnpinEncryptedGroupMessage,
+		connect.WithSchema(chatServiceMethods.ByName("UnpinEncryptedGroupMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/aerochat.chat.v1.ChatService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChatServicePingProcedure:
@@ -1265,6 +1357,14 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServicePinMessageHandler.ServeHTTP(w, r)
 		case ChatServiceUnpinMessageProcedure:
 			chatServiceUnpinMessageHandler.ServeHTTP(w, r)
+		case ChatServicePinEncryptedDirectMessageV2Procedure:
+			chatServicePinEncryptedDirectMessageV2Handler.ServeHTTP(w, r)
+		case ChatServiceUnpinEncryptedDirectMessageV2Procedure:
+			chatServiceUnpinEncryptedDirectMessageV2Handler.ServeHTTP(w, r)
+		case ChatServicePinEncryptedGroupMessageProcedure:
+			chatServicePinEncryptedGroupMessageHandler.ServeHTTP(w, r)
+		case ChatServiceUnpinEncryptedGroupMessageProcedure:
+			chatServiceUnpinEncryptedGroupMessageHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1464,4 +1564,20 @@ func (UnimplementedChatServiceHandler) PinMessage(context.Context, *connect.Requ
 
 func (UnimplementedChatServiceHandler) UnpinMessage(context.Context, *connect.Request[v1.UnpinMessageRequest]) (*connect.Response[v1.UnpinMessageResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.UnpinMessage is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) PinEncryptedDirectMessageV2(context.Context, *connect.Request[v1.PinEncryptedDirectMessageV2Request]) (*connect.Response[v1.PinEncryptedDirectMessageV2Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.PinEncryptedDirectMessageV2 is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) UnpinEncryptedDirectMessageV2(context.Context, *connect.Request[v1.UnpinEncryptedDirectMessageV2Request]) (*connect.Response[v1.UnpinEncryptedDirectMessageV2Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.UnpinEncryptedDirectMessageV2 is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) PinEncryptedGroupMessage(context.Context, *connect.Request[v1.PinEncryptedGroupMessageRequest]) (*connect.Response[v1.PinEncryptedGroupMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.PinEncryptedGroupMessage is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) UnpinEncryptedGroupMessage(context.Context, *connect.Request[v1.UnpinEncryptedGroupMessageRequest]) (*connect.Response[v1.UnpinEncryptedGroupMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.UnpinEncryptedGroupMessage is not implemented"))
 }
