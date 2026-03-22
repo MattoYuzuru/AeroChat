@@ -212,6 +212,7 @@ export interface Group {
   kind: string;
   selfRole: GroupMemberRole;
   memberCount: number;
+  encryptedPinnedMessageIds: string[];
   unreadCount: number;
   permissions: GroupPermissions;
   createdAt: string;
@@ -268,6 +269,7 @@ export interface DirectChat {
   kind: string;
   participants: ChatUser[];
   pinnedMessageIds: string[];
+  encryptedPinnedMessageIds: string[];
   unreadCount: number;
   createdAt: string;
   updatedAt: string;
@@ -899,7 +901,7 @@ export interface GatewayClient {
       mlsGroupId: string;
       rosterVersion: number;
       senderCryptoDeviceId: string;
-      operationKind: "content" | "control";
+      operationKind: "content" | "control" | "edit" | "tombstone";
       targetMessageId?: string | null;
       revision: number;
       ciphertext: string;
@@ -927,6 +929,26 @@ export interface GatewayClient {
     chatId: string,
     messageId: string,
   ): Promise<DirectChatMessage>;
+  pinEncryptedDirectMessageV2(
+    token: string,
+    chatId: string,
+    messageId: string,
+  ): Promise<DirectChat>;
+  unpinEncryptedDirectMessageV2(
+    token: string,
+    chatId: string,
+    messageId: string,
+  ): Promise<DirectChat>;
+  pinEncryptedGroupMessage(
+    token: string,
+    groupId: string,
+    messageId: string,
+  ): Promise<Group>;
+  unpinEncryptedGroupMessage(
+    token: string,
+    groupId: string,
+    messageId: string,
+  ): Promise<Group>;
   sendFriendRequest(token: string, login: string): Promise<void>;
   acceptFriendRequest(token: string, login: string): Promise<void>;
   declineFriendRequest(token: string, login: string): Promise<void>;

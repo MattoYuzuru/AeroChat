@@ -15,6 +15,7 @@ export interface EncryptedDirectMessageV2ProjectedMessageEntry {
   senderUserId: string;
   senderCryptoDeviceId: string;
   revision: number;
+  replyToMessageId: string | null;
   createdAt: string;
   storedAt: string;
   text: string | null;
@@ -126,6 +127,7 @@ function applyReadyProjection(
       senderUserId: update.senderUserId,
       senderCryptoDeviceId: update.senderCryptoDeviceId,
       revision: update.revision,
+      replyToMessageId: update.replyToMessageId,
       createdAt: update.createdAt,
       storedAt: update.storedAt,
       text: update.text,
@@ -161,6 +163,7 @@ function applyReadyProjection(
     entries.set(targetKey, {
       ...target,
       revision: Math.max(target.revision, update.revision),
+      replyToMessageId: update.replyToMessageId,
       storedAt: maxTimestamp(target.storedAt, update.storedAt),
       text: update.text,
       markdownPolicy: update.markdownPolicy,

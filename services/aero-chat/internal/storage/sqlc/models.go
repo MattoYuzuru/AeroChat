@@ -118,6 +118,13 @@ type DirectChatEncryptedMessageDeliveriesV2 struct {
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
 }
 
+type DirectChatEncryptedMessagePinsV2 struct {
+	ChatID         uuid.UUID          `db:"chat_id" json:"chat_id"`
+	MessageID      uuid.UUID          `db:"message_id" json:"message_id"`
+	PinnedByUserID uuid.UUID          `db:"pinned_by_user_id" json:"pinned_by_user_id"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type DirectChatEncryptedMessagesV2 struct {
 	ID                   uuid.UUID          `db:"id" json:"id"`
 	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
@@ -202,6 +209,13 @@ type GroupEncryptedMessageDeliveriesV1 struct {
 	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
 	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+type GroupEncryptedMessagePinsV1 struct {
+	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
+	MessageID      uuid.UUID          `db:"message_id" json:"message_id"`
+	PinnedByUserID uuid.UUID          `db:"pinned_by_user_id" json:"pinned_by_user_id"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type GroupEncryptedMessagesV1 struct {

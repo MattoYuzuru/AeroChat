@@ -3112,6 +3112,16 @@ func (r *fakeRepository) GetEncryptedDirectMessageV2(_ context.Context, userID s
 	return nil, ErrNotFound
 }
 
+func (r *fakeRepository) GetEncryptedDirectMessageV2Stored(_ context.Context, chatID string, messageID string) (*EncryptedDirectMessageV2StoredEnvelope, error) {
+	record, ok := r.encryptedMessagesV2[messageID]
+	if !ok || record.Envelope.ChatID != chatID {
+		return nil, ErrNotFound
+	}
+
+	copy := record.Envelope
+	return &copy, nil
+}
+
 func (r *fakeRepository) ListEncryptedGroupMessages(_ context.Context, userID string, groupID string, viewerCryptoDeviceID string, limit int32) ([]EncryptedGroupEnvelope, error) {
 	if _, ok := r.groupMembers[groupID][userID]; !ok {
 		return nil, ErrNotFound
@@ -3177,6 +3187,16 @@ func (r *fakeRepository) GetEncryptedGroupMessage(_ context.Context, userID stri
 	}
 
 	return nil, ErrNotFound
+}
+
+func (r *fakeRepository) GetEncryptedGroupStoredMessage(_ context.Context, groupID string, messageID string) (*EncryptedGroupStoredEnvelope, error) {
+	record, ok := r.encryptedGroupMsgs[messageID]
+	if !ok || record.Envelope.GroupID != groupID {
+		return nil, ErrNotFound
+	}
+
+	copy := record.Envelope
+	return &copy, nil
 }
 
 func (r *fakeRepository) SearchDirectMessages(_ context.Context, userID string, params SearchDirectMessagesParams) ([]MessageSearchResult, error) {
@@ -3338,6 +3358,106 @@ func (r *fakeRepository) UnpinDirectChatMessage(_ context.Context, chatID string
 	}
 	directChat.PinnedMessageIDs = filteredPins
 	r.chats[chatID] = directChat
+	return true, nil
+}
+
+func (r *fakeRepository) PinEncryptedDirectMessageV2(_ context.Context, chatID string, messageID string, _ string, at time.Time) (bool, error) {
+	record, ok := r.encryptedMessagesV2[messageID]
+	if !ok || record.Envelope.ChatID != chatID {
+		return false, ErrNotFound
+	}
+
+	directChat, ok := r.chats[chatID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	for _, pinnedID := range directChat.EncryptedPinnedMessageIDs {
+		if pinnedID == messageID {
+			return false, nil
+		}
+	}
+
+	directChat.EncryptedPinnedMessageIDs = append(directChat.EncryptedPinnedMessageIDs, messageID)
+	directChat.UpdatedAt = at
+	r.chats[chatID] = directChat
+	return true, nil
+}
+
+func (r *fakeRepository) UnpinEncryptedDirectMessageV2(_ context.Context, chatID string, messageID string) (bool, error) {
+	record, ok := r.encryptedMessagesV2[messageID]
+	if !ok || record.Envelope.ChatID != chatID {
+		return false, ErrNotFound
+	}
+
+	directChat, ok := r.chats[chatID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	filteredPins := make([]string, 0, len(directChat.EncryptedPinnedMessageIDs))
+	removed := false
+	for _, pinnedID := range directChat.EncryptedPinnedMessageIDs {
+		if pinnedID == messageID {
+			removed = true
+			continue
+		}
+		filteredPins = append(filteredPins, pinnedID)
+	}
+	if !removed {
+		return false, nil
+	}
+
+	directChat.EncryptedPinnedMessageIDs = filteredPins
+	r.chats[chatID] = directChat
+	return true, nil
+}
+
+func (r *fakeRepository) PinEncryptedGroupMessage(_ context.Context, groupID string, messageID string, _ string, at time.Time) (bool, error) {
+	record, ok := r.encryptedGroupMsgs[messageID]
+	if !ok || record.Envelope.GroupID != groupID {
+		return false, ErrNotFound
+	}
+
+	group, ok := r.groups[groupID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	for _, pinnedID := range group.EncryptedPinnedMessageIDs {
+		if pinnedID == messageID {
+			return false, nil
+		}
+	}
+
+	group.EncryptedPinnedMessageIDs = append(group.EncryptedPinnedMessageIDs, messageID)
+	group.UpdatedAt = at
+	r.groups[groupID] = group
+	return true, nil
+}
+
+func (r *fakeRepository) UnpinEncryptedGroupMessage(_ context.Context, groupID string, messageID string) (bool, error) {
+	record, ok := r.encryptedGroupMsgs[messageID]
+	if !ok || record.Envelope.GroupID != groupID {
+		return false, ErrNotFound
+	}
+
+	group, ok := r.groups[groupID]
+	if !ok {
+		return false, ErrNotFound
+	}
+	filteredPins := make([]string, 0, len(group.EncryptedPinnedMessageIDs))
+	removed := false
+	for _, pinnedID := range group.EncryptedPinnedMessageIDs {
+		if pinnedID == messageID {
+			removed = true
+			continue
+		}
+		filteredPins = append(filteredPins, pinnedID)
+	}
+	if !removed {
+		return false, nil
+	}
+
+	group.EncryptedPinnedMessageIDs = filteredPins
+	r.groups[groupID] = group
 	return true, nil
 }
 

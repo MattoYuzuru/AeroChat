@@ -32,6 +32,7 @@ describe("encrypted group codec", () => {
       payload: {
         schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
         operation: "content",
+        replyToMessageId: null,
         message: {
           text: "group local hello",
           markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
@@ -58,6 +59,7 @@ describe("encrypted group codec", () => {
       senderCryptoDeviceId: "crypto-1",
       operationKind: "content",
       targetMessageId: null,
+      replyToMessageId: null,
       revision: 1,
       createdAt: "2026-03-22T12:00:00Z",
       storedAt: "2026-03-22T12:00:01Z",
@@ -94,6 +96,7 @@ describe("encrypted group codec", () => {
       payload: {
         schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
         operation: "content",
+        replyToMessageId: null,
         message: {
           text: "bound payload",
           markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",

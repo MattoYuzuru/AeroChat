@@ -22,6 +22,7 @@ interface DirectChatWire {
   kind?: string;
   participants?: ChatUserWire[];
   pinnedMessageIds?: string[];
+  encryptedPinnedMessageIds?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -328,6 +329,9 @@ function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
       avatarUrl: normalizeNullableString(participant?.avatarUrl),
     })),
     pinnedMessageIds: (input?.pinnedMessageIds ?? []).filter(
+      (value): value is string => typeof value === "string" && value.trim() !== "",
+    ),
+    encryptedPinnedMessageIds: (input?.encryptedPinnedMessageIds ?? []).filter(
       (value): value is string => typeof value === "string" && value.trim() !== "",
     ),
     unreadCount: 0,

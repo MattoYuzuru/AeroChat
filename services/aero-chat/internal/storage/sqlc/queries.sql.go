@@ -1490,6 +1490,43 @@ func (q *Queries) GetDirectChatEncryptedMessageV2ByDevice(ctx context.Context, a
 	return i, err
 }
 
+const getDirectChatEncryptedMessageV2Stored = `-- name: GetDirectChatEncryptedMessageV2Stored :one
+SELECT
+    id,
+    chat_id,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    created_at,
+    stored_at
+FROM direct_chat_encrypted_messages_v2
+WHERE chat_id = $1 AND id = $2
+`
+
+type GetDirectChatEncryptedMessageV2StoredParams struct {
+	ChatID uuid.UUID `db:"chat_id" json:"chat_id"`
+	ID     uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) GetDirectChatEncryptedMessageV2Stored(ctx context.Context, arg GetDirectChatEncryptedMessageV2StoredParams) (DirectChatEncryptedMessagesV2, error) {
+	row := q.db.QueryRow(ctx, getDirectChatEncryptedMessageV2Stored, arg.ChatID, arg.ID)
+	var i DirectChatEncryptedMessagesV2
+	err := row.Scan(
+		&i.ID,
+		&i.ChatID,
+		&i.SenderUserID,
+		&i.SenderCryptoDeviceID,
+		&i.OperationKind,
+		&i.TargetMessageID,
+		&i.Revision,
+		&i.CreatedAt,
+		&i.StoredAt,
+	)
+	return i, err
+}
+
 const getDirectChatMessageByID = `-- name: GetDirectChatMessageByID :one
 SELECT
     m.id,
@@ -1794,6 +1831,64 @@ func (q *Queries) GetEncryptedGroupMessageByDevice(ctx context.Context, arg GetE
 		&i.RecipientUserID,
 		&i.RecipientCryptoDeviceID,
 		&i.DeliveryStoredAt,
+	)
+	return i, err
+}
+
+const getEncryptedGroupStoredMessage = `-- name: GetEncryptedGroupStoredMessage :one
+SELECT
+    id,
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    created_at,
+    stored_at
+FROM group_encrypted_messages_v1
+WHERE group_id = $1 AND id = $2
+`
+
+type GetEncryptedGroupStoredMessageParams struct {
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+	ID      uuid.UUID `db:"id" json:"id"`
+}
+
+type GetEncryptedGroupStoredMessageRow struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	GroupID              uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID             uuid.UUID          `db:"thread_id" json:"thread_id"`
+	MlsGroupID           uuid.UUID          `db:"mls_group_id" json:"mls_group_id"`
+	RosterVersion        int64              `db:"roster_version" json:"roster_version"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+func (q *Queries) GetEncryptedGroupStoredMessage(ctx context.Context, arg GetEncryptedGroupStoredMessageParams) (GetEncryptedGroupStoredMessageRow, error) {
+	row := q.db.QueryRow(ctx, getEncryptedGroupStoredMessage, arg.GroupID, arg.ID)
+	var i GetEncryptedGroupStoredMessageRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.ThreadID,
+		&i.MlsGroupID,
+		&i.RosterVersion,
+		&i.SenderUserID,
+		&i.SenderCryptoDeviceID,
+		&i.OperationKind,
+		&i.TargetMessageID,
+		&i.Revision,
+		&i.CreatedAt,
+		&i.StoredAt,
 	)
 	return i, err
 }
@@ -3388,6 +3483,60 @@ func (q *Queries) ListEncryptedGroupRosterMembersByGroupID(ctx context.Context, 
 	return items, nil
 }
 
+const listEncryptedPinnedMessageIDsByChatID = `-- name: ListEncryptedPinnedMessageIDsByChatID :many
+SELECT message_id
+FROM direct_chat_encrypted_message_pins_v2
+WHERE chat_id = $1
+ORDER BY created_at DESC, message_id DESC
+`
+
+func (q *Queries) ListEncryptedPinnedMessageIDsByChatID(ctx context.Context, chatID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listEncryptedPinnedMessageIDsByChatID, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var message_id uuid.UUID
+		if err := rows.Scan(&message_id); err != nil {
+			return nil, err
+		}
+		items = append(items, message_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEncryptedPinnedMessageIDsByGroupID = `-- name: ListEncryptedPinnedMessageIDsByGroupID :many
+SELECT message_id
+FROM group_encrypted_message_pins_v1
+WHERE group_id = $1
+ORDER BY created_at DESC, message_id DESC
+`
+
+func (q *Queries) ListEncryptedPinnedMessageIDsByGroupID(ctx context.Context, groupID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listEncryptedPinnedMessageIDsByGroupID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var message_id uuid.UUID
+		if err := rows.Scan(&message_id); err != nil {
+			return nil, err
+		}
+		items = append(items, message_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGroupInviteLinksByGroupID = `-- name: ListGroupInviteLinksByGroupID :many
 SELECT
     id,
@@ -4044,6 +4193,66 @@ func (q *Queries) PinDirectChatMessage(ctx context.Context, arg PinDirectChatMes
 	return result.RowsAffected(), nil
 }
 
+const pinEncryptedDirectMessageV2 = `-- name: PinEncryptedDirectMessageV2 :execrows
+INSERT INTO direct_chat_encrypted_message_pins_v2 (
+    chat_id,
+    message_id,
+    pinned_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (chat_id, message_id) DO NOTHING
+`
+
+type PinEncryptedDirectMessageV2Params struct {
+	ChatID         uuid.UUID          `db:"chat_id" json:"chat_id"`
+	MessageID      uuid.UUID          `db:"message_id" json:"message_id"`
+	PinnedByUserID uuid.UUID          `db:"pinned_by_user_id" json:"pinned_by_user_id"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) PinEncryptedDirectMessageV2(ctx context.Context, arg PinEncryptedDirectMessageV2Params) (int64, error) {
+	result, err := q.db.Exec(ctx, pinEncryptedDirectMessageV2,
+		arg.ChatID,
+		arg.MessageID,
+		arg.PinnedByUserID,
+		arg.CreatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const pinEncryptedGroupMessage = `-- name: PinEncryptedGroupMessage :execrows
+INSERT INTO group_encrypted_message_pins_v1 (
+    group_id,
+    message_id,
+    pinned_by_user_id,
+    created_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (group_id, message_id) DO NOTHING
+`
+
+type PinEncryptedGroupMessageParams struct {
+	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
+	MessageID      uuid.UUID          `db:"message_id" json:"message_id"`
+	PinnedByUserID uuid.UUID          `db:"pinned_by_user_id" json:"pinned_by_user_id"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) PinEncryptedGroupMessage(ctx context.Context, arg PinEncryptedGroupMessageParams) (int64, error) {
+	result, err := q.db.Exec(ctx, pinEncryptedGroupMessage,
+		arg.GroupID,
+		arg.MessageID,
+		arg.PinnedByUserID,
+		arg.CreatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const searchDirectMessages = `-- name: SearchDirectMessages :many
 WITH search_query AS (
     SELECT websearch_to_tsquery('simple', $6::TEXT) AS query
@@ -4434,6 +4643,42 @@ type UnpinDirectChatMessageParams struct {
 
 func (q *Queries) UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error) {
 	result, err := q.db.Exec(ctx, unpinDirectChatMessage, arg.ChatID, arg.MessageID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const unpinEncryptedDirectMessageV2 = `-- name: UnpinEncryptedDirectMessageV2 :execrows
+DELETE FROM direct_chat_encrypted_message_pins_v2
+WHERE chat_id = $1 AND message_id = $2
+`
+
+type UnpinEncryptedDirectMessageV2Params struct {
+	ChatID    uuid.UUID `db:"chat_id" json:"chat_id"`
+	MessageID uuid.UUID `db:"message_id" json:"message_id"`
+}
+
+func (q *Queries) UnpinEncryptedDirectMessageV2(ctx context.Context, arg UnpinEncryptedDirectMessageV2Params) (int64, error) {
+	result, err := q.db.Exec(ctx, unpinEncryptedDirectMessageV2, arg.ChatID, arg.MessageID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const unpinEncryptedGroupMessage = `-- name: UnpinEncryptedGroupMessage :execrows
+DELETE FROM group_encrypted_message_pins_v1
+WHERE group_id = $1 AND message_id = $2
+`
+
+type UnpinEncryptedGroupMessageParams struct {
+	GroupID   uuid.UUID `db:"group_id" json:"group_id"`
+	MessageID uuid.UUID `db:"message_id" json:"message_id"`
+}
+
+func (q *Queries) UnpinEncryptedGroupMessage(ctx context.Context, arg UnpinEncryptedGroupMessageParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unpinEncryptedGroupMessage, arg.GroupID, arg.MessageID)
 	if err != nil {
 		return 0, err
 	}

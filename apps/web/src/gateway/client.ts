@@ -261,6 +261,7 @@ interface DirectChatWire extends TimestampedWire {
   kind?: string;
   participants?: ChatUserWire[];
   pinnedMessageIds?: string[];
+  encryptedPinnedMessageIds?: string[];
   unreadState?: UnreadStateWire;
 }
 
@@ -270,6 +271,7 @@ interface GroupWire extends TimestampedWire {
   kind?: string;
   selfRole?: string;
   memberCount?: number;
+  encryptedPinnedMessageIds?: string[];
   unreadState?: UnreadStateWire;
   permissions?: GroupPermissionsWire;
 }
@@ -757,6 +759,22 @@ interface PinMessageResponseWire {
 
 interface UnpinMessageResponseWire {
   message?: DirectChatMessageWire;
+}
+
+interface PinEncryptedDirectMessageV2ResponseWire {
+  chat?: DirectChatWire;
+}
+
+interface UnpinEncryptedDirectMessageV2ResponseWire {
+  chat?: DirectChatWire;
+}
+
+interface PinEncryptedGroupMessageResponseWire {
+  group?: GroupWire;
+}
+
+interface UnpinEncryptedGroupMessageResponseWire {
+  group?: GroupWire;
 }
 
 interface MessageSearchCursorWire {
@@ -1799,6 +1817,70 @@ export function createGatewayClient(
       return normalizeDirectChatMessage(response.message);
     },
 
+    async pinEncryptedDirectMessageV2(token, chatId, messageId) {
+      const response = await unaryCall<PinEncryptedDirectMessageV2ResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "PinEncryptedDirectMessageV2",
+        {
+          chatId: chatId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChat(response.chat);
+    },
+
+    async unpinEncryptedDirectMessageV2(token, chatId, messageId) {
+      const response = await unaryCall<UnpinEncryptedDirectMessageV2ResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "UnpinEncryptedDirectMessageV2",
+        {
+          chatId: chatId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return normalizeDirectChat(response.chat);
+    },
+
+    async pinEncryptedGroupMessage(token, groupId, messageId) {
+      const response = await unaryCall<PinEncryptedGroupMessageResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "PinEncryptedGroupMessage",
+        {
+          groupId: groupId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroup(response.group);
+    },
+
+    async unpinEncryptedGroupMessage(token, groupId, messageId) {
+      const response = await unaryCall<UnpinEncryptedGroupMessageResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "UnpinEncryptedGroupMessage",
+        {
+          groupId: groupId.trim(),
+          messageId: messageId.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroup(response.group);
+    },
+
     async sendFriendRequest(token, login) {
       await unaryCall(
         fetchImpl,
@@ -2303,6 +2385,9 @@ function normalizeGroup(input: GroupWire | undefined): Group {
     kind: input?.kind ?? "CHAT_KIND_UNSPECIFIED",
     selfRole: normalizeGroupMemberRole(input?.selfRole),
     memberCount: input?.memberCount ?? 0,
+    encryptedPinnedMessageIds: (input?.encryptedPinnedMessageIds ?? []).filter(
+      (value): value is string => typeof value === "string" && value.trim() !== "",
+    ),
     unreadCount: normalizeUnreadCount(input?.unreadState),
     permissions: normalizeGroupPermissions(input?.permissions),
     createdAt: input?.createdAt ?? "",
@@ -2522,6 +2607,9 @@ function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
     pinnedMessageIds: (input?.pinnedMessageIds ?? []).filter(
       (value): value is string => typeof value === "string" && value.trim() !== "",
     ),
+    encryptedPinnedMessageIds: (input?.encryptedPinnedMessageIds ?? []).filter(
+      (value): value is string => typeof value === "string" && value.trim() !== "",
+    ),
     unreadCount: normalizeUnreadCount(input?.unreadState),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
@@ -2544,13 +2632,17 @@ function normalizeEncryptedDirectMessageV2OperationKindForWire(
 }
 
 function normalizeEncryptedGroupOperationKindForWire(
-  value: "content" | "control",
+  value: "content" | "control" | "edit" | "tombstone",
 ): string {
   switch (value) {
     case "content":
       return "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT";
     case "control":
       return "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTROL";
+    case "edit":
+      return "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_EDIT";
+    case "tombstone":
+      return "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_TOMBSTONE";
     default:
       return "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_UNSPECIFIED";
   }

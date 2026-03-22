@@ -26,6 +26,7 @@ import { createMarkdownPreview } from "../chats/createMarkdownPreview";
 import {
   describeEncryptedDirectMessageV2Failure,
   type EncryptedDirectMessageV2ProjectionEntry,
+  type EncryptedDirectMessageV2ProjectedMessageEntry,
 } from "../chats/encrypted-v2-projection";
 import { EncryptedMessageAttachmentList } from "../chats/EncryptedMessageAttachmentList";
 import { publishLocalEncryptedDirectMessageV2Projection } from "../chats/encrypted-v2-local-outbound";
@@ -39,6 +40,7 @@ import {
 import type { CryptoContextState } from "../crypto/runtime-context";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { useChats } from "../chats/useChats";
+import { gatewayClient } from "../gateway/runtime";
 import type {
   ChatUser,
   DirectChat,
@@ -62,10 +64,13 @@ export function ChatsPage() {
   const [composerError, setComposerError] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState("");
+  const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
   const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
   const [isSendingVoiceNote, setIsSendingVoiceNote] = useState(false);
   const [isSendingVideoNote, setIsSendingVideoNote] = useState(false);
   const [selectedReplyMessage, setSelectedReplyMessage] = useState<DirectChatMessage | null>(null);
+  const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
+    useState<string | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const pendingPeerRef = useRef<string | null>(null);
@@ -161,7 +166,9 @@ export function ChatsPage() {
   useEffect(() => {
     setEditingMessageId(null);
     setEditingMessageText("");
+    setEditingEncryptedMessageId(null);
     setSelectedReplyMessage(null);
+    setSelectedEncryptedReplyMessageId(null);
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
     discardVoiceNoteRecording();
@@ -241,6 +248,29 @@ export function ChatsPage() {
   const encryptedMessageCount = encryptedLane.items.filter(
     (item) => item.kind === "message",
   ).length;
+  const encryptedMessageEntries = encryptedLane.items.filter(
+    (
+      item,
+    ): item is EncryptedDirectMessageV2ProjectedMessageEntry => item.kind === "message",
+  );
+  const encryptedMessageIndex = new Map(
+    encryptedMessageEntries.map((item) => [item.messageId, item] as const),
+  );
+  const selectedEncryptedReplyEntry =
+    selectedEncryptedReplyMessageId === null
+      ? null
+      : encryptedMessageIndex.get(selectedEncryptedReplyMessageId) ?? null;
+  const editingEncryptedEntry =
+    editingEncryptedMessageId === null
+      ? null
+      : encryptedMessageIndex.get(editingEncryptedMessageId) ?? null;
+  const encryptedPinnedMessages =
+    selectedThread === null
+      ? []
+      : selectedThread.chat.encryptedPinnedMessageIds.map((messageId) => ({
+          messageId,
+          entry: encryptedMessageIndex.get(messageId) ?? null,
+        }));
   const encryptedFailureCount = encryptedLane.items.filter(
     (item) => item.kind === "failure",
   ).length;
@@ -307,7 +337,6 @@ export function ChatsPage() {
     !encryptedMediaAttachmentDraft.isUploading &&
     attachmentDraft === null &&
     uploadedAttachmentId === null &&
-    selectedReplyMessage === null &&
     (normalizeComposerMessageText(composerText) !== "" ||
       uploadedEncryptedAttachmentDraft !== null);
   const encryptedSendHint = describeEncryptedBootstrapSendHint({
@@ -317,11 +346,21 @@ export function ChatsPage() {
     encryptedAttachmentDraft,
     hasPendingVoiceNote,
     hasPendingVideoNote,
-    hasReplyTarget: selectedReplyMessage !== null,
+    hasLegacyReplyTarget: selectedReplyMessage !== null,
+    hasEncryptedReplyTarget: selectedEncryptedReplyEntry !== null,
+    isEditingEncryptedMessage: editingEncryptedEntry !== null,
     cryptoRuntimeState: cryptoRuntime.state,
   });
 
   async function submitComposer() {
+    if (selectedEncryptedReplyEntry !== null || editingEncryptedEntry !== null) {
+      setComposerError(
+        "Текущий composer находится в encrypted режиме. Для plaintext send сначала снимите encrypted reply/edit.",
+      );
+      chats.clearFeedback();
+      return;
+    }
+
     if (encryptedAttachmentDraft !== null || uploadedEncryptedAttachmentDraft !== null) {
       setComposerError(
         "Текущий encrypted media draft отправляется только через кнопку Encrypted DM v2.",
@@ -374,7 +413,7 @@ export function ChatsPage() {
     }
     if (selectedReplyMessage !== null) {
       setComposerError(
-        "Encrypted DM v2 bootstrap send в этом PR не восстанавливает reply semantics.",
+        "Encrypted DM v2 reply в этом slice работает только по encrypted message id внутри local encrypted lane.",
       );
       chats.clearFeedback();
       return;
@@ -400,13 +439,24 @@ export function ChatsPage() {
     chats.clearFeedback();
 
     try {
-      const result = await cryptoRuntime.sendEncryptedDirectMessageV2Content(
-        selectedThread.chat.id,
-        normalizedText,
-        uploadedEncryptedAttachmentDraft === null
-          ? []
-          : [uploadedEncryptedAttachmentDraft],
-      );
+      const attachmentDrafts =
+        uploadedEncryptedAttachmentDraft === null ? [] : [uploadedEncryptedAttachmentDraft];
+      const result =
+        editingEncryptedEntry !== null
+          ? await cryptoRuntime.sendEncryptedDirectMessageV2Edit(
+              selectedThread.chat.id,
+              editingEncryptedEntry.messageId,
+              editingEncryptedEntry.revision + 1,
+              normalizedText,
+              selectedEncryptedReplyEntry?.messageId ?? null,
+              attachmentDrafts,
+            )
+          : await cryptoRuntime.sendEncryptedDirectMessageV2Content(
+              selectedThread.chat.id,
+              normalizedText,
+              selectedEncryptedReplyEntry?.messageId ?? null,
+              attachmentDrafts,
+            );
       if (result === null) {
         return;
       }
@@ -414,6 +464,8 @@ export function ChatsPage() {
       publishLocalEncryptedDirectMessageV2Projection(result.localProjection);
       setComposerText("");
       setSelectedReplyMessage(null);
+      setSelectedEncryptedReplyMessageId(null);
+      setEditingEncryptedMessageId(null);
       encryptedMediaAttachmentDraft.markSendSucceeded();
     } catch (error) {
       encryptedMediaAttachmentDraft.markSendFailed();
@@ -421,6 +473,78 @@ export function ChatsPage() {
         error instanceof Error && error.message.trim() !== ""
           ? error.message
           : "Не удалось отправить encrypted DM v2 через crypto runtime.",
+      );
+    }
+  }
+
+  async function handleDeleteEncryptedDirectMessageV2(
+    message: EncryptedDirectMessageV2ProjectedMessageEntry,
+  ) {
+    if (selectedThread === null) {
+      return;
+    }
+
+    setComposerError(null);
+    chats.clearFeedback();
+
+    try {
+      const result = await cryptoRuntime.sendEncryptedDirectMessageV2Tombstone(
+        selectedThread.chat.id,
+        message.messageId,
+        message.revision + 1,
+      );
+      if (result === null) {
+        return;
+      }
+
+      publishLocalEncryptedDirectMessageV2Projection(result.localProjection);
+      if (editingEncryptedMessageId === message.messageId) {
+        setEditingEncryptedMessageId(null);
+        setComposerText("");
+      }
+      if (selectedEncryptedReplyMessageId === message.messageId) {
+        setSelectedEncryptedReplyMessageId(null);
+      }
+    } catch (error) {
+      setComposerError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось опубликовать encrypted tombstone.",
+      );
+    }
+  }
+
+  async function handleToggleEncryptedDirectPin(messageId: string, pinned: boolean) {
+    if (selectedThread === null) {
+      return;
+    }
+
+    setComposerError(null);
+    chats.clearFeedback();
+
+    try {
+      if (pinned) {
+        await gatewayClient.unpinEncryptedDirectMessageV2(
+          sessionToken,
+          selectedThread.chat.id,
+          messageId,
+        );
+      } else {
+        await gatewayClient.pinEncryptedDirectMessageV2(
+          sessionToken,
+          selectedThread.chat.id,
+          messageId,
+        );
+      }
+      await chats.reloadChats();
+      await chats.openChat(selectedThread.chat.id);
+    } catch (error) {
+      setComposerError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : pinned
+            ? "Не удалось снять encrypted pin."
+            : "Не удалось закрепить encrypted message.",
       );
     }
   }
@@ -926,6 +1050,44 @@ export function ChatsPage() {
                   </section>
                 )}
 
+                {selectedThread.chat.encryptedPinnedMessageIds.length > 0 && (
+                  <section className={styles.pinnedStrip}>
+                    <div className={styles.blockHeader}>
+                      <div>
+                        <p className={styles.cardLabel}>Encrypted pinned</p>
+                        <h3 className={styles.blockTitle}>Закрепления encrypted DM v2</h3>
+                      </div>
+                      <span className={styles.metaTag}>
+                        {selectedThread.chat.encryptedPinnedMessageIds.length}
+                      </span>
+                    </div>
+
+                    <div className={styles.pinnedList}>
+                      {encryptedPinnedMessages.map(({ messageId, entry }) => (
+                        <article key={messageId} className={styles.pinnedCard}>
+                          <div className={styles.pinnedHeader}>
+                            <strong>
+                              {entry === null
+                                ? "Encrypted message"
+                                : entry.senderUserId === authState.profile.id
+                                  ? "Вы"
+                                  : selectedPeer?.nickname ?? "Собеседник"}
+                            </strong>
+                            <span className={styles.pinnedMeta}>
+                              {entry === null
+                                ? "Локально не разрешено"
+                                : formatDateTime(entry.createdAt)}
+                            </span>
+                          </div>
+                          <p className={styles.pinnedText}>
+                            {describeEncryptedPinnedPreview(entry)}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
                 <section className={styles.messagesPanel}>
                   <div className={styles.blockHeader}>
                     <div>
@@ -991,6 +1153,65 @@ export function ChatsPage() {
                           accessToken: sessionToken,
                           currentUserId: authState.profile.id,
                           peerNickname: selectedPeer?.nickname ?? "Собеседник",
+                          replyTarget:
+                            item.kind === "message"
+                              ? resolveEncryptedDirectReplyTarget(
+                                  encryptedMessageIndex,
+                                  item.replyToMessageId,
+                                  authState.profile.id,
+                                  selectedPeer?.nickname ?? "Собеседник",
+                                )
+                              : null,
+                          isPinned:
+                            item.kind === "message" &&
+                            selectedThread.chat.encryptedPinnedMessageIds.includes(
+                              item.messageId,
+                            ),
+                          onJumpToReplyTarget: (messageId) => {
+                            jumpToMessage(`encrypted-direct-message-${messageId}`);
+                          },
+                          onReply:
+                            item.kind !== "message"
+                              ? undefined
+                              : () => {
+                                  setSelectedReplyMessage(null);
+                                  setSelectedEncryptedReplyMessageId(item.messageId);
+                                  setEditingEncryptedMessageId(null);
+                                  setComposerError(null);
+                                  chats.clearFeedback();
+                                },
+                          onEdit:
+                            item.kind !== "message" ||
+                            item.senderUserId !== authState.profile.id ||
+                            item.isTombstone
+                              ? undefined
+                              : () => {
+                                  setSelectedReplyMessage(null);
+                                  setEditingEncryptedMessageId(item.messageId);
+                                  setSelectedEncryptedReplyMessageId(item.replyToMessageId);
+                                  setComposerText(item.text ?? "");
+                                  setComposerError(null);
+                                  chats.clearFeedback();
+                                },
+                          onDeleteForEveryone:
+                            item.kind !== "message" ||
+                            item.senderUserId !== authState.profile.id ||
+                            item.isTombstone
+                              ? undefined
+                              : () => {
+                                  void handleDeleteEncryptedDirectMessageV2(item);
+                                },
+                          onTogglePin:
+                            item.kind !== "message"
+                              ? undefined
+                              : () => {
+                                  void handleToggleEncryptedDirectPin(
+                                    item.messageId,
+                                    selectedThread.chat.encryptedPinnedMessageIds.includes(
+                                      item.messageId,
+                                    ),
+                                  );
+                                },
                         }),
                       )}
                   </div>
@@ -1202,6 +1423,8 @@ export function ChatsPage() {
                                         className={styles.ghostButton}
                                         disabled={pendingLabel !== null}
                                         onClick={() => {
+                                          setSelectedEncryptedReplyMessageId(null);
+                                          setEditingEncryptedMessageId(null);
                                           setSelectedReplyMessage(message);
                                           setComposerError(null);
                                           chats.clearFeedback();
@@ -1216,6 +1439,8 @@ export function ChatsPage() {
                                           className={styles.ghostButton}
                                           disabled={pendingLabel !== null}
                                           onClick={() => {
+                                            setSelectedEncryptedReplyMessageId(null);
+                                            setEditingEncryptedMessageId(null);
                                             setEditingMessageId(message.id);
                                             setEditingMessageText(message.text?.text ?? "");
                                             setComposerError(null);
@@ -1271,6 +1496,57 @@ export function ChatsPage() {
                   </div>
 
                   <form className={styles.composer} onSubmit={handleComposerSubmit}>
+                    {selectedEncryptedReplyEntry && (
+                      <div className={styles.replyComposerCard}>
+                        <div>
+                          <p className={styles.replyPreviewAuthor}>
+                            Encrypted reply на{" "}
+                            {selectedEncryptedReplyEntry.senderUserId === authState.profile.id
+                              ? "ваше сообщение"
+                              : selectedPeer?.nickname ?? "сообщение собеседника"}
+                          </p>
+                          <p className={styles.replyPreviewText}>
+                            {describeEncryptedDirectComposerReplyTarget(
+                              selectedEncryptedReplyEntry,
+                            )}
+                          </p>
+                        </div>
+                        <button
+                          className={styles.ghostButton}
+                          onClick={() => {
+                            setSelectedEncryptedReplyMessageId(null);
+                          }}
+                          type="button"
+                        >
+                          Отменить encrypted reply
+                        </button>
+                      </div>
+                    )}
+
+                    {editingEncryptedEntry && (
+                      <div className={styles.replyComposerCard}>
+                        <div>
+                          <p className={styles.replyPreviewAuthor}>
+                            Encrypted edit revision {editingEncryptedEntry.revision + 1}
+                          </p>
+                          <p className={styles.replyPreviewText}>
+                            {describeEncryptedDirectComposerReplyTarget(editingEncryptedEntry)}
+                          </p>
+                        </div>
+                        <button
+                          className={styles.ghostButton}
+                          onClick={() => {
+                            setEditingEncryptedMessageId(null);
+                            setSelectedEncryptedReplyMessageId(null);
+                            setComposerText("");
+                          }}
+                          type="button"
+                        >
+                          Отменить encrypted edit
+                        </button>
+                      </div>
+                    )}
+
                     {selectedReplyMessage && (
                       <div className={styles.replyComposerCard}>
                         <div>
@@ -1570,7 +1846,9 @@ export function ChatsPage() {
                         >
                           {cryptoRuntime.state.isActionPending
                             ? "Собираем..."
-                            : "Encrypted DM v2"}
+                            : editingEncryptedEntry !== null
+                              ? "Сохранить encrypted edit"
+                              : "Encrypted DM v2"}
                         </button>
                       </div>
                     </div>
@@ -1641,6 +1919,13 @@ interface RenderEncryptedDirectMessageV2EntryInput {
   accessToken: string;
   currentUserId: string;
   peerNickname: string;
+  replyTarget: EncryptedReplyTargetDescriptor | null;
+  isPinned: boolean;
+  onJumpToReplyTarget(messageId: string): void;
+  onReply?: () => void;
+  onEdit?: () => void;
+  onDeleteForEveryone?: () => void;
+  onTogglePin?: () => void;
 }
 
 function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessageV2EntryInput) {
@@ -1677,6 +1962,7 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
       key={input.item.key}
       className={styles.messageRow}
       data-own={isOwn}
+      id={`encrypted-direct-message-${input.item.messageId}`}
     >
       <div className={styles.messageBubble} data-own={isOwn}>
         <div className={styles.messageHeader}>
@@ -1688,6 +1974,7 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
             <span className={styles.statusBadge} data-tone="accent">
               Encrypted v2
             </span>
+            {input.isPinned && <span className={styles.statusBadge}>Pin</span>}
             {input.item.editedAt && <span className={styles.statusBadge}>Изменено</span>}
             {input.item.isTombstone && <span className={styles.statusBadge}>Удалено</span>}
           </div>
@@ -1697,6 +1984,26 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
             <p className={styles.tombstoneText}>Encrypted сообщение удалено для всех.</p>
           ) : (
             <>
+              {input.replyTarget && (
+                <button
+                  className={styles.replyPreviewCard}
+                  disabled={input.replyTarget.messageId === null}
+                  onClick={() => {
+                    const replyTarget = input.replyTarget;
+                    if (replyTarget !== null && replyTarget.messageId !== null) {
+                      input.onJumpToReplyTarget(replyTarget.messageId);
+                    }
+                  }}
+                  type="button"
+                >
+                  <span className={styles.replyPreviewAuthor}>
+                    {input.replyTarget.authorLabel}
+                  </span>
+                  <span className={styles.replyPreviewText}>
+                    {input.replyTarget.previewText}
+                  </span>
+                </button>
+              )}
               {input.item.text && (
                 <div className={styles.messageText}>
                   <SafeMessageMarkdown text={input.item.text} />
@@ -1717,9 +2024,54 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
             </>
           )}
         </div>
+        {!input.item.isTombstone && (
+          <div className={styles.actions}>
+            {input.onTogglePin && (
+              <button
+                className={styles.ghostButton}
+                onClick={input.onTogglePin}
+                type="button"
+              >
+                {input.isPinned ? "Снять encrypted pin" : "Закрепить"}
+              </button>
+            )}
+            {input.onReply && (
+              <button className={styles.ghostButton} onClick={input.onReply} type="button">
+                Ответить
+              </button>
+            )}
+            {input.onEdit && (
+              <button className={styles.ghostButton} onClick={input.onEdit} type="button">
+                Редактировать
+              </button>
+            )}
+            {input.onDeleteForEveryone && (
+              <button
+                className={styles.ghostButton}
+                onClick={input.onDeleteForEveryone}
+                type="button"
+              >
+                Удалить для всех
+              </button>
+            )}
+          </div>
+        )}
+        <p className={styles.editMeta}>
+          stored {formatDateTime(input.item.storedAt)}
+          {input.item.editedAt ? ` • edited ${formatDateTime(input.item.editedAt)}` : ""}
+          {input.item.deletedAt
+            ? ` • tombstone ${formatDateTime(input.item.deletedAt)}`
+            : ""}
+        </p>
       </div>
     </article>
   );
+}
+
+interface EncryptedReplyTargetDescriptor {
+  messageId: string | null;
+  authorLabel: string;
+  previewText: string;
 }
 
 function getPeerParticipant(chat: DirectChat, currentUserId: string): ChatUser | null {
@@ -1895,6 +2247,72 @@ function describeDirectComposerReplyTarget(
   return message.senderUserId === currentUserId ? "Ваше сообщение" : "Сообщение собеседника";
 }
 
+function resolveEncryptedDirectReplyTarget(
+  entries: Map<string, EncryptedDirectMessageV2ProjectedMessageEntry>,
+  messageId: string | null,
+  currentUserId: string,
+  fallbackPeerName: string,
+): EncryptedReplyTargetDescriptor | null {
+  if (messageId === null) {
+    return null;
+  }
+
+  const target = entries.get(messageId);
+  if (target === undefined) {
+    return {
+      messageId: null,
+      authorLabel: "Недоступное encrypted сообщение",
+      previewText: "Reply target пока не разрешён в текущем локальном bounded окне.",
+    };
+  }
+
+  if (target.isTombstone) {
+    return {
+      messageId: target.messageId,
+      authorLabel: "Удалённое encrypted сообщение",
+      previewText: "Сообщение удалено для всех локальным tombstone.",
+    };
+  }
+
+  return {
+    messageId: target.messageId,
+    authorLabel:
+      target.senderUserId === currentUserId ? "Вы" : fallbackPeerName,
+    previewText: describeEncryptedDirectComposerReplyTarget(target),
+  };
+}
+
+function describeEncryptedDirectComposerReplyTarget(
+  entry: EncryptedDirectMessageV2ProjectedMessageEntry,
+): string {
+  if (entry.isTombstone) {
+    return "Сообщение удалено для всех.";
+  }
+  if (entry.text && entry.text.trim() !== "") {
+    return entry.text.length > 140 ? `${entry.text.slice(0, 137)}...` : entry.text;
+  }
+  if (entry.attachments.length > 0) {
+    return entry.attachments.length === 1
+      ? "Encrypted вложение"
+      : `Encrypted вложения: ${entry.attachments.length}`;
+  }
+
+  return "Encrypted сообщение без renderable content.";
+}
+
+function describeEncryptedPinnedPreview(
+  entry: EncryptedDirectMessageV2ProjectedMessageEntry | null,
+): string {
+  if (entry === null) {
+    return "Серверный pin уже сохранён, но содержимое сообщения ещё не разрешено локальной encrypted projection.";
+  }
+  if (entry.isTombstone) {
+    return "Сообщение закреплено по logical id, но его текущее состояние tombstone.";
+  }
+
+  return describeEncryptedDirectComposerReplyTarget(entry);
+}
+
 function describeEncryptedBootstrapSendHint(input: {
   chatSelected: boolean;
   composerText: string;
@@ -1904,7 +2322,9 @@ function describeEncryptedBootstrapSendHint(input: {
   >["draft"];
   hasPendingVoiceNote: boolean;
   hasPendingVideoNote: boolean;
-  hasReplyTarget: boolean;
+  hasLegacyReplyTarget: boolean;
+  hasEncryptedReplyTarget: boolean;
+  isEditingEncryptedMessage: boolean;
   cryptoRuntimeState: CryptoContextState;
 }): string {
   if (!input.chatSelected) {
@@ -1937,8 +2357,14 @@ function describeEncryptedBootstrapSendHint(input: {
   if (input.encryptedAttachmentDraft?.status === "error") {
     return "Encrypted media draft не готов: исправьте ошибку upload и повторите.";
   }
-  if (input.hasReplyTarget) {
-    return "Encrypted reply send в этом PR не восстанавливается.";
+  if (input.hasLegacyReplyTarget) {
+    return "Plaintext reply target не используется внутри encrypted DM v2 slice. Выберите reply в encrypted lane.";
+  }
+  if (input.isEditingEncryptedMessage) {
+    return "Кнопка Encrypted DM v2 опубликует новую opaque edit revision для выбранного logical message id.";
+  }
+  if (input.hasEncryptedReplyTarget) {
+    return "Reply reference уйдёт только внутри ciphertext payload. Preview строится локально после decrypt без server-side plaintext quote.";
   }
   if (input.hasPendingVoiceNote || input.hasPendingVideoNote) {
     return "Voice/video note path остаётся legacy attachment flow и не входит в encrypted bootstrap send.";

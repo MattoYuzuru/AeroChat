@@ -37,6 +37,7 @@ export interface EncryptedDirectMessageV2OutboundEnvelopeMetadata {
 interface EncryptedDirectMessageV2ContentPayloadV1 {
   schema: typeof payloadSchema;
   operation: "content";
+  replyToMessageId: string | null;
   message: {
     text: string | null;
     markdownPolicy: string | null;
@@ -47,6 +48,7 @@ interface EncryptedDirectMessageV2ContentPayloadV1 {
 interface EncryptedDirectMessageV2EditPayloadV1 {
   schema: typeof payloadSchema;
   operation: "edit";
+  replyToMessageId: string | null;
   message: {
     text: string | null;
     markdownPolicy: string | null;
@@ -332,6 +334,10 @@ function parsePayload(value: string): EncryptedDirectMessageV2PayloadV1 | null {
       if (!isRecord(raw.message)) {
         return null;
       }
+      const replyToMessageId =
+        raw.replyToMessageId === null || typeof raw.replyToMessageId === "string"
+          ? normalizeReplyToMessageID(raw.replyToMessageId)
+          : undefined;
       const text =
         raw.message.text === null || typeof raw.message.text === "string"
           ? raw.message.text
@@ -346,6 +352,7 @@ function parsePayload(value: string): EncryptedDirectMessageV2PayloadV1 | null {
         : undefined;
       const attachments = rawAttachments?.map(parseEncryptedMediaAttachmentDescriptor);
       if (
+        replyToMessageId === undefined ||
         text === undefined ||
         markdownPolicy === undefined ||
         attachments === undefined ||
@@ -367,6 +374,7 @@ function parsePayload(value: string): EncryptedDirectMessageV2PayloadV1 | null {
             descriptor !== null,
         ),
       };
+      raw.replyToMessageId = replyToMessageId;
     }
     if (raw.operation === "tombstone" && typeof raw.deletedAt !== "string") {
       return null;
@@ -402,6 +410,10 @@ function buildReadyProjection(
     senderCryptoDeviceId: envelope.senderCryptoDeviceId,
     operationKind,
     targetMessageId: envelope.targetMessageId,
+    replyToMessageId:
+      payload.operation === "content" || payload.operation === "edit"
+        ? payload.replyToMessageId
+        : null,
     revision: envelope.revision,
     createdAt: envelope.createdAt,
     storedAt: envelope.storedAt,
@@ -437,6 +449,15 @@ function buildFailure(
     storedAt: envelope.storedAt,
     failureKind,
   };
+}
+
+function normalizeReplyToMessageID(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized === "" ? null : normalized;
 }
 
 function normalizeOperationKind(

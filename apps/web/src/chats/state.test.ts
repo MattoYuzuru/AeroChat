@@ -23,6 +23,7 @@ const directChat = {
     },
   ],
   pinnedMessageIds: [],
+  encryptedPinnedMessageIds: [],
   unreadCount: 0,
   createdAt: "2026-03-25T10:00:00Z",
   updatedAt: "2026-03-25T10:10:00Z",

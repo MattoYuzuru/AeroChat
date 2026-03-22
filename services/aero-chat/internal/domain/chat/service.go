@@ -74,8 +74,10 @@ type Repository interface {
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
 	ListEncryptedDirectMessageV2(context.Context, string, string, string, int32) ([]EncryptedDirectMessageV2Envelope, error)
 	GetEncryptedDirectMessageV2(context.Context, string, string, string, string) (*EncryptedDirectMessageV2Envelope, error)
+	GetEncryptedDirectMessageV2Stored(context.Context, string, string) (*EncryptedDirectMessageV2StoredEnvelope, error)
 	ListEncryptedGroupMessages(context.Context, string, string, string, int32) ([]EncryptedGroupEnvelope, error)
 	GetEncryptedGroupMessage(context.Context, string, string, string, string) (*EncryptedGroupEnvelope, error)
+	GetEncryptedGroupStoredMessage(context.Context, string, string) (*EncryptedGroupStoredEnvelope, error)
 	ListGroupMessages(context.Context, string, string, int32) ([]GroupMessage, error)
 	SearchDirectMessages(context.Context, string, SearchDirectMessagesParams) ([]MessageSearchResult, error)
 	SearchGroupMessages(context.Context, string, SearchGroupMessagesParams) ([]MessageSearchResult, error)
@@ -84,6 +86,10 @@ type Repository interface {
 	DeleteDirectChatMessageForEveryone(context.Context, string, string, string, time.Time) (bool, error)
 	PinDirectChatMessage(context.Context, string, string, string, time.Time) (bool, error)
 	UnpinDirectChatMessage(context.Context, string, string) (bool, error)
+	PinEncryptedDirectMessageV2(context.Context, string, string, string, time.Time) (bool, error)
+	UnpinEncryptedDirectMessageV2(context.Context, string, string) (bool, error)
+	PinEncryptedGroupMessage(context.Context, string, string, string, time.Time) (bool, error)
+	UnpinEncryptedGroupMessage(context.Context, string, string) (bool, error)
 }
 
 type FriendshipChecker interface {
@@ -1058,6 +1064,15 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 	if err := validateEncryptedDirectMessageV2Operation(normalizedOperationKind, normalizedTargetMessageID); err != nil {
 		return nil, err
 	}
+	if err := s.validateEncryptedDirectMessageV2MutationTarget(
+		ctx,
+		authSession.User.ID,
+		normalizedChatID,
+		normalizedOperationKind,
+		normalizedTargetMessageID,
+	); err != nil {
+		return nil, err
+	}
 
 	peerUserID, err := directChatPeerUserID(*directChat, authSession.User.ID)
 	if err != nil {
@@ -1249,6 +1264,15 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 		return nil, err
 	}
 	if err := validateEncryptedGroupMessageOperation(normalizedOperationKind, normalizedTargetMessageID); err != nil {
+		return nil, err
+	}
+	if err := s.validateEncryptedGroupMessageMutationTarget(
+		ctx,
+		authSession.User.ID,
+		group.ID,
+		normalizedOperationKind,
+		normalizedTargetMessageID,
+	); err != nil {
 		return nil, err
 	}
 	normalizedRevision, err := normalizeEncryptedGroupMessageRevision(params.Revision)
@@ -2060,6 +2084,126 @@ func (s *Service) UnpinMessage(ctx context.Context, token string, chatID string,
 	return s.repo.GetDirectChatMessage(ctx, authSession.User.ID, normalizedChatID, normalizedMessageID)
 }
 
+func (s *Service) PinEncryptedDirectMessageV2(ctx context.Context, token string, chatID string, messageID string) (*DirectChat, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, err
+	}
+
+	target, err := s.repo.GetEncryptedDirectMessageV2Stored(ctx, normalizedChatID, normalizedMessageID)
+	if err != nil {
+		return nil, err
+	}
+	if target.OperationKind != EncryptedDirectMessageV2OperationContent {
+		return nil, fmt.Errorf("%w: encrypted pin must reference logical content message", ErrConflict)
+	}
+
+	if _, err := s.repo.PinEncryptedDirectMessageV2(ctx, normalizedChatID, normalizedMessageID, authSession.User.ID, s.now()); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+}
+
+func (s *Service) UnpinEncryptedDirectMessageV2(ctx context.Context, token string, chatID string, messageID string) (*DirectChat, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetEncryptedDirectMessageV2Stored(ctx, normalizedChatID, normalizedMessageID); err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.UnpinEncryptedDirectMessageV2(ctx, normalizedChatID, normalizedMessageID); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+}
+
+func (s *Service) PinEncryptedGroupMessage(ctx context.Context, token string, groupID string, messageID string) (*Group, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID); err != nil {
+		return nil, err
+	}
+
+	target, err := s.repo.GetEncryptedGroupStoredMessage(ctx, normalizedGroupID, normalizedMessageID)
+	if err != nil {
+		return nil, err
+	}
+	if target.OperationKind != EncryptedGroupMessageOperationContent {
+		return nil, fmt.Errorf("%w: encrypted pin must reference logical content message", ErrConflict)
+	}
+
+	if _, err := s.repo.PinEncryptedGroupMessage(ctx, normalizedGroupID, normalizedMessageID, authSession.User.ID, s.now()); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+}
+
+func (s *Service) UnpinEncryptedGroupMessage(ctx context.Context, token string, groupID string, messageID string) (*Group, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID); err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetEncryptedGroupStoredMessage(ctx, normalizedGroupID, normalizedMessageID); err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.UnpinEncryptedGroupMessage(ctx, normalizedGroupID, normalizedMessageID); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+}
+
 func (s *Service) authenticate(ctx context.Context, token string) (*SessionAuth, error) {
 	parsed, err := s.sessionToken.Parse(token)
 	if err != nil {
@@ -2324,6 +2468,10 @@ func normalizeEncryptedGroupMessageOperationKind(value string) (string, error) {
 		return EncryptedGroupMessageOperationContent, nil
 	case EncryptedGroupMessageOperationControl:
 		return EncryptedGroupMessageOperationControl, nil
+	case EncryptedGroupMessageOperationEdit:
+		return EncryptedGroupMessageOperationEdit, nil
+	case EncryptedGroupMessageOperationTombstone:
+		return EncryptedGroupMessageOperationTombstone, nil
 	default:
 		return "", fmt.Errorf("%w: encrypted group message operation_kind is unsupported", ErrInvalidArgument)
 	}
@@ -2359,9 +2507,38 @@ func validateEncryptedGroupMessageOperation(operationKind string, targetMessageI
 		if targetMessageID != nil {
 			return fmt.Errorf("%w: encrypted group content operation must not include target_message_id", ErrInvalidArgument)
 		}
-	case EncryptedGroupMessageOperationControl:
+	case EncryptedGroupMessageOperationControl, EncryptedGroupMessageOperationEdit, EncryptedGroupMessageOperationTombstone:
+		if targetMessageID == nil {
+			return fmt.Errorf("%w: encrypted group mutation must include target_message_id", ErrInvalidArgument)
+		}
 	default:
 		return fmt.Errorf("%w: encrypted group message operation_kind is unsupported", ErrInvalidArgument)
+	}
+
+	return nil
+}
+
+func (s *Service) validateEncryptedGroupMessageMutationTarget(
+	ctx context.Context,
+	userID string,
+	groupID string,
+	operationKind string,
+	targetMessageID *string,
+) error {
+	if targetMessageID == nil || operationKind == EncryptedGroupMessageOperationContent {
+		return nil
+	}
+
+	target, err := s.repo.GetEncryptedGroupStoredMessage(ctx, groupID, *targetMessageID)
+	if err != nil {
+		return err
+	}
+	if target.OperationKind != EncryptedGroupMessageOperationContent {
+		return fmt.Errorf("%w: encrypted group mutation target must reference logical content message", ErrConflict)
+	}
+	if (operationKind == EncryptedGroupMessageOperationEdit || operationKind == EncryptedGroupMessageOperationTombstone) &&
+		target.SenderUserID != userID {
+		return fmt.Errorf("%w: only the author can mutate encrypted group message", ErrPermissionDenied)
 	}
 
 	return nil
@@ -2496,6 +2673,31 @@ func validateEncryptedDirectMessageV2Operation(operationKind string, targetMessa
 		}
 	default:
 		return fmt.Errorf("%w: encrypted direct message v2 operation_kind is unsupported", ErrInvalidArgument)
+	}
+
+	return nil
+}
+
+func (s *Service) validateEncryptedDirectMessageV2MutationTarget(
+	ctx context.Context,
+	userID string,
+	chatID string,
+	operationKind string,
+	targetMessageID *string,
+) error {
+	if targetMessageID == nil || operationKind == EncryptedDirectMessageV2OperationContent {
+		return nil
+	}
+
+	target, err := s.repo.GetEncryptedDirectMessageV2Stored(ctx, chatID, *targetMessageID)
+	if err != nil {
+		return err
+	}
+	if target.OperationKind != EncryptedDirectMessageV2OperationContent {
+		return fmt.Errorf("%w: encrypted direct message v2 mutation target must reference logical content message", ErrConflict)
+	}
+	if target.SenderUserID != userID {
+		return fmt.Errorf("%w: only the author can mutate encrypted direct message", ErrPermissionDenied)
 	}
 
 	return nil

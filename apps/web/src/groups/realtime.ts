@@ -19,6 +19,7 @@ interface GroupWire {
   kind?: string;
   selfRole?: string;
   memberCount?: number;
+  encryptedPinnedMessageIds?: string[];
   permissions?: GroupPermissionsWire;
   createdAt?: string;
   updatedAt?: string;
@@ -598,6 +599,9 @@ function normalizeGroup(input: GroupWire | undefined): Group {
     kind: input?.kind ?? "CHAT_KIND_GROUP",
     selfRole: normalizeGroupMemberRole(input?.selfRole),
     memberCount: input?.memberCount ?? 0,
+    encryptedPinnedMessageIds: (input?.encryptedPinnedMessageIds ?? []).filter(
+      (value): value is string => typeof value === "string" && value.trim() !== "",
+    ),
     unreadCount: 0,
     permissions: normalizeGroupPermissions(input?.permissions),
     createdAt: input?.createdAt ?? "",

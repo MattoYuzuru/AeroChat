@@ -75,6 +75,10 @@ AeroChat должен поддерживать:
     - browser шифрует файл до upload, descriptor уходит внутри encrypted DM v2 payload, а ciphertext blob расшифровывается локально после download;
     - текущий direct encrypted lane умеет bounded text + encrypted attachment и attachment-only send/use path;
     - storage/lifecycle/quota/retention foundation остаётся общей и future-ready для group E2EE;
+  - encrypted direct-message v2 mutation recovery foundation:
+    - reply reference, edit revision и tombstone/delete-for-everyone больше не зависят от plaintext server projection;
+    - reply preview собирается только client-side после decrypt и честно деградирует, если target message ещё не попал в локальное bounded окно или уже tombstoned;
+    - pin/unpin для encrypted DM v2 живёт как отдельная control-plane ссылка на stable logical `message_id` без доступа сервера к message body;
   - первый backend-first MLS-compatible foundation для encrypted groups:
     - отдельный encrypted group control-plane lane в `aero-chat` c явным `mls_group_id` и `roster_version`;
     - materialized readable roster по active trusted crypto devices current group members, включая `reader` и write-restricted участников;
@@ -88,13 +92,17 @@ AeroChat должен поддерживать:
         - worker/runtime сам читает минимальный encrypted group bootstrap и собирает group-scoped ciphertext внутри crypto boundary;
         - web отправляет только opaque envelope через существующий `SendEncryptedGroupMessage`, а storage/realtime остаются source of truth;
         - bounded local optimistic projection используется только до server-backed fetch/realtime convergence и не dual-write'ит plaintext timeline;
+      - mutation recovery foundation для encrypted group lane:
+        - replies, edits и tombstones применяются как encrypted events c deterministic local projection convergence;
+        - pin/unpin остаётся server-visible control-plane metadata по stable logical `message_id`, без plaintext preview на сервере;
+        - web рендерит pinned/reply state только из локально разрешённых encrypted entries и честно показывает unresolved/tombstoned состояние, если target пока недоступен;
       - coexistence остаётся честным: encrypted lane не притворяется unified timeline поверх legacy plaintext history;
     - coexistence остаётся bounded и честной:
       - legacy plaintext group history не переписывается и не re-encrypt'ится;
       - encrypted lane forward-only и не dual-write'ит те же сообщения в plaintext path;
-    - текущий slice не объявляет full MLS implementation, encrypted group media send, reply/edit/search/unread parity или backup/recovery.
+    - текущий slice не объявляет full MLS implementation, unread/search parity, encrypted group media parity во всех сценариях или backup/recovery.
   - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
-  - без claims о full encrypted DM parity, encrypted search, MLS/group encrypted messaging или backup/recovery.
+  - без claims о full encrypted DM/group parity, encrypted search, backup/recovery или full MLS client completeness.
 - explicit group moderation/admin policy foundation:
   - явная policy matrix для `owner` / `admin` / `member` / `reader`;
   - durable write restriction для участников группы без потери membership;

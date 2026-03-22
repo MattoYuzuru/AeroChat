@@ -284,7 +284,7 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
             input,
           );
         },
-        async sendEncryptedDirectMessageV2Content(chatId, text, attachmentDrafts) {
+        async sendEncryptedDirectMessageV2Content(chatId, text, replyToMessageId, attachmentDrafts) {
           if (runtimeRef.current === null || currentSessionRef.current === null) {
             return null;
           }
@@ -305,6 +305,7 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
               {
                 chatId,
                 text,
+                replyToMessageId,
                 attachmentDrafts,
               },
             );
@@ -350,7 +351,142 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
             throw error;
           }
         },
-        async sendEncryptedGroupContent(groupId, text) {
+        async sendEncryptedDirectMessageV2Edit(chatId, targetMessageId, nextRevision, text, replyToMessageId, attachmentDrafts) {
+          if (runtimeRef.current === null || currentSessionRef.current === null) {
+            return null;
+          }
+
+          setState((current) =>
+            current.status === "disabled"
+              ? current
+              : {
+                  ...current,
+                  isActionPending: true,
+                  pendingLabel: "Публикуем encrypted DM v2 edit...",
+                },
+          );
+
+          try {
+            const result = await runtimeRef.current.sendEncryptedDirectMessageV2Edit(
+              currentSessionRef.current,
+              {
+                chatId,
+                targetMessageId,
+                nextRevision,
+                text,
+                replyToMessageId,
+                attachmentDrafts,
+              },
+            );
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            return result;
+          } catch (error) {
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    snapshot:
+                      current.snapshot === null
+                        ? current.snapshot
+                        : {
+                            ...current.snapshot,
+                            notice: null,
+                            errorMessage:
+                              error instanceof Error && error.message.trim() !== ""
+                                ? error.message
+                                : "Не удалось опубликовать encrypted DM v2 edit.",
+                          },
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            throw error;
+          }
+        },
+        async sendEncryptedDirectMessageV2Tombstone(chatId, targetMessageId, nextRevision) {
+          if (runtimeRef.current === null || currentSessionRef.current === null) {
+            return null;
+          }
+
+          setState((current) =>
+            current.status === "disabled"
+              ? current
+              : {
+                  ...current,
+                  isActionPending: true,
+                  pendingLabel: "Публикуем encrypted DM v2 tombstone...",
+                },
+          );
+
+          try {
+            const result = await runtimeRef.current.sendEncryptedDirectMessageV2Tombstone(
+              currentSessionRef.current,
+              {
+                chatId,
+                targetMessageId,
+                nextRevision,
+              },
+            );
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            return result;
+          } catch (error) {
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    snapshot:
+                      current.snapshot === null
+                        ? current.snapshot
+                        : {
+                            ...current.snapshot,
+                            notice: null,
+                            errorMessage:
+                              error instanceof Error && error.message.trim() !== ""
+                                ? error.message
+                                : "Не удалось опубликовать encrypted DM v2 tombstone.",
+                          },
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            throw error;
+          }
+        },
+        async sendEncryptedGroupContent(groupId, text, replyToMessageId) {
           if (runtimeRef.current === null || currentSessionRef.current === null) {
             return null;
           }
@@ -371,6 +507,7 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
               {
                 groupId,
                 text,
+                replyToMessageId,
               },
             );
             if (!mountedRef.current) {
@@ -407,6 +544,140 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
                               error instanceof Error && error.message.trim() !== ""
                                 ? error.message
                                 : "Не удалось отправить encrypted group message.",
+                          },
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            throw error;
+          }
+        },
+        async sendEncryptedGroupEdit(groupId, targetMessageId, nextRevision, text, replyToMessageId) {
+          if (runtimeRef.current === null || currentSessionRef.current === null) {
+            return null;
+          }
+
+          setState((current) =>
+            current.status === "disabled"
+              ? current
+              : {
+                  ...current,
+                  isActionPending: true,
+                  pendingLabel: "Публикуем encrypted group edit...",
+                },
+          );
+
+          try {
+            const result = await runtimeRef.current.sendEncryptedGroupEdit(
+              currentSessionRef.current,
+              {
+                groupId,
+                targetMessageId,
+                nextRevision,
+                text,
+                replyToMessageId,
+              },
+            );
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            return result;
+          } catch (error) {
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    snapshot:
+                      current.snapshot === null
+                        ? current.snapshot
+                        : {
+                            ...current.snapshot,
+                            notice: null,
+                            errorMessage:
+                              error instanceof Error && error.message.trim() !== ""
+                                ? error.message
+                                : "Не удалось опубликовать encrypted group edit.",
+                          },
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            throw error;
+          }
+        },
+        async sendEncryptedGroupTombstone(groupId, targetMessageId, nextRevision) {
+          if (runtimeRef.current === null || currentSessionRef.current === null) {
+            return null;
+          }
+
+          setState((current) =>
+            current.status === "disabled"
+              ? current
+              : {
+                  ...current,
+                  isActionPending: true,
+                  pendingLabel: "Публикуем encrypted group tombstone...",
+                },
+          );
+
+          try {
+            const result = await runtimeRef.current.sendEncryptedGroupTombstone(
+              currentSessionRef.current,
+              {
+                groupId,
+                targetMessageId,
+                nextRevision,
+              },
+            );
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            return result;
+          } catch (error) {
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    snapshot:
+                      current.snapshot === null
+                        ? current.snapshot
+                        : {
+                            ...current.snapshot,
+                            notice: null,
+                            errorMessage:
+                              error instanceof Error && error.message.trim() !== ""
+                                ? error.message
+                                : "Не удалось опубликовать encrypted group tombstone.",
                           },
                     isActionPending: false,
                     pendingLabel: null,

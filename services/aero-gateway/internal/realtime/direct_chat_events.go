@@ -84,12 +84,13 @@ type chatUserWire struct {
 }
 
 type directChatWire struct {
-	ID               string         `json:"id"`
-	Kind             string         `json:"kind"`
-	Participants     []chatUserWire `json:"participants"`
-	PinnedMessageIDs []string       `json:"pinnedMessageIds"`
-	CreatedAt        string         `json:"createdAt"`
-	UpdatedAt        string         `json:"updatedAt"`
+	ID                        string         `json:"id"`
+	Kind                      string         `json:"kind"`
+	Participants              []chatUserWire `json:"participants"`
+	PinnedMessageIDs          []string       `json:"pinnedMessageIds"`
+	EncryptedPinnedMessageIDs []string       `json:"encryptedPinnedMessageIds"`
+	CreatedAt                 string         `json:"createdAt"`
+	UpdatedAt                 string         `json:"updatedAt"`
 }
 
 type textMessageContentWire struct {
@@ -198,12 +199,13 @@ func toDirectChatWire(chat *chatv1.DirectChat) *directChatWire {
 	}
 
 	return &directChatWire{
-		ID:               chat.GetId(),
-		Kind:             chat.GetKind().String(),
-		Participants:     participants,
-		PinnedMessageIDs: append([]string(nil), chat.GetPinnedMessageIds()...),
-		CreatedAt:        formatProtoTimestamp(chat.GetCreatedAt()),
-		UpdatedAt:        formatProtoTimestamp(chat.GetUpdatedAt()),
+		ID:                        chat.GetId(),
+		Kind:                      chat.GetKind().String(),
+		Participants:              participants,
+		PinnedMessageIDs:          append([]string(nil), chat.GetPinnedMessageIds()...),
+		EncryptedPinnedMessageIDs: append([]string(nil), chat.GetEncryptedPinnedMessageIds()...),
+		CreatedAt:                 formatProtoTimestamp(chat.GetCreatedAt()),
+		UpdatedAt:                 formatProtoTimestamp(chat.GetUpdatedAt()),
 	}
 }
 

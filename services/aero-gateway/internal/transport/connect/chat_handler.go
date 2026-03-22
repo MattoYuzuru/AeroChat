@@ -465,6 +465,22 @@ func (h *ChatHandler) UnpinMessage(ctx context.Context, req *connect.Request[cha
 	return response, nil
 }
 
+func (h *ChatHandler) PinEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.PinEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.PinEncryptedDirectMessageV2Response], error) {
+	return forwardUnary(ctx, req, h.client.PinEncryptedDirectMessageV2)
+}
+
+func (h *ChatHandler) UnpinEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.UnpinEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.UnpinEncryptedDirectMessageV2Response], error) {
+	return forwardUnary(ctx, req, h.client.UnpinEncryptedDirectMessageV2)
+}
+
+func (h *ChatHandler) PinEncryptedGroupMessage(ctx context.Context, req *connect.Request[chatv1.PinEncryptedGroupMessageRequest]) (*connect.Response[chatv1.PinEncryptedGroupMessageResponse], error) {
+	return forwardUnary(ctx, req, h.client.PinEncryptedGroupMessage)
+}
+
+func (h *ChatHandler) UnpinEncryptedGroupMessage(ctx context.Context, req *connect.Request[chatv1.UnpinEncryptedGroupMessageRequest]) (*connect.Response[chatv1.UnpinEncryptedGroupMessageResponse], error) {
+	return forwardUnary(ctx, req, h.client.UnpinEncryptedGroupMessage)
+}
+
 func (h *ChatHandler) publishMessageUpdate(
 	ctx context.Context,
 	headers http.Header,

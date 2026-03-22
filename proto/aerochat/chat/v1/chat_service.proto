@@ -56,6 +56,10 @@ service ChatService {
   rpc DeleteMessageForEveryone(DeleteMessageForEveryoneRequest) returns (DeleteMessageForEveryoneResponse);
   rpc PinMessage(PinMessageRequest) returns (PinMessageResponse);
   rpc UnpinMessage(UnpinMessageRequest) returns (UnpinMessageResponse);
+  rpc PinEncryptedDirectMessageV2(PinEncryptedDirectMessageV2Request) returns (PinEncryptedDirectMessageV2Response);
+  rpc UnpinEncryptedDirectMessageV2(UnpinEncryptedDirectMessageV2Request) returns (UnpinEncryptedDirectMessageV2Response);
+  rpc PinEncryptedGroupMessage(PinEncryptedGroupMessageRequest) returns (PinEncryptedGroupMessageResponse);
+  rpc UnpinEncryptedGroupMessage(UnpinEncryptedGroupMessageRequest) returns (UnpinEncryptedGroupMessageResponse);
 }
 
 enum ChatKind {
@@ -80,6 +84,8 @@ enum EncryptedGroupMessageOperationKind {
   ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_UNSPECIFIED = 0;
   ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT = 1;
   ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTROL = 2;
+  ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_EDIT = 3;
+  ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_TOMBSTONE = 4;
 }
 
 enum MarkdownPolicy {
@@ -147,6 +153,7 @@ message DirectChat {
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
   DirectChatUnreadState unread_state = 7;
+  repeated string encrypted_pinned_message_ids = 8;
 }
 
 message Group {
@@ -159,6 +166,7 @@ message Group {
   google.protobuf.Timestamp updated_at = 7;
   GroupUnreadState unread_state = 8;
   GroupPermissions permissions = 9;
+  repeated string encrypted_pinned_message_ids = 10;
 }
 
 message GroupPermissions {
@@ -1002,4 +1010,40 @@ message UnpinMessageRequest {
 
 message UnpinMessageResponse {
   DirectChatMessage message = 1;
+}
+
+message PinEncryptedDirectMessageV2Request {
+  string chat_id = 1;
+  string message_id = 2;
+}
+
+message PinEncryptedDirectMessageV2Response {
+  DirectChat chat = 1;
+}
+
+message UnpinEncryptedDirectMessageV2Request {
+  string chat_id = 1;
+  string message_id = 2;
+}
+
+message UnpinEncryptedDirectMessageV2Response {
+  DirectChat chat = 1;
+}
+
+message PinEncryptedGroupMessageRequest {
+  string group_id = 1;
+  string message_id = 2;
+}
+
+message PinEncryptedGroupMessageResponse {
+  Group group = 1;
+}
+
+message UnpinEncryptedGroupMessageRequest {
+  string group_id = 1;
+  string message_id = 2;
+}
+
+message UnpinEncryptedGroupMessageResponse {
+  Group group = 1;
 }
