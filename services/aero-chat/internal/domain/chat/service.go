@@ -59,6 +59,7 @@ type Repository interface {
 	ListDirectChatPresenceStateEntries(context.Context, string, string) ([]DirectChatPresenceStateEntry, error)
 	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
 	ListActiveCryptoDevicesByUserIDs(context.Context, []string) ([]CryptoDevice, error)
+	ListCurrentCryptoDeviceBundlesByDeviceIDs(context.Context, []string) ([]CryptoDeviceBundle, error)
 	UpsertDirectChatReadReceipt(context.Context, UpsertDirectChatReadReceiptParams) (bool, error)
 	UpsertGroupChatReadState(context.Context, UpsertGroupChatReadStateParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
@@ -928,6 +929,82 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 		ReplyPreview:     replyPreview,
 		CreatedAt:        now,
 	})
+}
+
+func (s *Service) GetEncryptedDirectMessageV2SendBootstrap(ctx context.Context, token string, chatID string, senderCryptoDeviceID string) (*EncryptedDirectMessageV2SendBootstrap, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedSenderCryptoDeviceID, err := normalizeID(senderCryptoDeviceID, "sender_crypto_device_id")
+	if err != nil {
+		return nil, err
+	}
+
+	directChat, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureDirectChatWriteAllowed(ctx, authSession.User.ID, *directChat); err != nil {
+		return nil, err
+	}
+
+	peerUserID, err := directChatPeerUserID(*directChat, authSession.User.ID)
+	if err != nil {
+		return nil, err
+	}
+	activeDevices, err := s.repo.ListActiveCryptoDevicesByUserIDs(ctx, []string{authSession.User.ID, peerUserID})
+	if err != nil {
+		return nil, err
+	}
+
+	recipientDevices, senderOtherDevices, err := resolveEncryptedDirectMessageV2SendTargetDevices(
+		authSession.User.ID,
+		peerUserID,
+		normalizedSenderCryptoDeviceID,
+		activeDevices,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	targetDeviceIDs := make([]string, 0, len(recipientDevices)+len(senderOtherDevices))
+	for _, device := range recipientDevices {
+		targetDeviceIDs = append(targetDeviceIDs, device.ID)
+	}
+	for _, device := range senderOtherDevices {
+		targetDeviceIDs = append(targetDeviceIDs, device.ID)
+	}
+
+	bundles, err := s.repo.ListCurrentCryptoDeviceBundlesByDeviceIDs(ctx, targetDeviceIDs)
+	if err != nil {
+		return nil, err
+	}
+	bundleByDeviceID := make(map[string]CryptoDeviceBundle, len(bundles))
+	for _, bundle := range bundles {
+		bundleByDeviceID[bundle.CryptoDeviceID] = bundle
+	}
+
+	resolvedRecipientDevices, err := attachEncryptedDirectMessageV2SendTargetBundles(recipientDevices, bundleByDeviceID)
+	if err != nil {
+		return nil, err
+	}
+	resolvedSenderOtherDevices, err := attachEncryptedDirectMessageV2SendTargetBundles(senderOtherDevices, bundleByDeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &EncryptedDirectMessageV2SendBootstrap{
+		ChatID:             normalizedChatID,
+		RecipientUserID:    peerUserID,
+		RecipientDevices:   resolvedRecipientDevices,
+		SenderOtherDevices: resolvedSenderOtherDevices,
+	}, nil
 }
 
 func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string, params SendEncryptedDirectMessageV2Params) (*EncryptedDirectMessageV2StoredEnvelope, error) {
@@ -1988,6 +2065,63 @@ func resolveEncryptedDirectMessageV2Deliveries(
 
 	if len(expectedTargets) > 0 {
 		return nil, fmt.Errorf("%w: encrypted direct message v2 target roster is incomplete", ErrConflict)
+	}
+
+	return result, nil
+}
+
+func resolveEncryptedDirectMessageV2SendTargetDevices(
+	senderUserID string,
+	recipientUserID string,
+	senderCryptoDeviceID string,
+	activeDevices []CryptoDevice,
+) ([]CryptoDevice, []CryptoDevice, error) {
+	senderDeviceIsActive := false
+	recipientDevices := make([]CryptoDevice, 0)
+	senderOtherDevices := make([]CryptoDevice, 0)
+	for _, device := range activeDevices {
+		if device.Status != CryptoDeviceStatusActive {
+			continue
+		}
+
+		switch device.UserID {
+		case senderUserID:
+			if device.ID == senderCryptoDeviceID {
+				senderDeviceIsActive = true
+				continue
+			}
+			senderOtherDevices = append(senderOtherDevices, device)
+		case recipientUserID:
+			recipientDevices = append(recipientDevices, device)
+		}
+	}
+
+	if !senderDeviceIsActive {
+		return nil, nil, fmt.Errorf("%w: sender crypto device must be active", ErrConflict)
+	}
+	if len(recipientDevices) == 0 {
+		return nil, nil, fmt.Errorf("%w: recipient must have at least one active crypto device", ErrConflict)
+	}
+
+	return recipientDevices, senderOtherDevices, nil
+}
+
+func attachEncryptedDirectMessageV2SendTargetBundles(
+	devices []CryptoDevice,
+	bundleByDeviceID map[string]CryptoDeviceBundle,
+) ([]EncryptedDirectMessageV2SendTargetDevice, error) {
+	result := make([]EncryptedDirectMessageV2SendTargetDevice, 0, len(devices))
+	for _, device := range devices {
+		bundle, ok := bundleByDeviceID[device.ID]
+		if !ok {
+			return nil, fmt.Errorf("%w: active crypto device %s has no current public bundle", ErrConflict, device.ID)
+		}
+
+		result = append(result, EncryptedDirectMessageV2SendTargetDevice{
+			UserID:   device.UserID,
+			DeviceID: device.ID,
+			Bundle:   bundle,
+		})
 	}
 
 	return result, nil

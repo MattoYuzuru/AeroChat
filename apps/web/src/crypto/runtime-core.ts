@@ -10,9 +10,14 @@ import {
 } from "../gateway/types";
 import type { CryptoKeyStore } from "./keystore";
 import type { CryptoMaterialFactory } from "./material";
-import { decryptEncryptedDirectMessageV2Envelope } from "./encrypted-v2-codec";
+import {
+  decryptEncryptedDirectMessageV2Envelope,
+  encryptEncryptedDirectMessageV2Payload,
+  type EncryptedDirectMessageV2PayloadV1,
+} from "./encrypted-v2-codec";
 import type {
   EncryptedDirectMessageV2DecryptedEnvelope,
+  EncryptedDirectMessageV2OutboundSendResult,
   CryptoRuntimeSession,
   CryptoRuntimeSnapshot,
   LocalCryptoDeviceMaterial,
@@ -263,6 +268,130 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           decryptEncryptedDirectMessageV2Envelope(localMaterial, envelope),
         ),
       );
+    },
+
+    async sendEncryptedDirectMessageV2Content(
+      session: CryptoRuntimeSession,
+      input: {
+        chatId: string;
+        text: string;
+      },
+    ): Promise<EncryptedDirectMessageV2OutboundSendResult> {
+      const supportError = assertSupport(dependencies);
+      if (supportError !== null) {
+        throw new Error(
+          supportError.errorMessage ??
+            "Текущий browser runtime не поддерживает encrypted DM v2 bootstrap send.",
+        );
+      }
+
+      const normalizedChatId = input.chatId.trim();
+      const normalizedText = input.text.trim();
+      if (normalizedChatId === "") {
+        throw new Error("Не выбран direct chat для encrypted DM v2 send.");
+      }
+      if (normalizedText === "") {
+        throw new Error("Encrypted DM v2 bootstrap send пока поддерживает только непустой text payload.");
+      }
+
+      const localMaterial = await dependencies.keyStore.load(session.profileId);
+      if (localMaterial === null || localMaterial.record.status !== "active") {
+        throw new Error(
+          "Encrypted DM v2 send доступен только для browser profile с active local crypto-device.",
+        );
+      }
+
+      const sendBootstrap =
+        await dependencies.gatewayClient.getEncryptedDirectMessageV2SendBootstrap(
+          session.token,
+          normalizedChatId,
+          localMaterial.record.cryptoDeviceId,
+        );
+      const targetDevices = [
+        ...sendBootstrap.recipientDevices,
+        ...sendBootstrap.senderOtherDevices,
+      ];
+      if (targetDevices.length === 0) {
+        throw new Error("Encrypted DM v2 send bootstrap не вернул target crypto-device roster.");
+      }
+
+      const messageId = createLogicalMessageId();
+      const createdAt = new Date().toISOString();
+      const payload: EncryptedDirectMessageV2PayloadV1 = {
+        schema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
+        operation: "content",
+        message: {
+          kind: "text",
+          text: normalizedText,
+          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        },
+      };
+
+      const deliveries = await Promise.all(
+        targetDevices.map(async (device) => {
+          if (device.signedPrekeyPublicBase64.trim() === "") {
+            throw new Error(
+              `Active target crypto-device ${device.cryptoDeviceId} не имеет public signed prekey для bootstrap send.`,
+            );
+          }
+
+          const encrypted = await encryptEncryptedDirectMessageV2Payload({
+            recipientSignedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
+            metadata: {
+              messageId,
+              chatId: normalizedChatId,
+              senderUserId: session.profileId,
+              senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
+              operationKind: "content",
+              targetMessageId: null,
+              revision: 1,
+              createdAt,
+              recipientCryptoDeviceId: device.cryptoDeviceId,
+            },
+            payload,
+          });
+
+          return {
+            recipientCryptoDeviceId: device.cryptoDeviceId,
+            transportHeader: encrypted.transportHeader,
+            ciphertext: encrypted.ciphertext,
+          };
+        }),
+      );
+
+      const storedEnvelope = await dependencies.gatewayClient.sendEncryptedDirectMessageV2(
+        session.token,
+        {
+          chatId: normalizedChatId,
+          messageId,
+          senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
+          operationKind: "content",
+          targetMessageId: null,
+          revision: 1,
+          deliveries,
+        },
+      );
+
+      return {
+        storedEnvelope,
+        localProjection: {
+          status: "ready",
+          messageId: storedEnvelope.messageId,
+          chatId: storedEnvelope.chatId,
+          senderUserId: storedEnvelope.senderUserId,
+          senderCryptoDeviceId: storedEnvelope.senderCryptoDeviceId,
+          operationKind: "content",
+          targetMessageId: null,
+          revision: storedEnvelope.revision,
+          createdAt: storedEnvelope.createdAt,
+          storedAt: storedEnvelope.storedAt,
+          payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
+          text: normalizedText,
+          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+          editedAt: null,
+          deletedAt: null,
+        },
+      };
     },
   };
 }
@@ -598,4 +727,28 @@ function buildSnapshot(input: {
     notice: input.notice,
     errorMessage: input.errorMessage,
   };
+}
+
+function createLogicalMessageId(): string {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const byte6 = bytes[6];
+  const byte8 = bytes[8];
+  if (byte6 === undefined || byte8 === undefined) {
+    throw new Error("Не удалось подготовить local logical message id для encrypted DM v2.");
+  }
+  bytes[6] = (byte6 & 0x0f) | 0x40;
+  bytes[8] = (byte8 & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+  return [
+    hex.slice(0, 4).join(""),
+    hex.slice(4, 6).join(""),
+    hex.slice(6, 8).join(""),
+    hex.slice(8, 10).join(""),
+    hex.slice(10, 16).join(""),
+  ].join("-");
 }

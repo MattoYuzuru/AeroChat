@@ -912,6 +912,28 @@ WHERE status = 'active'
   AND user_id = ANY($1::uuid[])
 ORDER BY user_id ASC, created_at ASC, id ASC;
 
+-- name: ListCurrentCryptoDeviceBundlesByDeviceIDs :many
+SELECT
+    crypto_device_id,
+    bundle_version,
+    crypto_suite,
+    identity_public_key,
+    signed_prekey_public,
+    signed_prekey_id,
+    signed_prekey_signature,
+    kem_public_key,
+    kem_key_id,
+    kem_signature,
+    one_time_prekeys_total,
+    one_time_prekeys_available,
+    bundle_digest,
+    published_at,
+    expires_at
+FROM crypto_device_bundles
+WHERE superseded_at IS NULL
+  AND crypto_device_id = ANY($1::uuid[])
+ORDER BY crypto_device_id ASC;
+
 -- name: CompleteAttachmentUpload :execrows
 WITH updated_attachment AS (
     UPDATE attachments

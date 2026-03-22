@@ -721,6 +721,53 @@ func TestSendEncryptedDirectMessageV2CreatesDeviceScopedDeliveries(t *testing.T)
 	}
 }
 
+func TestGetEncryptedDirectMessageV2SendBootstrapReturnsRecipientAndSenderSecondaryBundles(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	aliceOther := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+	bobSecond := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	bootstrap, err := service.GetEncryptedDirectMessageV2SendBootstrap(
+		context.Background(),
+		alice.Token,
+		directChat.ID,
+		aliceSender.ID,
+	)
+	if err != nil {
+		t.Fatalf("get encrypted direct message v2 send bootstrap: %v", err)
+	}
+
+	if bootstrap.ChatID != directChat.ID {
+		t.Fatalf("ожидался chat id %q, получен %q", directChat.ID, bootstrap.ChatID)
+	}
+	if bootstrap.RecipientUserID != bob.User.ID {
+		t.Fatalf("ожидался recipient user id %q, получен %q", bob.User.ID, bootstrap.RecipientUserID)
+	}
+	if len(bootstrap.RecipientDevices) != 2 {
+		t.Fatalf("ожидалось 2 recipient devices, получено %d", len(bootstrap.RecipientDevices))
+	}
+	if len(bootstrap.SenderOtherDevices) != 1 {
+		t.Fatalf("ожидался 1 sender secondary device, получено %d", len(bootstrap.SenderOtherDevices))
+	}
+	if bootstrap.SenderOtherDevices[0].DeviceID != aliceOther.ID {
+		t.Fatalf("ожидался sender secondary device %q, получен %q", aliceOther.ID, bootstrap.SenderOtherDevices[0].DeviceID)
+	}
+	if bootstrap.SenderOtherDevices[0].Bundle.SignedPrekeyID == "" {
+		t.Fatal("ожидался current public bundle для sender secondary device")
+	}
+	if bootstrap.RecipientDevices[0].DeviceID != bobFirst.ID || bootstrap.RecipientDevices[1].DeviceID != bobSecond.ID {
+		t.Fatalf("неверный recipient roster: %+v", bootstrap.RecipientDevices)
+	}
+}
+
 func TestSendEncryptedDirectMessageV2RejectsRosterMismatch(t *testing.T) {
 	t.Parallel()
 
@@ -1360,6 +1407,7 @@ type fakeRepository struct {
 	sessions            map[string]SessionAuth
 	users               map[string]UserSummary
 	cryptoDevices       map[string]CryptoDevice
+	cryptoBundles       map[string]CryptoDeviceBundle
 	friendships         map[string]bool
 	blocks              map[string]map[string]bool
 	groups              map[string]Group
@@ -1388,6 +1436,7 @@ func newFakeRepository() *fakeRepository {
 		sessions:            make(map[string]SessionAuth),
 		users:               make(map[string]UserSummary),
 		cryptoDevices:       make(map[string]CryptoDevice),
+		cryptoBundles:       make(map[string]CryptoDeviceBundle),
 		friendships:         make(map[string]bool),
 		blocks:              make(map[string]map[string]bool),
 		groups:              make(map[string]Group),
@@ -1457,6 +1506,23 @@ func (r *fakeRepository) mustAddActiveCryptoDevice(userID string) CryptoDevice {
 		Status: CryptoDeviceStatusActive,
 	}
 	r.cryptoDevices[device.ID] = device
+	r.cryptoBundles[device.ID] = CryptoDeviceBundle{
+		CryptoDeviceID:          device.ID,
+		BundleVersion:           1,
+		CryptoSuite:             "webcrypto-p256-foundation-v1",
+		IdentityPublicKey:       []byte("identity-public-" + device.ID),
+		SignedPrekeyPublic:      []byte("signed-prekey-public-" + device.ID),
+		SignedPrekeyID:          "signed-prekey-" + device.ID,
+		SignedPrekeySignature:   []byte("signature-" + device.ID),
+		KemPublicKey:            nil,
+		KemKeyID:                nil,
+		KemSignature:            nil,
+		OneTimePrekeysTotal:     0,
+		OneTimePrekeysAvailable: 0,
+		BundleDigest:            []byte("bundle-digest-" + device.ID),
+		PublishedAt:             time.Date(2026, 3, 22, 12, 0, 0, 0, time.UTC),
+		ExpiresAt:               nil,
+	}
 	return device
 }
 
@@ -1567,6 +1633,27 @@ func (r *fakeRepository) ListActiveCryptoDevicesByUserIDs(_ context.Context, use
 			return result[i].ID < result[j].ID
 		}
 		return result[i].UserID < result[j].UserID
+	})
+
+	return result, nil
+}
+
+func (r *fakeRepository) ListCurrentCryptoDeviceBundlesByDeviceIDs(_ context.Context, deviceIDs []string) ([]CryptoDeviceBundle, error) {
+	result := make([]CryptoDeviceBundle, 0, len(deviceIDs))
+	seen := make(map[string]struct{}, len(deviceIDs))
+	for _, deviceID := range deviceIDs {
+		if _, ok := seen[deviceID]; ok {
+			continue
+		}
+		seen[deviceID] = struct{}{}
+		bundle, ok := r.cryptoBundles[deviceID]
+		if !ok {
+			continue
+		}
+		result = append(result, bundle)
+	}
+	sort.Slice(result, func(i int, j int) bool {
+		return result[i].CryptoDeviceID < result[j].CryptoDeviceID
 	})
 
 	return result, nil

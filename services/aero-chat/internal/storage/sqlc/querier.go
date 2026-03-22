@@ -56,6 +56,7 @@ type Querier interface {
 	ListActiveCryptoDevicesByUserIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListActiveCryptoDevicesByUserIDsRow, error)
 	ListAttachmentObjectDeletionCandidates(ctx context.Context, arg ListAttachmentObjectDeletionCandidatesParams) ([]ListAttachmentObjectDeletionCandidatesRow, error)
 	ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListAttachmentRowsByIDsRow, error)
+	ListCurrentCryptoDeviceBundlesByDeviceIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListCurrentCryptoDeviceBundlesByDeviceIDsRow, error)
 	ListDirectChatEncryptedMessageV2ByDevice(ctx context.Context, arg ListDirectChatEncryptedMessageV2ByDeviceParams) ([]ListDirectChatEncryptedMessageV2ByDeviceRow, error)
 	ListDirectChatMessages(ctx context.Context, arg ListDirectChatMessagesParams) ([]ListDirectChatMessagesRow, error)
 	ListDirectChatPresenceStateEntries(ctx context.Context, arg ListDirectChatPresenceStateEntriesParams) ([]ListDirectChatPresenceStateEntriesRow, error)

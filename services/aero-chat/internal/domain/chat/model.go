@@ -74,6 +74,37 @@ type CryptoDevice struct {
 	Status string
 }
 
+type CryptoDeviceBundle struct {
+	CryptoDeviceID          string
+	BundleVersion           uint64
+	CryptoSuite             string
+	IdentityPublicKey       []byte
+	SignedPrekeyPublic      []byte
+	SignedPrekeyID          string
+	SignedPrekeySignature   []byte
+	KemPublicKey            []byte
+	KemKeyID                *string
+	KemSignature            []byte
+	OneTimePrekeysTotal     uint32
+	OneTimePrekeysAvailable uint32
+	BundleDigest            []byte
+	PublishedAt             time.Time
+	ExpiresAt               *time.Time
+}
+
+type EncryptedDirectMessageV2SendTargetDevice struct {
+	UserID   string
+	DeviceID string
+	Bundle   CryptoDeviceBundle
+}
+
+type EncryptedDirectMessageV2SendBootstrap struct {
+	ChatID             string
+	RecipientUserID    string
+	RecipientDevices   []EncryptedDirectMessageV2SendTargetDevice
+	SenderOtherDevices []EncryptedDirectMessageV2SendTargetDevice
+}
+
 type SessionAuth struct {
 	User      UserSummary
 	Device    Device

@@ -1694,6 +1694,35 @@ func (h *testChatHandler) GetDirectChat(_ context.Context, req *connect.Request[
 	}), nil
 }
 
+func (h *testChatHandler) GetEncryptedDirectMessageV2SendBootstrap(_ context.Context, req *connect.Request[chatv1.GetEncryptedDirectMessageV2SendBootstrapRequest]) (*connect.Response[chatv1.GetEncryptedDirectMessageV2SendBootstrapResponse], error) {
+	h.setAuthorization(req.Header().Get("Authorization"))
+
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	peerID := "user-2"
+	if actorID == "user-2" {
+		peerID = "user-1"
+	}
+
+	return connect.NewResponse(&chatv1.GetEncryptedDirectMessageV2SendBootstrapResponse{
+		ChatId:          req.Msg.ChatId,
+		RecipientUserId: peerID,
+		RecipientDevices: []*chatv1.EncryptedDirectMessageV2SendTargetDevice{
+			{
+				UserId:                peerID,
+				CryptoDeviceId:        "peer-crypto-device-1",
+				BundleVersion:         1,
+				CryptoSuite:           "webcrypto-p256-foundation-v1",
+				IdentityPublicKey:     []byte("identity-public"),
+				SignedPrekeyPublic:    []byte("signed-prekey-public"),
+				SignedPrekeyId:        "signed-prekey-1",
+				SignedPrekeySignature: []byte("signature"),
+				BundleDigest:          []byte("bundle-digest"),
+				PublishedAt:           timestamppb.Now(),
+			},
+		},
+	}), nil
+}
+
 func (h *testChatHandler) GetGroupChat(_ context.Context, req *connect.Request[chatv1.GetGroupChatRequest]) (*connect.Response[chatv1.GetGroupChatResponse], error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

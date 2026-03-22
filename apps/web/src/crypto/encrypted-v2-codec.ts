@@ -17,6 +17,18 @@ interface EncryptedDirectMessageV2TransportHeaderV1 {
   ivBase64: string;
 }
 
+export interface EncryptedDirectMessageV2OutboundEnvelopeMetadata {
+  messageId: string;
+  chatId: string;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: "content" | "edit" | "tombstone";
+  targetMessageId: string | null;
+  revision: number;
+  createdAt: string;
+  recipientCryptoDeviceId: string;
+}
+
 interface EncryptedDirectMessageV2ContentPayloadV1 {
   schema: typeof payloadSchema;
   operation: "content";
@@ -44,7 +56,7 @@ interface EncryptedDirectMessageV2TombstonePayloadV1 {
   deletedAt: string;
 }
 
-type EncryptedDirectMessageV2PayloadV1 =
+export type EncryptedDirectMessageV2PayloadV1 =
   | EncryptedDirectMessageV2ContentPayloadV1
   | EncryptedDirectMessageV2EditPayloadV1
   | EncryptedDirectMessageV2TombstonePayloadV1;
@@ -89,6 +101,33 @@ export async function decryptEncryptedDirectMessageV2Envelope(
   }
 }
 
+export async function encryptEncryptedDirectMessageV2Payload(input: {
+  recipientSignedPrekeyPublicBase64: string;
+  metadata: EncryptedDirectMessageV2OutboundEnvelopeMetadata;
+  payload: EncryptedDirectMessageV2PayloadV1;
+}): Promise<{
+  transportHeader: string;
+  ciphertext: string;
+  ciphertextSizeBytes: number;
+}> {
+  const recipientSignedPrekeyPublicKey = await crypto.subtle.importKey(
+    "spki",
+    toArrayBuffer(fromBase64(input.recipientSignedPrekeyPublicBase64)),
+    {
+      name: "ECDH",
+      namedCurve: "P-256",
+    },
+    false,
+    [],
+  );
+
+  return encryptEncryptedDirectMessageV2PayloadWithImportedKey({
+    recipientSignedPrekeyPublicKey,
+    metadata: input.metadata,
+    payload: input.payload,
+  });
+}
+
 export async function encryptEncryptedDirectMessageV2PayloadForTest(input: {
   recipientSignedPrekeyPublicKey: CryptoKey;
   envelope: EncryptedDirectMessageV2Envelope;
@@ -96,6 +135,37 @@ export async function encryptEncryptedDirectMessageV2PayloadForTest(input: {
 }): Promise<
   Pick<EncryptedDirectMessageV2Envelope["viewerDelivery"], "transportHeader" | "ciphertext">
 > {
+  const encrypted = await encryptEncryptedDirectMessageV2PayloadWithImportedKey({
+    recipientSignedPrekeyPublicKey: input.recipientSignedPrekeyPublicKey,
+    metadata: {
+      messageId: input.envelope.messageId,
+      chatId: input.envelope.chatId,
+      senderUserId: input.envelope.senderUserId,
+      senderCryptoDeviceId: input.envelope.senderCryptoDeviceId,
+      operationKind: normalizeOperationKind(input.envelope.operationKind) ?? "content",
+      targetMessageId: input.envelope.targetMessageId,
+      revision: input.envelope.revision,
+      createdAt: input.envelope.createdAt,
+      recipientCryptoDeviceId: input.envelope.viewerDelivery.recipientCryptoDeviceId,
+    },
+    payload: input.payload,
+  });
+
+  return {
+    transportHeader: encrypted.transportHeader,
+    ciphertext: encrypted.ciphertext,
+  };
+}
+
+async function encryptEncryptedDirectMessageV2PayloadWithImportedKey(input: {
+  recipientSignedPrekeyPublicKey: CryptoKey;
+  metadata: EncryptedDirectMessageV2OutboundEnvelopeMetadata;
+  payload: EncryptedDirectMessageV2PayloadV1;
+}): Promise<{
+  transportHeader: string;
+  ciphertext: string;
+  ciphertextSizeBytes: number;
+}> {
   const ephemeralKeyPair = await crypto.subtle.generateKey(
     {
       name: "ECDH",
@@ -124,7 +194,9 @@ export async function encryptEncryptedDirectMessageV2PayloadForTest(input: {
     {
       name: "AES-GCM",
       iv,
-      additionalData: toArrayBuffer(buildAdditionalAuthenticatedData(input.envelope)),
+      additionalData: toArrayBuffer(
+        buildAdditionalAuthenticatedDataFromMetadata(input.metadata),
+      ),
     },
     contentKey,
     toArrayBuffer(plaintext),
@@ -142,6 +214,7 @@ export async function encryptEncryptedDirectMessageV2PayloadForTest(input: {
       ),
     ),
     ciphertext: toBase64(new Uint8Array(ciphertext)),
+    ciphertextSizeBytes: new Uint8Array(ciphertext).byteLength,
   };
 }
 
@@ -343,17 +416,33 @@ function normalizeOperationKind(
 function buildAdditionalAuthenticatedData(
   envelope: EncryptedDirectMessageV2Envelope,
 ): Uint8Array {
+  return buildAdditionalAuthenticatedDataFromMetadata({
+    messageId: envelope.messageId,
+    chatId: envelope.chatId,
+    senderUserId: envelope.senderUserId,
+    senderCryptoDeviceId: envelope.senderCryptoDeviceId,
+    operationKind: normalizeOperationKind(envelope.operationKind) ?? "content",
+    targetMessageId: envelope.targetMessageId,
+    revision: envelope.revision,
+    createdAt: envelope.createdAt,
+    recipientCryptoDeviceId: envelope.viewerDelivery.recipientCryptoDeviceId,
+  });
+}
+
+function buildAdditionalAuthenticatedDataFromMetadata(
+  metadata: EncryptedDirectMessageV2OutboundEnvelopeMetadata,
+): Uint8Array {
   return new TextEncoder().encode(
     JSON.stringify({
-      messageId: envelope.messageId,
-      chatId: envelope.chatId,
-      senderUserId: envelope.senderUserId,
-      senderCryptoDeviceId: envelope.senderCryptoDeviceId,
-      operationKind: envelope.operationKind,
-      targetMessageId: envelope.targetMessageId,
-      revision: envelope.revision,
-      createdAt: envelope.createdAt,
-      recipientCryptoDeviceId: envelope.viewerDelivery.recipientCryptoDeviceId,
+      messageId: metadata.messageId,
+      chatId: metadata.chatId,
+      senderUserId: metadata.senderUserId,
+      senderCryptoDeviceId: metadata.senderCryptoDeviceId,
+      operationKind: metadata.operationKind,
+      targetMessageId: metadata.targetMessageId,
+      revision: metadata.revision,
+      createdAt: metadata.createdAt,
+      recipientCryptoDeviceId: metadata.recipientCryptoDeviceId,
     }),
   );
 }

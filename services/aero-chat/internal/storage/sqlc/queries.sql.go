@@ -2162,6 +2162,83 @@ func (q *Queries) ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.U
 	return items, nil
 }
 
+const listCurrentCryptoDeviceBundlesByDeviceIDs = `-- name: ListCurrentCryptoDeviceBundlesByDeviceIDs :many
+SELECT
+    crypto_device_id,
+    bundle_version,
+    crypto_suite,
+    identity_public_key,
+    signed_prekey_public,
+    signed_prekey_id,
+    signed_prekey_signature,
+    kem_public_key,
+    kem_key_id,
+    kem_signature,
+    one_time_prekeys_total,
+    one_time_prekeys_available,
+    bundle_digest,
+    published_at,
+    expires_at
+FROM crypto_device_bundles
+WHERE superseded_at IS NULL
+  AND crypto_device_id = ANY($1::uuid[])
+ORDER BY crypto_device_id ASC
+`
+
+type ListCurrentCryptoDeviceBundlesByDeviceIDsRow struct {
+	CryptoDeviceID          uuid.UUID          `db:"crypto_device_id" json:"crypto_device_id"`
+	BundleVersion           int64              `db:"bundle_version" json:"bundle_version"`
+	CryptoSuite             string             `db:"crypto_suite" json:"crypto_suite"`
+	IdentityPublicKey       []byte             `db:"identity_public_key" json:"identity_public_key"`
+	SignedPrekeyPublic      []byte             `db:"signed_prekey_public" json:"signed_prekey_public"`
+	SignedPrekeyID          string             `db:"signed_prekey_id" json:"signed_prekey_id"`
+	SignedPrekeySignature   []byte             `db:"signed_prekey_signature" json:"signed_prekey_signature"`
+	KemPublicKey            []byte             `db:"kem_public_key" json:"kem_public_key"`
+	KemKeyID                pgtype.Text        `db:"kem_key_id" json:"kem_key_id"`
+	KemSignature            []byte             `db:"kem_signature" json:"kem_signature"`
+	OneTimePrekeysTotal     int32              `db:"one_time_prekeys_total" json:"one_time_prekeys_total"`
+	OneTimePrekeysAvailable int32              `db:"one_time_prekeys_available" json:"one_time_prekeys_available"`
+	BundleDigest            []byte             `db:"bundle_digest" json:"bundle_digest"`
+	PublishedAt             pgtype.Timestamptz `db:"published_at" json:"published_at"`
+	ExpiresAt               pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+}
+
+func (q *Queries) ListCurrentCryptoDeviceBundlesByDeviceIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListCurrentCryptoDeviceBundlesByDeviceIDsRow, error) {
+	rows, err := q.db.Query(ctx, listCurrentCryptoDeviceBundlesByDeviceIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCurrentCryptoDeviceBundlesByDeviceIDsRow
+	for rows.Next() {
+		var i ListCurrentCryptoDeviceBundlesByDeviceIDsRow
+		if err := rows.Scan(
+			&i.CryptoDeviceID,
+			&i.BundleVersion,
+			&i.CryptoSuite,
+			&i.IdentityPublicKey,
+			&i.SignedPrekeyPublic,
+			&i.SignedPrekeyID,
+			&i.SignedPrekeySignature,
+			&i.KemPublicKey,
+			&i.KemKeyID,
+			&i.KemSignature,
+			&i.OneTimePrekeysTotal,
+			&i.OneTimePrekeysAvailable,
+			&i.BundleDigest,
+			&i.PublishedAt,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDirectChatEncryptedMessageV2ByDevice = `-- name: ListDirectChatEncryptedMessageV2ByDevice :many
 SELECT
     m.id,

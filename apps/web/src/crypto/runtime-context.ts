@@ -4,6 +4,7 @@ import type {
   CryptoRuntimeSession,
   CryptoRuntimeSnapshot,
   EncryptedDirectMessageV2DecryptedEnvelope,
+  EncryptedDirectMessageV2OutboundSendResult,
 } from "./types";
 import type { EncryptedDirectMessageV2Envelope } from "../gateway/types";
 
@@ -30,6 +31,10 @@ export interface CryptoRuntimeContextValue {
   decryptEncryptedDirectMessageV2Envelopes(
     envelopes: EncryptedDirectMessageV2Envelope[],
   ): Promise<EncryptedDirectMessageV2DecryptedEnvelope[]>;
+  sendEncryptedDirectMessageV2Content(
+    chatId: string,
+    text: string,
+  ): Promise<EncryptedDirectMessageV2OutboundSendResult | null>;
 }
 
 export const CryptoRuntimeContext = createContext<CryptoRuntimeContextValue | null>(null);

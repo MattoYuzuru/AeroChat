@@ -3,6 +3,7 @@ import type {
   CryptoDeviceBundle,
   CryptoDeviceLinkIntent,
   EncryptedDirectMessageV2Envelope,
+  EncryptedDirectMessageV2StoredEnvelope,
 } from "../gateway/types";
 
 export interface CryptoRuntimeSession {
@@ -109,6 +110,11 @@ export type EncryptedDirectMessageV2DecryptedEnvelope =
   | EncryptedDirectMessageV2ReadyProjection
   | EncryptedDirectMessageV2DecryptFailure;
 
+export interface EncryptedDirectMessageV2OutboundSendResult {
+  storedEnvelope: EncryptedDirectMessageV2StoredEnvelope;
+  localProjection: EncryptedDirectMessageV2ReadyProjection;
+}
+
 export interface CryptoRuntimeClient {
   bootstrapSession(session: CryptoRuntimeSession): Promise<CryptoRuntimeSnapshot>;
   createPendingLinkedDevice(session: CryptoRuntimeSession): Promise<CryptoRuntimeSnapshot>;
@@ -121,6 +127,13 @@ export interface CryptoRuntimeClient {
     session: CryptoRuntimeSession,
     envelopes: EncryptedDirectMessageV2Envelope[],
   ): Promise<EncryptedDirectMessageV2DecryptedEnvelope[]>;
+  sendEncryptedDirectMessageV2Content(
+    session: CryptoRuntimeSession,
+    input: {
+      chatId: string;
+      text: string;
+    },
+  ): Promise<EncryptedDirectMessageV2OutboundSendResult>;
   dispose(): void;
 }
 
@@ -133,6 +146,13 @@ export interface CryptoWorkerRequestMap {
     session: CryptoRuntimeSession;
     envelopes: EncryptedDirectMessageV2Envelope[];
   };
+  sendEncryptedDirectMessageV2Content: {
+    session: CryptoRuntimeSession;
+    input: {
+      chatId: string;
+      text: string;
+    };
+  };
 }
 
 export interface CryptoWorkerResultMap {
@@ -141,6 +161,7 @@ export interface CryptoWorkerResultMap {
   publishCurrentBundle: CryptoRuntimeSnapshot;
   approveLinkIntent: CryptoRuntimeSnapshot;
   decryptEncryptedDirectMessageV2Envelopes: EncryptedDirectMessageV2DecryptedEnvelope[];
+  sendEncryptedDirectMessageV2Content: EncryptedDirectMessageV2OutboundSendResult;
 }
 
 export type CryptoWorkerRequest =
@@ -164,6 +185,11 @@ export type CryptoWorkerRequest =
       id: number;
       type: "decryptEncryptedDirectMessageV2Envelopes";
       payload: CryptoWorkerRequestMap["decryptEncryptedDirectMessageV2Envelopes"];
+    }
+  | {
+      id: number;
+      type: "sendEncryptedDirectMessageV2Content";
+      payload: CryptoWorkerRequestMap["sendEncryptedDirectMessageV2Content"];
     };
 
 export type CryptoWorkerResponse =

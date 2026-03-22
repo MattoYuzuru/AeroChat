@@ -418,6 +418,19 @@ export interface EncryptedDirectMessageV2Delivery {
   storedAt: string;
 }
 
+export interface EncryptedDirectMessageV2StoredEnvelope {
+  messageId: string;
+  chatId: string;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: string;
+  targetMessageId: string | null;
+  revision: number;
+  createdAt: string;
+  storedAt: string;
+  storedDeliveryCount: number;
+}
+
 export interface EncryptedDirectMessageV2Envelope {
   messageId: string;
   chatId: string;
@@ -429,6 +442,32 @@ export interface EncryptedDirectMessageV2Envelope {
   createdAt: string;
   storedAt: string;
   viewerDelivery: EncryptedDirectMessageV2Delivery;
+}
+
+export interface EncryptedDirectMessageV2SendTargetDevice {
+  userId: string;
+  cryptoDeviceId: string;
+  bundleVersion: number;
+  cryptoSuite: string;
+  identityPublicKeyBase64: string;
+  signedPrekeyPublicBase64: string;
+  signedPrekeyId: string;
+  signedPrekeySignatureBase64: string;
+  kemPublicKeyBase64: string | null;
+  kemKeyId: string | null;
+  kemSignatureBase64: string | null;
+  oneTimePrekeysTotal: number;
+  oneTimePrekeysAvailable: number;
+  bundleDigestBase64: string;
+  publishedAt: string;
+  expiresAt: string | null;
+}
+
+export interface EncryptedDirectMessageV2SendBootstrap {
+  chatId: string;
+  recipientUserId: string;
+  recipientDevices: EncryptedDirectMessageV2SendTargetDevice[];
+  senderOtherDevices: EncryptedDirectMessageV2SendTargetDevice[];
 }
 
 export interface DirectChatSnapshot {
@@ -715,6 +754,27 @@ export interface GatewayClient {
     token: string,
     chatId: string,
   ): Promise<DirectChatPresenceState | null>;
+  getEncryptedDirectMessageV2SendBootstrap(
+    token: string,
+    chatId: string,
+    senderCryptoDeviceId: string,
+  ): Promise<EncryptedDirectMessageV2SendBootstrap>;
+  sendEncryptedDirectMessageV2(
+    token: string,
+    input: {
+      chatId: string;
+      messageId: string;
+      senderCryptoDeviceId: string;
+      operationKind: "content" | "edit" | "tombstone";
+      targetMessageId?: string | null;
+      revision: number;
+      deliveries: Array<{
+        recipientCryptoDeviceId: string;
+        transportHeader: string;
+        ciphertext: string;
+      }>;
+    },
+  ): Promise<EncryptedDirectMessageV2StoredEnvelope>;
   sendTextMessage(
     token: string,
     chatId: string,

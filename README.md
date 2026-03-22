@@ -65,6 +65,10 @@ AeroChat должен поддерживать:
   - explicit device-aware realtime binding по active local `crypto_device_id` в `aero-gateway`;
   - отдельный realtime family для device-scoped opaque encrypted envelope delivery без plaintext snapshot payload;
   - raw list/get fetch path, worker-side decrypt foundation и bounded local web projection для текущего direct chat;
+  - первый web outbound bootstrap send path для text-only encrypted DM v2:
+    - target roster собирается только по active crypto devices собеседника и other active devices отправителя;
+    - per-device opaque envelopes собираются внутри crypto worker/runtime boundary;
+    - originating sender device получает только bounded local optimistic projection без server-side plaintext fallback;
   - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
   - без claims о full encrypted DM parity, encrypted search, encrypted media relay или backup/recovery.
 - explicit group moderation/admin policy foundation:

@@ -67,6 +67,8 @@ function createClient(overrides: Partial<GatewayClient>): GatewayClient {
     clearDirectChatTyping: vi.fn(),
     setDirectChatPresenceHeartbeat: vi.fn(),
     clearDirectChatPresence: vi.fn(),
+    getEncryptedDirectMessageV2SendBootstrap: vi.fn(),
+    sendEncryptedDirectMessageV2: vi.fn(),
     sendTextMessage: vi.fn(),
     editDirectChatMessage: vi.fn(),
     listDirectChatMessages: vi.fn(),

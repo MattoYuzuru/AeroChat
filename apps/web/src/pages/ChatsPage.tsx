@@ -27,12 +27,15 @@ import {
   describeEncryptedDirectMessageV2Failure,
   type EncryptedDirectMessageV2ProjectionEntry,
 } from "../chats/encrypted-v2-projection";
+import { publishLocalEncryptedDirectMessageV2Projection } from "../chats/encrypted-v2-local-outbound";
 import { resolveChatsRouteSyncAction } from "../chats/route-sync";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
 import {
   describeEncryptedDirectMessageV2LaneEmptyState,
   useEncryptedDirectMessageV2Lane,
 } from "../chats/useEncryptedDirectMessageV2Lane";
+import type { CryptoContextState } from "../crypto/runtime-context";
+import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { useChats } from "../chats/useChats";
 import type {
   ChatUser,
@@ -51,6 +54,7 @@ import styles from "./ChatsPage.module.css";
 
 export function ChatsPage() {
   const { state: authState, expireSession } = useAuth();
+  const cryptoRuntime = useCryptoRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
   const [composerText, setComposerText] = useState("");
   const [composerError, setComposerError] = useState<string | null>(null);
@@ -269,6 +273,25 @@ export function ChatsPage() {
     !attachmentComposer.isUploading &&
     attachmentDraft === null &&
     !hasPendingVoiceNote;
+  const canSendEncryptedDirectMessageV2 =
+    selectedThread !== null &&
+    !chats.state.isSendingMessage &&
+    !cryptoRuntime.state.isActionPending &&
+    !isSendingRecordedNote &&
+    !attachmentComposer.isUploading &&
+    attachmentDraft === null &&
+    uploadedAttachmentId === null &&
+    selectedReplyMessage === null &&
+    normalizeComposerMessageText(composerText) !== "";
+  const encryptedSendHint = describeEncryptedBootstrapSendHint({
+    chatSelected: selectedThread !== null,
+    composerText,
+    attachmentDraftPresent: attachmentDraft !== null || uploadedAttachmentId !== null,
+    hasPendingVoiceNote,
+    hasPendingVideoNote,
+    hasReplyTarget: selectedReplyMessage !== null,
+    cryptoRuntimeState: cryptoRuntime.state,
+  });
 
   async function submitComposer() {
     if (!canSubmitComposer) {
@@ -298,6 +321,64 @@ export function ChatsPage() {
 
     if (uploadedAttachmentId !== null) {
       attachmentComposer.markSendFailed();
+    }
+  }
+
+  async function handleEncryptedDirectMessageV2Send() {
+    if (selectedThread === null) {
+      return;
+    }
+
+    if (attachmentDraft !== null || uploadedAttachmentId !== null) {
+      setComposerError(
+        "Encrypted DM v2 bootstrap send в этом PR остаётся text-only и не принимает attachments.",
+      );
+      chats.clearFeedback();
+      return;
+    }
+    if (selectedReplyMessage !== null) {
+      setComposerError(
+        "Encrypted DM v2 bootstrap send в этом PR не восстанавливает reply semantics.",
+      );
+      chats.clearFeedback();
+      return;
+    }
+    if (hasPendingVoiceNote || hasPendingVideoNote || isSendingRecordedNote) {
+      setComposerError(
+        "Encrypted DM v2 bootstrap send пока не расширяется на voice/video notes.",
+      );
+      chats.clearFeedback();
+      return;
+    }
+
+    const normalizedText = normalizeComposerMessageText(composerText);
+    if (normalizedText === "") {
+      setComposerError("Введите текст для encrypted DM v2 bootstrap send.");
+      chats.clearFeedback();
+      return;
+    }
+
+    setComposerError(null);
+    chats.clearFeedback();
+
+    try {
+      const result = await cryptoRuntime.sendEncryptedDirectMessageV2Content(
+        selectedThread.chat.id,
+        normalizedText,
+      );
+      if (result === null) {
+        return;
+      }
+
+      publishLocalEncryptedDirectMessageV2Projection(result.localProjection);
+      setComposerText("");
+      setSelectedReplyMessage(null);
+    } catch (error) {
+      setComposerError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось отправить encrypted DM v2 через crypto runtime.",
+      );
     }
   }
 
@@ -1321,17 +1402,30 @@ export function ChatsPage() {
                       <div className={styles.actions}>
                         <button
                           className={styles.primaryButton}
-                        disabled={
-                          chats.state.isSendingMessage ||
-                          isSendingVoiceNote ||
-                          !canSubmitComposer
-                        }
-                        type="submit"
-                      >
+                          disabled={
+                            chats.state.isSendingMessage ||
+                            isSendingVoiceNote ||
+                            !canSubmitComposer
+                          }
+                          type="submit"
+                        >
                           {chats.state.isSendingMessage ? "Отправляем..." : "Отправить"}
+                        </button>
+                        <button
+                          className={styles.secondaryButton}
+                          disabled={!canSendEncryptedDirectMessageV2}
+                          onClick={() => {
+                            void handleEncryptedDirectMessageV2Send();
+                          }}
+                          type="button"
+                        >
+                          {cryptoRuntime.state.isActionPending
+                            ? "Собираем..."
+                            : "Encrypted DM v2"}
                         </button>
                       </div>
                     </div>
+                    <p className={styles.attachmentHint}>{encryptedSendHint}</p>
                   </form>
                 </section>
               </div>
@@ -1637,6 +1731,49 @@ function describeDirectComposerReplyTarget(
       : `Вложения: ${message.attachments.length}`;
   }
   return message.senderUserId === currentUserId ? "Ваше сообщение" : "Сообщение собеседника";
+}
+
+function describeEncryptedBootstrapSendHint(input: {
+  chatSelected: boolean;
+  composerText: string;
+  attachmentDraftPresent: boolean;
+  hasPendingVoiceNote: boolean;
+  hasPendingVideoNote: boolean;
+  hasReplyTarget: boolean;
+  cryptoRuntimeState: CryptoContextState;
+}): string {
+  if (!input.chatSelected) {
+    return "Encrypted DM v2 bootstrap send доступен только внутри открытого direct chat.";
+  }
+  if (input.cryptoRuntimeState.status !== "ready") {
+    return "Crypto runtime ещё не готов. Encrypted DM v2 bootstrap send ждёт worker bootstrap.";
+  }
+  const snapshot = input.cryptoRuntimeState.snapshot;
+  if (
+    snapshot === null ||
+    snapshot.support !== "available" ||
+    snapshot.phase === "error" ||
+    snapshot.localDevice?.status !== "active"
+  ) {
+    return (
+      snapshot?.errorMessage ??
+      "Для encrypted DM v2 bootstrap send нужен active local crypto-device."
+    );
+  }
+  if (input.attachmentDraftPresent) {
+    return "Этот PR не добавляет encrypted attachments: bootstrap send остаётся text-only.";
+  }
+  if (input.hasReplyTarget) {
+    return "Encrypted reply send в этом PR не восстанавливается.";
+  }
+  if (input.hasPendingVoiceNote || input.hasPendingVideoNote) {
+    return "Voice/video note path остаётся legacy attachment flow и не входит в encrypted bootstrap send.";
+  }
+  if (normalizeComposerMessageText(input.composerText) === "") {
+    return "Введите текст, чтобы отправить bounded encrypted DM v2 envelope.";
+  }
+
+  return "Отдельное явное действие: worker соберёт text-only encrypted DM v2 envelope и отправит opaque deliveries без plaintext shadow write.";
 }
 
 function jumpToMessage(elementId: string) {
