@@ -5,6 +5,7 @@ import {
   isGatewayErrorCode,
   type DirectChat,
   type DirectChatMessage,
+  type EncryptedDirectChatReadState,
 } from "../gateway/types";
 import { subscribeRealtimeEnvelopes } from "../realtime/events";
 import {
@@ -22,6 +23,7 @@ import {
   createInitialChatsState,
   type ChatThreadSnapshot,
 } from "./state";
+import { subscribeEncryptedDirectMessageV2RealtimeEvents } from "./encrypted-v2-realtime";
 
 interface UseChatsOptions {
   enabled: boolean;
@@ -123,6 +125,14 @@ export function useChats({
           readState: event.readState,
           unreadCount: event.unreadCount,
         });
+        if (event.encryptedReadState !== null || event.encryptedUnreadCount !== null) {
+          dispatch({
+            type: "encrypted_read_state_replaced",
+            chatId: event.chatId,
+            readState: event.encryptedReadState,
+            unreadCount: event.encryptedUnreadCount,
+          });
+        }
         return;
       }
 
@@ -142,6 +152,25 @@ export function useChats({
       });
     });
   }, [enabled, currentUserId]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    return subscribeEncryptedDirectMessageV2RealtimeEvents((event) => {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      dispatch({
+        type: "encrypted_delivery_observed",
+        chatId: event.envelope.chatId,
+        updatedAt: event.envelope.storedAt,
+        unreadCount: event.envelope.viewerDelivery.unreadState?.unreadCount ?? null,
+      });
+    });
+  }, [enabled]);
 
   const activePresenceChatId = resolveDirectChatPresenceHeartbeatChatId({
     enabled,
@@ -727,6 +756,18 @@ export function useChats({
     deleteMessageForEveryone,
     pinMessage,
     unpinMessage,
+    replaceEncryptedReadState(
+      chatId: string,
+      readState: EncryptedDirectChatReadState | null,
+      unreadCount: number,
+    ) {
+      dispatch({
+        type: "encrypted_read_state_replaced",
+        chatId,
+        readState,
+        unreadCount,
+      });
+    },
     clearFeedback() {
       dispatch({ type: "clear_feedback" });
     },
@@ -901,6 +942,7 @@ async function fetchThreadSnapshot(
     },
     messages,
     readState,
+    encryptedReadState: snapshot.encryptedReadState,
     typingState: snapshot.typingState,
     presenceState: snapshot.presenceState,
   };

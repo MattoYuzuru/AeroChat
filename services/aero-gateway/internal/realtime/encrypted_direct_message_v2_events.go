@@ -20,24 +20,27 @@ type encryptedDirectMessageV2EnvelopeWire struct {
 }
 
 type encryptedDirectMessageV2DeliveryWire struct {
-	RecipientCryptoDeviceID string `json:"recipientCryptoDeviceId"`
-	TransportHeader         []byte `json:"transportHeader"`
-	Ciphertext              []byte `json:"ciphertext"`
-	CiphertextSizeBytes     uint64 `json:"ciphertextSizeBytes"`
-	StoredAt                string `json:"storedAt"`
+	RecipientCryptoDeviceID string                    `json:"recipientCryptoDeviceId"`
+	TransportHeader         []byte                    `json:"transportHeader"`
+	Ciphertext              []byte                    `json:"ciphertext"`
+	CiphertextSizeBytes     uint64                    `json:"ciphertextSizeBytes"`
+	StoredAt                string                    `json:"storedAt"`
+	UnreadState             *encryptedUnreadStateWire `json:"unreadState,omitempty"`
 }
 
 func NewEncryptedDirectMessageV2DeliveredEnvelope(
 	envelope *chatv1.EncryptedDirectMessageV2StoredEnvelope,
+	storedDelivery *chatv1.EncryptedDirectMessageV2StoredDelivery,
 	delivery *chatv1.EncryptedDirectMessageV2DeliveryInput,
 ) Envelope {
 	return newEnvelope(EncryptedDirectMessageV2EventTypeDelivered, EncryptedDirectMessageV2DeliveredPayload{
-		Envelope: toEncryptedDirectMessageV2EnvelopeWire(envelope, delivery),
+		Envelope: toEncryptedDirectMessageV2EnvelopeWire(envelope, storedDelivery, delivery),
 	})
 }
 
 func toEncryptedDirectMessageV2EnvelopeWire(
 	envelope *chatv1.EncryptedDirectMessageV2StoredEnvelope,
+	storedDelivery *chatv1.EncryptedDirectMessageV2StoredDelivery,
 	delivery *chatv1.EncryptedDirectMessageV2DeliveryInput,
 ) *encryptedDirectMessageV2EnvelopeWire {
 	if envelope == nil || delivery == nil {
@@ -54,16 +57,22 @@ func toEncryptedDirectMessageV2EnvelopeWire(
 		Revision:             envelope.GetRevision(),
 		CreatedAt:            formatProtoTimestamp(envelope.GetCreatedAt()),
 		StoredAt:             formatProtoTimestamp(envelope.GetStoredAt()),
-		ViewerDelivery:       toEncryptedDirectMessageV2DeliveryWire(delivery, formatProtoTimestamp(envelope.GetStoredAt())),
+		ViewerDelivery:       toEncryptedDirectMessageV2DeliveryWire(delivery, storedDelivery, formatProtoTimestamp(envelope.GetStoredAt())),
 	}
 }
 
 func toEncryptedDirectMessageV2DeliveryWire(
 	delivery *chatv1.EncryptedDirectMessageV2DeliveryInput,
+	storedDelivery *chatv1.EncryptedDirectMessageV2StoredDelivery,
 	storedAt string,
 ) *encryptedDirectMessageV2DeliveryWire {
 	if delivery == nil {
 		return nil
+	}
+
+	var unreadState *chatv1.EncryptedUnreadState
+	if storedDelivery != nil {
+		unreadState = storedDelivery.GetUnreadState()
 	}
 
 	return &encryptedDirectMessageV2DeliveryWire{
@@ -72,5 +81,6 @@ func toEncryptedDirectMessageV2DeliveryWire(
 		Ciphertext:              append([]byte(nil), delivery.GetCiphertext()...),
 		CiphertextSizeBytes:     uint64(len(delivery.GetCiphertext())),
 		StoredAt:                storedAt,
+		UnreadState:             toEncryptedUnreadStateWire(unreadState),
 	}
 }

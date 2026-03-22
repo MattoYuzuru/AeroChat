@@ -45,6 +45,7 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
         memberCount: 2,
         encryptedPinnedMessageIds: [],
         unreadCount: 0,
+        encryptedUnreadCount: 0,
         permissions: ownerPermissions,
         createdAt: "2026-04-09T09:00:00Z",
         updatedAt: "2026-04-10T12:00:00Z",
@@ -58,6 +59,7 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
         updatedAt: "2026-04-10T12:00:00Z",
       },
       readState: null,
+      encryptedReadState: null,
       typingState: {
         threadId: "thread-1",
         typers: [],
@@ -280,5 +282,34 @@ describe("group realtime state helpers", () => {
 
     const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event, "user-1");
     expect(nextGroups[0]?.unreadCount).toBe(0);
+  });
+
+  it("replaces encrypted group read state and unread counters", () => {
+    const state = createReadyState();
+    const event: GroupRealtimeEvent = {
+      type: "group.read.updated",
+      groupId: "group-1",
+      readState: null,
+      unreadCount: 0,
+      encryptedReadState: {
+        selfPosition: {
+          messageId: "encrypted-1",
+          messageCreatedAt: "2026-04-10T12:08:00Z",
+          updatedAt: "2026-04-10T12:09:00Z",
+        },
+      },
+      encryptedUnreadCount: 1,
+    };
+
+    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
+    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event, "user-1");
+
+    if (nextState.status !== "ready") {
+      throw new Error("expected ready state");
+    }
+
+    expect(nextState.snapshot.encryptedReadState?.selfPosition?.messageId).toBe("encrypted-1");
+    expect(nextState.snapshot.group.encryptedUnreadCount).toBe(1);
+    expect(nextGroups[0]?.encryptedUnreadCount).toBe(1);
   });
 });

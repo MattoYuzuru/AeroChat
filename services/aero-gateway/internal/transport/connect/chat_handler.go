@@ -270,7 +270,18 @@ func (h *ChatHandler) MarkGroupChatRead(ctx context.Context, req *connect.Reques
 		return nil, err
 	}
 
-	h.publishGroupReadUpdate(ctx, req.Header(), req.Msg.GroupId, response.Msg.ReadState, response.Msg.UnreadState)
+	h.publishGroupReadUpdate(ctx, req.Header(), req.Msg.GroupId, response.Msg.ReadState, response.Msg.UnreadState, nil, nil)
+
+	return response, nil
+}
+
+func (h *ChatHandler) MarkEncryptedGroupChatRead(ctx context.Context, req *connect.Request[chatv1.MarkEncryptedGroupChatReadRequest]) (*connect.Response[chatv1.MarkEncryptedGroupChatReadResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.MarkEncryptedGroupChatRead)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishGroupReadUpdate(ctx, req.Header(), req.Msg.GroupId, nil, nil, response.Msg.ReadState, response.Msg.UnreadState)
 
 	return response, nil
 }
@@ -281,7 +292,18 @@ func (h *ChatHandler) MarkDirectChatRead(ctx context.Context, req *connect.Reque
 		return nil, err
 	}
 
-	h.publishReadStateUpdate(ctx, req.Header(), req.Msg.ChatId, response.Msg.ReadState, response.Msg.UnreadState)
+	h.publishReadStateUpdate(ctx, req.Header(), req.Msg.ChatId, response.Msg.ReadState, response.Msg.UnreadState, nil, nil)
+
+	return response, nil
+}
+
+func (h *ChatHandler) MarkEncryptedDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkEncryptedDirectChatReadRequest]) (*connect.Response[chatv1.MarkEncryptedDirectChatReadResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.MarkEncryptedDirectChatRead)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishReadStateUpdate(ctx, req.Header(), req.Msg.ChatId, nil, nil, response.Msg.ReadState, response.Msg.UnreadState)
 
 	return response, nil
 }
@@ -526,9 +548,14 @@ func (h *ChatHandler) publishEncryptedDirectMessageV2Deliveries(
 			continue
 		}
 
+		storedDelivery := findEncryptedDirectStoredDelivery(
+			envelope.GetStoredDeliveries(),
+			delivery.GetRecipientCryptoDeviceId(),
+		)
+
 		delivered := h.realtimeHub.PublishToCryptoDevice(
 			delivery.GetRecipientCryptoDeviceId(),
-			realtime.NewEncryptedDirectMessageV2DeliveredEnvelope(envelope, delivery),
+			realtime.NewEncryptedDirectMessageV2DeliveredEnvelope(envelope, storedDelivery, delivery),
 		)
 		if delivered == 0 {
 			continue
@@ -542,6 +569,22 @@ func (h *ChatHandler) publishEncryptedDirectMessageV2Deliveries(
 			slog.Int("realtime_session_count", delivered),
 		)
 	}
+}
+
+func findEncryptedDirectStoredDelivery(
+	deliveries []*chatv1.EncryptedDirectMessageV2StoredDelivery,
+	recipientCryptoDeviceID string,
+) *chatv1.EncryptedDirectMessageV2StoredDelivery {
+	for _, delivery := range deliveries {
+		if delivery == nil {
+			continue
+		}
+		if delivery.GetRecipientCryptoDeviceId() == recipientCryptoDeviceID {
+			return delivery
+		}
+	}
+
+	return nil
 }
 
 func (h *ChatHandler) publishEncryptedGroupMessageDeliveries(
@@ -581,8 +624,13 @@ func (h *ChatHandler) publishReadStateUpdate(
 	chatID string,
 	readState *chatv1.DirectChatReadState,
 	unreadState *chatv1.DirectChatUnreadState,
+	encryptedReadState *chatv1.EncryptedDirectChatReadState,
+	encryptedUnreadState *chatv1.EncryptedUnreadState,
 ) {
-	if h.realtimeHub == nil || readState == nil || chatID == "" {
+	if h.realtimeHub == nil || chatID == "" {
+		return
+	}
+	if readState == nil && encryptedReadState == nil {
 		return
 	}
 
@@ -623,6 +671,13 @@ func (h *ChatHandler) publishReadStateUpdate(
 					readState,
 				),
 				unreadStateForRecipient(participantID, profile.GetId(), unreadState),
+				mirrorEncryptedReadStateForRecipient(
+					participantID,
+					profile.GetId(),
+					profile.GetReadReceiptsEnabled(),
+					encryptedReadState,
+				),
+				encryptedUnreadStateForRecipient(participantID, profile.GetId(), encryptedUnreadState),
 			),
 		)
 	}
@@ -809,6 +864,74 @@ func unreadStateForRecipient(
 	}
 
 	return &chatv1.DirectChatUnreadState{
+		UnreadCount: unreadState.GetUnreadCount(),
+	}
+}
+
+func mirrorEncryptedReadStateForRecipient(
+	recipientUserID string,
+	actorUserID string,
+	actorReadReceiptsEnabled bool,
+	readState *chatv1.EncryptedDirectChatReadState,
+) *chatv1.EncryptedDirectChatReadState {
+	if readState == nil {
+		return nil
+	}
+
+	if recipientUserID == actorUserID {
+		return cloneEncryptedReadState(readState)
+	}
+
+	return &chatv1.EncryptedDirectChatReadState{
+		SelfPosition: cloneEncryptedReadPosition(readState.GetPeerPosition()),
+		PeerPosition: encryptedPeerReadPositionForRecipient(actorReadReceiptsEnabled, readState.GetSelfPosition()),
+	}
+}
+
+func cloneEncryptedReadState(readState *chatv1.EncryptedDirectChatReadState) *chatv1.EncryptedDirectChatReadState {
+	if readState == nil {
+		return nil
+	}
+
+	return &chatv1.EncryptedDirectChatReadState{
+		SelfPosition: cloneEncryptedReadPosition(readState.GetSelfPosition()),
+		PeerPosition: cloneEncryptedReadPosition(readState.GetPeerPosition()),
+	}
+}
+
+func cloneEncryptedReadPosition(position *chatv1.EncryptedConversationReadPosition) *chatv1.EncryptedConversationReadPosition {
+	if position == nil {
+		return nil
+	}
+
+	return &chatv1.EncryptedConversationReadPosition{
+		MessageId:        position.GetMessageId(),
+		MessageCreatedAt: position.GetMessageCreatedAt(),
+		UpdatedAt:        position.GetUpdatedAt(),
+	}
+}
+
+func encryptedPeerReadPositionForRecipient(
+	actorReadReceiptsEnabled bool,
+	position *chatv1.EncryptedConversationReadPosition,
+) *chatv1.EncryptedConversationReadPosition {
+	if !actorReadReceiptsEnabled {
+		return nil
+	}
+
+	return cloneEncryptedReadPosition(position)
+}
+
+func encryptedUnreadStateForRecipient(
+	recipientUserID string,
+	actorUserID string,
+	unreadState *chatv1.EncryptedUnreadState,
+) *chatv1.EncryptedUnreadState {
+	if unreadState == nil || recipientUserID != actorUserID {
+		return nil
+	}
+
+	return &chatv1.EncryptedUnreadState{
 		UnreadCount: unreadState.GetUnreadCount(),
 	}
 }
@@ -1262,8 +1385,13 @@ func (h *ChatHandler) publishGroupReadUpdate(
 	groupID string,
 	readState *chatv1.GroupReadState,
 	unreadState *chatv1.GroupUnreadState,
+	encryptedReadState *chatv1.EncryptedGroupReadState,
+	encryptedUnreadState *chatv1.EncryptedUnreadState,
 ) {
 	if h.realtimeHub == nil || groupID == "" {
+		return
+	}
+	if readState == nil && encryptedReadState == nil {
 		return
 	}
 
@@ -1279,7 +1407,7 @@ func (h *ChatHandler) publishGroupReadUpdate(
 
 	h.realtimeHub.PublishToUser(
 		profile.GetId(),
-		realtime.NewGroupReadUpdatedEnvelope(groupID, readState, unreadState),
+		realtime.NewGroupReadUpdatedEnvelope(groupID, readState, unreadState, encryptedReadState, encryptedUnreadState),
 	)
 }
 

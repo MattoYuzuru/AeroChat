@@ -17,6 +17,9 @@ describe("parseDirectChatRealtimeEvent", () => {
             { id: "user-2", login: "bob", nickname: "Bob" },
           ],
           pinnedMessageIds: [],
+          encryptedUnreadState: {
+            unreadCount: 2,
+          },
           createdAt: "2026-04-06T11:59:00Z",
           updatedAt: "2026-04-06T12:00:00Z",
         },
@@ -56,6 +59,7 @@ describe("parseDirectChatRealtimeEvent", () => {
       reason: "message_created",
       chat: expect.objectContaining({
         id: "chat-1",
+        encryptedUnreadCount: 2,
         participants: expect.arrayContaining([
           expect.objectContaining({ id: "user-1" }),
         ]),
@@ -88,6 +92,17 @@ describe("parseDirectChatRealtimeEvent", () => {
             updatedAt: "2026-04-06T12:01:00Z",
           },
         },
+        encryptedReadState: {
+          selfPosition: {
+            messageId: "encrypted-3",
+            messageCreatedAt: "2026-04-06T12:00:20Z",
+            updatedAt: "2026-04-06T12:01:00Z",
+          },
+          peerPosition: null,
+        },
+        encryptedUnread: {
+          unreadCount: 0,
+        },
       },
     });
 
@@ -103,6 +118,15 @@ describe("parseDirectChatRealtimeEvent", () => {
         },
       },
       unreadCount: null,
+      encryptedReadState: {
+        selfPosition: {
+          messageId: "encrypted-3",
+          messageCreatedAt: "2026-04-06T12:00:20Z",
+          updatedAt: "2026-04-06T12:01:00Z",
+        },
+        peerPosition: null,
+      },
+      encryptedUnreadCount: 0,
     });
   });
 

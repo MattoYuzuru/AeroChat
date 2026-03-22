@@ -266,6 +266,7 @@ func (r *Repository) ListGroups(ctx context.Context, userID string) ([]chat.Grou
 			MemberCount:               row.MemberCount,
 			EncryptedPinnedMessageIDs: uuidSliceToStrings(encryptedPinnedIDs),
 			UnreadCount:               row.UnreadCount,
+			EncryptedUnreadCount:      row.EncryptedUnreadCount,
 			CreatedAt:                 timestampValue(row.CreatedAt),
 			UpdatedAt:                 timestampValue(row.UpdatedAt),
 		})
@@ -297,6 +298,7 @@ func (r *Repository) GetGroup(ctx context.Context, userID string, groupID string
 		MemberCount:               row.MemberCount,
 		EncryptedPinnedMessageIDs: uuidSliceToStrings(encryptedPinnedIDs),
 		UnreadCount:               row.UnreadCount,
+		EncryptedUnreadCount:      row.EncryptedUnreadCount,
 		CreatedAt:                 timestampValue(row.CreatedAt),
 		UpdatedAt:                 timestampValue(row.UpdatedAt),
 	}
@@ -336,6 +338,30 @@ func (r *Repository) GetGroupReadStateEntry(ctx context.Context, userID string, 
 	}
 	if row.LastReadMessageID.Valid && row.LastReadMessageCreatedAt.Valid && row.UpdatedAt.Valid {
 		entry.LastReadPosition = &chat.GroupReadPosition{
+			MessageID:        row.LastReadMessageID.String(),
+			MessageCreatedAt: timestampValue(row.LastReadMessageCreatedAt),
+			UpdatedAt:        timestampValue(row.UpdatedAt),
+		}
+	}
+
+	return entry, nil
+}
+
+func (r *Repository) GetEncryptedGroupReadStateEntry(ctx context.Context, userID string, groupID string) (*chat.EncryptedGroupReadStateEntry, error) {
+	row, err := r.queries.GetEncryptedGroupReadStateEntryByGroupIDAndUserID(ctx, chatsqlc.GetEncryptedGroupReadStateEntryByGroupIDAndUserIDParams{
+		UserID:  mustParseUUID(userID),
+		GroupID: mustParseUUID(groupID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	entry := &chat.EncryptedGroupReadStateEntry{
+		GroupID: row.GroupID.String(),
+		UserID:  row.UserID.String(),
+	}
+	if row.LastReadMessageID.Valid && row.LastReadMessageCreatedAt.Valid && row.UpdatedAt.Valid {
+		entry.LastReadPosition = &chat.EncryptedConversationReadPosition{
 			MessageID:        row.LastReadMessageID.String(),
 			MessageCreatedAt: timestampValue(row.LastReadMessageCreatedAt),
 			UpdatedAt:        timestampValue(row.UpdatedAt),
@@ -394,6 +420,34 @@ func (r *Repository) ListGroupTypingStateEntries(ctx context.Context, userID str
 			},
 			TypingVisibilityEnabled: row.TypingVisibilityEnabled,
 		})
+	}
+
+	return result, nil
+}
+
+func (r *Repository) ListEncryptedDirectChatReadStateEntries(ctx context.Context, userID string, chatID string) ([]chat.EncryptedDirectChatReadStateEntry, error) {
+	rows, err := r.queries.ListEncryptedDirectChatReadStateEntries(ctx, chatsqlc.ListEncryptedDirectChatReadStateEntriesParams{
+		UserID: mustParseUUID(userID),
+		ChatID: mustParseUUID(chatID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.EncryptedDirectChatReadStateEntry, 0, len(rows))
+	for _, row := range rows {
+		entry := chat.EncryptedDirectChatReadStateEntry{
+			UserID:              row.UserID.String(),
+			ReadReceiptsEnabled: row.ReadReceiptsEnabled,
+		}
+		if row.LastReadMessageID.Valid && row.LastReadMessageCreatedAt.Valid && row.UpdatedAt.Valid {
+			entry.LastReadPosition = &chat.EncryptedConversationReadPosition{
+				MessageID:        row.LastReadMessageID.String(),
+				MessageCreatedAt: timestampValue(row.LastReadMessageCreatedAt),
+				UpdatedAt:        timestampValue(row.UpdatedAt),
+			}
+		}
+		result = append(result, entry)
 	}
 
 	return result, nil
@@ -1003,6 +1057,36 @@ func (r *Repository) UpsertGroupChatReadState(ctx context.Context, params chat.U
 	return affected > 0, nil
 }
 
+func (r *Repository) UpsertEncryptedDirectChatReadState(ctx context.Context, params chat.UpsertEncryptedDirectChatReadStateParams) (bool, error) {
+	affected, err := r.queries.UpsertEncryptedDirectChatReadState(ctx, chatsqlc.UpsertEncryptedDirectChatReadStateParams{
+		ChatID:                   mustParseUUID(params.ChatID),
+		UserID:                   mustParseUUID(params.UserID),
+		LastReadMessageID:        mustParseUUID(params.LastReadMessageID),
+		LastReadMessageCreatedAt: timestamptzValue(params.LastReadMessageAt),
+		UpdatedAt:                timestamptzValue(params.UpdatedAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+
+	return affected > 0, nil
+}
+
+func (r *Repository) UpsertEncryptedGroupReadState(ctx context.Context, params chat.UpsertEncryptedGroupReadStateParams) (bool, error) {
+	affected, err := r.queries.UpsertEncryptedGroupReadState(ctx, chatsqlc.UpsertEncryptedGroupReadStateParams{
+		GroupID:                  mustParseUUID(params.GroupID),
+		UserID:                   mustParseUUID(params.UserID),
+		LastReadMessageID:        mustParseUUID(params.LastReadMessageID),
+		LastReadMessageCreatedAt: timestamptzValue(params.LastReadMessageAt),
+		UpdatedAt:                timestamptzValue(params.UpdatedAt),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+
+	return affected > 0, nil
+}
+
 func (r *Repository) ListActiveCryptoDevicesByUserIDs(ctx context.Context, userIDs []string) ([]chat.CryptoDevice, error) {
 	normalizedUserIDs := uniqueUUIDs(userIDs)
 	if len(normalizedUserIDs) == 0 {
@@ -1237,6 +1321,7 @@ func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params 
 		return nil, convertError(err)
 	}
 
+	unreadCountByUserID := make(map[string]int32, len(params.Deliveries))
 	for _, delivery := range params.Deliveries {
 		storedAt := delivery.StoredAt
 		if storedAt.IsZero() {
@@ -1262,6 +1347,34 @@ func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params 
 		return nil, convertError(err)
 	}
 
+	storedDeliveries := make([]chat.EncryptedDirectMessageV2StoredDelivery, 0, len(params.Deliveries))
+	for _, delivery := range params.Deliveries {
+		if _, ok := unreadCountByUserID[delivery.RecipientUserID]; !ok {
+			rows, err := q.GetDirectChatRowsByIDAndUserID(ctx, chatsqlc.GetDirectChatRowsByIDAndUserIDParams{
+				UserID: mustParseUUID(delivery.RecipientUserID),
+				ID:     mustParseUUID(params.ChatID),
+			})
+			if err != nil {
+				return nil, convertError(err)
+			}
+			if len(rows) == 0 {
+				return nil, chat.ErrNotFound
+			}
+			unreadCountByUserID[delivery.RecipientUserID] = rows[0].EncryptedUnreadCount
+		}
+
+		storedAt := delivery.StoredAt
+		if storedAt.IsZero() {
+			storedAt = params.StoredAt
+		}
+		storedDeliveries = append(storedDeliveries, chat.EncryptedDirectMessageV2StoredDelivery{
+			RecipientUserID:         delivery.RecipientUserID,
+			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
+			StoredAt:                storedAt,
+			UnreadCount:             unreadCountByUserID[delivery.RecipientUserID],
+		})
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit tx: %w", err)
 	}
@@ -1277,6 +1390,7 @@ func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params 
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
 		StoredDeliveryCount:  uint32(len(params.Deliveries)),
+		StoredDeliveries:     storedDeliveries,
 	}, nil
 }
 
@@ -1310,6 +1424,7 @@ func (r *Repository) CreateEncryptedGroupMessage(ctx context.Context, params cha
 		return nil, convertError(err)
 	}
 
+	unreadCountByUserID := make(map[string]int32, len(params.Deliveries))
 	storedDeliveries := make([]chat.EncryptedGroupMessageDelivery, 0, len(params.Deliveries))
 	for _, delivery := range params.Deliveries {
 		storedAt := delivery.StoredAt
@@ -1324,11 +1439,35 @@ func (r *Repository) CreateEncryptedGroupMessage(ctx context.Context, params cha
 		}); err != nil {
 			return nil, convertError(err)
 		}
+		if _, ok := unreadCountByUserID[delivery.RecipientUserID]; !ok {
+			groupRow, err := q.GetGroupRowByIDAndUserID(ctx, chatsqlc.GetGroupRowByIDAndUserIDParams{
+				UserID: mustParseUUID(delivery.RecipientUserID),
+				ID:     mustParseUUID(params.GroupID),
+			})
+			if err != nil {
+				return nil, convertError(err)
+			}
+			unreadCountByUserID[delivery.RecipientUserID] = groupRow.EncryptedUnreadCount
+		}
 		storedDeliveries = append(storedDeliveries, chat.EncryptedGroupMessageDelivery{
 			RecipientUserID:         delivery.RecipientUserID,
 			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
 			StoredAt:                storedAt,
+			UnreadCount:             unreadCountByUserID[delivery.RecipientUserID],
 		})
+	}
+
+	if err := q.TouchGroupThreadUpdatedAt(ctx, chatsqlc.TouchGroupThreadUpdatedAtParams{
+		ID:        mustParseUUID(params.ThreadID),
+		UpdatedAt: timestamptzValue(params.StoredAt),
+	}); err != nil {
+		return nil, convertError(err)
+	}
+	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
+		ID:        mustParseUUID(params.GroupID),
+		UpdatedAt: timestamptzValue(params.StoredAt),
+	}); err != nil {
+		return nil, convertError(err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -2174,6 +2313,7 @@ type listChatRow struct {
 	ChatCreatedAt        pgtype.Timestamptz
 	ChatUpdatedAt        pgtype.Timestamptz
 	UnreadCount          int32
+	EncryptedUnreadCount int32
 	ParticipantUserID    uuid.UUID
 	ParticipantLogin     string
 	ParticipantNickname  string
@@ -2188,6 +2328,7 @@ func rowsToListChatRows(rows []chatsqlc.ListDirectChatRowsByUserIDRow) []listCha
 			ChatCreatedAt:        row.ChatCreatedAt,
 			ChatUpdatedAt:        row.ChatUpdatedAt,
 			UnreadCount:          row.UnreadCount,
+			EncryptedUnreadCount: row.EncryptedUnreadCount,
 			ParticipantUserID:    row.ParticipantUserID,
 			ParticipantLogin:     row.ParticipantLogin,
 			ParticipantNickname:  row.ParticipantNickname,
@@ -2205,6 +2346,7 @@ func rowsToGetChatRows(rows []chatsqlc.GetDirectChatRowsByIDAndUserIDRow) []list
 			ChatCreatedAt:        row.ChatCreatedAt,
 			ChatUpdatedAt:        row.ChatUpdatedAt,
 			UnreadCount:          row.UnreadCount,
+			EncryptedUnreadCount: row.EncryptedUnreadCount,
 			ParticipantUserID:    row.ParticipantUserID,
 			ParticipantLogin:     row.ParticipantLogin,
 			ParticipantNickname:  row.ParticipantNickname,
@@ -2236,6 +2378,7 @@ func (r *Repository) collectChats(ctx context.Context, rows []listChatRow) ([]ch
 				PinnedMessageIDs:          uuidSliceToStrings(pinnedIDs),
 				EncryptedPinnedMessageIDs: nil,
 				UnreadCount:               row.UnreadCount,
+				EncryptedUnreadCount:      row.EncryptedUnreadCount,
 				CreatedAt:                 timestampValue(row.ChatCreatedAt),
 				UpdatedAt:                 timestampValue(row.ChatUpdatedAt),
 			})

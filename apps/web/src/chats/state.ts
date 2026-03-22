@@ -5,12 +5,14 @@ import type {
   DirectChatReadPosition,
   DirectChatReadState,
   DirectChatTypingState,
+  EncryptedDirectChatReadState,
 } from "../gateway/types";
 
 export interface ChatThreadSnapshot {
   chat: DirectChat;
   messages: DirectChatMessage[];
   readState: DirectChatReadState | null;
+  encryptedReadState: EncryptedDirectChatReadState | null;
   typingState: DirectChatTypingState | null;
   presenceState: DirectChatPresenceState | null;
 }
@@ -54,6 +56,18 @@ type ChatsAction =
       type: "read_state_replaced";
       chatId: string;
       readState: DirectChatReadState | null;
+      unreadCount?: number | null;
+    }
+  | {
+      type: "encrypted_read_state_replaced";
+      chatId: string;
+      readState: EncryptedDirectChatReadState | null;
+      unreadCount?: number | null;
+    }
+  | {
+      type: "encrypted_delivery_observed";
+      chatId: string;
+      updatedAt: string;
       unreadCount?: number | null;
     }
   | {
@@ -205,6 +219,10 @@ export function chatsReducer(
       return applyMessageUpdate(state, action);
     case "read_state_replaced":
       return applyReadStateReplacement(state, action);
+    case "encrypted_read_state_replaced":
+      return applyEncryptedReadStateReplacement(state, action);
+    case "encrypted_delivery_observed":
+      return applyEncryptedDeliveryObserved(state, action);
     case "send_started":
       return {
         ...state,
@@ -324,6 +342,71 @@ function applyReadStateReplacement(
               unreadCount: action.unreadCount,
             },
       readState: action.readState,
+    },
+  };
+}
+
+function applyEncryptedReadStateReplacement(
+  state: ChatsState,
+  action: Extract<ChatsAction, { type: "encrypted_read_state_replaced" }>,
+): ChatsState {
+  const nextChats =
+    action.unreadCount === undefined || action.unreadCount === null
+      ? state.chats
+      : replaceChatEncryptedUnreadCount(state.chats, action.chatId, action.unreadCount);
+
+  if (state.thread?.chat.id !== action.chatId) {
+    return {
+      ...state,
+      chats: nextChats,
+    };
+  }
+
+  return {
+    ...state,
+    chats: nextChats,
+    thread: {
+      ...state.thread,
+      chat:
+        action.unreadCount === undefined || action.unreadCount === null
+          ? state.thread.chat
+          : {
+              ...state.thread.chat,
+              encryptedUnreadCount: action.unreadCount,
+            },
+      encryptedReadState: action.readState,
+    },
+  };
+}
+
+function applyEncryptedDeliveryObserved(
+  state: ChatsState,
+  action: Extract<ChatsAction, { type: "encrypted_delivery_observed" }>,
+): ChatsState {
+  const nextChats = patchEncryptedChatActivity(
+    state.chats,
+    action.chatId,
+    action.updatedAt,
+    action.unreadCount,
+  );
+
+  if (state.thread?.chat.id !== action.chatId) {
+    return {
+      ...state,
+      chats: nextChats,
+    };
+  }
+
+  return {
+    ...state,
+    chats: nextChats,
+    thread: {
+      ...state.thread,
+      chat: patchSingleEncryptedChatActivity(
+        state.thread.chat,
+        action.updatedAt,
+        action.unreadCount,
+      ),
     },
   };
 }
@@ -469,4 +552,51 @@ function replaceChatUnreadCount(
           unreadCount,
         },
   );
+}
+
+function replaceChatEncryptedUnreadCount(
+  chats: DirectChat[],
+  chatId: string,
+  unreadCount: number,
+): DirectChat[] {
+  return chats.map((chat) =>
+    chat.id !== chatId
+      ? chat
+      : {
+          ...chat,
+          encryptedUnreadCount: unreadCount,
+        },
+  );
+}
+
+function patchEncryptedChatActivity(
+  chats: DirectChat[],
+  chatId: string,
+  updatedAt: string,
+  unreadCount: number | null | undefined,
+): DirectChat[] {
+  const currentChat = findChatByID(chats, chatId);
+  if (!currentChat) {
+    return chats;
+  }
+
+  return upsertChatInList(chats, patchSingleEncryptedChatActivity(currentChat, updatedAt, unreadCount));
+}
+
+function patchSingleEncryptedChatActivity(
+  chat: DirectChat,
+  updatedAt: string,
+  unreadCount: number | null | undefined,
+): DirectChat {
+  return {
+    ...chat,
+    updatedAt:
+      updatedAt.trim() !== "" && updatedAt > chat.updatedAt
+        ? updatedAt
+        : chat.updatedAt,
+    encryptedUnreadCount:
+      unreadCount === undefined || unreadCount === null
+        ? chat.encryptedUnreadCount
+        : unreadCount,
+  };
 }

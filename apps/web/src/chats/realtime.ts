@@ -2,6 +2,8 @@ import type {
   Attachment,
   DirectChat,
   DirectChatMessage,
+  EncryptedConversationReadPosition,
+  EncryptedDirectChatReadState,
   DirectChatPresenceState,
   DirectChatReadPosition,
   DirectChatReadState,
@@ -23,6 +25,7 @@ interface DirectChatWire {
   participants?: ChatUserWire[];
   pinnedMessageIds?: string[];
   encryptedPinnedMessageIds?: string[];
+  encryptedUnreadState?: DirectChatUnreadStateWire;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -94,6 +97,17 @@ interface DirectChatReadStateWire {
   peerPosition?: DirectChatReadPositionWire;
 }
 
+interface EncryptedConversationReadPositionWire {
+  messageId?: string;
+  messageCreatedAt?: string;
+  updatedAt?: string;
+}
+
+interface EncryptedDirectChatReadStateWire {
+  selfPosition?: EncryptedConversationReadPositionWire;
+  peerPosition?: EncryptedConversationReadPositionWire;
+}
+
 interface DirectChatUnreadStateWire {
   unreadCount?: number | string;
 }
@@ -108,6 +122,8 @@ interface DirectChatReadUpdatedPayloadWire {
   chatId?: string;
   readState?: DirectChatReadStateWire;
   unread?: DirectChatUnreadStateWire;
+  encryptedReadState?: EncryptedDirectChatReadStateWire;
+  encryptedUnread?: DirectChatUnreadStateWire;
 }
 
 interface DirectChatTypingIndicatorWire {
@@ -152,6 +168,8 @@ export type DirectChatRealtimeEvent =
       chatId: string;
       readState: DirectChatReadState | null;
       unreadCount: number | null;
+      encryptedReadState: EncryptedDirectChatReadState | null;
+      encryptedUnreadCount: number | null;
     }
   | {
       type: "direct_chat.typing.updated";
@@ -192,6 +210,8 @@ export function parseDirectChatRealtimeEvent(
       chatId: payload.chatId,
       readState: payload.readState,
       unreadCount: payload.unreadCount,
+      encryptedReadState: payload.encryptedReadState,
+      encryptedUnreadCount: payload.encryptedUnreadCount,
     };
   }
 
@@ -256,6 +276,8 @@ function normalizeReadUpdatedPayload(
   chatId: string;
   readState: DirectChatReadState | null;
   unreadCount: number | null;
+  encryptedReadState: EncryptedDirectChatReadState | null;
+  encryptedUnreadCount: number | null;
 } | null {
   if (!input || typeof input !== "object") {
     return null;
@@ -271,6 +293,8 @@ function normalizeReadUpdatedPayload(
     chatId,
     readState: normalizeReadState(payload.readState),
     unreadCount: normalizeUnreadCount(payload.unread),
+    encryptedReadState: normalizeEncryptedReadState(payload.encryptedReadState),
+    encryptedUnreadCount: normalizeUnreadCount(payload.encryptedUnread),
   };
 }
 
@@ -335,6 +359,7 @@ function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
       (value): value is string => typeof value === "string" && value.trim() !== "",
     ),
     unreadCount: 0,
+    encryptedUnreadCount: normalizeUnreadCount(input?.encryptedUnreadState) ?? 0,
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
   };
@@ -449,9 +474,49 @@ function normalizeReadState(
   );
 }
 
+function normalizeEncryptedReadState(
+  input: EncryptedDirectChatReadStateWire | undefined,
+): EncryptedDirectChatReadState | null {
+  if (!input) {
+    return null;
+  }
+
+  const selfPosition = normalizeEncryptedReadPosition(input.selfPosition);
+  const peerPosition = normalizeEncryptedReadPosition(input.peerPosition);
+  if (!selfPosition && !peerPosition) {
+    return null;
+  }
+
+  return {
+    selfPosition,
+    peerPosition,
+  };
+}
+
 function normalizeReadPosition(
   input: DirectChatReadPositionWire | undefined,
 ): DirectChatReadPosition | null {
+  if (!input) {
+    return null;
+  }
+
+  const messageId = input.messageId ?? "";
+  const messageCreatedAt = input.messageCreatedAt ?? "";
+  const updatedAt = input.updatedAt ?? "";
+  if (messageId === "" && messageCreatedAt === "" && updatedAt === "") {
+    return null;
+  }
+
+  return {
+    messageId,
+    messageCreatedAt,
+    updatedAt,
+  };
+}
+
+function normalizeEncryptedReadPosition(
+  input: EncryptedConversationReadPositionWire | undefined,
+): EncryptedConversationReadPosition | null {
   if (!input) {
     return null;
   }

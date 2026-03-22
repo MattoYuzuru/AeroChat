@@ -33,6 +33,7 @@ function createDirectChat(overrides: Partial<DirectChat> = {}): DirectChat {
     ],
     pinnedMessageIds: [],
     unreadCount: 0,
+    encryptedUnreadCount: 0,
     createdAt: "2026-03-21T10:00:00Z",
     updatedAt: "2026-03-21T10:00:00Z",
     ...overrides,
@@ -48,6 +49,7 @@ function createGroup(overrides: Partial<Group> = {}): Group {
     selfRole: "member",
     memberCount: 3,
     unreadCount: 0,
+    encryptedUnreadCount: 0,
     permissions: {
       canManageInviteLinks: false,
       creatableInviteRoles: [],

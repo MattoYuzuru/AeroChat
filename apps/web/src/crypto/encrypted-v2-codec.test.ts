@@ -129,6 +129,7 @@ function createOpaqueEnvelope(): EncryptedDirectMessageV2Envelope {
       ciphertext: "",
       ciphertextSizeBytes: 0,
       storedAt: "2026-03-22T12:00:01Z",
+      unreadState: null,
     },
   };
 }

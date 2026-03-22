@@ -1660,6 +1660,23 @@ SELECT
               )
           )
     ), 0)::INT AS unread_count,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM direct_chat_encrypted_messages_v2 AS m
+        LEFT JOIN direct_chat_encrypted_read_states_v1 AS self_read
+            ON self_read.chat_id = c.id AND self_read.user_id = self.user_id
+        WHERE m.chat_id = c.id
+          AND m.operation_kind = 'content'
+          AND m.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR m.created_at > self_read.last_read_message_created_at
+              OR (
+                  m.created_at = self_read.last_read_message_created_at
+                  AND m.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS encrypted_unread_count,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
@@ -1685,6 +1702,7 @@ type GetDirectChatRowsByIDAndUserIDRow struct {
 	ChatCreatedAt        pgtype.Timestamptz `db:"chat_created_at" json:"chat_created_at"`
 	ChatUpdatedAt        pgtype.Timestamptz `db:"chat_updated_at" json:"chat_updated_at"`
 	UnreadCount          int32              `db:"unread_count" json:"unread_count"`
+	EncryptedUnreadCount int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
 	ParticipantUserID    uuid.UUID          `db:"participant_user_id" json:"participant_user_id"`
 	ParticipantLogin     string             `db:"participant_login" json:"participant_login"`
 	ParticipantNickname  string             `db:"participant_nickname" json:"participant_nickname"`
@@ -1708,6 +1726,7 @@ func (q *Queries) GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDir
 			&i.ChatCreatedAt,
 			&i.ChatUpdatedAt,
 			&i.UnreadCount,
+			&i.EncryptedUnreadCount,
 			&i.ParticipantUserID,
 			&i.ParticipantLogin,
 			&i.ParticipantNickname,
@@ -1831,6 +1850,45 @@ func (q *Queries) GetEncryptedGroupMessageByDevice(ctx context.Context, arg GetE
 		&i.RecipientUserID,
 		&i.RecipientCryptoDeviceID,
 		&i.DeliveryStoredAt,
+	)
+	return i, err
+}
+
+const getEncryptedGroupReadStateEntryByGroupIDAndUserID = `-- name: GetEncryptedGroupReadStateEntryByGroupIDAndUserID :one
+SELECT
+    self.group_id,
+    self.user_id,
+    r.last_read_message_id,
+    r.last_read_message_created_at,
+    r.updated_at
+FROM group_memberships AS self
+LEFT JOIN group_encrypted_read_states_v1 AS r
+    ON r.group_id = self.group_id AND r.user_id = self.user_id
+WHERE self.user_id = $1 AND self.group_id = $2
+`
+
+type GetEncryptedGroupReadStateEntryByGroupIDAndUserIDParams struct {
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+}
+
+type GetEncryptedGroupReadStateEntryByGroupIDAndUserIDRow struct {
+	GroupID                  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        pgtype.UUID        `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetEncryptedGroupReadStateEntryByGroupIDAndUserID(ctx context.Context, arg GetEncryptedGroupReadStateEntryByGroupIDAndUserIDParams) (GetEncryptedGroupReadStateEntryByGroupIDAndUserIDRow, error) {
+	row := q.db.QueryRow(ctx, getEncryptedGroupReadStateEntryByGroupIDAndUserID, arg.UserID, arg.GroupID)
+	var i GetEncryptedGroupReadStateEntryByGroupIDAndUserIDRow
+	err := row.Scan(
+		&i.GroupID,
+		&i.UserID,
+		&i.LastReadMessageID,
+		&i.LastReadMessageCreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -2210,6 +2268,23 @@ SELECT
     ), 0)::INT AS unread_count,
     COALESCE((
         SELECT COUNT(*)::INT
+        FROM group_encrypted_messages_v1 AS gm
+        LEFT JOIN group_encrypted_read_states_v1 AS self_read
+            ON self_read.group_id = g.id AND self_read.user_id = self.user_id
+        WHERE gm.group_id = g.id
+          AND gm.operation_kind = 'content'
+          AND gm.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR gm.created_at > self_read.last_read_message_created_at
+              OR (
+                  gm.created_at = self_read.last_read_message_created_at
+                  AND gm.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS encrypted_unread_count,
+    COALESCE((
+        SELECT COUNT(*)::INT
         FROM group_memberships AS members
         WHERE members.group_id = g.id
     ), 0)::INT AS member_count
@@ -2232,6 +2307,7 @@ type GetGroupRowByIDAndUserIDRow struct {
 	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	UnreadCount           int32              `db:"unread_count" json:"unread_count"`
+	EncryptedUnreadCount  int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
 	MemberCount           int32              `db:"member_count" json:"member_count"`
 }
 
@@ -2247,6 +2323,7 @@ func (q *Queries) GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowB
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.UnreadCount,
+		&i.EncryptedUnreadCount,
 		&i.MemberCount,
 	)
 	return i, err
@@ -3041,6 +3118,23 @@ SELECT
               )
           )
     ), 0)::INT AS unread_count,
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM direct_chat_encrypted_messages_v2 AS m
+        LEFT JOIN direct_chat_encrypted_read_states_v1 AS self_read
+            ON self_read.chat_id = c.id AND self_read.user_id = self.user_id
+        WHERE m.chat_id = c.id
+          AND m.operation_kind = 'content'
+          AND m.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR m.created_at > self_read.last_read_message_created_at
+              OR (
+                  m.created_at = self_read.last_read_message_created_at
+                  AND m.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS encrypted_unread_count,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
@@ -3061,6 +3155,7 @@ type ListDirectChatRowsByUserIDRow struct {
 	ChatCreatedAt        pgtype.Timestamptz `db:"chat_created_at" json:"chat_created_at"`
 	ChatUpdatedAt        pgtype.Timestamptz `db:"chat_updated_at" json:"chat_updated_at"`
 	UnreadCount          int32              `db:"unread_count" json:"unread_count"`
+	EncryptedUnreadCount int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
 	ParticipantUserID    uuid.UUID          `db:"participant_user_id" json:"participant_user_id"`
 	ParticipantLogin     string             `db:"participant_login" json:"participant_login"`
 	ParticipantNickname  string             `db:"participant_nickname" json:"participant_nickname"`
@@ -3084,6 +3179,7 @@ func (q *Queries) ListDirectChatRowsByUserID(ctx context.Context, userID uuid.UU
 			&i.ChatCreatedAt,
 			&i.ChatUpdatedAt,
 			&i.UnreadCount,
+			&i.EncryptedUnreadCount,
 			&i.ParticipantUserID,
 			&i.ParticipantLogin,
 			&i.ParticipantNickname,
@@ -3290,6 +3386,60 @@ func (q *Queries) ListDirectReplyPreviewRows(ctx context.Context, arg ListDirect
 			&i.DeletedByUserID,
 			&i.DeletedAt,
 			&i.AttachmentCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEncryptedDirectChatReadStateEntries = `-- name: ListEncryptedDirectChatReadStateEntries :many
+SELECT
+    p.user_id,
+    u.read_receipts_enabled,
+    r.last_read_message_id,
+    r.last_read_message_created_at,
+    r.updated_at
+FROM direct_chat_participants AS self
+JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
+JOIN users AS u ON u.id = p.user_id
+LEFT JOIN direct_chat_encrypted_read_states_v1 AS r ON r.chat_id = p.chat_id AND r.user_id = p.user_id
+WHERE self.user_id = $1 AND self.chat_id = $2
+ORDER BY p.joined_at ASC, p.user_id ASC
+`
+
+type ListEncryptedDirectChatReadStateEntriesParams struct {
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+	ChatID uuid.UUID `db:"chat_id" json:"chat_id"`
+}
+
+type ListEncryptedDirectChatReadStateEntriesRow struct {
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	LastReadMessageID        pgtype.UUID        `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListEncryptedDirectChatReadStateEntries(ctx context.Context, arg ListEncryptedDirectChatReadStateEntriesParams) ([]ListEncryptedDirectChatReadStateEntriesRow, error) {
+	rows, err := q.db.Query(ctx, listEncryptedDirectChatReadStateEntries, arg.UserID, arg.ChatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEncryptedDirectChatReadStateEntriesRow
+	for rows.Next() {
+		var i ListEncryptedDirectChatReadStateEntriesRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.ReadReceiptsEnabled,
+			&i.LastReadMessageID,
+			&i.LastReadMessageCreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -3929,6 +4079,23 @@ SELECT
     ), 0)::INT AS unread_count,
     COALESCE((
         SELECT COUNT(*)::INT
+        FROM group_encrypted_messages_v1 AS gm
+        LEFT JOIN group_encrypted_read_states_v1 AS self_read
+            ON self_read.group_id = g.id AND self_read.user_id = self.user_id
+        WHERE gm.group_id = g.id
+          AND gm.operation_kind = 'content'
+          AND gm.sender_user_id <> self.user_id
+          AND (
+              self_read.last_read_message_id IS NULL
+              OR gm.created_at > self_read.last_read_message_created_at
+              OR (
+                  gm.created_at = self_read.last_read_message_created_at
+                  AND gm.id > self_read.last_read_message_id
+              )
+          )
+    ), 0)::INT AS encrypted_unread_count,
+    COALESCE((
+        SELECT COUNT(*)::INT
         FROM group_memberships AS members
         WHERE members.group_id = g.id
     ), 0)::INT AS member_count
@@ -3947,6 +4114,7 @@ type ListGroupRowsByUserIDRow struct {
 	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	UnreadCount           int32              `db:"unread_count" json:"unread_count"`
+	EncryptedUnreadCount  int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
 	MemberCount           int32              `db:"member_count" json:"member_count"`
 }
 
@@ -3968,6 +4136,7 @@ func (q *Queries) ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) (
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.UnreadCount,
+			&i.EncryptedUnreadCount,
 			&i.MemberCount,
 		); err != nil {
 			return nil, err
@@ -4765,6 +4934,90 @@ type UpsertDirectChatReadReceiptParams struct {
 func (q *Queries) UpsertDirectChatReadReceipt(ctx context.Context, arg UpsertDirectChatReadReceiptParams) (int64, error) {
 	result, err := q.db.Exec(ctx, upsertDirectChatReadReceipt,
 		arg.ChatID,
+		arg.UserID,
+		arg.LastReadMessageID,
+		arg.LastReadMessageCreatedAt,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const upsertEncryptedDirectChatReadState = `-- name: UpsertEncryptedDirectChatReadState :execrows
+INSERT INTO direct_chat_encrypted_read_states_v1 (
+    chat_id,
+    user_id,
+    last_read_message_id,
+    last_read_message_created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (chat_id, user_id) DO UPDATE
+SET
+    last_read_message_id = EXCLUDED.last_read_message_id,
+    last_read_message_created_at = EXCLUDED.last_read_message_created_at,
+    updated_at = EXCLUDED.updated_at
+WHERE direct_chat_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
+   OR (
+        direct_chat_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
+        AND direct_chat_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
+   )
+`
+
+type UpsertEncryptedDirectChatReadStateParams struct {
+	ChatID                   uuid.UUID          `db:"chat_id" json:"chat_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpsertEncryptedDirectChatReadState(ctx context.Context, arg UpsertEncryptedDirectChatReadStateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertEncryptedDirectChatReadState,
+		arg.ChatID,
+		arg.UserID,
+		arg.LastReadMessageID,
+		arg.LastReadMessageCreatedAt,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const upsertEncryptedGroupReadState = `-- name: UpsertEncryptedGroupReadState :execrows
+INSERT INTO group_encrypted_read_states_v1 (
+    group_id,
+    user_id,
+    last_read_message_id,
+    last_read_message_created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+    last_read_message_id = EXCLUDED.last_read_message_id,
+    last_read_message_created_at = EXCLUDED.last_read_message_created_at,
+    updated_at = EXCLUDED.updated_at
+WHERE group_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
+   OR (
+        group_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
+        AND group_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
+   )
+`
+
+type UpsertEncryptedGroupReadStateParams struct {
+	GroupID                  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
+	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpsertEncryptedGroupReadState(ctx context.Context, arg UpsertEncryptedGroupReadStateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertEncryptedGroupReadState,
+		arg.GroupID,
 		arg.UserID,
 		arg.LastReadMessageID,
 		arg.LastReadMessageCreatedAt,

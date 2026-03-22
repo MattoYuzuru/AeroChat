@@ -21,6 +21,9 @@ export interface EncryptedDirectMessageV2RealtimeEvent {
       ciphertext: string;
       ciphertextSizeBytes: number;
       storedAt: string;
+      unreadState: {
+        unreadCount: number;
+      } | null;
     };
   };
 }
@@ -95,6 +98,7 @@ export function parseEncryptedDirectMessageV2RealtimeEvent(
         ciphertext,
         ciphertextSizeBytes,
         storedAt: viewerStoredAt,
+        unreadState: readUnreadState(payload.envelope.viewerDelivery.unreadState),
       },
     },
   };
@@ -164,4 +168,17 @@ function readRequiredNumber(value: unknown): number | null {
   }
 
   return value;
+}
+
+function readUnreadState(value: unknown): { unreadCount: number } | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const unreadCount = readRequiredNumber(value.unreadCount);
+  if (unreadCount === null) {
+    return null;
+  }
+
+  return { unreadCount };
 }
