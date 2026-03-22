@@ -914,6 +914,237 @@ func TestGetEncryptedDirectMessageV2ReturnsViewerScopedEnvelope(t *testing.T) {
 	}
 }
 
+func TestGetEncryptedGroupBootstrapRequiresReadyReadableRoster(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	aliceDevice := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	group := mustCreateGroup(t, service, alice.Token, "Encrypted team")
+
+	readerInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleReader)
+	if err != nil {
+		t.Fatalf("create reader invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, readerInvite.InviteToken); err != nil {
+		t.Fatalf("join reader invite: %v", err)
+	}
+
+	if _, err := service.GetEncryptedGroupBootstrap(context.Background(), alice.Token, group.ID, aliceDevice.ID); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка bootstrap без ready device у readable member, получено %v", err)
+	}
+}
+
+func TestGetEncryptedGroupBootstrapMaterializesReadableDeviceRoster(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	charlie := repo.mustIssueAuth(testUUID(3), "charlie", "Charlie")
+
+	aliceFirst := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	aliceSecond := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobReader := repo.mustAddActiveCryptoDevice(bob.User.ID)
+	charlieMember := repo.mustAddActiveCryptoDevice(charlie.User.ID)
+
+	group := mustCreateGroup(t, service, alice.Token, "Encrypted roster")
+	readerInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleReader)
+	if err != nil {
+		t.Fatalf("create reader invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, readerInvite.InviteToken); err != nil {
+		t.Fatalf("join reader invite: %v", err)
+	}
+
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), charlie.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+	if _, err := service.RestrictGroupMember(context.Background(), alice.Token, group.ID, charlie.User.ID); err != nil {
+		t.Fatalf("restrict member before bootstrap: %v", err)
+	}
+
+	bootstrap, err := service.GetEncryptedGroupBootstrap(context.Background(), alice.Token, group.ID, aliceFirst.ID)
+	if err != nil {
+		t.Fatalf("get encrypted group bootstrap: %v", err)
+	}
+
+	if bootstrap.Lane.GroupID != group.ID {
+		t.Fatalf("ожидался group id %q, получен %q", group.ID, bootstrap.Lane.GroupID)
+	}
+	if bootstrap.Lane.MLSGroupID == "" || bootstrap.Lane.RosterVersion == 0 {
+		t.Fatalf("ожидался materialized encrypted lane, получено %+v", bootstrap.Lane)
+	}
+	if len(bootstrap.RosterMembers) != 3 {
+		t.Fatalf("ожидалось 3 readable roster members, получено %d", len(bootstrap.RosterMembers))
+	}
+	if len(bootstrap.RosterDevices) != 4 {
+		t.Fatalf("ожидалось 4 eligible roster devices, получено %d", len(bootstrap.RosterDevices))
+	}
+
+	var readerSeen bool
+	var restrictedSeen bool
+	for _, member := range bootstrap.RosterMembers {
+		switch member.User.ID {
+		case bob.User.ID:
+			readerSeen = true
+			if member.Role != GroupMemberRoleReader || !member.HasEligibleCryptoDevice || len(member.EligibleCryptoDeviceIDs) != 1 {
+				t.Fatalf("reader должен остаться readable частью roster, получено %+v", member)
+			}
+			if member.EligibleCryptoDeviceIDs[0] != bobReader.ID {
+				t.Fatalf("ожидался reader device %q, получено %+v", bobReader.ID, member.EligibleCryptoDeviceIDs)
+			}
+		case charlie.User.ID:
+			restrictedSeen = true
+			if member.Role != GroupMemberRoleMember || !member.IsWriteRestricted || !member.HasEligibleCryptoDevice {
+				t.Fatalf("restricted member должен остаться readable частью roster, получено %+v", member)
+			}
+			if len(member.EligibleCryptoDeviceIDs) != 1 || member.EligibleCryptoDeviceIDs[0] != charlieMember.ID {
+				t.Fatalf("ожидался restricted member device %q, получено %+v", charlieMember.ID, member.EligibleCryptoDeviceIDs)
+			}
+		}
+	}
+	if !readerSeen || !restrictedSeen {
+		t.Fatalf("ожидались reader и restricted member в bootstrap roster, получено %+v", bootstrap.RosterMembers)
+	}
+
+	deviceIDs := make([]string, 0, len(bootstrap.RosterDevices))
+	for _, device := range bootstrap.RosterDevices {
+		deviceIDs = append(deviceIDs, device.DeviceID)
+		if device.Bundle.SignedPrekeyID == "" {
+			t.Fatalf("ожидался current public bundle для roster device %+v", device)
+		}
+	}
+	sort.Strings(deviceIDs)
+	expected := []string{aliceFirst.ID, aliceSecond.ID, bobReader.ID, charlieMember.ID}
+	sort.Strings(expected)
+	if strings.Join(deviceIDs, ",") != strings.Join(expected, ",") {
+		t.Fatalf("неверный eligible device roster: %v", deviceIDs)
+	}
+}
+
+func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+	bobSecond := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	group := mustCreateGroup(t, service, alice.Token, "Encrypted lane")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	bootstrap, err := service.GetEncryptedGroupBootstrap(context.Background(), alice.Token, group.ID, aliceSender.ID)
+	if err != nil {
+		t.Fatalf("bootstrap encrypted group: %v", err)
+	}
+
+	receipt, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
+		GroupID:              group.ID,
+		MessageID:            testUUID(704),
+		MLSGroupID:           bootstrap.Lane.MLSGroupID,
+		RosterVersion:        bootstrap.Lane.RosterVersion,
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedGroupMessageOperationContent,
+		Revision:             1,
+		Ciphertext:           []byte("group-ciphertext"),
+	})
+	if err != nil {
+		t.Fatalf("send encrypted group message: %v", err)
+	}
+	if receipt.StoredDeliveryCount != 3 {
+		t.Fatalf("ожидалось 3 group delivery records, получено %d", receipt.StoredDeliveryCount)
+	}
+
+	bobView, err := service.ListEncryptedGroupMessages(context.Background(), bob.Token, group.ID, bobFirst.ID, 0)
+	if err != nil {
+		t.Fatalf("list encrypted group messages for bob first device: %v", err)
+	}
+	if len(bobView) != 1 {
+		t.Fatalf("ожидался один encrypted group envelope для bob first device, получено %d", len(bobView))
+	}
+	if bobView[0].MLSGroupID != bootstrap.Lane.MLSGroupID || bobView[0].RosterVersion != bootstrap.Lane.RosterVersion {
+		t.Fatalf("ожидался lane reference из bootstrap, получено %+v", bobView[0])
+	}
+	if bobView[0].ViewerDelivery.RecipientCryptoDeviceID != bobFirst.ID {
+		t.Fatalf("ожидался viewer delivery target %q, получено %q", bobFirst.ID, bobView[0].ViewerDelivery.RecipientCryptoDeviceID)
+	}
+	if string(bobView[0].Ciphertext) != "group-ciphertext" {
+		t.Fatalf("ожидался ciphertext %q, получен %q", "group-ciphertext", string(bobView[0].Ciphertext))
+	}
+
+	originView, err := service.GetEncryptedGroupMessage(context.Background(), alice.Token, group.ID, receipt.MessageID, aliceSender.ID)
+	if err != nil {
+		t.Fatalf("get encrypted group message for origin device: %v", err)
+	}
+	if originView.ViewerDelivery.RecipientCryptoDeviceID != aliceSender.ID {
+		t.Fatalf("ожидался sender self-delivery %q, получено %q", aliceSender.ID, originView.ViewerDelivery.RecipientCryptoDeviceID)
+	}
+
+	secondDeviceView, err := service.GetEncryptedGroupMessage(context.Background(), bob.Token, group.ID, receipt.MessageID, bobSecond.ID)
+	if err != nil {
+		t.Fatalf("get encrypted group message for bob second device: %v", err)
+	}
+	if secondDeviceView.ViewerDelivery.RecipientCryptoDeviceID != bobSecond.ID {
+		t.Fatalf("ожидался bob second delivery %q, получено %q", bobSecond.ID, secondDeviceView.ViewerDelivery.RecipientCryptoDeviceID)
+	}
+}
+
+func TestSendEncryptedGroupMessageRejectsStaleRosterVersion(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	_ = repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	group := mustCreateGroup(t, service, alice.Token, "Stale roster")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	bootstrap, err := service.GetEncryptedGroupBootstrap(context.Background(), alice.Token, group.ID, aliceSender.ID)
+	if err != nil {
+		t.Fatalf("bootstrap encrypted group: %v", err)
+	}
+
+	_ = repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	if _, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
+		GroupID:              group.ID,
+		MessageID:            testUUID(705),
+		MLSGroupID:           bootstrap.Lane.MLSGroupID,
+		RosterVersion:        bootstrap.Lane.RosterVersion,
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedGroupMessageOperationContent,
+		Revision:             1,
+		Ciphertext:           []byte("stale-group-ciphertext"),
+	}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка stale group roster version, получено %v", err)
+	}
+}
+
 func TestDeleteMessageUsesTombstoneAndAuthorRule(t *testing.T) {
 	t.Parallel()
 
@@ -1421,6 +1652,23 @@ func cloneStringPointerForTest(value *string) *string {
 	return &copyValue
 }
 
+func copyEncryptedGroupMessageDeliveriesForTest(values []EncryptedGroupMessageDelivery) []EncryptedGroupMessageDelivery {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]EncryptedGroupMessageDelivery, 0, len(values))
+	for _, value := range values {
+		result = append(result, EncryptedGroupMessageDelivery{
+			RecipientUserID:         value.RecipientUserID,
+			RecipientCryptoDeviceID: value.RecipientCryptoDeviceID,
+			StoredAt:                value.StoredAt,
+		})
+	}
+
+	return result
+}
+
 type issuedAuth struct {
 	User      UserSummary
 	Token     string
@@ -1430,6 +1678,18 @@ type issuedAuth struct {
 type fakeEncryptedDirectMessageV2Record struct {
 	Envelope   EncryptedDirectMessageV2StoredEnvelope
 	Deliveries map[string]EncryptedDirectMessageV2Delivery
+}
+
+type fakeEncryptedGroupLaneRecord struct {
+	Lane    EncryptedGroupLane
+	Members map[string]EncryptedGroupRosterMemberSnapshot
+	Devices map[string]EncryptedGroupRosterDeviceSnapshot
+}
+
+type fakeEncryptedGroupMessageRecord struct {
+	Envelope   EncryptedGroupStoredEnvelope
+	Ciphertext []byte
+	Deliveries map[string]EncryptedGroupMessageDelivery
 }
 
 type fakeRepository struct {
@@ -1450,6 +1710,8 @@ type fakeRepository struct {
 	groupMessages       map[string]GroupMessage
 	messages            map[string]DirectChatMessage
 	encryptedMessagesV2 map[string]fakeEncryptedDirectMessageV2Record
+	encryptedGroupLanes map[string]fakeEncryptedGroupLaneRecord
+	encryptedGroupMsgs  map[string]fakeEncryptedGroupMessageRecord
 	readPositions       map[string]DirectChatReadPosition
 	groupReadPositions  map[string]GroupReadPosition
 	typingStore         *fakeTypingStore
@@ -1479,6 +1741,8 @@ func newFakeRepository() *fakeRepository {
 		groupMessages:       make(map[string]GroupMessage),
 		messages:            make(map[string]DirectChatMessage),
 		encryptedMessagesV2: make(map[string]fakeEncryptedDirectMessageV2Record),
+		encryptedGroupLanes: make(map[string]fakeEncryptedGroupLaneRecord),
+		encryptedGroupMsgs:  make(map[string]fakeEncryptedGroupMessageRecord),
 		readPositions:       make(map[string]DirectChatReadPosition),
 		groupReadPositions:  make(map[string]GroupReadPosition),
 		typingStore:         newFakeTypingStore(),
@@ -1687,6 +1951,59 @@ func (r *fakeRepository) ListCurrentCryptoDeviceBundlesByDeviceIDs(_ context.Con
 	})
 
 	return result, nil
+}
+
+func (r *fakeRepository) GetEncryptedGroupLane(_ context.Context, groupID string) (*EncryptedGroupLane, error) {
+	record, ok := r.encryptedGroupLanes[groupID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	lane := record.Lane
+	return &lane, nil
+}
+
+func (r *fakeRepository) SyncEncryptedGroupControlPlane(_ context.Context, params SyncEncryptedGroupControlPlaneParams) (*EncryptedGroupLane, error) {
+	if _, ok := r.groups[params.GroupID]; !ok {
+		return nil, ErrNotFound
+	}
+	thread, ok := r.groupThreads[params.GroupID]
+	if !ok || thread.ID != params.ThreadID {
+		return nil, ErrNotFound
+	}
+
+	record, ok := r.encryptedGroupLanes[params.GroupID]
+	if !ok {
+		record = fakeEncryptedGroupLaneRecord{
+			Lane: EncryptedGroupLane{
+				GroupID:       params.GroupID,
+				ThreadID:      params.ThreadID,
+				MLSGroupID:    params.MLSGroupID,
+				RosterVersion: 1,
+				ActivatedAt:   params.ActivatedAt,
+				UpdatedAt:     params.UpdatedAt,
+			},
+			Members: make(map[string]EncryptedGroupRosterMemberSnapshot),
+			Devices: make(map[string]EncryptedGroupRosterDeviceSnapshot),
+		}
+	} else if encryptedGroupLaneChanged(record, params) {
+		record.Lane.ThreadID = params.ThreadID
+		record.Lane.RosterVersion++
+		record.Lane.UpdatedAt = params.UpdatedAt
+	}
+
+	record.Members = make(map[string]EncryptedGroupRosterMemberSnapshot, len(params.RosterMembers))
+	for _, member := range params.RosterMembers {
+		record.Members[member.UserID] = member
+	}
+	record.Devices = make(map[string]EncryptedGroupRosterDeviceSnapshot, len(params.RosterDevices))
+	for _, device := range params.RosterDevices {
+		record.Devices[device.UserID+":"+device.CryptoDeviceID] = device
+	}
+
+	r.encryptedGroupLanes[params.GroupID] = record
+	lane := record.Lane
+	return &lane, nil
 }
 
 func (r *fakeRepository) UpsertDirectChatReadReceipt(_ context.Context, params UpsertDirectChatReadReceiptParams) (bool, error) {
@@ -2611,6 +2928,54 @@ func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, param
 	return &envelopeCopy, nil
 }
 
+func (r *fakeRepository) CreateEncryptedGroupMessage(_ context.Context, params CreateEncryptedGroupMessageParams) (*EncryptedGroupStoredEnvelope, error) {
+	if _, ok := r.groupMembers[params.GroupID][params.SenderUserID]; !ok {
+		return nil, ErrNotFound
+	}
+	if _, exists := r.encryptedGroupMsgs[params.MessageID]; exists {
+		return nil, ErrConflict
+	}
+
+	storedDeliveries := make([]EncryptedGroupMessageDelivery, 0, len(params.Deliveries))
+	deliveries := make(map[string]EncryptedGroupMessageDelivery, len(params.Deliveries))
+	for _, delivery := range params.Deliveries {
+		storedDelivery := EncryptedGroupMessageDelivery{
+			RecipientUserID:         delivery.RecipientUserID,
+			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
+			StoredAt:                params.StoredAt,
+		}
+		deliveries[delivery.RecipientCryptoDeviceID] = storedDelivery
+		storedDeliveries = append(storedDeliveries, storedDelivery)
+	}
+
+	record := fakeEncryptedGroupMessageRecord{
+		Envelope: EncryptedGroupStoredEnvelope{
+			MessageID:            params.MessageID,
+			GroupID:              params.GroupID,
+			ThreadID:             params.ThreadID,
+			MLSGroupID:           params.MLSGroupID,
+			RosterVersion:        params.RosterVersion,
+			SenderUserID:         params.SenderUserID,
+			SenderCryptoDeviceID: params.SenderCryptoDeviceID,
+			OperationKind:        params.OperationKind,
+			TargetMessageID:      cloneStringPointerForTest(params.TargetMessageID),
+			Revision:             params.Revision,
+			CreatedAt:            params.CreatedAt,
+			StoredAt:             params.StoredAt,
+			StoredDeliveryCount:  uint32(len(storedDeliveries)),
+			StoredDeliveries:     copyEncryptedGroupMessageDeliveriesForTest(storedDeliveries),
+		},
+		Ciphertext: append([]byte(nil), params.Ciphertext...),
+		Deliveries: deliveries,
+	}
+	r.encryptedGroupMsgs[params.MessageID] = record
+
+	envelopeCopy := record.Envelope
+	envelopeCopy.TargetMessageID = cloneStringPointerForTest(record.Envelope.TargetMessageID)
+	envelopeCopy.StoredDeliveries = copyEncryptedGroupMessageDeliveriesForTest(record.Envelope.StoredDeliveries)
+	return &envelopeCopy, nil
+}
+
 func (r *fakeRepository) CreateDirectChatMessage(_ context.Context, params CreateDirectChatMessageParams) (*DirectChatMessage, error) {
 	directChat, ok := r.chats[params.ChatID]
 	if !ok || !isParticipant(directChat, params.SenderUserID) {
@@ -2733,6 +3098,73 @@ func (r *fakeRepository) ListEncryptedDirectMessageV2(_ context.Context, userID 
 
 func (r *fakeRepository) GetEncryptedDirectMessageV2(_ context.Context, userID string, chatID string, messageID string, viewerCryptoDeviceID string) (*EncryptedDirectMessageV2Envelope, error) {
 	result, err := r.ListEncryptedDirectMessageV2(context.Background(), userID, chatID, viewerCryptoDeviceID, 1<<30)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, envelope := range result {
+		if envelope.MessageID == messageID {
+			value := envelope
+			return &value, nil
+		}
+	}
+
+	return nil, ErrNotFound
+}
+
+func (r *fakeRepository) ListEncryptedGroupMessages(_ context.Context, userID string, groupID string, viewerCryptoDeviceID string, limit int32) ([]EncryptedGroupEnvelope, error) {
+	if _, ok := r.groupMembers[groupID][userID]; !ok {
+		return nil, ErrNotFound
+	}
+
+	result := make([]EncryptedGroupEnvelope, 0)
+	for _, record := range r.encryptedGroupMsgs {
+		if record.Envelope.GroupID != groupID {
+			continue
+		}
+		delivery, ok := record.Deliveries[viewerCryptoDeviceID]
+		if !ok || delivery.RecipientUserID != userID {
+			continue
+		}
+
+		result = append(result, EncryptedGroupEnvelope{
+			MessageID:            record.Envelope.MessageID,
+			GroupID:              record.Envelope.GroupID,
+			ThreadID:             record.Envelope.ThreadID,
+			MLSGroupID:           record.Envelope.MLSGroupID,
+			RosterVersion:        record.Envelope.RosterVersion,
+			SenderUserID:         record.Envelope.SenderUserID,
+			SenderCryptoDeviceID: record.Envelope.SenderCryptoDeviceID,
+			OperationKind:        record.Envelope.OperationKind,
+			TargetMessageID:      cloneStringPointerForTest(record.Envelope.TargetMessageID),
+			Revision:             record.Envelope.Revision,
+			Ciphertext:           append([]byte(nil), record.Ciphertext...),
+			CiphertextSizeBytes:  int64(len(record.Ciphertext)),
+			CreatedAt:            record.Envelope.CreatedAt,
+			StoredAt:             record.Envelope.StoredAt,
+			ViewerDelivery: EncryptedGroupMessageDelivery{
+				RecipientUserID:         delivery.RecipientUserID,
+				RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
+				StoredAt:                delivery.StoredAt,
+			},
+		})
+	}
+
+	sort.Slice(result, func(i int, j int) bool {
+		if result[i].CreatedAt.Equal(result[j].CreatedAt) {
+			return result[i].MessageID > result[j].MessageID
+		}
+		return result[i].CreatedAt.After(result[j].CreatedAt)
+	})
+	if len(result) > int(limit) {
+		result = result[:limit]
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) GetEncryptedGroupMessage(_ context.Context, userID string, groupID string, messageID string, viewerCryptoDeviceID string) (*EncryptedGroupEnvelope, error) {
+	result, err := r.ListEncryptedGroupMessages(context.Background(), userID, groupID, viewerCryptoDeviceID, 1<<30)
 	if err != nil {
 		return nil, err
 	}
@@ -3025,6 +3457,32 @@ func (r *fakeRepository) setPresenceEnabled(userID string, enabled bool) {
 		directChat.Participants = updatedParticipants
 		r.chats[chatID] = directChat
 	}
+}
+
+func encryptedGroupLaneChanged(record fakeEncryptedGroupLaneRecord, params SyncEncryptedGroupControlPlaneParams) bool {
+	if record.Lane.ThreadID != params.ThreadID {
+		return true
+	}
+	if len(record.Members) != len(params.RosterMembers) || len(record.Devices) != len(params.RosterDevices) {
+		return true
+	}
+
+	for _, member := range params.RosterMembers {
+		existing, ok := record.Members[member.UserID]
+		if !ok {
+			return true
+		}
+		if existing.Role != member.Role || existing.IsWriteRestricted != member.IsWriteRestricted {
+			return true
+		}
+	}
+	for _, device := range params.RosterDevices {
+		if _, ok := record.Devices[device.UserID+":"+device.CryptoDeviceID]; !ok {
+			return true
+		}
+	}
+
+	return false
 }
 
 func pairKey(firstUserID string, secondUserID string) string {

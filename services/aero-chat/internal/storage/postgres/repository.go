@@ -1051,6 +1051,157 @@ func (r *Repository) ListCurrentCryptoDeviceBundlesByDeviceIDs(ctx context.Conte
 	return result, nil
 }
 
+func (r *Repository) GetEncryptedGroupLane(ctx context.Context, groupID string) (*chat.EncryptedGroupLane, error) {
+	row, err := r.queries.GetEncryptedGroupLaneByGroupID(ctx, mustParseUUID(groupID))
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	return &chat.EncryptedGroupLane{
+		GroupID:       row.GroupID.String(),
+		ThreadID:      row.ThreadID.String(),
+		MLSGroupID:    row.MlsGroupID.String(),
+		RosterVersion: uint64(row.RosterVersion),
+		ActivatedAt:   timestampValue(row.ActivatedAt),
+		UpdatedAt:     timestampValue(row.UpdatedAt),
+	}, nil
+}
+
+func (r *Repository) SyncEncryptedGroupControlPlane(ctx context.Context, params chat.SyncEncryptedGroupControlPlaneParams) (*chat.EncryptedGroupLane, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	groupID := mustParseUUID(params.GroupID)
+	threadID := mustParseUUID(params.ThreadID)
+	if _, err := q.LockGroupByID(ctx, groupID); err != nil {
+		return nil, convertError(err)
+	}
+
+	existingLaneRow, err := q.GetEncryptedGroupLaneByGroupID(ctx, groupID)
+	hasExistingLane := err == nil
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, convertError(err)
+	}
+
+	if !hasExistingLane && strings.TrimSpace(params.MLSGroupID) == "" {
+		return nil, fmt.Errorf("%w: encrypted group mls_group_id is required for initial bootstrap", chat.ErrConflict)
+	}
+
+	desiredMembers := params.RosterMembers
+	desiredDevices := params.RosterDevices
+
+	rosterVersion := int64(1)
+	activatedAt := params.ActivatedAt
+	updatedAt := params.UpdatedAt
+	laneMLSGroupID := params.MLSGroupID
+	shouldRewrite := !hasExistingLane
+	if hasExistingLane {
+		laneMLSGroupID = existingLaneRow.MlsGroupID.String()
+		rosterVersion = existingLaneRow.RosterVersion
+		activatedAt = timestampValue(existingLaneRow.ActivatedAt)
+		updatedAt = timestampValue(existingLaneRow.UpdatedAt)
+
+		existingMembers, err := q.ListEncryptedGroupRosterMembersByGroupID(ctx, groupID)
+		if err != nil {
+			return nil, convertError(err)
+		}
+		existingDevices, err := q.ListEncryptedGroupRosterDevicesByGroupID(ctx, groupID)
+		if err != nil {
+			return nil, convertError(err)
+		}
+
+		shouldRewrite = existingLaneRow.ThreadID != threadID ||
+			!sameEncryptedGroupRosterMembers(existingMembers, desiredMembers) ||
+			!sameEncryptedGroupRosterDevices(existingDevices, desiredDevices)
+		if shouldRewrite {
+			rosterVersion = existingLaneRow.RosterVersion + 1
+			updatedAt = params.UpdatedAt
+		}
+	}
+
+	if shouldRewrite {
+		if hasExistingLane {
+			updatedRows, err := q.UpdateEncryptedGroupLane(ctx, chatsqlc.UpdateEncryptedGroupLaneParams{
+				GroupID:       groupID,
+				ThreadID:      threadID,
+				RosterVersion: rosterVersion,
+				UpdatedAt:     timestamptzValue(updatedAt),
+			})
+			if err != nil {
+				return nil, convertError(err)
+			}
+			if updatedRows == 0 {
+				return nil, chat.ErrNotFound
+			}
+		} else {
+			createdLane, err := q.CreateEncryptedGroupLane(ctx, chatsqlc.CreateEncryptedGroupLaneParams{
+				GroupID:       groupID,
+				ThreadID:      threadID,
+				MlsGroupID:    mustParseUUID(laneMLSGroupID),
+				RosterVersion: rosterVersion,
+				ActivatedAt:   timestamptzValue(activatedAt),
+				UpdatedAt:     timestamptzValue(updatedAt),
+			})
+			if err != nil {
+				return nil, convertError(err)
+			}
+			laneMLSGroupID = createdLane.MlsGroupID.String()
+		}
+
+		if err := q.DeleteEncryptedGroupRosterDevicesByGroupID(ctx, groupID); err != nil {
+			return nil, convertError(err)
+		}
+		if err := q.DeleteEncryptedGroupRosterMembersByGroupID(ctx, groupID); err != nil {
+			return nil, convertError(err)
+		}
+
+		for _, member := range desiredMembers {
+			if err := q.InsertEncryptedGroupRosterMember(ctx, chatsqlc.InsertEncryptedGroupRosterMemberParams{
+				GroupID:           groupID,
+				UserID:            mustParseUUID(member.UserID),
+				Role:              member.Role,
+				IsWriteRestricted: member.IsWriteRestricted,
+				RosterVersion:     rosterVersion,
+				CreatedAt:         timestamptzValue(updatedAt),
+				UpdatedAt:         timestamptzValue(updatedAt),
+			}); err != nil {
+				return nil, convertError(err)
+			}
+		}
+		for _, device := range desiredDevices {
+			if err := q.InsertEncryptedGroupRosterDevice(ctx, chatsqlc.InsertEncryptedGroupRosterDeviceParams{
+				GroupID:        groupID,
+				UserID:         mustParseUUID(device.UserID),
+				CryptoDeviceID: mustParseUUID(device.CryptoDeviceID),
+				RosterVersion:  rosterVersion,
+				CreatedAt:      timestamptzValue(updatedAt),
+				UpdatedAt:      timestamptzValue(updatedAt),
+			}); err != nil {
+				return nil, convertError(err)
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return &chat.EncryptedGroupLane{
+		GroupID:       params.GroupID,
+		ThreadID:      params.ThreadID,
+		MLSGroupID:    laneMLSGroupID,
+		RosterVersion: uint64(rosterVersion),
+		ActivatedAt:   activatedAt,
+		UpdatedAt:     updatedAt,
+	}, nil
+}
+
 func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params chat.CreateEncryptedDirectMessageV2Params) (*chat.EncryptedDirectMessageV2StoredEnvelope, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -1116,6 +1267,79 @@ func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params 
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
 		StoredDeliveryCount:  uint32(len(params.Deliveries)),
+	}, nil
+}
+
+func (r *Repository) CreateEncryptedGroupMessage(ctx context.Context, params chat.CreateEncryptedGroupMessageParams) (*chat.EncryptedGroupStoredEnvelope, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	q := r.queries.WithTx(tx)
+	row, err := q.CreateEncryptedGroupMessage(ctx, chatsqlc.CreateEncryptedGroupMessageParams{
+		ID:                   mustParseUUID(params.MessageID),
+		GroupID:              mustParseUUID(params.GroupID),
+		ThreadID:             mustParseUUID(params.ThreadID),
+		MlsGroupID:           mustParseUUID(params.MLSGroupID),
+		RosterVersion:        int64(params.RosterVersion),
+		SenderUserID:         mustParseUUID(params.SenderUserID),
+		SenderCryptoDeviceID: mustParseUUID(params.SenderCryptoDeviceID),
+		OperationKind:        params.OperationKind,
+		TargetMessageID:      nullableUUID(params.TargetMessageID),
+		Revision:             int32(params.Revision),
+		Ciphertext:           append([]byte(nil), params.Ciphertext...),
+		CiphertextSizeBytes:  int64(len(params.Ciphertext)),
+		CreatedAt:            timestamptzValue(params.CreatedAt),
+		StoredAt:             timestamptzValue(params.StoredAt),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	storedDeliveries := make([]chat.EncryptedGroupMessageDelivery, 0, len(params.Deliveries))
+	for _, delivery := range params.Deliveries {
+		storedAt := delivery.StoredAt
+		if storedAt.IsZero() {
+			storedAt = params.StoredAt
+		}
+		if err := q.CreateEncryptedGroupMessageDelivery(ctx, chatsqlc.CreateEncryptedGroupMessageDeliveryParams{
+			MessageID:               row.ID,
+			RecipientUserID:         mustParseUUID(delivery.RecipientUserID),
+			RecipientCryptoDeviceID: mustParseUUID(delivery.RecipientCryptoDeviceID),
+			StoredAt:                timestamptzValue(storedAt),
+		}); err != nil {
+			return nil, convertError(err)
+		}
+		storedDeliveries = append(storedDeliveries, chat.EncryptedGroupMessageDelivery{
+			RecipientUserID:         delivery.RecipientUserID,
+			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
+			StoredAt:                storedAt,
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
+	}
+
+	return &chat.EncryptedGroupStoredEnvelope{
+		MessageID:            row.ID.String(),
+		GroupID:              row.GroupID.String(),
+		ThreadID:             row.ThreadID.String(),
+		MLSGroupID:           row.MlsGroupID.String(),
+		RosterVersion:        uint64(row.RosterVersion),
+		SenderUserID:         row.SenderUserID.String(),
+		SenderCryptoDeviceID: row.SenderCryptoDeviceID.String(),
+		OperationKind:        row.OperationKind,
+		TargetMessageID:      uuidPointerString(row.TargetMessageID),
+		Revision:             uint32(row.Revision),
+		CreatedAt:            timestampValue(row.CreatedAt),
+		StoredAt:             timestampValue(row.StoredAt),
+		StoredDeliveryCount:  uint32(len(storedDeliveries)),
+		StoredDeliveries:     storedDeliveries,
 	}, nil
 }
 
@@ -1330,6 +1554,40 @@ func (r *Repository) GetEncryptedDirectMessageV2(ctx context.Context, userID str
 			StoredAt:                timestampValue(row.DeliveryStoredAt),
 		},
 	}, nil
+}
+
+func (r *Repository) ListEncryptedGroupMessages(ctx context.Context, userID string, groupID string, viewerCryptoDeviceID string, limit int32) ([]chat.EncryptedGroupEnvelope, error) {
+	rows, err := r.queries.ListEncryptedGroupMessagesByDevice(ctx, chatsqlc.ListEncryptedGroupMessagesByDeviceParams{
+		UserID:                  mustParseUUID(userID),
+		GroupID:                 mustParseUUID(groupID),
+		RecipientCryptoDeviceID: mustParseUUID(viewerCryptoDeviceID),
+		Limit:                   limit,
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	result := make([]chat.EncryptedGroupEnvelope, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, toDomainEncryptedGroupEnvelope(row))
+	}
+
+	return result, nil
+}
+
+func (r *Repository) GetEncryptedGroupMessage(ctx context.Context, userID string, groupID string, messageID string, viewerCryptoDeviceID string) (*chat.EncryptedGroupEnvelope, error) {
+	row, err := r.queries.GetEncryptedGroupMessageByDevice(ctx, chatsqlc.GetEncryptedGroupMessageByDeviceParams{
+		UserID:                  mustParseUUID(userID),
+		GroupID:                 mustParseUUID(groupID),
+		ID:                      mustParseUUID(messageID),
+		RecipientCryptoDeviceID: mustParseUUID(viewerCryptoDeviceID),
+	})
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	envelope := toDomainEncryptedGroupEnvelopeFromGet(row)
+	return &envelope, nil
 }
 
 func (r *Repository) SearchDirectMessages(ctx context.Context, userID string, params chat.SearchDirectMessagesParams) ([]chat.MessageSearchResult, error) {
@@ -1799,6 +2057,103 @@ func toDomainEncryptedDirectMessageV2Envelope(row chatsqlc.ListDirectChatEncrypt
 			StoredAt:                timestampValue(row.DeliveryStoredAt),
 		},
 	}
+}
+
+func toDomainEncryptedGroupEnvelope(row chatsqlc.ListEncryptedGroupMessagesByDeviceRow) chat.EncryptedGroupEnvelope {
+	return chat.EncryptedGroupEnvelope{
+		MessageID:            row.ID.String(),
+		GroupID:              row.GroupID.String(),
+		ThreadID:             row.ThreadID.String(),
+		MLSGroupID:           row.MlsGroupID.String(),
+		RosterVersion:        uint64(row.RosterVersion),
+		SenderUserID:         row.SenderUserID.String(),
+		SenderCryptoDeviceID: row.SenderCryptoDeviceID.String(),
+		OperationKind:        row.OperationKind,
+		TargetMessageID:      uuidPointerString(row.TargetMessageID),
+		Revision:             uint32(row.Revision),
+		Ciphertext:           append([]byte(nil), row.Ciphertext...),
+		CiphertextSizeBytes:  row.CiphertextSizeBytes,
+		CreatedAt:            timestampValue(row.CreatedAt),
+		StoredAt:             timestampValue(row.StoredAt),
+		ViewerDelivery: chat.EncryptedGroupMessageDelivery{
+			RecipientUserID:         row.RecipientUserID.String(),
+			RecipientCryptoDeviceID: row.RecipientCryptoDeviceID.String(),
+			StoredAt:                timestampValue(row.DeliveryStoredAt),
+		},
+	}
+}
+
+func toDomainEncryptedGroupEnvelopeFromGet(row chatsqlc.GetEncryptedGroupMessageByDeviceRow) chat.EncryptedGroupEnvelope {
+	return chat.EncryptedGroupEnvelope{
+		MessageID:            row.ID.String(),
+		GroupID:              row.GroupID.String(),
+		ThreadID:             row.ThreadID.String(),
+		MLSGroupID:           row.MlsGroupID.String(),
+		RosterVersion:        uint64(row.RosterVersion),
+		SenderUserID:         row.SenderUserID.String(),
+		SenderCryptoDeviceID: row.SenderCryptoDeviceID.String(),
+		OperationKind:        row.OperationKind,
+		TargetMessageID:      uuidPointerString(row.TargetMessageID),
+		Revision:             uint32(row.Revision),
+		Ciphertext:           append([]byte(nil), row.Ciphertext...),
+		CiphertextSizeBytes:  row.CiphertextSizeBytes,
+		CreatedAt:            timestampValue(row.CreatedAt),
+		StoredAt:             timestampValue(row.StoredAt),
+		ViewerDelivery: chat.EncryptedGroupMessageDelivery{
+			RecipientUserID:         row.RecipientUserID.String(),
+			RecipientCryptoDeviceID: row.RecipientCryptoDeviceID.String(),
+			StoredAt:                timestampValue(row.DeliveryStoredAt),
+		},
+	}
+}
+
+func sameEncryptedGroupRosterMembers(
+	existing []chatsqlc.GroupEncryptedRosterMembersV1,
+	desired []chat.EncryptedGroupRosterMemberSnapshot,
+) bool {
+	if len(existing) != len(desired) {
+		return false
+	}
+
+	desiredByUserID := make(map[string]chat.EncryptedGroupRosterMemberSnapshot, len(desired))
+	for _, member := range desired {
+		desiredByUserID[member.UserID] = member
+	}
+
+	for _, member := range existing {
+		desiredMember, ok := desiredByUserID[member.UserID.String()]
+		if !ok {
+			return false
+		}
+		if desiredMember.Role != member.Role || desiredMember.IsWriteRestricted != member.IsWriteRestricted {
+			return false
+		}
+	}
+
+	return true
+}
+
+func sameEncryptedGroupRosterDevices(
+	existing []chatsqlc.GroupEncryptedRosterDevicesV1,
+	desired []chat.EncryptedGroupRosterDeviceSnapshot,
+) bool {
+	if len(existing) != len(desired) {
+		return false
+	}
+
+	desiredKeys := make(map[string]struct{}, len(desired))
+	for _, device := range desired {
+		desiredKeys[device.UserID+":"+device.CryptoDeviceID] = struct{}{}
+	}
+
+	for _, device := range existing {
+		key := device.UserID.String() + ":" + device.CryptoDeviceID.String()
+		if _, ok := desiredKeys[key]; !ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 func messageTextContentFromStorage(text string, markdownPolicy string) *chat.TextMessageContent {

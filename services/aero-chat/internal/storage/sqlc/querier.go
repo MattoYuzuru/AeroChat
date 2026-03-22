@@ -23,10 +23,15 @@ type Querier interface {
 	CreateDirectChatEncryptedMessageV2Delivery(ctx context.Context, arg CreateDirectChatEncryptedMessageV2DeliveryParams) error
 	CreateDirectChatMessage(ctx context.Context, arg CreateDirectChatMessageParams) (CreateDirectChatMessageRow, error)
 	CreateDirectChatMessageTombstone(ctx context.Context, arg CreateDirectChatMessageTombstoneParams) (int64, error)
+	CreateEncryptedGroupLane(ctx context.Context, arg CreateEncryptedGroupLaneParams) (GroupEncryptedLanesV1, error)
+	CreateEncryptedGroupMessage(ctx context.Context, arg CreateEncryptedGroupMessageParams) (CreateEncryptedGroupMessageRow, error)
+	CreateEncryptedGroupMessageDelivery(ctx context.Context, arg CreateEncryptedGroupMessageDeliveryParams) error
 	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
 	CreateGroupInviteLink(ctx context.Context, arg CreateGroupInviteLinkParams) (CreateGroupInviteLinkRow, error)
 	CreateGroupMessage(ctx context.Context, arg CreateGroupMessageParams) (CreateGroupMessageRow, error)
 	CreateGroupThread(ctx context.Context, arg CreateGroupThreadParams) (GroupThread, error)
+	DeleteEncryptedGroupRosterDevicesByGroupID(ctx context.Context, groupID uuid.UUID) error
+	DeleteEncryptedGroupRosterMembersByGroupID(ctx context.Context, groupID uuid.UUID) error
 	DeleteGroupMembership(ctx context.Context, arg DeleteGroupMembershipParams) (int64, error)
 	DetachDirectMessageAttachments(ctx context.Context, arg DetachDirectMessageAttachmentsParams) (int64, error)
 	DisableGroupInviteLink(ctx context.Context, arg DisableGroupInviteLinkParams) (int64, error)
@@ -44,6 +49,8 @@ type Querier interface {
 	GetDirectChatMessageByID(ctx context.Context, arg GetDirectChatMessageByIDParams) (GetDirectChatMessageByIDRow, error)
 	GetDirectChatRelationshipState(ctx context.Context, arg GetDirectChatRelationshipStateParams) (GetDirectChatRelationshipStateRow, error)
 	GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDirectChatRowsByIDAndUserIDParams) ([]GetDirectChatRowsByIDAndUserIDRow, error)
+	GetEncryptedGroupLaneByGroupID(ctx context.Context, groupID uuid.UUID) (GroupEncryptedLanesV1, error)
+	GetEncryptedGroupMessageByDevice(ctx context.Context, arg GetEncryptedGroupMessageByDeviceParams) (GetEncryptedGroupMessageByDeviceRow, error)
 	GetGroupChatThreadRowByGroupIDAndUserID(ctx context.Context, arg GetGroupChatThreadRowByGroupIDAndUserIDParams) (GroupThread, error)
 	GetGroupInviteLinkByIDAndGroupID(ctx context.Context, arg GetGroupInviteLinkByIDAndGroupIDParams) (GetGroupInviteLinkByIDAndGroupIDRow, error)
 	GetGroupInviteLinkForJoin(ctx context.Context, tokenHash string) (GetGroupInviteLinkForJoinRow, error)
@@ -52,6 +59,8 @@ type Querier interface {
 	GetGroupReadStateEntryByGroupIDAndUserID(ctx context.Context, arg GetGroupReadStateEntryByGroupIDAndUserIDParams) (GetGroupReadStateEntryByGroupIDAndUserIDRow, error)
 	GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowByIDAndUserIDParams) (GetGroupRowByIDAndUserIDRow, error)
 	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
+	InsertEncryptedGroupRosterDevice(ctx context.Context, arg InsertEncryptedGroupRosterDeviceParams) error
+	InsertEncryptedGroupRosterMember(ctx context.Context, arg InsertEncryptedGroupRosterMemberParams) error
 	JoinGroupMembership(ctx context.Context, arg JoinGroupMembershipParams) (int64, error)
 	ListActiveCryptoDevicesByUserIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListActiveCryptoDevicesByUserIDsRow, error)
 	ListAttachmentObjectDeletionCandidates(ctx context.Context, arg ListAttachmentObjectDeletionCandidatesParams) ([]ListAttachmentObjectDeletionCandidatesRow, error)
@@ -65,6 +74,9 @@ type Querier interface {
 	ListDirectChatTypingStateEntries(ctx context.Context, arg ListDirectChatTypingStateEntriesParams) ([]ListDirectChatTypingStateEntriesRow, error)
 	ListDirectMessageAttachmentRowsByMessageIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListDirectMessageAttachmentRowsByMessageIDsRow, error)
 	ListDirectReplyPreviewRows(ctx context.Context, arg ListDirectReplyPreviewRowsParams) ([]ListDirectReplyPreviewRowsRow, error)
+	ListEncryptedGroupMessagesByDevice(ctx context.Context, arg ListEncryptedGroupMessagesByDeviceParams) ([]ListEncryptedGroupMessagesByDeviceRow, error)
+	ListEncryptedGroupRosterDevicesByGroupID(ctx context.Context, groupID uuid.UUID) ([]GroupEncryptedRosterDevicesV1, error)
+	ListEncryptedGroupRosterMembersByGroupID(ctx context.Context, groupID uuid.UUID) ([]GroupEncryptedRosterMembersV1, error)
 	ListGroupInviteLinksByGroupID(ctx context.Context, groupID uuid.UUID) ([]ListGroupInviteLinksByGroupIDRow, error)
 	ListGroupMemberRowsByGroupIDAndUserID(ctx context.Context, arg ListGroupMemberRowsByGroupIDAndUserIDParams) ([]ListGroupMemberRowsByGroupIDAndUserIDRow, error)
 	ListGroupMessageAttachmentRowsByMessageIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListGroupMessageAttachmentRowsByMessageIDsRow, error)
@@ -74,6 +86,7 @@ type Querier interface {
 	ListGroupTypingStateEntries(ctx context.Context, arg ListGroupTypingStateEntriesParams) ([]ListGroupTypingStateEntriesRow, error)
 	ListPinnedMessageIDsByChatID(ctx context.Context, chatID uuid.UUID) ([]uuid.UUID, error)
 	LockAttachmentQuotaOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	LockGroupByID(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	LockGroupMembershipQuotaOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	MarkAttachmentAttached(ctx context.Context, arg MarkAttachmentAttachedParams) (int64, error)
 	MarkAttachmentDeleted(ctx context.Context, arg MarkAttachmentDeletedParams) (int64, error)
@@ -89,6 +102,7 @@ type Querier interface {
 	TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error
 	TransferGroupOwnership(ctx context.Context, arg TransferGroupOwnershipParams) (int64, error)
 	UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error)
+	UpdateEncryptedGroupLane(ctx context.Context, arg UpdateEncryptedGroupLaneParams) (int64, error)
 	UpdateGroupMembershipRole(ctx context.Context, arg UpdateGroupMembershipRoleParams) (int64, error)
 	UpsertDirectChatReadReceipt(ctx context.Context, arg UpsertDirectChatReadReceiptParams) (int64, error)
 	UpsertGroupChatReadState(ctx context.Context, arg UpsertGroupChatReadStateParams) (int64, error)

@@ -42,6 +42,10 @@ service ChatService {
   rpc SendEncryptedDirectMessageV2(SendEncryptedDirectMessageV2Request) returns (SendEncryptedDirectMessageV2Response);
   rpc ListEncryptedDirectMessageV2(ListEncryptedDirectMessageV2Request) returns (ListEncryptedDirectMessageV2Response);
   rpc GetEncryptedDirectMessageV2(GetEncryptedDirectMessageV2Request) returns (GetEncryptedDirectMessageV2Response);
+  rpc GetEncryptedGroupBootstrap(GetEncryptedGroupBootstrapRequest) returns (GetEncryptedGroupBootstrapResponse);
+  rpc SendEncryptedGroupMessage(SendEncryptedGroupMessageRequest) returns (SendEncryptedGroupMessageResponse);
+  rpc ListEncryptedGroupMessages(ListEncryptedGroupMessagesRequest) returns (ListEncryptedGroupMessagesResponse);
+  rpc GetEncryptedGroupMessage(GetEncryptedGroupMessageRequest) returns (GetEncryptedGroupMessageResponse);
   rpc SendTextMessage(SendTextMessageRequest) returns (SendTextMessageResponse);
   rpc EditDirectChatMessage(EditDirectChatMessageRequest) returns (EditDirectChatMessageResponse);
   rpc ListDirectChatMessages(ListDirectChatMessagesRequest) returns (ListDirectChatMessagesResponse);
@@ -70,6 +74,12 @@ enum EncryptedDirectMessageV2OperationKind {
   ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT = 1;
   ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_EDIT = 2;
   ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_TOMBSTONE = 3;
+}
+
+enum EncryptedGroupMessageOperationKind {
+  ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_UNSPECIFIED = 0;
+  ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT = 1;
+  ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTROL = 2;
 }
 
 enum MarkdownPolicy {
@@ -329,6 +339,84 @@ message EncryptedDirectMessageV2StoredEnvelope {
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp stored_at = 9;
   uint32 stored_delivery_count = 10;
+}
+
+message EncryptedGroupLane {
+  string group_id = 1;
+  string thread_id = 2;
+  string mls_group_id = 3;
+  uint64 roster_version = 4;
+  google.protobuf.Timestamp activated_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message EncryptedGroupRosterMember {
+  ChatUser user = 1;
+  GroupMemberRole role = 2;
+  bool is_write_restricted = 3;
+  bool has_eligible_crypto_devices = 4;
+  repeated string eligible_crypto_device_ids = 5;
+}
+
+message EncryptedGroupRosterDevice {
+  string user_id = 1;
+  string crypto_device_id = 2;
+  uint64 bundle_version = 3;
+  string crypto_suite = 4;
+  bytes identity_public_key = 5;
+  bytes signed_prekey_public = 6;
+  string signed_prekey_id = 7;
+  bytes signed_prekey_signature = 8;
+  bytes kem_public_key = 9;
+  string kem_key_id = 10;
+  bytes kem_signature = 11;
+  uint32 one_time_prekeys_total = 12;
+  uint32 one_time_prekeys_available = 13;
+  bytes bundle_digest = 14;
+  google.protobuf.Timestamp published_at = 15;
+  google.protobuf.Timestamp expires_at = 16;
+  google.protobuf.Timestamp updated_at = 17;
+}
+
+message EncryptedGroupMessageDelivery {
+  string recipient_user_id = 1;
+  string recipient_crypto_device_id = 2;
+  google.protobuf.Timestamp stored_at = 3;
+}
+
+message EncryptedGroupEnvelope {
+  string message_id = 1;
+  string group_id = 2;
+  string thread_id = 3;
+  string mls_group_id = 4;
+  uint64 roster_version = 5;
+  string sender_user_id = 6;
+  string sender_crypto_device_id = 7;
+  EncryptedGroupMessageOperationKind operation_kind = 8;
+  optional string target_message_id = 9;
+  uint32 revision = 10;
+  bytes ciphertext = 11;
+  uint64 ciphertext_size_bytes = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp stored_at = 14;
+  EncryptedGroupMessageDelivery viewer_delivery = 15;
+}
+
+message EncryptedGroupStoredEnvelope {
+  string message_id = 1;
+  string group_id = 2;
+  string thread_id = 3;
+  string mls_group_id = 4;
+  uint64 roster_version = 5;
+  string sender_user_id = 6;
+  string sender_crypto_device_id = 7;
+  EncryptedGroupMessageOperationKind operation_kind = 8;
+  optional string target_message_id = 9;
+  uint32 revision = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp stored_at = 12;
+  uint32 stored_delivery_count = 13;
+  repeated EncryptedGroupMessageDelivery stored_deliveries = 14;
 }
 
 message EncryptedDirectMessageV2SendTargetDevice {
@@ -718,6 +806,60 @@ message GetEncryptedDirectMessageV2Request {
 
 message GetEncryptedDirectMessageV2Response {
   EncryptedDirectMessageV2Envelope envelope = 1;
+}
+
+message GetEncryptedGroupBootstrapRequest {
+  string group_id = 1;
+  // viewer_crypto_device_id фиксирует локальный active trusted crypto-device,
+  // для которого materialize'ится и проверяется encrypted group control-plane.
+  string viewer_crypto_device_id = 2;
+}
+
+message GetEncryptedGroupBootstrapResponse {
+  EncryptedGroupLane lane = 1;
+  repeated EncryptedGroupRosterMember roster_members = 2;
+  repeated EncryptedGroupRosterDevice roster_devices = 3;
+}
+
+message SendEncryptedGroupMessageRequest {
+  string group_id = 1;
+  // message_id назначается клиентом до send и остаётся стабильным logical identifier.
+  string message_id = 2;
+  string mls_group_id = 3;
+  uint64 roster_version = 4;
+  string sender_crypto_device_id = 5;
+  EncryptedGroupMessageOperationKind operation_kind = 6;
+  optional string target_message_id = 7;
+  uint32 revision = 8;
+  bytes ciphertext = 9;
+}
+
+message SendEncryptedGroupMessageResponse {
+  EncryptedGroupStoredEnvelope envelope = 1;
+}
+
+message ListEncryptedGroupMessagesRequest {
+  string group_id = 1;
+  // viewer_crypto_device_id фиксирует, для какого локального active crypto-device
+  // нужно вернуть group-scoped opaque envelope delivery.
+  string viewer_crypto_device_id = 2;
+  uint32 page_size = 3;
+}
+
+message ListEncryptedGroupMessagesResponse {
+  repeated EncryptedGroupEnvelope envelopes = 1;
+}
+
+message GetEncryptedGroupMessageRequest {
+  string group_id = 1;
+  string message_id = 2;
+  // viewer_crypto_device_id фиксирует, для какого локального active crypto-device
+  // нужно вернуть group-scoped opaque envelope delivery.
+  string viewer_crypto_device_id = 3;
+}
+
+message GetEncryptedGroupMessageResponse {
+  EncryptedGroupEnvelope envelope = 1;
 }
 
 message SendTextMessageRequest {

@@ -130,6 +130,18 @@ const (
 	// ChatServiceGetEncryptedDirectMessageV2Procedure is the fully-qualified name of the ChatService's
 	// GetEncryptedDirectMessageV2 RPC.
 	ChatServiceGetEncryptedDirectMessageV2Procedure = "/aerochat.chat.v1.ChatService/GetEncryptedDirectMessageV2"
+	// ChatServiceGetEncryptedGroupBootstrapProcedure is the fully-qualified name of the ChatService's
+	// GetEncryptedGroupBootstrap RPC.
+	ChatServiceGetEncryptedGroupBootstrapProcedure = "/aerochat.chat.v1.ChatService/GetEncryptedGroupBootstrap"
+	// ChatServiceSendEncryptedGroupMessageProcedure is the fully-qualified name of the ChatService's
+	// SendEncryptedGroupMessage RPC.
+	ChatServiceSendEncryptedGroupMessageProcedure = "/aerochat.chat.v1.ChatService/SendEncryptedGroupMessage"
+	// ChatServiceListEncryptedGroupMessagesProcedure is the fully-qualified name of the ChatService's
+	// ListEncryptedGroupMessages RPC.
+	ChatServiceListEncryptedGroupMessagesProcedure = "/aerochat.chat.v1.ChatService/ListEncryptedGroupMessages"
+	// ChatServiceGetEncryptedGroupMessageProcedure is the fully-qualified name of the ChatService's
+	// GetEncryptedGroupMessage RPC.
+	ChatServiceGetEncryptedGroupMessageProcedure = "/aerochat.chat.v1.ChatService/GetEncryptedGroupMessage"
 	// ChatServiceSendTextMessageProcedure is the fully-qualified name of the ChatService's
 	// SendTextMessage RPC.
 	ChatServiceSendTextMessageProcedure = "/aerochat.chat.v1.ChatService/SendTextMessage"
@@ -197,6 +209,10 @@ type ChatServiceClient interface {
 	SendEncryptedDirectMessageV2(context.Context, *connect.Request[v1.SendEncryptedDirectMessageV2Request]) (*connect.Response[v1.SendEncryptedDirectMessageV2Response], error)
 	ListEncryptedDirectMessageV2(context.Context, *connect.Request[v1.ListEncryptedDirectMessageV2Request]) (*connect.Response[v1.ListEncryptedDirectMessageV2Response], error)
 	GetEncryptedDirectMessageV2(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2Request]) (*connect.Response[v1.GetEncryptedDirectMessageV2Response], error)
+	GetEncryptedGroupBootstrap(context.Context, *connect.Request[v1.GetEncryptedGroupBootstrapRequest]) (*connect.Response[v1.GetEncryptedGroupBootstrapResponse], error)
+	SendEncryptedGroupMessage(context.Context, *connect.Request[v1.SendEncryptedGroupMessageRequest]) (*connect.Response[v1.SendEncryptedGroupMessageResponse], error)
+	ListEncryptedGroupMessages(context.Context, *connect.Request[v1.ListEncryptedGroupMessagesRequest]) (*connect.Response[v1.ListEncryptedGroupMessagesResponse], error)
+	GetEncryptedGroupMessage(context.Context, *connect.Request[v1.GetEncryptedGroupMessageRequest]) (*connect.Response[v1.GetEncryptedGroupMessageResponse], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
 	EditDirectChatMessage(context.Context, *connect.Request[v1.EditDirectChatMessageRequest]) (*connect.Response[v1.EditDirectChatMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
@@ -424,6 +440,30 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("GetEncryptedDirectMessageV2")),
 			connect.WithClientOptions(opts...),
 		),
+		getEncryptedGroupBootstrap: connect.NewClient[v1.GetEncryptedGroupBootstrapRequest, v1.GetEncryptedGroupBootstrapResponse](
+			httpClient,
+			baseURL+ChatServiceGetEncryptedGroupBootstrapProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("GetEncryptedGroupBootstrap")),
+			connect.WithClientOptions(opts...),
+		),
+		sendEncryptedGroupMessage: connect.NewClient[v1.SendEncryptedGroupMessageRequest, v1.SendEncryptedGroupMessageResponse](
+			httpClient,
+			baseURL+ChatServiceSendEncryptedGroupMessageProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("SendEncryptedGroupMessage")),
+			connect.WithClientOptions(opts...),
+		),
+		listEncryptedGroupMessages: connect.NewClient[v1.ListEncryptedGroupMessagesRequest, v1.ListEncryptedGroupMessagesResponse](
+			httpClient,
+			baseURL+ChatServiceListEncryptedGroupMessagesProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("ListEncryptedGroupMessages")),
+			connect.WithClientOptions(opts...),
+		),
+		getEncryptedGroupMessage: connect.NewClient[v1.GetEncryptedGroupMessageRequest, v1.GetEncryptedGroupMessageResponse](
+			httpClient,
+			baseURL+ChatServiceGetEncryptedGroupMessageProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("GetEncryptedGroupMessage")),
+			connect.WithClientOptions(opts...),
+		),
 		sendTextMessage: connect.NewClient[v1.SendTextMessageRequest, v1.SendTextMessageResponse](
 			httpClient,
 			baseURL+ChatServiceSendTextMessageProcedure,
@@ -523,6 +563,10 @@ type chatServiceClient struct {
 	sendEncryptedDirectMessageV2             *connect.Client[v1.SendEncryptedDirectMessageV2Request, v1.SendEncryptedDirectMessageV2Response]
 	listEncryptedDirectMessageV2             *connect.Client[v1.ListEncryptedDirectMessageV2Request, v1.ListEncryptedDirectMessageV2Response]
 	getEncryptedDirectMessageV2              *connect.Client[v1.GetEncryptedDirectMessageV2Request, v1.GetEncryptedDirectMessageV2Response]
+	getEncryptedGroupBootstrap               *connect.Client[v1.GetEncryptedGroupBootstrapRequest, v1.GetEncryptedGroupBootstrapResponse]
+	sendEncryptedGroupMessage                *connect.Client[v1.SendEncryptedGroupMessageRequest, v1.SendEncryptedGroupMessageResponse]
+	listEncryptedGroupMessages               *connect.Client[v1.ListEncryptedGroupMessagesRequest, v1.ListEncryptedGroupMessagesResponse]
+	getEncryptedGroupMessage                 *connect.Client[v1.GetEncryptedGroupMessageRequest, v1.GetEncryptedGroupMessageResponse]
 	sendTextMessage                          *connect.Client[v1.SendTextMessageRequest, v1.SendTextMessageResponse]
 	editDirectChatMessage                    *connect.Client[v1.EditDirectChatMessageRequest, v1.EditDirectChatMessageResponse]
 	listDirectChatMessages                   *connect.Client[v1.ListDirectChatMessagesRequest, v1.ListDirectChatMessagesResponse]
@@ -706,6 +750,26 @@ func (c *chatServiceClient) GetEncryptedDirectMessageV2(ctx context.Context, req
 	return c.getEncryptedDirectMessageV2.CallUnary(ctx, req)
 }
 
+// GetEncryptedGroupBootstrap calls aerochat.chat.v1.ChatService.GetEncryptedGroupBootstrap.
+func (c *chatServiceClient) GetEncryptedGroupBootstrap(ctx context.Context, req *connect.Request[v1.GetEncryptedGroupBootstrapRequest]) (*connect.Response[v1.GetEncryptedGroupBootstrapResponse], error) {
+	return c.getEncryptedGroupBootstrap.CallUnary(ctx, req)
+}
+
+// SendEncryptedGroupMessage calls aerochat.chat.v1.ChatService.SendEncryptedGroupMessage.
+func (c *chatServiceClient) SendEncryptedGroupMessage(ctx context.Context, req *connect.Request[v1.SendEncryptedGroupMessageRequest]) (*connect.Response[v1.SendEncryptedGroupMessageResponse], error) {
+	return c.sendEncryptedGroupMessage.CallUnary(ctx, req)
+}
+
+// ListEncryptedGroupMessages calls aerochat.chat.v1.ChatService.ListEncryptedGroupMessages.
+func (c *chatServiceClient) ListEncryptedGroupMessages(ctx context.Context, req *connect.Request[v1.ListEncryptedGroupMessagesRequest]) (*connect.Response[v1.ListEncryptedGroupMessagesResponse], error) {
+	return c.listEncryptedGroupMessages.CallUnary(ctx, req)
+}
+
+// GetEncryptedGroupMessage calls aerochat.chat.v1.ChatService.GetEncryptedGroupMessage.
+func (c *chatServiceClient) GetEncryptedGroupMessage(ctx context.Context, req *connect.Request[v1.GetEncryptedGroupMessageRequest]) (*connect.Response[v1.GetEncryptedGroupMessageResponse], error) {
+	return c.getEncryptedGroupMessage.CallUnary(ctx, req)
+}
+
 // SendTextMessage calls aerochat.chat.v1.ChatService.SendTextMessage.
 func (c *chatServiceClient) SendTextMessage(ctx context.Context, req *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error) {
 	return c.sendTextMessage.CallUnary(ctx, req)
@@ -792,6 +856,10 @@ type ChatServiceHandler interface {
 	SendEncryptedDirectMessageV2(context.Context, *connect.Request[v1.SendEncryptedDirectMessageV2Request]) (*connect.Response[v1.SendEncryptedDirectMessageV2Response], error)
 	ListEncryptedDirectMessageV2(context.Context, *connect.Request[v1.ListEncryptedDirectMessageV2Request]) (*connect.Response[v1.ListEncryptedDirectMessageV2Response], error)
 	GetEncryptedDirectMessageV2(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2Request]) (*connect.Response[v1.GetEncryptedDirectMessageV2Response], error)
+	GetEncryptedGroupBootstrap(context.Context, *connect.Request[v1.GetEncryptedGroupBootstrapRequest]) (*connect.Response[v1.GetEncryptedGroupBootstrapResponse], error)
+	SendEncryptedGroupMessage(context.Context, *connect.Request[v1.SendEncryptedGroupMessageRequest]) (*connect.Response[v1.SendEncryptedGroupMessageResponse], error)
+	ListEncryptedGroupMessages(context.Context, *connect.Request[v1.ListEncryptedGroupMessagesRequest]) (*connect.Response[v1.ListEncryptedGroupMessagesResponse], error)
+	GetEncryptedGroupMessage(context.Context, *connect.Request[v1.GetEncryptedGroupMessageRequest]) (*connect.Response[v1.GetEncryptedGroupMessageResponse], error)
 	SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error)
 	EditDirectChatMessage(context.Context, *connect.Request[v1.EditDirectChatMessageRequest]) (*connect.Response[v1.EditDirectChatMessageResponse], error)
 	ListDirectChatMessages(context.Context, *connect.Request[v1.ListDirectChatMessagesRequest]) (*connect.Response[v1.ListDirectChatMessagesResponse], error)
@@ -1015,6 +1083,30 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceMethods.ByName("GetEncryptedDirectMessageV2")),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceGetEncryptedGroupBootstrapHandler := connect.NewUnaryHandler(
+		ChatServiceGetEncryptedGroupBootstrapProcedure,
+		svc.GetEncryptedGroupBootstrap,
+		connect.WithSchema(chatServiceMethods.ByName("GetEncryptedGroupBootstrap")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceSendEncryptedGroupMessageHandler := connect.NewUnaryHandler(
+		ChatServiceSendEncryptedGroupMessageProcedure,
+		svc.SendEncryptedGroupMessage,
+		connect.WithSchema(chatServiceMethods.ByName("SendEncryptedGroupMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceListEncryptedGroupMessagesHandler := connect.NewUnaryHandler(
+		ChatServiceListEncryptedGroupMessagesProcedure,
+		svc.ListEncryptedGroupMessages,
+		connect.WithSchema(chatServiceMethods.ByName("ListEncryptedGroupMessages")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceGetEncryptedGroupMessageHandler := connect.NewUnaryHandler(
+		ChatServiceGetEncryptedGroupMessageProcedure,
+		svc.GetEncryptedGroupMessage,
+		connect.WithSchema(chatServiceMethods.ByName("GetEncryptedGroupMessage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatServiceSendTextMessageHandler := connect.NewUnaryHandler(
 		ChatServiceSendTextMessageProcedure,
 		svc.SendTextMessage,
@@ -1145,6 +1237,14 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceListEncryptedDirectMessageV2Handler.ServeHTTP(w, r)
 		case ChatServiceGetEncryptedDirectMessageV2Procedure:
 			chatServiceGetEncryptedDirectMessageV2Handler.ServeHTTP(w, r)
+		case ChatServiceGetEncryptedGroupBootstrapProcedure:
+			chatServiceGetEncryptedGroupBootstrapHandler.ServeHTTP(w, r)
+		case ChatServiceSendEncryptedGroupMessageProcedure:
+			chatServiceSendEncryptedGroupMessageHandler.ServeHTTP(w, r)
+		case ChatServiceListEncryptedGroupMessagesProcedure:
+			chatServiceListEncryptedGroupMessagesHandler.ServeHTTP(w, r)
+		case ChatServiceGetEncryptedGroupMessageProcedure:
+			chatServiceGetEncryptedGroupMessageHandler.ServeHTTP(w, r)
 		case ChatServiceSendTextMessageProcedure:
 			chatServiceSendTextMessageHandler.ServeHTTP(w, r)
 		case ChatServiceEditDirectChatMessageProcedure:
@@ -1308,6 +1408,22 @@ func (UnimplementedChatServiceHandler) ListEncryptedDirectMessageV2(context.Cont
 
 func (UnimplementedChatServiceHandler) GetEncryptedDirectMessageV2(context.Context, *connect.Request[v1.GetEncryptedDirectMessageV2Request]) (*connect.Response[v1.GetEncryptedDirectMessageV2Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetEncryptedDirectMessageV2 is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetEncryptedGroupBootstrap(context.Context, *connect.Request[v1.GetEncryptedGroupBootstrapRequest]) (*connect.Response[v1.GetEncryptedGroupBootstrapResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetEncryptedGroupBootstrap is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) SendEncryptedGroupMessage(context.Context, *connect.Request[v1.SendEncryptedGroupMessageRequest]) (*connect.Response[v1.SendEncryptedGroupMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.SendEncryptedGroupMessage is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ListEncryptedGroupMessages(context.Context, *connect.Request[v1.ListEncryptedGroupMessagesRequest]) (*connect.Response[v1.ListEncryptedGroupMessagesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.ListEncryptedGroupMessages is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetEncryptedGroupMessage(context.Context, *connect.Request[v1.GetEncryptedGroupMessageRequest]) (*connect.Response[v1.GetEncryptedGroupMessageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.GetEncryptedGroupMessage is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) SendTextMessage(context.Context, *connect.Request[v1.SendTextMessageRequest]) (*connect.Response[v1.SendTextMessageResponse], error) {

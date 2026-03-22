@@ -188,6 +188,58 @@ type GroupChatReadState struct {
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type GroupEncryptedLanesV1 struct {
+	GroupID       uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID      uuid.UUID          `db:"thread_id" json:"thread_id"`
+	MlsGroupID    uuid.UUID          `db:"mls_group_id" json:"mls_group_id"`
+	RosterVersion int64              `db:"roster_version" json:"roster_version"`
+	ActivatedAt   pgtype.Timestamptz `db:"activated_at" json:"activated_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type GroupEncryptedMessageDeliveriesV1 struct {
+	MessageID               uuid.UUID          `db:"message_id" json:"message_id"`
+	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
+	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+type GroupEncryptedMessagesV1 struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	GroupID              uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID             uuid.UUID          `db:"thread_id" json:"thread_id"`
+	MlsGroupID           uuid.UUID          `db:"mls_group_id" json:"mls_group_id"`
+	RosterVersion        int64              `db:"roster_version" json:"roster_version"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	Ciphertext           []byte             `db:"ciphertext" json:"ciphertext"`
+	CiphertextSizeBytes  int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+type GroupEncryptedRosterDevicesV1 struct {
+	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	CryptoDeviceID uuid.UUID          `db:"crypto_device_id" json:"crypto_device_id"`
+	RosterVersion  int64              `db:"roster_version" json:"roster_version"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type GroupEncryptedRosterMembersV1 struct {
+	GroupID           uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	Role              string             `db:"role" json:"role"`
+	IsWriteRestricted bool               `db:"is_write_restricted" json:"is_write_restricted"`
+	RosterVersion     int64              `db:"roster_version" json:"roster_version"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type GroupInviteLink struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	GroupID         uuid.UUID          `db:"group_id" json:"group_id"`

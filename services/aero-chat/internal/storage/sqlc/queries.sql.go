@@ -566,6 +566,182 @@ func (q *Queries) CreateDirectChatMessageTombstone(ctx context.Context, arg Crea
 	return result.RowsAffected(), nil
 }
 
+const createEncryptedGroupLane = `-- name: CreateEncryptedGroupLane :one
+INSERT INTO group_encrypted_lanes_v1 (
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    activated_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    activated_at,
+    updated_at
+`
+
+type CreateEncryptedGroupLaneParams struct {
+	GroupID       uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID      uuid.UUID          `db:"thread_id" json:"thread_id"`
+	MlsGroupID    uuid.UUID          `db:"mls_group_id" json:"mls_group_id"`
+	RosterVersion int64              `db:"roster_version" json:"roster_version"`
+	ActivatedAt   pgtype.Timestamptz `db:"activated_at" json:"activated_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateEncryptedGroupLane(ctx context.Context, arg CreateEncryptedGroupLaneParams) (GroupEncryptedLanesV1, error) {
+	row := q.db.QueryRow(ctx, createEncryptedGroupLane,
+		arg.GroupID,
+		arg.ThreadID,
+		arg.MlsGroupID,
+		arg.RosterVersion,
+		arg.ActivatedAt,
+		arg.UpdatedAt,
+	)
+	var i GroupEncryptedLanesV1
+	err := row.Scan(
+		&i.GroupID,
+		&i.ThreadID,
+		&i.MlsGroupID,
+		&i.RosterVersion,
+		&i.ActivatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createEncryptedGroupMessage = `-- name: CreateEncryptedGroupMessage :one
+INSERT INTO group_encrypted_messages_v1 (
+    id,
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    ciphertext,
+    ciphertext_size_bytes,
+    created_at,
+    stored_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING
+    id,
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    ciphertext_size_bytes,
+    created_at,
+    stored_at
+`
+
+type CreateEncryptedGroupMessageParams struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	GroupID              uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID             uuid.UUID          `db:"thread_id" json:"thread_id"`
+	MlsGroupID           uuid.UUID          `db:"mls_group_id" json:"mls_group_id"`
+	RosterVersion        int64              `db:"roster_version" json:"roster_version"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	Ciphertext           []byte             `db:"ciphertext" json:"ciphertext"`
+	CiphertextSizeBytes  int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+type CreateEncryptedGroupMessageRow struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	GroupID              uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID             uuid.UUID          `db:"thread_id" json:"thread_id"`
+	MlsGroupID           uuid.UUID          `db:"mls_group_id" json:"mls_group_id"`
+	RosterVersion        int64              `db:"roster_version" json:"roster_version"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	CiphertextSizeBytes  int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+func (q *Queries) CreateEncryptedGroupMessage(ctx context.Context, arg CreateEncryptedGroupMessageParams) (CreateEncryptedGroupMessageRow, error) {
+	row := q.db.QueryRow(ctx, createEncryptedGroupMessage,
+		arg.ID,
+		arg.GroupID,
+		arg.ThreadID,
+		arg.MlsGroupID,
+		arg.RosterVersion,
+		arg.SenderUserID,
+		arg.SenderCryptoDeviceID,
+		arg.OperationKind,
+		arg.TargetMessageID,
+		arg.Revision,
+		arg.Ciphertext,
+		arg.CiphertextSizeBytes,
+		arg.CreatedAt,
+		arg.StoredAt,
+	)
+	var i CreateEncryptedGroupMessageRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.ThreadID,
+		&i.MlsGroupID,
+		&i.RosterVersion,
+		&i.SenderUserID,
+		&i.SenderCryptoDeviceID,
+		&i.OperationKind,
+		&i.TargetMessageID,
+		&i.Revision,
+		&i.CiphertextSizeBytes,
+		&i.CreatedAt,
+		&i.StoredAt,
+	)
+	return i, err
+}
+
+const createEncryptedGroupMessageDelivery = `-- name: CreateEncryptedGroupMessageDelivery :exec
+INSERT INTO group_encrypted_message_deliveries_v1 (
+    message_id,
+    recipient_user_id,
+    recipient_crypto_device_id,
+    stored_at
+) VALUES ($1, $2, $3, $4)
+`
+
+type CreateEncryptedGroupMessageDeliveryParams struct {
+	MessageID               uuid.UUID          `db:"message_id" json:"message_id"`
+	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
+	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+}
+
+func (q *Queries) CreateEncryptedGroupMessageDelivery(ctx context.Context, arg CreateEncryptedGroupMessageDeliveryParams) error {
+	_, err := q.db.Exec(ctx, createEncryptedGroupMessageDelivery,
+		arg.MessageID,
+		arg.RecipientUserID,
+		arg.RecipientCryptoDeviceID,
+		arg.StoredAt,
+	)
+	return err
+}
+
 const createGroup = `-- name: CreateGroup :one
 INSERT INTO groups (
     id,
@@ -769,6 +945,26 @@ func (q *Queries) CreateGroupThread(ctx context.Context, arg CreateGroupThreadPa
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const deleteEncryptedGroupRosterDevicesByGroupID = `-- name: DeleteEncryptedGroupRosterDevicesByGroupID :exec
+DELETE FROM group_encrypted_roster_devices_v1
+WHERE group_id = $1
+`
+
+func (q *Queries) DeleteEncryptedGroupRosterDevicesByGroupID(ctx context.Context, groupID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteEncryptedGroupRosterDevicesByGroupID, groupID)
+	return err
+}
+
+const deleteEncryptedGroupRosterMembersByGroupID = `-- name: DeleteEncryptedGroupRosterMembersByGroupID :exec
+DELETE FROM group_encrypted_roster_members_v1
+WHERE group_id = $1
+`
+
+func (q *Queries) DeleteEncryptedGroupRosterMembersByGroupID(ctx context.Context, groupID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteEncryptedGroupRosterMembersByGroupID, groupID)
+	return err
 }
 
 const deleteGroupMembership = `-- name: DeleteGroupMembership :execrows
@@ -1490,6 +1686,118 @@ func (q *Queries) GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDir
 	return items, nil
 }
 
+const getEncryptedGroupLaneByGroupID = `-- name: GetEncryptedGroupLaneByGroupID :one
+SELECT
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    activated_at,
+    updated_at
+FROM group_encrypted_lanes_v1
+WHERE group_id = $1
+`
+
+func (q *Queries) GetEncryptedGroupLaneByGroupID(ctx context.Context, groupID uuid.UUID) (GroupEncryptedLanesV1, error) {
+	row := q.db.QueryRow(ctx, getEncryptedGroupLaneByGroupID, groupID)
+	var i GroupEncryptedLanesV1
+	err := row.Scan(
+		&i.GroupID,
+		&i.ThreadID,
+		&i.MlsGroupID,
+		&i.RosterVersion,
+		&i.ActivatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEncryptedGroupMessageByDevice = `-- name: GetEncryptedGroupMessageByDevice :one
+SELECT
+    m.id,
+    m.group_id,
+    m.thread_id,
+    m.mls_group_id,
+    m.roster_version,
+    m.sender_user_id,
+    m.sender_crypto_device_id,
+    m.operation_kind,
+    m.target_message_id,
+    m.revision,
+    m.ciphertext,
+    m.ciphertext_size_bytes,
+    m.created_at,
+    m.stored_at,
+    d.recipient_user_id,
+    d.recipient_crypto_device_id,
+    d.stored_at AS delivery_stored_at
+FROM group_encrypted_messages_v1 AS m
+JOIN group_memberships AS self ON self.group_id = m.group_id
+JOIN group_encrypted_message_deliveries_v1 AS d ON d.message_id = m.id
+WHERE self.user_id = $1
+  AND m.group_id = $2
+  AND m.id = $3
+  AND d.recipient_user_id = $1
+  AND d.recipient_crypto_device_id = $4
+`
+
+type GetEncryptedGroupMessageByDeviceParams struct {
+	UserID                  uuid.UUID `db:"user_id" json:"user_id"`
+	GroupID                 uuid.UUID `db:"group_id" json:"group_id"`
+	ID                      uuid.UUID `db:"id" json:"id"`
+	RecipientCryptoDeviceID uuid.UUID `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+}
+
+type GetEncryptedGroupMessageByDeviceRow struct {
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	GroupID                 uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID                uuid.UUID          `db:"thread_id" json:"thread_id"`
+	MlsGroupID              uuid.UUID          `db:"mls_group_id" json:"mls_group_id"`
+	RosterVersion           int64              `db:"roster_version" json:"roster_version"`
+	SenderUserID            uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID    uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind           string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID         pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision                int32              `db:"revision" json:"revision"`
+	Ciphertext              []byte             `db:"ciphertext" json:"ciphertext"`
+	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
+	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	DeliveryStoredAt        pgtype.Timestamptz `db:"delivery_stored_at" json:"delivery_stored_at"`
+}
+
+func (q *Queries) GetEncryptedGroupMessageByDevice(ctx context.Context, arg GetEncryptedGroupMessageByDeviceParams) (GetEncryptedGroupMessageByDeviceRow, error) {
+	row := q.db.QueryRow(ctx, getEncryptedGroupMessageByDevice,
+		arg.UserID,
+		arg.GroupID,
+		arg.ID,
+		arg.RecipientCryptoDeviceID,
+	)
+	var i GetEncryptedGroupMessageByDeviceRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.ThreadID,
+		&i.MlsGroupID,
+		&i.RosterVersion,
+		&i.SenderUserID,
+		&i.SenderCryptoDeviceID,
+		&i.OperationKind,
+		&i.TargetMessageID,
+		&i.Revision,
+		&i.Ciphertext,
+		&i.CiphertextSizeBytes,
+		&i.CreatedAt,
+		&i.StoredAt,
+		&i.RecipientUserID,
+		&i.RecipientCryptoDeviceID,
+		&i.DeliveryStoredAt,
+	)
+	return i, err
+}
+
 const getGroupChatThreadRowByGroupIDAndUserID = `-- name: GetGroupChatThreadRowByGroupIDAndUserID :one
 SELECT
     t.id,
@@ -1930,6 +2238,73 @@ func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSess
 		&i.UserUpdatedAt,
 	)
 	return i, err
+}
+
+const insertEncryptedGroupRosterDevice = `-- name: InsertEncryptedGroupRosterDevice :exec
+INSERT INTO group_encrypted_roster_devices_v1 (
+    group_id,
+    user_id,
+    crypto_device_id,
+    roster_version,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type InsertEncryptedGroupRosterDeviceParams struct {
+	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	CryptoDeviceID uuid.UUID          `db:"crypto_device_id" json:"crypto_device_id"`
+	RosterVersion  int64              `db:"roster_version" json:"roster_version"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) InsertEncryptedGroupRosterDevice(ctx context.Context, arg InsertEncryptedGroupRosterDeviceParams) error {
+	_, err := q.db.Exec(ctx, insertEncryptedGroupRosterDevice,
+		arg.GroupID,
+		arg.UserID,
+		arg.CryptoDeviceID,
+		arg.RosterVersion,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const insertEncryptedGroupRosterMember = `-- name: InsertEncryptedGroupRosterMember :exec
+INSERT INTO group_encrypted_roster_members_v1 (
+    group_id,
+    user_id,
+    role,
+    is_write_restricted,
+    roster_version,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`
+
+type InsertEncryptedGroupRosterMemberParams struct {
+	GroupID           uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	Role              string             `db:"role" json:"role"`
+	IsWriteRestricted bool               `db:"is_write_restricted" json:"is_write_restricted"`
+	RosterVersion     int64              `db:"roster_version" json:"roster_version"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) InsertEncryptedGroupRosterMember(ctx context.Context, arg InsertEncryptedGroupRosterMemberParams) error {
+	_, err := q.db.Exec(ctx, insertEncryptedGroupRosterMember,
+		arg.GroupID,
+		arg.UserID,
+		arg.Role,
+		arg.IsWriteRestricted,
+		arg.RosterVersion,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
 }
 
 const joinGroupMembership = `-- name: JoinGroupMembership :execrows
@@ -2829,6 +3204,188 @@ func (q *Queries) ListDirectReplyPreviewRows(ctx context.Context, arg ListDirect
 	return items, nil
 }
 
+const listEncryptedGroupMessagesByDevice = `-- name: ListEncryptedGroupMessagesByDevice :many
+SELECT
+    m.id,
+    m.group_id,
+    m.thread_id,
+    m.mls_group_id,
+    m.roster_version,
+    m.sender_user_id,
+    m.sender_crypto_device_id,
+    m.operation_kind,
+    m.target_message_id,
+    m.revision,
+    m.ciphertext,
+    m.ciphertext_size_bytes,
+    m.created_at,
+    m.stored_at,
+    d.recipient_user_id,
+    d.recipient_crypto_device_id,
+    d.stored_at AS delivery_stored_at
+FROM group_encrypted_messages_v1 AS m
+JOIN group_memberships AS self ON self.group_id = m.group_id
+JOIN group_encrypted_message_deliveries_v1 AS d ON d.message_id = m.id
+WHERE self.user_id = $1
+  AND m.group_id = $2
+  AND d.recipient_user_id = $1
+  AND d.recipient_crypto_device_id = $3
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $4
+`
+
+type ListEncryptedGroupMessagesByDeviceParams struct {
+	UserID                  uuid.UUID `db:"user_id" json:"user_id"`
+	GroupID                 uuid.UUID `db:"group_id" json:"group_id"`
+	RecipientCryptoDeviceID uuid.UUID `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	Limit                   int32     `db:"limit" json:"limit"`
+}
+
+type ListEncryptedGroupMessagesByDeviceRow struct {
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	GroupID                 uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID                uuid.UUID          `db:"thread_id" json:"thread_id"`
+	MlsGroupID              uuid.UUID          `db:"mls_group_id" json:"mls_group_id"`
+	RosterVersion           int64              `db:"roster_version" json:"roster_version"`
+	SenderUserID            uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID    uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind           string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID         pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision                int32              `db:"revision" json:"revision"`
+	Ciphertext              []byte             `db:"ciphertext" json:"ciphertext"`
+	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
+	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
+	DeliveryStoredAt        pgtype.Timestamptz `db:"delivery_stored_at" json:"delivery_stored_at"`
+}
+
+func (q *Queries) ListEncryptedGroupMessagesByDevice(ctx context.Context, arg ListEncryptedGroupMessagesByDeviceParams) ([]ListEncryptedGroupMessagesByDeviceRow, error) {
+	rows, err := q.db.Query(ctx, listEncryptedGroupMessagesByDevice,
+		arg.UserID,
+		arg.GroupID,
+		arg.RecipientCryptoDeviceID,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListEncryptedGroupMessagesByDeviceRow
+	for rows.Next() {
+		var i ListEncryptedGroupMessagesByDeviceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GroupID,
+			&i.ThreadID,
+			&i.MlsGroupID,
+			&i.RosterVersion,
+			&i.SenderUserID,
+			&i.SenderCryptoDeviceID,
+			&i.OperationKind,
+			&i.TargetMessageID,
+			&i.Revision,
+			&i.Ciphertext,
+			&i.CiphertextSizeBytes,
+			&i.CreatedAt,
+			&i.StoredAt,
+			&i.RecipientUserID,
+			&i.RecipientCryptoDeviceID,
+			&i.DeliveryStoredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEncryptedGroupRosterDevicesByGroupID = `-- name: ListEncryptedGroupRosterDevicesByGroupID :many
+SELECT
+    group_id,
+    user_id,
+    crypto_device_id,
+    roster_version,
+    created_at,
+    updated_at
+FROM group_encrypted_roster_devices_v1
+WHERE group_id = $1
+ORDER BY user_id ASC, crypto_device_id ASC
+`
+
+func (q *Queries) ListEncryptedGroupRosterDevicesByGroupID(ctx context.Context, groupID uuid.UUID) ([]GroupEncryptedRosterDevicesV1, error) {
+	rows, err := q.db.Query(ctx, listEncryptedGroupRosterDevicesByGroupID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GroupEncryptedRosterDevicesV1
+	for rows.Next() {
+		var i GroupEncryptedRosterDevicesV1
+		if err := rows.Scan(
+			&i.GroupID,
+			&i.UserID,
+			&i.CryptoDeviceID,
+			&i.RosterVersion,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEncryptedGroupRosterMembersByGroupID = `-- name: ListEncryptedGroupRosterMembersByGroupID :many
+SELECT
+    group_id,
+    user_id,
+    role,
+    is_write_restricted,
+    roster_version,
+    created_at,
+    updated_at
+FROM group_encrypted_roster_members_v1
+WHERE group_id = $1
+ORDER BY user_id ASC
+`
+
+func (q *Queries) ListEncryptedGroupRosterMembersByGroupID(ctx context.Context, groupID uuid.UUID) ([]GroupEncryptedRosterMembersV1, error) {
+	rows, err := q.db.Query(ctx, listEncryptedGroupRosterMembersByGroupID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GroupEncryptedRosterMembersV1
+	for rows.Next() {
+		var i GroupEncryptedRosterMembersV1
+		if err := rows.Scan(
+			&i.GroupID,
+			&i.UserID,
+			&i.Role,
+			&i.IsWriteRestricted,
+			&i.RosterVersion,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGroupInviteLinksByGroupID = `-- name: ListGroupInviteLinksByGroupID :many
 SELECT
     id,
@@ -3372,6 +3929,19 @@ func (q *Queries) LockAttachmentQuotaOwner(ctx context.Context, id uuid.UUID) (u
 	return id, err
 }
 
+const lockGroupByID = `-- name: LockGroupByID :one
+SELECT id
+FROM groups
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockGroupByID(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockGroupByID, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
 const lockGroupMembershipQuotaOwner = `-- name: LockGroupMembershipQuotaOwner :one
 SELECT id
 FROM users
@@ -3860,6 +4430,35 @@ type UnpinDirectChatMessageParams struct {
 
 func (q *Queries) UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error) {
 	result, err := q.db.Exec(ctx, unpinDirectChatMessage, arg.ChatID, arg.MessageID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateEncryptedGroupLane = `-- name: UpdateEncryptedGroupLane :execrows
+UPDATE group_encrypted_lanes_v1
+SET
+    thread_id = $2,
+    roster_version = $3,
+    updated_at = $4
+WHERE group_id = $1
+`
+
+type UpdateEncryptedGroupLaneParams struct {
+	GroupID       uuid.UUID          `db:"group_id" json:"group_id"`
+	ThreadID      uuid.UUID          `db:"thread_id" json:"thread_id"`
+	RosterVersion int64              `db:"roster_version" json:"roster_version"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateEncryptedGroupLane(ctx context.Context, arg UpdateEncryptedGroupLaneParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateEncryptedGroupLane,
+		arg.GroupID,
+		arg.ThreadID,
+		arg.RosterVersion,
+		arg.UpdatedAt,
+	)
 	if err != nil {
 		return 0, err
 	}

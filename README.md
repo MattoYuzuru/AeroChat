@@ -75,6 +75,15 @@ AeroChat должен поддерживать:
     - browser шифрует файл до upload, descriptor уходит внутри encrypted DM v2 payload, а ciphertext blob расшифровывается локально после download;
     - текущий direct encrypted lane умеет bounded text + encrypted attachment и attachment-only send/use path;
     - storage/lifecycle/quota/retention foundation остаётся общей и future-ready для group E2EE;
+  - первый backend-first MLS-compatible foundation для encrypted groups:
+    - отдельный encrypted group control-plane lane в `aero-chat` c явным `mls_group_id` и `roster_version`;
+    - materialized readable roster по active trusted crypto devices current group members, включая `reader` и write-restricted участников;
+    - отдельный opaque storage path для group-scoped encrypted envelopes и explicit per-device deliveries без reuse `group_messages`;
+    - device-aware fetch/bootstrap surface и отдельный realtime family `encrypted_group_message_v1.delivery` без plaintext-style `group.message.updated` snapshots;
+    - coexistence остаётся bounded и честной:
+      - legacy plaintext group history не переписывается и не re-encrypt'ится;
+      - encrypted lane forward-only и не dual-write'ит те же сообщения в plaintext path;
+    - текущий slice не объявляет full MLS implementation, encrypted group decrypt/render UX, media send UX, reply/edit/search/unread parity или backup/recovery.
   - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
   - без claims о full encrypted DM parity, encrypted search, MLS/group encrypted messaging или backup/recovery.
 - explicit group moderation/admin policy foundation:
