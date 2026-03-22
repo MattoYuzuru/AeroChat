@@ -19,6 +19,7 @@ const (
 var readyCapabilities = []string{
 	"direct_chats",
 	"encrypted_direct_message_v2",
+	"encrypted_group_message_v1",
 	"groups",
 	"people",
 	"presence",

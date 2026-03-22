@@ -353,6 +353,29 @@ func (h *ChatHandler) GetEncryptedDirectMessageV2(ctx context.Context, req *conn
 	return forwardUnary(ctx, req, h.client.GetEncryptedDirectMessageV2)
 }
 
+func (h *ChatHandler) GetEncryptedGroupBootstrap(ctx context.Context, req *connect.Request[chatv1.GetEncryptedGroupBootstrapRequest]) (*connect.Response[chatv1.GetEncryptedGroupBootstrapResponse], error) {
+	return forwardUnary(ctx, req, h.client.GetEncryptedGroupBootstrap)
+}
+
+func (h *ChatHandler) SendEncryptedGroupMessage(ctx context.Context, req *connect.Request[chatv1.SendEncryptedGroupMessageRequest]) (*connect.Response[chatv1.SendEncryptedGroupMessageResponse], error) {
+	response, err := forwardUnary(ctx, req, h.client.SendEncryptedGroupMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	h.publishEncryptedGroupMessageDeliveries(req.Msg, response.Msg.Envelope)
+
+	return response, nil
+}
+
+func (h *ChatHandler) ListEncryptedGroupMessages(ctx context.Context, req *connect.Request[chatv1.ListEncryptedGroupMessagesRequest]) (*connect.Response[chatv1.ListEncryptedGroupMessagesResponse], error) {
+	return forwardUnary(ctx, req, h.client.ListEncryptedGroupMessages)
+}
+
+func (h *ChatHandler) GetEncryptedGroupMessage(ctx context.Context, req *connect.Request[chatv1.GetEncryptedGroupMessageRequest]) (*connect.Response[chatv1.GetEncryptedGroupMessageResponse], error) {
+	return forwardUnary(ctx, req, h.client.GetEncryptedGroupMessage)
+}
+
 func (h *ChatHandler) SendTextMessage(ctx context.Context, req *connect.Request[chatv1.SendTextMessageRequest]) (*connect.Response[chatv1.SendTextMessageResponse], error) {
 	response, err := forwardUnary(ctx, req, h.client.SendTextMessage)
 	if err != nil {
@@ -499,6 +522,37 @@ func (h *ChatHandler) publishEncryptedDirectMessageV2Deliveries(
 			"доставлен encrypted dm v2 realtime envelope",
 			slog.String("message_id", envelope.GetMessageId()),
 			slog.String("chat_id", envelope.GetChatId()),
+			slog.String("recipient_crypto_device_id", delivery.GetRecipientCryptoDeviceId()),
+			slog.Int("realtime_session_count", delivered),
+		)
+	}
+}
+
+func (h *ChatHandler) publishEncryptedGroupMessageDeliveries(
+	request *chatv1.SendEncryptedGroupMessageRequest,
+	envelope *chatv1.EncryptedGroupStoredEnvelope,
+) {
+	if h.realtimeHub == nil || request == nil || envelope == nil {
+		return
+	}
+
+	for _, delivery := range envelope.GetStoredDeliveries() {
+		if delivery == nil || strings.TrimSpace(delivery.GetRecipientCryptoDeviceId()) == "" {
+			continue
+		}
+
+		delivered := h.realtimeHub.PublishToCryptoDevice(
+			delivery.GetRecipientCryptoDeviceId(),
+			realtime.NewEncryptedGroupMessageV1DeliveredEnvelope(envelope, request.GetCiphertext(), delivery),
+		)
+		if delivered == 0 {
+			continue
+		}
+
+		h.logger.Info(
+			"доставлен encrypted group realtime envelope",
+			slog.String("message_id", envelope.GetMessageId()),
+			slog.String("group_id", envelope.GetGroupId()),
 			slog.String("recipient_crypto_device_id", delivery.GetRecipientCryptoDeviceId()),
 			slog.Int("realtime_session_count", delivered),
 		)

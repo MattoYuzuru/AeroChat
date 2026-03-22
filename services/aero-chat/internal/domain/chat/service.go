@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -60,16 +61,21 @@ type Repository interface {
 	ListDirectChatTypingStateEntries(context.Context, string, string) ([]DirectChatTypingStateEntry, error)
 	ListActiveCryptoDevicesByUserIDs(context.Context, []string) ([]CryptoDevice, error)
 	ListCurrentCryptoDeviceBundlesByDeviceIDs(context.Context, []string) ([]CryptoDeviceBundle, error)
+	GetEncryptedGroupLane(context.Context, string) (*EncryptedGroupLane, error)
+	SyncEncryptedGroupControlPlane(context.Context, SyncEncryptedGroupControlPlaneParams) (*EncryptedGroupLane, error)
 	UpsertDirectChatReadReceipt(context.Context, UpsertDirectChatReadReceiptParams) (bool, error)
 	UpsertGroupChatReadState(context.Context, UpsertGroupChatReadStateParams) (bool, error)
 	CreateDirectChatMessage(context.Context, CreateDirectChatMessageParams) (*DirectChatMessage, error)
 	CreateEncryptedDirectMessageV2(context.Context, CreateEncryptedDirectMessageV2Params) (*EncryptedDirectMessageV2StoredEnvelope, error)
+	CreateEncryptedGroupMessage(context.Context, CreateEncryptedGroupMessageParams) (*EncryptedGroupStoredEnvelope, error)
 	CreateGroupMessage(context.Context, CreateGroupMessageParams) (*GroupMessage, error)
 	UpdateDirectChatMessageText(context.Context, EditDirectChatMessageParams) (bool, error)
 	UpdateGroupMessageText(context.Context, EditGroupMessageParams) (bool, error)
 	ListDirectChatMessages(context.Context, string, string, int32) ([]DirectChatMessage, error)
 	ListEncryptedDirectMessageV2(context.Context, string, string, string, int32) ([]EncryptedDirectMessageV2Envelope, error)
 	GetEncryptedDirectMessageV2(context.Context, string, string, string, string) (*EncryptedDirectMessageV2Envelope, error)
+	ListEncryptedGroupMessages(context.Context, string, string, string, int32) ([]EncryptedGroupEnvelope, error)
+	GetEncryptedGroupMessage(context.Context, string, string, string, string) (*EncryptedGroupEnvelope, error)
 	ListGroupMessages(context.Context, string, string, int32) ([]GroupMessage, error)
 	SearchDirectMessages(context.Context, string, SearchDirectMessagesParams) ([]MessageSearchResult, error)
 	SearchGroupMessages(context.Context, string, SearchGroupMessagesParams) ([]MessageSearchResult, error)
@@ -1161,6 +1167,214 @@ func (s *Service) GetEncryptedDirectMessageV2(ctx context.Context, token string,
 	)
 }
 
+func (s *Service) GetEncryptedGroupBootstrap(ctx context.Context, token string, groupID string, viewerCryptoDeviceID string) (*EncryptedGroupBootstrap, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	group, thread, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedViewerCryptoDeviceID, err := normalizeID(viewerCryptoDeviceID, "viewer_crypto_device_id")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureCurrentUserOwnsActiveCryptoDevice(ctx, authSession.User.ID, normalizedViewerCryptoDeviceID); err != nil {
+		return nil, err
+	}
+
+	members, err := s.repo.ListGroupMembers(ctx, authSession.User.ID, group.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	rosterMembers, rosterDevices, memberSnapshots, deviceSnapshots, err := s.resolveEncryptedGroupRoster(ctx, group.ID, members)
+	if err != nil {
+		return nil, err
+	}
+	if !encryptedGroupRosterHasDevice(rosterDevices, authSession.User.ID, normalizedViewerCryptoDeviceID) {
+		return nil, fmt.Errorf("%w: viewer crypto device must be active, owned by current user and present in encrypted group roster", ErrConflict)
+	}
+
+	lane, err := s.materializeEncryptedGroupControlPlane(ctx, group.ID, thread.ID, memberSnapshots, deviceSnapshots, true)
+	if err != nil {
+		return nil, err
+	}
+	for index := range rosterDevices {
+		rosterDevices[index].UpdatedAt = lane.UpdatedAt
+	}
+
+	return &EncryptedGroupBootstrap{
+		Lane:          *lane,
+		RosterMembers: rosterMembers,
+		RosterDevices: rosterDevices,
+	}, nil
+}
+
+func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, params SendEncryptedGroupMessageParams) (*EncryptedGroupStoredEnvelope, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	group, thread, err := s.resolveGroupChat(ctx, authSession.User.ID, params.GroupID)
+	if err != nil {
+		return nil, err
+	}
+	if !canSendGroupMessages(group.SelfRole, group.SelfWriteRestricted) {
+		return nil, fmt.Errorf("%w: current group role cannot send encrypted messages", ErrPermissionDenied)
+	}
+
+	normalizedMessageID, err := normalizeID(params.MessageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedMLSGroupID, err := normalizeID(params.MLSGroupID, "mls_group_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedSenderCryptoDeviceID, err := normalizeID(params.SenderCryptoDeviceID, "sender_crypto_device_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedOperationKind, err := normalizeEncryptedGroupMessageOperationKind(params.OperationKind)
+	if err != nil {
+		return nil, err
+	}
+	normalizedTargetMessageID, err := normalizeOptionalID(valueOrEmpty(params.TargetMessageID), "target_message_id")
+	if err != nil {
+		return nil, err
+	}
+	if err := validateEncryptedGroupMessageOperation(normalizedOperationKind, normalizedTargetMessageID); err != nil {
+		return nil, err
+	}
+	normalizedRevision, err := normalizeEncryptedGroupMessageRevision(params.Revision)
+	if err != nil {
+		return nil, err
+	}
+	normalizedCiphertext, err := normalizeEncryptedGroupCiphertext(params.Ciphertext)
+	if err != nil {
+		return nil, err
+	}
+	normalizedRosterVersion, err := normalizeEncryptedGroupRosterVersion(params.RosterVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	members, err := s.repo.ListGroupMembers(ctx, authSession.User.ID, group.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	bootstrap, err := s.buildEncryptedGroupBootstrap(ctx, group.ID, thread.ID, members, false)
+	if err != nil {
+		return nil, err
+	}
+	if bootstrap.Lane.MLSGroupID != normalizedMLSGroupID || bootstrap.Lane.RosterVersion != normalizedRosterVersion {
+		return nil, fmt.Errorf("%w: encrypted group roster version is stale; bootstrap must be refreshed before send", ErrConflict)
+	}
+	if !encryptedGroupBootstrapHasDevice(*bootstrap, authSession.User.ID, normalizedSenderCryptoDeviceID) {
+		return nil, fmt.Errorf("%w: sender crypto device must be active, owned by current user and present in encrypted group roster", ErrConflict)
+	}
+
+	deliveries, err := resolveEncryptedGroupMessageDeliveries(
+		authSession.User.ID,
+		normalizedSenderCryptoDeviceID,
+		bootstrap.RosterDevices,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	return s.repo.CreateEncryptedGroupMessage(ctx, CreateEncryptedGroupMessageParams{
+		MessageID:            normalizedMessageID,
+		GroupID:              group.ID,
+		ThreadID:             thread.ID,
+		MLSGroupID:           bootstrap.Lane.MLSGroupID,
+		RosterVersion:        bootstrap.Lane.RosterVersion,
+		SenderUserID:         authSession.User.ID,
+		SenderCryptoDeviceID: normalizedSenderCryptoDeviceID,
+		OperationKind:        normalizedOperationKind,
+		TargetMessageID:      normalizedTargetMessageID,
+		Revision:             normalizedRevision,
+		Ciphertext:           normalizedCiphertext,
+		Deliveries:           deliveries,
+		CreatedAt:            now,
+		StoredAt:             now,
+	})
+}
+
+func (s *Service) ListEncryptedGroupMessages(ctx context.Context, token string, groupID string, viewerCryptoDeviceID string, pageSize uint32) ([]EncryptedGroupEnvelope, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	group, _, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedViewerCryptoDeviceID, err := normalizeID(viewerCryptoDeviceID, "viewer_crypto_device_id")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureCurrentUserOwnsActiveCryptoDevice(ctx, authSession.User.ID, normalizedViewerCryptoDeviceID); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.repo.GetEncryptedGroupLane(ctx, group.ID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil, fmt.Errorf("%w: encrypted group control-plane is not bootstrapped", ErrConflict)
+		}
+		return nil, err
+	}
+
+	limit, err := normalizePageSize(pageSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.ListEncryptedGroupMessages(ctx, authSession.User.ID, group.ID, normalizedViewerCryptoDeviceID, limit)
+}
+
+func (s *Service) GetEncryptedGroupMessage(ctx context.Context, token string, groupID string, messageID string, viewerCryptoDeviceID string) (*EncryptedGroupEnvelope, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	group, _, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedMessageID, err := normalizeID(messageID, "message_id")
+	if err != nil {
+		return nil, err
+	}
+	normalizedViewerCryptoDeviceID, err := normalizeID(viewerCryptoDeviceID, "viewer_crypto_device_id")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureCurrentUserOwnsActiveCryptoDevice(ctx, authSession.User.ID, normalizedViewerCryptoDeviceID); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.repo.GetEncryptedGroupLane(ctx, group.ID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil, fmt.Errorf("%w: encrypted group control-plane is not bootstrapped", ErrConflict)
+		}
+		return nil, err
+	}
+
+	return s.repo.GetEncryptedGroupMessage(ctx, authSession.User.ID, group.ID, normalizedMessageID, normalizedViewerCryptoDeviceID)
+}
+
 func (s *Service) SendTextMessage(ctx context.Context, token string, chatID string, text string, attachmentIDs []string, replyToMessageIDInput ...string) (*DirectChatMessage, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
@@ -1936,6 +2150,287 @@ func normalizeMessageText(value string) (string, error) {
 	}
 
 	return normalized, nil
+}
+
+func (s *Service) buildEncryptedGroupBootstrap(
+	ctx context.Context,
+	groupID string,
+	threadID string,
+	members []GroupMember,
+	allowCreate bool,
+) (*EncryptedGroupBootstrap, error) {
+	rosterMembers, rosterDevices, memberSnapshots, deviceSnapshots, err := s.resolveEncryptedGroupRoster(ctx, groupID, members)
+	if err != nil {
+		return nil, err
+	}
+
+	lane, err := s.materializeEncryptedGroupControlPlane(
+		ctx,
+		groupID,
+		threadID,
+		memberSnapshots,
+		deviceSnapshots,
+		allowCreate,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for index := range rosterDevices {
+		rosterDevices[index].UpdatedAt = lane.UpdatedAt
+	}
+
+	return &EncryptedGroupBootstrap{
+		Lane:          *lane,
+		RosterMembers: rosterMembers,
+		RosterDevices: rosterDevices,
+	}, nil
+}
+
+func (s *Service) resolveEncryptedGroupRoster(
+	ctx context.Context,
+	groupID string,
+	members []GroupMember,
+) ([]EncryptedGroupRosterMember, []EncryptedGroupRosterDevice, []EncryptedGroupRosterMemberSnapshot, []EncryptedGroupRosterDeviceSnapshot, error) {
+	userIDs := collectGroupMemberUserIDs(members)
+	activeDevices, err := s.repo.ListActiveCryptoDevicesByUserIDs(ctx, userIDs)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	deviceIDs := make([]string, 0, len(activeDevices))
+	for _, device := range activeDevices {
+		deviceIDs = append(deviceIDs, device.ID)
+	}
+
+	bundles, err := s.repo.ListCurrentCryptoDeviceBundlesByDeviceIDs(ctx, deviceIDs)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	bundleByDeviceID := make(map[string]CryptoDeviceBundle, len(bundles))
+	for _, bundle := range bundles {
+		bundleByDeviceID[bundle.CryptoDeviceID] = bundle
+	}
+
+	devicesByUserID := make(map[string][]EncryptedGroupRosterDevice)
+	for _, device := range activeDevices {
+		bundle, ok := bundleByDeviceID[device.ID]
+		if !ok {
+			continue
+		}
+
+		devicesByUserID[device.UserID] = append(devicesByUserID[device.UserID], EncryptedGroupRosterDevice{
+			GroupID:  groupID,
+			UserID:   device.UserID,
+			DeviceID: device.ID,
+			Bundle:   bundle,
+		})
+	}
+
+	rosterMembers := make([]EncryptedGroupRosterMember, 0, len(members))
+	memberSnapshots := make([]EncryptedGroupRosterMemberSnapshot, 0, len(members))
+	rosterDevices := make([]EncryptedGroupRosterDevice, 0)
+	deviceSnapshots := make([]EncryptedGroupRosterDeviceSnapshot, 0)
+	for _, member := range members {
+		eligibleDevices := devicesByUserID[member.User.ID]
+		eligibleDeviceIDs := make([]string, 0, len(eligibleDevices))
+		for _, device := range eligibleDevices {
+			eligibleDeviceIDs = append(eligibleDeviceIDs, device.DeviceID)
+			rosterDevices = append(rosterDevices, device)
+			deviceSnapshots = append(deviceSnapshots, EncryptedGroupRosterDeviceSnapshot{
+				UserID:         device.UserID,
+				CryptoDeviceID: device.DeviceID,
+			})
+		}
+
+		rosterMembers = append(rosterMembers, EncryptedGroupRosterMember{
+			GroupID:                 groupID,
+			User:                    member.User,
+			Role:                    member.Role,
+			IsWriteRestricted:       member.IsWriteRestricted,
+			HasEligibleCryptoDevice: len(eligibleDevices) > 0,
+			EligibleCryptoDeviceIDs: eligibleDeviceIDs,
+		})
+		memberSnapshots = append(memberSnapshots, EncryptedGroupRosterMemberSnapshot{
+			UserID:            member.User.ID,
+			Role:              member.Role,
+			IsWriteRestricted: member.IsWriteRestricted,
+		})
+	}
+
+	return rosterMembers, rosterDevices, memberSnapshots, deviceSnapshots, nil
+}
+
+func (s *Service) materializeEncryptedGroupControlPlane(
+	ctx context.Context,
+	groupID string,
+	threadID string,
+	rosterMembers []EncryptedGroupRosterMemberSnapshot,
+	rosterDevices []EncryptedGroupRosterDeviceSnapshot,
+	allowCreate bool,
+) (*EncryptedGroupLane, error) {
+	if len(rosterMembers) == 0 {
+		return nil, fmt.Errorf("%w: encrypted group readable roster is empty", ErrConflict)
+	}
+
+	existingLane, err := s.repo.GetEncryptedGroupLane(ctx, groupID)
+	switch {
+	case err == nil:
+	case errors.Is(err, ErrNotFound):
+		if !allowCreate {
+			return nil, fmt.Errorf("%w: encrypted group control-plane must be bootstrapped before send", ErrConflict)
+		}
+		for _, member := range rosterMembers {
+			if !encryptedGroupMemberHasEligibleDevice(member.UserID, rosterDevices) {
+				return nil, fmt.Errorf("%w: encrypted group bootstrap requires at least one active trusted crypto-device with current bundle for every readable member", ErrConflict)
+			}
+		}
+		existingLane = &EncryptedGroupLane{
+			GroupID:    groupID,
+			ThreadID:   threadID,
+			MLSGroupID: s.newID(),
+		}
+	default:
+		return nil, err
+	}
+
+	now := s.now()
+	return s.repo.SyncEncryptedGroupControlPlane(ctx, SyncEncryptedGroupControlPlaneParams{
+		GroupID:       groupID,
+		ThreadID:      threadID,
+		MLSGroupID:    existingLane.MLSGroupID,
+		RosterMembers: rosterMembers,
+		RosterDevices: rosterDevices,
+		ActivatedAt:   now,
+		UpdatedAt:     now,
+	})
+}
+
+func (s *Service) ensureCurrentUserOwnsActiveCryptoDevice(ctx context.Context, userID string, cryptoDeviceID string) error {
+	activeDevices, err := s.repo.ListActiveCryptoDevicesByUserIDs(ctx, []string{userID})
+	if err != nil {
+		return err
+	}
+	if !hasActiveCryptoDevice(activeDevices, userID, cryptoDeviceID) {
+		return fmt.Errorf("%w: viewer crypto device must be active and owned by current user", ErrConflict)
+	}
+
+	return nil
+}
+
+func normalizeEncryptedGroupMessageOperationKind(value string) (string, error) {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case EncryptedGroupMessageOperationContent:
+		return EncryptedGroupMessageOperationContent, nil
+	case EncryptedGroupMessageOperationControl:
+		return EncryptedGroupMessageOperationControl, nil
+	default:
+		return "", fmt.Errorf("%w: encrypted group message operation_kind is unsupported", ErrInvalidArgument)
+	}
+}
+
+func normalizeEncryptedGroupMessageRevision(value uint32) (uint32, error) {
+	if value == 0 {
+		return 0, fmt.Errorf("%w: encrypted group message revision must be greater than zero", ErrInvalidArgument)
+	}
+
+	return value, nil
+}
+
+func normalizeEncryptedGroupCiphertext(value []byte) ([]byte, error) {
+	if len(value) == 0 {
+		return nil, fmt.Errorf("%w: encrypted group ciphertext must be non-empty", ErrInvalidArgument)
+	}
+
+	return append([]byte(nil), value...), nil
+}
+
+func normalizeEncryptedGroupRosterVersion(value uint64) (uint64, error) {
+	if value == 0 {
+		return 0, fmt.Errorf("%w: encrypted group roster_version must be greater than zero", ErrInvalidArgument)
+	}
+
+	return value, nil
+}
+
+func validateEncryptedGroupMessageOperation(operationKind string, targetMessageID *string) error {
+	switch operationKind {
+	case EncryptedGroupMessageOperationContent:
+		if targetMessageID != nil {
+			return fmt.Errorf("%w: encrypted group content operation must not include target_message_id", ErrInvalidArgument)
+		}
+	case EncryptedGroupMessageOperationControl:
+	default:
+		return fmt.Errorf("%w: encrypted group message operation_kind is unsupported", ErrInvalidArgument)
+	}
+
+	return nil
+}
+
+func resolveEncryptedGroupMessageDeliveries(
+	senderUserID string,
+	senderCryptoDeviceID string,
+	rosterDevices []EncryptedGroupRosterDevice,
+) ([]EncryptedGroupMessageDelivery, error) {
+	if len(rosterDevices) == 0 {
+		return nil, fmt.Errorf("%w: encrypted group device roster is empty", ErrConflict)
+	}
+
+	result := make([]EncryptedGroupMessageDelivery, 0, len(rosterDevices))
+	senderDeviceIncluded := false
+	now := time.Time{}
+	for _, device := range rosterDevices {
+		result = append(result, EncryptedGroupMessageDelivery{
+			RecipientUserID:         device.UserID,
+			RecipientCryptoDeviceID: device.DeviceID,
+			StoredAt:                now,
+		})
+		if device.UserID == senderUserID && device.DeviceID == senderCryptoDeviceID {
+			senderDeviceIncluded = true
+		}
+	}
+	if !senderDeviceIncluded {
+		return nil, fmt.Errorf("%w: sender crypto device is not present in encrypted group roster", ErrConflict)
+	}
+
+	return result, nil
+}
+
+func encryptedGroupBootstrapHasDevice(bootstrap EncryptedGroupBootstrap, ownerUserID string, cryptoDeviceID string) bool {
+	return encryptedGroupRosterHasDevice(bootstrap.RosterDevices, ownerUserID, cryptoDeviceID)
+}
+
+func encryptedGroupRosterHasDevice(devices []EncryptedGroupRosterDevice, ownerUserID string, cryptoDeviceID string) bool {
+	for _, device := range devices {
+		if device.UserID == ownerUserID && device.DeviceID == cryptoDeviceID {
+			return true
+		}
+	}
+
+	return false
+}
+
+func encryptedGroupMemberHasEligibleDevice(userID string, devices []EncryptedGroupRosterDeviceSnapshot) bool {
+	for _, device := range devices {
+		if device.UserID == userID {
+			return true
+		}
+	}
+
+	return false
+}
+
+func collectGroupMemberUserIDs(members []GroupMember) []string {
+	if len(members) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(members))
+	for _, member := range members {
+		result = append(result, member.User.ID)
+	}
+
+	return result
 }
 
 func normalizeEncryptedDirectMessageV2OperationKind(value string) (string, error) {

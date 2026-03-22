@@ -11,6 +11,8 @@ const (
 	EncryptedDirectMessageV2OperationContent         = "content"
 	EncryptedDirectMessageV2OperationEdit            = "edit"
 	EncryptedDirectMessageV2OperationTombstone       = "tombstone"
+	EncryptedGroupMessageOperationContent            = "content"
+	EncryptedGroupMessageOperationControl            = "control"
 	MarkdownPolicySafeSubsetV1                       = "safe_subset_v1"
 	AttachmentScopeDirect                            = "direct"
 	AttachmentScopeGroup                             = "group"
@@ -105,6 +107,38 @@ type EncryptedDirectMessageV2SendBootstrap struct {
 	RecipientUserID    string
 	RecipientDevices   []EncryptedDirectMessageV2SendTargetDevice
 	SenderOtherDevices []EncryptedDirectMessageV2SendTargetDevice
+}
+
+type EncryptedGroupLane struct {
+	GroupID       string
+	ThreadID      string
+	MLSGroupID    string
+	RosterVersion uint64
+	ActivatedAt   time.Time
+	UpdatedAt     time.Time
+}
+
+type EncryptedGroupRosterMember struct {
+	GroupID                 string
+	User                    UserSummary
+	Role                    string
+	IsWriteRestricted       bool
+	HasEligibleCryptoDevice bool
+	EligibleCryptoDeviceIDs []string
+}
+
+type EncryptedGroupRosterDevice struct {
+	GroupID   string
+	UserID    string
+	DeviceID  string
+	Bundle    CryptoDeviceBundle
+	UpdatedAt time.Time
+}
+
+type EncryptedGroupBootstrap struct {
+	Lane          EncryptedGroupLane
+	RosterMembers []EncryptedGroupRosterMember
+	RosterDevices []EncryptedGroupRosterDevice
 }
 
 type SessionAuth struct {
@@ -345,6 +379,47 @@ type EncryptedDirectMessageV2StoredEnvelope struct {
 	StoredDeliveryCount  uint32
 }
 
+type EncryptedGroupMessageDelivery struct {
+	RecipientUserID         string
+	RecipientCryptoDeviceID string
+	StoredAt                time.Time
+}
+
+type EncryptedGroupEnvelope struct {
+	MessageID            string
+	GroupID              string
+	ThreadID             string
+	MLSGroupID           string
+	RosterVersion        uint64
+	SenderUserID         string
+	SenderCryptoDeviceID string
+	OperationKind        string
+	TargetMessageID      *string
+	Revision             uint32
+	Ciphertext           []byte
+	CiphertextSizeBytes  int64
+	CreatedAt            time.Time
+	StoredAt             time.Time
+	ViewerDelivery       EncryptedGroupMessageDelivery
+}
+
+type EncryptedGroupStoredEnvelope struct {
+	MessageID            string
+	GroupID              string
+	ThreadID             string
+	MLSGroupID           string
+	RosterVersion        uint64
+	SenderUserID         string
+	SenderCryptoDeviceID string
+	OperationKind        string
+	TargetMessageID      *string
+	Revision             uint32
+	CreatedAt            time.Time
+	StoredAt             time.Time
+	StoredDeliveryCount  uint32
+	StoredDeliveries     []EncryptedGroupMessageDelivery
+}
+
 type GroupMessage struct {
 	ID               string
 	GroupID          string
@@ -567,6 +642,27 @@ type CreateEncryptedDirectMessageV2Params struct {
 	StoredAt             time.Time
 }
 
+type EncryptedGroupRosterMemberSnapshot struct {
+	UserID            string
+	Role              string
+	IsWriteRestricted bool
+}
+
+type EncryptedGroupRosterDeviceSnapshot struct {
+	UserID         string
+	CryptoDeviceID string
+}
+
+type SyncEncryptedGroupControlPlaneParams struct {
+	GroupID       string
+	ThreadID      string
+	MLSGroupID    string
+	RosterMembers []EncryptedGroupRosterMemberSnapshot
+	RosterDevices []EncryptedGroupRosterDeviceSnapshot
+	ActivatedAt   time.Time
+	UpdatedAt     time.Time
+}
+
 type SendEncryptedDirectMessageV2Params struct {
 	ChatID               string
 	MessageID            string
@@ -575,6 +671,35 @@ type SendEncryptedDirectMessageV2Params struct {
 	TargetMessageID      *string
 	Revision             uint32
 	Deliveries           []EncryptedDirectMessageV2DeliveryDraft
+}
+
+type CreateEncryptedGroupMessageParams struct {
+	MessageID            string
+	GroupID              string
+	ThreadID             string
+	MLSGroupID           string
+	RosterVersion        uint64
+	SenderUserID         string
+	SenderCryptoDeviceID string
+	OperationKind        string
+	TargetMessageID      *string
+	Revision             uint32
+	Ciphertext           []byte
+	Deliveries           []EncryptedGroupMessageDelivery
+	CreatedAt            time.Time
+	StoredAt             time.Time
+}
+
+type SendEncryptedGroupMessageParams struct {
+	GroupID              string
+	MessageID            string
+	MLSGroupID           string
+	RosterVersion        uint64
+	SenderCryptoDeviceID string
+	OperationKind        string
+	TargetMessageID      *string
+	Revision             uint32
+	Ciphertext           []byte
 }
 
 type CreateGroupMessageParams struct {

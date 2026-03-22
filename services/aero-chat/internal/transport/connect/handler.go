@@ -639,6 +639,89 @@ func (h *Handler) GetEncryptedDirectMessageV2(ctx context.Context, req *connect.
 	}), nil
 }
 
+func (h *Handler) GetEncryptedGroupBootstrap(ctx context.Context, req *connect.Request[chatv1.GetEncryptedGroupBootstrapRequest]) (*connect.Response[chatv1.GetEncryptedGroupBootstrapResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	bootstrap, err := h.service.GetEncryptedGroupBootstrap(ctx, token, req.Msg.GroupId, req.Msg.ViewerCryptoDeviceId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(toProtoEncryptedGroupBootstrap(*bootstrap)), nil
+}
+
+func (h *Handler) SendEncryptedGroupMessage(ctx context.Context, req *connect.Request[chatv1.SendEncryptedGroupMessageRequest]) (*connect.Response[chatv1.SendEncryptedGroupMessageResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	envelope, err := h.service.SendEncryptedGroupMessage(ctx, token, chat.SendEncryptedGroupMessageParams{
+		GroupID:              req.Msg.GroupId,
+		MessageID:            req.Msg.MessageId,
+		MLSGroupID:           req.Msg.MlsGroupId,
+		RosterVersion:        req.Msg.RosterVersion,
+		SenderCryptoDeviceID: req.Msg.SenderCryptoDeviceId,
+		OperationKind:        fromProtoEncryptedGroupMessageOperationKind(req.Msg.OperationKind),
+		TargetMessageID:      req.Msg.TargetMessageId,
+		Revision:             req.Msg.Revision,
+		Ciphertext:           append([]byte(nil), req.Msg.Ciphertext...),
+	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.SendEncryptedGroupMessageResponse{
+		Envelope: toProtoEncryptedGroupStoredEnvelope(*envelope),
+	}), nil
+}
+
+func (h *Handler) ListEncryptedGroupMessages(ctx context.Context, req *connect.Request[chatv1.ListEncryptedGroupMessagesRequest]) (*connect.Response[chatv1.ListEncryptedGroupMessagesResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	envelopes, err := h.service.ListEncryptedGroupMessages(ctx, token, req.Msg.GroupId, req.Msg.ViewerCryptoDeviceId, req.Msg.PageSize)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &chatv1.ListEncryptedGroupMessagesResponse{
+		Envelopes: make([]*chatv1.EncryptedGroupEnvelope, 0, len(envelopes)),
+	}
+	for _, envelope := range envelopes {
+		response.Envelopes = append(response.Envelopes, toProtoEncryptedGroupEnvelope(envelope))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) GetEncryptedGroupMessage(ctx context.Context, req *connect.Request[chatv1.GetEncryptedGroupMessageRequest]) (*connect.Response[chatv1.GetEncryptedGroupMessageResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	envelope, err := h.service.GetEncryptedGroupMessage(
+		ctx,
+		token,
+		req.Msg.GroupId,
+		req.Msg.MessageId,
+		req.Msg.ViewerCryptoDeviceId,
+	)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.GetEncryptedGroupMessageResponse{
+		Envelope: toProtoEncryptedGroupEnvelope(*envelope),
+	}), nil
+}
+
 func (h *Handler) SendTextMessage(ctx context.Context, req *connect.Request[chatv1.SendTextMessageRequest]) (*connect.Response[chatv1.SendTextMessageResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -1120,6 +1203,122 @@ func toProtoEncryptedDirectMessageV2Delivery(value chat.EncryptedDirectMessageV2
 	}
 }
 
+func toProtoEncryptedGroupBootstrap(value chat.EncryptedGroupBootstrap) *chatv1.GetEncryptedGroupBootstrapResponse {
+	response := &chatv1.GetEncryptedGroupBootstrapResponse{
+		Lane:          toProtoEncryptedGroupLane(value.Lane),
+		RosterMembers: make([]*chatv1.EncryptedGroupRosterMember, 0, len(value.RosterMembers)),
+		RosterDevices: make([]*chatv1.EncryptedGroupRosterDevice, 0, len(value.RosterDevices)),
+	}
+	for _, member := range value.RosterMembers {
+		response.RosterMembers = append(response.RosterMembers, toProtoEncryptedGroupRosterMember(member))
+	}
+	for _, device := range value.RosterDevices {
+		response.RosterDevices = append(response.RosterDevices, toProtoEncryptedGroupRosterDevice(device))
+	}
+
+	return response
+}
+
+func toProtoEncryptedGroupLane(value chat.EncryptedGroupLane) *chatv1.EncryptedGroupLane {
+	return &chatv1.EncryptedGroupLane{
+		GroupId:       value.GroupID,
+		ThreadId:      value.ThreadID,
+		MlsGroupId:    value.MLSGroupID,
+		RosterVersion: value.RosterVersion,
+		ActivatedAt:   timestamppb.New(value.ActivatedAt),
+		UpdatedAt:     timestamppb.New(value.UpdatedAt),
+	}
+}
+
+func toProtoEncryptedGroupRosterMember(value chat.EncryptedGroupRosterMember) *chatv1.EncryptedGroupRosterMember {
+	return &chatv1.EncryptedGroupRosterMember{
+		User:                     toProtoChatUser(value.User),
+		Role:                     toProtoGroupMemberRole(value.Role),
+		IsWriteRestricted:        value.IsWriteRestricted,
+		HasEligibleCryptoDevices: value.HasEligibleCryptoDevice,
+		EligibleCryptoDeviceIds:  append([]string(nil), value.EligibleCryptoDeviceIDs...),
+	}
+}
+
+func toProtoEncryptedGroupRosterDevice(value chat.EncryptedGroupRosterDevice) *chatv1.EncryptedGroupRosterDevice {
+	kemKeyID := ""
+	if value.Bundle.KemKeyID != nil {
+		kemKeyID = *value.Bundle.KemKeyID
+	}
+
+	return &chatv1.EncryptedGroupRosterDevice{
+		UserId:                  value.UserID,
+		CryptoDeviceId:          value.DeviceID,
+		BundleVersion:           value.Bundle.BundleVersion,
+		CryptoSuite:             value.Bundle.CryptoSuite,
+		IdentityPublicKey:       append([]byte(nil), value.Bundle.IdentityPublicKey...),
+		SignedPrekeyPublic:      append([]byte(nil), value.Bundle.SignedPrekeyPublic...),
+		SignedPrekeyId:          value.Bundle.SignedPrekeyID,
+		SignedPrekeySignature:   append([]byte(nil), value.Bundle.SignedPrekeySignature...),
+		KemPublicKey:            append([]byte(nil), value.Bundle.KemPublicKey...),
+		KemKeyId:                kemKeyID,
+		KemSignature:            append([]byte(nil), value.Bundle.KemSignature...),
+		OneTimePrekeysTotal:     value.Bundle.OneTimePrekeysTotal,
+		OneTimePrekeysAvailable: value.Bundle.OneTimePrekeysAvailable,
+		BundleDigest:            append([]byte(nil), value.Bundle.BundleDigest...),
+		PublishedAt:             timestamppb.New(value.Bundle.PublishedAt),
+		ExpiresAt:               timestampPointer(value.Bundle.ExpiresAt),
+		UpdatedAt:               timestamppb.New(value.UpdatedAt),
+	}
+}
+
+func toProtoEncryptedGroupEnvelope(value chat.EncryptedGroupEnvelope) *chatv1.EncryptedGroupEnvelope {
+	return &chatv1.EncryptedGroupEnvelope{
+		MessageId:            value.MessageID,
+		GroupId:              value.GroupID,
+		ThreadId:             value.ThreadID,
+		MlsGroupId:           value.MLSGroupID,
+		RosterVersion:        value.RosterVersion,
+		SenderUserId:         value.SenderUserID,
+		SenderCryptoDeviceId: value.SenderCryptoDeviceID,
+		OperationKind:        toProtoEncryptedGroupMessageOperationKind(value.OperationKind),
+		TargetMessageId:      value.TargetMessageID,
+		Revision:             value.Revision,
+		Ciphertext:           append([]byte(nil), value.Ciphertext...),
+		CiphertextSizeBytes:  uint64(max(value.CiphertextSizeBytes, 0)),
+		CreatedAt:            timestamppb.New(value.CreatedAt),
+		StoredAt:             timestamppb.New(value.StoredAt),
+		ViewerDelivery:       toProtoEncryptedGroupMessageDelivery(value.ViewerDelivery),
+	}
+}
+
+func toProtoEncryptedGroupStoredEnvelope(value chat.EncryptedGroupStoredEnvelope) *chatv1.EncryptedGroupStoredEnvelope {
+	response := &chatv1.EncryptedGroupStoredEnvelope{
+		MessageId:            value.MessageID,
+		GroupId:              value.GroupID,
+		ThreadId:             value.ThreadID,
+		MlsGroupId:           value.MLSGroupID,
+		RosterVersion:        value.RosterVersion,
+		SenderUserId:         value.SenderUserID,
+		SenderCryptoDeviceId: value.SenderCryptoDeviceID,
+		OperationKind:        toProtoEncryptedGroupMessageOperationKind(value.OperationKind),
+		TargetMessageId:      value.TargetMessageID,
+		Revision:             value.Revision,
+		CreatedAt:            timestamppb.New(value.CreatedAt),
+		StoredAt:             timestamppb.New(value.StoredAt),
+		StoredDeliveryCount:  value.StoredDeliveryCount,
+		StoredDeliveries:     make([]*chatv1.EncryptedGroupMessageDelivery, 0, len(value.StoredDeliveries)),
+	}
+	for _, delivery := range value.StoredDeliveries {
+		response.StoredDeliveries = append(response.StoredDeliveries, toProtoEncryptedGroupMessageDelivery(delivery))
+	}
+
+	return response
+}
+
+func toProtoEncryptedGroupMessageDelivery(value chat.EncryptedGroupMessageDelivery) *chatv1.EncryptedGroupMessageDelivery {
+	return &chatv1.EncryptedGroupMessageDelivery{
+		RecipientUserId:         value.RecipientUserID,
+		RecipientCryptoDeviceId: value.RecipientCryptoDeviceID,
+		StoredAt:                timestamppb.New(value.StoredAt),
+	}
+}
+
 func toProtoGroupMessage(value chat.GroupMessage) *chatv1.GroupMessage {
 	result := &chatv1.GroupMessage{
 		Id:           value.ID,
@@ -1413,6 +1612,28 @@ func fromProtoEncryptedDirectMessageV2OperationKind(value chatv1.EncryptedDirect
 		return chat.EncryptedDirectMessageV2OperationEdit
 	case chatv1.EncryptedDirectMessageV2OperationKind_ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_TOMBSTONE:
 		return chat.EncryptedDirectMessageV2OperationTombstone
+	default:
+		return ""
+	}
+}
+
+func toProtoEncryptedGroupMessageOperationKind(value string) chatv1.EncryptedGroupMessageOperationKind {
+	switch value {
+	case chat.EncryptedGroupMessageOperationContent:
+		return chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT
+	case chat.EncryptedGroupMessageOperationControl:
+		return chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTROL
+	default:
+		return chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_UNSPECIFIED
+	}
+}
+
+func fromProtoEncryptedGroupMessageOperationKind(value chatv1.EncryptedGroupMessageOperationKind) string {
+	switch value {
+	case chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT:
+		return chat.EncryptedGroupMessageOperationContent
+	case chatv1.EncryptedGroupMessageOperationKind_ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTROL:
+		return chat.EncryptedGroupMessageOperationControl
 	default:
 		return ""
 	}

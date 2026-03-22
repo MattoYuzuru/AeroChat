@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] encrypted media relay v1
+- [x] MLS control-plane and opaque encrypted group envelope foundation
 
 ---
 
@@ -142,6 +142,9 @@
 - [x] Message search foundation через `aero-gateway`
 - [x] Group moderation foundation и admin policy expansion
 - [x] Max groups per user rules
+- [x] MLS control-plane and opaque encrypted group envelope foundation
+- [ ] Web encrypted group runtime, local projection и outbound text bootstrap
+- [ ] Encrypted media relay integration for MLS group lane
 
 ---
 

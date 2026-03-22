@@ -11,6 +11,7 @@ const (
 	EventTypeCryptoDeviceBound                   = "connection.crypto_device.bound"
 	EventTypeCryptoDeviceBindRejected            = "connection.crypto_device.bind_rejected"
 	EncryptedDirectMessageV2EventTypeDelivered   = "encrypted_direct_message_v2.delivery"
+	EncryptedGroupMessageV1EventTypeDelivered    = "encrypted_group_message_v1.delivery"
 	cryptoDeviceBindRejectReasonInvalidPayload   = "invalid_payload"
 	cryptoDeviceBindRejectReasonPermissionDenied = "permission_denied"
 	cryptoDeviceBindRejectReasonUnavailable      = "unavailable"

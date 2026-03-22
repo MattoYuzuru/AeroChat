@@ -189,6 +189,12 @@ INSERT INTO group_memberships (
 ) VALUES ($1, $2, $3, $4)
 ON CONFLICT (group_id, user_id) DO NOTHING;
 
+-- name: LockGroupByID :one
+SELECT id
+FROM groups
+WHERE id = $1
+FOR UPDATE;
+
 -- name: LockGroupMembershipQuotaOwner :one
 SELECT id
 FROM users
@@ -766,6 +772,136 @@ INSERT INTO direct_chat_encrypted_message_deliveries_v2 (
     stored_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7);
 
+-- name: GetEncryptedGroupLaneByGroupID :one
+SELECT
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    activated_at,
+    updated_at
+FROM group_encrypted_lanes_v1
+WHERE group_id = $1;
+
+-- name: ListEncryptedGroupRosterMembersByGroupID :many
+SELECT
+    group_id,
+    user_id,
+    role,
+    is_write_restricted,
+    roster_version,
+    created_at,
+    updated_at
+FROM group_encrypted_roster_members_v1
+WHERE group_id = $1
+ORDER BY user_id ASC;
+
+-- name: ListEncryptedGroupRosterDevicesByGroupID :many
+SELECT
+    group_id,
+    user_id,
+    crypto_device_id,
+    roster_version,
+    created_at,
+    updated_at
+FROM group_encrypted_roster_devices_v1
+WHERE group_id = $1
+ORDER BY user_id ASC, crypto_device_id ASC;
+
+-- name: CreateEncryptedGroupLane :one
+INSERT INTO group_encrypted_lanes_v1 (
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    activated_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    activated_at,
+    updated_at;
+
+-- name: UpdateEncryptedGroupLane :execrows
+UPDATE group_encrypted_lanes_v1
+SET
+    thread_id = $2,
+    roster_version = $3,
+    updated_at = $4
+WHERE group_id = $1;
+
+-- name: DeleteEncryptedGroupRosterDevicesByGroupID :exec
+DELETE FROM group_encrypted_roster_devices_v1
+WHERE group_id = $1;
+
+-- name: DeleteEncryptedGroupRosterMembersByGroupID :exec
+DELETE FROM group_encrypted_roster_members_v1
+WHERE group_id = $1;
+
+-- name: InsertEncryptedGroupRosterMember :exec
+INSERT INTO group_encrypted_roster_members_v1 (
+    group_id,
+    user_id,
+    role,
+    is_write_restricted,
+    roster_version,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7);
+
+-- name: InsertEncryptedGroupRosterDevice :exec
+INSERT INTO group_encrypted_roster_devices_v1 (
+    group_id,
+    user_id,
+    crypto_device_id,
+    roster_version,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: CreateEncryptedGroupMessage :one
+INSERT INTO group_encrypted_messages_v1 (
+    id,
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    ciphertext,
+    ciphertext_size_bytes,
+    created_at,
+    stored_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING
+    id,
+    group_id,
+    thread_id,
+    mls_group_id,
+    roster_version,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    ciphertext_size_bytes,
+    created_at,
+    stored_at;
+
+-- name: CreateEncryptedGroupMessageDelivery :exec
+INSERT INTO group_encrypted_message_deliveries_v1 (
+    message_id,
+    recipient_user_id,
+    recipient_crypto_device_id,
+    stored_at
+) VALUES ($1, $2, $3, $4);
+
 -- name: CreateAttachment :one
 INSERT INTO attachments (
     id,
@@ -1342,6 +1478,63 @@ JOIN direct_chat_participants AS self ON self.chat_id = m.chat_id
 JOIN direct_chat_encrypted_message_deliveries_v2 AS d ON d.message_id = m.id
 WHERE self.user_id = $1
   AND m.chat_id = $2
+  AND m.id = $3
+  AND d.recipient_user_id = $1
+  AND d.recipient_crypto_device_id = $4;
+
+-- name: ListEncryptedGroupMessagesByDevice :many
+SELECT
+    m.id,
+    m.group_id,
+    m.thread_id,
+    m.mls_group_id,
+    m.roster_version,
+    m.sender_user_id,
+    m.sender_crypto_device_id,
+    m.operation_kind,
+    m.target_message_id,
+    m.revision,
+    m.ciphertext,
+    m.ciphertext_size_bytes,
+    m.created_at,
+    m.stored_at,
+    d.recipient_user_id,
+    d.recipient_crypto_device_id,
+    d.stored_at AS delivery_stored_at
+FROM group_encrypted_messages_v1 AS m
+JOIN group_memberships AS self ON self.group_id = m.group_id
+JOIN group_encrypted_message_deliveries_v1 AS d ON d.message_id = m.id
+WHERE self.user_id = $1
+  AND m.group_id = $2
+  AND d.recipient_user_id = $1
+  AND d.recipient_crypto_device_id = $3
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $4;
+
+-- name: GetEncryptedGroupMessageByDevice :one
+SELECT
+    m.id,
+    m.group_id,
+    m.thread_id,
+    m.mls_group_id,
+    m.roster_version,
+    m.sender_user_id,
+    m.sender_crypto_device_id,
+    m.operation_kind,
+    m.target_message_id,
+    m.revision,
+    m.ciphertext,
+    m.ciphertext_size_bytes,
+    m.created_at,
+    m.stored_at,
+    d.recipient_user_id,
+    d.recipient_crypto_device_id,
+    d.stored_at AS delivery_stored_at
+FROM group_encrypted_messages_v1 AS m
+JOIN group_memberships AS self ON self.group_id = m.group_id
+JOIN group_encrypted_message_deliveries_v1 AS d ON d.message_id = m.id
+WHERE self.user_id = $1
+  AND m.group_id = $2
   AND m.id = $3
   AND d.recipient_user_id = $1
   AND d.recipient_crypto_device_id = $4;
