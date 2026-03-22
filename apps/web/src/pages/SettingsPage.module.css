@@ -33,6 +33,7 @@
 .sectionHeader,
 .deviceHeader,
 .sessionRow,
+.runtimeIntentRow,
 .deviceTitleRow,
 .sessionTitleRow,
 .sessionHeader {
@@ -50,7 +51,9 @@
 .deviceCopy,
 .sessionBlock,
 .sessionList,
-.sessionCopy {
+.sessionCopy,
+.runtimeIntentList,
+.runtimeIntentCopy {
   display: grid;
   gap: 1rem;
 }
@@ -81,7 +84,8 @@
 .summarySubtitle,
 .toggleCopy span,
 .deviceMeta,
-.sessionCopy span {
+.sessionCopy span,
+.runtimeIntentCopy span {
   margin: 0.75rem 0 0;
   color: rgba(3, 50, 82, 0.76);
 }
@@ -163,7 +167,8 @@
 
 .toggleCopy span,
 .deviceMeta,
-.sessionCopy span {
+.sessionCopy span,
+.runtimeIntentCopy span {
   margin: 0;
 }
 
@@ -350,6 +355,23 @@
   align-items: center;
 }
 
+.runtimeIntentList {
+  margin-top: 1rem;
+  gap: 0.8rem;
+}
+
+.runtimeIntentRow {
+  align-items: flex-start;
+  padding: 0.95rem;
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(3, 50, 82, 0.08);
+}
+
+.runtimeIntentCopy {
+  gap: 0.24rem;
+}
+
 .primaryButton,
 .secondaryButton,
 .dangerButton,
@@ -409,6 +431,7 @@
   .deviceHeader,
   .toggleCard,
   .sessionRow,
+  .runtimeIntentRow,
   .deviceTitleRow,
   .sessionTitleRow,
   .sessionHeader {

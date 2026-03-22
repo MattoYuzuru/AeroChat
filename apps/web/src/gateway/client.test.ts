@@ -1311,4 +1311,138 @@ describe("createGatewayClient", () => {
       }),
     );
   });
+
+  it("registers first crypto device through gateway with opaque public bundle payload", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          device: {
+            id: "crypto-1",
+            userId: "user-1",
+            label: "Web Linux",
+            status: "CRYPTO_DEVICE_STATUS_ACTIVE",
+            lastBundleVersion: "1",
+            lastBundlePublishedAt: "2026-03-22T12:00:00Z",
+            createdAt: "2026-03-22T12:00:00Z",
+            activatedAt: "2026-03-22T12:00:00Z",
+          },
+          currentBundle: {
+            cryptoDeviceId: "crypto-1",
+            bundleVersion: "1",
+            cryptoSuite: "webcrypto-p256-foundation-v1",
+            identityPublicKey: "identity-public",
+            signedPrekeyPublic: "signed-prekey-public",
+            signedPrekeyId: "signed-prekey-1",
+            signedPrekeySignature: "signature",
+            bundleDigest: "digest-1",
+            oneTimePrekeysTotal: "0",
+            oneTimePrekeysAvailable: "0",
+            publishedAt: "2026-03-22T12:00:00Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const result = await client.registerFirstCryptoDevice("token-1", {
+      deviceLabel: "Web Linux",
+      bundle: {
+        cryptoSuite: "webcrypto-p256-foundation-v1",
+        identityPublicKeyBase64: "identity-public",
+        signedPrekeyPublicBase64: "signed-prekey-public",
+        signedPrekeyId: "signed-prekey-1",
+        signedPrekeySignatureBase64: "signature",
+        kemPublicKeyBase64: null,
+        kemKeyId: null,
+        kemSignatureBase64: null,
+        oneTimePrekeysTotal: 0,
+        oneTimePrekeysAvailable: 0,
+        bundleDigestBase64: "digest-1",
+        expiresAt: null,
+      },
+    });
+
+    expect(result.device.status).toBe("active");
+    expect(result.currentBundle.bundleDigestBase64).toBe("digest-1");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.identity.v1.IdentityService/RegisterFirstCryptoDevice",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          deviceLabel: "Web Linux",
+          bundle: {
+            cryptoSuite: "webcrypto-p256-foundation-v1",
+            identityPublicKey: "identity-public",
+            signedPrekeyPublic: "signed-prekey-public",
+            signedPrekeyId: "signed-prekey-1",
+            signedPrekeySignature: "signature",
+            oneTimePrekeysTotal: 0,
+            oneTimePrekeysAvailable: 0,
+            bundleDigest: "digest-1",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("loads pending link intents through gateway identity endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          linkIntents: [
+            {
+              id: "intent-1",
+              userId: "user-1",
+              pendingCryptoDeviceId: "crypto-pending",
+              status: "CRYPTO_DEVICE_LINK_INTENT_STATUS_PENDING",
+              bundleDigest: "digest-1",
+              createdAt: "2026-03-22T12:00:00Z",
+              expiresAt: "2026-03-22T13:00:00Z",
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const intents = await client.listCryptoDeviceLinkIntents("token-1");
+
+    expect(intents).toEqual([
+      {
+        id: "intent-1",
+        userId: "user-1",
+        pendingCryptoDeviceId: "crypto-pending",
+        status: "pending",
+        bundleDigestBase64: "digest-1",
+        createdAt: "2026-03-22T12:00:00Z",
+        expiresAt: "2026-03-22T13:00:00Z",
+        approvedAt: null,
+        expiredAt: null,
+        approverCryptoDeviceId: null,
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.identity.v1.IdentityService/ListCryptoDeviceLinkIntents",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({}),
+      }),
+    );
+  });
 });

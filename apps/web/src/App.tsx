@@ -1,10 +1,13 @@
 import { AuthProvider } from "./auth/AuthContext";
 import { AppRouter } from "./app/AppRouter";
+import { CryptoRuntimeProvider } from "./crypto/context";
 
 function App() {
   return (
     <AuthProvider>
-      <AppRouter />
+      <CryptoRuntimeProvider>
+        <AppRouter />
+      </CryptoRuntimeProvider>
     </AuthProvider>
   );
 }

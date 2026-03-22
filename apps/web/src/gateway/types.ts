@@ -57,6 +57,75 @@ export interface DeviceWithSessions {
   sessions: Session[];
 }
 
+export type CryptoDeviceStatus = "pending_link" | "active" | "revoked";
+
+export type CryptoDeviceLinkIntentStatus =
+  | "pending"
+  | "approved"
+  | "expired";
+
+export interface CryptoDevice {
+  id: string;
+  userId: string;
+  label: string;
+  status: CryptoDeviceStatus;
+  linkedByCryptoDeviceId: string | null;
+  lastBundleVersion: number | null;
+  lastBundlePublishedAt: string | null;
+  createdAt: string;
+  activatedAt: string | null;
+  revokedAt: string | null;
+  revocationReason: string | null;
+  revokedByActor: string | null;
+}
+
+export interface CryptoDeviceBundlePayload {
+  cryptoSuite: string;
+  identityPublicKeyBase64: string;
+  signedPrekeyPublicBase64: string;
+  signedPrekeyId: string;
+  signedPrekeySignatureBase64: string;
+  kemPublicKeyBase64: string | null;
+  kemKeyId: string | null;
+  kemSignatureBase64: string | null;
+  oneTimePrekeysTotal: number;
+  oneTimePrekeysAvailable: number;
+  bundleDigestBase64: string;
+  expiresAt: string | null;
+}
+
+export interface CryptoDeviceBundle {
+  cryptoDeviceId: string;
+  bundleVersion: number;
+  cryptoSuite: string;
+  identityPublicKeyBase64: string;
+  signedPrekeyPublicBase64: string;
+  signedPrekeyId: string;
+  signedPrekeySignatureBase64: string;
+  kemPublicKeyBase64: string | null;
+  kemKeyId: string | null;
+  kemSignatureBase64: string | null;
+  oneTimePrekeysTotal: number;
+  oneTimePrekeysAvailable: number;
+  bundleDigestBase64: string;
+  publishedAt: string;
+  expiresAt: string | null;
+  supersededAt: string | null;
+}
+
+export interface CryptoDeviceLinkIntent {
+  id: string;
+  userId: string;
+  pendingCryptoDeviceId: string;
+  status: CryptoDeviceLinkIntentStatus;
+  bundleDigestBase64: string;
+  createdAt: string;
+  expiresAt: string;
+  approvedAt: string | null;
+  expiredAt: string | null;
+  approverCryptoDeviceId: string | null;
+}
+
 export interface CurrentAuth {
   profile: Profile;
   device: Device | null;
@@ -413,6 +482,55 @@ export interface GatewayClient {
   login(input: LoginInput): Promise<CurrentAuth>;
   logoutCurrentSession(token: string): Promise<void>;
   getCurrentProfile(token: string): Promise<Profile>;
+  registerFirstCryptoDevice(
+    token: string,
+    input: {
+      deviceLabel?: string;
+      bundle: CryptoDeviceBundlePayload;
+    },
+  ): Promise<{
+    device: CryptoDevice;
+    currentBundle: CryptoDeviceBundle;
+  }>;
+  registerPendingLinkedCryptoDevice(
+    token: string,
+    input: {
+      deviceLabel?: string;
+      bundle: CryptoDeviceBundlePayload;
+    },
+  ): Promise<{
+    device: CryptoDevice;
+    currentBundle: CryptoDeviceBundle;
+  }>;
+  listCryptoDevices(token: string): Promise<CryptoDevice[]>;
+  getCryptoDevice(
+    token: string,
+    cryptoDeviceId: string,
+  ): Promise<{
+    device: CryptoDevice;
+    currentBundle: CryptoDeviceBundle | null;
+  }>;
+  publishCryptoDeviceBundle(
+    token: string,
+    cryptoDeviceId: string,
+    bundle: CryptoDeviceBundlePayload,
+  ): Promise<{
+    device: CryptoDevice;
+    currentBundle: CryptoDeviceBundle;
+  }>;
+  createCryptoDeviceLinkIntent(
+    token: string,
+    pendingCryptoDeviceId: string,
+  ): Promise<CryptoDeviceLinkIntent>;
+  listCryptoDeviceLinkIntents(token: string): Promise<CryptoDeviceLinkIntent[]>;
+  approveCryptoDeviceLinkIntent(
+    token: string,
+    linkIntentId: string,
+    approverCryptoDeviceId: string,
+  ): Promise<{
+    linkIntent: CryptoDeviceLinkIntent;
+    device: CryptoDevice;
+  }>;
   listDevices(token: string): Promise<DeviceWithSessions[]>;
   revokeSessionOrDevice(
     token: string,

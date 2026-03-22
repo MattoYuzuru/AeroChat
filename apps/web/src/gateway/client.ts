@@ -1,6 +1,10 @@
 import type {
   Attachment,
   AttachmentUploadSession,
+  CryptoDevice,
+  CryptoDeviceBundle,
+  CryptoDeviceBundlePayload,
+  CryptoDeviceLinkIntent,
   CurrentAuth,
   DirectChat,
   DirectChatMessage,
@@ -120,6 +124,78 @@ interface UpdateCurrentProfileResponseWire {
 
 interface ListDevicesResponseWire {
   devices?: DeviceWithSessionsWire[];
+}
+
+interface CryptoDeviceWire extends TimestampedWire {
+  id?: string;
+  label?: string;
+  userId?: string;
+  linkedByCryptoDeviceId?: string;
+  lastBundleVersion?: number | string;
+  lastBundlePublishedAt?: string;
+  activatedAt?: string;
+  revocationReason?: string;
+  revokedByActor?: string;
+  status?: string;
+}
+
+interface CryptoDeviceBundleWire {
+  cryptoDeviceId?: string;
+  bundleVersion?: number | string;
+  cryptoSuite?: string;
+  identityPublicKey?: string;
+  signedPrekeyPublic?: string;
+  signedPrekeyId?: string;
+  signedPrekeySignature?: string;
+  kemPublicKey?: string;
+  kemKeyId?: string;
+  kemSignature?: string;
+  oneTimePrekeysTotal?: number | string;
+  oneTimePrekeysAvailable?: number | string;
+  bundleDigest?: string;
+  publishedAt?: string;
+  expiresAt?: string;
+  supersededAt?: string;
+}
+
+interface CryptoDeviceLinkIntentWire {
+  id?: string;
+  userId?: string;
+  pendingCryptoDeviceId?: string;
+  status?: string;
+  bundleDigest?: string;
+  createdAt?: string;
+  expiresAt?: string;
+  approvedAt?: string;
+  expiredAt?: string;
+  approverCryptoDeviceId?: string;
+}
+
+interface RegisterCryptoDeviceResponseWire {
+  device?: CryptoDeviceWire;
+  currentBundle?: CryptoDeviceBundleWire;
+}
+
+interface ListCryptoDevicesResponseWire {
+  devices?: CryptoDeviceWire[];
+}
+
+interface GetCryptoDeviceResponseWire {
+  device?: CryptoDeviceWire;
+  currentBundle?: CryptoDeviceBundleWire;
+}
+
+interface CreateCryptoDeviceLinkIntentResponseWire {
+  linkIntent?: CryptoDeviceLinkIntentWire;
+}
+
+interface ListCryptoDeviceLinkIntentsResponseWire {
+  linkIntents?: CryptoDeviceLinkIntentWire[];
+}
+
+interface ApproveCryptoDeviceLinkIntentResponseWire {
+  linkIntent?: CryptoDeviceLinkIntentWire;
+  device?: CryptoDeviceWire;
 }
 
 interface FriendRequestWire {
@@ -580,6 +656,141 @@ export function createGatewayClient(
       );
 
       return normalizeProfile(response.profile);
+    },
+
+    async registerFirstCryptoDevice(token, input) {
+      const response = await unaryCall<RegisterCryptoDeviceResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "RegisterFirstCryptoDevice",
+        {
+          deviceLabel: normalizeOptionalString(input.deviceLabel ?? ""),
+          bundle: normalizeCryptoDeviceBundlePayloadForWire(input.bundle),
+        },
+        token,
+      );
+
+      return {
+        device: normalizeCryptoDevice(response.device),
+        currentBundle: normalizeCryptoDeviceBundle(response.currentBundle),
+      };
+    },
+
+    async registerPendingLinkedCryptoDevice(token, input) {
+      const response = await unaryCall<RegisterCryptoDeviceResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "RegisterPendingLinkedCryptoDevice",
+        {
+          deviceLabel: normalizeOptionalString(input.deviceLabel ?? ""),
+          bundle: normalizeCryptoDeviceBundlePayloadForWire(input.bundle),
+        },
+        token,
+      );
+
+      return {
+        device: normalizeCryptoDevice(response.device),
+        currentBundle: normalizeCryptoDeviceBundle(response.currentBundle),
+      };
+    },
+
+    async listCryptoDevices(token) {
+      const response = await unaryCall<ListCryptoDevicesResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "ListCryptoDevices",
+        {},
+        token,
+      );
+
+      return (response.devices ?? []).map(normalizeCryptoDevice);
+    },
+
+    async getCryptoDevice(token, cryptoDeviceId) {
+      const response = await unaryCall<GetCryptoDeviceResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "GetCryptoDevice",
+        {
+          cryptoDeviceId: cryptoDeviceId.trim(),
+        },
+        token,
+      );
+
+      return {
+        device: normalizeCryptoDevice(response.device),
+        currentBundle: normalizeCryptoDeviceBundleOrNull(response.currentBundle),
+      };
+    },
+
+    async publishCryptoDeviceBundle(token, cryptoDeviceId, bundle) {
+      const response = await unaryCall<RegisterCryptoDeviceResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "PublishCryptoDeviceBundle",
+        {
+          cryptoDeviceId: cryptoDeviceId.trim(),
+          bundle: normalizeCryptoDeviceBundlePayloadForWire(bundle),
+        },
+        token,
+      );
+
+      return {
+        device: normalizeCryptoDevice(response.device),
+        currentBundle: normalizeCryptoDeviceBundle(response.currentBundle),
+      };
+    },
+
+    async createCryptoDeviceLinkIntent(token, pendingCryptoDeviceId) {
+      const response = await unaryCall<CreateCryptoDeviceLinkIntentResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "CreateCryptoDeviceLinkIntent",
+        {
+          pendingCryptoDeviceId: pendingCryptoDeviceId.trim(),
+        },
+        token,
+      );
+
+      return normalizeCryptoDeviceLinkIntent(response.linkIntent);
+    },
+
+    async listCryptoDeviceLinkIntents(token) {
+      const response = await unaryCall<ListCryptoDeviceLinkIntentsResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "ListCryptoDeviceLinkIntents",
+        {},
+        token,
+      );
+
+      return (response.linkIntents ?? []).map(normalizeCryptoDeviceLinkIntent);
+    },
+
+    async approveCryptoDeviceLinkIntent(token, linkIntentId, approverCryptoDeviceId) {
+      const response = await unaryCall<ApproveCryptoDeviceLinkIntentResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "ApproveCryptoDeviceLinkIntent",
+        {
+          linkIntentId: linkIntentId.trim(),
+          approverCryptoDeviceId: approverCryptoDeviceId.trim(),
+        },
+        token,
+      );
+
+      return {
+        linkIntent: normalizeCryptoDeviceLinkIntent(response.linkIntent),
+        device: normalizeCryptoDevice(response.device),
+      };
     },
 
     async listDevices(token) {
@@ -1534,6 +1745,110 @@ function normalizeDeviceWithSessions(
   };
 }
 
+function normalizeCryptoDevice(input: CryptoDeviceWire | undefined): CryptoDevice {
+  return {
+    id: input?.id ?? "",
+    userId: input?.userId ?? "",
+    label: input?.label ?? "",
+    status: normalizeCryptoDeviceStatus(input?.status),
+    linkedByCryptoDeviceId: normalizeNullableString(input?.linkedByCryptoDeviceId),
+    lastBundleVersion:
+      input?.lastBundleVersion === undefined
+        ? null
+        : normalizeCount(input.lastBundleVersion),
+    lastBundlePublishedAt: normalizeNullableString(input?.lastBundlePublishedAt),
+    createdAt: input?.createdAt ?? "",
+    activatedAt: normalizeNullableString(input?.activatedAt),
+    revokedAt: normalizeNullableString(input?.revokedAt),
+    revocationReason: normalizeNullableString(input?.revocationReason),
+    revokedByActor: normalizeNullableString(input?.revokedByActor),
+  };
+}
+
+function normalizeCryptoDeviceStatus(
+  value: string | undefined,
+): CryptoDevice["status"] {
+  switch (value) {
+    case "CRYPTO_DEVICE_STATUS_PENDING_LINK":
+    case "pending_link":
+      return "pending_link";
+    case "CRYPTO_DEVICE_STATUS_REVOKED":
+    case "revoked":
+      return "revoked";
+    case "CRYPTO_DEVICE_STATUS_ACTIVE":
+    case "active":
+    default:
+      return "active";
+  }
+}
+
+function normalizeCryptoDeviceBundle(
+  input: CryptoDeviceBundleWire | undefined,
+): CryptoDeviceBundle {
+  return {
+    cryptoDeviceId: input?.cryptoDeviceId ?? "",
+    bundleVersion: normalizeCount(input?.bundleVersion),
+    cryptoSuite: input?.cryptoSuite ?? "",
+    identityPublicKeyBase64: input?.identityPublicKey ?? "",
+    signedPrekeyPublicBase64: input?.signedPrekeyPublic ?? "",
+    signedPrekeyId: input?.signedPrekeyId ?? "",
+    signedPrekeySignatureBase64: input?.signedPrekeySignature ?? "",
+    kemPublicKeyBase64: normalizeNullableString(input?.kemPublicKey),
+    kemKeyId: normalizeNullableString(input?.kemKeyId),
+    kemSignatureBase64: normalizeNullableString(input?.kemSignature),
+    oneTimePrekeysTotal: normalizeCount(input?.oneTimePrekeysTotal),
+    oneTimePrekeysAvailable: normalizeCount(input?.oneTimePrekeysAvailable),
+    bundleDigestBase64: input?.bundleDigest ?? "",
+    publishedAt: input?.publishedAt ?? "",
+    expiresAt: normalizeNullableString(input?.expiresAt),
+    supersededAt: normalizeNullableString(input?.supersededAt),
+  };
+}
+
+function normalizeCryptoDeviceBundleOrNull(
+  input: CryptoDeviceBundleWire | undefined,
+): CryptoDeviceBundle | null {
+  if (!input || (input.cryptoDeviceId ?? "") === "") {
+    return null;
+  }
+
+  return normalizeCryptoDeviceBundle(input);
+}
+
+function normalizeCryptoDeviceLinkIntent(
+  input: CryptoDeviceLinkIntentWire | undefined,
+): CryptoDeviceLinkIntent {
+  return {
+    id: input?.id ?? "",
+    userId: input?.userId ?? "",
+    pendingCryptoDeviceId: input?.pendingCryptoDeviceId ?? "",
+    status: normalizeCryptoDeviceLinkIntentStatus(input?.status),
+    bundleDigestBase64: input?.bundleDigest ?? "",
+    createdAt: input?.createdAt ?? "",
+    expiresAt: input?.expiresAt ?? "",
+    approvedAt: normalizeNullableString(input?.approvedAt),
+    expiredAt: normalizeNullableString(input?.expiredAt),
+    approverCryptoDeviceId: normalizeNullableString(input?.approverCryptoDeviceId),
+  };
+}
+
+function normalizeCryptoDeviceLinkIntentStatus(
+  value: string | undefined,
+): CryptoDeviceLinkIntent["status"] {
+  switch (value) {
+    case "CRYPTO_DEVICE_LINK_INTENT_STATUS_APPROVED":
+    case "approved":
+      return "approved";
+    case "CRYPTO_DEVICE_LINK_INTENT_STATUS_EXPIRED":
+    case "expired":
+      return "expired";
+    case "CRYPTO_DEVICE_LINK_INTENT_STATUS_PENDING":
+    case "pending":
+    default:
+      return "pending";
+  }
+}
+
 function normalizeFriendRequest(input: FriendRequestWire): FriendRequest {
   return {
     profile: normalizeProfile(input.profile),
@@ -2138,6 +2453,25 @@ function normalizeUnreadCount(value: UnreadStateWire | undefined): number {
 function normalizeOptionalString(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
+}
+
+function normalizeCryptoDeviceBundlePayloadForWire(
+  input: CryptoDeviceBundlePayload,
+): Record<string, unknown> {
+  return {
+    cryptoSuite: input.cryptoSuite.trim(),
+    identityPublicKey: input.identityPublicKeyBase64,
+    signedPrekeyPublic: input.signedPrekeyPublicBase64,
+    signedPrekeyId: input.signedPrekeyId.trim(),
+    signedPrekeySignature: input.signedPrekeySignatureBase64,
+    kemPublicKey: input.kemPublicKeyBase64 ?? undefined,
+    kemKeyId: normalizeOptionalString(input.kemKeyId ?? ""),
+    kemSignature: input.kemSignatureBase64 ?? undefined,
+    oneTimePrekeysTotal: input.oneTimePrekeysTotal,
+    oneTimePrekeysAvailable: input.oneTimePrekeysAvailable,
+    bundleDigest: input.bundleDigestBase64,
+    expiresAt: input.expiresAt ?? undefined,
+  };
 }
 
 function normalizeIDs(values: string[]): string[] {

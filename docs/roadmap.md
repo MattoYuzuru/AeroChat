@@ -59,6 +59,7 @@
 - [x] Crypto device registry foundation
 - [x] Public crypto bundles and prekey inventory foundation
 - [x] Linked-device control-plane foundation
+- [x] Web secure key storage and crypto worker foundation
 - [ ] Block list
 - [ ] Key backup status
 

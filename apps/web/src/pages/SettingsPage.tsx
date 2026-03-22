@@ -20,6 +20,7 @@ import {
   countActiveSessions,
   useDevices,
 } from "../settings/useDevices";
+import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import styles from "./SettingsPage.module.css";
 
 const privacyItems = [
@@ -77,6 +78,7 @@ export function SettingsPage() {
     token: state.status === "authenticated" ? state.token : "",
     onUnauthenticated: expireSession,
   });
+  const cryptoRuntime = useCryptoRuntime();
 
   loadSettingsRef.current = async () => {
     clearNotice();
@@ -608,6 +610,187 @@ export function SettingsPage() {
             </section>
 
             <section className={styles.summaryCard}>
+              <p className={styles.cardLabel}>Crypto runtime</p>
+              <h2 className={styles.summaryTitle}>Локальный crypto-device foundation</h2>
+              <p className={styles.summarySubtitle}>
+                Здесь visible только keystore/runtime bootstrap и registry control-plane.
+                Сообщения и trust verification ещё не шифруются в этом PR.
+              </p>
+
+              {cryptoRuntime.state.status === "bootstrapping" ? (
+                <SectionStateCard
+                  eyebrow="Crypto runtime"
+                  title="Поднимаем crypto runtime"
+                  message="Проверяем persistent keystore, читаем account registry и синхронизируем browser profile с текущим crypto-device state."
+                />
+              ) : cryptoRuntime.state.status === "ready" &&
+                cryptoRuntime.state.snapshot !== null ? (
+                <>
+                  <div className={styles.metaGrid}>
+                    <div>
+                      <dt>Локальный device</dt>
+                      <dd>
+                        {describeLocalCryptoDevice(cryptoRuntime.state.snapshot.localDevice)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Registry devices</dt>
+                      <dd>{cryptoRuntime.state.snapshot.devices.length}</dd>
+                    </div>
+                    <div>
+                      <dt>Pending intents</dt>
+                      <dd>
+                        {
+                          cryptoRuntime.state.snapshot.linkIntents.filter(
+                            (intent) => intent.status === "pending",
+                          ).length
+                        }
+                      </dd>
+                    </div>
+                  </div>
+
+                  {cryptoRuntime.state.snapshot.notice && (
+                    <div className={styles.notice}>
+                      {cryptoRuntime.state.snapshot.notice}
+                    </div>
+                  )}
+                  {cryptoRuntime.state.snapshot.errorMessage && (
+                    <div className={styles.error}>
+                      {cryptoRuntime.state.snapshot.errorMessage}
+                    </div>
+                  )}
+
+                  <div className={styles.chipGroup}>
+                    <span className={styles.metaChip}>
+                      support: {cryptoRuntime.state.snapshot.support}
+                    </span>
+                    <span className={styles.metaChip}>
+                      phase: {cryptoRuntime.state.snapshot.phase}
+                    </span>
+                    {cryptoRuntime.state.snapshot.localDevice && (
+                      <span className={styles.metaChip}>
+                        bundle v{cryptoRuntime.state.snapshot.localDevice.lastBundleVersion}
+                      </span>
+                    )}
+                  </div>
+
+                  {cryptoRuntime.state.snapshot.localDevice && (
+                    <div className={styles.metaGrid}>
+                      <div>
+                        <dt>Crypto device ID</dt>
+                        <dd>
+                          {formatShortId(
+                            cryptoRuntime.state.snapshot.localDevice.cryptoDeviceId,
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Bundle опубликован</dt>
+                        <dd>
+                          {cryptoRuntime.state.snapshot.localDevice.lastBundlePublishedAt
+                            ? formatDateTime(
+                                cryptoRuntime.state.snapshot.localDevice
+                                  .lastBundlePublishedAt,
+                              )
+                            : "ещё нет"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Link intent</dt>
+                        <dd>
+                          {cryptoRuntime.state.snapshot.localDevice.linkIntentId
+                            ? formatShortId(
+                                cryptoRuntime.state.snapshot.localDevice.linkIntentId,
+                              )
+                            : "не требуется"}
+                        </dd>
+                      </div>
+                    </div>
+                  )}
+
+                  {cryptoRuntime.state.snapshot.canApproveLinkIntents &&
+                    cryptoRuntime.state.snapshot.linkIntents.some(
+                      (intent) => intent.status === "pending",
+                    ) && (
+                      <div className={styles.runtimeIntentList}>
+                        {cryptoRuntime.state.snapshot.linkIntents
+                          .filter((intent) => intent.status === "pending")
+                          .map((intent) => (
+                            <div className={styles.runtimeIntentRow} key={intent.id}>
+                              <div className={styles.runtimeIntentCopy}>
+                                <strong>
+                                  Pending device {formatShortId(intent.pendingCryptoDeviceId)}
+                                </strong>
+                                <span>Intent ID: {formatShortId(intent.id)}</span>
+                                <span>Истекает: {formatDateTime(intent.expiresAt)}</span>
+                              </div>
+                              <button
+                                className={styles.secondaryButton}
+                                disabled={cryptoRuntime.state.isActionPending}
+                                onClick={() => {
+                                  void cryptoRuntime.approveLinkIntent(intent.id);
+                                }}
+                                type="button"
+                              >
+                                Одобрить
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                  <div className={styles.actions}>
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={cryptoRuntime.state.isActionPending}
+                      onClick={() => {
+                        void cryptoRuntime.refresh();
+                      }}
+                      type="button"
+                    >
+                      {cryptoRuntime.state.pendingLabel ===
+                      "Синхронизируем crypto runtime..."
+                        ? cryptoRuntime.state.pendingLabel
+                        : "Обновить crypto runtime"}
+                    </button>
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={
+                        cryptoRuntime.state.isActionPending ||
+                        !cryptoRuntime.state.snapshot.canCreatePendingDevice
+                      }
+                      onClick={() => {
+                        void cryptoRuntime.createPendingLinkedDevice();
+                      }}
+                      type="button"
+                    >
+                      {cryptoRuntime.state.pendingLabel ===
+                      "Создаём pending crypto-device..."
+                        ? cryptoRuntime.state.pendingLabel
+                        : "Создать pending device"}
+                    </button>
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={
+                        cryptoRuntime.state.isActionPending ||
+                        cryptoRuntime.state.snapshot.localDevice === null
+                      }
+                      onClick={() => {
+                        void cryptoRuntime.publishCurrentBundle();
+                      }}
+                      type="button"
+                    >
+                      {cryptoRuntime.state.pendingLabel ===
+                      "Публикуем текущий bundle..."
+                        ? cryptoRuntime.state.pendingLabel
+                        : "Опубликовать bundle"}
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </section>
+
+            <section className={styles.summaryCard}>
               <p className={styles.cardLabel}>Действия</p>
               <div className={styles.actions}>
                 <button
@@ -661,6 +844,7 @@ function MetricCard({ label, value, detail }: MetricCardProps) {
 }
 
 interface SectionStateCardProps {
+  eyebrow?: string;
   title: string;
   message: string;
   action?: ReactNode;
@@ -668,6 +852,7 @@ interface SectionStateCardProps {
 }
 
 function SectionStateCard({
+  eyebrow = "Devices state",
   title,
   message,
   action,
@@ -675,7 +860,7 @@ function SectionStateCard({
 }: SectionStateCardProps) {
   return (
     <section className={styles.inlineStateCard} data-tone={tone}>
-      <p className={styles.cardLabel}>Devices state</p>
+      <p className={styles.cardLabel}>{eyebrow}</p>
       <h3 className={styles.stateTitle}>{title}</h3>
       <p className={styles.stateMessage}>{message}</p>
       {action && <div className={styles.actions}>{action}</div>}
@@ -723,4 +908,28 @@ function formatShortId(value: string): string {
   }
 
   return `${trimmed.slice(0, 8)}...${trimmed.slice(-4)}`;
+}
+
+function describeLocalCryptoDevice(
+  device:
+    | {
+        status: "active" | "pending_link" | "revoked";
+        deviceLabel: string;
+      }
+    | null,
+): string {
+  if (device === null) {
+    return "не создан";
+  }
+
+  switch (device.status) {
+    case "active":
+      return `${device.deviceLabel} · active`;
+    case "pending_link":
+      return `${device.deviceLabel} · pending link`;
+    case "revoked":
+      return `${device.deviceLabel} · revoked`;
+    default:
+      return device.deviceLabel;
+  }
 }
