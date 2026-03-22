@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	commonv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/common/v1"
@@ -344,6 +345,190 @@ func (h *Handler) RemoveFriend(ctx context.Context, req *connect.Request[identit
 	return connect.NewResponse(&identityv1.RemoveFriendResponse{}), nil
 }
 
+func (h *Handler) RegisterFirstCryptoDevice(ctx context.Context, req *connect.Request[identityv1.RegisterFirstCryptoDeviceRequest]) (*connect.Response[identityv1.RegisterFirstCryptoDeviceResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	details, err := h.service.RegisterFirstCryptoDevice(ctx, token, identity.RegisterCryptoDeviceInput{
+		DeviceLabel: req.Msg.DeviceLabel,
+		Bundle:      fromProtoCryptoDeviceBundlePayload(req.Msg.Bundle),
+	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.RegisterFirstCryptoDeviceResponse{
+		Device:        toProtoCryptoDevice(details.Device),
+		CurrentBundle: toProtoCryptoDeviceBundle(details.CurrentBundle),
+	}), nil
+}
+
+func (h *Handler) RegisterPendingLinkedCryptoDevice(ctx context.Context, req *connect.Request[identityv1.RegisterPendingLinkedCryptoDeviceRequest]) (*connect.Response[identityv1.RegisterPendingLinkedCryptoDeviceResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	details, err := h.service.RegisterPendingLinkedCryptoDevice(ctx, token, identity.RegisterCryptoDeviceInput{
+		DeviceLabel: req.Msg.DeviceLabel,
+		Bundle:      fromProtoCryptoDeviceBundlePayload(req.Msg.Bundle),
+	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.RegisterPendingLinkedCryptoDeviceResponse{
+		Device:        toProtoCryptoDevice(details.Device),
+		CurrentBundle: toProtoCryptoDeviceBundle(details.CurrentBundle),
+	}), nil
+}
+
+func (h *Handler) ListCryptoDevices(ctx context.Context, req *connect.Request[identityv1.ListCryptoDevicesRequest]) (*connect.Response[identityv1.ListCryptoDevicesResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	devices, err := h.service.ListCryptoDevices(ctx, token)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &identityv1.ListCryptoDevicesResponse{
+		Devices: make([]*identityv1.CryptoDevice, 0, len(devices)),
+	}
+	for _, device := range devices {
+		response.Devices = append(response.Devices, toProtoCryptoDevice(device))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) GetCryptoDevice(ctx context.Context, req *connect.Request[identityv1.GetCryptoDeviceRequest]) (*connect.Response[identityv1.GetCryptoDeviceResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	details, err := h.service.GetCryptoDevice(ctx, token, req.Msg.CryptoDeviceId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.GetCryptoDeviceResponse{
+		Device:        toProtoCryptoDevice(details.Device),
+		CurrentBundle: toProtoCryptoDeviceBundle(details.CurrentBundle),
+	}), nil
+}
+
+func (h *Handler) PublishCryptoDeviceBundle(ctx context.Context, req *connect.Request[identityv1.PublishCryptoDeviceBundleRequest]) (*connect.Response[identityv1.PublishCryptoDeviceBundleResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	details, err := h.service.PublishCryptoDeviceBundle(ctx, token, identity.PublishCryptoDeviceBundleInput{
+		CryptoDeviceID: req.Msg.CryptoDeviceId,
+		Bundle:         fromProtoCryptoDeviceBundlePayload(req.Msg.Bundle),
+	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.PublishCryptoDeviceBundleResponse{
+		Device:        toProtoCryptoDevice(details.Device),
+		CurrentBundle: toProtoCryptoDeviceBundle(details.CurrentBundle),
+	}), nil
+}
+
+func (h *Handler) CreateCryptoDeviceLinkIntent(ctx context.Context, req *connect.Request[identityv1.CreateCryptoDeviceLinkIntentRequest]) (*connect.Response[identityv1.CreateCryptoDeviceLinkIntentResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	linkIntent, err := h.service.CreateCryptoDeviceLinkIntent(ctx, token, req.Msg.PendingCryptoDeviceId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.CreateCryptoDeviceLinkIntentResponse{
+		LinkIntent: toProtoCryptoDeviceLinkIntent(linkIntent),
+	}), nil
+}
+
+func (h *Handler) ListCryptoDeviceLinkIntents(ctx context.Context, req *connect.Request[identityv1.ListCryptoDeviceLinkIntentsRequest]) (*connect.Response[identityv1.ListCryptoDeviceLinkIntentsResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	linkIntents, err := h.service.ListCryptoDeviceLinkIntents(ctx, token)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &identityv1.ListCryptoDeviceLinkIntentsResponse{
+		LinkIntents: make([]*identityv1.CryptoDeviceLinkIntent, 0, len(linkIntents)),
+	}
+	for _, linkIntent := range linkIntents {
+		response.LinkIntents = append(response.LinkIntents, toProtoCryptoDeviceLinkIntent(&linkIntent))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
+func (h *Handler) ApproveCryptoDeviceLinkIntent(ctx context.Context, req *connect.Request[identityv1.ApproveCryptoDeviceLinkIntentRequest]) (*connect.Response[identityv1.ApproveCryptoDeviceLinkIntentResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	linkIntent, device, err := h.service.ApproveCryptoDeviceLinkIntent(ctx, token, req.Msg.LinkIntentId, req.Msg.ApproverCryptoDeviceId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.ApproveCryptoDeviceLinkIntentResponse{
+		LinkIntent: toProtoCryptoDeviceLinkIntent(linkIntent),
+		Device:     toProtoCryptoDevice(*device),
+	}), nil
+}
+
+func (h *Handler) ExpireCryptoDeviceLinkIntent(ctx context.Context, req *connect.Request[identityv1.ExpireCryptoDeviceLinkIntentRequest]) (*connect.Response[identityv1.ExpireCryptoDeviceLinkIntentResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	linkIntent, err := h.service.ExpireCryptoDeviceLinkIntent(ctx, token, req.Msg.LinkIntentId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.ExpireCryptoDeviceLinkIntentResponse{
+		LinkIntent: toProtoCryptoDeviceLinkIntent(linkIntent),
+	}), nil
+}
+
+func (h *Handler) RevokeCryptoDevice(ctx context.Context, req *connect.Request[identityv1.RevokeCryptoDeviceRequest]) (*connect.Response[identityv1.RevokeCryptoDeviceResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	device, err := h.service.RevokeCryptoDevice(ctx, token, req.Msg.CryptoDeviceId, req.Msg.RevocationReason)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.RevokeCryptoDeviceResponse{
+		Device: toProtoCryptoDevice(*device),
+	}), nil
+}
+
 func bearerToken[T any](req *connect.Request[T]) (string, error) {
 	const prefix = "Bearer "
 
@@ -425,6 +610,159 @@ func toProtoProfile(value identity.User) *identityv1.Profile {
 	}
 
 	return profile
+}
+
+func fromProtoCryptoDeviceBundlePayload(value *identityv1.CryptoDeviceBundlePayload) identity.CryptoDeviceBundleInput {
+	if value == nil {
+		return identity.CryptoDeviceBundleInput{}
+	}
+
+	var kemKeyID *string
+	if strings.TrimSpace(value.GetKemKeyId()) != "" {
+		trimmed := strings.TrimSpace(value.GetKemKeyId())
+		kemKeyID = &trimmed
+	}
+
+	var expiresAt *time.Time
+	if value.GetExpiresAt() != nil {
+		timestamp := value.GetExpiresAt().AsTime().UTC()
+		expiresAt = &timestamp
+	}
+
+	return identity.CryptoDeviceBundleInput{
+		CryptoSuite:             value.GetCryptoSuite(),
+		IdentityPublicKey:       append([]byte(nil), value.GetIdentityPublicKey()...),
+		SignedPrekeyPublic:      append([]byte(nil), value.GetSignedPrekeyPublic()...),
+		SignedPrekeyID:          value.GetSignedPrekeyId(),
+		SignedPrekeySignature:   append([]byte(nil), value.GetSignedPrekeySignature()...),
+		KEMPublicKey:            append([]byte(nil), value.GetKemPublicKey()...),
+		KEMKeyID:                kemKeyID,
+		KEMSignature:            append([]byte(nil), value.GetKemSignature()...),
+		OneTimePrekeysTotal:     int32(value.GetOneTimePrekeysTotal()),
+		OneTimePrekeysAvailable: int32(value.GetOneTimePrekeysAvailable()),
+		BundleDigest:            append([]byte(nil), value.GetBundleDigest()...),
+		ExpiresAt:               expiresAt,
+	}
+}
+
+func toProtoCryptoDevice(value identity.CryptoDevice) *identityv1.CryptoDevice {
+	device := &identityv1.CryptoDevice{
+		Id:        value.ID,
+		UserId:    value.UserID,
+		Label:     value.Label,
+		Status:    toProtoCryptoDeviceStatus(value.Status),
+		CreatedAt: timestamppb.New(value.CreatedAt),
+	}
+	if value.LinkedByCryptoDeviceID != nil {
+		device.LinkedByCryptoDeviceId = value.LinkedByCryptoDeviceID
+	}
+	if value.LastBundleVersion != nil {
+		version := uint64(*value.LastBundleVersion)
+		device.LastBundleVersion = &version
+	}
+	if value.LastBundlePublishedAt != nil {
+		device.LastBundlePublishedAt = timestamppb.New(*value.LastBundlePublishedAt)
+	}
+	if value.ActivatedAt != nil {
+		device.ActivatedAt = timestamppb.New(*value.ActivatedAt)
+	}
+	if value.RevokedAt != nil {
+		device.RevokedAt = timestamppb.New(*value.RevokedAt)
+	}
+	if value.RevocationReason != nil {
+		device.RevocationReason = value.RevocationReason
+	}
+	if value.RevokedByActor != nil {
+		device.RevokedByActor = value.RevokedByActor
+	}
+
+	return device
+}
+
+func toProtoCryptoDeviceBundle(value *identity.CryptoDeviceBundle) *identityv1.CryptoDeviceBundle {
+	if value == nil {
+		return nil
+	}
+
+	bundle := &identityv1.CryptoDeviceBundle{
+		CryptoDeviceId:          value.CryptoDeviceID,
+		BundleVersion:           uint64(value.BundleVersion),
+		CryptoSuite:             value.CryptoSuite,
+		IdentityPublicKey:       append([]byte(nil), value.IdentityPublicKey...),
+		SignedPrekeyPublic:      append([]byte(nil), value.SignedPrekeyPublic...),
+		SignedPrekeyId:          value.SignedPrekeyID,
+		SignedPrekeySignature:   append([]byte(nil), value.SignedPrekeySignature...),
+		KemPublicKey:            append([]byte(nil), value.KEMPublicKey...),
+		KemSignature:            append([]byte(nil), value.KEMSignature...),
+		OneTimePrekeysTotal:     uint32(value.OneTimePrekeysTotal),
+		OneTimePrekeysAvailable: uint32(value.OneTimePrekeysAvailable),
+		BundleDigest:            append([]byte(nil), value.BundleDigest...),
+		PublishedAt:             timestamppb.New(value.PublishedAt),
+	}
+	if value.KEMKeyID != nil {
+		bundle.KemKeyId = *value.KEMKeyID
+	}
+	if value.ExpiresAt != nil {
+		bundle.ExpiresAt = timestamppb.New(*value.ExpiresAt)
+	}
+	if value.SupersededAt != nil {
+		bundle.SupersededAt = timestamppb.New(*value.SupersededAt)
+	}
+
+	return bundle
+}
+
+func toProtoCryptoDeviceLinkIntent(value *identity.CryptoDeviceLinkIntent) *identityv1.CryptoDeviceLinkIntent {
+	if value == nil {
+		return nil
+	}
+
+	linkIntent := &identityv1.CryptoDeviceLinkIntent{
+		Id:                    value.ID,
+		UserId:                value.UserID,
+		PendingCryptoDeviceId: value.PendingCryptoDeviceID,
+		Status:                toProtoCryptoDeviceLinkIntentStatus(value.Status),
+		BundleDigest:          append([]byte(nil), value.BundleDigest...),
+		CreatedAt:             timestamppb.New(value.CreatedAt),
+		ExpiresAt:             timestamppb.New(value.ExpiresAt),
+	}
+	if value.ApprovedAt != nil {
+		linkIntent.ApprovedAt = timestamppb.New(*value.ApprovedAt)
+	}
+	if value.ExpiredAt != nil {
+		linkIntent.ExpiredAt = timestamppb.New(*value.ExpiredAt)
+	}
+	if value.ApproverCryptoDeviceID != nil {
+		linkIntent.ApproverCryptoDeviceId = value.ApproverCryptoDeviceID
+	}
+
+	return linkIntent
+}
+
+func toProtoCryptoDeviceStatus(status string) identityv1.CryptoDeviceStatus {
+	switch status {
+	case identity.CryptoDeviceStatusPendingLink:
+		return identityv1.CryptoDeviceStatus_CRYPTO_DEVICE_STATUS_PENDING_LINK
+	case identity.CryptoDeviceStatusActive:
+		return identityv1.CryptoDeviceStatus_CRYPTO_DEVICE_STATUS_ACTIVE
+	case identity.CryptoDeviceStatusRevoked:
+		return identityv1.CryptoDeviceStatus_CRYPTO_DEVICE_STATUS_REVOKED
+	default:
+		return identityv1.CryptoDeviceStatus_CRYPTO_DEVICE_STATUS_UNSPECIFIED
+	}
+}
+
+func toProtoCryptoDeviceLinkIntentStatus(status string) identityv1.CryptoDeviceLinkIntentStatus {
+	switch status {
+	case identity.CryptoDeviceLinkIntentStatusPending:
+		return identityv1.CryptoDeviceLinkIntentStatus_CRYPTO_DEVICE_LINK_INTENT_STATUS_PENDING
+	case identity.CryptoDeviceLinkIntentStatusApproved:
+		return identityv1.CryptoDeviceLinkIntentStatus_CRYPTO_DEVICE_LINK_INTENT_STATUS_APPROVED
+	case identity.CryptoDeviceLinkIntentStatusExpired:
+		return identityv1.CryptoDeviceLinkIntentStatus_CRYPTO_DEVICE_LINK_INTENT_STATUS_EXPIRED
+	default:
+		return identityv1.CryptoDeviceLinkIntentStatus_CRYPTO_DEVICE_LINK_INTENT_STATUS_UNSPECIFIED
+	}
 }
 
 func toProtoDevice(value identity.Device) *identityv1.Device {

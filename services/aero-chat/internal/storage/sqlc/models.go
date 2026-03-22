@@ -41,6 +41,53 @@ type AttachmentUploadSession struct {
 	FailedAt     pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
 }
 
+type CryptoDevice struct {
+	ID                     uuid.UUID          `db:"id" json:"id"`
+	UserID                 uuid.UUID          `db:"user_id" json:"user_id"`
+	Label                  string             `db:"label" json:"label"`
+	Status                 string             `db:"status" json:"status"`
+	LinkedByCryptoDeviceID pgtype.UUID        `db:"linked_by_crypto_device_id" json:"linked_by_crypto_device_id"`
+	LastBundleVersion      pgtype.Int8        `db:"last_bundle_version" json:"last_bundle_version"`
+	LastBundlePublishedAt  pgtype.Timestamptz `db:"last_bundle_published_at" json:"last_bundle_published_at"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ActivatedAt            pgtype.Timestamptz `db:"activated_at" json:"activated_at"`
+	RevokedAt              pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	RevocationReason       pgtype.Text        `db:"revocation_reason" json:"revocation_reason"`
+	RevokedByActor         pgtype.Text        `db:"revoked_by_actor" json:"revoked_by_actor"`
+}
+
+type CryptoDeviceBundle struct {
+	CryptoDeviceID          uuid.UUID          `db:"crypto_device_id" json:"crypto_device_id"`
+	BundleVersion           int64              `db:"bundle_version" json:"bundle_version"`
+	CryptoSuite             string             `db:"crypto_suite" json:"crypto_suite"`
+	IdentityPublicKey       []byte             `db:"identity_public_key" json:"identity_public_key"`
+	SignedPrekeyPublic      []byte             `db:"signed_prekey_public" json:"signed_prekey_public"`
+	SignedPrekeyID          string             `db:"signed_prekey_id" json:"signed_prekey_id"`
+	SignedPrekeySignature   []byte             `db:"signed_prekey_signature" json:"signed_prekey_signature"`
+	KemPublicKey            []byte             `db:"kem_public_key" json:"kem_public_key"`
+	KemKeyID                pgtype.Text        `db:"kem_key_id" json:"kem_key_id"`
+	KemSignature            []byte             `db:"kem_signature" json:"kem_signature"`
+	OneTimePrekeysTotal     int32              `db:"one_time_prekeys_total" json:"one_time_prekeys_total"`
+	OneTimePrekeysAvailable int32              `db:"one_time_prekeys_available" json:"one_time_prekeys_available"`
+	BundleDigest            []byte             `db:"bundle_digest" json:"bundle_digest"`
+	PublishedAt             pgtype.Timestamptz `db:"published_at" json:"published_at"`
+	ExpiresAt               pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	SupersededAt            pgtype.Timestamptz `db:"superseded_at" json:"superseded_at"`
+}
+
+type CryptoDeviceLinkIntent struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	PendingCryptoDeviceID    uuid.UUID          `db:"pending_crypto_device_id" json:"pending_crypto_device_id"`
+	Status                   string             `db:"status" json:"status"`
+	BundleDigest             []byte             `db:"bundle_digest" json:"bundle_digest"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt                pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ApprovedAt               pgtype.Timestamptz `db:"approved_at" json:"approved_at"`
+	ExpiredAt                pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
+	ApprovedByCryptoDeviceID pgtype.UUID        `db:"approved_by_crypto_device_id" json:"approved_by_crypto_device_id"`
+}
+
 type DirectChat struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`

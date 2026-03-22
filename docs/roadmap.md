@@ -56,6 +56,9 @@
 - [ ] Sessions
 - [x] Devices & sessions UI/data model
 - [x] Privacy flags
+- [x] Crypto device registry foundation
+- [x] Public crypto bundles and prekey inventory foundation
+- [x] Linked-device control-plane foundation
 - [ ] Block list
 - [ ] Key backup status
 
