@@ -233,12 +233,14 @@ SELECT
               )
           )
     ), 0)::INT AS unread_count,
-    COUNT(m.user_id)::INT AS member_count
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM group_memberships AS members
+        WHERE members.group_id = g.id
+    ), 0)::INT AS member_count
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
-JOIN group_memberships AS m ON m.group_id = g.id
 WHERE self.user_id = $1
-GROUP BY g.id, g.name, g.created_by_user_id, self.role, g.created_at, g.updated_at
 ORDER BY g.updated_at DESC, g.id DESC;
 
 -- name: GetGroupRowByIDAndUserID :one
@@ -268,12 +270,14 @@ SELECT
               )
           )
     ), 0)::INT AS unread_count,
-    COUNT(m.user_id)::INT AS member_count
+    COALESCE((
+        SELECT COUNT(*)::INT
+        FROM group_memberships AS members
+        WHERE members.group_id = g.id
+    ), 0)::INT AS member_count
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
-JOIN group_memberships AS m ON m.group_id = g.id
-WHERE self.user_id = $1 AND g.id = $2
-GROUP BY g.id, g.name, g.created_by_user_id, self.role, g.created_at, g.updated_at;
+WHERE self.user_id = $1 AND g.id = $2;
 
 -- name: GetGroupChatThreadRowByGroupIDAndUserID :one
 SELECT
