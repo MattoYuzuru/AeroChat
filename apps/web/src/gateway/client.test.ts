@@ -1179,6 +1179,84 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("loads encrypted direct message v2 envelopes through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          envelopes: [
+            {
+              messageId: "message-1",
+              chatId: "chat-1",
+              senderUserId: "user-1",
+              senderCryptoDeviceId: "crypto-1",
+              operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
+              revision: 1,
+              createdAt: "2026-03-22T12:00:00Z",
+              storedAt: "2026-03-22T12:00:01Z",
+              viewerDelivery: {
+                recipientUserId: "user-2",
+                recipientCryptoDeviceId: "crypto-2",
+                transportHeader: "header-1",
+                ciphertext: "cipher-1",
+                ciphertextSizeBytes: "8",
+                storedAt: "2026-03-22T12:00:01Z",
+              },
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const envelopes = await client.listEncryptedDirectMessageV2(
+      "token-1",
+      "chat-1",
+      "crypto-2",
+      25,
+    );
+
+    expect(envelopes).toEqual([
+      {
+        messageId: "message-1",
+        chatId: "chat-1",
+        senderUserId: "user-1",
+        senderCryptoDeviceId: "crypto-1",
+        operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
+        targetMessageId: null,
+        revision: 1,
+        createdAt: "2026-03-22T12:00:00Z",
+        storedAt: "2026-03-22T12:00:01Z",
+        viewerDelivery: {
+          recipientUserId: "user-2",
+          recipientCryptoDeviceId: "crypto-2",
+          transportHeader: "header-1",
+          ciphertext: "cipher-1",
+          ciphertextSizeBytes: 8,
+          storedAt: "2026-03-22T12:00:01Z",
+        },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/ListEncryptedDirectMessageV2",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          chatId: "chat-1",
+          viewerCryptoDeviceId: "crypto-2",
+          pageSize: 25,
+        }),
+      }),
+    );
+  });
+
   it("calls message action endpoints with chat and message ids", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     const client = createGatewayClient(fetchMock, "/api");

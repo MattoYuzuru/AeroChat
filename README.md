@@ -64,8 +64,9 @@ AeroChat должен поддерживать:
   - parallel storage path для logical encrypted envelopes и per-device deliveries;
   - explicit device-aware realtime binding по active local `crypto_device_id` в `aero-gateway`;
   - отдельный realtime family для device-scoped opaque encrypted envelope delivery без plaintext snapshot payload;
-  - raw list/get fetch path и минимальный web runtime buffer для будущего client-side decrypt/render;
-  - без claims о готовом encrypted DM UX, decrypt/render, encrypted search или encrypted media relay.
+  - raw list/get fetch path, worker-side decrypt foundation и bounded local web projection для текущего direct chat;
+  - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
+  - без claims о full encrypted DM parity, encrypted search, encrypted media relay или backup/recovery.
 - explicit group moderation/admin policy foundation:
   - явная policy matrix для `owner` / `admin` / `member` / `reader`;
   - durable write restriction для участников группы без потери membership;

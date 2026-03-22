@@ -2,6 +2,7 @@ import type {
   CryptoDevice,
   CryptoDeviceBundle,
   CryptoDeviceLinkIntent,
+  EncryptedDirectMessageV2Envelope,
 } from "../gateway/types";
 
 export interface CryptoRuntimeSession {
@@ -64,6 +65,50 @@ export interface CryptoRuntimeSnapshot {
   errorMessage: string | null;
 }
 
+export interface EncryptedDirectMessageV2ReadyProjection {
+  status: "ready";
+  messageId: string;
+  chatId: string;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: "content" | "edit" | "tombstone";
+  targetMessageId: string | null;
+  revision: number;
+  createdAt: string;
+  storedAt: string;
+  payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1";
+  text: string | null;
+  markdownPolicy: string | null;
+  editedAt: string | null;
+  deletedAt: string | null;
+}
+
+export interface EncryptedDirectMessageV2DecryptFailure {
+  status: "decrypt_failed";
+  messageId: string;
+  chatId: string;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: string;
+  targetMessageId: string | null;
+  revision: number;
+  createdAt: string;
+  storedAt: string;
+  failureKind:
+    | "runtime_unavailable"
+    | "recipient_mismatch"
+    | "invalid_transport_header"
+    | "unsupported_transport_schema"
+    | "unsupported_operation_kind"
+    | "invalid_payload"
+    | "aad_mismatch"
+    | "decrypt_failed";
+}
+
+export type EncryptedDirectMessageV2DecryptedEnvelope =
+  | EncryptedDirectMessageV2ReadyProjection
+  | EncryptedDirectMessageV2DecryptFailure;
+
 export interface CryptoRuntimeClient {
   bootstrapSession(session: CryptoRuntimeSession): Promise<CryptoRuntimeSnapshot>;
   createPendingLinkedDevice(session: CryptoRuntimeSession): Promise<CryptoRuntimeSnapshot>;
@@ -72,6 +117,10 @@ export interface CryptoRuntimeClient {
     session: CryptoRuntimeSession,
     linkIntentId: string,
   ): Promise<CryptoRuntimeSnapshot>;
+  decryptEncryptedDirectMessageV2Envelopes(
+    session: CryptoRuntimeSession,
+    envelopes: EncryptedDirectMessageV2Envelope[],
+  ): Promise<EncryptedDirectMessageV2DecryptedEnvelope[]>;
   dispose(): void;
 }
 
@@ -80,6 +129,18 @@ export interface CryptoWorkerRequestMap {
   createPendingLinkedDevice: { session: CryptoRuntimeSession };
   publishCurrentBundle: { session: CryptoRuntimeSession };
   approveLinkIntent: { session: CryptoRuntimeSession; linkIntentId: string };
+  decryptEncryptedDirectMessageV2Envelopes: {
+    session: CryptoRuntimeSession;
+    envelopes: EncryptedDirectMessageV2Envelope[];
+  };
+}
+
+export interface CryptoWorkerResultMap {
+  bootstrap: CryptoRuntimeSnapshot;
+  createPendingLinkedDevice: CryptoRuntimeSnapshot;
+  publishCurrentBundle: CryptoRuntimeSnapshot;
+  approveLinkIntent: CryptoRuntimeSnapshot;
+  decryptEncryptedDirectMessageV2Envelopes: EncryptedDirectMessageV2DecryptedEnvelope[];
 }
 
 export type CryptoWorkerRequest =
@@ -98,8 +159,13 @@ export type CryptoWorkerRequest =
       id: number;
       type: "approveLinkIntent";
       payload: CryptoWorkerRequestMap["approveLinkIntent"];
+    }
+  | {
+      id: number;
+      type: "decryptEncryptedDirectMessageV2Envelopes";
+      payload: CryptoWorkerRequestMap["decryptEncryptedDirectMessageV2Envelopes"];
     };
 
 export type CryptoWorkerResponse =
-  | { id: number; ok: true; snapshot: CryptoRuntimeSnapshot }
+  | { id: number; ok: true; result: CryptoWorkerResultMap[keyof CryptoWorkerResultMap] }
   | { id: number; ok: false; message: string };

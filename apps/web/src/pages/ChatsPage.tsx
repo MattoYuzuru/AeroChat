@@ -23,8 +23,16 @@ import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
 import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import { createMarkdownPreview } from "../chats/createMarkdownPreview";
+import {
+  describeEncryptedDirectMessageV2Failure,
+  type EncryptedDirectMessageV2ProjectionEntry,
+} from "../chats/encrypted-v2-projection";
 import { resolveChatsRouteSyncAction } from "../chats/route-sync";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
+import {
+  describeEncryptedDirectMessageV2LaneEmptyState,
+  useEncryptedDirectMessageV2Lane,
+} from "../chats/useEncryptedDirectMessageV2Lane";
 import { useChats } from "../chats/useChats";
 import type {
   ChatUser,
@@ -193,11 +201,16 @@ export function ChatsPage() {
     setSearchParams,
   ]);
 
+  const selectedThread = isThreadRouteActive ? chats.state.thread : null;
+  const encryptedLane = useEncryptedDirectMessageV2Lane({
+    enabled: authState.status === "authenticated",
+    token: sessionToken,
+    chatId: selectedThread?.chat.id ?? null,
+  });
+
   if (authState.status !== "authenticated") {
     return null;
   }
-
-  const selectedThread = isThreadRouteActive ? chats.state.thread : null;
   const selectedPeer =
     selectedThread !== null
       ? getPeerParticipant(selectedThread.chat, authState.profile.id)
@@ -212,6 +225,12 @@ export function ChatsPage() {
       : selectedThread.messages.filter((message) =>
           selectedThread.chat.pinnedMessageIds.includes(message.id) || message.pinned,
         );
+  const encryptedMessageCount = encryptedLane.items.filter(
+    (item) => item.kind === "message",
+  ).length;
+  const encryptedFailureCount = encryptedLane.items.filter(
+    (item) => item.kind === "failure",
+  ).length;
   const uploadedAttachmentId = attachmentComposer.uploadedAttachmentId;
   const attachmentDraft = attachmentComposer.state.draft;
   const voiceNoteStatus = voiceNoteRecorder.state.status;
@@ -774,6 +793,75 @@ export function ChatsPage() {
                 <section className={styles.messagesPanel}>
                   <div className={styles.blockHeader}>
                     <div>
+                      <p className={styles.cardLabel}>Encrypted DM v2</p>
+                      <h3 className={styles.blockTitle}>Локальная decrypted projection</h3>
+                    </div>
+                    <span className={styles.metaTag}>
+                      {encryptedLane.status === "ready"
+                        ? `${encryptedMessageCount} msg / ${encryptedFailureCount} fail`
+                        : encryptedLane.status === "unavailable"
+                          ? "Недоступно"
+                          : "Подготавливаем"}
+                    </span>
+                  </div>
+
+                  <p className={styles.encryptedLaneDescription}>
+                    Эта секция показывает только client-side decrypted projection из opaque
+                    encrypted envelopes для текущего local crypto-device. Legacy plaintext
+                    timeline остаётся ниже без скрытого merge.
+                  </p>
+
+                  <div className={styles.messagesList}>
+                    {encryptedLane.status === "loading" && (
+                      <StateCard
+                        title="Готовим encrypted DM v2"
+                        message="Загружаем opaque envelopes из storage и пропускаем их через crypto runtime worker."
+                      />
+                    )}
+
+                    {encryptedLane.status === "unavailable" && (
+                      <StateCard
+                        title="Encrypted DM v2 недоступен"
+                        message={
+                          encryptedLane.errorMessage ??
+                          "Для этого browser profile encrypted DM v2 local projection пока недоступен."
+                        }
+                      />
+                    )}
+
+                    {encryptedLane.status === "error" && (
+                      <StateCard
+                        title="Encrypted DM v2 не загрузился"
+                        message={
+                          encryptedLane.errorMessage ??
+                          "Не удалось собрать local projection для encrypted DM v2."
+                        }
+                        tone="error"
+                      />
+                    )}
+
+                    {encryptedLane.status === "ready" &&
+                      encryptedLane.items.length === 0 && (
+                        <StateCard
+                          title="Encrypted envelopes пока не видны"
+                          message={describeEncryptedDirectMessageV2LaneEmptyState(0)}
+                        />
+                      )}
+
+                    {encryptedLane.status === "ready" &&
+                      encryptedLane.items.map((item) =>
+                        renderEncryptedDirectMessageV2Entry({
+                          item,
+                          currentUserId: authState.profile.id,
+                          peerNickname: selectedPeer?.nickname ?? "Собеседник",
+                        }),
+                      )}
+                  </div>
+                </section>
+
+                <section className={styles.messagesPanel}>
+                  <div className={styles.blockHeader}>
+                    <div>
                       <p className={styles.cardLabel}>Timeline</p>
                       <h3 className={styles.blockTitle}>Сообщения</h3>
                     </div>
@@ -1302,6 +1390,79 @@ function StateCard({
       <p className={styles.stateMessage}>{message}</p>
       {action && <div className={styles.actions}>{action}</div>}
     </section>
+  );
+}
+
+interface RenderEncryptedDirectMessageV2EntryInput {
+  item: EncryptedDirectMessageV2ProjectionEntry;
+  currentUserId: string;
+  peerNickname: string;
+}
+
+function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessageV2EntryInput) {
+  const isOwn = input.item.senderUserId === input.currentUserId;
+  const authorLabel = isOwn ? "Вы" : input.peerNickname;
+
+  if (input.item.kind === "failure") {
+    return (
+      <article
+        key={input.item.key}
+        className={styles.messageRow}
+        data-own={isOwn}
+      >
+        <div className={styles.messageBubble} data-own={isOwn}>
+          <div className={styles.messageHeader}>
+            <div>
+              <p className={styles.messageAuthor}>{authorLabel}</p>
+              <p className={styles.messageMeta}>{formatDateTime(input.item.createdAt)}</p>
+            </div>
+            <div className={styles.messageBadges}>
+              <span className={styles.statusBadge}>Decrypt failed</span>
+            </div>
+          </div>
+          <p className={styles.encryptedFailureText}>
+            {describeEncryptedDirectMessageV2Failure(input.item)}
+          </p>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article
+      key={input.item.key}
+      className={styles.messageRow}
+      data-own={isOwn}
+    >
+      <div className={styles.messageBubble} data-own={isOwn}>
+        <div className={styles.messageHeader}>
+          <div>
+            <p className={styles.messageAuthor}>{authorLabel}</p>
+            <p className={styles.messageMeta}>{formatDateTime(input.item.createdAt)}</p>
+          </div>
+          <div className={styles.messageBadges}>
+            <span className={styles.statusBadge} data-tone="accent">
+              Encrypted v2
+            </span>
+            {input.item.editedAt && <span className={styles.statusBadge}>Изменено</span>}
+            {input.item.isTombstone && <span className={styles.statusBadge}>Удалено</span>}
+          </div>
+        </div>
+        <div className={styles.messageBody}>
+          {input.item.isTombstone ? (
+            <p className={styles.tombstoneText}>Encrypted сообщение удалено для всех.</p>
+          ) : input.item.text ? (
+            <div className={styles.messageText}>
+              <SafeMessageMarkdown text={input.item.text} />
+            </div>
+          ) : (
+            <p className={styles.encryptedFailureText}>
+              Payload расшифровался, но renderable text для этого slice отсутствует.
+            </p>
+          )}
+        </div>
+      </div>
+    </article>
   );
 }
 

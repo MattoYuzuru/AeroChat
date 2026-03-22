@@ -1,9 +1,9 @@
 import type {
   CryptoRuntimeClient,
   CryptoRuntimeSession,
-  CryptoRuntimeSnapshot,
   CryptoWorkerRequest,
   CryptoWorkerRequestMap,
+  CryptoWorkerResultMap,
   CryptoWorkerResponse,
 } from "./types";
 
@@ -16,7 +16,7 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
   const pending = new Map<
     number,
     {
-      resolve(snapshot: CryptoRuntimeSnapshot): void;
+      resolve(result: unknown): void;
       reject(error: Error): void;
     }
   >();
@@ -30,7 +30,7 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
 
     pending.delete(response.id);
     if (response.ok) {
-      request.resolve(response.snapshot);
+      request.resolve(response.result);
       return;
     }
 
@@ -48,7 +48,7 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
   function sendCommand<TType extends keyof CryptoWorkerRequestMap>(
     type: TType,
     payload: CryptoWorkerRequestMap[TType],
-  ): Promise<CryptoRuntimeSnapshot> {
+  ): Promise<CryptoWorkerResultMap[TType]> {
     const id = nextRequestID++;
     const request = {
       id,
@@ -57,7 +57,12 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
     } as CryptoWorkerRequest;
 
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
+      pending.set(id, {
+        resolve(result) {
+          resolve(result as CryptoWorkerResultMap[TType]);
+        },
+        reject,
+      });
       worker.postMessage(request);
     });
   }
@@ -74,6 +79,12 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
     },
     approveLinkIntent(session: CryptoRuntimeSession, linkIntentId: string) {
       return sendCommand("approveLinkIntent", { session, linkIntentId });
+    },
+    decryptEncryptedDirectMessageV2Envelopes(session, envelopes) {
+      return sendCommand("decryptEncryptedDirectMessageV2Envelopes", {
+        session,
+        envelopes,
+      });
     },
     dispose() {
       for (const request of pending.values()) {
