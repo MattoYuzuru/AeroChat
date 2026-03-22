@@ -7,6 +7,7 @@ import type {
   EncryptedGroupDecryptedEnvelope,
   EncryptedDirectMessageV2DecryptedEnvelope,
   EncryptedDirectMessageV2OutboundSendResult,
+  EncryptedGroupOutboundSendResult,
   PreparedEncryptedMediaRelayUpload,
 } from "./types";
 import type {
@@ -57,6 +58,10 @@ export interface CryptoRuntimeContextValue {
       attachmentId: string;
     }>,
   ): Promise<EncryptedDirectMessageV2OutboundSendResult | null>;
+  sendEncryptedGroupContent(
+    groupId: string,
+    text: string,
+  ): Promise<EncryptedGroupOutboundSendResult | null>;
 }
 
 export const CryptoRuntimeContext = createContext<CryptoRuntimeContextValue | null>(null);

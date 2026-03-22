@@ -350,6 +350,71 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
             throw error;
           }
         },
+        async sendEncryptedGroupContent(groupId, text) {
+          if (runtimeRef.current === null || currentSessionRef.current === null) {
+            return null;
+          }
+
+          setState((current) =>
+            current.status === "disabled"
+              ? current
+              : {
+                  ...current,
+                  isActionPending: true,
+                  pendingLabel: "Собираем encrypted group message...",
+                },
+          );
+
+          try {
+            const result = await runtimeRef.current.sendEncryptedGroupContent(
+              currentSessionRef.current,
+              {
+                groupId,
+                text,
+              },
+            );
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            return result;
+          } catch (error) {
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    snapshot:
+                      current.snapshot === null
+                        ? current.snapshot
+                        : {
+                            ...current.snapshot,
+                            notice: null,
+                            errorMessage:
+                              error instanceof Error && error.message.trim() !== ""
+                                ? error.message
+                                : "Не удалось отправить encrypted group message.",
+                          },
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            throw error;
+          }
+        },
       }}
     >
       {children}

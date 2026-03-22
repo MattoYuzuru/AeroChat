@@ -70,6 +70,7 @@ function createClient(overrides: Partial<GatewayClient>): GatewayClient {
     getEncryptedDirectMessageV2SendBootstrap: vi.fn(),
     getEncryptedGroupBootstrap: vi.fn(),
     sendEncryptedDirectMessageV2: vi.fn(),
+    sendEncryptedGroupMessage: vi.fn(),
     sendTextMessage: vi.fn(),
     editDirectChatMessage: vi.fn(),
     listDirectChatMessages: vi.fn(),

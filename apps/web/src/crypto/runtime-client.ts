@@ -110,6 +110,12 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
         input,
       });
     },
+    sendEncryptedGroupContent(session, input) {
+      return sendCommand("sendEncryptedGroupContent", {
+        session,
+        input,
+      });
+    },
     dispose() {
       for (const request of pending.values()) {
         request.reject(new Error("Crypto runtime client disposed."));

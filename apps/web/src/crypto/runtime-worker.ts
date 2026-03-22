@@ -68,6 +68,12 @@ async function handleRequest(request: CryptoWorkerRequest) {
           request.payload.input,
         );
         break;
+      case "sendEncryptedGroupContent":
+        snapshot = await runtime.sendEncryptedGroupContent(
+          request.payload.session,
+          request.payload.input,
+        );
+        break;
       default:
         throw new Error("Неизвестная crypto worker command.");
     }

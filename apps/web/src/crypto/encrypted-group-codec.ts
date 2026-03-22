@@ -55,6 +55,20 @@ export type EncryptedGroupPayloadV1 =
   | EncryptedGroupEditPayloadV1
   | EncryptedGroupTombstonePayloadV1;
 
+export interface EncryptedGroupOutboundEnvelopeMetadata {
+  messageId: string;
+  groupId: string;
+  threadId: string;
+  mlsGroupId: string;
+  rosterVersion: number;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: "content" | "control";
+  targetMessageId: string | null;
+  revision: number;
+  createdAt: string;
+}
+
 export async function decryptEncryptedGroupEnvelope(
   material: LocalCryptoDeviceMaterial,
   envelope: EncryptedGroupEnvelope,
@@ -115,7 +129,62 @@ export async function decryptEncryptedGroupEnvelope(
   }
 }
 
+export async function encryptEncryptedGroupPayload(input: {
+  recipientDevices: Array<{
+    cryptoDeviceId: string;
+    signedPrekeyPublicBase64: string;
+  }>;
+  metadata: EncryptedGroupOutboundEnvelopeMetadata;
+  payload: EncryptedGroupPayloadV1;
+}): Promise<Pick<EncryptedGroupEnvelope, "ciphertext" | "ciphertextSizeBytes">> {
+  const recipientDevices = await Promise.all(
+    input.recipientDevices.map(async (recipientDevice) => ({
+      cryptoDeviceId: recipientDevice.cryptoDeviceId,
+      signedPrekeyPublicKey: await crypto.subtle.importKey(
+        "spki",
+        toArrayBuffer(fromBase64(recipientDevice.signedPrekeyPublicBase64)),
+        {
+          name: "ECDH",
+          namedCurve: "P-256",
+        },
+        false,
+        [],
+      ),
+    })),
+  );
+
+  return encryptEncryptedGroupPayloadWithImportedKeys({
+    recipientDevices,
+    envelope: input.metadata,
+    payload: input.payload,
+  });
+}
+
 export async function encryptEncryptedGroupPayloadForTest(input: {
+  recipientDevices: Array<{
+    cryptoDeviceId: string;
+    signedPrekeyPublicKey: CryptoKey;
+  }>;
+  envelope: Pick<
+    EncryptedGroupEnvelope,
+    | "messageId"
+    | "groupId"
+    | "threadId"
+    | "mlsGroupId"
+    | "rosterVersion"
+    | "senderUserId"
+    | "senderCryptoDeviceId"
+    | "operationKind"
+    | "targetMessageId"
+    | "revision"
+    | "createdAt"
+  >;
+  payload: EncryptedGroupPayloadV1;
+}): Promise<Pick<EncryptedGroupEnvelope, "ciphertext" | "ciphertextSizeBytes">> {
+  return encryptEncryptedGroupPayloadWithImportedKeys(input);
+}
+
+async function encryptEncryptedGroupPayloadWithImportedKeys(input: {
   recipientDevices: Array<{
     cryptoDeviceId: string;
     signedPrekeyPublicKey: CryptoKey;

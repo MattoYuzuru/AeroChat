@@ -13,6 +13,8 @@ import type { CryptoKeyStore } from "./keystore";
 import type { CryptoMaterialFactory } from "./material";
 import {
   decryptEncryptedGroupEnvelope,
+  encryptEncryptedGroupPayload,
+  type EncryptedGroupPayloadV1,
 } from "./encrypted-group-codec";
 import {
   decryptEncryptedDirectMessageV2Envelope,
@@ -31,6 +33,7 @@ import type {
   EncryptedDirectMessageV2DecryptedEnvelope,
   EncryptedMediaAttachmentDescriptor,
   EncryptedDirectMessageV2OutboundSendResult,
+  EncryptedGroupOutboundSendResult,
   CryptoRuntimeSession,
   CryptoRuntimeSnapshot,
   LocalCryptoDeviceMaterial,
@@ -562,6 +565,147 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           markdownPolicy:
             normalizedText === "" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
           attachments: attachmentDescriptors.map(stripEncryptedMediaAttachmentDescriptor),
+          editedAt: null,
+          deletedAt: null,
+        },
+      };
+    },
+
+    async sendEncryptedGroupContent(
+      session: CryptoRuntimeSession,
+      input: {
+        groupId: string;
+        text: string;
+      },
+    ): Promise<EncryptedGroupOutboundSendResult> {
+      const supportError = assertSupport(dependencies);
+      if (supportError !== null) {
+        throw new Error(
+          supportError.errorMessage ??
+            "Текущий browser runtime не поддерживает encrypted group bootstrap send.",
+        );
+      }
+
+      const normalizedGroupId = input.groupId.trim();
+      const normalizedText = input.text.trim();
+      if (normalizedGroupId === "") {
+        throw new Error("Не выбрана группа для encrypted group send.");
+      }
+      if (normalizedText === "") {
+        throw new Error(
+          "Encrypted group bootstrap send требует text payload внутри crypto runtime.",
+        );
+      }
+
+      const localMaterial = await dependencies.keyStore.load(session.profileId);
+      if (localMaterial === null || localMaterial.record.status !== "active") {
+        throw new Error(
+          "Encrypted group send доступен только для browser profile с active local crypto-device.",
+        );
+      }
+
+      const bootstrap = await dependencies.gatewayClient.getEncryptedGroupBootstrap(
+        session.token,
+        normalizedGroupId,
+        localMaterial.record.cryptoDeviceId,
+      );
+      if (
+        bootstrap.lane.threadId.trim() === "" ||
+        bootstrap.lane.mlsGroupId.trim() === "" ||
+        bootstrap.lane.rosterVersion <= 0
+      ) {
+        throw new Error(
+          "Encrypted group bootstrap вернул неполный control-plane state для outbound send.",
+        );
+      }
+      const targetDevices = bootstrap.rosterDevices.map((device) => ({
+        cryptoDeviceId: device.cryptoDeviceId,
+        signedPrekeyPublicBase64: device.signedPrekeyPublicBase64,
+      }));
+      if (targetDevices.length === 0) {
+        throw new Error(
+          "Encrypted group bootstrap не вернул eligible crypto-device roster для send.",
+        );
+      }
+      if (
+        !targetDevices.some(
+          (device) => device.cryptoDeviceId === localMaterial.record.cryptoDeviceId,
+        )
+      ) {
+        throw new Error(
+          "Текущий local crypto-device не попал в encrypted group roster и не может отправить bootstrap payload.",
+        );
+      }
+      for (const targetDevice of targetDevices) {
+        if (targetDevice.signedPrekeyPublicBase64.trim() === "") {
+          throw new Error(
+            `Active group crypto-device ${targetDevice.cryptoDeviceId} не имеет signed prekey для bootstrap send.`,
+          );
+        }
+      }
+
+      const messageId = createLogicalMessageId();
+      const createdAt = new Date().toISOString();
+      const payload: EncryptedGroupPayloadV1 = {
+        schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+        operation: "content",
+        message: {
+          text: normalizedText,
+          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        },
+      };
+      const encrypted = await encryptEncryptedGroupPayload({
+        recipientDevices: targetDevices,
+        metadata: {
+          messageId,
+          groupId: normalizedGroupId,
+          threadId: bootstrap.lane.threadId,
+          mlsGroupId: bootstrap.lane.mlsGroupId,
+          rosterVersion: bootstrap.lane.rosterVersion,
+          senderUserId: session.profileId,
+          senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
+          operationKind: "content",
+          targetMessageId: null,
+          revision: 1,
+          createdAt,
+        },
+        payload,
+      });
+
+      const storedEnvelope = await dependencies.gatewayClient.sendEncryptedGroupMessage(
+        session.token,
+        {
+          groupId: normalizedGroupId,
+          messageId,
+          mlsGroupId: bootstrap.lane.mlsGroupId,
+          rosterVersion: bootstrap.lane.rosterVersion,
+          senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
+          operationKind: "content",
+          targetMessageId: null,
+          revision: 1,
+          ciphertext: encrypted.ciphertext,
+        },
+      );
+
+      return {
+        storedEnvelope,
+        localProjection: {
+          status: "ready",
+          messageId: storedEnvelope.messageId,
+          groupId: storedEnvelope.groupId,
+          threadId: storedEnvelope.threadId,
+          mlsGroupId: storedEnvelope.mlsGroupId,
+          rosterVersion: storedEnvelope.rosterVersion,
+          senderUserId: storedEnvelope.senderUserId,
+          senderCryptoDeviceId: storedEnvelope.senderCryptoDeviceId,
+          operationKind: "content",
+          targetMessageId: null,
+          revision: storedEnvelope.revision,
+          createdAt: storedEnvelope.createdAt,
+          storedAt: storedEnvelope.storedAt,
+          payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+          text: normalizedText,
+          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
           editedAt: null,
           deletedAt: null,
         },
