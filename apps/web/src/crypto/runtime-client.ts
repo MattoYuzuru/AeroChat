@@ -80,6 +80,12 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
     approveLinkIntent(session: CryptoRuntimeSession, linkIntentId: string) {
       return sendCommand("approveLinkIntent", { session, linkIntentId });
     },
+    decryptEncryptedGroupEnvelopes(session, envelopes) {
+      return sendCommand("decryptEncryptedGroupEnvelopes", {
+        session,
+        envelopes,
+      });
+    },
     decryptEncryptedDirectMessageV2Envelopes(session, envelopes) {
       return sendCommand("decryptEncryptedDirectMessageV2Envelopes", {
         session,

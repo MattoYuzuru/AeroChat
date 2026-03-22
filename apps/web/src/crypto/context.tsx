@@ -192,6 +192,16 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
             runtime.approveLinkIntent(session, linkIntentId),
           );
         },
+        async decryptEncryptedGroupEnvelopes(envelopes) {
+          if (runtimeRef.current === null || currentSessionRef.current === null) {
+            return [];
+          }
+
+          return runtimeRef.current.decryptEncryptedGroupEnvelopes(
+            currentSessionRef.current,
+            envelopes,
+          );
+        },
         async decryptEncryptedDirectMessageV2Envelopes(envelopes) {
           if (runtimeRef.current === null || currentSessionRef.current === null) {
             return [];

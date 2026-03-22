@@ -419,6 +419,73 @@ export interface EncryptedDirectMessageV2Delivery {
   storedAt: string;
 }
 
+export interface EncryptedGroupLane {
+  groupId: string;
+  threadId: string;
+  mlsGroupId: string;
+  rosterVersion: number;
+  activatedAt: string;
+  updatedAt: string;
+}
+
+export interface EncryptedGroupRosterMember {
+  user: ChatUser;
+  role: GroupMemberRole;
+  isWriteRestricted: boolean;
+  hasEligibleCryptoDevices: boolean;
+  eligibleCryptoDeviceIds: string[];
+}
+
+export interface EncryptedGroupRosterDevice {
+  userId: string;
+  cryptoDeviceId: string;
+  bundleVersion: number;
+  cryptoSuite: string;
+  identityPublicKeyBase64: string;
+  signedPrekeyPublicBase64: string;
+  signedPrekeyId: string;
+  signedPrekeySignatureBase64: string;
+  kemPublicKeyBase64: string | null;
+  kemKeyId: string | null;
+  kemSignatureBase64: string | null;
+  oneTimePrekeysTotal: number;
+  oneTimePrekeysAvailable: number;
+  bundleDigestBase64: string;
+  publishedAt: string;
+  expiresAt: string | null;
+  updatedAt: string;
+}
+
+export interface EncryptedGroupMessageDelivery {
+  recipientUserId: string;
+  recipientCryptoDeviceId: string;
+  storedAt: string;
+}
+
+export interface EncryptedGroupEnvelope {
+  messageId: string;
+  groupId: string;
+  threadId: string;
+  mlsGroupId: string;
+  rosterVersion: number;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: string;
+  targetMessageId: string | null;
+  revision: number;
+  ciphertext: string;
+  ciphertextSizeBytes: number;
+  createdAt: string;
+  storedAt: string;
+  viewerDelivery: EncryptedGroupMessageDelivery;
+}
+
+export interface EncryptedGroupBootstrap {
+  lane: EncryptedGroupLane;
+  rosterMembers: EncryptedGroupRosterMember[];
+  rosterDevices: EncryptedGroupRosterDevice[];
+}
+
 export interface EncryptedDirectMessageV2StoredEnvelope {
   messageId: string;
   chatId: string;
@@ -802,6 +869,17 @@ export interface GatewayClient {
     viewerCryptoDeviceId: string,
     pageSize?: number,
   ): Promise<EncryptedDirectMessageV2Envelope[]>;
+  getEncryptedGroupBootstrap(
+    token: string,
+    groupId: string,
+    viewerCryptoDeviceId: string,
+  ): Promise<EncryptedGroupBootstrap>;
+  listEncryptedGroupMessages(
+    token: string,
+    groupId: string,
+    viewerCryptoDeviceId: string,
+    pageSize?: number,
+  ): Promise<EncryptedGroupEnvelope[]>;
   searchMessages(token: string, input: SearchMessagesInput): Promise<MessageSearchPage>;
   deleteMessageForEveryone(
     token: string,

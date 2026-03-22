@@ -15,6 +15,12 @@ import type {
   EncryptedDirectMessageV2SendBootstrap,
   EncryptedDirectMessageV2SendTargetDevice,
   EncryptedDirectMessageV2StoredEnvelope,
+  EncryptedGroupBootstrap,
+  EncryptedGroupEnvelope,
+  EncryptedGroupLane,
+  EncryptedGroupMessageDelivery,
+  EncryptedGroupRosterDevice,
+  EncryptedGroupRosterMember,
   DirectChatMessage,
   DirectChatPresenceIndicator,
   DirectChatPresenceState,
@@ -465,11 +471,78 @@ interface EncryptedDirectMessageV2SendTargetDeviceWire {
   expiresAt?: string;
 }
 
+interface EncryptedGroupLaneWire {
+  groupId?: string;
+  threadId?: string;
+  mlsGroupId?: string;
+  rosterVersion?: number | string;
+  activatedAt?: string;
+  updatedAt?: string;
+}
+
+interface EncryptedGroupRosterMemberWire {
+  user?: ChatUserWire;
+  role?: string;
+  isWriteRestricted?: boolean;
+  hasEligibleCryptoDevices?: boolean;
+  eligibleCryptoDeviceIds?: string[];
+}
+
+interface EncryptedGroupRosterDeviceWire {
+  userId?: string;
+  cryptoDeviceId?: string;
+  bundleVersion?: number | string;
+  cryptoSuite?: string;
+  identityPublicKey?: string;
+  signedPrekeyPublic?: string;
+  signedPrekeyId?: string;
+  signedPrekeySignature?: string;
+  kemPublicKey?: string;
+  kemKeyId?: string;
+  kemSignature?: string;
+  oneTimePrekeysTotal?: number | string;
+  oneTimePrekeysAvailable?: number | string;
+  bundleDigest?: string;
+  publishedAt?: string;
+  expiresAt?: string;
+  updatedAt?: string;
+}
+
+interface EncryptedGroupMessageDeliveryWire {
+  recipientUserId?: string;
+  recipientCryptoDeviceId?: string;
+  storedAt?: string;
+}
+
+interface EncryptedGroupEnvelopeWire {
+  messageId?: string;
+  groupId?: string;
+  threadId?: string;
+  mlsGroupId?: string;
+  rosterVersion?: number | string;
+  senderUserId?: string;
+  senderCryptoDeviceId?: string;
+  operationKind?: string;
+  targetMessageId?: string;
+  revision?: number | string;
+  ciphertext?: string;
+  ciphertextSizeBytes?: number | string;
+  createdAt?: string;
+  storedAt?: string;
+  viewerDelivery?: EncryptedGroupMessageDeliveryWire;
+}
+
 interface GetEncryptedDirectMessageV2SendBootstrapResponseWire {
   chatId?: string;
   recipientUserId?: string;
   recipientDevices?: EncryptedDirectMessageV2SendTargetDeviceWire[];
   senderOtherDevices?: EncryptedDirectMessageV2SendTargetDeviceWire[];
+}
+
+interface GetEncryptedGroupBootstrapResponseWire {
+  lane?: EncryptedGroupLaneWire;
+  rosterMembers?: EncryptedGroupRosterMemberWire[];
+  rosterDevices?: EncryptedGroupRosterDeviceWire[];
 }
 
 interface GroupReadStateWire {
@@ -642,6 +715,10 @@ interface ListDirectChatMessagesResponseWire {
 
 interface ListEncryptedDirectMessageV2ResponseWire {
   envelopes?: EncryptedDirectMessageV2EnvelopeWire[];
+}
+
+interface ListEncryptedGroupMessagesResponseWire {
+  envelopes?: EncryptedGroupEnvelopeWire[];
 }
 
 interface SendEncryptedDirectMessageV2ResponseWire {
@@ -1570,6 +1647,44 @@ export function createGatewayClient(
       );
 
       return (response.envelopes ?? []).map(normalizeEncryptedDirectMessageV2Envelope);
+    },
+
+    async getEncryptedGroupBootstrap(token, groupId, viewerCryptoDeviceId) {
+      const response = await unaryCall<GetEncryptedGroupBootstrapResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "GetEncryptedGroupBootstrap",
+        {
+          groupId: groupId.trim(),
+          viewerCryptoDeviceId: viewerCryptoDeviceId.trim(),
+        },
+        token,
+      );
+
+      return normalizeEncryptedGroupBootstrap(response);
+    },
+
+    async listEncryptedGroupMessages(
+      token,
+      groupId,
+      viewerCryptoDeviceId,
+      pageSize = 50,
+    ) {
+      const response = await unaryCall<ListEncryptedGroupMessagesResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ListEncryptedGroupMessages",
+        {
+          groupId: groupId.trim(),
+          viewerCryptoDeviceId: viewerCryptoDeviceId.trim(),
+          pageSize,
+        },
+        token,
+      );
+
+      return (response.envelopes ?? []).map(normalizeEncryptedGroupEnvelope);
     },
 
     async searchMessages(token, input) {
@@ -2541,6 +2656,97 @@ function normalizeEncryptedDirectMessageV2SendBootstrap(
     senderOtherDevices: (input?.senderOtherDevices ?? []).map(
       normalizeEncryptedDirectMessageV2SendTargetDevice,
     ),
+  };
+}
+
+function normalizeEncryptedGroupLane(
+  input: EncryptedGroupLaneWire | undefined,
+): EncryptedGroupLane {
+  return {
+    groupId: input?.groupId ?? "",
+    threadId: input?.threadId ?? "",
+    mlsGroupId: input?.mlsGroupId ?? "",
+    rosterVersion: normalizeCount(input?.rosterVersion),
+    activatedAt: input?.activatedAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeEncryptedGroupRosterMember(
+  input: EncryptedGroupRosterMemberWire | undefined,
+): EncryptedGroupRosterMember {
+  return {
+    user: normalizeChatUser(input?.user),
+    role: normalizeGroupMemberRole(input?.role),
+    isWriteRestricted: input?.isWriteRestricted ?? false,
+    hasEligibleCryptoDevices: input?.hasEligibleCryptoDevices ?? false,
+    eligibleCryptoDeviceIds: normalizeIDs(input?.eligibleCryptoDeviceIds ?? []),
+  };
+}
+
+function normalizeEncryptedGroupRosterDevice(
+  input: EncryptedGroupRosterDeviceWire | undefined,
+): EncryptedGroupRosterDevice {
+  return {
+    userId: input?.userId ?? "",
+    cryptoDeviceId: input?.cryptoDeviceId ?? "",
+    bundleVersion: normalizeCount(input?.bundleVersion),
+    cryptoSuite: input?.cryptoSuite ?? "",
+    identityPublicKeyBase64: input?.identityPublicKey ?? "",
+    signedPrekeyPublicBase64: input?.signedPrekeyPublic ?? "",
+    signedPrekeyId: input?.signedPrekeyId ?? "",
+    signedPrekeySignatureBase64: input?.signedPrekeySignature ?? "",
+    kemPublicKeyBase64: normalizeNullableString(input?.kemPublicKey),
+    kemKeyId: normalizeNullableString(input?.kemKeyId),
+    kemSignatureBase64: normalizeNullableString(input?.kemSignature),
+    oneTimePrekeysTotal: normalizeCount(input?.oneTimePrekeysTotal),
+    oneTimePrekeysAvailable: normalizeCount(input?.oneTimePrekeysAvailable),
+    bundleDigestBase64: input?.bundleDigest ?? "",
+    publishedAt: input?.publishedAt ?? "",
+    expiresAt: normalizeNullableString(input?.expiresAt),
+    updatedAt: input?.updatedAt ?? "",
+  };
+}
+
+function normalizeEncryptedGroupMessageDelivery(
+  input: EncryptedGroupMessageDeliveryWire | undefined,
+): EncryptedGroupMessageDelivery {
+  return {
+    recipientUserId: input?.recipientUserId ?? "",
+    recipientCryptoDeviceId: input?.recipientCryptoDeviceId ?? "",
+    storedAt: input?.storedAt ?? "",
+  };
+}
+
+function normalizeEncryptedGroupEnvelope(
+  input: EncryptedGroupEnvelopeWire | undefined,
+): EncryptedGroupEnvelope {
+  return {
+    messageId: input?.messageId ?? "",
+    groupId: input?.groupId ?? "",
+    threadId: input?.threadId ?? "",
+    mlsGroupId: input?.mlsGroupId ?? "",
+    rosterVersion: normalizeCount(input?.rosterVersion),
+    senderUserId: input?.senderUserId ?? "",
+    senderCryptoDeviceId: input?.senderCryptoDeviceId ?? "",
+    operationKind: input?.operationKind ?? "",
+    targetMessageId: normalizeNullableString(input?.targetMessageId),
+    revision: normalizeCount(input?.revision),
+    ciphertext: input?.ciphertext ?? "",
+    ciphertextSizeBytes: normalizeCount(input?.ciphertextSizeBytes),
+    createdAt: input?.createdAt ?? "",
+    storedAt: input?.storedAt ?? "",
+    viewerDelivery: normalizeEncryptedGroupMessageDelivery(input?.viewerDelivery),
+  };
+}
+
+function normalizeEncryptedGroupBootstrap(
+  input: GetEncryptedGroupBootstrapResponseWire | undefined,
+): EncryptedGroupBootstrap {
+  return {
+    lane: normalizeEncryptedGroupLane(input?.lane),
+    rosterMembers: (input?.rosterMembers ?? []).map(normalizeEncryptedGroupRosterMember),
+    rosterDevices: (input?.rosterDevices ?? []).map(normalizeEncryptedGroupRosterDevice),
   };
 }
 

@@ -1331,6 +1331,198 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("loads encrypted group bootstrap through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          lane: {
+            groupId: "group-1",
+            threadId: "thread-1",
+            mlsGroupId: "mls-1",
+            rosterVersion: "4",
+            activatedAt: "2026-03-22T12:00:00Z",
+            updatedAt: "2026-03-22T12:05:00Z",
+          },
+          rosterMembers: [
+            {
+              user: {
+                id: "user-2",
+                login: "bob",
+                nickname: "Bob",
+              },
+              role: "GROUP_MEMBER_ROLE_MEMBER",
+              isWriteRestricted: false,
+              hasEligibleCryptoDevices: true,
+              eligibleCryptoDeviceIds: ["crypto-2"],
+            },
+          ],
+          rosterDevices: [
+            {
+              userId: "user-2",
+              cryptoDeviceId: "crypto-2",
+              bundleVersion: "3",
+              cryptoSuite: "webcrypto-p256-foundation-v1",
+              identityPublicKey: "identity-public",
+              signedPrekeyPublic: "signed-prekey-public",
+              signedPrekeyId: "signed-prekey-1",
+              signedPrekeySignature: "signature",
+              bundleDigest: "bundle-digest",
+              publishedAt: "2026-03-22T12:00:00Z",
+              updatedAt: "2026-03-22T12:03:00Z",
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const bootstrap = await client.getEncryptedGroupBootstrap(
+      "token-1",
+      "group-1",
+      "crypto-2",
+    );
+
+    expect(bootstrap).toEqual({
+      lane: {
+        groupId: "group-1",
+        threadId: "thread-1",
+        mlsGroupId: "mls-1",
+        rosterVersion: 4,
+        activatedAt: "2026-03-22T12:00:00Z",
+        updatedAt: "2026-03-22T12:05:00Z",
+      },
+      rosterMembers: [
+        {
+          user: {
+            id: "user-2",
+            login: "bob",
+            nickname: "Bob",
+            avatarUrl: null,
+          },
+          role: "member",
+          isWriteRestricted: false,
+          hasEligibleCryptoDevices: true,
+          eligibleCryptoDeviceIds: ["crypto-2"],
+        },
+      ],
+      rosterDevices: [
+        {
+          userId: "user-2",
+          cryptoDeviceId: "crypto-2",
+          bundleVersion: 3,
+          cryptoSuite: "webcrypto-p256-foundation-v1",
+          identityPublicKeyBase64: "identity-public",
+          signedPrekeyPublicBase64: "signed-prekey-public",
+          signedPrekeyId: "signed-prekey-1",
+          signedPrekeySignatureBase64: "signature",
+          kemPublicKeyBase64: null,
+          kemKeyId: null,
+          kemSignatureBase64: null,
+          oneTimePrekeysTotal: 0,
+          oneTimePrekeysAvailable: 0,
+          bundleDigestBase64: "bundle-digest",
+          publishedAt: "2026-03-22T12:00:00Z",
+          expiresAt: null,
+          updatedAt: "2026-03-22T12:03:00Z",
+        },
+      ],
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/GetEncryptedGroupBootstrap",
+      expect.objectContaining({
+        body: JSON.stringify({
+          groupId: "group-1",
+          viewerCryptoDeviceId: "crypto-2",
+        }),
+      }),
+    );
+  });
+
+  it("loads encrypted group messages through gateway chat endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          envelopes: [
+            {
+              messageId: "message-1",
+              groupId: "group-1",
+              threadId: "thread-1",
+              mlsGroupId: "mls-1",
+              rosterVersion: "4",
+              senderUserId: "user-1",
+              senderCryptoDeviceId: "crypto-1",
+              operationKind: "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT",
+              revision: "1",
+              ciphertext: "cipher-1",
+              ciphertextSizeBytes: "8",
+              createdAt: "2026-03-22T12:00:00Z",
+              storedAt: "2026-03-22T12:00:01Z",
+              viewerDelivery: {
+                recipientUserId: "user-2",
+                recipientCryptoDeviceId: "crypto-2",
+                storedAt: "2026-03-22T12:00:01Z",
+              },
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const envelopes = await client.listEncryptedGroupMessages(
+      "token-1",
+      "group-1",
+      "crypto-2",
+      25,
+    );
+
+    expect(envelopes).toEqual([
+      {
+        messageId: "message-1",
+        groupId: "group-1",
+        threadId: "thread-1",
+        mlsGroupId: "mls-1",
+        rosterVersion: 4,
+        senderUserId: "user-1",
+        senderCryptoDeviceId: "crypto-1",
+        operationKind: "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT",
+        targetMessageId: null,
+        revision: 1,
+        ciphertext: "cipher-1",
+        ciphertextSizeBytes: 8,
+        createdAt: "2026-03-22T12:00:00Z",
+        storedAt: "2026-03-22T12:00:01Z",
+        viewerDelivery: {
+          recipientUserId: "user-2",
+          recipientCryptoDeviceId: "crypto-2",
+          storedAt: "2026-03-22T12:00:01Z",
+        },
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/ListEncryptedGroupMessages",
+      expect.objectContaining({
+        body: JSON.stringify({
+          groupId: "group-1",
+          viewerCryptoDeviceId: "crypto-2",
+          pageSize: 25,
+        }),
+      }),
+    );
+  });
+
   it("sends encrypted dm v2 opaque deliveries through gateway chat endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

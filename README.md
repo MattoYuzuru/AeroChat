@@ -80,10 +80,15 @@ AeroChat должен поддерживать:
     - materialized readable roster по active trusted crypto devices current group members, включая `reader` и write-restricted участников;
     - отдельный opaque storage path для group-scoped encrypted envelopes и explicit per-device deliveries без reuse `group_messages`;
     - device-aware fetch/bootstrap surface и отдельный realtime family `encrypted_group_message_v1.delivery` без plaintext-style `group.message.updated` snapshots;
+    - первый web runtime/local projection foundation для encrypted groups:
+      - opaque group envelopes читаются через explicit bootstrap/list path для текущего local crypto-device;
+      - decrypt/render остаётся внутри crypto runtime worker boundary;
+      - web держит отдельную bounded local projection и отдельную realtime merge path для encrypted group lane;
+      - coexistence остаётся честным: encrypted lane не притворяется unified timeline поверх legacy plaintext history;
     - coexistence остаётся bounded и честной:
       - legacy plaintext group history не переписывается и не re-encrypt'ится;
       - encrypted lane forward-only и не dual-write'ит те же сообщения в plaintext path;
-    - текущий slice не объявляет full MLS implementation, encrypted group decrypt/render UX, media send UX, reply/edit/search/unread parity или backup/recovery.
+    - текущий slice не объявляет full MLS implementation, outbound encrypted group send, media send UX, reply/edit/search/unread parity или backup/recovery.
   - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
   - без claims о full encrypted DM parity, encrypted search, MLS/group encrypted messaging или backup/recovery.
 - explicit group moderation/admin policy foundation:
