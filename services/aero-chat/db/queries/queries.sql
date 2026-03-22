@@ -732,6 +732,40 @@ INSERT INTO direct_chat_messages (
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING id, chat_id, sender_user_id, kind, text_content, markdown_policy, reply_to_message_id, created_at, updated_at, edited_at;
 
+-- name: CreateDirectChatEncryptedMessageV2 :one
+INSERT INTO direct_chat_encrypted_messages_v2 (
+    id,
+    chat_id,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    created_at,
+    stored_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING
+    id,
+    chat_id,
+    sender_user_id,
+    sender_crypto_device_id,
+    operation_kind,
+    target_message_id,
+    revision,
+    created_at,
+    stored_at;
+
+-- name: CreateDirectChatEncryptedMessageV2Delivery :exec
+INSERT INTO direct_chat_encrypted_message_deliveries_v2 (
+    message_id,
+    recipient_user_id,
+    recipient_crypto_device_id,
+    transport_header,
+    ciphertext,
+    ciphertext_size_bytes,
+    stored_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7);
+
 -- name: CreateAttachment :one
 INSERT INTO attachments (
     id,
@@ -867,6 +901,16 @@ FROM attachments AS a
 LEFT JOIN attachment_upload_sessions AS s ON s.attachment_id = a.id
 LEFT JOIN message_attachments AS ma ON ma.attachment_id = a.id
 WHERE a.id = ANY($1::uuid[]);
+
+-- name: ListActiveCryptoDevicesByUserIDs :many
+SELECT
+    id,
+    user_id,
+    status
+FROM crypto_devices
+WHERE status = 'active'
+  AND user_id = ANY($1::uuid[])
+ORDER BY user_id ASC, created_at ASC, id ASC;
 
 -- name: CompleteAttachmentUpload :execrows
 WITH updated_attachment AS (
@@ -1220,6 +1264,33 @@ WHERE direct_chat_read_receipts.last_read_message_created_at < EXCLUDED.last_rea
         direct_chat_read_receipts.last_read_message_created_at = EXCLUDED.last_read_message_created_at
         AND direct_chat_read_receipts.last_read_message_id < EXCLUDED.last_read_message_id
    );
+
+-- name: ListDirectChatEncryptedMessageV2ByDevice :many
+SELECT
+    m.id,
+    m.chat_id,
+    m.sender_user_id,
+    m.sender_crypto_device_id,
+    m.operation_kind,
+    m.target_message_id,
+    m.revision,
+    m.created_at,
+    m.stored_at,
+    d.recipient_user_id,
+    d.recipient_crypto_device_id,
+    d.transport_header,
+    d.ciphertext,
+    d.ciphertext_size_bytes,
+    d.stored_at AS delivery_stored_at
+FROM direct_chat_encrypted_messages_v2 AS m
+JOIN direct_chat_participants AS self ON self.chat_id = m.chat_id
+JOIN direct_chat_encrypted_message_deliveries_v2 AS d ON d.message_id = m.id
+WHERE self.user_id = $1
+  AND m.chat_id = $2
+  AND d.recipient_user_id = $1
+  AND d.recipient_crypto_device_id = $3
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $4;
 
 -- name: UpsertGroupChatReadState :execrows
 INSERT INTO group_chat_read_states (

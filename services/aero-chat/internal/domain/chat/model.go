@@ -3,37 +3,41 @@ package chat
 import "time"
 
 const (
-	ChatKindDirect                                = "direct"
-	ChatKindGroup                                 = "group"
-	GroupThreadKeyPrimary                         = "primary"
-	MessageKindText                               = "text"
-	MarkdownPolicySafeSubsetV1                    = "safe_subset_v1"
-	AttachmentScopeDirect                         = "direct"
-	AttachmentScopeGroup                          = "group"
-	AttachmentStatusPending                       = "pending"
-	AttachmentStatusUploaded                      = "uploaded"
-	AttachmentStatusAttached                      = "attached"
-	AttachmentStatusDetached                      = "detached"
-	AttachmentStatusFailed                        = "failed"
-	AttachmentStatusExpired                       = "expired"
-	AttachmentStatusDeleted                       = "deleted"
-	AttachmentUploadSessionPending                = "pending"
-	AttachmentUploadSessionCompleted              = "completed"
-	AttachmentUploadSessionFailed                 = "failed"
-	AttachmentUploadSessionExpired                = "expired"
-	GroupMemberRoleOwner                          = "owner"
-	GroupMemberRoleAdmin                          = "admin"
-	GroupMemberRoleMember                         = "member"
-	GroupMemberRoleReader                         = "reader"
-	defaultMaxActiveGroupMembershipsPerUser       = 100
-	defaultMessagePageSize                  int32 = 50
-	maxMessagePageSize                      int32 = 200
-	defaultSearchPageSize                   int32 = 20
-	maxSearchPageSize                       int32 = 50
-	maxTextMessageLength                          = 4000
-	maxSearchQueryLength                          = 200
-	maxGroupNameLength                            = 80
-	defaultMediaUserQuotaBytes              int64 = 512 * 1024 * 1024
+	ChatKindDirect                                   = "direct"
+	ChatKindGroup                                    = "group"
+	CryptoDeviceStatusActive                         = "active"
+	GroupThreadKeyPrimary                            = "primary"
+	MessageKindText                                  = "text"
+	EncryptedDirectMessageV2OperationContent         = "content"
+	EncryptedDirectMessageV2OperationEdit            = "edit"
+	EncryptedDirectMessageV2OperationTombstone       = "tombstone"
+	MarkdownPolicySafeSubsetV1                       = "safe_subset_v1"
+	AttachmentScopeDirect                            = "direct"
+	AttachmentScopeGroup                             = "group"
+	AttachmentStatusPending                          = "pending"
+	AttachmentStatusUploaded                         = "uploaded"
+	AttachmentStatusAttached                         = "attached"
+	AttachmentStatusDetached                         = "detached"
+	AttachmentStatusFailed                           = "failed"
+	AttachmentStatusExpired                          = "expired"
+	AttachmentStatusDeleted                          = "deleted"
+	AttachmentUploadSessionPending                   = "pending"
+	AttachmentUploadSessionCompleted                 = "completed"
+	AttachmentUploadSessionFailed                    = "failed"
+	AttachmentUploadSessionExpired                   = "expired"
+	GroupMemberRoleOwner                             = "owner"
+	GroupMemberRoleAdmin                             = "admin"
+	GroupMemberRoleMember                            = "member"
+	GroupMemberRoleReader                            = "reader"
+	defaultMaxActiveGroupMembershipsPerUser          = 100
+	defaultMessagePageSize                     int32 = 50
+	maxMessagePageSize                         int32 = 200
+	defaultSearchPageSize                      int32 = 20
+	maxSearchPageSize                          int32 = 50
+	maxTextMessageLength                             = 4000
+	maxSearchQueryLength                             = 200
+	maxGroupNameLength                               = 80
+	defaultMediaUserQuotaBytes                 int64 = 512 * 1024 * 1024
 )
 
 type UserSummary struct {
@@ -62,6 +66,12 @@ type Device struct {
 	CreatedAt  time.Time
 	LastSeenAt time.Time
 	RevokedAt  *time.Time
+}
+
+type CryptoDevice struct {
+	ID     string
+	UserID string
+	Status string
 }
 
 type SessionAuth struct {
@@ -258,6 +268,47 @@ type DirectChatMessage struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	EditedAt         *time.Time
+}
+
+type EncryptedDirectMessageV2DeliveryDraft struct {
+	RecipientCryptoDeviceID string
+	TransportHeader         []byte
+	Ciphertext              []byte
+}
+
+type EncryptedDirectMessageV2Delivery struct {
+	RecipientUserID         string
+	RecipientCryptoDeviceID string
+	TransportHeader         []byte
+	Ciphertext              []byte
+	CiphertextSizeBytes     int64
+	StoredAt                time.Time
+}
+
+type EncryptedDirectMessageV2Envelope struct {
+	MessageID            string
+	ChatID               string
+	SenderUserID         string
+	SenderCryptoDeviceID string
+	OperationKind        string
+	TargetMessageID      *string
+	Revision             uint32
+	CreatedAt            time.Time
+	StoredAt             time.Time
+	ViewerDelivery       EncryptedDirectMessageV2Delivery
+}
+
+type EncryptedDirectMessageV2StoredEnvelope struct {
+	MessageID            string
+	ChatID               string
+	SenderUserID         string
+	SenderCryptoDeviceID string
+	OperationKind        string
+	TargetMessageID      *string
+	Revision             uint32
+	CreatedAt            time.Time
+	StoredAt             time.Time
+	StoredDeliveryCount  uint32
 }
 
 type GroupMessage struct {
@@ -467,6 +518,29 @@ type CreateDirectChatMessageParams struct {
 	ReplyToMessageID *string
 	ReplyPreview     *ReplyPreview
 	CreatedAt        time.Time
+}
+
+type CreateEncryptedDirectMessageV2Params struct {
+	MessageID            string
+	ChatID               string
+	SenderUserID         string
+	SenderCryptoDeviceID string
+	OperationKind        string
+	TargetMessageID      *string
+	Revision             uint32
+	Deliveries           []EncryptedDirectMessageV2Delivery
+	CreatedAt            time.Time
+	StoredAt             time.Time
+}
+
+type SendEncryptedDirectMessageV2Params struct {
+	ChatID               string
+	MessageID            string
+	SenderCryptoDeviceID string
+	OperationKind        string
+	TargetMessageID      *string
+	Revision             uint32
+	Deliveries           []EncryptedDirectMessageV2DeliveryDraft
 }
 
 type CreateGroupMessageParams struct {

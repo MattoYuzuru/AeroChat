@@ -59,6 +59,11 @@ AeroChat должен поддерживать:
   - компактные jump-oriented результаты с переходом в нужный direct chat или group;
   - временную подсветку target message, если он уже попал в текущую загруженную историю;
 - bounded realtime для chat/group foundation;
+- backend-first foundation для encrypted direct-message v2:
+  - explicit opaque intake RPC в `aero-chat` и thin proxy через `aero-gateway`;
+  - parallel storage path для logical encrypted envelopes и per-device deliveries;
+  - raw fetch path для будущего client-side decrypt/render;
+  - без claims о готовом encrypted DM UX, realtime convergence, encrypted search или encrypted media relay.
 - explicit group moderation/admin policy foundation:
   - явная policy matrix для `owner` / `admin` / `member` / `reader`;
   - durable write restriction для участников группы без потери membership;

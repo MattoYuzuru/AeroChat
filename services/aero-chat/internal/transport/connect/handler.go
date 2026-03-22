@@ -545,6 +545,63 @@ func (h *Handler) ClearDirectChatPresence(ctx context.Context, req *connect.Requ
 	}), nil
 }
 
+func (h *Handler) SendEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.SendEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.SendEncryptedDirectMessageV2Response], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	deliveries := make([]chat.EncryptedDirectMessageV2DeliveryDraft, 0, len(req.Msg.Deliveries))
+	for _, delivery := range req.Msg.Deliveries {
+		if delivery == nil {
+			continue
+		}
+		deliveries = append(deliveries, chat.EncryptedDirectMessageV2DeliveryDraft{
+			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceId,
+			TransportHeader:         append([]byte(nil), delivery.TransportHeader...),
+			Ciphertext:              append([]byte(nil), delivery.Ciphertext...),
+		})
+	}
+
+	envelope, err := h.service.SendEncryptedDirectMessageV2(ctx, token, chat.SendEncryptedDirectMessageV2Params{
+		ChatID:               req.Msg.ChatId,
+		MessageID:            req.Msg.MessageId,
+		SenderCryptoDeviceID: req.Msg.SenderCryptoDeviceId,
+		OperationKind:        fromProtoEncryptedDirectMessageV2OperationKind(req.Msg.OperationKind),
+		TargetMessageID:      req.Msg.TargetMessageId,
+		Revision:             req.Msg.Revision,
+		Deliveries:           deliveries,
+	})
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.SendEncryptedDirectMessageV2Response{
+		Envelope: toProtoEncryptedDirectMessageV2StoredEnvelope(*envelope),
+	}), nil
+}
+
+func (h *Handler) ListEncryptedDirectMessageV2(ctx context.Context, req *connect.Request[chatv1.ListEncryptedDirectMessageV2Request]) (*connect.Response[chatv1.ListEncryptedDirectMessageV2Response], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	envelopes, err := h.service.ListEncryptedDirectMessageV2(ctx, token, req.Msg.ChatId, req.Msg.ViewerCryptoDeviceId, req.Msg.PageSize)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &chatv1.ListEncryptedDirectMessageV2Response{
+		Envelopes: make([]*chatv1.EncryptedDirectMessageV2Envelope, 0, len(envelopes)),
+	}
+	for _, envelope := range envelopes {
+		response.Envelopes = append(response.Envelopes, toProtoEncryptedDirectMessageV2Envelope(envelope))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
 func (h *Handler) SendTextMessage(ctx context.Context, req *connect.Request[chatv1.SendTextMessageRequest]) (*connect.Response[chatv1.SendTextMessageResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -942,6 +999,47 @@ func toProtoDirectChatMessage(value chat.DirectChatMessage) *chatv1.DirectChatMe
 	return result
 }
 
+func toProtoEncryptedDirectMessageV2Envelope(value chat.EncryptedDirectMessageV2Envelope) *chatv1.EncryptedDirectMessageV2Envelope {
+	return &chatv1.EncryptedDirectMessageV2Envelope{
+		MessageId:            value.MessageID,
+		ChatId:               value.ChatID,
+		SenderUserId:         value.SenderUserID,
+		SenderCryptoDeviceId: value.SenderCryptoDeviceID,
+		OperationKind:        toProtoEncryptedDirectMessageV2OperationKind(value.OperationKind),
+		TargetMessageId:      value.TargetMessageID,
+		Revision:             value.Revision,
+		CreatedAt:            timestamppb.New(value.CreatedAt),
+		StoredAt:             timestamppb.New(value.StoredAt),
+		ViewerDelivery:       toProtoEncryptedDirectMessageV2Delivery(value.ViewerDelivery),
+	}
+}
+
+func toProtoEncryptedDirectMessageV2StoredEnvelope(value chat.EncryptedDirectMessageV2StoredEnvelope) *chatv1.EncryptedDirectMessageV2StoredEnvelope {
+	return &chatv1.EncryptedDirectMessageV2StoredEnvelope{
+		MessageId:            value.MessageID,
+		ChatId:               value.ChatID,
+		SenderUserId:         value.SenderUserID,
+		SenderCryptoDeviceId: value.SenderCryptoDeviceID,
+		OperationKind:        toProtoEncryptedDirectMessageV2OperationKind(value.OperationKind),
+		TargetMessageId:      value.TargetMessageID,
+		Revision:             value.Revision,
+		CreatedAt:            timestamppb.New(value.CreatedAt),
+		StoredAt:             timestamppb.New(value.StoredAt),
+		StoredDeliveryCount:  value.StoredDeliveryCount,
+	}
+}
+
+func toProtoEncryptedDirectMessageV2Delivery(value chat.EncryptedDirectMessageV2Delivery) *chatv1.EncryptedDirectMessageV2Delivery {
+	return &chatv1.EncryptedDirectMessageV2Delivery{
+		RecipientUserId:         value.RecipientUserID,
+		RecipientCryptoDeviceId: value.RecipientCryptoDeviceID,
+		TransportHeader:         append([]byte(nil), value.TransportHeader...),
+		Ciphertext:              append([]byte(nil), value.Ciphertext...),
+		CiphertextSizeBytes:     uint64(max(value.CiphertextSizeBytes, 0)),
+		StoredAt:                timestamppb.New(value.StoredAt),
+	}
+}
+
 func toProtoGroupMessage(value chat.GroupMessage) *chatv1.GroupMessage {
 	result := &chatv1.GroupMessage{
 		Id:           value.ID,
@@ -1211,6 +1309,32 @@ func toProtoMessageKind(value string) chatv1.MessageKind {
 		return chatv1.MessageKind_MESSAGE_KIND_TEXT
 	default:
 		return chatv1.MessageKind_MESSAGE_KIND_UNSPECIFIED
+	}
+}
+
+func toProtoEncryptedDirectMessageV2OperationKind(value string) chatv1.EncryptedDirectMessageV2OperationKind {
+	switch value {
+	case chat.EncryptedDirectMessageV2OperationContent:
+		return chatv1.EncryptedDirectMessageV2OperationKind_ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT
+	case chat.EncryptedDirectMessageV2OperationEdit:
+		return chatv1.EncryptedDirectMessageV2OperationKind_ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_EDIT
+	case chat.EncryptedDirectMessageV2OperationTombstone:
+		return chatv1.EncryptedDirectMessageV2OperationKind_ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_TOMBSTONE
+	default:
+		return chatv1.EncryptedDirectMessageV2OperationKind_ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_UNSPECIFIED
+	}
+}
+
+func fromProtoEncryptedDirectMessageV2OperationKind(value chatv1.EncryptedDirectMessageV2OperationKind) string {
+	switch value {
+	case chatv1.EncryptedDirectMessageV2OperationKind_ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT:
+		return chat.EncryptedDirectMessageV2OperationContent
+	case chatv1.EncryptedDirectMessageV2OperationKind_ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_EDIT:
+		return chat.EncryptedDirectMessageV2OperationEdit
+	case chatv1.EncryptedDirectMessageV2OperationKind_ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_TOMBSTONE:
+		return chat.EncryptedDirectMessageV2OperationTombstone
+	default:
+		return ""
 	}
 }
 

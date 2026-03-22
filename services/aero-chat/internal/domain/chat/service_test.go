@@ -641,6 +641,152 @@ func TestSendTextMessageRejectsInconsistentDirectChatParticipants(t *testing.T) 
 	}
 }
 
+func TestSendEncryptedDirectMessageV2CreatesDeviceScopedDeliveries(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	aliceOther := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+	bobSecond := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
+		ChatID:               directChat.ID,
+		MessageID:            testUUID(700),
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedDirectMessageV2OperationContent,
+		Revision:             1,
+		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: aliceOther.ID,
+				TransportHeader:         []byte("sender-other-header"),
+				Ciphertext:              []byte("sender-other-ciphertext"),
+			},
+			{
+				RecipientCryptoDeviceID: bobFirst.ID,
+				TransportHeader:         []byte("bob-first-header"),
+				Ciphertext:              []byte("bob-first-ciphertext"),
+			},
+			{
+				RecipientCryptoDeviceID: bobSecond.ID,
+				TransportHeader:         []byte("bob-second-header"),
+				Ciphertext:              []byte("bob-second-ciphertext"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("send encrypted direct message v2: %v", err)
+	}
+	if receipt.StoredDeliveryCount != 3 {
+		t.Fatalf("ожидалось 3 delivery records, получено %d", receipt.StoredDeliveryCount)
+	}
+	if receipt.OperationKind != EncryptedDirectMessageV2OperationContent {
+		t.Fatalf("ожидался content operation, получено %q", receipt.OperationKind)
+	}
+
+	bobView, err := service.ListEncryptedDirectMessageV2(context.Background(), bob.Token, directChat.ID, bobFirst.ID, 0)
+	if err != nil {
+		t.Fatalf("list encrypted direct message v2 for bob first device: %v", err)
+	}
+	if len(bobView) != 1 {
+		t.Fatalf("ожидался один envelope для bob first device, получено %d", len(bobView))
+	}
+	if bobView[0].MessageID != receipt.MessageID {
+		t.Fatalf("ожидался тот же logical message id, получено %q", bobView[0].MessageID)
+	}
+	if bobView[0].ViewerDelivery.RecipientCryptoDeviceID != bobFirst.ID {
+		t.Fatalf("ожидался delivery target %q, получено %q", bobFirst.ID, bobView[0].ViewerDelivery.RecipientCryptoDeviceID)
+	}
+	if string(bobView[0].ViewerDelivery.TransportHeader) != "bob-first-header" {
+		t.Fatalf("неверный opaque header для bob first device: %q", string(bobView[0].ViewerDelivery.TransportHeader))
+	}
+	if string(bobView[0].ViewerDelivery.Ciphertext) != "bob-first-ciphertext" {
+		t.Fatalf("неверный ciphertext для bob first device: %q", string(bobView[0].ViewerDelivery.Ciphertext))
+	}
+
+	aliceOtherView, err := service.ListEncryptedDirectMessageV2(context.Background(), alice.Token, directChat.ID, aliceOther.ID, 0)
+	if err != nil {
+		t.Fatalf("list encrypted direct message v2 for alice other device: %v", err)
+	}
+	if len(aliceOtherView) != 1 {
+		t.Fatalf("ожидался один envelope для sender secondary device, получено %d", len(aliceOtherView))
+	}
+	if aliceOtherView[0].ViewerDelivery.RecipientUserID != alice.User.ID {
+		t.Fatalf("ожидался sender-side delivery owner %q, получено %q", alice.User.ID, aliceOtherView[0].ViewerDelivery.RecipientUserID)
+	}
+}
+
+func TestSendEncryptedDirectMessageV2RejectsRosterMismatch(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	_ = repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	_, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
+		ChatID:               directChat.ID,
+		MessageID:            testUUID(701),
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedDirectMessageV2OperationContent,
+		Revision:             1,
+		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: bobFirst.ID,
+				TransportHeader:         []byte("bob-header"),
+				Ciphertext:              []byte("bob-ciphertext"),
+			},
+		},
+	})
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка roster mismatch, получено %v", err)
+	}
+}
+
+func TestListEncryptedDirectMessageV2RequiresActiveViewerDevice(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	if _, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
+		ChatID:               directChat.ID,
+		MessageID:            testUUID(702),
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedDirectMessageV2OperationContent,
+		Revision:             1,
+		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: bobFirst.ID,
+				TransportHeader:         []byte("bob-header"),
+				Ciphertext:              []byte("bob-ciphertext"),
+			},
+		},
+	}); err != nil {
+		t.Fatalf("prepare encrypted direct message v2: %v", err)
+	}
+
+	if _, err := service.ListEncryptedDirectMessageV2(context.Background(), bob.Token, directChat.ID, testUUID(999), 0); !errors.Is(err, ErrConflict) {
+		t.Fatalf("ожидалась ошибка inactive viewer crypto device, получено %v", err)
+	}
+}
+
 func TestDeleteMessageUsesTombstoneAndAuthorRule(t *testing.T) {
 	t.Parallel()
 
@@ -1138,60 +1284,78 @@ func stringPointerForTest(value string) *string {
 	return &value
 }
 
+func cloneStringPointerForTest(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	copyValue := *value
+	return &copyValue
+}
+
 type issuedAuth struct {
 	User      UserSummary
 	Token     string
 	SessionID string
 }
 
+type fakeEncryptedDirectMessageV2Record struct {
+	Envelope   EncryptedDirectMessageV2StoredEnvelope
+	Deliveries map[string]EncryptedDirectMessageV2Delivery
+}
+
 type fakeRepository struct {
-	tokenManager       *libauth.SessionTokenManager
-	sessions           map[string]SessionAuth
-	users              map[string]UserSummary
-	friendships        map[string]bool
-	blocks             map[string]map[string]bool
-	groups             map[string]Group
-	groupThreads       map[string]GroupChatThread
-	groupMembers       map[string]map[string]GroupMember
-	groupInvites       map[string]GroupInviteLink
-	inviteHashes       map[string]string
-	inviteByHash       map[string]string
-	chats              map[string]DirectChat
-	groupMessages      map[string]GroupMessage
-	messages           map[string]DirectChatMessage
-	readPositions      map[string]DirectChatReadPosition
-	groupReadPositions map[string]GroupReadPosition
-	typingStore        *fakeTypingStore
-	presenceStore      *fakePresenceStore
-	objectStorage      *fakeObjectStorage
-	attachments        map[string]Attachment
-	uploadSessions     map[string]AttachmentUploadSession
-	touchCalls         int
+	tokenManager        *libauth.SessionTokenManager
+	sessions            map[string]SessionAuth
+	users               map[string]UserSummary
+	cryptoDevices       map[string]CryptoDevice
+	friendships         map[string]bool
+	blocks              map[string]map[string]bool
+	groups              map[string]Group
+	groupThreads        map[string]GroupChatThread
+	groupMembers        map[string]map[string]GroupMember
+	groupInvites        map[string]GroupInviteLink
+	inviteHashes        map[string]string
+	inviteByHash        map[string]string
+	chats               map[string]DirectChat
+	groupMessages       map[string]GroupMessage
+	messages            map[string]DirectChatMessage
+	encryptedMessagesV2 map[string]fakeEncryptedDirectMessageV2Record
+	readPositions       map[string]DirectChatReadPosition
+	groupReadPositions  map[string]GroupReadPosition
+	typingStore         *fakeTypingStore
+	presenceStore       *fakePresenceStore
+	objectStorage       *fakeObjectStorage
+	attachments         map[string]Attachment
+	uploadSessions      map[string]AttachmentUploadSession
+	touchCalls          int
 }
 
 func newFakeRepository() *fakeRepository {
 	return &fakeRepository{
-		tokenManager:       libauth.NewSessionTokenManager(),
-		sessions:           make(map[string]SessionAuth),
-		users:              make(map[string]UserSummary),
-		friendships:        make(map[string]bool),
-		blocks:             make(map[string]map[string]bool),
-		groups:             make(map[string]Group),
-		groupThreads:       make(map[string]GroupChatThread),
-		groupMembers:       make(map[string]map[string]GroupMember),
-		groupInvites:       make(map[string]GroupInviteLink),
-		inviteHashes:       make(map[string]string),
-		inviteByHash:       make(map[string]string),
-		chats:              make(map[string]DirectChat),
-		groupMessages:      make(map[string]GroupMessage),
-		messages:           make(map[string]DirectChatMessage),
-		readPositions:      make(map[string]DirectChatReadPosition),
-		groupReadPositions: make(map[string]GroupReadPosition),
-		typingStore:        newFakeTypingStore(),
-		presenceStore:      newFakePresenceStore(),
-		objectStorage:      newFakeObjectStorage(),
-		attachments:        make(map[string]Attachment),
-		uploadSessions:     make(map[string]AttachmentUploadSession),
+		tokenManager:        libauth.NewSessionTokenManager(),
+		sessions:            make(map[string]SessionAuth),
+		users:               make(map[string]UserSummary),
+		cryptoDevices:       make(map[string]CryptoDevice),
+		friendships:         make(map[string]bool),
+		blocks:              make(map[string]map[string]bool),
+		groups:              make(map[string]Group),
+		groupThreads:        make(map[string]GroupChatThread),
+		groupMembers:        make(map[string]map[string]GroupMember),
+		groupInvites:        make(map[string]GroupInviteLink),
+		inviteHashes:        make(map[string]string),
+		inviteByHash:        make(map[string]string),
+		chats:               make(map[string]DirectChat),
+		groupMessages:       make(map[string]GroupMessage),
+		messages:            make(map[string]DirectChatMessage),
+		encryptedMessagesV2: make(map[string]fakeEncryptedDirectMessageV2Record),
+		readPositions:       make(map[string]DirectChatReadPosition),
+		groupReadPositions:  make(map[string]GroupReadPosition),
+		typingStore:         newFakeTypingStore(),
+		presenceStore:       newFakePresenceStore(),
+		objectStorage:       newFakeObjectStorage(),
+		attachments:         make(map[string]Attachment),
+		uploadSessions:      make(map[string]AttachmentUploadSession),
 	}
 }
 
@@ -1233,6 +1397,16 @@ func (r *fakeRepository) mustIssueAuth(userID string, login string, nickname str
 	}
 
 	return issuedAuth{User: user, Token: token, SessionID: sessionID}
+}
+
+func (r *fakeRepository) mustAddActiveCryptoDevice(userID string) CryptoDevice {
+	device := CryptoDevice{
+		ID:     testUUID(len(r.cryptoDevices) + 400),
+		UserID: userID,
+		Status: CryptoDeviceStatusActive,
+	}
+	r.cryptoDevices[device.ID] = device
+	return device
 }
 
 func (r *fakeRepository) GetSessionAuthByID(_ context.Context, sessionID string) (*SessionAuth, error) {
@@ -1318,6 +1492,31 @@ func (r *fakeRepository) ListDirectChatPresenceStateEntries(_ context.Context, u
 			PresenceEnabled: participant.PresenceEnabled,
 		})
 	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) ListActiveCryptoDevicesByUserIDs(_ context.Context, userIDs []string) ([]CryptoDevice, error) {
+	result := make([]CryptoDevice, 0)
+	allowed := make(map[string]struct{}, len(userIDs))
+	for _, userID := range userIDs {
+		allowed[userID] = struct{}{}
+	}
+	for _, device := range r.cryptoDevices {
+		if _, ok := allowed[device.UserID]; !ok {
+			continue
+		}
+		if device.Status != CryptoDeviceStatusActive {
+			continue
+		}
+		result = append(result, device)
+	}
+	sort.Slice(result, func(i int, j int) bool {
+		if result[i].UserID == result[j].UserID {
+			return result[i].ID < result[j].ID
+		}
+		return result[i].UserID < result[j].UserID
+	})
 
 	return result, nil
 }
@@ -2198,6 +2397,51 @@ func (r *fakeRepository) SearchGroupMessages(_ context.Context, userID string, p
 	return result, nil
 }
 
+func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, params CreateEncryptedDirectMessageV2Params) (*EncryptedDirectMessageV2StoredEnvelope, error) {
+	directChat, ok := r.chats[params.ChatID]
+	if !ok || !isParticipant(directChat, params.SenderUserID) {
+		return nil, ErrNotFound
+	}
+	if _, exists := r.encryptedMessagesV2[params.MessageID]; exists {
+		return nil, ErrConflict
+	}
+
+	record := fakeEncryptedDirectMessageV2Record{
+		Envelope: EncryptedDirectMessageV2StoredEnvelope{
+			MessageID:            params.MessageID,
+			ChatID:               params.ChatID,
+			SenderUserID:         params.SenderUserID,
+			SenderCryptoDeviceID: params.SenderCryptoDeviceID,
+			OperationKind:        params.OperationKind,
+			TargetMessageID:      cloneStringPointerForTest(params.TargetMessageID),
+			Revision:             params.Revision,
+			CreatedAt:            params.CreatedAt,
+			StoredAt:             params.StoredAt,
+			StoredDeliveryCount:  uint32(len(params.Deliveries)),
+		},
+		Deliveries: make(map[string]EncryptedDirectMessageV2Delivery, len(params.Deliveries)),
+	}
+	for _, delivery := range params.Deliveries {
+		storedDelivery := EncryptedDirectMessageV2Delivery{
+			RecipientUserID:         delivery.RecipientUserID,
+			RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
+			TransportHeader:         append([]byte(nil), delivery.TransportHeader...),
+			Ciphertext:              append([]byte(nil), delivery.Ciphertext...),
+			CiphertextSizeBytes:     delivery.CiphertextSizeBytes,
+			StoredAt:                params.StoredAt,
+		}
+		record.Deliveries[delivery.RecipientCryptoDeviceID] = storedDelivery
+	}
+
+	r.encryptedMessagesV2[params.MessageID] = record
+	directChat.UpdatedAt = params.StoredAt
+	r.chats[params.ChatID] = directChat
+
+	envelopeCopy := record.Envelope
+	envelopeCopy.TargetMessageID = cloneStringPointerForTest(record.Envelope.TargetMessageID)
+	return &envelopeCopy, nil
+}
+
 func (r *fakeRepository) CreateDirectChatMessage(_ context.Context, params CreateDirectChatMessageParams) (*DirectChatMessage, error) {
 	directChat, ok := r.chats[params.ChatID]
 	if !ok || !isParticipant(directChat, params.SenderUserID) {
@@ -2261,6 +2505,56 @@ func (r *fakeRepository) ListDirectChatMessages(_ context.Context, userID string
 			result = append(result, message)
 		}
 	}
+	if len(result) > int(limit) {
+		result = result[:limit]
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) ListEncryptedDirectMessageV2(_ context.Context, userID string, chatID string, viewerCryptoDeviceID string, limit int32) ([]EncryptedDirectMessageV2Envelope, error) {
+	directChat, ok := r.chats[chatID]
+	if !ok || !isParticipant(directChat, userID) {
+		return nil, ErrNotFound
+	}
+
+	result := make([]EncryptedDirectMessageV2Envelope, 0)
+	for _, record := range r.encryptedMessagesV2 {
+		if record.Envelope.ChatID != chatID {
+			continue
+		}
+		delivery, ok := record.Deliveries[viewerCryptoDeviceID]
+		if !ok || delivery.RecipientUserID != userID {
+			continue
+		}
+
+		result = append(result, EncryptedDirectMessageV2Envelope{
+			MessageID:            record.Envelope.MessageID,
+			ChatID:               record.Envelope.ChatID,
+			SenderUserID:         record.Envelope.SenderUserID,
+			SenderCryptoDeviceID: record.Envelope.SenderCryptoDeviceID,
+			OperationKind:        record.Envelope.OperationKind,
+			TargetMessageID:      cloneStringPointerForTest(record.Envelope.TargetMessageID),
+			Revision:             record.Envelope.Revision,
+			CreatedAt:            record.Envelope.CreatedAt,
+			StoredAt:             record.Envelope.StoredAt,
+			ViewerDelivery: EncryptedDirectMessageV2Delivery{
+				RecipientUserID:         delivery.RecipientUserID,
+				RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
+				TransportHeader:         append([]byte(nil), delivery.TransportHeader...),
+				Ciphertext:              append([]byte(nil), delivery.Ciphertext...),
+				CiphertextSizeBytes:     delivery.CiphertextSizeBytes,
+				StoredAt:                delivery.StoredAt,
+			},
+		})
+	}
+
+	sort.Slice(result, func(i int, j int) bool {
+		if result[i].CreatedAt.Equal(result[j].CreatedAt) {
+			return result[i].MessageID > result[j].MessageID
+		}
+		return result[i].CreatedAt.After(result[j].CreatedAt)
+	})
 	if len(result) > int(limit) {
 		result = result[:limit]
 	}

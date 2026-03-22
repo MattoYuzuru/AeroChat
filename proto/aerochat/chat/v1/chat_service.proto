@@ -38,6 +38,8 @@ service ChatService {
   rpc ClearDirectChatTyping(ClearDirectChatTypingRequest) returns (ClearDirectChatTypingResponse);
   rpc SetDirectChatPresenceHeartbeat(SetDirectChatPresenceHeartbeatRequest) returns (SetDirectChatPresenceHeartbeatResponse);
   rpc ClearDirectChatPresence(ClearDirectChatPresenceRequest) returns (ClearDirectChatPresenceResponse);
+  rpc SendEncryptedDirectMessageV2(SendEncryptedDirectMessageV2Request) returns (SendEncryptedDirectMessageV2Response);
+  rpc ListEncryptedDirectMessageV2(ListEncryptedDirectMessageV2Request) returns (ListEncryptedDirectMessageV2Response);
   rpc SendTextMessage(SendTextMessageRequest) returns (SendTextMessageResponse);
   rpc EditDirectChatMessage(EditDirectChatMessageRequest) returns (EditDirectChatMessageResponse);
   rpc ListDirectChatMessages(ListDirectChatMessagesRequest) returns (ListDirectChatMessagesResponse);
@@ -59,6 +61,13 @@ enum ChatKind {
 enum MessageKind {
   MESSAGE_KIND_UNSPECIFIED = 0;
   MESSAGE_KIND_TEXT = 1;
+}
+
+enum EncryptedDirectMessageV2OperationKind {
+  ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_UNSPECIFIED = 0;
+  ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT = 1;
+  ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_EDIT = 2;
+  ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_TOMBSTONE = 3;
 }
 
 enum MarkdownPolicy {
@@ -268,6 +277,47 @@ message GroupMessage {
   google.protobuf.Timestamp edited_at = 10;
   optional string reply_to_message_id = 11;
   ReplyPreview reply_preview = 12;
+}
+
+message EncryptedDirectMessageV2DeliveryInput {
+  string recipient_crypto_device_id = 1;
+  bytes transport_header = 2;
+  bytes ciphertext = 3;
+}
+
+message EncryptedDirectMessageV2Delivery {
+  string recipient_user_id = 1;
+  string recipient_crypto_device_id = 2;
+  bytes transport_header = 3;
+  bytes ciphertext = 4;
+  uint64 ciphertext_size_bytes = 5;
+  google.protobuf.Timestamp stored_at = 6;
+}
+
+message EncryptedDirectMessageV2Envelope {
+  string message_id = 1;
+  string chat_id = 2;
+  string sender_user_id = 3;
+  string sender_crypto_device_id = 4;
+  EncryptedDirectMessageV2OperationKind operation_kind = 5;
+  optional string target_message_id = 6;
+  uint32 revision = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp stored_at = 9;
+  EncryptedDirectMessageV2Delivery viewer_delivery = 10;
+}
+
+message EncryptedDirectMessageV2StoredEnvelope {
+  string message_id = 1;
+  string chat_id = 2;
+  string sender_user_id = 3;
+  string sender_crypto_device_id = 4;
+  EncryptedDirectMessageV2OperationKind operation_kind = 5;
+  optional string target_message_id = 6;
+  uint32 revision = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp stored_at = 9;
+  uint32 stored_delivery_count = 10;
 }
 
 message DirectChatReadPosition {
@@ -578,6 +628,32 @@ message ClearDirectChatPresenceRequest {
 
 message ClearDirectChatPresenceResponse {
   DirectChatPresenceState presence_state = 1;
+}
+
+message SendEncryptedDirectMessageV2Request {
+  string chat_id = 1;
+  // message_id назначается клиентом до fanout и остаётся стабильным logical identifier.
+  string message_id = 2;
+  string sender_crypto_device_id = 3;
+  EncryptedDirectMessageV2OperationKind operation_kind = 4;
+  optional string target_message_id = 5;
+  uint32 revision = 6;
+  repeated EncryptedDirectMessageV2DeliveryInput deliveries = 7;
+}
+
+message SendEncryptedDirectMessageV2Response {
+  EncryptedDirectMessageV2StoredEnvelope envelope = 1;
+}
+
+message ListEncryptedDirectMessageV2Request {
+  string chat_id = 1;
+  // viewer_crypto_device_id фиксирует, для какого локального active crypto device нужно вернуть opaque delivery.
+  string viewer_crypto_device_id = 2;
+  uint32 page_size = 3;
+}
+
+message ListEncryptedDirectMessageV2Response {
+  repeated EncryptedDirectMessageV2Envelope envelopes = 1;
 }
 
 message SendTextMessageRequest {
