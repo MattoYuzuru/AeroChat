@@ -1061,6 +1061,54 @@ func (q *Queries) DetachDirectMessageAttachments(ctx context.Context, arg Detach
 	return result.RowsAffected(), nil
 }
 
+const detachEncryptedDirectMessageV2Attachments = `-- name: DetachEncryptedDirectMessageV2Attachments :execrows
+UPDATE attachments AS a
+SET
+    status = 'detached',
+    updated_at = $2
+FROM message_attachments AS ma
+WHERE ma.attachment_id = a.id
+  AND ma.encrypted_direct_message_v2_id = $1
+  AND a.status = 'attached'
+`
+
+type DetachEncryptedDirectMessageV2AttachmentsParams struct {
+	EncryptedDirectMessageV2ID pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
+	UpdatedAt                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) DetachEncryptedDirectMessageV2Attachments(ctx context.Context, arg DetachEncryptedDirectMessageV2AttachmentsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, detachEncryptedDirectMessageV2Attachments, arg.EncryptedDirectMessageV2ID, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const detachEncryptedGroupMessageV1Attachments = `-- name: DetachEncryptedGroupMessageV1Attachments :execrows
+UPDATE attachments AS a
+SET
+    status = 'detached',
+    updated_at = $2
+FROM message_attachments AS ma
+WHERE ma.attachment_id = a.id
+  AND ma.encrypted_group_message_v1_id = $1
+  AND a.status = 'attached'
+`
+
+type DetachEncryptedGroupMessageV1AttachmentsParams struct {
+	EncryptedGroupMessageV1ID pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
+	UpdatedAt                 pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) DetachEncryptedGroupMessageV1Attachments(ctx context.Context, arg DetachEncryptedGroupMessageV1AttachmentsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, detachEncryptedGroupMessageV1Attachments, arg.EncryptedGroupMessageV1ID, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const disableGroupInviteLink = `-- name: DisableGroupInviteLink :execrows
 UPDATE group_invite_links
 SET

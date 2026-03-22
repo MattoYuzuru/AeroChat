@@ -75,6 +75,10 @@ AeroChat должен поддерживать:
     - browser шифрует файл до upload, descriptor уходит внутри encrypted DM v2 payload, а ciphertext blob расшифровывается локально после download;
     - текущий direct encrypted lane умеет bounded text + encrypted attachment и attachment-only send/use path;
     - storage/lifecycle/quota/retention foundation остаётся общей и future-ready для group E2EE;
+    - encrypted media retention parity для encrypted direct и encrypted group lanes:
+      - explicit encrypted tombstone event теперь так же переводит linked ciphertext attachment из `attached` в `detached`, как и legacy direct tombstone path;
+      - это освобождает active quota budget и переводит object в already-existing detached cleanup flow без нового lifecycle status;
+      - решение остаётся полностью relay/control-plane driven и не требует plaintext media metadata или чтения encrypted descriptor сервером;
   - encrypted direct-message v2 mutation recovery foundation:
     - reply reference, edit revision и tombstone/delete-for-everyone больше не зависят от plaintext server projection;
     - reply preview собирается только client-side после decrypt и честно деградирует, если target message ещё не попал в локальное bounded окно или уже tombstoned;
