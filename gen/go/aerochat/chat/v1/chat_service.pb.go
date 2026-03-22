@@ -2593,10 +2593,14 @@ func (x *GetEncryptedDirectMessageV2SendBootstrapRequest) GetSenderCryptoDeviceI
 }
 
 type GetEncryptedDirectMessageV2SendBootstrapResponse struct {
-	state              protoimpl.MessageState                      `protogen:"open.v1"`
-	ChatId             string                                      `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
-	RecipientUserId    string                                      `protobuf:"bytes,2,opt,name=recipient_user_id,json=recipientUserId,proto3" json:"recipient_user_id,omitempty"`
-	RecipientDevices   []*EncryptedDirectMessageV2SendTargetDevice `protobuf:"bytes,3,rep,name=recipient_devices,json=recipientDevices,proto3" json:"recipient_devices,omitempty"`
+	state            protoimpl.MessageState                      `protogen:"open.v1"`
+	ChatId           string                                      `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	RecipientUserId  string                                      `protobuf:"bytes,2,opt,name=recipient_user_id,json=recipientUserId,proto3" json:"recipient_user_id,omitempty"`
+	RecipientDevices []*EncryptedDirectMessageV2SendTargetDevice `protobuf:"bytes,3,rep,name=recipient_devices,json=recipientDevices,proto3" json:"recipient_devices,omitempty"`
+	// sender_other_devices содержит только secondary active devices отправителя.
+	// Originating sender device не возвращается здесь повторно:
+	// его self-delivery всё равно обязателен и собирается внутри local crypto runtime
+	// из текущего active local material, после чего проходит тем же server-backed storage path.
 	SenderOtherDevices []*EncryptedDirectMessageV2SendTargetDevice `protobuf:"bytes,4,rep,name=sender_other_devices,json=senderOtherDevices,proto3" json:"sender_other_devices,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
@@ -6040,14 +6044,17 @@ type SendEncryptedDirectMessageV2Request struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	ChatId string                 `protobuf:"bytes,1,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
 	// message_id назначается клиентом до fanout и остаётся стабильным logical identifier.
-	MessageId            string                                   `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	SenderCryptoDeviceId string                                   `protobuf:"bytes,3,opt,name=sender_crypto_device_id,json=senderCryptoDeviceId,proto3" json:"sender_crypto_device_id,omitempty"`
-	OperationKind        EncryptedDirectMessageV2OperationKind    `protobuf:"varint,4,opt,name=operation_kind,json=operationKind,proto3,enum=aerochat.chat.v1.EncryptedDirectMessageV2OperationKind" json:"operation_kind,omitempty"`
-	TargetMessageId      *string                                  `protobuf:"bytes,5,opt,name=target_message_id,json=targetMessageId,proto3,oneof" json:"target_message_id,omitempty"`
-	Revision             uint32                                   `protobuf:"varint,6,opt,name=revision,proto3" json:"revision,omitempty"`
-	Deliveries           []*EncryptedDirectMessageV2DeliveryInput `protobuf:"bytes,7,rep,name=deliveries,proto3" json:"deliveries,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	MessageId            string                                `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	SenderCryptoDeviceId string                                `protobuf:"bytes,3,opt,name=sender_crypto_device_id,json=senderCryptoDeviceId,proto3" json:"sender_crypto_device_id,omitempty"`
+	OperationKind        EncryptedDirectMessageV2OperationKind `protobuf:"varint,4,opt,name=operation_kind,json=operationKind,proto3,enum=aerochat.chat.v1.EncryptedDirectMessageV2OperationKind" json:"operation_kind,omitempty"`
+	TargetMessageId      *string                               `protobuf:"bytes,5,opt,name=target_message_id,json=targetMessageId,proto3,oneof" json:"target_message_id,omitempty"`
+	Revision             uint32                                `protobuf:"varint,6,opt,name=revision,proto3" json:"revision,omitempty"`
+	// deliveries должны покрывать весь active target roster:
+	// все active devices получателя и все active devices отправителя,
+	// включая originating sender device для server-backed self-delivery.
+	Deliveries    []*EncryptedDirectMessageV2DeliveryInput `protobuf:"bytes,7,rep,name=deliveries,proto3" json:"deliveries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SendEncryptedDirectMessageV2Request) Reset() {

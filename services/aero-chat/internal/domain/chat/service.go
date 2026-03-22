@@ -2024,7 +2024,6 @@ func resolveEncryptedDirectMessageV2Deliveries(
 		case senderUserID:
 			if device.ID == senderCryptoDeviceID {
 				senderDeviceIsActive = true
-				continue
 			}
 			expectedTargets[device.ID] = senderUserID
 		case recipientUserID:

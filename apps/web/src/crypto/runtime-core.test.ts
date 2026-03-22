@@ -380,18 +380,23 @@ describe("createCryptoRuntimeCore", () => {
         senderCryptoDeviceId: "crypto-1",
         operationKind: "content",
         revision: 1,
-        deliveries: [
+        deliveries: expect.arrayContaining([
+          expect.objectContaining({
+            recipientCryptoDeviceId: "crypto-1",
+            transportHeader: expect.any(String),
+            ciphertext: expect.any(String),
+          }),
           expect.objectContaining({
             recipientCryptoDeviceId: "peer-device-1",
             transportHeader: expect.any(String),
             ciphertext: expect.any(String),
           }),
-        ],
+        ]),
       }),
     );
     expect(result.localProjection.text).toBe("secret hello");
     expect(result.localProjection.chatId).toBe("chat-1");
-    expect(result.storedEnvelope.storedDeliveryCount).toBe(1);
+    expect(result.storedEnvelope.storedDeliveryCount).toBe(2);
   });
 });
 
@@ -432,16 +437,23 @@ function createFakeMaterialFactory(): CryptoMaterialFactory {
         login: input.login,
         deviceLabel: input.deviceLabel,
       });
+      const signedPrekeyPublicBase64 = await createSignedPrekeyPublicBase64();
 
       return {
         material,
-        bundle: createBundlePayload("digest-1", material.record.signedPrekeyId),
+        bundle: createBundlePayload(
+          "digest-1",
+          material.record.signedPrekeyId,
+          signedPrekeyPublicBase64,
+        ),
       };
     },
     async buildBundle(material) {
+      const signedPrekeyPublicBase64 = await createSignedPrekeyPublicBase64();
       return createBundlePayload(
         material.record.bundleDigestBase64,
         material.record.signedPrekeyId,
+        signedPrekeyPublicBase64,
       );
     },
     async buildLinkApprovalProof(_material, input) {
@@ -494,11 +506,12 @@ function createFakeMaterialFactory(): CryptoMaterialFactory {
 function createBundlePayload(
   digest: string,
   signedPrekeyId: string,
+  signedPrekeyPublicBase64: string,
 ): CryptoDeviceBundlePayload {
   return {
     cryptoSuite: "webcrypto-p256-foundation-v1",
     identityPublicKeyBase64: "identity-public",
-    signedPrekeyPublicBase64: "signed-prekey-public",
+    signedPrekeyPublicBase64,
     signedPrekeyId,
     signedPrekeySignatureBase64: "signature",
     kemPublicKeyBase64: null,

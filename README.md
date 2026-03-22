@@ -66,9 +66,9 @@ AeroChat должен поддерживать:
   - отдельный realtime family для device-scoped opaque encrypted envelope delivery без plaintext snapshot payload;
   - raw list/get fetch path, worker-side decrypt foundation и bounded local web projection для текущего direct chat;
   - первый web outbound bootstrap send path для text-only encrypted DM v2:
-    - target roster собирается только по active crypto devices собеседника и other active devices отправителя;
+    - target roster собирается по active crypto devices собеседника и всех active devices отправителя, включая originating sender device;
     - per-device opaque envelopes собираются внутри crypto worker/runtime boundary;
-    - originating sender device получает только bounded local optimistic projection без server-side plaintext fallback;
+    - originating sender device теперь получает server-backed self-delivery через тот же opaque storage/realtime path, а bounded local optimistic projection остаётся только временным reconciliation layer без plaintext fallback;
   - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
   - без claims о full encrypted DM parity, encrypted search, encrypted media relay или backup/recovery.
 - explicit group moderation/admin policy foundation:

@@ -113,4 +113,79 @@ describe("mergeEncryptedDirectMessageV2Projection", () => {
       },
     ]);
   });
+
+  it("does not let stale optimistic content overwrite newer server-backed revision", () => {
+    const projection = mergeEncryptedDirectMessageV2Projection([], [
+      {
+        status: "ready",
+        messageId: "message-1",
+        chatId: "chat-1",
+        senderUserId: "user-1",
+        senderCryptoDeviceId: "crypto-1",
+        operationKind: "content",
+        targetMessageId: null,
+        revision: 1,
+        createdAt: "2026-03-22T12:00:00Z",
+        storedAt: "2026-03-22T12:00:01Z",
+        payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
+        text: "hello",
+        markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        editedAt: null,
+        deletedAt: null,
+      },
+      {
+        status: "ready",
+        messageId: "message-2",
+        chatId: "chat-1",
+        senderUserId: "user-1",
+        senderCryptoDeviceId: "crypto-1",
+        operationKind: "edit",
+        targetMessageId: "message-1",
+        revision: 2,
+        createdAt: "2026-03-22T12:01:00Z",
+        storedAt: "2026-03-22T12:01:01Z",
+        payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
+        text: "hello edited",
+        markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        editedAt: "2026-03-22T12:01:00Z",
+        deletedAt: null,
+      },
+      {
+        status: "ready",
+        messageId: "message-1",
+        chatId: "chat-1",
+        senderUserId: "user-1",
+        senderCryptoDeviceId: "crypto-1",
+        operationKind: "content",
+        targetMessageId: null,
+        revision: 1,
+        createdAt: "2026-03-22T12:00:00Z",
+        storedAt: "2026-03-22T12:00:02Z",
+        payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
+        text: "hello optimistic",
+        markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        editedAt: null,
+        deletedAt: null,
+      },
+    ]);
+
+    expect(projection).toEqual([
+      {
+        kind: "message",
+        key: "message:message-1",
+        messageId: "message-1",
+        chatId: "chat-1",
+        senderUserId: "user-1",
+        senderCryptoDeviceId: "crypto-1",
+        revision: 2,
+        createdAt: "2026-03-22T12:00:00Z",
+        storedAt: "2026-03-22T12:01:01Z",
+        text: "hello edited",
+        markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+        editedAt: "2026-03-22T12:01:00Z",
+        deletedAt: null,
+        isTombstone: false,
+      },
+    ]);
+  });
 });
