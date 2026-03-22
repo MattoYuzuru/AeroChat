@@ -281,6 +281,146 @@ func TestSendAttachmentOnlyMessageInGroupChat(t *testing.T) {
 	}
 }
 
+func TestEncryptedDirectMessageTombstoneDetachesEncryptedRelayBlobAndReleasesQuota(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.mediaUserQuotaBytes = 2048
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobDevice := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	intent, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		directChat.ID,
+		"",
+		"ciphertext.bin",
+		"application/octet-stream",
+		AttachmentRelaySchemaEncryptedBlobV1,
+		2048,
+	)
+	if err != nil {
+		t.Fatalf("create encrypted direct upload intent: %v", err)
+	}
+
+	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+		Size:        intent.Attachment.SizeBytes,
+		ContentType: intent.Attachment.MimeType,
+	}
+
+	uploadedAttachment, err := service.CompleteAttachmentUpload(context.Background(), alice.Token, intent.Attachment.ID, intent.UploadSession.ID)
+	if err != nil {
+		t.Fatalf("complete encrypted direct upload: %v", err)
+	}
+
+	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
+		ChatID:               directChat.ID,
+		MessageID:            testUUID(706),
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedDirectMessageV2OperationContent,
+		Revision:             1,
+		AttachmentIDs:        []string{uploadedAttachment.ID},
+		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: aliceSender.ID,
+				TransportHeader:         []byte("alice-self-header"),
+				Ciphertext:              []byte("alice-self-ciphertext"),
+			},
+			{
+				RecipientCryptoDeviceID: bobDevice.ID,
+				TransportHeader:         []byte("bob-header"),
+				Ciphertext:              []byte("bob-ciphertext"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("send encrypted direct message with media: %v", err)
+	}
+
+	participantAccess, err := service.GetAttachment(context.Background(), bob.Token, uploadedAttachment.ID)
+	if err != nil {
+		t.Fatalf("peer get attached encrypted relay blob: %v", err)
+	}
+	if participantAccess.DownloadURL == "" {
+		t.Fatal("ожидался presigned download url для attached encrypted relay blob")
+	}
+
+	if _, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		directChat.ID,
+		"",
+		"second.bin",
+		"application/octet-stream",
+		AttachmentRelaySchemaEncryptedBlobV1,
+		2048,
+	); !errors.Is(err, ErrResourceExhausted) {
+		t.Fatalf("ожидалась quota exhaustion до tombstone parity detach, получено %v", err)
+	}
+
+	targetMessageID := receipt.MessageID
+	if _, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
+		ChatID:               directChat.ID,
+		MessageID:            testUUID(707),
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedDirectMessageV2OperationTombstone,
+		TargetMessageID:      &targetMessageID,
+		Revision:             2,
+		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: aliceSender.ID,
+				TransportHeader:         []byte("alice-self-tombstone-header"),
+				Ciphertext:              []byte("alice-self-tombstone-ciphertext"),
+			},
+			{
+				RecipientCryptoDeviceID: bobDevice.ID,
+				TransportHeader:         []byte("bob-tombstone-header"),
+				Ciphertext:              []byte("bob-tombstone-ciphertext"),
+			},
+		},
+	}); err != nil {
+		t.Fatalf("send encrypted direct tombstone: %v", err)
+	}
+
+	detachedAttachment := repo.attachments[uploadedAttachment.ID]
+	if detachedAttachment.Status != AttachmentStatusDetached {
+		t.Fatalf("ожидался detached status после encrypted direct tombstone, получено %q", detachedAttachment.Status)
+	}
+
+	ownerAccess, err := service.GetAttachment(context.Background(), alice.Token, uploadedAttachment.ID)
+	if err != nil {
+		t.Fatalf("owner get detached encrypted relay blob: %v", err)
+	}
+	if ownerAccess.Attachment.Status != AttachmentStatusDetached {
+		t.Fatalf("ожидался detached attachment для owner после tombstone, получено %q", ownerAccess.Attachment.Status)
+	}
+	if ownerAccess.DownloadURL != "" {
+		t.Fatal("detached encrypted relay blob не должен возвращать download url")
+	}
+	if _, err := service.GetAttachment(context.Background(), bob.Token, uploadedAttachment.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("peer не должен получать detached encrypted relay blob, получено %v", err)
+	}
+
+	if _, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		directChat.ID,
+		"",
+		"fresh.bin",
+		"application/octet-stream",
+		AttachmentRelaySchemaEncryptedBlobV1,
+		2048,
+	); err != nil {
+		t.Fatalf("ожидалось освобождение quota после encrypted direct detach, получено %v", err)
+	}
+}
+
 func TestSendEncryptedGroupMessageAttachesEncryptedRelayBlobForGroupParticipants(t *testing.T) {
 	t.Parallel()
 
@@ -367,6 +507,140 @@ func TestSendEncryptedGroupMessageAttachesEncryptedRelayBlobForGroupParticipants
 	}
 	if participantAccess.DownloadURL == "" {
 		t.Fatal("ожидался presigned download url для encrypted relay blob")
+	}
+}
+
+func TestEncryptedGroupMessageTombstoneDetachesEncryptedRelayBlobAndReleasesQuota(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.mediaUserQuotaBytes = 2048
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	_ = repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	group := mustCreateGroup(t, service, alice.Token, "Encrypted retention")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	intent, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		"",
+		group.ID,
+		"ciphertext.bin",
+		"application/octet-stream",
+		AttachmentRelaySchemaEncryptedBlobV1,
+		2048,
+	)
+	if err != nil {
+		t.Fatalf("create encrypted group upload intent: %v", err)
+	}
+
+	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+		Size:        intent.Attachment.SizeBytes,
+		ContentType: intent.Attachment.MimeType,
+	}
+
+	uploadedAttachment, err := service.CompleteAttachmentUpload(context.Background(), alice.Token, intent.Attachment.ID, intent.UploadSession.ID)
+	if err != nil {
+		t.Fatalf("complete encrypted group upload: %v", err)
+	}
+
+	bootstrap, err := service.GetEncryptedGroupBootstrap(context.Background(), alice.Token, group.ID, aliceSender.ID)
+	if err != nil {
+		t.Fatalf("bootstrap encrypted group: %v", err)
+	}
+
+	receipt, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
+		GroupID:              group.ID,
+		MessageID:            testUUID(708),
+		MLSGroupID:           bootstrap.Lane.MLSGroupID,
+		RosterVersion:        bootstrap.Lane.RosterVersion,
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedGroupMessageOperationContent,
+		Revision:             1,
+		AttachmentIDs:        []string{uploadedAttachment.ID},
+		Ciphertext:           []byte("group-encrypted-media"),
+	})
+	if err != nil {
+		t.Fatalf("send encrypted group message with media: %v", err)
+	}
+
+	participantAccess, err := service.GetAttachment(context.Background(), bob.Token, uploadedAttachment.ID)
+	if err != nil {
+		t.Fatalf("group participant get attached encrypted relay blob: %v", err)
+	}
+	if participantAccess.DownloadURL == "" {
+		t.Fatal("ожидался presigned download url для attached encrypted group relay blob")
+	}
+
+	if _, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		"",
+		group.ID,
+		"second.bin",
+		"application/octet-stream",
+		AttachmentRelaySchemaEncryptedBlobV1,
+		2048,
+	); !errors.Is(err, ErrResourceExhausted) {
+		t.Fatalf("ожидалась quota exhaustion до encrypted group tombstone detach, получено %v", err)
+	}
+
+	targetMessageID := receipt.MessageID
+	if _, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
+		GroupID:              group.ID,
+		MessageID:            testUUID(709),
+		MLSGroupID:           bootstrap.Lane.MLSGroupID,
+		RosterVersion:        bootstrap.Lane.RosterVersion,
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedGroupMessageOperationTombstone,
+		TargetMessageID:      &targetMessageID,
+		Revision:             2,
+		Ciphertext:           []byte("group-tombstone"),
+	}); err != nil {
+		t.Fatalf("send encrypted group tombstone: %v", err)
+	}
+
+	detachedAttachment := repo.attachments[uploadedAttachment.ID]
+	if detachedAttachment.Status != AttachmentStatusDetached {
+		t.Fatalf("ожидался detached status после encrypted group tombstone, получено %q", detachedAttachment.Status)
+	}
+
+	ownerAccess, err := service.GetAttachment(context.Background(), alice.Token, uploadedAttachment.ID)
+	if err != nil {
+		t.Fatalf("owner get detached encrypted group relay blob: %v", err)
+	}
+	if ownerAccess.Attachment.Status != AttachmentStatusDetached {
+		t.Fatalf("ожидался detached attachment для owner после encrypted group tombstone, получено %q", ownerAccess.Attachment.Status)
+	}
+	if ownerAccess.DownloadURL != "" {
+		t.Fatal("detached encrypted group relay blob не должен возвращать download url")
+	}
+	if _, err := service.GetAttachment(context.Background(), bob.Token, uploadedAttachment.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("group participant не должен получать detached encrypted relay blob, получено %v", err)
+	}
+
+	if _, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		"",
+		group.ID,
+		"fresh.bin",
+		"application/octet-stream",
+		AttachmentRelaySchemaEncryptedBlobV1,
+		2048,
+	); err != nil {
+		t.Fatalf("ожидалось освобождение quota после encrypted group detach, получено %v", err)
 	}
 }
 

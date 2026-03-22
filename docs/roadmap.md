@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] Web encrypted group media send bootstrap
+- [x] Encrypted media retention and tombstone parity
 
 ---
 
@@ -175,6 +175,7 @@
 - [x] Video notes
 - [x] Image/audio/video preview
 - [x] Encrypted relay
+- [x] Encrypted media retention and tombstone parity for encrypted lanes
 - [x] TTL cleanup
 - [ ] Local media drafts
 

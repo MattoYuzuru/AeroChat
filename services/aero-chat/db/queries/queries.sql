@@ -1377,6 +1377,26 @@ WHERE ma.attachment_id = a.id
   AND ma.direct_chat_message_id = $1
   AND a.status = 'attached';
 
+-- name: DetachEncryptedDirectMessageV2Attachments :execrows
+UPDATE attachments AS a
+SET
+    status = 'detached',
+    updated_at = $2
+FROM message_attachments AS ma
+WHERE ma.attachment_id = a.id
+  AND ma.encrypted_direct_message_v2_id = $1
+  AND a.status = 'attached';
+
+-- name: DetachEncryptedGroupMessageV1Attachments :execrows
+UPDATE attachments AS a
+SET
+    status = 'detached',
+    updated_at = $2
+FROM message_attachments AS ma
+WHERE ma.attachment_id = a.id
+  AND ma.encrypted_group_message_v1_id = $1
+  AND a.status = 'attached';
+
 -- name: AttachDirectMessageAttachment :exec
 INSERT INTO message_attachments (
     attachment_id,

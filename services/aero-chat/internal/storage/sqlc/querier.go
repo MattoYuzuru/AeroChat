@@ -36,6 +36,8 @@ type Querier interface {
 	DeleteEncryptedGroupRosterMembersByGroupID(ctx context.Context, groupID uuid.UUID) error
 	DeleteGroupMembership(ctx context.Context, arg DeleteGroupMembershipParams) (int64, error)
 	DetachDirectMessageAttachments(ctx context.Context, arg DetachDirectMessageAttachmentsParams) (int64, error)
+	DetachEncryptedDirectMessageV2Attachments(ctx context.Context, arg DetachEncryptedDirectMessageV2AttachmentsParams) (int64, error)
+	DetachEncryptedGroupMessageV1Attachments(ctx context.Context, arg DetachEncryptedGroupMessageV1AttachmentsParams) (int64, error)
 	DisableGroupInviteLink(ctx context.Context, arg DisableGroupInviteLinkParams) (int64, error)
 	EditDirectChatMessageText(ctx context.Context, arg EditDirectChatMessageTextParams) (int64, error)
 	EditGroupMessageText(ctx context.Context, arg EditGroupMessageTextParams) (int64, error)

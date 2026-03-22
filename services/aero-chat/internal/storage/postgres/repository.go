@@ -1377,6 +1377,11 @@ func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params 
 	if err := attachUploadedEncryptedDirectMessageV2Attachments(ctx, q, params); err != nil {
 		return nil, err
 	}
+	if params.OperationKind == chat.EncryptedDirectMessageV2OperationTombstone && params.TargetMessageID != nil {
+		if err := detachEncryptedDirectMessageV2Attachments(ctx, q, *params.TargetMessageID, params.StoredAt); err != nil {
+			return nil, err
+		}
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit tx: %w", err)
@@ -1461,6 +1466,11 @@ func (r *Repository) CreateEncryptedGroupMessage(ctx context.Context, params cha
 	}
 	if err := attachUploadedEncryptedGroupMessageAttachments(ctx, q, params); err != nil {
 		return nil, err
+	}
+	if params.OperationKind == chat.EncryptedGroupMessageOperationTombstone && params.TargetMessageID != nil {
+		if err := detachEncryptedGroupMessageAttachments(ctx, q, *params.TargetMessageID, params.StoredAt); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := q.TouchGroupThreadUpdatedAt(ctx, chatsqlc.TouchGroupThreadUpdatedAtParams{

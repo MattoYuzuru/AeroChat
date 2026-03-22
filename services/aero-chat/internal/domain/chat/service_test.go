@@ -3219,6 +3219,19 @@ func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, param
 		attachment.MessageID = &params.MessageID
 		r.attachments[attachmentID] = attachment
 	}
+	if params.OperationKind == EncryptedDirectMessageV2OperationTombstone && params.TargetMessageID != nil {
+		for attachmentID, attachment := range r.attachments {
+			if attachment.MessageID == nil || *attachment.MessageID != *params.TargetMessageID {
+				continue
+			}
+			if attachment.Status != AttachmentStatusAttached {
+				continue
+			}
+			attachment.Status = AttachmentStatusDetached
+			attachment.UpdatedAt = params.StoredAt
+			r.attachments[attachmentID] = attachment
+		}
+	}
 
 	r.encryptedMessagesV2[params.MessageID] = record
 	directChat.UpdatedAt = params.StoredAt
@@ -3287,6 +3300,19 @@ func (r *fakeRepository) CreateEncryptedGroupMessage(_ context.Context, params C
 		attachment.AttachedAt = &params.StoredAt
 		attachment.MessageID = &params.MessageID
 		r.attachments[attachmentID] = attachment
+	}
+	if params.OperationKind == EncryptedGroupMessageOperationTombstone && params.TargetMessageID != nil {
+		for attachmentID, attachment := range r.attachments {
+			if attachment.MessageID == nil || *attachment.MessageID != *params.TargetMessageID {
+				continue
+			}
+			if attachment.Status != AttachmentStatusAttached {
+				continue
+			}
+			attachment.Status = AttachmentStatusDetached
+			attachment.UpdatedAt = params.StoredAt
+			r.attachments[attachmentID] = attachment
+		}
 	}
 
 	r.encryptedGroupMsgs[params.MessageID] = record
