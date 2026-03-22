@@ -202,7 +202,79 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
             envelopes,
           );
         },
-        async sendEncryptedDirectMessageV2Content(chatId, text) {
+        async prepareEncryptedMediaRelayUpload(input) {
+          if (runtimeRef.current === null || currentSessionRef.current === null) {
+            return null;
+          }
+
+          setState((current) =>
+            current.status === "disabled"
+              ? current
+              : {
+                  ...current,
+                  isActionPending: true,
+                  pendingLabel: "Шифруем файл перед upload...",
+                },
+          );
+
+          try {
+            const result = await runtimeRef.current.prepareEncryptedMediaRelayUpload(
+              currentSessionRef.current,
+              input,
+            );
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            return result;
+          } catch (error) {
+            if (!mountedRef.current) {
+              return null;
+            }
+
+            setState((current) =>
+              current.status === "disabled"
+                ? current
+                : {
+                    ...current,
+                    snapshot:
+                      current.snapshot === null
+                        ? current.snapshot
+                        : {
+                            ...current.snapshot,
+                            notice: null,
+                            errorMessage:
+                              error instanceof Error && error.message.trim() !== ""
+                                ? error.message
+                                : "Не удалось подготовить encrypted media relay upload.",
+                          },
+                    isActionPending: false,
+                    pendingLabel: null,
+                  },
+            );
+            throw error;
+          }
+        },
+        async decryptEncryptedMediaAttachment(input) {
+          if (runtimeRef.current === null || currentSessionRef.current === null) {
+            return null;
+          }
+
+          return runtimeRef.current.decryptEncryptedMediaAttachment(
+            currentSessionRef.current,
+            input,
+          );
+        },
+        async sendEncryptedDirectMessageV2Content(chatId, text, attachmentDrafts) {
           if (runtimeRef.current === null || currentSessionRef.current === null) {
             return null;
           }
@@ -223,6 +295,7 @@ export function CryptoRuntimeProvider({ children }: PropsWithChildren) {
               {
                 chatId,
                 text,
+                attachmentDrafts,
               },
             );
             if (!mountedRef.current) {

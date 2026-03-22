@@ -27,6 +27,7 @@ type Attachment struct {
 	AttachedAt   pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
 	FailedAt     pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
 	DeletedAt    pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	RelaySchema  string             `db:"relay_schema" json:"relay_schema"`
 }
 
 type AttachmentUploadSession struct {

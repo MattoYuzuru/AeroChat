@@ -94,6 +94,12 @@ enum AttachmentStatus {
   ATTACHMENT_STATUS_DETACHED = 7;
 }
 
+enum AttachmentRelaySchema {
+  ATTACHMENT_RELAY_SCHEMA_UNSPECIFIED = 0;
+  ATTACHMENT_RELAY_SCHEMA_LEGACY_PLAINTEXT = 1;
+  ATTACHMENT_RELAY_SCHEMA_ENCRYPTED_BLOB_V1 = 2;
+}
+
 enum AttachmentUploadSessionStatus {
   ATTACHMENT_UPLOAD_SESSION_STATUS_UNSPECIFIED = 0;
   ATTACHMENT_UPLOAD_SESSION_STATUS_PENDING = 1;
@@ -219,6 +225,8 @@ message Attachment {
   string direct_chat_id = 4;
   string group_id = 5;
   string message_id = 6;
+  // file_name / mime_type / size_bytes описывают relay-visible object metadata.
+  // Для encrypted relay v1 user-facing display metadata переносится в encrypted descriptor.
   string file_name = 7;
   string mime_type = 8;
   uint64 size_bytes = 9;
@@ -229,6 +237,7 @@ message Attachment {
   google.protobuf.Timestamp attached_at = 14;
   google.protobuf.Timestamp failed_at = 15;
   google.protobuf.Timestamp deleted_at = 16;
+  AttachmentRelaySchema relay_schema = 17;
 }
 
 message AttachmentUploadSession {
@@ -445,6 +454,10 @@ message CreateAttachmentUploadIntentRequest {
   string file_name = 3;
   string mime_type = 4;
   uint64 size_bytes = 5;
+  // Для legacy attachment flow поле можно не заполнять:
+  // сервер использует legacy plaintext relay semantics.
+  // Encrypted media relay v1 обязан передавать ENCRYPTED_BLOB_V1 и ciphertext-visible metadata.
+  AttachmentRelaySchema relay_schema = 6;
 }
 
 message CreateAttachmentUploadIntentResponse {

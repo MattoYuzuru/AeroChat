@@ -3,8 +3,10 @@ import type {
   CryptoRuntimeClient,
   CryptoRuntimeSession,
   CryptoRuntimeSnapshot,
+  DecryptedEncryptedMediaAttachment,
   EncryptedDirectMessageV2DecryptedEnvelope,
   EncryptedDirectMessageV2OutboundSendResult,
+  PreparedEncryptedMediaRelayUpload,
 } from "./types";
 import type { EncryptedDirectMessageV2Envelope } from "../gateway/types";
 
@@ -31,9 +33,22 @@ export interface CryptoRuntimeContextValue {
   decryptEncryptedDirectMessageV2Envelopes(
     envelopes: EncryptedDirectMessageV2Envelope[],
   ): Promise<EncryptedDirectMessageV2DecryptedEnvelope[]>;
+  prepareEncryptedMediaRelayUpload(input: {
+    fileName: string;
+    mimeType: string;
+    fileBytes: ArrayBuffer;
+  }): Promise<PreparedEncryptedMediaRelayUpload | null>;
+  decryptEncryptedMediaAttachment(input: {
+    attachmentId: string;
+    ciphertextBytes: ArrayBuffer;
+  }): Promise<DecryptedEncryptedMediaAttachment | null>;
   sendEncryptedDirectMessageV2Content(
     chatId: string,
     text: string,
+    attachmentDrafts?: Array<{
+      draftId: string;
+      attachmentId: string;
+    }>,
   ): Promise<EncryptedDirectMessageV2OutboundSendResult | null>;
 }
 

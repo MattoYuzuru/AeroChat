@@ -13,6 +13,7 @@ const uploadedAttachment = {
   messageId: null,
   fileName: "report.pdf",
   mimeType: "application/pdf",
+  relaySchema: "ATTACHMENT_RELAY_SCHEMA_LEGACY_PLAINTEXT",
   sizeBytes: 4096,
   status: "ATTACHMENT_STATUS_UPLOADED",
   createdAt: "2026-04-14T10:00:00Z",

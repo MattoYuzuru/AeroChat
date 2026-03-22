@@ -105,6 +105,7 @@ func (h *Handler) CreateAttachmentUploadIntent(ctx context.Context, req *connect
 		req.Msg.GetGroupId(),
 		req.Msg.FileName,
 		req.Msg.MimeType,
+		fromProtoAttachmentRelaySchema(req.Msg.RelaySchema),
 		req.Msg.SizeBytes,
 	)
 	if err != nil {
@@ -1444,6 +1445,7 @@ func toProtoAttachment(value chat.Attachment) *chatv1.Attachment {
 		MimeType:    value.MimeType,
 		SizeBytes:   uint64(value.SizeBytes),
 		Status:      toProtoAttachmentStatus(value.Status),
+		RelaySchema: toProtoAttachmentRelaySchema(value.RelaySchema),
 		CreatedAt:   timestamppb.New(value.CreatedAt),
 		UpdatedAt:   timestamppb.New(value.UpdatedAt),
 	}
@@ -1538,6 +1540,29 @@ func toProtoAttachmentUploadSessionStatus(value string) chatv1.AttachmentUploadS
 		return chatv1.AttachmentUploadSessionStatus_ATTACHMENT_UPLOAD_SESSION_STATUS_EXPIRED
 	default:
 		return chatv1.AttachmentUploadSessionStatus_ATTACHMENT_UPLOAD_SESSION_STATUS_UNSPECIFIED
+	}
+}
+
+func toProtoAttachmentRelaySchema(value string) chatv1.AttachmentRelaySchema {
+	switch value {
+	case chat.AttachmentRelaySchemaLegacyPlaintext:
+		return chatv1.AttachmentRelaySchema_ATTACHMENT_RELAY_SCHEMA_LEGACY_PLAINTEXT
+	case chat.AttachmentRelaySchemaEncryptedBlobV1:
+		return chatv1.AttachmentRelaySchema_ATTACHMENT_RELAY_SCHEMA_ENCRYPTED_BLOB_V1
+	default:
+		return chatv1.AttachmentRelaySchema_ATTACHMENT_RELAY_SCHEMA_UNSPECIFIED
+	}
+}
+
+func fromProtoAttachmentRelaySchema(value chatv1.AttachmentRelaySchema) string {
+	switch value {
+	case chatv1.AttachmentRelaySchema_ATTACHMENT_RELAY_SCHEMA_ENCRYPTED_BLOB_V1:
+		return chat.AttachmentRelaySchemaEncryptedBlobV1
+	case chatv1.AttachmentRelaySchema_ATTACHMENT_RELAY_SCHEMA_LEGACY_PLAINTEXT,
+		chatv1.AttachmentRelaySchema_ATTACHMENT_RELAY_SCHEMA_UNSPECIFIED:
+		return chat.AttachmentRelaySchemaLegacyPlaintext
+	default:
+		return ""
 	}
 }
 

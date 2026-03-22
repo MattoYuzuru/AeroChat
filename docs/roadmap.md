@@ -10,7 +10,7 @@
 
 Последний завершённый platform slice:
 
-- [x] encrypted direct-message v2 sender self-delivery and convergence hardening
+- [x] encrypted media relay v1
 
 ---
 
@@ -164,7 +164,7 @@
 - [x] Voice notes
 - [x] Video notes
 - [x] Image/audio/video preview
-- [ ] Encrypted relay
+- [x] Encrypted relay
 - [x] TTL cleanup
 - [ ] Local media drafts
 

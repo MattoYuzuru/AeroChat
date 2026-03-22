@@ -44,6 +44,7 @@ func (r *Repository) CreateAttachmentUploadIntent(ctx context.Context, params ch
 		ObjectKey:    params.ObjectKey,
 		FileName:     params.FileName,
 		MimeType:     params.MimeType,
+		RelaySchema:  params.RelaySchema,
 		SizeBytes:    params.SizeBytes,
 		Status:       chat.AttachmentStatusPending,
 		CreatedAt:    timestamptzValue(params.CreatedAt),
@@ -71,7 +72,27 @@ func (r *Repository) CreateAttachmentUploadIntent(ctx context.Context, params ch
 	}
 
 	return &chat.AttachmentUploadIntent{
-		Attachment:    attachmentFromModel(attachmentRow, nil),
+		Attachment: attachmentFromQueryRow(
+			attachmentRow.ID,
+			attachmentRow.OwnerUserID,
+			attachmentRow.ScopeKind,
+			attachmentRow.DirectChatID,
+			attachmentRow.GroupID,
+			attachmentRow.BucketName,
+			attachmentRow.ObjectKey,
+			attachmentRow.FileName,
+			attachmentRow.MimeType,
+			attachmentRow.RelaySchema,
+			attachmentRow.SizeBytes,
+			attachmentRow.Status,
+			attachmentRow.CreatedAt,
+			attachmentRow.UpdatedAt,
+			attachmentRow.UploadedAt,
+			attachmentRow.AttachedAt,
+			attachmentRow.FailedAt,
+			attachmentRow.DeletedAt,
+			nil,
+		),
 		UploadSession: attachmentUploadSessionFromModel(sessionRow),
 	}, nil
 }
@@ -83,7 +104,7 @@ func (r *Repository) GetAttachment(ctx context.Context, attachmentID string) (*c
 	}
 
 	messageID := attachmentMessageID(row.DirectChatMessageID, row.GroupMessageID)
-	attachment := attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, messageID)
+	attachment := attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.RelaySchema, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, messageID)
 
 	var uploadSession *chat.AttachmentUploadSession
 	if row.UploadSessionID.Valid {
@@ -121,7 +142,7 @@ func (r *Repository) ListAttachments(ctx context.Context, attachmentIDs []string
 	result := make([]chat.Attachment, 0, len(rows))
 	for _, row := range rows {
 		messageID := attachmentMessageID(row.DirectChatMessageID, row.GroupMessageID)
-		result = append(result, attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, messageID))
+		result = append(result, attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.RelaySchema, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, messageID))
 	}
 
 	return result, nil
@@ -237,29 +258,6 @@ func (r *Repository) MarkAttachmentDeleted(ctx context.Context, attachmentID str
 	return affected > 0, nil
 }
 
-func attachmentFromModel(row chatsqlc.Attachment, messageID *string) chat.Attachment {
-	return attachmentFromQueryRow(
-		row.ID,
-		row.OwnerUserID,
-		row.ScopeKind,
-		row.DirectChatID,
-		row.GroupID,
-		row.BucketName,
-		row.ObjectKey,
-		row.FileName,
-		row.MimeType,
-		row.SizeBytes,
-		row.Status,
-		row.CreatedAt,
-		row.UpdatedAt,
-		row.UploadedAt,
-		row.AttachedAt,
-		row.FailedAt,
-		row.DeletedAt,
-		messageID,
-	)
-}
-
 func attachmentUploadSessionFromModel(row chatsqlc.AttachmentUploadSession) chat.AttachmentUploadSession {
 	return chat.AttachmentUploadSession{
 		ID:           row.ID.String(),
@@ -284,6 +282,7 @@ func attachmentFromQueryRow(
 	objectKey string,
 	fileName string,
 	mimeType string,
+	relaySchema string,
 	sizeBytes int64,
 	status string,
 	createdAt pgtype.Timestamptz,
@@ -305,6 +304,7 @@ func attachmentFromQueryRow(
 		ObjectKey:    objectKey,
 		FileName:     fileName,
 		MimeType:     mimeType,
+		RelaySchema:  relaySchema,
 		SizeBytes:    sizeBytes,
 		Status:       status,
 		CreatedAt:    timestampValue(createdAt),
@@ -361,7 +361,7 @@ func (r *Repository) listDirectAttachmentsByMessageIDs(ctx context.Context, mess
 			continue
 		}
 		messageID := uuid.UUID(row.DirectChatMessageID.Bytes).String()
-		attachment := attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, &messageID)
+		attachment := attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.RelaySchema, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, &messageID)
 		if attachment.Status != chat.AttachmentStatusAttached {
 			continue
 		}
@@ -387,7 +387,7 @@ func (r *Repository) listGroupAttachmentsByMessageIDs(ctx context.Context, messa
 			continue
 		}
 		messageID := uuid.UUID(row.GroupMessageID.Bytes).String()
-		attachment := attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, &messageID)
+		attachment := attachmentFromQueryRow(row.ID, row.OwnerUserID, row.ScopeKind, row.DirectChatID, row.GroupID, row.BucketName, row.ObjectKey, row.FileName, row.MimeType, row.RelaySchema, row.SizeBytes, row.Status, row.CreatedAt, row.UpdatedAt, row.UploadedAt, row.AttachedAt, row.FailedAt, row.DeletedAt, &messageID)
 		if attachment.Status != chat.AttachmentStatusAttached {
 			continue
 		}

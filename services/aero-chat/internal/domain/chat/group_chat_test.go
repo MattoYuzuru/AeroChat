@@ -361,6 +361,7 @@ func TestEditGroupMessageRejectsNonAuthorAndAttachmentOnly(t *testing.T) {
 		group.ID,
 		"note.txt",
 		"text/plain",
+		"",
 		64,
 	)
 	if err != nil {

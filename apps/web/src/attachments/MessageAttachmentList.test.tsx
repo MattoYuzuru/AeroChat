@@ -13,6 +13,7 @@ function createAttachment(overrides: Partial<Attachment> = {}): Attachment {
     messageId: "message-1",
     fileName: "very-long-filename-for-quarterly-report.pdf",
     mimeType: "application/pdf",
+    relaySchema: "ATTACHMENT_RELAY_SCHEMA_LEGACY_PLAINTEXT",
     sizeBytes: 24576,
     status: "attached",
     createdAt: "2026-04-17T10:00:00Z",

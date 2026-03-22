@@ -26,6 +26,7 @@ describe("encrypted direct message v2 local outbound buffer", () => {
       payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
       text: "hello",
       markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      attachments: [],
       editedAt: null,
       deletedAt: null,
     });
@@ -64,6 +65,7 @@ describe("encrypted direct message v2 local outbound buffer", () => {
       payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
       text: "late optimistic",
       markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+      attachments: [],
       editedAt: null,
       deletedAt: null,
     });

@@ -997,6 +997,7 @@ func TestEditDirectChatMessageRejectsNonAuthorAndNonEditableMessages(t *testing.
 		"",
 		"note.txt",
 		"text/plain",
+		"",
 		64,
 	)
 	if err != nil {
@@ -1811,6 +1812,7 @@ func (r *fakeRepository) CreateAttachmentUploadIntent(_ context.Context, params 
 		ObjectKey:    params.ObjectKey,
 		FileName:     params.FileName,
 		MimeType:     params.MimeType,
+		RelaySchema:  params.RelaySchema,
 		SizeBytes:    params.SizeBytes,
 		Status:       AttachmentStatusPending,
 		CreatedAt:    params.CreatedAt,
