@@ -70,7 +70,9 @@
 .pendingText,
 .composerHint,
 .characterCount,
-.tombstoneText {
+.tombstoneText,
+.encryptedLaneDescription,
+.encryptedFailureText {
   margin: 0.75rem 0 0;
   color: rgba(3, 50, 82, 0.76);
 }
@@ -381,6 +383,11 @@
 .messageText {
   color: rgba(3, 50, 82, 0.92);
   overflow-wrap: anywhere;
+}
+
+.encryptedLaneDescription,
+.encryptedFailureText {
+  margin-top: 0;
 }
 
 .editField textarea {

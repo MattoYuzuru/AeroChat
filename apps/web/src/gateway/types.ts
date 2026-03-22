@@ -409,6 +409,28 @@ export interface DirectChatPresenceState {
   peerPresence: DirectChatPresenceIndicator | null;
 }
 
+export interface EncryptedDirectMessageV2Delivery {
+  recipientUserId?: string | null;
+  recipientCryptoDeviceId: string;
+  transportHeader: string;
+  ciphertext: string;
+  ciphertextSizeBytes: number;
+  storedAt: string;
+}
+
+export interface EncryptedDirectMessageV2Envelope {
+  messageId: string;
+  chatId: string;
+  senderUserId: string;
+  senderCryptoDeviceId: string;
+  operationKind: string;
+  targetMessageId: string | null;
+  revision: number;
+  createdAt: string;
+  storedAt: string;
+  viewerDelivery: EncryptedDirectMessageV2Delivery;
+}
+
 export interface DirectChatSnapshot {
   chat: DirectChat;
   readState: DirectChatReadState | null;
@@ -711,6 +733,12 @@ export interface GatewayClient {
     chatId: string,
     pageSize?: number,
   ): Promise<DirectChatMessage[]>;
+  listEncryptedDirectMessageV2(
+    token: string,
+    chatId: string,
+    viewerCryptoDeviceId: string,
+    pageSize?: number,
+  ): Promise<EncryptedDirectMessageV2Envelope[]>;
   searchMessages(token: string, input: SearchMessagesInput): Promise<MessageSearchPage>;
   deleteMessageForEveryone(
     token: string,

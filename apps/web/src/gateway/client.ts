@@ -10,6 +10,8 @@ import type {
   CryptoDeviceLinkIntent,
   CurrentAuth,
   DirectChat,
+  EncryptedDirectMessageV2Envelope,
+  EncryptedDirectMessageV2Delivery,
   DirectChatMessage,
   DirectChatPresenceIndicator,
   DirectChatPresenceState,
@@ -405,6 +407,28 @@ interface DirectChatReadStateWire {
   peerPosition?: DirectChatReadPositionWire;
 }
 
+interface EncryptedDirectMessageV2DeliveryWire {
+  recipientUserId?: string;
+  recipientCryptoDeviceId?: string;
+  transportHeader?: string;
+  ciphertext?: string;
+  ciphertextSizeBytes?: number | string;
+  storedAt?: string;
+}
+
+interface EncryptedDirectMessageV2EnvelopeWire {
+  messageId?: string;
+  chatId?: string;
+  senderUserId?: string;
+  senderCryptoDeviceId?: string;
+  operationKind?: string;
+  targetMessageId?: string;
+  revision?: number | string;
+  createdAt?: string;
+  storedAt?: string;
+  viewerDelivery?: EncryptedDirectMessageV2DeliveryWire;
+}
+
 interface GroupReadStateWire {
   selfPosition?: GroupReadPositionWire;
 }
@@ -571,6 +595,10 @@ interface EditDirectChatMessageResponseWire {
 
 interface ListDirectChatMessagesResponseWire {
   messages?: DirectChatMessageWire[];
+}
+
+interface ListEncryptedDirectMessageV2ResponseWire {
+  envelopes?: EncryptedDirectMessageV2EnvelopeWire[];
 }
 
 interface DeleteMessageForEveryoneResponseWire {
@@ -1426,6 +1454,28 @@ export function createGatewayClient(
       );
 
       return (response.messages ?? []).map(normalizeDirectChatMessage);
+    },
+
+    async listEncryptedDirectMessageV2(
+      token,
+      chatId,
+      viewerCryptoDeviceId,
+      pageSize = 50,
+    ) {
+      const response = await unaryCall<ListEncryptedDirectMessageV2ResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "ListEncryptedDirectMessageV2",
+        {
+          chatId: chatId.trim(),
+          viewerCryptoDeviceId: viewerCryptoDeviceId.trim(),
+          pageSize,
+        },
+        token,
+      );
+
+      return (response.envelopes ?? []).map(normalizeEncryptedDirectMessageV2Envelope);
     },
 
     async searchMessages(token, input) {
@@ -2296,6 +2346,36 @@ function normalizeDirectChatMessage(
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
     editedAt: normalizeNullableString(input?.editedAt),
+  };
+}
+
+function normalizeEncryptedDirectMessageV2Delivery(
+  input: EncryptedDirectMessageV2DeliveryWire | undefined,
+): EncryptedDirectMessageV2Delivery {
+  return {
+    recipientUserId: normalizeNullableString(input?.recipientUserId),
+    recipientCryptoDeviceId: input?.recipientCryptoDeviceId ?? "",
+    transportHeader: input?.transportHeader ?? "",
+    ciphertext: input?.ciphertext ?? "",
+    ciphertextSizeBytes: normalizeCount(input?.ciphertextSizeBytes),
+    storedAt: input?.storedAt ?? "",
+  };
+}
+
+function normalizeEncryptedDirectMessageV2Envelope(
+  input: EncryptedDirectMessageV2EnvelopeWire | undefined,
+): EncryptedDirectMessageV2Envelope {
+  return {
+    messageId: input?.messageId ?? "",
+    chatId: input?.chatId ?? "",
+    senderUserId: input?.senderUserId ?? "",
+    senderCryptoDeviceId: input?.senderCryptoDeviceId ?? "",
+    operationKind: input?.operationKind ?? "",
+    targetMessageId: normalizeNullableString(input?.targetMessageId),
+    revision: normalizeCount(input?.revision),
+    createdAt: input?.createdAt ?? "",
+    storedAt: input?.storedAt ?? "",
+    viewerDelivery: normalizeEncryptedDirectMessageV2Delivery(input?.viewerDelivery),
   };
 }
 

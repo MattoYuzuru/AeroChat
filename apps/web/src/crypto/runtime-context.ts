@@ -3,7 +3,9 @@ import type {
   CryptoRuntimeClient,
   CryptoRuntimeSession,
   CryptoRuntimeSnapshot,
+  EncryptedDirectMessageV2DecryptedEnvelope,
 } from "./types";
+import type { EncryptedDirectMessageV2Envelope } from "../gateway/types";
 
 export type CryptoContextState =
   | {
@@ -25,6 +27,9 @@ export interface CryptoRuntimeContextValue {
   createPendingLinkedDevice(): Promise<void>;
   publishCurrentBundle(): Promise<void>;
   approveLinkIntent(linkIntentId: string): Promise<void>;
+  decryptEncryptedDirectMessageV2Envelopes(
+    envelopes: EncryptedDirectMessageV2Envelope[],
+  ): Promise<EncryptedDirectMessageV2DecryptedEnvelope[]>;
 }
 
 export const CryptoRuntimeContext = createContext<CryptoRuntimeContextValue | null>(null);

@@ -593,6 +593,7 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     sendTextMessage: vi.fn(),
     editDirectChatMessage: vi.fn(),
     listDirectChatMessages: vi.fn(),
+    listEncryptedDirectMessageV2: vi.fn(),
     searchMessages: vi.fn(),
     deleteMessageForEveryone: vi.fn(),
     pinMessage: vi.fn(),

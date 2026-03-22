@@ -38,6 +38,12 @@ async function handleRequest(request: CryptoWorkerRequest) {
           request.payload.linkIntentId,
         );
         break;
+      case "decryptEncryptedDirectMessageV2Envelopes":
+        snapshot = await runtime.decryptEncryptedDirectMessageV2Envelopes(
+          request.payload.session,
+          request.payload.envelopes,
+        );
+        break;
       default:
         throw new Error("Неизвестная crypto worker command.");
     }
@@ -45,7 +51,7 @@ async function handleRequest(request: CryptoWorkerRequest) {
     const response: CryptoWorkerResponse = {
       id: request.id,
       ok: true,
-      snapshot,
+      result: snapshot,
     };
     self.postMessage(response);
   } catch (error) {
