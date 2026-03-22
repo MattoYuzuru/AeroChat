@@ -157,7 +157,7 @@ export function useAttachmentComposer({
       abortControllerRef.current = abortController;
 
       await uploadFileWithProgress({
-        file,
+        body: file,
         uploadUrl: intent.uploadSession.uploadUrl,
         httpMethod: intent.uploadSession.httpMethod || "PUT",
         headers: intent.uploadSession.headers,

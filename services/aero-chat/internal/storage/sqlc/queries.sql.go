@@ -165,11 +165,12 @@ INSERT INTO attachments (
     object_key,
     file_name,
     mime_type,
+    relay_schema,
     size_bytes,
     status,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING
     id,
     owner_user_id,
@@ -180,6 +181,7 @@ RETURNING
     object_key,
     file_name,
     mime_type,
+    relay_schema,
     size_bytes,
     status,
     created_at,
@@ -200,13 +202,35 @@ type CreateAttachmentParams struct {
 	ObjectKey    string             `db:"object_key" json:"object_key"`
 	FileName     string             `db:"file_name" json:"file_name"`
 	MimeType     string             `db:"mime_type" json:"mime_type"`
+	RelaySchema  string             `db:"relay_schema" json:"relay_schema"`
 	SizeBytes    int64              `db:"size_bytes" json:"size_bytes"`
 	Status       string             `db:"status" json:"status"`
 	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error) {
+type CreateAttachmentRow struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind    string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID      pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName   string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey    string             `db:"object_key" json:"object_key"`
+	FileName     string             `db:"file_name" json:"file_name"`
+	MimeType     string             `db:"mime_type" json:"mime_type"`
+	RelaySchema  string             `db:"relay_schema" json:"relay_schema"`
+	SizeBytes    int64              `db:"size_bytes" json:"size_bytes"`
+	Status       string             `db:"status" json:"status"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt   pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt   pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt     pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt    pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (CreateAttachmentRow, error) {
 	row := q.db.QueryRow(ctx, createAttachment,
 		arg.ID,
 		arg.OwnerUserID,
@@ -217,12 +241,13 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		arg.ObjectKey,
 		arg.FileName,
 		arg.MimeType,
+		arg.RelaySchema,
 		arg.SizeBytes,
 		arg.Status,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i Attachment
+	var i CreateAttachmentRow
 	err := row.Scan(
 		&i.ID,
 		&i.OwnerUserID,
@@ -233,6 +258,7 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		&i.ObjectKey,
 		&i.FileName,
 		&i.MimeType,
+		&i.RelaySchema,
 		&i.SizeBytes,
 		&i.Status,
 		&i.CreatedAt,
@@ -1096,6 +1122,7 @@ SELECT
     a.object_key,
     a.file_name,
     a.mime_type,
+    a.relay_schema,
     a.size_bytes,
     a.status,
     a.created_at,
@@ -1130,6 +1157,7 @@ type GetAttachmentRowByIDRow struct {
 	ObjectKey                string             `db:"object_key" json:"object_key"`
 	FileName                 string             `db:"file_name" json:"file_name"`
 	MimeType                 string             `db:"mime_type" json:"mime_type"`
+	RelaySchema              string             `db:"relay_schema" json:"relay_schema"`
 	SizeBytes                int64              `db:"size_bytes" json:"size_bytes"`
 	Status                   string             `db:"status" json:"status"`
 	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
@@ -1163,6 +1191,7 @@ func (q *Queries) GetAttachmentRowByID(ctx context.Context, id uuid.UUID) (GetAt
 		&i.ObjectKey,
 		&i.FileName,
 		&i.MimeType,
+		&i.RelaySchema,
 		&i.SizeBytes,
 		&i.Status,
 		&i.CreatedAt,
@@ -2060,6 +2089,7 @@ SELECT
     a.object_key,
     a.file_name,
     a.mime_type,
+    a.relay_schema,
     a.size_bytes,
     a.status,
     a.created_at,
@@ -2094,6 +2124,7 @@ type ListAttachmentRowsByIDsRow struct {
 	ObjectKey                string             `db:"object_key" json:"object_key"`
 	FileName                 string             `db:"file_name" json:"file_name"`
 	MimeType                 string             `db:"mime_type" json:"mime_type"`
+	RelaySchema              string             `db:"relay_schema" json:"relay_schema"`
 	SizeBytes                int64              `db:"size_bytes" json:"size_bytes"`
 	Status                   string             `db:"status" json:"status"`
 	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
@@ -2133,6 +2164,7 @@ func (q *Queries) ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.U
 			&i.ObjectKey,
 			&i.FileName,
 			&i.MimeType,
+			&i.RelaySchema,
 			&i.SizeBytes,
 			&i.Status,
 			&i.CreatedAt,
@@ -2648,6 +2680,7 @@ SELECT
     a.object_key,
     a.file_name,
     a.mime_type,
+    a.relay_schema,
     a.size_bytes,
     a.status,
     a.created_at,
@@ -2673,6 +2706,7 @@ type ListDirectMessageAttachmentRowsByMessageIDsRow struct {
 	ObjectKey           string             `db:"object_key" json:"object_key"`
 	FileName            string             `db:"file_name" json:"file_name"`
 	MimeType            string             `db:"mime_type" json:"mime_type"`
+	RelaySchema         string             `db:"relay_schema" json:"relay_schema"`
 	SizeBytes           int64              `db:"size_bytes" json:"size_bytes"`
 	Status              string             `db:"status" json:"status"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
@@ -2703,6 +2737,7 @@ func (q *Queries) ListDirectMessageAttachmentRowsByMessageIDs(ctx context.Contex
 			&i.ObjectKey,
 			&i.FileName,
 			&i.MimeType,
+			&i.RelaySchema,
 			&i.SizeBytes,
 			&i.Status,
 			&i.CreatedAt,
@@ -2938,6 +2973,7 @@ SELECT
     a.object_key,
     a.file_name,
     a.mime_type,
+    a.relay_schema,
     a.size_bytes,
     a.status,
     a.created_at,
@@ -2963,6 +2999,7 @@ type ListGroupMessageAttachmentRowsByMessageIDsRow struct {
 	ObjectKey      string             `db:"object_key" json:"object_key"`
 	FileName       string             `db:"file_name" json:"file_name"`
 	MimeType       string             `db:"mime_type" json:"mime_type"`
+	RelaySchema    string             `db:"relay_schema" json:"relay_schema"`
 	SizeBytes      int64              `db:"size_bytes" json:"size_bytes"`
 	Status         string             `db:"status" json:"status"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
@@ -2993,6 +3030,7 @@ func (q *Queries) ListGroupMessageAttachmentRowsByMessageIDs(ctx context.Context
 			&i.ObjectKey,
 			&i.FileName,
 			&i.MimeType,
+			&i.RelaySchema,
 			&i.SizeBytes,
 			&i.Status,
 			&i.CreatedAt,

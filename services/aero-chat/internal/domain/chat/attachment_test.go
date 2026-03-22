@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -14,14 +15,14 @@ func TestCreateAttachmentUploadIntentRequiresWritableScope(t *testing.T) {
 	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
 	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
 
-	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, testUUID(99), "", "report.pdf", "application/pdf", 1024); !errors.Is(err, ErrNotFound) {
+	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, testUUID(99), "", "report.pdf", "application/pdf", "", 1024); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("ожидалась ошибка доступа к несуществующему direct chat, получено %v", err)
 	}
 
 	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
 
-	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "report.pdf", "application/pdf", 1024)
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "report.pdf", "application/pdf", "", 1024)
 	if err != nil {
 		t.Fatalf("create attachment upload intent: %v", err)
 	}
@@ -35,7 +36,7 @@ func TestCreateAttachmentUploadIntentRequiresWritableScope(t *testing.T) {
 		t.Fatal("ожидался presigned upload url")
 	}
 
-	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "unsafe.html", "text/html", 1024); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "unsafe.html", "text/html", "", 1024); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("ожидалась ошибка denylist mime_type, получено %v", err)
 	}
 
@@ -48,8 +49,62 @@ func TestCreateAttachmentUploadIntentRequiresWritableScope(t *testing.T) {
 		t.Fatalf("join reader invite: %v", err)
 	}
 
-	if _, err := service.CreateAttachmentUploadIntent(context.Background(), bob.Token, "", group.ID, "reader.pdf", "application/pdf", 1024); !errors.Is(err, ErrPermissionDenied) {
+	if _, err := service.CreateAttachmentUploadIntent(context.Background(), bob.Token, "", group.ID, "reader.pdf", "application/pdf", "", 1024); !errors.Is(err, ErrPermissionDenied) {
 		t.Fatalf("ожидалась ошибка write policy для reader attachment upload, получено %v", err)
+	}
+}
+
+func TestCreateAttachmentUploadIntentAcceptsEncryptedRelayMetadata(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	intent, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		directChat.ID,
+		"",
+		"ciphertext.bin",
+		"application/octet-stream",
+		AttachmentRelaySchemaEncryptedBlobV1,
+		2048,
+	)
+	if err != nil {
+		t.Fatalf("create encrypted relay upload intent: %v", err)
+	}
+	if intent.Attachment.RelaySchema != AttachmentRelaySchemaEncryptedBlobV1 {
+		t.Fatalf("ожидалась relay schema %q, получено %q", AttachmentRelaySchemaEncryptedBlobV1, intent.Attachment.RelaySchema)
+	}
+	if !strings.HasSuffix(intent.Attachment.ObjectKey, ".bin") {
+		t.Fatalf("ожидался ciphertext object key с .bin suffix, получено %q", intent.Attachment.ObjectKey)
+	}
+}
+
+func TestCreateAttachmentUploadIntentRejectsPlaintextMetadataForEncryptedRelay(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+
+	if _, err := service.CreateAttachmentUploadIntent(
+		context.Background(),
+		alice.Token,
+		directChat.ID,
+		"",
+		"photo.jpg",
+		"image/jpeg",
+		AttachmentRelaySchemaEncryptedBlobV1,
+		2048,
+	); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ожидалась ошибка plaintext metadata для encrypted relay, получено %v", err)
 	}
 }
 
@@ -62,7 +117,7 @@ func TestCompleteAttachmentUploadAndAttachToDirectMessage(t *testing.T) {
 	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
-	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "photo.jpg", "image/jpeg", 2048)
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "photo.jpg", "image/jpeg", "", 2048)
 	if err != nil {
 		t.Fatalf("create upload intent: %v", err)
 	}
@@ -118,7 +173,7 @@ func TestUnattachedAttachmentRemainsOwnerScoped(t *testing.T) {
 	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
-	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "clip.mp4", "video/mp4", 4096)
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "clip.mp4", "video/mp4", "", 4096)
 	if err != nil {
 		t.Fatalf("create upload intent: %v", err)
 	}
@@ -143,7 +198,7 @@ func TestSendAttachmentOnlyMessageInDirectChat(t *testing.T) {
 	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
-	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "photo.jpg", "image/jpeg", 2048)
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "photo.jpg", "image/jpeg", "", 2048)
 	if err != nil {
 		t.Fatalf("create upload intent: %v", err)
 	}
@@ -188,7 +243,7 @@ func TestSendAttachmentOnlyMessageInGroupChat(t *testing.T) {
 	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
 
 	group := mustCreateGroup(t, service, alice.Token, "Files")
-	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, "", group.ID, "photo.jpg", "image/jpeg", 2048)
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, "", group.ID, "photo.jpg", "image/jpeg", "", 2048)
 	if err != nil {
 		t.Fatalf("create upload intent: %v", err)
 	}
@@ -237,11 +292,11 @@ func TestCreateAttachmentUploadIntentRejectsQuotaExhaustion(t *testing.T) {
 	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
-	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "first.bin", "application/octet-stream", 2048); err != nil {
+	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "first.bin", "application/octet-stream", "", 2048); err != nil {
 		t.Fatalf("create first upload intent: %v", err)
 	}
 
-	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "second.bin", "application/octet-stream", 3072); !errors.Is(err, ErrResourceExhausted) {
+	if _, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "second.bin", "application/octet-stream", "", 3072); !errors.Is(err, ErrResourceExhausted) {
 		t.Fatalf("ожидалась quota exhaustion ошибка, получено %v", err)
 	}
 }
@@ -325,7 +380,7 @@ func TestCreateAttachmentUploadIntentIgnoresDetachedExpiredAndDeletedQuotaStates
 		DeletedAt:   &deletedAt,
 	}
 
-	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "fresh.bin", "application/octet-stream", 2048)
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "fresh.bin", "application/octet-stream", "", 2048)
 	if err != nil {
 		t.Fatalf("ожидалось успешное создание upload intent вне expired/deleted quota states: %v", err)
 	}
@@ -343,7 +398,7 @@ func TestDeleteDirectMessageTransitionsAttachmentToDetached(t *testing.T) {
 	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
-	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "photo.jpg", "image/jpeg", 2048)
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "photo.jpg", "image/jpeg", "", 2048)
 	if err != nil {
 		t.Fatalf("create upload intent: %v", err)
 	}
@@ -414,7 +469,7 @@ func TestCompleteAttachmentUploadMarksExpiredSession(t *testing.T) {
 	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
-	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "late.pdf", "application/pdf", 1024)
+	intent, err := service.CreateAttachmentUploadIntent(context.Background(), alice.Token, directChat.ID, "", "late.pdf", "application/pdf", "", 1024)
 	if err != nil {
 		t.Fatalf("create upload intent: %v", err)
 	}

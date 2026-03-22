@@ -21,6 +21,7 @@ func (s *Service) CreateAttachmentUploadIntent(
 	groupID string,
 	fileName string,
 	mimeType string,
+	relaySchema string,
 	sizeBytes uint64,
 ) (*AttachmentUploadIntent, error) {
 	authSession, err := s.authenticate(ctx, token)
@@ -40,15 +41,30 @@ func (s *Service) CreateAttachmentUploadIntent(
 	if err != nil {
 		return nil, err
 	}
+	normalizedRelaySchema, err := normalizeAttachmentRelaySchema(relaySchema)
+	if err != nil {
+		return nil, err
+	}
 	normalizedSize, err := s.normalizeAttachmentSize(sizeBytes)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateAttachmentRelayMetadata(normalizedRelaySchema, normalizedFileName, normalizedMimeType); err != nil {
 		return nil, err
 	}
 
 	now := s.now()
 	attachmentID := s.newID()
 	uploadSessionID := s.newID()
-	objectKey := buildAttachmentObjectKey(scope, resolvedDirectChatID, resolvedGroupID, authSession.User.ID, attachmentID, normalizedFileName)
+	objectKey := buildAttachmentObjectKey(
+		scope,
+		resolvedDirectChatID,
+		resolvedGroupID,
+		authSession.User.ID,
+		attachmentID,
+		normalizedRelaySchema,
+		normalizedFileName,
+	)
 	expiresAt := now.Add(s.uploadIntentTTL)
 
 	upload, err := s.objectStorage.CreateUpload(ctx, objectKey, normalizedMimeType, expiresAt)
@@ -67,6 +83,7 @@ func (s *Service) CreateAttachmentUploadIntent(
 		ObjectKey:       objectKey,
 		FileName:        normalizedFileName,
 		MimeType:        normalizedMimeType,
+		RelaySchema:     normalizedRelaySchema,
 		SizeBytes:       normalizedSize,
 		ExpiresAt:       upload.ExpiresAt,
 		CreatedAt:       now,
@@ -375,8 +392,36 @@ func (s *Service) normalizeAttachmentSize(sizeBytes uint64) (int64, error) {
 	return int64(sizeBytes), nil
 }
 
-func buildAttachmentObjectKey(scope string, directChatID *string, groupID *string, ownerUserID string, attachmentID string, fileName string) string {
+func normalizeAttachmentRelaySchema(relaySchema string) (string, error) {
+	trimmed := strings.TrimSpace(strings.ToLower(relaySchema))
+	switch trimmed {
+	case "", AttachmentRelaySchemaLegacyPlaintext:
+		return AttachmentRelaySchemaLegacyPlaintext, nil
+	case AttachmentRelaySchemaEncryptedBlobV1:
+		return AttachmentRelaySchemaEncryptedBlobV1, nil
+	default:
+		return "", fmt.Errorf("%w: unsupported attachment relay schema", ErrInvalidArgument)
+	}
+}
+
+func validateAttachmentRelayMetadata(relaySchema string, fileName string, mimeType string) error {
+	if relaySchema != AttachmentRelaySchemaEncryptedBlobV1 {
+		return nil
+	}
+	if !strings.HasSuffix(strings.ToLower(fileName), ".bin") {
+		return fmt.Errorf("%w: encrypted relay upload must use ciphertext relay file naming", ErrInvalidArgument)
+	}
+	if mimeType != "application/octet-stream" {
+		return fmt.Errorf("%w: encrypted relay upload must use application/octet-stream relay mime type", ErrInvalidArgument)
+	}
+	return nil
+}
+
+func buildAttachmentObjectKey(scope string, directChatID *string, groupID *string, ownerUserID string, attachmentID string, relaySchema string, fileName string) string {
 	extension := strings.ToLower(filepath.Ext(fileName))
+	if relaySchema == AttachmentRelaySchemaEncryptedBlobV1 {
+		extension = ".bin"
+	}
 	switch scope {
 	case AttachmentScopeDirect:
 		return fmt.Sprintf("attachments/direct/%s/%s/%s/original%s", dereferenceString(directChatID), ownerUserID, attachmentID, extension)

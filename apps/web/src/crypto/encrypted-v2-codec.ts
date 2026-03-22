@@ -5,6 +5,11 @@ import type {
   EncryptedDirectMessageV2ReadyProjection,
   LocalCryptoDeviceMaterial,
 } from "./types";
+import {
+  parseEncryptedMediaAttachmentDescriptor,
+  toPublicEncryptedMediaAttachmentDescriptor,
+  type EncryptedMediaAttachmentDescriptorV1,
+} from "./encrypted-media-relay";
 
 const transportSchema = "aerochat.web.encrypted_direct_message_v2.transport.v1";
 const payloadSchema = "aerochat.web.encrypted_direct_message_v2.payload.v1";
@@ -33,9 +38,9 @@ interface EncryptedDirectMessageV2ContentPayloadV1 {
   schema: typeof payloadSchema;
   operation: "content";
   message: {
-    kind: "text";
-    text: string;
-    markdownPolicy: string;
+    text: string | null;
+    markdownPolicy: string | null;
+    attachments: EncryptedMediaAttachmentDescriptorV1[];
   };
 }
 
@@ -43,9 +48,9 @@ interface EncryptedDirectMessageV2EditPayloadV1 {
   schema: typeof payloadSchema;
   operation: "edit";
   message: {
-    kind: "text";
-    text: string;
-    markdownPolicy: string;
+    text: string | null;
+    markdownPolicy: string | null;
+    attachments: EncryptedMediaAttachmentDescriptorV1[];
   };
   editedAt: string;
 }
@@ -64,6 +69,9 @@ export type EncryptedDirectMessageV2PayloadV1 =
 export async function decryptEncryptedDirectMessageV2Envelope(
   material: LocalCryptoDeviceMaterial,
   envelope: EncryptedDirectMessageV2Envelope,
+  options?: {
+    onEncryptedMediaDescriptor?(descriptor: EncryptedMediaAttachmentDescriptorV1): void;
+  },
 ): Promise<EncryptedDirectMessageV2DecryptedEnvelope> {
   if (
     material.record.cryptoDeviceId !== envelope.viewerDelivery.recipientCryptoDeviceId
@@ -91,7 +99,7 @@ export async function decryptEncryptedDirectMessageV2Envelope(
       return buildFailure(envelope, "invalid_payload");
     }
 
-    return buildReadyProjection(envelope, operationKind, payload);
+    return buildReadyProjection(envelope, operationKind, payload, options);
   } catch (error) {
     if (error instanceof DOMException && error.name === "OperationError") {
       return buildFailure(envelope, "aad_mismatch");
@@ -321,17 +329,44 @@ function parsePayload(value: string): EncryptedDirectMessageV2PayloadV1 | null {
       return null;
     }
     if (raw.operation === "content" || raw.operation === "edit") {
+      if (!isRecord(raw.message)) {
+        return null;
+      }
+      const text =
+        raw.message.text === null || typeof raw.message.text === "string"
+          ? raw.message.text
+          : undefined;
+      const markdownPolicy =
+        raw.message.markdownPolicy === null ||
+        typeof raw.message.markdownPolicy === "string"
+          ? raw.message.markdownPolicy
+          : undefined;
+      const rawAttachments = Array.isArray(raw.message.attachments)
+        ? raw.message.attachments
+        : undefined;
+      const attachments = rawAttachments?.map(parseEncryptedMediaAttachmentDescriptor);
       if (
-        !isRecord(raw.message) ||
-        raw.message.kind !== "text" ||
-        typeof raw.message.text !== "string" ||
-        typeof raw.message.markdownPolicy !== "string"
+        text === undefined ||
+        markdownPolicy === undefined ||
+        attachments === undefined ||
+        attachments.some((descriptor) => descriptor === null)
       ) {
+        return null;
+      }
+      if (text === "" && attachments.length === 0) {
         return null;
       }
       if (raw.operation === "edit" && typeof raw.editedAt !== "string") {
         return null;
       }
+      raw.message = {
+        text,
+        markdownPolicy,
+        attachments: attachments.filter(
+          (descriptor): descriptor is EncryptedMediaAttachmentDescriptorV1 =>
+            descriptor !== null,
+        ),
+      };
     }
     if (raw.operation === "tombstone" && typeof raw.deletedAt !== "string") {
       return null;
@@ -347,7 +382,18 @@ function buildReadyProjection(
   envelope: EncryptedDirectMessageV2Envelope,
   operationKind: EncryptedDirectMessageV2ReadyProjection["operationKind"],
   payload: EncryptedDirectMessageV2PayloadV1,
+  options?: {
+    onEncryptedMediaDescriptor?(descriptor: EncryptedMediaAttachmentDescriptorV1): void;
+  },
 ): EncryptedDirectMessageV2ReadyProjection {
+  const mediaDescriptors =
+    payload.operation === "content" || payload.operation === "edit"
+      ? payload.message.attachments
+      : [];
+  for (const descriptor of mediaDescriptors) {
+    options?.onEncryptedMediaDescriptor?.(descriptor);
+  }
+
   return {
     status: "ready",
     messageId: envelope.messageId,
@@ -368,6 +414,7 @@ function buildReadyProjection(
       payload.operation === "content" || payload.operation === "edit"
         ? payload.message.markdownPolicy
         : null,
+    attachments: mediaDescriptors.map(toPublicEncryptedMediaAttachmentDescriptor),
     editedAt: payload.operation === "edit" ? payload.editedAt : null,
     deletedAt: payload.operation === "tombstone" ? payload.deletedAt : null,
   };

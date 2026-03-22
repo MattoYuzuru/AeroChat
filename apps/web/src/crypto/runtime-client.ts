@@ -86,6 +86,18 @@ export function createCryptoRuntimeClient(): CryptoRuntimeClient {
         envelopes,
       });
     },
+    prepareEncryptedMediaRelayUpload(session, input) {
+      return sendCommand("prepareEncryptedMediaRelayUpload", {
+        session,
+        input,
+      });
+    },
+    decryptEncryptedMediaAttachment(session, input) {
+      return sendCommand("decryptEncryptedMediaAttachment", {
+        session,
+        input,
+      });
+    },
     sendEncryptedDirectMessageV2Content(session, input) {
       return sendCommand("sendEncryptedDirectMessageV2Content", {
         session,

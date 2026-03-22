@@ -343,6 +343,7 @@ interface AttachmentWire extends TimestampedWire {
   messageId?: string;
   fileName?: string;
   mimeType?: string;
+  relaySchema?: string;
   sizeBytes?: number | string;
   status?: string;
   uploadedAt?: string;
@@ -1016,6 +1017,10 @@ export function createGatewayClient(
             : { groupId: input.groupId.trim() }),
           fileName: input.fileName.trim(),
           mimeType: input.mimeType.trim(),
+          relaySchema:
+            typeof input.relaySchema === "string" && input.relaySchema.trim() !== ""
+              ? input.relaySchema.trim()
+              : undefined,
           sizeBytes: String(Math.max(0, Math.trunc(input.sizeBytes))),
         },
         token,
@@ -2300,6 +2305,7 @@ function normalizeAttachment(input: AttachmentWire | undefined): Attachment {
     messageId: normalizeNullableString(input?.messageId),
     fileName: input?.fileName ?? "",
     mimeType: input?.mimeType ?? "",
+    relaySchema: input?.relaySchema ?? "ATTACHMENT_RELAY_SCHEMA_UNSPECIFIED",
     sizeBytes: normalizeCount(input?.sizeBytes),
     status: input?.status ?? "ATTACHMENT_STATUS_UNSPECIFIED",
     createdAt: input?.createdAt ?? "",

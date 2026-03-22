@@ -69,8 +69,14 @@ AeroChat должен поддерживать:
     - target roster собирается по active crypto devices собеседника и всех active devices отправителя, включая originating sender device;
     - per-device opaque envelopes собираются внутри crypto worker/runtime boundary;
     - originating sender device теперь получает server-backed self-delivery через тот же opaque storage/realtime path, а bounded local optimistic projection остаётся только временным reconciliation layer без plaintext fallback;
+  - encrypted media relay v1 для direct encrypted lane:
+    - presigned direct-to-object-storage flow сохраняется, но encrypted media upload/download идёт только как ciphertext blob;
+    - relay metadata отделена от encrypted attachment descriptor;
+    - browser шифрует файл до upload, descriptor уходит внутри encrypted DM v2 payload, а ciphertext blob расшифровывается локально после download;
+    - текущий direct encrypted lane умеет bounded text + encrypted attachment и attachment-only send/use path;
+    - storage/lifecycle/quota/retention foundation остаётся общей и future-ready для group E2EE;
   - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
-  - без claims о full encrypted DM parity, encrypted search, encrypted media relay или backup/recovery.
+  - без claims о full encrypted DM parity, encrypted search, MLS/group encrypted messaging или backup/recovery.
 - explicit group moderation/admin policy foundation:
   - явная policy matrix для `owner` / `admin` / `member` / `reader`;
   - durable write restriction для участников группы без потери membership;
@@ -98,6 +104,10 @@ AeroChat должен поддерживать:
   - direct message tombstone переводит linked attachment из `attached` в `detached`;
   - `detached` больше не удерживает active quota budget;
   - object cleanup для `detached` остаётся staged и выполняется отдельно после retention grace period.
+- encrypted media relay v1:
+  - `attachment` теперь может явно работать как relay entity с `legacy_plaintext` или `encrypted_blob_v1` schema;
+  - для encrypted relay quota и cleanup считают ciphertext-visible bytes;
+  - user-facing filename/MIME/decrypt metadata для encrypted media больше не считаются server-visible source of truth.
 - max groups per user rules foundation:
   - configurable per-user limit по active group memberships;
   - limit применяется на `CreateGroup` и `JoinGroupByInviteLink`;

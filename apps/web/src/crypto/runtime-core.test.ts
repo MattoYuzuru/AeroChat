@@ -365,6 +365,7 @@ describe("createCryptoRuntimeCore", () => {
     const result = await runtime.sendEncryptedDirectMessageV2Content(baseSession, {
       chatId: "chat-1",
       text: "secret hello",
+      attachmentDrafts: [],
     });
 
     expect(gatewayClient.getEncryptedDirectMessageV2SendBootstrap).toHaveBeenCalledWith(

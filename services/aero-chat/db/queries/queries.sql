@@ -777,11 +777,12 @@ INSERT INTO attachments (
     object_key,
     file_name,
     mime_type,
+    relay_schema,
     size_bytes,
     status,
     created_at,
     updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING
     id,
     owner_user_id,
@@ -792,6 +793,7 @@ RETURNING
     object_key,
     file_name,
     mime_type,
+    relay_schema,
     size_bytes,
     status,
     created_at,
@@ -845,6 +847,7 @@ SELECT
     a.object_key,
     a.file_name,
     a.mime_type,
+    a.relay_schema,
     a.size_bytes,
     a.status,
     a.created_at,
@@ -879,6 +882,7 @@ SELECT
     a.object_key,
     a.file_name,
     a.mime_type,
+    a.relay_schema,
     a.size_bytes,
     a.status,
     a.created_at,
@@ -1159,6 +1163,7 @@ SELECT
     a.object_key,
     a.file_name,
     a.mime_type,
+    a.relay_schema,
     a.size_bytes,
     a.status,
     a.created_at,
@@ -1184,6 +1189,7 @@ SELECT
     a.object_key,
     a.file_name,
     a.mime_type,
+    a.relay_schema,
     a.size_bytes,
     a.status,
     a.created_at,

@@ -15,12 +15,21 @@ import {
   encryptEncryptedDirectMessageV2Payload,
   type EncryptedDirectMessageV2PayloadV1,
 } from "./encrypted-v2-codec";
+import {
+  decryptEncryptedMediaAttachment,
+  finalizeEncryptedMediaAttachmentDescriptorDraft,
+  prepareEncryptedMediaRelayUpload,
+  type EncryptedMediaAttachmentDescriptorV1,
+} from "./encrypted-media-relay";
 import type {
+  DecryptedEncryptedMediaAttachment,
   EncryptedDirectMessageV2DecryptedEnvelope,
+  EncryptedMediaAttachmentDescriptor,
   EncryptedDirectMessageV2OutboundSendResult,
   CryptoRuntimeSession,
   CryptoRuntimeSnapshot,
   LocalCryptoDeviceMaterial,
+  PreparedEncryptedMediaRelayUpload,
 } from "./types";
 
 interface RuntimeDependencies {
@@ -31,6 +40,9 @@ interface RuntimeDependencies {
 }
 
 export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
+  const encryptedMediaDrafts = new Map<string, EncryptedMediaAttachmentDescriptorV1>();
+  const encryptedMediaDescriptors = new Map<string, EncryptedMediaAttachmentDescriptorV1>();
+
   return {
     async bootstrapSession(session: CryptoRuntimeSession): Promise<CryptoRuntimeSnapshot> {
       return synchronizeSession(session, dependencies, null);
@@ -265,9 +277,77 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
 
       return Promise.all(
         envelopes.map((envelope) =>
-          decryptEncryptedDirectMessageV2Envelope(localMaterial, envelope),
+          decryptEncryptedDirectMessageV2Envelope(localMaterial, envelope, {
+            onEncryptedMediaDescriptor(descriptor) {
+              cacheEncryptedMediaDescriptor(encryptedMediaDescriptors, descriptor);
+            },
+          }),
         ),
       );
+    },
+
+    async prepareEncryptedMediaRelayUpload(
+      session: CryptoRuntimeSession,
+      input: {
+        fileName: string;
+        mimeType: string;
+        fileBytes: ArrayBuffer;
+      },
+    ): Promise<PreparedEncryptedMediaRelayUpload> {
+      const supportError = assertSupport(dependencies);
+      if (supportError !== null) {
+        throw new Error(
+          supportError.errorMessage ??
+            "Текущий browser runtime не поддерживает encrypted media relay v1.",
+        );
+      }
+
+      const localMaterial = await dependencies.keyStore.load(session.profileId);
+      if (localMaterial === null || localMaterial.record.status !== "active") {
+        throw new Error(
+          "Encrypted media relay v1 доступен только для browser profile с active local crypto-device.",
+        );
+      }
+
+      const prepared = await prepareEncryptedMediaRelayUpload(input);
+      cacheEncryptedMediaDraft(encryptedMediaDrafts, prepared.draftId, prepared.descriptor);
+      return prepared.relayUpload;
+    },
+
+    async decryptEncryptedMediaAttachment(
+      session: CryptoRuntimeSession,
+      input: {
+        attachmentId: string;
+        ciphertextBytes: ArrayBuffer;
+      },
+    ): Promise<DecryptedEncryptedMediaAttachment> {
+      const supportError = assertSupport(dependencies);
+      if (supportError !== null) {
+        throw new Error(
+          supportError.errorMessage ??
+            "Текущий browser runtime не поддерживает local media decrypt.",
+        );
+      }
+
+      const descriptor = encryptedMediaDescriptors.get(input.attachmentId);
+      if (descriptor === undefined) {
+        throw new Error(
+          "Encrypted attachment descriptor не найден в bounded local runtime cache.",
+        );
+      }
+
+      const localMaterial = await dependencies.keyStore.load(session.profileId);
+      if (localMaterial === null || localMaterial.record.status !== "active") {
+        throw new Error(
+          "Local media decrypt доступен только для browser profile с active local crypto-device.",
+        );
+      }
+
+      return decryptEncryptedMediaAttachment({
+        attachmentId: input.attachmentId,
+        ciphertextBytes: input.ciphertextBytes,
+        descriptor,
+      });
     },
 
     async sendEncryptedDirectMessageV2Content(
@@ -275,6 +355,10 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
       input: {
         chatId: string;
         text: string;
+        attachmentDrafts?: Array<{
+          draftId: string;
+          attachmentId: string;
+        }>;
       },
     ): Promise<EncryptedDirectMessageV2OutboundSendResult> {
       const supportError = assertSupport(dependencies);
@@ -287,11 +371,16 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
 
       const normalizedChatId = input.chatId.trim();
       const normalizedText = input.text.trim();
+      const normalizedAttachmentDrafts = normalizeEncryptedAttachmentDraftInputs(
+        input.attachmentDrafts,
+      );
       if (normalizedChatId === "") {
         throw new Error("Не выбран direct chat для encrypted DM v2 send.");
       }
-      if (normalizedText === "") {
-        throw new Error("Encrypted DM v2 bootstrap send пока поддерживает только непустой text payload.");
+      if (normalizedText === "" && normalizedAttachmentDrafts.length === 0) {
+        throw new Error(
+          "Encrypted DM v2 send требует text payload или хотя бы один encrypted attachment descriptor.",
+        );
       }
 
       const localMaterial = await dependencies.keyStore.load(session.profileId);
@@ -333,13 +422,18 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
 
       const messageId = createLogicalMessageId();
       const createdAt = new Date().toISOString();
+      const attachmentDescriptors = resolveEncryptedMediaAttachmentDescriptors(
+        encryptedMediaDrafts,
+        normalizedAttachmentDrafts,
+      );
       const payload: EncryptedDirectMessageV2PayloadV1 = {
         schema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
         operation: "content",
         message: {
-          kind: "text",
-          text: normalizedText,
-          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+          text: normalizedText === "" ? null : normalizedText,
+          markdownPolicy:
+            normalizedText === "" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+          attachments: attachmentDescriptors,
         },
       };
 
@@ -387,6 +481,14 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           deliveries,
         },
       );
+      for (const descriptor of attachmentDescriptors) {
+        cacheEncryptedMediaDescriptor(encryptedMediaDescriptors, descriptor);
+        encryptedMediaDrafts.delete(
+          normalizedAttachmentDrafts.find(
+            (draft) => draft.attachmentId === descriptor.attachmentId,
+          )?.draftId ?? "",
+        );
+      }
 
       return {
         storedEnvelope,
@@ -402,14 +504,116 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           createdAt: storedEnvelope.createdAt,
           storedAt: storedEnvelope.storedAt,
           payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
-          text: normalizedText,
-          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+          text: normalizedText === "" ? null : normalizedText,
+          markdownPolicy:
+            normalizedText === "" ? null : "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+          attachments: attachmentDescriptors.map(stripEncryptedMediaAttachmentDescriptor),
           editedAt: null,
           deletedAt: null,
         },
       };
     },
   };
+}
+
+function normalizeEncryptedAttachmentDraftInputs(
+  drafts:
+    | Array<{
+        draftId: string;
+        attachmentId: string;
+      }>
+    | undefined,
+): Array<{
+  draftId: string;
+  attachmentId: string;
+}> {
+  if (drafts === undefined || drafts.length === 0) {
+    return [];
+  }
+
+  const normalized = new Map<string, { draftId: string; attachmentId: string }>();
+  for (const draft of drafts) {
+    const draftId = draft.draftId.trim();
+    const attachmentId = draft.attachmentId.trim();
+    if (draftId === "" || attachmentId === "") {
+      throw new Error("Encrypted attachment draft должен содержать draftId и attachmentId.");
+    }
+    if (normalized.has(attachmentId)) {
+      throw new Error("Duplicate encrypted attachment ids не допускаются.");
+    }
+    normalized.set(attachmentId, { draftId, attachmentId });
+  }
+
+  return Array.from(normalized.values());
+}
+
+function resolveEncryptedMediaAttachmentDescriptors(
+  drafts: Map<string, EncryptedMediaAttachmentDescriptorV1>,
+  selectedDrafts: Array<{
+    draftId: string;
+    attachmentId: string;
+  }>,
+): EncryptedMediaAttachmentDescriptorV1[] {
+  return selectedDrafts.map((selectedDraft) => {
+    const descriptorDraft = drafts.get(selectedDraft.draftId);
+    if (descriptorDraft === undefined) {
+      throw new Error(
+        "Encrypted media draft больше не найден в bounded local runtime cache.",
+      );
+    }
+
+    return finalizeEncryptedMediaAttachmentDescriptorDraft(
+      descriptorDraft,
+      selectedDraft.attachmentId,
+    );
+  });
+}
+
+function stripEncryptedMediaAttachmentDescriptor(
+  descriptor: EncryptedMediaAttachmentDescriptorV1,
+): EncryptedMediaAttachmentDescriptor {
+  return {
+    attachmentId: descriptor.attachmentId,
+    relaySchema: descriptor.relaySchema,
+    fileName: descriptor.fileName,
+    mimeType: descriptor.mimeType,
+    plaintextSizeBytes: descriptor.plaintextSizeBytes,
+    ciphertextSizeBytes: descriptor.ciphertextSizeBytes,
+  };
+}
+
+function cacheEncryptedMediaDraft(
+  drafts: Map<string, EncryptedMediaAttachmentDescriptorV1>,
+  draftId: string,
+  descriptor: EncryptedMediaAttachmentDescriptorV1,
+) {
+  drafts.set(draftId, descriptor);
+  trimEncryptedMediaMap(drafts, 32);
+}
+
+function cacheEncryptedMediaDescriptor(
+  descriptors: Map<string, EncryptedMediaAttachmentDescriptorV1>,
+  descriptor: EncryptedMediaAttachmentDescriptorV1,
+) {
+  if (descriptor.attachmentId.trim() === "") {
+    return;
+  }
+
+  descriptors.set(descriptor.attachmentId, descriptor);
+  trimEncryptedMediaMap(descriptors, 200);
+}
+
+function trimEncryptedMediaMap(
+  values: Map<string, EncryptedMediaAttachmentDescriptorV1>,
+  limit: number,
+) {
+  for (; values.size > limit; ) {
+    const oldestKey = values.keys().next().value;
+    if (oldestKey === undefined) {
+      return;
+    }
+    values.delete(oldestKey);
+  }
 }
 
 async function synchronizeSession(

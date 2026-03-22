@@ -6,7 +6,7 @@ export class AttachmentUploadAbortedError extends Error {
 }
 
 interface UploadFileWithProgressInput {
-  file: File;
+  body: Blob | ArrayBuffer;
   uploadUrl: string;
   httpMethod: string;
   headers: Record<string, string>;
@@ -15,7 +15,7 @@ interface UploadFileWithProgressInput {
 }
 
 export function uploadFileWithProgress({
-  file,
+  body,
   uploadUrl,
   httpMethod,
   headers,
@@ -70,6 +70,6 @@ export function uploadFileWithProgress({
       );
     }
 
-    request.send(file);
+    request.send(body);
   });
 }

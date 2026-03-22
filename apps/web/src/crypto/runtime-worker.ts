@@ -44,6 +44,18 @@ async function handleRequest(request: CryptoWorkerRequest) {
           request.payload.envelopes,
         );
         break;
+      case "prepareEncryptedMediaRelayUpload":
+        snapshot = await runtime.prepareEncryptedMediaRelayUpload(
+          request.payload.session,
+          request.payload.input,
+        );
+        break;
+      case "decryptEncryptedMediaAttachment":
+        snapshot = await runtime.decryptEncryptedMediaAttachment(
+          request.payload.session,
+          request.payload.input,
+        );
+        break;
       case "sendEncryptedDirectMessageV2Content":
         snapshot = await runtime.sendEncryptedDirectMessageV2Content(
           request.payload.session,

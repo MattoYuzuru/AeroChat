@@ -66,6 +66,30 @@ export interface CryptoRuntimeSnapshot {
   errorMessage: string | null;
 }
 
+export interface EncryptedMediaAttachmentDescriptor {
+  attachmentId: string;
+  relaySchema: "ATTACHMENT_RELAY_SCHEMA_ENCRYPTED_BLOB_V1";
+  fileName: string;
+  mimeType: string;
+  plaintextSizeBytes: number;
+  ciphertextSizeBytes: number;
+}
+
+export interface PreparedEncryptedMediaRelayUpload {
+  draftId: string;
+  relayFileName: string;
+  relayMimeType: string;
+  ciphertextBytes: ArrayBuffer;
+  attachment: EncryptedMediaAttachmentDescriptor;
+}
+
+export interface DecryptedEncryptedMediaAttachment {
+  attachmentId: string;
+  fileName: string;
+  mimeType: string;
+  plaintextBytes: ArrayBuffer;
+}
+
 export interface EncryptedDirectMessageV2ReadyProjection {
   status: "ready";
   messageId: string;
@@ -80,6 +104,7 @@ export interface EncryptedDirectMessageV2ReadyProjection {
   payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1";
   text: string | null;
   markdownPolicy: string | null;
+  attachments: EncryptedMediaAttachmentDescriptor[];
   editedAt: string | null;
   deletedAt: string | null;
 }
@@ -127,11 +152,30 @@ export interface CryptoRuntimeClient {
     session: CryptoRuntimeSession,
     envelopes: EncryptedDirectMessageV2Envelope[],
   ): Promise<EncryptedDirectMessageV2DecryptedEnvelope[]>;
+  prepareEncryptedMediaRelayUpload(
+    session: CryptoRuntimeSession,
+    input: {
+      fileName: string;
+      mimeType: string;
+      fileBytes: ArrayBuffer;
+    },
+  ): Promise<PreparedEncryptedMediaRelayUpload>;
+  decryptEncryptedMediaAttachment(
+    session: CryptoRuntimeSession,
+    input: {
+      attachmentId: string;
+      ciphertextBytes: ArrayBuffer;
+    },
+  ): Promise<DecryptedEncryptedMediaAttachment>;
   sendEncryptedDirectMessageV2Content(
     session: CryptoRuntimeSession,
     input: {
       chatId: string;
       text: string;
+      attachmentDrafts?: Array<{
+        draftId: string;
+        attachmentId: string;
+      }>;
     },
   ): Promise<EncryptedDirectMessageV2OutboundSendResult>;
   dispose(): void;
@@ -146,11 +190,30 @@ export interface CryptoWorkerRequestMap {
     session: CryptoRuntimeSession;
     envelopes: EncryptedDirectMessageV2Envelope[];
   };
+  prepareEncryptedMediaRelayUpload: {
+    session: CryptoRuntimeSession;
+    input: {
+      fileName: string;
+      mimeType: string;
+      fileBytes: ArrayBuffer;
+    };
+  };
+  decryptEncryptedMediaAttachment: {
+    session: CryptoRuntimeSession;
+    input: {
+      attachmentId: string;
+      ciphertextBytes: ArrayBuffer;
+    };
+  };
   sendEncryptedDirectMessageV2Content: {
     session: CryptoRuntimeSession;
     input: {
       chatId: string;
       text: string;
+      attachmentDrafts?: Array<{
+        draftId: string;
+        attachmentId: string;
+      }>;
     };
   };
 }
@@ -161,6 +224,8 @@ export interface CryptoWorkerResultMap {
   publishCurrentBundle: CryptoRuntimeSnapshot;
   approveLinkIntent: CryptoRuntimeSnapshot;
   decryptEncryptedDirectMessageV2Envelopes: EncryptedDirectMessageV2DecryptedEnvelope[];
+  prepareEncryptedMediaRelayUpload: PreparedEncryptedMediaRelayUpload;
+  decryptEncryptedMediaAttachment: DecryptedEncryptedMediaAttachment;
   sendEncryptedDirectMessageV2Content: EncryptedDirectMessageV2OutboundSendResult;
 }
 
@@ -185,6 +250,16 @@ export type CryptoWorkerRequest =
       id: number;
       type: "decryptEncryptedDirectMessageV2Envelopes";
       payload: CryptoWorkerRequestMap["decryptEncryptedDirectMessageV2Envelopes"];
+    }
+  | {
+      id: number;
+      type: "prepareEncryptedMediaRelayUpload";
+      payload: CryptoWorkerRequestMap["prepareEncryptedMediaRelayUpload"];
+    }
+  | {
+      id: number;
+      type: "decryptEncryptedMediaAttachment";
+      payload: CryptoWorkerRequestMap["decryptEncryptedMediaAttachment"];
     }
   | {
       id: number;

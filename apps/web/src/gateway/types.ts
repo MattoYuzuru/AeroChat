@@ -297,6 +297,7 @@ export interface Attachment {
   messageId: string | null;
   fileName: string;
   mimeType: string;
+  relaySchema: string;
   sizeBytes: number;
   status: string;
   createdAt: string;
@@ -657,19 +658,21 @@ export interface GatewayClient {
   createAttachmentUploadIntent(
     token: string,
     input:
-      | {
-          directChatId: string;
-          groupId?: never;
-          fileName: string;
-          mimeType: string;
-          sizeBytes: number;
-        }
+        | {
+            directChatId: string;
+            groupId?: never;
+            fileName: string;
+            mimeType: string;
+            sizeBytes: number;
+            relaySchema?: string;
+          }
       | {
           directChatId?: never;
           groupId: string;
           fileName: string;
           mimeType: string;
           sizeBytes: number;
+          relaySchema?: string;
         },
   ): Promise<AttachmentUploadIntent>;
   completeAttachmentUpload(

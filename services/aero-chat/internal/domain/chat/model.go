@@ -14,6 +14,8 @@ const (
 	MarkdownPolicySafeSubsetV1                       = "safe_subset_v1"
 	AttachmentScopeDirect                            = "direct"
 	AttachmentScopeGroup                             = "group"
+	AttachmentRelaySchemaLegacyPlaintext             = "legacy_plaintext"
+	AttachmentRelaySchemaEncryptedBlobV1             = "encrypted_blob_v1"
 	AttachmentStatusPending                          = "pending"
 	AttachmentStatusUploaded                         = "uploaded"
 	AttachmentStatusAttached                         = "attached"
@@ -225,6 +227,7 @@ type Attachment struct {
 	ObjectKey    string
 	FileName     string
 	MimeType     string
+	RelaySchema  string
 	SizeBytes    int64
 	Status       string
 	CreatedAt    time.Time
@@ -612,6 +615,7 @@ type CreateAttachmentUploadIntentParams struct {
 	ObjectKey       string
 	FileName        string
 	MimeType        string
+	RelaySchema     string
 	SizeBytes       int64
 	ExpiresAt       time.Time
 	CreatedAt       time.Time

@@ -84,6 +84,7 @@ interface AttachmentWire {
   messageId?: string;
   fileName?: string;
   mimeType?: string;
+  relaySchema?: string;
   sizeBytes?: number | string;
   status?: string;
   createdAt?: string;
@@ -725,6 +726,7 @@ function normalizeAttachment(input: AttachmentWire): Attachment {
     messageId: normalizeNullableString(input.messageId),
     fileName: input.fileName ?? "",
     mimeType: input.mimeType ?? "",
+    relaySchema: input.relaySchema ?? "ATTACHMENT_RELAY_SCHEMA_UNSPECIFIED",
     sizeBytes: normalizeCount(input.sizeBytes),
     status: input.status ?? "ATTACHMENT_STATUS_UNSPECIFIED",
     createdAt: input.createdAt ?? "",
