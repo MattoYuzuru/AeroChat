@@ -10,6 +10,7 @@ import (
 	v1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -21,6 +22,254 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+type ConversationScopeType int32
+
+const (
+	ConversationScopeType_CONVERSATION_SCOPE_TYPE_UNSPECIFIED ConversationScopeType = 0
+	ConversationScopeType_CONVERSATION_SCOPE_TYPE_DIRECT      ConversationScopeType = 1
+	ConversationScopeType_CONVERSATION_SCOPE_TYPE_GROUP       ConversationScopeType = 2
+)
+
+// Enum value maps for ConversationScopeType.
+var (
+	ConversationScopeType_name = map[int32]string{
+		0: "CONVERSATION_SCOPE_TYPE_UNSPECIFIED",
+		1: "CONVERSATION_SCOPE_TYPE_DIRECT",
+		2: "CONVERSATION_SCOPE_TYPE_GROUP",
+	}
+	ConversationScopeType_value = map[string]int32{
+		"CONVERSATION_SCOPE_TYPE_UNSPECIFIED": 0,
+		"CONVERSATION_SCOPE_TYPE_DIRECT":      1,
+		"CONVERSATION_SCOPE_TYPE_GROUP":       2,
+	}
+)
+
+func (x ConversationScopeType) Enum() *ConversationScopeType {
+	p := new(ConversationScopeType)
+	*p = x
+	return p
+}
+
+func (x ConversationScopeType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ConversationScopeType) Descriptor() protoreflect.EnumDescriptor {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[0].Descriptor()
+}
+
+func (ConversationScopeType) Type() protoreflect.EnumType {
+	return &file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[0]
+}
+
+func (x ConversationScopeType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ConversationScopeType.Descriptor instead.
+func (ConversationScopeType) EnumDescriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{0}
+}
+
+type CallStatus int32
+
+const (
+	CallStatus_CALL_STATUS_UNSPECIFIED CallStatus = 0
+	CallStatus_CALL_STATUS_ACTIVE      CallStatus = 1
+	CallStatus_CALL_STATUS_ENDED       CallStatus = 2
+)
+
+// Enum value maps for CallStatus.
+var (
+	CallStatus_name = map[int32]string{
+		0: "CALL_STATUS_UNSPECIFIED",
+		1: "CALL_STATUS_ACTIVE",
+		2: "CALL_STATUS_ENDED",
+	}
+	CallStatus_value = map[string]int32{
+		"CALL_STATUS_UNSPECIFIED": 0,
+		"CALL_STATUS_ACTIVE":      1,
+		"CALL_STATUS_ENDED":       2,
+	}
+)
+
+func (x CallStatus) Enum() *CallStatus {
+	p := new(CallStatus)
+	*p = x
+	return p
+}
+
+func (x CallStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CallStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[1].Descriptor()
+}
+
+func (CallStatus) Type() protoreflect.EnumType {
+	return &file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[1]
+}
+
+func (x CallStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CallStatus.Descriptor instead.
+func (CallStatus) EnumDescriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{1}
+}
+
+type CallEndReason int32
+
+const (
+	CallEndReason_CALL_END_REASON_UNSPECIFIED           CallEndReason = 0
+	CallEndReason_CALL_END_REASON_MANUAL                CallEndReason = 1
+	CallEndReason_CALL_END_REASON_LAST_PARTICIPANT_LEFT CallEndReason = 2
+)
+
+// Enum value maps for CallEndReason.
+var (
+	CallEndReason_name = map[int32]string{
+		0: "CALL_END_REASON_UNSPECIFIED",
+		1: "CALL_END_REASON_MANUAL",
+		2: "CALL_END_REASON_LAST_PARTICIPANT_LEFT",
+	}
+	CallEndReason_value = map[string]int32{
+		"CALL_END_REASON_UNSPECIFIED":           0,
+		"CALL_END_REASON_MANUAL":                1,
+		"CALL_END_REASON_LAST_PARTICIPANT_LEFT": 2,
+	}
+)
+
+func (x CallEndReason) Enum() *CallEndReason {
+	p := new(CallEndReason)
+	*p = x
+	return p
+}
+
+func (x CallEndReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CallEndReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[2].Descriptor()
+}
+
+func (CallEndReason) Type() protoreflect.EnumType {
+	return &file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[2]
+}
+
+func (x CallEndReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CallEndReason.Descriptor instead.
+func (CallEndReason) EnumDescriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{2}
+}
+
+type ParticipantState int32
+
+const (
+	ParticipantState_PARTICIPANT_STATE_UNSPECIFIED ParticipantState = 0
+	ParticipantState_PARTICIPANT_STATE_ACTIVE      ParticipantState = 1
+	ParticipantState_PARTICIPANT_STATE_LEFT        ParticipantState = 2
+)
+
+// Enum value maps for ParticipantState.
+var (
+	ParticipantState_name = map[int32]string{
+		0: "PARTICIPANT_STATE_UNSPECIFIED",
+		1: "PARTICIPANT_STATE_ACTIVE",
+		2: "PARTICIPANT_STATE_LEFT",
+	}
+	ParticipantState_value = map[string]int32{
+		"PARTICIPANT_STATE_UNSPECIFIED": 0,
+		"PARTICIPANT_STATE_ACTIVE":      1,
+		"PARTICIPANT_STATE_LEFT":        2,
+	}
+)
+
+func (x ParticipantState) Enum() *ParticipantState {
+	p := new(ParticipantState)
+	*p = x
+	return p
+}
+
+func (x ParticipantState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ParticipantState) Descriptor() protoreflect.EnumDescriptor {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[3].Descriptor()
+}
+
+func (ParticipantState) Type() protoreflect.EnumType {
+	return &file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[3]
+}
+
+func (x ParticipantState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ParticipantState.Descriptor instead.
+func (ParticipantState) EnumDescriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{3}
+}
+
+type SignalEnvelopeType int32
+
+const (
+	SignalEnvelopeType_SIGNAL_ENVELOPE_TYPE_UNSPECIFIED   SignalEnvelopeType = 0
+	SignalEnvelopeType_SIGNAL_ENVELOPE_TYPE_OFFER         SignalEnvelopeType = 1
+	SignalEnvelopeType_SIGNAL_ENVELOPE_TYPE_ANSWER        SignalEnvelopeType = 2
+	SignalEnvelopeType_SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE SignalEnvelopeType = 3
+)
+
+// Enum value maps for SignalEnvelopeType.
+var (
+	SignalEnvelopeType_name = map[int32]string{
+		0: "SIGNAL_ENVELOPE_TYPE_UNSPECIFIED",
+		1: "SIGNAL_ENVELOPE_TYPE_OFFER",
+		2: "SIGNAL_ENVELOPE_TYPE_ANSWER",
+		3: "SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE",
+	}
+	SignalEnvelopeType_value = map[string]int32{
+		"SIGNAL_ENVELOPE_TYPE_UNSPECIFIED":   0,
+		"SIGNAL_ENVELOPE_TYPE_OFFER":         1,
+		"SIGNAL_ENVELOPE_TYPE_ANSWER":        2,
+		"SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE": 3,
+	}
+)
+
+func (x SignalEnvelopeType) Enum() *SignalEnvelopeType {
+	p := new(SignalEnvelopeType)
+	*p = x
+	return p
+}
+
+func (x SignalEnvelopeType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SignalEnvelopeType) Descriptor() protoreflect.EnumDescriptor {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[4].Descriptor()
+}
+
+func (SignalEnvelopeType) Type() protoreflect.EnumType {
+	return &file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes[4]
+}
+
+func (x SignalEnvelopeType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SignalEnvelopeType.Descriptor instead.
+func (SignalEnvelopeType) EnumDescriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{4}
+}
 
 type PingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -102,16 +351,1254 @@ func (x *PingResponse) GetService() *v1.ServiceMeta {
 	return nil
 }
 
+type ConversationScope struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          ConversationScopeType  `protobuf:"varint,1,opt,name=type,proto3,enum=aerochat.rtc.v1.ConversationScopeType" json:"type,omitempty"`
+	DirectChatId  string                 `protobuf:"bytes,2,opt,name=direct_chat_id,json=directChatId,proto3" json:"direct_chat_id,omitempty"`
+	GroupId       string                 `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConversationScope) Reset() {
+	*x = ConversationScope{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationScope) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationScope) ProtoMessage() {}
+
+func (x *ConversationScope) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationScope.ProtoReflect.Descriptor instead.
+func (*ConversationScope) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ConversationScope) GetType() ConversationScopeType {
+	if x != nil {
+		return x.Type
+	}
+	return ConversationScopeType_CONVERSATION_SCOPE_TYPE_UNSPECIFIED
+}
+
+func (x *ConversationScope) GetDirectChatId() string {
+	if x != nil {
+		return x.DirectChatId
+	}
+	return ""
+}
+
+func (x *ConversationScope) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+type Call struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Scope                  *ConversationScope     `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
+	CreatedByUserId        string                 `protobuf:"bytes,3,opt,name=created_by_user_id,json=createdByUserId,proto3" json:"created_by_user_id,omitempty"`
+	Status                 CallStatus             `protobuf:"varint,4,opt,name=status,proto3,enum=aerochat.rtc.v1.CallStatus" json:"status,omitempty"`
+	ActiveParticipantCount uint32                 `protobuf:"varint,5,opt,name=active_participant_count,json=activeParticipantCount,proto3" json:"active_participant_count,omitempty"`
+	CreatedAt              *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt              *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	StartedAt              *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	EndedAt                *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=ended_at,json=endedAt,proto3" json:"ended_at,omitempty"`
+	EndedByUserId          string                 `protobuf:"bytes,10,opt,name=ended_by_user_id,json=endedByUserId,proto3" json:"ended_by_user_id,omitempty"`
+	EndReason              CallEndReason          `protobuf:"varint,11,opt,name=end_reason,json=endReason,proto3,enum=aerochat.rtc.v1.CallEndReason" json:"end_reason,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *Call) Reset() {
+	*x = Call{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Call) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Call) ProtoMessage() {}
+
+func (x *Call) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Call.ProtoReflect.Descriptor instead.
+func (*Call) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Call) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Call) GetScope() *ConversationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *Call) GetCreatedByUserId() string {
+	if x != nil {
+		return x.CreatedByUserId
+	}
+	return ""
+}
+
+func (x *Call) GetStatus() CallStatus {
+	if x != nil {
+		return x.Status
+	}
+	return CallStatus_CALL_STATUS_UNSPECIFIED
+}
+
+func (x *Call) GetActiveParticipantCount() uint32 {
+	if x != nil {
+		return x.ActiveParticipantCount
+	}
+	return 0
+}
+
+func (x *Call) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Call) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *Call) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *Call) GetEndedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndedAt
+	}
+	return nil
+}
+
+func (x *Call) GetEndedByUserId() string {
+	if x != nil {
+		return x.EndedByUserId
+	}
+	return ""
+}
+
+func (x *Call) GetEndReason() CallEndReason {
+	if x != nil {
+		return x.EndReason
+	}
+	return CallEndReason_CALL_END_REASON_UNSPECIFIED
+}
+
+type CallParticipant struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CallId        string                 `protobuf:"bytes,2,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	State         ParticipantState       `protobuf:"varint,4,opt,name=state,proto3,enum=aerochat.rtc.v1.ParticipantState" json:"state,omitempty"`
+	JoinedAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=joined_at,json=joinedAt,proto3" json:"joined_at,omitempty"`
+	LeftAt        *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=left_at,json=leftAt,proto3" json:"left_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	LastSignalAt  *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_signal_at,json=lastSignalAt,proto3" json:"last_signal_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CallParticipant) Reset() {
+	*x = CallParticipant{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CallParticipant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CallParticipant) ProtoMessage() {}
+
+func (x *CallParticipant) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CallParticipant.ProtoReflect.Descriptor instead.
+func (*CallParticipant) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CallParticipant) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CallParticipant) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+func (x *CallParticipant) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *CallParticipant) GetState() ParticipantState {
+	if x != nil {
+		return x.State
+	}
+	return ParticipantState_PARTICIPANT_STATE_UNSPECIFIED
+}
+
+func (x *CallParticipant) GetJoinedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.JoinedAt
+	}
+	return nil
+}
+
+func (x *CallParticipant) GetLeftAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LeftAt
+	}
+	return nil
+}
+
+func (x *CallParticipant) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *CallParticipant) GetLastSignalAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSignalAt
+	}
+	return nil
+}
+
+type SignalEnvelope struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	FromUserId    string                 `protobuf:"bytes,2,opt,name=from_user_id,json=fromUserId,proto3" json:"from_user_id,omitempty"`
+	TargetUserId  string                 `protobuf:"bytes,3,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	Type          SignalEnvelopeType     `protobuf:"varint,4,opt,name=type,proto3,enum=aerochat.rtc.v1.SignalEnvelopeType" json:"type,omitempty"`
+	Payload       []byte                 `protobuf:"bytes,5,opt,name=payload,proto3" json:"payload,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignalEnvelope) Reset() {
+	*x = SignalEnvelope{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignalEnvelope) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignalEnvelope) ProtoMessage() {}
+
+func (x *SignalEnvelope) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignalEnvelope.ProtoReflect.Descriptor instead.
+func (*SignalEnvelope) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *SignalEnvelope) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+func (x *SignalEnvelope) GetFromUserId() string {
+	if x != nil {
+		return x.FromUserId
+	}
+	return ""
+}
+
+func (x *SignalEnvelope) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *SignalEnvelope) GetType() SignalEnvelopeType {
+	if x != nil {
+		return x.Type
+	}
+	return SignalEnvelopeType_SIGNAL_ENVELOPE_TYPE_UNSPECIFIED
+}
+
+func (x *SignalEnvelope) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *SignalEnvelope) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type GetActiveCallRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         *ConversationScope     `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetActiveCallRequest) Reset() {
+	*x = GetActiveCallRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetActiveCallRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetActiveCallRequest) ProtoMessage() {}
+
+func (x *GetActiveCallRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetActiveCallRequest.ProtoReflect.Descriptor instead.
+func (*GetActiveCallRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetActiveCallRequest) GetScope() *ConversationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+type GetActiveCallResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Call          *Call                  `protobuf:"bytes,1,opt,name=call,proto3" json:"call,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetActiveCallResponse) Reset() {
+	*x = GetActiveCallResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetActiveCallResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetActiveCallResponse) ProtoMessage() {}
+
+func (x *GetActiveCallResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetActiveCallResponse.ProtoReflect.Descriptor instead.
+func (*GetActiveCallResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetActiveCallResponse) GetCall() *Call {
+	if x != nil {
+		return x.Call
+	}
+	return nil
+}
+
+type GetCallRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCallRequest) Reset() {
+	*x = GetCallRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCallRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCallRequest) ProtoMessage() {}
+
+func (x *GetCallRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCallRequest.ProtoReflect.Descriptor instead.
+func (*GetCallRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetCallRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+type GetCallResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Call          *Call                  `protobuf:"bytes,1,opt,name=call,proto3" json:"call,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCallResponse) Reset() {
+	*x = GetCallResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCallResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCallResponse) ProtoMessage() {}
+
+func (x *GetCallResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCallResponse.ProtoReflect.Descriptor instead.
+func (*GetCallResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetCallResponse) GetCall() *Call {
+	if x != nil {
+		return x.Call
+	}
+	return nil
+}
+
+type StartCallRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         *ConversationScope     `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartCallRequest) Reset() {
+	*x = StartCallRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartCallRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartCallRequest) ProtoMessage() {}
+
+func (x *StartCallRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartCallRequest.ProtoReflect.Descriptor instead.
+func (*StartCallRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *StartCallRequest) GetScope() *ConversationScope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+type StartCallResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Call            *Call                  `protobuf:"bytes,1,opt,name=call,proto3" json:"call,omitempty"`
+	SelfParticipant *CallParticipant       `protobuf:"bytes,2,opt,name=self_participant,json=selfParticipant,proto3" json:"self_participant,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *StartCallResponse) Reset() {
+	*x = StartCallResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartCallResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartCallResponse) ProtoMessage() {}
+
+func (x *StartCallResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartCallResponse.ProtoReflect.Descriptor instead.
+func (*StartCallResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *StartCallResponse) GetCall() *Call {
+	if x != nil {
+		return x.Call
+	}
+	return nil
+}
+
+func (x *StartCallResponse) GetSelfParticipant() *CallParticipant {
+	if x != nil {
+		return x.SelfParticipant
+	}
+	return nil
+}
+
+type JoinCallRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *JoinCallRequest) Reset() {
+	*x = JoinCallRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JoinCallRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JoinCallRequest) ProtoMessage() {}
+
+func (x *JoinCallRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JoinCallRequest.ProtoReflect.Descriptor instead.
+func (*JoinCallRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *JoinCallRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+type JoinCallResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Call            *Call                  `protobuf:"bytes,1,opt,name=call,proto3" json:"call,omitempty"`
+	SelfParticipant *CallParticipant       `protobuf:"bytes,2,opt,name=self_participant,json=selfParticipant,proto3" json:"self_participant,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *JoinCallResponse) Reset() {
+	*x = JoinCallResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JoinCallResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JoinCallResponse) ProtoMessage() {}
+
+func (x *JoinCallResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JoinCallResponse.ProtoReflect.Descriptor instead.
+func (*JoinCallResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *JoinCallResponse) GetCall() *Call {
+	if x != nil {
+		return x.Call
+	}
+	return nil
+}
+
+func (x *JoinCallResponse) GetSelfParticipant() *CallParticipant {
+	if x != nil {
+		return x.SelfParticipant
+	}
+	return nil
+}
+
+type LeaveCallRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LeaveCallRequest) Reset() {
+	*x = LeaveCallRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LeaveCallRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LeaveCallRequest) ProtoMessage() {}
+
+func (x *LeaveCallRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LeaveCallRequest.ProtoReflect.Descriptor instead.
+func (*LeaveCallRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *LeaveCallRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+type LeaveCallResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Call            *Call                  `protobuf:"bytes,1,opt,name=call,proto3" json:"call,omitempty"`
+	SelfParticipant *CallParticipant       `protobuf:"bytes,2,opt,name=self_participant,json=selfParticipant,proto3" json:"self_participant,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *LeaveCallResponse) Reset() {
+	*x = LeaveCallResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LeaveCallResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LeaveCallResponse) ProtoMessage() {}
+
+func (x *LeaveCallResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LeaveCallResponse.ProtoReflect.Descriptor instead.
+func (*LeaveCallResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *LeaveCallResponse) GetCall() *Call {
+	if x != nil {
+		return x.Call
+	}
+	return nil
+}
+
+func (x *LeaveCallResponse) GetSelfParticipant() *CallParticipant {
+	if x != nil {
+		return x.SelfParticipant
+	}
+	return nil
+}
+
+type EndCallRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EndCallRequest) Reset() {
+	*x = EndCallRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndCallRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndCallRequest) ProtoMessage() {}
+
+func (x *EndCallRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndCallRequest.ProtoReflect.Descriptor instead.
+func (*EndCallRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *EndCallRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+type EndCallResponse struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Call                 *Call                  `protobuf:"bytes,1,opt,name=call,proto3" json:"call,omitempty"`
+	AffectedParticipants []*CallParticipant     `protobuf:"bytes,2,rep,name=affected_participants,json=affectedParticipants,proto3" json:"affected_participants,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *EndCallResponse) Reset() {
+	*x = EndCallResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndCallResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndCallResponse) ProtoMessage() {}
+
+func (x *EndCallResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndCallResponse.ProtoReflect.Descriptor instead.
+func (*EndCallResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *EndCallResponse) GetCall() *Call {
+	if x != nil {
+		return x.Call
+	}
+	return nil
+}
+
+func (x *EndCallResponse) GetAffectedParticipants() []*CallParticipant {
+	if x != nil {
+		return x.AffectedParticipants
+	}
+	return nil
+}
+
+type ListCallParticipantsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCallParticipantsRequest) Reset() {
+	*x = ListCallParticipantsRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCallParticipantsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCallParticipantsRequest) ProtoMessage() {}
+
+func (x *ListCallParticipantsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCallParticipantsRequest.ProtoReflect.Descriptor instead.
+func (*ListCallParticipantsRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ListCallParticipantsRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+type ListCallParticipantsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Participants  []*CallParticipant     `protobuf:"bytes,1,rep,name=participants,proto3" json:"participants,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCallParticipantsResponse) Reset() {
+	*x = ListCallParticipantsResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCallParticipantsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCallParticipantsResponse) ProtoMessage() {}
+
+func (x *ListCallParticipantsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCallParticipantsResponse.ProtoReflect.Descriptor instead.
+func (*ListCallParticipantsResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListCallParticipantsResponse) GetParticipants() []*CallParticipant {
+	if x != nil {
+		return x.Participants
+	}
+	return nil
+}
+
+type SendSignalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	TargetUserId  string                 `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	Type          SignalEnvelopeType     `protobuf:"varint,3,opt,name=type,proto3,enum=aerochat.rtc.v1.SignalEnvelopeType" json:"type,omitempty"`
+	Payload       []byte                 `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendSignalRequest) Reset() {
+	*x = SendSignalRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendSignalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendSignalRequest) ProtoMessage() {}
+
+func (x *SendSignalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendSignalRequest.ProtoReflect.Descriptor instead.
+func (*SendSignalRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SendSignalRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+func (x *SendSignalRequest) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *SendSignalRequest) GetType() SignalEnvelopeType {
+	if x != nil {
+		return x.Type
+	}
+	return SignalEnvelopeType_SIGNAL_ENVELOPE_TYPE_UNSPECIFIED
+}
+
+func (x *SendSignalRequest) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+type SendSignalResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Signal        *SignalEnvelope        `protobuf:"bytes,1,opt,name=signal,proto3" json:"signal,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendSignalResponse) Reset() {
+	*x = SendSignalResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendSignalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendSignalResponse) ProtoMessage() {}
+
+func (x *SendSignalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendSignalResponse.ProtoReflect.Descriptor instead.
+func (*SendSignalResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *SendSignalResponse) GetSignal() *SignalEnvelope {
+	if x != nil {
+		return x.Signal
+	}
+	return nil
+}
+
 var File_aerochat_rtc_v1_rtc_control_service_proto protoreflect.FileDescriptor
 
 const file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc = "" +
 	"\n" +
-	")aerochat/rtc/v1/rtc_control_service.proto\x12\x0faerochat.rtc.v1\x1a\x1faerochat/common/v1/common.proto\"\r\n" +
+	")aerochat/rtc/v1/rtc_control_service.proto\x12\x0faerochat.rtc.v1\x1a\x1faerochat/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\r\n" +
 	"\vPingRequest\"I\n" +
 	"\fPingResponse\x129\n" +
-	"\aservice\x18\x01 \x01(\v2\x1f.aerochat.common.v1.ServiceMetaR\aservice2X\n" +
+	"\aservice\x18\x01 \x01(\v2\x1f.aerochat.common.v1.ServiceMetaR\aservice\"\x90\x01\n" +
+	"\x11ConversationScope\x12:\n" +
+	"\x04type\x18\x01 \x01(\x0e2&.aerochat.rtc.v1.ConversationScopeTypeR\x04type\x12$\n" +
+	"\x0edirect_chat_id\x18\x02 \x01(\tR\fdirectChatId\x12\x19\n" +
+	"\bgroup_id\x18\x03 \x01(\tR\agroupId\"\xbc\x04\n" +
+	"\x04Call\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x128\n" +
+	"\x05scope\x18\x02 \x01(\v2\".aerochat.rtc.v1.ConversationScopeR\x05scope\x12+\n" +
+	"\x12created_by_user_id\x18\x03 \x01(\tR\x0fcreatedByUserId\x123\n" +
+	"\x06status\x18\x04 \x01(\x0e2\x1b.aerochat.rtc.v1.CallStatusR\x06status\x128\n" +
+	"\x18active_participant_count\x18\x05 \x01(\rR\x16activeParticipantCount\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
+	"\n" +
+	"started_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x125\n" +
+	"\bended_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\x12'\n" +
+	"\x10ended_by_user_id\x18\n" +
+	" \x01(\tR\rendedByUserId\x12=\n" +
+	"\n" +
+	"end_reason\x18\v \x01(\x0e2\x1e.aerochat.rtc.v1.CallEndReasonR\tendReason\"\xf7\x02\n" +
+	"\x0fCallParticipant\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\acall_id\x18\x02 \x01(\tR\x06callId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x127\n" +
+	"\x05state\x18\x04 \x01(\x0e2!.aerochat.rtc.v1.ParticipantStateR\x05state\x127\n" +
+	"\tjoined_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bjoinedAt\x123\n" +
+	"\aleft_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06leftAt\x129\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12@\n" +
+	"\x0elast_signal_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\flastSignalAt\"\xff\x01\n" +
+	"\x0eSignalEnvelope\x12\x17\n" +
+	"\acall_id\x18\x01 \x01(\tR\x06callId\x12 \n" +
+	"\ffrom_user_id\x18\x02 \x01(\tR\n" +
+	"fromUserId\x12$\n" +
+	"\x0etarget_user_id\x18\x03 \x01(\tR\ftargetUserId\x127\n" +
+	"\x04type\x18\x04 \x01(\x0e2#.aerochat.rtc.v1.SignalEnvelopeTypeR\x04type\x12\x18\n" +
+	"\apayload\x18\x05 \x01(\fR\apayload\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"P\n" +
+	"\x14GetActiveCallRequest\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".aerochat.rtc.v1.ConversationScopeR\x05scope\"B\n" +
+	"\x15GetActiveCallResponse\x12)\n" +
+	"\x04call\x18\x01 \x01(\v2\x15.aerochat.rtc.v1.CallR\x04call\")\n" +
+	"\x0eGetCallRequest\x12\x17\n" +
+	"\acall_id\x18\x01 \x01(\tR\x06callId\"<\n" +
+	"\x0fGetCallResponse\x12)\n" +
+	"\x04call\x18\x01 \x01(\v2\x15.aerochat.rtc.v1.CallR\x04call\"L\n" +
+	"\x10StartCallRequest\x128\n" +
+	"\x05scope\x18\x01 \x01(\v2\".aerochat.rtc.v1.ConversationScopeR\x05scope\"\x8b\x01\n" +
+	"\x11StartCallResponse\x12)\n" +
+	"\x04call\x18\x01 \x01(\v2\x15.aerochat.rtc.v1.CallR\x04call\x12K\n" +
+	"\x10self_participant\x18\x02 \x01(\v2 .aerochat.rtc.v1.CallParticipantR\x0fselfParticipant\"*\n" +
+	"\x0fJoinCallRequest\x12\x17\n" +
+	"\acall_id\x18\x01 \x01(\tR\x06callId\"\x8a\x01\n" +
+	"\x10JoinCallResponse\x12)\n" +
+	"\x04call\x18\x01 \x01(\v2\x15.aerochat.rtc.v1.CallR\x04call\x12K\n" +
+	"\x10self_participant\x18\x02 \x01(\v2 .aerochat.rtc.v1.CallParticipantR\x0fselfParticipant\"+\n" +
+	"\x10LeaveCallRequest\x12\x17\n" +
+	"\acall_id\x18\x01 \x01(\tR\x06callId\"\x8b\x01\n" +
+	"\x11LeaveCallResponse\x12)\n" +
+	"\x04call\x18\x01 \x01(\v2\x15.aerochat.rtc.v1.CallR\x04call\x12K\n" +
+	"\x10self_participant\x18\x02 \x01(\v2 .aerochat.rtc.v1.CallParticipantR\x0fselfParticipant\")\n" +
+	"\x0eEndCallRequest\x12\x17\n" +
+	"\acall_id\x18\x01 \x01(\tR\x06callId\"\x93\x01\n" +
+	"\x0fEndCallResponse\x12)\n" +
+	"\x04call\x18\x01 \x01(\v2\x15.aerochat.rtc.v1.CallR\x04call\x12U\n" +
+	"\x15affected_participants\x18\x02 \x03(\v2 .aerochat.rtc.v1.CallParticipantR\x14affectedParticipants\"6\n" +
+	"\x1bListCallParticipantsRequest\x12\x17\n" +
+	"\acall_id\x18\x01 \x01(\tR\x06callId\"d\n" +
+	"\x1cListCallParticipantsResponse\x12D\n" +
+	"\fparticipants\x18\x01 \x03(\v2 .aerochat.rtc.v1.CallParticipantR\fparticipants\"\xa5\x01\n" +
+	"\x11SendSignalRequest\x12\x17\n" +
+	"\acall_id\x18\x01 \x01(\tR\x06callId\x12$\n" +
+	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x127\n" +
+	"\x04type\x18\x03 \x01(\x0e2#.aerochat.rtc.v1.SignalEnvelopeTypeR\x04type\x12\x18\n" +
+	"\apayload\x18\x04 \x01(\fR\apayload\"M\n" +
+	"\x12SendSignalResponse\x127\n" +
+	"\x06signal\x18\x01 \x01(\v2\x1f.aerochat.rtc.v1.SignalEnvelopeR\x06signal*\x87\x01\n" +
+	"\x15ConversationScopeType\x12'\n" +
+	"#CONVERSATION_SCOPE_TYPE_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eCONVERSATION_SCOPE_TYPE_DIRECT\x10\x01\x12!\n" +
+	"\x1dCONVERSATION_SCOPE_TYPE_GROUP\x10\x02*X\n" +
+	"\n" +
+	"CallStatus\x12\x1b\n" +
+	"\x17CALL_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12CALL_STATUS_ACTIVE\x10\x01\x12\x15\n" +
+	"\x11CALL_STATUS_ENDED\x10\x02*w\n" +
+	"\rCallEndReason\x12\x1f\n" +
+	"\x1bCALL_END_REASON_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16CALL_END_REASON_MANUAL\x10\x01\x12)\n" +
+	"%CALL_END_REASON_LAST_PARTICIPANT_LEFT\x10\x02*o\n" +
+	"\x10ParticipantState\x12!\n" +
+	"\x1dPARTICIPANT_STATE_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18PARTICIPANT_STATE_ACTIVE\x10\x01\x12\x1a\n" +
+	"\x16PARTICIPANT_STATE_LEFT\x10\x02*\xa3\x01\n" +
+	"\x12SignalEnvelopeType\x12$\n" +
+	" SIGNAL_ENVELOPE_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aSIGNAL_ENVELOPE_TYPE_OFFER\x10\x01\x12\x1f\n" +
+	"\x1bSIGNAL_ENVELOPE_TYPE_ANSWER\x10\x02\x12&\n" +
+	"\"SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE\x10\x032\x99\x06\n" +
 	"\x11RtcControlService\x12C\n" +
-	"\x04Ping\x12\x1c.aerochat.rtc.v1.PingRequest\x1a\x1d.aerochat.rtc.v1.PingResponseB>Z<github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1;rtcv1b\x06proto3"
+	"\x04Ping\x12\x1c.aerochat.rtc.v1.PingRequest\x1a\x1d.aerochat.rtc.v1.PingResponse\x12^\n" +
+	"\rGetActiveCall\x12%.aerochat.rtc.v1.GetActiveCallRequest\x1a&.aerochat.rtc.v1.GetActiveCallResponse\x12L\n" +
+	"\aGetCall\x12\x1f.aerochat.rtc.v1.GetCallRequest\x1a .aerochat.rtc.v1.GetCallResponse\x12R\n" +
+	"\tStartCall\x12!.aerochat.rtc.v1.StartCallRequest\x1a\".aerochat.rtc.v1.StartCallResponse\x12O\n" +
+	"\bJoinCall\x12 .aerochat.rtc.v1.JoinCallRequest\x1a!.aerochat.rtc.v1.JoinCallResponse\x12R\n" +
+	"\tLeaveCall\x12!.aerochat.rtc.v1.LeaveCallRequest\x1a\".aerochat.rtc.v1.LeaveCallResponse\x12L\n" +
+	"\aEndCall\x12\x1f.aerochat.rtc.v1.EndCallRequest\x1a .aerochat.rtc.v1.EndCallResponse\x12s\n" +
+	"\x14ListCallParticipants\x12,.aerochat.rtc.v1.ListCallParticipantsRequest\x1a-.aerochat.rtc.v1.ListCallParticipantsResponse\x12U\n" +
+	"\n" +
+	"SendSignal\x12\".aerochat.rtc.v1.SendSignalRequest\x1a#.aerochat.rtc.v1.SendSignalResponseB>Z<github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1;rtcv1b\x06proto3"
 
 var (
 	file_aerochat_rtc_v1_rtc_control_service_proto_rawDescOnce sync.Once
@@ -125,21 +1612,94 @@ func file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP() []byte {
 	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescData
 }
 
-var file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_aerochat_rtc_v1_rtc_control_service_proto_goTypes = []any{
-	(*PingRequest)(nil),    // 0: aerochat.rtc.v1.PingRequest
-	(*PingResponse)(nil),   // 1: aerochat.rtc.v1.PingResponse
-	(*v1.ServiceMeta)(nil), // 2: aerochat.common.v1.ServiceMeta
+	(ConversationScopeType)(0),           // 0: aerochat.rtc.v1.ConversationScopeType
+	(CallStatus)(0),                      // 1: aerochat.rtc.v1.CallStatus
+	(CallEndReason)(0),                   // 2: aerochat.rtc.v1.CallEndReason
+	(ParticipantState)(0),                // 3: aerochat.rtc.v1.ParticipantState
+	(SignalEnvelopeType)(0),              // 4: aerochat.rtc.v1.SignalEnvelopeType
+	(*PingRequest)(nil),                  // 5: aerochat.rtc.v1.PingRequest
+	(*PingResponse)(nil),                 // 6: aerochat.rtc.v1.PingResponse
+	(*ConversationScope)(nil),            // 7: aerochat.rtc.v1.ConversationScope
+	(*Call)(nil),                         // 8: aerochat.rtc.v1.Call
+	(*CallParticipant)(nil),              // 9: aerochat.rtc.v1.CallParticipant
+	(*SignalEnvelope)(nil),               // 10: aerochat.rtc.v1.SignalEnvelope
+	(*GetActiveCallRequest)(nil),         // 11: aerochat.rtc.v1.GetActiveCallRequest
+	(*GetActiveCallResponse)(nil),        // 12: aerochat.rtc.v1.GetActiveCallResponse
+	(*GetCallRequest)(nil),               // 13: aerochat.rtc.v1.GetCallRequest
+	(*GetCallResponse)(nil),              // 14: aerochat.rtc.v1.GetCallResponse
+	(*StartCallRequest)(nil),             // 15: aerochat.rtc.v1.StartCallRequest
+	(*StartCallResponse)(nil),            // 16: aerochat.rtc.v1.StartCallResponse
+	(*JoinCallRequest)(nil),              // 17: aerochat.rtc.v1.JoinCallRequest
+	(*JoinCallResponse)(nil),             // 18: aerochat.rtc.v1.JoinCallResponse
+	(*LeaveCallRequest)(nil),             // 19: aerochat.rtc.v1.LeaveCallRequest
+	(*LeaveCallResponse)(nil),            // 20: aerochat.rtc.v1.LeaveCallResponse
+	(*EndCallRequest)(nil),               // 21: aerochat.rtc.v1.EndCallRequest
+	(*EndCallResponse)(nil),              // 22: aerochat.rtc.v1.EndCallResponse
+	(*ListCallParticipantsRequest)(nil),  // 23: aerochat.rtc.v1.ListCallParticipantsRequest
+	(*ListCallParticipantsResponse)(nil), // 24: aerochat.rtc.v1.ListCallParticipantsResponse
+	(*SendSignalRequest)(nil),            // 25: aerochat.rtc.v1.SendSignalRequest
+	(*SendSignalResponse)(nil),           // 26: aerochat.rtc.v1.SendSignalResponse
+	(*v1.ServiceMeta)(nil),               // 27: aerochat.common.v1.ServiceMeta
+	(*timestamppb.Timestamp)(nil),        // 28: google.protobuf.Timestamp
 }
 var file_aerochat_rtc_v1_rtc_control_service_proto_depIdxs = []int32{
-	2, // 0: aerochat.rtc.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
-	0, // 1: aerochat.rtc.v1.RtcControlService.Ping:input_type -> aerochat.rtc.v1.PingRequest
-	1, // 2: aerochat.rtc.v1.RtcControlService.Ping:output_type -> aerochat.rtc.v1.PingResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	27, // 0: aerochat.rtc.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
+	0,  // 1: aerochat.rtc.v1.ConversationScope.type:type_name -> aerochat.rtc.v1.ConversationScopeType
+	7,  // 2: aerochat.rtc.v1.Call.scope:type_name -> aerochat.rtc.v1.ConversationScope
+	1,  // 3: aerochat.rtc.v1.Call.status:type_name -> aerochat.rtc.v1.CallStatus
+	28, // 4: aerochat.rtc.v1.Call.created_at:type_name -> google.protobuf.Timestamp
+	28, // 5: aerochat.rtc.v1.Call.updated_at:type_name -> google.protobuf.Timestamp
+	28, // 6: aerochat.rtc.v1.Call.started_at:type_name -> google.protobuf.Timestamp
+	28, // 7: aerochat.rtc.v1.Call.ended_at:type_name -> google.protobuf.Timestamp
+	2,  // 8: aerochat.rtc.v1.Call.end_reason:type_name -> aerochat.rtc.v1.CallEndReason
+	3,  // 9: aerochat.rtc.v1.CallParticipant.state:type_name -> aerochat.rtc.v1.ParticipantState
+	28, // 10: aerochat.rtc.v1.CallParticipant.joined_at:type_name -> google.protobuf.Timestamp
+	28, // 11: aerochat.rtc.v1.CallParticipant.left_at:type_name -> google.protobuf.Timestamp
+	28, // 12: aerochat.rtc.v1.CallParticipant.updated_at:type_name -> google.protobuf.Timestamp
+	28, // 13: aerochat.rtc.v1.CallParticipant.last_signal_at:type_name -> google.protobuf.Timestamp
+	4,  // 14: aerochat.rtc.v1.SignalEnvelope.type:type_name -> aerochat.rtc.v1.SignalEnvelopeType
+	28, // 15: aerochat.rtc.v1.SignalEnvelope.created_at:type_name -> google.protobuf.Timestamp
+	7,  // 16: aerochat.rtc.v1.GetActiveCallRequest.scope:type_name -> aerochat.rtc.v1.ConversationScope
+	8,  // 17: aerochat.rtc.v1.GetActiveCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	8,  // 18: aerochat.rtc.v1.GetCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	7,  // 19: aerochat.rtc.v1.StartCallRequest.scope:type_name -> aerochat.rtc.v1.ConversationScope
+	8,  // 20: aerochat.rtc.v1.StartCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	9,  // 21: aerochat.rtc.v1.StartCallResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
+	8,  // 22: aerochat.rtc.v1.JoinCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	9,  // 23: aerochat.rtc.v1.JoinCallResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
+	8,  // 24: aerochat.rtc.v1.LeaveCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	9,  // 25: aerochat.rtc.v1.LeaveCallResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
+	8,  // 26: aerochat.rtc.v1.EndCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	9,  // 27: aerochat.rtc.v1.EndCallResponse.affected_participants:type_name -> aerochat.rtc.v1.CallParticipant
+	9,  // 28: aerochat.rtc.v1.ListCallParticipantsResponse.participants:type_name -> aerochat.rtc.v1.CallParticipant
+	4,  // 29: aerochat.rtc.v1.SendSignalRequest.type:type_name -> aerochat.rtc.v1.SignalEnvelopeType
+	10, // 30: aerochat.rtc.v1.SendSignalResponse.signal:type_name -> aerochat.rtc.v1.SignalEnvelope
+	5,  // 31: aerochat.rtc.v1.RtcControlService.Ping:input_type -> aerochat.rtc.v1.PingRequest
+	11, // 32: aerochat.rtc.v1.RtcControlService.GetActiveCall:input_type -> aerochat.rtc.v1.GetActiveCallRequest
+	13, // 33: aerochat.rtc.v1.RtcControlService.GetCall:input_type -> aerochat.rtc.v1.GetCallRequest
+	15, // 34: aerochat.rtc.v1.RtcControlService.StartCall:input_type -> aerochat.rtc.v1.StartCallRequest
+	17, // 35: aerochat.rtc.v1.RtcControlService.JoinCall:input_type -> aerochat.rtc.v1.JoinCallRequest
+	19, // 36: aerochat.rtc.v1.RtcControlService.LeaveCall:input_type -> aerochat.rtc.v1.LeaveCallRequest
+	21, // 37: aerochat.rtc.v1.RtcControlService.EndCall:input_type -> aerochat.rtc.v1.EndCallRequest
+	23, // 38: aerochat.rtc.v1.RtcControlService.ListCallParticipants:input_type -> aerochat.rtc.v1.ListCallParticipantsRequest
+	25, // 39: aerochat.rtc.v1.RtcControlService.SendSignal:input_type -> aerochat.rtc.v1.SendSignalRequest
+	6,  // 40: aerochat.rtc.v1.RtcControlService.Ping:output_type -> aerochat.rtc.v1.PingResponse
+	12, // 41: aerochat.rtc.v1.RtcControlService.GetActiveCall:output_type -> aerochat.rtc.v1.GetActiveCallResponse
+	14, // 42: aerochat.rtc.v1.RtcControlService.GetCall:output_type -> aerochat.rtc.v1.GetCallResponse
+	16, // 43: aerochat.rtc.v1.RtcControlService.StartCall:output_type -> aerochat.rtc.v1.StartCallResponse
+	18, // 44: aerochat.rtc.v1.RtcControlService.JoinCall:output_type -> aerochat.rtc.v1.JoinCallResponse
+	20, // 45: aerochat.rtc.v1.RtcControlService.LeaveCall:output_type -> aerochat.rtc.v1.LeaveCallResponse
+	22, // 46: aerochat.rtc.v1.RtcControlService.EndCall:output_type -> aerochat.rtc.v1.EndCallResponse
+	24, // 47: aerochat.rtc.v1.RtcControlService.ListCallParticipants:output_type -> aerochat.rtc.v1.ListCallParticipantsResponse
+	26, // 48: aerochat.rtc.v1.RtcControlService.SendSignal:output_type -> aerochat.rtc.v1.SendSignalResponse
+	40, // [40:49] is the sub-list for method output_type
+	31, // [31:40] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_aerochat_rtc_v1_rtc_control_service_proto_init() }
@@ -152,13 +1712,14 @@ func file_aerochat_rtc_v1_rtc_control_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc), len(file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   2,
+			NumEnums:      5,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_aerochat_rtc_v1_rtc_control_service_proto_goTypes,
 		DependencyIndexes: file_aerochat_rtc_v1_rtc_control_service_proto_depIdxs,
+		EnumInfos:         file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes,
 		MessageInfos:      file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes,
 	}.Build()
 	File_aerochat_rtc_v1_rtc_control_service_proto = out.File

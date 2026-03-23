@@ -19,6 +19,8 @@ import (
 	chatv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/v1/chatv1connect"
 	identityv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1"
 	identityv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1/identityv1connect"
+	rtcv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1"
+	rtcv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1/rtcv1connect"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/downstream"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/realtime"
@@ -31,6 +33,7 @@ func TestNewHTTPHandlerRoutesIdentityAndChatRequests(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
 	chatDownstream := &testChatHandler{}
+	rtcDownstream := &testRTCHandler{}
 
 	identityServer := httptest.NewServer(identityHTTPHandler(identityDownstream))
 	defer identityServer.Close()
@@ -38,9 +41,12 @@ func TestNewHTTPHandlerRoutesIdentityAndChatRequests(t *testing.T) {
 	chatServer := httptest.NewServer(chatHTTPHandler(chatDownstream))
 	defer chatServer.Close()
 
+	rtcServer := httptest.NewServer(rtcHTTPHandler(rtcDownstream))
+	defer rtcServer.Close()
+
 	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{
 		CORSAllowedOrigins: []string{"http://localhost:5173"},
-	}, downstream.NewClients(&http.Client{Timeout: time.Second}, identityServer.URL, chatServer.URL), newTestRealtimeHub(t, logger))
+	}, downstream.NewClients(&http.Client{Timeout: time.Second}, identityServer.URL, chatServer.URL, rtcServer.URL), newTestRealtimeHub(t, logger))
 
 	gatewayServer := httptest.NewServer(handler)
 	defer gatewayServer.Close()
@@ -91,6 +97,7 @@ func TestNewHTTPHandlerReadinessDependsOnDownstreams(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
 	chatDownstream := &testChatHandler{}
+	rtcDownstream := &testRTCHandler{}
 
 	identityServer := httptest.NewServer(identityHTTPHandler(identityDownstream))
 	defer identityServer.Close()
@@ -98,10 +105,14 @@ func TestNewHTTPHandlerReadinessDependsOnDownstreams(t *testing.T) {
 	chatServer := httptest.NewServer(chatHTTPHandler(chatDownstream))
 	defer chatServer.Close()
 
+	rtcServer := httptest.NewServer(rtcHTTPHandler(rtcDownstream))
+	defer rtcServer.Close()
+
 	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{}, downstream.NewClients(
 		&http.Client{Timeout: time.Second},
 		identityServer.URL,
 		chatServer.URL,
+		rtcServer.URL,
 	), newTestRealtimeHub(t, logger))
 
 	healthyRequest := httptest.NewRequest(http.MethodGet, "/readyz", nil)
@@ -130,6 +141,7 @@ func TestNewHTTPHandlerPreservesDownstreamAuthOwnership(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
 	chatDownstream := &testChatHandler{}
+	rtcDownstream := &testRTCHandler{}
 	identityDownstream.SetProfileError(connect.NewError(connect.CodeUnauthenticated, errors.New("authorization header is required")))
 
 	identityServer := httptest.NewServer(identityHTTPHandler(identityDownstream))
@@ -138,10 +150,14 @@ func TestNewHTTPHandlerPreservesDownstreamAuthOwnership(t *testing.T) {
 	chatServer := httptest.NewServer(chatHTTPHandler(chatDownstream))
 	defer chatServer.Close()
 
+	rtcServer := httptest.NewServer(rtcHTTPHandler(rtcDownstream))
+	defer rtcServer.Close()
+
 	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{}, downstream.NewClients(
 		&http.Client{Timeout: time.Second},
 		identityServer.URL,
 		chatServer.URL,
+		rtcServer.URL,
 	), newTestRealtimeHub(t, logger))
 
 	gatewayServer := httptest.NewServer(handler)
@@ -167,6 +183,7 @@ func TestNewHTTPHandlerAcceptsRealtimeConnections(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
 	chatDownstream := &testChatHandler{}
+	rtcDownstream := &testRTCHandler{}
 
 	identityServer := httptest.NewServer(identityHTTPHandler(identityDownstream))
 	defer identityServer.Close()
@@ -174,12 +191,16 @@ func TestNewHTTPHandlerAcceptsRealtimeConnections(t *testing.T) {
 	chatServer := httptest.NewServer(chatHTTPHandler(chatDownstream))
 	defer chatServer.Close()
 
+	rtcServer := httptest.NewServer(rtcHTTPHandler(rtcDownstream))
+	defer rtcServer.Close()
+
 	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{
 		CORSAllowedOrigins: []string{"http://app.aerochat.local"},
 	}, downstream.NewClients(
 		&http.Client{Timeout: time.Second},
 		identityServer.URL,
 		chatServer.URL,
+		rtcServer.URL,
 	), newTestRealtimeHub(t, logger))
 
 	gatewayServer := httptest.NewServer(handler)
@@ -236,6 +257,7 @@ func TestNewHTTPHandlerRejectsRealtimeConnectionWithoutSessionToken(t *testing.T
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
 	chatDownstream := &testChatHandler{}
+	rtcDownstream := &testRTCHandler{}
 
 	identityServer := httptest.NewServer(identityHTTPHandler(identityDownstream))
 	defer identityServer.Close()
@@ -243,12 +265,16 @@ func TestNewHTTPHandlerRejectsRealtimeConnectionWithoutSessionToken(t *testing.T
 	chatServer := httptest.NewServer(chatHTTPHandler(chatDownstream))
 	defer chatServer.Close()
 
+	rtcServer := httptest.NewServer(rtcHTTPHandler(rtcDownstream))
+	defer rtcServer.Close()
+
 	handler := NewHTTPHandler(logger, observability.ServiceMeta{Name: "aero-gateway", Version: "dev"}, Config{
 		CORSAllowedOrigins: []string{"http://app.aerochat.local"},
 	}, downstream.NewClients(
 		&http.Client{Timeout: time.Second},
 		identityServer.URL,
 		chatServer.URL,
+		rtcServer.URL,
 	), newTestRealtimeHub(t, logger))
 
 	gatewayServer := httptest.NewServer(handler)
@@ -1240,6 +1266,11 @@ func chatHTTPHandler(handler chatv1connect.ChatServiceHandler) http.Handler {
 	return httpHandler
 }
 
+func rtcHTTPHandler(handler rtcv1connect.RtcControlServiceHandler) http.Handler {
+	_, httpHandler := rtcv1connect.NewRtcControlServiceHandler(handler)
+	return httpHandler
+}
+
 type testIdentityHandler struct {
 	identityv1connect.UnimplementedIdentityServiceHandler
 
@@ -1257,6 +1288,14 @@ type testFriendRequestRecord struct {
 	requesterLogin string
 	addresseeLogin string
 	requestedAt    *timestamppb.Timestamp
+}
+
+type testRTCHandler struct {
+	rtcv1connect.UnimplementedRtcControlServiceHandler
+}
+
+func (h *testRTCHandler) Ping(context.Context, *connect.Request[rtcv1.PingRequest]) (*connect.Response[rtcv1.PingResponse], error) {
+	return connect.NewResponse(&rtcv1.PingResponse{}), nil
 }
 
 func (h *testIdentityHandler) Ping(context.Context, *connect.Request[identityv1.PingRequest]) (*connect.Response[identityv1.PingResponse], error) {
@@ -2523,10 +2562,14 @@ func newGatewayTestServer(
 	chatServer := httptest.NewServer(chatHTTPHandler(chatDownstream))
 	t.Cleanup(chatServer.Close)
 
+	rtcServer := httptest.NewServer(rtcHTTPHandler(&testRTCHandler{}))
+	t.Cleanup(rtcServer.Close)
+
 	clients := downstream.NewClients(
 		&http.Client{Timeout: time.Second},
 		identityServer.URL,
 		chatServer.URL,
+		rtcServer.URL,
 	)
 	realtimeHub := realtime.NewHub(
 		logger,

@@ -23,6 +23,7 @@ var readyCapabilities = []string{
 	"groups",
 	"people",
 	"presence",
+	"rtc_control",
 	"crypto_device_binding",
 }
 

@@ -11,6 +11,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 	t.Setenv("AERO_REALTIME_WRITE_TIMEOUT", "")
 	t.Setenv("AERO_IDENTITY_URL", "")
 	t.Setenv("AERO_CHAT_URL", "")
+	t.Setenv("AERO_RTC_CONTROL_URL", "")
 	t.Setenv("AERO_CORS_ALLOWED_ORIGINS", "")
 
 	cfg, err := LoadConfig(":8080")
@@ -26,6 +27,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	}
 	if cfg.ChatBaseURL != "http://127.0.0.1:8082" {
 		t.Fatalf("ожидался chat url по умолчанию, получен %q", cfg.ChatBaseURL)
+	}
+	if cfg.RTCBaseURL != "http://127.0.0.1:8083" {
+		t.Fatalf("ожидался rtc url по умолчанию, получен %q", cfg.RTCBaseURL)
 	}
 	if cfg.DownstreamTimeout.String() != "5s" {
 		t.Fatalf("ожидался downstream timeout 5s, получен %s", cfg.DownstreamTimeout)

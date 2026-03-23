@@ -18,6 +18,7 @@ type Config struct {
 	RealtimeWriteTimeout time.Duration
 	IdentityBaseURL      string
 	ChatBaseURL          string
+	RTCBaseURL           string
 	CORSAllowedOrigins   []string
 }
 
@@ -53,6 +54,10 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	rtcBaseURL, err := lookupURL("AERO_RTC_CONTROL_URL", "http://127.0.0.1:8083")
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddress:          lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
@@ -63,6 +68,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		RealtimeWriteTimeout: realtimeWriteTimeout,
 		IdentityBaseURL:      identityBaseURL,
 		ChatBaseURL:          chatBaseURL,
+		RTCBaseURL:           rtcBaseURL,
 		CORSAllowedOrigins:   lookupCSV("AERO_CORS_ALLOWED_ORIGINS"),
 	}, nil
 }

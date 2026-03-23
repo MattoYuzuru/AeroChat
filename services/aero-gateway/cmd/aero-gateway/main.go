@@ -40,7 +40,7 @@ func run() error {
 	}
 
 	downstreamClient := downstream.NewHTTPClient(cfg.DownstreamTimeout)
-	clients := downstream.NewClients(downstreamClient, cfg.IdentityBaseURL, cfg.ChatBaseURL)
+	clients := downstream.NewClients(downstreamClient, cfg.IdentityBaseURL, cfg.ChatBaseURL, cfg.RTCBaseURL)
 	realtimeHub := realtime.NewHub(
 		logger,
 		cfg.RealtimePingInterval,

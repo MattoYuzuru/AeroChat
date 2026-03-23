@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] Encrypted media retention and tombstone parity
+- [x] RTC signaling and call-control foundation
 
 ---
 
@@ -191,7 +191,8 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Задачи:
 
-- [ ] Signaling model
+- [x] Signaling model
+- [x] Active call and participant control-plane foundation через `aero-rtc-control`
 - [ ] 1:1 calls
 - [ ] Group call control
 - [ ] One-active-call-per-user policy

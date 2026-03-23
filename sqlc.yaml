@@ -34,3 +34,21 @@ sql:
         overrides:
           - db_type: uuid
             go_type: github.com/google/uuid.UUID
+  - engine: postgresql
+    schema:
+      - services/aero-identity/db/schema
+      - services/aero-chat/db/schema
+      - services/aero-rtc-control/db/schema
+    queries:
+      - services/aero-rtc-control/db/queries
+    gen:
+      go:
+        out: services/aero-rtc-control/internal/storage/sqlc
+        package: rtcsqlc
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_json_tags: true
+        emit_db_tags: true
+        overrides:
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID
