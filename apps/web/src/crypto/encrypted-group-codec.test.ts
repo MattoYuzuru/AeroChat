@@ -122,6 +122,68 @@ describe("encrypted group codec", () => {
     }
     expect(decrypted.failureKind).toBe("aad_mismatch");
   });
+
+  it("decrypts sender self-delivery after server round-trip operation kind normalization", async () => {
+    const factory = createWebCryptoMaterialFactory();
+    const { material } = await factory.createDeviceMaterial({
+      accountId: "user-1",
+      login: "alice",
+      deviceLabel: "Web Test",
+      deviceId: "crypto-1",
+      status: "active",
+      bundleVersion: 1,
+      publishedAt: null,
+      linkIntentId: null,
+      linkIntentExpiresAt: null,
+    });
+    const encrypted = await encryptEncryptedGroupPayloadForTest({
+      recipientDevices: [
+        {
+          cryptoDeviceId: "crypto-1",
+          signedPrekeyPublicKey: material.signedPrekeyPublicKey,
+        },
+      ],
+      envelope: {
+        ...createOpaqueEnvelope(),
+        senderUserId: "user-1",
+        senderCryptoDeviceId: "crypto-1",
+        operationKind: "content",
+      },
+      payload: {
+        schema: "aerochat.web.encrypted_group_message_v1.payload.v1",
+        operation: "content",
+        replyToMessageId: null,
+        message: {
+          text: "self delivery",
+          markdownPolicy: "MARKDOWN_POLICY_SAFE_SUBSET_V1",
+          attachments: [],
+        },
+      },
+    });
+
+    const decrypted = await decryptEncryptedGroupEnvelope(material, {
+      ...createOpaqueEnvelope(),
+      senderUserId: "user-1",
+      senderCryptoDeviceId: "crypto-1",
+      ...encrypted,
+      viewerDelivery: {
+        recipientUserId: "user-1",
+        recipientCryptoDeviceId: "crypto-1",
+        storedAt: "2026-03-22T12:00:01Z",
+        unreadState: null,
+      },
+    });
+
+    expect(decrypted).toEqual(
+      expect.objectContaining({
+        status: "ready",
+        text: "self delivery",
+        senderUserId: "user-1",
+        senderCryptoDeviceId: "crypto-1",
+        operationKind: "content",
+      }),
+    );
+  });
 });
 
 function createOpaqueEnvelope(): EncryptedGroupEnvelope {

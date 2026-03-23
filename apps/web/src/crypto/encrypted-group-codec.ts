@@ -594,7 +594,7 @@ function buildWrapAAD(
       rosterVersion: envelope.rosterVersion,
       senderUserId: envelope.senderUserId,
       senderCryptoDeviceId: envelope.senderCryptoDeviceId,
-      operationKind: envelope.operationKind,
+      operationKind: canonicalizeEnvelopeOperationKind(envelope.operationKind),
       targetMessageId: envelope.targetMessageId,
       revision: envelope.revision,
       createdAt: envelope.createdAt,
@@ -629,12 +629,16 @@ function buildPayloadAAD(
       rosterVersion: envelope.rosterVersion,
       senderUserId: envelope.senderUserId,
       senderCryptoDeviceId: envelope.senderCryptoDeviceId,
-      operationKind: envelope.operationKind,
+      operationKind: canonicalizeEnvelopeOperationKind(envelope.operationKind),
       targetMessageId: envelope.targetMessageId,
       revision: envelope.revision,
       createdAt: envelope.createdAt,
     }),
   );
+}
+
+function canonicalizeEnvelopeOperationKind(operationKind: string): string {
+  return normalizeEnvelopeOperationKind(operationKind) ?? operationKind;
 }
 
 function normalizeEnvelopeOperationKind(
