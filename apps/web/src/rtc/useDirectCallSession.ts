@@ -25,6 +25,8 @@ import {
   selectDirectCallSelfParticipant,
 } from "./state";
 import {
+  flushPendingRemoteICECandidates,
+  queueOrApplyRemoteICECandidate,
   teardownDirectCallPeerRuntime,
   teardownDirectCallRuntime,
 } from "./runtime";
@@ -87,6 +89,7 @@ export function useDirectCallSession(
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
+  const pendingRemoteICECandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const refreshDirectChatCallRef = useRef(refreshDirectChatCall);
 
   useEffect(() => {
@@ -129,6 +132,7 @@ export function useDirectCallSession(
     });
     peerConnectionRef.current = null;
     remoteStreamRef.current = null;
+    pendingRemoteICECandidatesRef.current = [];
     setRemoteAudioStream(null);
     dispatch({
       type: "remote_audio_state_replaced",
@@ -146,6 +150,7 @@ export function useDirectCallSession(
     localStreamRef.current = null;
     peerConnectionRef.current = null;
     remoteStreamRef.current = null;
+    pendingRemoteICECandidatesRef.current = [];
     setRemoteAudioStream(null);
     dispatch({ type: "local_left" });
   }, []);
@@ -367,6 +372,10 @@ export function useDirectCallSession(
               return;
             }
             await refreshedPeerConnection.setRemoteDescription(offer);
+            pendingRemoteICECandidatesRef.current = await flushPendingRemoteICECandidates(
+              refreshedPeerConnection,
+              pendingRemoteICECandidatesRef.current,
+            );
             const answer = await refreshedPeerConnection.createAnswer();
             await refreshedPeerConnection.setLocalDescription(answer);
             dispatch({
@@ -381,6 +390,10 @@ export function useDirectCallSession(
           }
 
           await peerConnection.setRemoteDescription(offer);
+          pendingRemoteICECandidatesRef.current = await flushPendingRemoteICECandidates(
+            peerConnection,
+            pendingRemoteICECandidatesRef.current,
+          );
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
           dispatch({
@@ -400,6 +413,10 @@ export function useDirectCallSession(
           }
 
           await peerConnection.setRemoteDescription(answer);
+          pendingRemoteICECandidatesRef.current = await flushPendingRemoteICECandidates(
+            peerConnection,
+            pendingRemoteICECandidatesRef.current,
+          );
           dispatch({
             type: "peer_state_replaced",
             peerConnectionState: "connecting",
@@ -412,7 +429,11 @@ export function useDirectCallSession(
             throw new Error("invalid ice candidate payload");
           }
 
-          await peerConnection.addIceCandidate(candidate);
+          pendingRemoteICECandidatesRef.current = await queueOrApplyRemoteICECandidate(
+            peerConnection,
+            pendingRemoteICECandidatesRef.current,
+            candidate,
+          );
           return;
         }
         default:
