@@ -2,15 +2,24 @@ package app
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
 type Config struct {
-	HTTPAddress     string
-	LogLevel        string
-	ShutdownTimeout time.Duration
+	DatabaseURL               string
+	HTTPAddress               string
+	LogLevel                  string
+	ShutdownTimeout           time.Duration
+	DatabaseBootstrapTimeout  time.Duration
+	DownstreamTimeout         time.Duration
+	IdentityBaseURL           string
+	ChatBaseURL               string
+	MaxSignalPayloadSizeBytes int
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -19,11 +28,40 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	bootstrapTimeout, err := lookupDuration("AERO_DATABASE_BOOTSTRAP_TIMEOUT", 30*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	downstreamTimeout, err := lookupDuration("AERO_DOWNSTREAM_TIMEOUT", 5*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	identityBaseURL, err := lookupURL("AERO_IDENTITY_URL", "http://127.0.0.1:8081")
+	if err != nil {
+		return Config{}, err
+	}
+	chatBaseURL, err := lookupURL("AERO_CHAT_URL", "http://127.0.0.1:8082")
+	if err != nil {
+		return Config{}, err
+	}
+	maxSignalPayloadSizeBytes, err := lookupInt("AERO_RTC_SIGNAL_MAX_PAYLOAD_BYTES", 16*1024)
+	if err != nil {
+		return Config{}, err
+	}
+	if maxSignalPayloadSizeBytes <= 0 {
+		return Config{}, fmt.Errorf("переменная %s должна быть положительной", "AERO_RTC_SIGNAL_MAX_PAYLOAD_BYTES")
+	}
 
 	return Config{
-		HTTPAddress:     lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
-		LogLevel:        lookupString("AERO_LOG_LEVEL", "info"),
-		ShutdownTimeout: shutdownTimeout,
+		DatabaseURL:               lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
+		HTTPAddress:               lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
+		LogLevel:                  lookupString("AERO_LOG_LEVEL", "info"),
+		ShutdownTimeout:           shutdownTimeout,
+		DatabaseBootstrapTimeout:  bootstrapTimeout,
+		DownstreamTimeout:         downstreamTimeout,
+		IdentityBaseURL:           identityBaseURL,
+		ChatBaseURL:               chatBaseURL,
+		MaxSignalPayloadSizeBytes: maxSignalPayloadSizeBytes,
 	}, nil
 }
 
@@ -43,6 +81,34 @@ func lookupDuration(key string, fallback time.Duration) (time.Duration, error) {
 	}
 
 	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("переменная %s: %w", key, err)
+	}
+
+	return parsed, nil
+}
+
+func lookupURL(key string, fallback string) (string, error) {
+	value := lookupString(key, fallback)
+
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return "", fmt.Errorf("переменная %s: %w", key, err)
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("переменная %s: требуется абсолютный url", key)
+	}
+
+	return strings.TrimRight(value, "/"), nil
+}
+
+func lookupInt(key string, fallback int) (int, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.Atoi(value)
 	if err != nil {
 		return 0, fmt.Errorf("переменная %s: %w", key, err)
 	}

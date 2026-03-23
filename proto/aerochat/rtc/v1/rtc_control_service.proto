@@ -5,13 +5,164 @@ package aerochat.rtc.v1;
 option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1;rtcv1";
 
 import "aerochat/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
 
 service RtcControlService {
   rpc Ping(PingRequest) returns (PingResponse);
+  rpc GetActiveCall(GetActiveCallRequest) returns (GetActiveCallResponse);
+  rpc GetCall(GetCallRequest) returns (GetCallResponse);
+  rpc StartCall(StartCallRequest) returns (StartCallResponse);
+  rpc JoinCall(JoinCallRequest) returns (JoinCallResponse);
+  rpc LeaveCall(LeaveCallRequest) returns (LeaveCallResponse);
+  rpc EndCall(EndCallRequest) returns (EndCallResponse);
+  rpc ListCallParticipants(ListCallParticipantsRequest) returns (ListCallParticipantsResponse);
+  rpc SendSignal(SendSignalRequest) returns (SendSignalResponse);
 }
 
 message PingRequest {}
 
 message PingResponse {
   aerochat.common.v1.ServiceMeta service = 1;
+}
+
+enum ConversationScopeType {
+  CONVERSATION_SCOPE_TYPE_UNSPECIFIED = 0;
+  CONVERSATION_SCOPE_TYPE_DIRECT = 1;
+  CONVERSATION_SCOPE_TYPE_GROUP = 2;
+}
+
+enum CallStatus {
+  CALL_STATUS_UNSPECIFIED = 0;
+  CALL_STATUS_ACTIVE = 1;
+  CALL_STATUS_ENDED = 2;
+}
+
+enum CallEndReason {
+  CALL_END_REASON_UNSPECIFIED = 0;
+  CALL_END_REASON_MANUAL = 1;
+  CALL_END_REASON_LAST_PARTICIPANT_LEFT = 2;
+}
+
+enum ParticipantState {
+  PARTICIPANT_STATE_UNSPECIFIED = 0;
+  PARTICIPANT_STATE_ACTIVE = 1;
+  PARTICIPANT_STATE_LEFT = 2;
+}
+
+enum SignalEnvelopeType {
+  SIGNAL_ENVELOPE_TYPE_UNSPECIFIED = 0;
+  SIGNAL_ENVELOPE_TYPE_OFFER = 1;
+  SIGNAL_ENVELOPE_TYPE_ANSWER = 2;
+  SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE = 3;
+}
+
+message ConversationScope {
+  ConversationScopeType type = 1;
+  string direct_chat_id = 2;
+  string group_id = 3;
+}
+
+message Call {
+  string id = 1;
+  ConversationScope scope = 2;
+  string created_by_user_id = 3;
+  CallStatus status = 4;
+  uint32 active_participant_count = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp started_at = 8;
+  google.protobuf.Timestamp ended_at = 9;
+  string ended_by_user_id = 10;
+  CallEndReason end_reason = 11;
+}
+
+message CallParticipant {
+  string id = 1;
+  string call_id = 2;
+  string user_id = 3;
+  ParticipantState state = 4;
+  google.protobuf.Timestamp joined_at = 5;
+  google.protobuf.Timestamp left_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp last_signal_at = 8;
+}
+
+message SignalEnvelope {
+  string call_id = 1;
+  string from_user_id = 2;
+  string target_user_id = 3;
+  SignalEnvelopeType type = 4;
+  bytes payload = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message GetActiveCallRequest {
+  ConversationScope scope = 1;
+}
+
+message GetActiveCallResponse {
+  Call call = 1;
+}
+
+message GetCallRequest {
+  string call_id = 1;
+}
+
+message GetCallResponse {
+  Call call = 1;
+}
+
+message StartCallRequest {
+  ConversationScope scope = 1;
+}
+
+message StartCallResponse {
+  Call call = 1;
+  CallParticipant self_participant = 2;
+}
+
+message JoinCallRequest {
+  string call_id = 1;
+}
+
+message JoinCallResponse {
+  Call call = 1;
+  CallParticipant self_participant = 2;
+}
+
+message LeaveCallRequest {
+  string call_id = 1;
+}
+
+message LeaveCallResponse {
+  Call call = 1;
+  CallParticipant self_participant = 2;
+}
+
+message EndCallRequest {
+  string call_id = 1;
+}
+
+message EndCallResponse {
+  Call call = 1;
+  repeated CallParticipant affected_participants = 2;
+}
+
+message ListCallParticipantsRequest {
+  string call_id = 1;
+}
+
+message ListCallParticipantsResponse {
+  repeated CallParticipant participants = 1;
+}
+
+message SendSignalRequest {
+  string call_id = 1;
+  string target_user_id = 2;
+  SignalEnvelopeType type = 3;
+  bytes payload = 4;
+}
+
+message SendSignalResponse {
+  SignalEnvelope signal = 1;
 }

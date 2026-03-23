@@ -35,11 +35,43 @@ const (
 const (
 	// RtcControlServicePingProcedure is the fully-qualified name of the RtcControlService's Ping RPC.
 	RtcControlServicePingProcedure = "/aerochat.rtc.v1.RtcControlService/Ping"
+	// RtcControlServiceGetActiveCallProcedure is the fully-qualified name of the RtcControlService's
+	// GetActiveCall RPC.
+	RtcControlServiceGetActiveCallProcedure = "/aerochat.rtc.v1.RtcControlService/GetActiveCall"
+	// RtcControlServiceGetCallProcedure is the fully-qualified name of the RtcControlService's GetCall
+	// RPC.
+	RtcControlServiceGetCallProcedure = "/aerochat.rtc.v1.RtcControlService/GetCall"
+	// RtcControlServiceStartCallProcedure is the fully-qualified name of the RtcControlService's
+	// StartCall RPC.
+	RtcControlServiceStartCallProcedure = "/aerochat.rtc.v1.RtcControlService/StartCall"
+	// RtcControlServiceJoinCallProcedure is the fully-qualified name of the RtcControlService's
+	// JoinCall RPC.
+	RtcControlServiceJoinCallProcedure = "/aerochat.rtc.v1.RtcControlService/JoinCall"
+	// RtcControlServiceLeaveCallProcedure is the fully-qualified name of the RtcControlService's
+	// LeaveCall RPC.
+	RtcControlServiceLeaveCallProcedure = "/aerochat.rtc.v1.RtcControlService/LeaveCall"
+	// RtcControlServiceEndCallProcedure is the fully-qualified name of the RtcControlService's EndCall
+	// RPC.
+	RtcControlServiceEndCallProcedure = "/aerochat.rtc.v1.RtcControlService/EndCall"
+	// RtcControlServiceListCallParticipantsProcedure is the fully-qualified name of the
+	// RtcControlService's ListCallParticipants RPC.
+	RtcControlServiceListCallParticipantsProcedure = "/aerochat.rtc.v1.RtcControlService/ListCallParticipants"
+	// RtcControlServiceSendSignalProcedure is the fully-qualified name of the RtcControlService's
+	// SendSignal RPC.
+	RtcControlServiceSendSignalProcedure = "/aerochat.rtc.v1.RtcControlService/SendSignal"
 )
 
 // RtcControlServiceClient is a client for the aerochat.rtc.v1.RtcControlService service.
 type RtcControlServiceClient interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
+	GetActiveCall(context.Context, *connect.Request[v1.GetActiveCallRequest]) (*connect.Response[v1.GetActiveCallResponse], error)
+	GetCall(context.Context, *connect.Request[v1.GetCallRequest]) (*connect.Response[v1.GetCallResponse], error)
+	StartCall(context.Context, *connect.Request[v1.StartCallRequest]) (*connect.Response[v1.StartCallResponse], error)
+	JoinCall(context.Context, *connect.Request[v1.JoinCallRequest]) (*connect.Response[v1.JoinCallResponse], error)
+	LeaveCall(context.Context, *connect.Request[v1.LeaveCallRequest]) (*connect.Response[v1.LeaveCallResponse], error)
+	EndCall(context.Context, *connect.Request[v1.EndCallRequest]) (*connect.Response[v1.EndCallResponse], error)
+	ListCallParticipants(context.Context, *connect.Request[v1.ListCallParticipantsRequest]) (*connect.Response[v1.ListCallParticipantsResponse], error)
+	SendSignal(context.Context, *connect.Request[v1.SendSignalRequest]) (*connect.Response[v1.SendSignalResponse], error)
 }
 
 // NewRtcControlServiceClient constructs a client for the aerochat.rtc.v1.RtcControlService service.
@@ -59,12 +91,68 @@ func NewRtcControlServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(rtcControlServiceMethods.ByName("Ping")),
 			connect.WithClientOptions(opts...),
 		),
+		getActiveCall: connect.NewClient[v1.GetActiveCallRequest, v1.GetActiveCallResponse](
+			httpClient,
+			baseURL+RtcControlServiceGetActiveCallProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("GetActiveCall")),
+			connect.WithClientOptions(opts...),
+		),
+		getCall: connect.NewClient[v1.GetCallRequest, v1.GetCallResponse](
+			httpClient,
+			baseURL+RtcControlServiceGetCallProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("GetCall")),
+			connect.WithClientOptions(opts...),
+		),
+		startCall: connect.NewClient[v1.StartCallRequest, v1.StartCallResponse](
+			httpClient,
+			baseURL+RtcControlServiceStartCallProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("StartCall")),
+			connect.WithClientOptions(opts...),
+		),
+		joinCall: connect.NewClient[v1.JoinCallRequest, v1.JoinCallResponse](
+			httpClient,
+			baseURL+RtcControlServiceJoinCallProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("JoinCall")),
+			connect.WithClientOptions(opts...),
+		),
+		leaveCall: connect.NewClient[v1.LeaveCallRequest, v1.LeaveCallResponse](
+			httpClient,
+			baseURL+RtcControlServiceLeaveCallProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("LeaveCall")),
+			connect.WithClientOptions(opts...),
+		),
+		endCall: connect.NewClient[v1.EndCallRequest, v1.EndCallResponse](
+			httpClient,
+			baseURL+RtcControlServiceEndCallProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("EndCall")),
+			connect.WithClientOptions(opts...),
+		),
+		listCallParticipants: connect.NewClient[v1.ListCallParticipantsRequest, v1.ListCallParticipantsResponse](
+			httpClient,
+			baseURL+RtcControlServiceListCallParticipantsProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("ListCallParticipants")),
+			connect.WithClientOptions(opts...),
+		),
+		sendSignal: connect.NewClient[v1.SendSignalRequest, v1.SendSignalResponse](
+			httpClient,
+			baseURL+RtcControlServiceSendSignalProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("SendSignal")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // rtcControlServiceClient implements RtcControlServiceClient.
 type rtcControlServiceClient struct {
-	ping *connect.Client[v1.PingRequest, v1.PingResponse]
+	ping                 *connect.Client[v1.PingRequest, v1.PingResponse]
+	getActiveCall        *connect.Client[v1.GetActiveCallRequest, v1.GetActiveCallResponse]
+	getCall              *connect.Client[v1.GetCallRequest, v1.GetCallResponse]
+	startCall            *connect.Client[v1.StartCallRequest, v1.StartCallResponse]
+	joinCall             *connect.Client[v1.JoinCallRequest, v1.JoinCallResponse]
+	leaveCall            *connect.Client[v1.LeaveCallRequest, v1.LeaveCallResponse]
+	endCall              *connect.Client[v1.EndCallRequest, v1.EndCallResponse]
+	listCallParticipants *connect.Client[v1.ListCallParticipantsRequest, v1.ListCallParticipantsResponse]
+	sendSignal           *connect.Client[v1.SendSignalRequest, v1.SendSignalResponse]
 }
 
 // Ping calls aerochat.rtc.v1.RtcControlService.Ping.
@@ -72,9 +160,57 @@ func (c *rtcControlServiceClient) Ping(ctx context.Context, req *connect.Request
 	return c.ping.CallUnary(ctx, req)
 }
 
+// GetActiveCall calls aerochat.rtc.v1.RtcControlService.GetActiveCall.
+func (c *rtcControlServiceClient) GetActiveCall(ctx context.Context, req *connect.Request[v1.GetActiveCallRequest]) (*connect.Response[v1.GetActiveCallResponse], error) {
+	return c.getActiveCall.CallUnary(ctx, req)
+}
+
+// GetCall calls aerochat.rtc.v1.RtcControlService.GetCall.
+func (c *rtcControlServiceClient) GetCall(ctx context.Context, req *connect.Request[v1.GetCallRequest]) (*connect.Response[v1.GetCallResponse], error) {
+	return c.getCall.CallUnary(ctx, req)
+}
+
+// StartCall calls aerochat.rtc.v1.RtcControlService.StartCall.
+func (c *rtcControlServiceClient) StartCall(ctx context.Context, req *connect.Request[v1.StartCallRequest]) (*connect.Response[v1.StartCallResponse], error) {
+	return c.startCall.CallUnary(ctx, req)
+}
+
+// JoinCall calls aerochat.rtc.v1.RtcControlService.JoinCall.
+func (c *rtcControlServiceClient) JoinCall(ctx context.Context, req *connect.Request[v1.JoinCallRequest]) (*connect.Response[v1.JoinCallResponse], error) {
+	return c.joinCall.CallUnary(ctx, req)
+}
+
+// LeaveCall calls aerochat.rtc.v1.RtcControlService.LeaveCall.
+func (c *rtcControlServiceClient) LeaveCall(ctx context.Context, req *connect.Request[v1.LeaveCallRequest]) (*connect.Response[v1.LeaveCallResponse], error) {
+	return c.leaveCall.CallUnary(ctx, req)
+}
+
+// EndCall calls aerochat.rtc.v1.RtcControlService.EndCall.
+func (c *rtcControlServiceClient) EndCall(ctx context.Context, req *connect.Request[v1.EndCallRequest]) (*connect.Response[v1.EndCallResponse], error) {
+	return c.endCall.CallUnary(ctx, req)
+}
+
+// ListCallParticipants calls aerochat.rtc.v1.RtcControlService.ListCallParticipants.
+func (c *rtcControlServiceClient) ListCallParticipants(ctx context.Context, req *connect.Request[v1.ListCallParticipantsRequest]) (*connect.Response[v1.ListCallParticipantsResponse], error) {
+	return c.listCallParticipants.CallUnary(ctx, req)
+}
+
+// SendSignal calls aerochat.rtc.v1.RtcControlService.SendSignal.
+func (c *rtcControlServiceClient) SendSignal(ctx context.Context, req *connect.Request[v1.SendSignalRequest]) (*connect.Response[v1.SendSignalResponse], error) {
+	return c.sendSignal.CallUnary(ctx, req)
+}
+
 // RtcControlServiceHandler is an implementation of the aerochat.rtc.v1.RtcControlService service.
 type RtcControlServiceHandler interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
+	GetActiveCall(context.Context, *connect.Request[v1.GetActiveCallRequest]) (*connect.Response[v1.GetActiveCallResponse], error)
+	GetCall(context.Context, *connect.Request[v1.GetCallRequest]) (*connect.Response[v1.GetCallResponse], error)
+	StartCall(context.Context, *connect.Request[v1.StartCallRequest]) (*connect.Response[v1.StartCallResponse], error)
+	JoinCall(context.Context, *connect.Request[v1.JoinCallRequest]) (*connect.Response[v1.JoinCallResponse], error)
+	LeaveCall(context.Context, *connect.Request[v1.LeaveCallRequest]) (*connect.Response[v1.LeaveCallResponse], error)
+	EndCall(context.Context, *connect.Request[v1.EndCallRequest]) (*connect.Response[v1.EndCallResponse], error)
+	ListCallParticipants(context.Context, *connect.Request[v1.ListCallParticipantsRequest]) (*connect.Response[v1.ListCallParticipantsResponse], error)
+	SendSignal(context.Context, *connect.Request[v1.SendSignalRequest]) (*connect.Response[v1.SendSignalResponse], error)
 }
 
 // NewRtcControlServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -90,10 +226,74 @@ func NewRtcControlServiceHandler(svc RtcControlServiceHandler, opts ...connect.H
 		connect.WithSchema(rtcControlServiceMethods.ByName("Ping")),
 		connect.WithHandlerOptions(opts...),
 	)
+	rtcControlServiceGetActiveCallHandler := connect.NewUnaryHandler(
+		RtcControlServiceGetActiveCallProcedure,
+		svc.GetActiveCall,
+		connect.WithSchema(rtcControlServiceMethods.ByName("GetActiveCall")),
+		connect.WithHandlerOptions(opts...),
+	)
+	rtcControlServiceGetCallHandler := connect.NewUnaryHandler(
+		RtcControlServiceGetCallProcedure,
+		svc.GetCall,
+		connect.WithSchema(rtcControlServiceMethods.ByName("GetCall")),
+		connect.WithHandlerOptions(opts...),
+	)
+	rtcControlServiceStartCallHandler := connect.NewUnaryHandler(
+		RtcControlServiceStartCallProcedure,
+		svc.StartCall,
+		connect.WithSchema(rtcControlServiceMethods.ByName("StartCall")),
+		connect.WithHandlerOptions(opts...),
+	)
+	rtcControlServiceJoinCallHandler := connect.NewUnaryHandler(
+		RtcControlServiceJoinCallProcedure,
+		svc.JoinCall,
+		connect.WithSchema(rtcControlServiceMethods.ByName("JoinCall")),
+		connect.WithHandlerOptions(opts...),
+	)
+	rtcControlServiceLeaveCallHandler := connect.NewUnaryHandler(
+		RtcControlServiceLeaveCallProcedure,
+		svc.LeaveCall,
+		connect.WithSchema(rtcControlServiceMethods.ByName("LeaveCall")),
+		connect.WithHandlerOptions(opts...),
+	)
+	rtcControlServiceEndCallHandler := connect.NewUnaryHandler(
+		RtcControlServiceEndCallProcedure,
+		svc.EndCall,
+		connect.WithSchema(rtcControlServiceMethods.ByName("EndCall")),
+		connect.WithHandlerOptions(opts...),
+	)
+	rtcControlServiceListCallParticipantsHandler := connect.NewUnaryHandler(
+		RtcControlServiceListCallParticipantsProcedure,
+		svc.ListCallParticipants,
+		connect.WithSchema(rtcControlServiceMethods.ByName("ListCallParticipants")),
+		connect.WithHandlerOptions(opts...),
+	)
+	rtcControlServiceSendSignalHandler := connect.NewUnaryHandler(
+		RtcControlServiceSendSignalProcedure,
+		svc.SendSignal,
+		connect.WithSchema(rtcControlServiceMethods.ByName("SendSignal")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/aerochat.rtc.v1.RtcControlService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RtcControlServicePingProcedure:
 			rtcControlServicePingHandler.ServeHTTP(w, r)
+		case RtcControlServiceGetActiveCallProcedure:
+			rtcControlServiceGetActiveCallHandler.ServeHTTP(w, r)
+		case RtcControlServiceGetCallProcedure:
+			rtcControlServiceGetCallHandler.ServeHTTP(w, r)
+		case RtcControlServiceStartCallProcedure:
+			rtcControlServiceStartCallHandler.ServeHTTP(w, r)
+		case RtcControlServiceJoinCallProcedure:
+			rtcControlServiceJoinCallHandler.ServeHTTP(w, r)
+		case RtcControlServiceLeaveCallProcedure:
+			rtcControlServiceLeaveCallHandler.ServeHTTP(w, r)
+		case RtcControlServiceEndCallProcedure:
+			rtcControlServiceEndCallHandler.ServeHTTP(w, r)
+		case RtcControlServiceListCallParticipantsProcedure:
+			rtcControlServiceListCallParticipantsHandler.ServeHTTP(w, r)
+		case RtcControlServiceSendSignalProcedure:
+			rtcControlServiceSendSignalHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -105,4 +305,36 @@ type UnimplementedRtcControlServiceHandler struct{}
 
 func (UnimplementedRtcControlServiceHandler) Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.Ping is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) GetActiveCall(context.Context, *connect.Request[v1.GetActiveCallRequest]) (*connect.Response[v1.GetActiveCallResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.GetActiveCall is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) GetCall(context.Context, *connect.Request[v1.GetCallRequest]) (*connect.Response[v1.GetCallResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.GetCall is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) StartCall(context.Context, *connect.Request[v1.StartCallRequest]) (*connect.Response[v1.StartCallResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.StartCall is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) JoinCall(context.Context, *connect.Request[v1.JoinCallRequest]) (*connect.Response[v1.JoinCallResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.JoinCall is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) LeaveCall(context.Context, *connect.Request[v1.LeaveCallRequest]) (*connect.Response[v1.LeaveCallResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.LeaveCall is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) EndCall(context.Context, *connect.Request[v1.EndCallRequest]) (*connect.Response[v1.EndCallResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.EndCall is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) ListCallParticipants(context.Context, *connect.Request[v1.ListCallParticipantsRequest]) (*connect.Response[v1.ListCallParticipantsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.ListCallParticipants is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) SendSignal(context.Context, *connect.Request[v1.SendSignalRequest]) (*connect.Response[v1.SendSignalResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.SendSignal is not implemented"))
 }

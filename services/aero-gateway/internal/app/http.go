@@ -6,6 +6,7 @@ import (
 
 	chatv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/v1/chatv1connect"
 	identityv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1/identityv1connect"
+	rtcv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1/rtcv1connect"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/downstream"
 	edgehttp "github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/edgehttp"
@@ -30,6 +31,11 @@ func NewHTTPHandler(logger *slog.Logger, meta observability.ServiceMeta, cfg Con
 		connecthandler.NewChatHandler(logger, meta.Name, meta.Version, clients.Chat, clients.Identity, realtimeHub),
 	)
 	connectMux.Handle(chatPath, chatHandler)
+
+	rtcPath, rtcHandler := rtcv1connect.NewRtcControlServiceHandler(
+		connecthandler.NewRTCHandler(logger, meta.Name, meta.Version, clients.RTC, clients.Chat, realtimeHub),
+	)
+	connectMux.Handle(rtcPath, rtcHandler)
 	loggedConnectMux := observability.WrapHTTPInstrumentation(logger, connectMux)
 
 	return edgehttp.WrapCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
