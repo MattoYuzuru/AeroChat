@@ -87,6 +87,18 @@ export function useDirectCallSession(
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
+  const refreshDirectChatCallRef = useRef(refreshDirectChatCall);
+
+  useEffect(() => {
+    refreshDirectChatCallRef.current = refreshDirectChatCall;
+  }, [refreshDirectChatCall]);
+
+  const runRefreshDirectChatCall = useCallback(
+    async (showLoading = false) => {
+      await refreshDirectChatCallRef.current(showLoading);
+    },
+    [],
+  );
 
   useEffect(() => {
     stateRef.current = state;
@@ -460,8 +472,8 @@ export function useDirectCallSession(
   const bootstrapJoinedCall = useCallback(async (callId: string) => {
     dispatch({ type: "local_joined", callId });
     ensurePeerConnection();
-    await refreshDirectChatCall(false);
-  }, [ensurePeerConnection, refreshDirectChatCall]);
+    await runRefreshDirectChatCall(false);
+  }, [ensurePeerConnection, runRefreshDirectChatCall]);
 
   async function startCall() {
     if (!enabled || chat === null || !isDirectChatSupported) {
@@ -503,7 +515,7 @@ export function useDirectCallSession(
         return;
       }
       if (isGatewayErrorCode(error, "failed_precondition")) {
-        await refreshDirectChatCall(false);
+        await runRefreshDirectChatCall(false);
         dispatch({
           type: "failure",
           message:
@@ -588,7 +600,7 @@ export function useDirectCallSession(
     } finally {
       dispatch({ type: "action_finished" });
       disposeLocalRuntime();
-      await refreshDirectChatCall(false);
+      await runRefreshDirectChatCall(false);
     }
   }
 
@@ -611,7 +623,7 @@ export function useDirectCallSession(
     } finally {
       dispatch({ type: "action_finished" });
       disposeLocalRuntime();
-      await refreshDirectChatCall(false);
+      await runRefreshDirectChatCall(false);
     }
   }
 
@@ -647,7 +659,7 @@ export function useDirectCallSession(
     }
 
     dispatch({ type: "sync_started" });
-    void refreshDirectChatCall(true);
+    void runRefreshDirectChatCall(true);
 
     return () => {
       disposeLocalRuntime();
@@ -657,7 +669,7 @@ export function useDirectCallSession(
     disposeLocalRuntime,
     enabled,
     isDirectChatSupported,
-    refreshDirectChatCall,
+    runRefreshDirectChatCall,
   ]);
 
   useEffect(() => {
@@ -725,7 +737,7 @@ export function useDirectCallSession(
     }
 
     const intervalID = window.setInterval(() => {
-      void refreshDirectChatCall(false);
+      void runRefreshDirectChatCall(false);
     }, directCallRefreshIntervalMs);
 
     return () => {
@@ -737,7 +749,7 @@ export function useDirectCallSession(
     enabled,
     pageVisible,
     token,
-    refreshDirectChatCall,
+    runRefreshDirectChatCall,
     state.call,
     state.localJoinedCallId,
   ]);

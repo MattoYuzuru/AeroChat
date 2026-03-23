@@ -167,16 +167,28 @@ export function chatsReducer(
         ...state,
         isCreatingChat: false,
       };
-    case "thread_load_started":
+    case "thread_load_started": {
+      const keepLoadedThread =
+        state.thread?.chat.id === action.chatId ? state.thread : null;
+
       return {
         ...state,
         selectedChatId: action.chatId,
         threadStatus: "loading",
+        thread: keepLoadedThread,
         threadErrorMessage: null,
         actionErrorMessage: null,
         notice: null,
       };
+    }
     case "thread_load_succeeded":
+      if (
+        state.selectedChatId !== null &&
+        state.selectedChatId !== action.snapshot.chat.id
+      ) {
+        return state;
+      }
+
       return {
         ...state,
         selectedChatId: action.snapshot.chat.id,
@@ -185,6 +197,10 @@ export function chatsReducer(
         threadErrorMessage: null,
       };
     case "thread_load_failed":
+      if (state.selectedChatId !== action.chatId) {
+        return state;
+      }
+
       return {
         ...state,
         selectedChatId: action.chatId,
