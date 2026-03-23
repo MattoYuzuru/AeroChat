@@ -63,6 +63,42 @@ func (r *Repository) GetActiveCallByScope(ctx context.Context, scope rtc.Convers
 	}
 }
 
+func (r *Repository) GetActiveParticipationByUserID(ctx context.Context, userID string) (*rtc.ActiveParticipation, error) {
+	row, err := r.queries.GetActiveParticipationByUserID(ctx, mustParseUUID(userID))
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	return &rtc.ActiveParticipation{
+		Call: rtc.Call{
+			ID: row.ID.String(),
+			Scope: toDomainScope(
+				row.ScopeType,
+				row.DirectChatID,
+				row.GroupID,
+			),
+			CreatedByUserID: row.CreatedByUserID.String(),
+			Status:          row.Status,
+			CreatedAt:       row.CreatedAt.Time.UTC(),
+			UpdatedAt:       row.UpdatedAt.Time.UTC(),
+			StartedAt:       row.StartedAt.Time.UTC(),
+			EndedAt:         timestampPointer(row.EndedAt),
+			EndedByUserID:   uuidPointerString(row.EndedByUserID),
+			EndReason:       textValue(row.EndReason),
+		},
+		Participant: rtc.CallParticipant{
+			ID:           row.ParticipantID.String(),
+			CallID:       row.ID.String(),
+			UserID:       row.UserID.String(),
+			State:        row.State,
+			JoinedAt:     row.JoinedAt.Time.UTC(),
+			LeftAt:       timestampPointer(row.LeftAt),
+			UpdatedAt:    row.ParticipantUpdatedAt.Time.UTC(),
+			LastSignalAt: timestampPointer(row.LastSignalAt),
+		},
+	}, nil
+}
+
 func (r *Repository) CreateCallWithParticipant(ctx context.Context, call rtc.Call, participant rtc.CallParticipant) (*rtc.Call, *rtc.CallParticipant, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -343,22 +379,9 @@ func toDomainCallFromGroupScopeRow(row rtcsqlc.GetActiveCallByGroupIDRow) *rtc.C
 }
 
 func toDomainCallFromBase(row rtcsqlc.RtcCall) *rtc.Call {
-	var scope rtc.ConversationScope
-	if row.ScopeType == rtc.ScopeTypeDirect {
-		scope = rtc.ConversationScope{
-			Type:         rtc.ScopeTypeDirect,
-			DirectChatID: row.DirectChatID.String(),
-		}
-	} else {
-		scope = rtc.ConversationScope{
-			Type:    rtc.ScopeTypeGroup,
-			GroupID: row.GroupID.String(),
-		}
-	}
-
 	return &rtc.Call{
 		ID:              row.ID.String(),
-		Scope:           scope,
+		Scope:           toDomainScope(row.ScopeType, row.DirectChatID, row.GroupID),
 		CreatedByUserID: row.CreatedByUserID.String(),
 		Status:          row.Status,
 		CreatedAt:       row.CreatedAt.Time.UTC(),
@@ -381,6 +404,29 @@ func toDomainParticipant(row rtcsqlc.RtcCallParticipant) rtc.CallParticipant {
 		UpdatedAt:    row.UpdatedAt.Time.UTC(),
 		LastSignalAt: timestampPointer(row.LastSignalAt),
 	}
+}
+
+func toDomainScope(scopeType string, directChatID pgtype.UUID, groupID pgtype.UUID) rtc.ConversationScope {
+	if scopeType == rtc.ScopeTypeDirect {
+		return rtc.ConversationScope{
+			Type:         rtc.ScopeTypeDirect,
+			DirectChatID: directChatID.String(),
+		}
+	}
+
+	return rtc.ConversationScope{
+		Type:    rtc.ScopeTypeGroup,
+		GroupID: groupID.String(),
+	}
+}
+
+func uuidPointerString(value pgtype.UUID) *string {
+	if !value.Valid {
+		return nil
+	}
+
+	result := value.String()
+	return &result
 }
 
 func textValue(value pgtype.Text) string {

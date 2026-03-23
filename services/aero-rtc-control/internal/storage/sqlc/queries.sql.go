@@ -345,6 +345,85 @@ func (q *Queries) GetActiveParticipantByCallIDAndUserID(ctx context.Context, arg
 	return i, err
 }
 
+const getActiveParticipationByUserID = `-- name: GetActiveParticipationByUserID :one
+SELECT
+    c.id,
+    c.scope_type,
+    c.direct_chat_id,
+    c.group_id,
+    c.created_by_user_id,
+    c.status,
+    c.created_at,
+    c.started_at,
+    c.updated_at,
+    c.ended_at,
+    c.ended_by_user_id,
+    c.end_reason,
+    p.id AS participant_id,
+    p.user_id,
+    p.state,
+    p.joined_at,
+    p.left_at,
+    p.updated_at AS participant_updated_at,
+    p.last_signal_at
+FROM rtc_call_participants p
+JOIN rtc_calls c ON c.id = p.call_id
+WHERE p.user_id = $1
+  AND p.state = 'active'
+  AND c.status = 'active'
+ORDER BY p.joined_at DESC, p.id DESC
+LIMIT 1
+`
+
+type GetActiveParticipationByUserIDRow struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	ScopeType            string             `db:"scope_type" json:"scope_type"`
+	DirectChatID         pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID              pgtype.UUID        `db:"group_id" json:"group_id"`
+	CreatedByUserID      uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	Status               string             `db:"status" json:"status"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StartedAt            pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EndedAt              pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	EndedByUserID        pgtype.UUID        `db:"ended_by_user_id" json:"ended_by_user_id"`
+	EndReason            pgtype.Text        `db:"end_reason" json:"end_reason"`
+	ParticipantID        uuid.UUID          `db:"participant_id" json:"participant_id"`
+	UserID               uuid.UUID          `db:"user_id" json:"user_id"`
+	State                string             `db:"state" json:"state"`
+	JoinedAt             pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	LeftAt               pgtype.Timestamptz `db:"left_at" json:"left_at"`
+	ParticipantUpdatedAt pgtype.Timestamptz `db:"participant_updated_at" json:"participant_updated_at"`
+	LastSignalAt         pgtype.Timestamptz `db:"last_signal_at" json:"last_signal_at"`
+}
+
+func (q *Queries) GetActiveParticipationByUserID(ctx context.Context, userID uuid.UUID) (GetActiveParticipationByUserIDRow, error) {
+	row := q.db.QueryRow(ctx, getActiveParticipationByUserID, userID)
+	var i GetActiveParticipationByUserIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.ScopeType,
+		&i.DirectChatID,
+		&i.GroupID,
+		&i.CreatedByUserID,
+		&i.Status,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.UpdatedAt,
+		&i.EndedAt,
+		&i.EndedByUserID,
+		&i.EndReason,
+		&i.ParticipantID,
+		&i.UserID,
+		&i.State,
+		&i.JoinedAt,
+		&i.LeftAt,
+		&i.ParticipantUpdatedAt,
+		&i.LastSignalAt,
+	)
+	return i, err
+}
+
 const getCallByID = `-- name: GetCallByID :one
 SELECT
     c.id,

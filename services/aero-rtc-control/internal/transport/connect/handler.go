@@ -3,6 +3,7 @@ package connecthandler
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 
@@ -193,6 +194,13 @@ func bearerToken[T any](req *connect.Request[T]) (string, error) {
 }
 
 func mapError(err error) error {
+	var activeConflict *rtc.ActiveCallConflictError
+	if errors.As(err, &activeConflict) {
+		connectErr := connect.NewError(connect.CodeFailedPrecondition, err)
+		applyActiveCallConflictMetadata(connectErr.Meta(), activeConflict)
+		return connectErr
+	}
+
 	switch {
 	case errors.Is(err, rtc.ErrInvalidArgument):
 		return connect.NewError(connect.CodeInvalidArgument, err)
@@ -206,6 +214,23 @@ func mapError(err error) error {
 		return connect.NewError(connect.CodeFailedPrecondition, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
+	}
+}
+
+func applyActiveCallConflictMetadata(header http.Header, conflict *rtc.ActiveCallConflictError) {
+	if conflict == nil {
+		return
+	}
+
+	header.Set("X-Aerochat-Rtc-Conflict-Reason", conflict.Reason())
+	header.Set("X-Aerochat-Rtc-Conflict-Call-Id", conflict.Call.ID)
+	header.Set("X-Aerochat-Rtc-Conflict-Participant-Id", conflict.Participant.ID)
+	header.Set("X-Aerochat-Rtc-Conflict-Scope-Type", conflict.Call.Scope.Type)
+	if conflict.Call.Scope.DirectChatID != "" {
+		header.Set("X-Aerochat-Rtc-Conflict-Direct-Chat-Id", conflict.Call.Scope.DirectChatID)
+	}
+	if conflict.Call.Scope.GroupID != "" {
+		header.Set("X-Aerochat-Rtc-Conflict-Group-Id", conflict.Call.Scope.GroupID)
 	}
 }
 

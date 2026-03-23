@@ -13,6 +13,7 @@ import (
 type Repository interface {
 	GetCallByID(context.Context, string) (*Call, error)
 	GetActiveCallByScope(context.Context, ConversationScope) (*Call, error)
+	GetActiveParticipationByUserID(context.Context, string) (*ActiveParticipation, error)
 	CreateCallWithParticipant(context.Context, Call, CallParticipant) (*Call, *CallParticipant, error)
 	CreateParticipant(context.Context, CallParticipant) (*CallParticipant, error)
 	GetActiveParticipant(context.Context, string, string) (*CallParticipant, error)
@@ -97,6 +98,10 @@ func (s *Service) StartCall(ctx context.Context, token string, scope Conversatio
 		return nil, nil, err
 	}
 
+	if err := s.ensureNoOtherActiveParticipation(ctx, user.ID, ""); err != nil {
+		return nil, nil, err
+	}
+
 	if _, err := s.repo.GetActiveCallByScope(ctx, access.Scope); err == nil {
 		return nil, nil, fmt.Errorf("%w: active call already exists for scope", ErrConflict)
 	} else if !errors.Is(err, ErrNotFound) {
@@ -124,6 +129,12 @@ func (s *Service) StartCall(ctx context.Context, token string, scope Conversatio
 
 	createdCall, createdParticipant, err := s.repo.CreateCallWithParticipant(ctx, call, participant)
 	if err != nil {
+		if errors.Is(err, ErrConflict) {
+			if conflictErr := s.resolveActiveParticipationConflict(ctx, user.ID, ""); conflictErr != nil {
+				return nil, nil, conflictErr
+			}
+		}
+
 		return nil, nil, err
 	}
 
@@ -149,6 +160,10 @@ func (s *Service) JoinCall(ctx context.Context, token string, callID string) (*C
 		return nil, nil, err
 	}
 
+	if err := s.ensureNoOtherActiveParticipation(ctx, user.ID, call.ID); err != nil {
+		return nil, nil, err
+	}
+
 	now := s.now()
 	participant, err := s.repo.CreateParticipant(ctx, CallParticipant{
 		ID:        s.newID(),
@@ -160,6 +175,10 @@ func (s *Service) JoinCall(ctx context.Context, token string, callID string) (*C
 	})
 	if err != nil {
 		if errors.Is(err, ErrConflict) {
+			if conflictErr := s.resolveActiveParticipationConflict(ctx, user.ID, call.ID); conflictErr != nil {
+				return nil, nil, conflictErr
+			}
+
 			participant, retryErr := s.repo.GetActiveParticipant(ctx, call.ID, user.ID)
 			if retryErr != nil {
 				return nil, nil, retryErr
@@ -181,6 +200,42 @@ func (s *Service) JoinCall(ctx context.Context, token string, callID string) (*C
 	}
 
 	return call, participant, nil
+}
+
+func (s *Service) ensureNoOtherActiveParticipation(ctx context.Context, userID string, allowedCallID string) error {
+	participation, err := s.repo.GetActiveParticipationByUserID(ctx, userID)
+	if errors.Is(err, ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if allowedCallID != "" && participation.Call.ID == allowedCallID {
+		return nil
+	}
+
+	return &ActiveCallConflictError{
+		Call:        participation.Call,
+		Participant: participation.Participant,
+	}
+}
+
+func (s *Service) resolveActiveParticipationConflict(ctx context.Context, userID string, allowedCallID string) error {
+	participation, err := s.repo.GetActiveParticipationByUserID(ctx, userID)
+	if errors.Is(err, ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if allowedCallID != "" && participation.Call.ID == allowedCallID {
+		return nil
+	}
+
+	return &ActiveCallConflictError{
+		Call:        participation.Call,
+		Participant: participation.Participant,
+	}
 }
 
 func (s *Service) LeaveCall(ctx context.Context, token string, callID string) (*Call, *CallParticipant, error) {

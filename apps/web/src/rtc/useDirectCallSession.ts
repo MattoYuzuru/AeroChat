@@ -3,6 +3,7 @@ import { gatewayClient } from "../gateway/runtime";
 import {
   describeGatewayError,
   isGatewayErrorCode,
+  isRTCActiveCallConflict,
   type DirectChat,
   type RtcCallParticipant,
   type RtcSignalEnvelope,
@@ -494,6 +495,13 @@ export function useDirectCallSession(
       }
 
       dispatch({ type: "action_finished" });
+      if (isRTCActiveCallConflict(error)) {
+        dispatch({
+          type: "failure",
+          message: "Нельзя начать новый звонок, пока вы уже участвуете в другом активном звонке.",
+        });
+        return;
+      }
       if (isGatewayErrorCode(error, "failed_precondition")) {
         await refreshDirectChatCall(false);
         dispatch({
@@ -546,6 +554,14 @@ export function useDirectCallSession(
       }
 
       dispatch({ type: "action_finished" });
+      if (isRTCActiveCallConflict(error)) {
+        dispatch({
+          type: "failure",
+          message:
+            "Нельзя присоединиться к этому звонку, пока вы уже участвуете в другом активном звонке.",
+        });
+        return;
+      }
       dispatch({
         type: "failure",
         message: describeError(error, "Не удалось присоединиться к активному звонку."),

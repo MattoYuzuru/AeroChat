@@ -53,6 +53,11 @@ type CallParticipant struct {
 	LastSignalAt *time.Time
 }
 
+type ActiveParticipation struct {
+	Call        Call
+	Participant CallParticipant
+}
+
 type SignalEnvelope struct {
 	CallID       string
 	FromUserID   string

@@ -19,6 +19,7 @@ type Querier interface {
 	GetActiveCallByDirectChatID(ctx context.Context, directChatID pgtype.UUID) (GetActiveCallByDirectChatIDRow, error)
 	GetActiveCallByGroupID(ctx context.Context, groupID pgtype.UUID) (GetActiveCallByGroupIDRow, error)
 	GetActiveParticipantByCallIDAndUserID(ctx context.Context, arg GetActiveParticipantByCallIDAndUserIDParams) (RtcCallParticipant, error)
+	GetActiveParticipationByUserID(ctx context.Context, userID uuid.UUID) (GetActiveParticipationByUserIDRow, error)
 	GetCallByID(ctx context.Context, id uuid.UUID) (GetCallByIDRow, error)
 	LeaveActiveParticipantsByCallID(ctx context.Context, arg LeaveActiveParticipantsByCallIDParams) (int64, error)
 	LeaveParticipant(ctx context.Context, arg LeaveParticipantParams) (int64, error)
