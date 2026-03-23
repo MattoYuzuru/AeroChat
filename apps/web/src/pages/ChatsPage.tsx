@@ -58,11 +58,13 @@ import {
   readSearchJumpIntent,
 } from "../search/jump";
 import { primeEncryptedDirectLocalSearchIndex } from "../search/encrypted-local-search";
+import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import { useDirectCallSession } from "../rtc/useDirectCallSession";
 import styles from "./ChatsPage.module.css";
 
 export function ChatsPage() {
   const { state: authState, expireSession } = useAuth();
+  const directCallAwareness = useDirectCallAwareness();
   const cryptoRuntime = useCryptoRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
   const [composerText, setComposerText] = useState("");
@@ -141,6 +143,7 @@ export function ChatsPage() {
   const requestedChatId = searchParams.get("chat")?.trim() ?? "";
   const requestedPeerUserId = searchParams.get("peer")?.trim() ?? "";
   const isThreadRouteActive = requestedChatId !== "" || requestedPeerUserId !== "";
+  const requestedCallAction = searchParams.get("call")?.trim() ?? "";
   const searchJumpIntent = readSearchJumpIntent(searchParams);
   const syncRouteSelection = useEffectEvent(async () => {
     const action = resolveChatsRouteSyncAction({
@@ -212,6 +215,9 @@ export function ChatsPage() {
   }, [highlightedMessageId]);
 
   const selectedThread = isThreadRouteActive ? chats.state.thread : null;
+  const selectedDirectCallAwarenessEntry = directCallAwareness.getEntry(
+    selectedThread?.chat.id ?? null,
+  );
   const encryptedLane = useEncryptedDirectMessageV2Lane({
     enabled: authState.status === "authenticated",
     token: sessionToken,
@@ -231,12 +237,25 @@ export function ChatsPage() {
       selectedThread !== null,
     token: sessionToken,
     chat: selectedThread?.chat ?? null,
+    awarenessEntry: selectedDirectCallAwarenessEntry,
+    awarenessSyncStatus: directCallAwareness.state.syncStatus,
     currentUserId: authState.status === "authenticated" ? authState.profile.id : "",
     pageVisible: isPageVisible,
+    refreshDirectChatCall: async (showLoading = false) => {
+      const chatId = selectedThread?.chat.id ?? "";
+      if (chatId === "") {
+        return;
+      }
+
+      await directCallAwareness.refreshDirectChatCall(chatId, showLoading);
+    },
     onUnauthenticated: () => expireSession(),
   });
   const directCallRemoteAudioStream = directCall.remoteAudioStream;
   const retryDirectCallRemoteAudioPlayback = directCall.retryRemoteAudioPlayback;
+  const triggerRouteDirectCallJoin = useEffectEvent(() => {
+    void directCall.joinCall();
+  });
   const shouldAutoMarkEncryptedRead =
     authState.status === "authenticated" &&
     isThreadRouteActive &&
@@ -280,6 +299,62 @@ export function ChatsPage() {
       }
     };
   }, [directCallRemoteAudioStream, retryDirectCallRemoteAudioPlayback]);
+
+  useEffect(() => {
+    if (
+      requestedCallAction === "" ||
+      selectedThread === null ||
+      chats.state.threadStatus !== "ready"
+    ) {
+      return;
+    }
+
+    if (
+      requestedChatId !== "" &&
+      selectedThread.chat.id !== requestedChatId
+    ) {
+      return;
+    }
+
+    if (directCall.state.syncStatus === "loading") {
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    const clearCallIntent = () => {
+      nextSearchParams.delete("call");
+      setSearchParams(nextSearchParams, { replace: true });
+    };
+
+    if (directCall.isLocallyJoined) {
+      clearCallIntent();
+      return;
+    }
+
+    if (directCall.state.call === null) {
+      clearCallIntent();
+      return;
+    }
+
+    if (!directCall.canJoin) {
+      clearCallIntent();
+      return;
+    }
+
+    clearCallIntent();
+    triggerRouteDirectCallJoin();
+  }, [
+    chats.state.threadStatus,
+    directCall.canJoin,
+    directCall.isLocallyJoined,
+    directCall.state.call,
+    directCall.state.syncStatus,
+    requestedCallAction,
+    requestedChatId,
+    searchParams,
+    selectedThread,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     if (searchJumpIntent === null || chats.state.threadStatus !== "ready" || chats.state.thread === null) {
@@ -1054,6 +1129,11 @@ export function ChatsPage() {
                               Непрочитано: {chat.unreadCount}
                             </span>
                           )}
+                          {directCallAwareness.getEntry(chat.id) && (
+                            <span className={styles.statusBadge} data-tone="success">
+                              Активный звонок
+                            </span>
+                          )}
                           {chat.encryptedUnreadCount > 0 && (
                             <span className={styles.statusBadge} data-tone="accent">
                               Encrypted unread: {chat.encryptedUnreadCount}
@@ -1226,9 +1306,9 @@ export function ChatsPage() {
                   </div>
 
                   <p className={styles.callDescription}>
-                    Узкий browser bootstrap поверх текущего RTC control plane: только direct
-                    chat, только audio, без video/device scope и без claims про finished call
-                    subsystem.
+                    Узкий browser bootstrap поверх текущего RTC control plane: active call
+                    остаётся server-backed, а local audio session можно явно вернуть после
+                    ухода из thread. Только direct chat, только audio, без video/device scope.
                   </p>
 
                   <div className={styles.callActions}>

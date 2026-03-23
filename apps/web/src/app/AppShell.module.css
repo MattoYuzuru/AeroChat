@@ -100,6 +100,71 @@
   padding: 0 1.5rem 1.5rem;
 }
 
+.callSurface {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin: 0 1.5rem 1.1rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 1.35rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(202, 229, 245, 0.62));
+  box-shadow: var(--shadow-shell);
+  backdrop-filter: blur(18px);
+}
+
+.callSurfaceLabel {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(2, 50, 87, 0.7);
+}
+
+.callSurfaceTitle {
+  margin: 0.3rem 0 0;
+  font-size: 1.15rem;
+}
+
+.callSurfaceText {
+  margin: 0.45rem 0 0;
+  max-width: 42rem;
+  color: rgba(2, 50, 87, 0.74);
+}
+
+.callSurfaceActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.surfacePrimaryButton,
+.surfaceGhostButton {
+  min-height: 2.7rem;
+  padding: 0.72rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.surfacePrimaryButton {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  background: var(--surface-button-primary);
+  box-shadow: var(--shadow-button);
+}
+
+.surfaceGhostButton {
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
 .sidebar,
 .contentArea {
   display: grid;
@@ -244,5 +309,14 @@
 
   .workspace {
     display: grid;
+  }
+
+  .callSurface {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .callSurfaceActions {
+    justify-content: flex-start;
   }
 }

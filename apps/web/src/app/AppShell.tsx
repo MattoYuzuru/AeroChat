@@ -1,6 +1,8 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { getAuthErrorMessage, useAuth } from "../auth/useAuth";
+import { selectVisibleDirectCallSurfaceEntry } from "../rtc/awareness";
+import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import styles from "./AppShell.module.css";
 
 const navigationItems = [
@@ -24,8 +26,10 @@ const statusItems = [
 ];
 
 export function AppShell() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { state, logout } = useAuth();
+  const directCallAwareness = useDirectCallAwareness();
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -47,6 +51,41 @@ export function AppShell() {
     } finally {
       setIsLoggingOut(false);
     }
+  }
+
+  const currentSearchParams = new URLSearchParams(location.search);
+  const currentChatId =
+    location.pathname === "/app/chats"
+      ? currentSearchParams.get("chat")?.trim() ?? null
+      : null;
+  const visibleDirectCallSurface = selectVisibleDirectCallSurfaceEntry(
+    directCallAwareness.state,
+    currentChatId,
+  );
+  const visibleDirectCallPeer =
+    visibleDirectCallSurface === null
+      ? null
+      : visibleDirectCallSurface.chat.participants.find(
+          (participant) => participant.id !== state.profile.id,
+        ) ?? null;
+  const canReturnToCall =
+    visibleDirectCallSurface?.participants.some(
+      (participant) =>
+        participant.userId === state.profile.id && participant.state === "active",
+    ) ?? false;
+
+  function openDirectCallThread(withJoinIntent: boolean) {
+    if (visibleDirectCallSurface === null) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams();
+    nextParams.set("chat", visibleDirectCallSurface.chat.id);
+    if (withJoinIntent) {
+      nextParams.set("call", canReturnToCall ? "return" : "join");
+    }
+
+    navigate(`/app/chats?${nextParams.toString()}`);
   }
 
   return (
@@ -81,6 +120,55 @@ export function AppShell() {
           {logoutError && <p className={styles.logoutError}>{logoutError}</p>}
         </div>
       </header>
+
+      {visibleDirectCallSurface && (
+        <section className={styles.callSurface}>
+          <div>
+            <p className={styles.callSurfaceLabel}>Активный direct call</p>
+            <h2 className={styles.callSurfaceTitle}>
+              {visibleDirectCallPeer?.nickname ?? "Direct chat"}
+            </h2>
+            <p className={styles.callSurfaceText}>
+              {canReturnToCall
+                ? "Звонок ещё активен на сервере. Можно быстро вернуться в direct thread и заново поднять локальную audio session."
+                : "В одном из direct chats идёт активный аудиозвонок. Можно открыть thread или явно присоединиться."}
+            </p>
+          </div>
+
+          <div className={styles.callSurfaceActions}>
+            <button
+              className={styles.surfaceGhostButton}
+              onClick={() => {
+                openDirectCallThread(false);
+              }}
+              type="button"
+            >
+              Открыть чат
+            </button>
+            <button
+              className={styles.surfacePrimaryButton}
+              onClick={() => {
+                openDirectCallThread(true);
+              }}
+              type="button"
+            >
+              {canReturnToCall ? "Вернуться в звонок" : "Присоединиться"}
+            </button>
+            <button
+              className={styles.surfaceGhostButton}
+              onClick={() => {
+                directCallAwareness.dismissSurface(
+                  visibleDirectCallSurface.chat.id,
+                  visibleDirectCallSurface.call.id,
+                );
+              }}
+              type="button"
+            >
+              Скрыть
+            </button>
+          </div>
+        </section>
+      )}
 
       <main className={styles.workspace}>
         <aside className={styles.sidebar}>
