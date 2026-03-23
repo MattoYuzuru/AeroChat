@@ -277,6 +277,69 @@ export interface DirectChat {
   updatedAt: string;
 }
 
+export type RtcConversationScopeType = "direct" | "group";
+
+export interface RtcConversationScope {
+  kind: RtcConversationScopeType;
+  directChatId: string | null;
+  groupId: string | null;
+}
+
+export type RtcCallStatus = "active" | "ended";
+
+export type RtcCallEndReason =
+  | "unspecified"
+  | "manual"
+  | "last_participant_left";
+
+export interface RtcCall {
+  id: string;
+  scope: RtcConversationScope;
+  createdByUserId: string;
+  status: RtcCallStatus;
+  activeParticipantCount: number;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string;
+  endedAt: string | null;
+  endedByUserId: string | null;
+  endReason: RtcCallEndReason;
+}
+
+export type RtcParticipantState = "active" | "left";
+
+export interface RtcCallParticipant {
+  id: string;
+  callId: string;
+  userId: string;
+  state: RtcParticipantState;
+  joinedAt: string;
+  leftAt: string | null;
+  updatedAt: string;
+  lastSignalAt: string | null;
+}
+
+export type RtcSignalType = "offer" | "answer" | "ice_candidate";
+
+export interface RtcSignalEnvelope {
+  callId: string;
+  fromUserId: string;
+  targetUserId: string;
+  type: RtcSignalType;
+  payload: Uint8Array;
+  createdAt: string;
+}
+
+export type RtcConversationScopeInput =
+  | {
+      kind: "direct";
+      directChatId: string;
+    }
+  | {
+      kind: "group";
+      groupId: string;
+    };
+
 export interface TextMessageContent {
   text: string;
   markdownPolicy: string;
@@ -870,6 +933,45 @@ export interface GatewayClient {
   createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
   listDirectChats(token: string): Promise<DirectChat[]>;
   getDirectChat(token: string, chatId: string): Promise<DirectChatSnapshot>;
+  getActiveCall(token: string, scope: RtcConversationScopeInput): Promise<RtcCall | null>;
+  startCall(
+    token: string,
+    scope: RtcConversationScopeInput,
+  ): Promise<{
+    call: RtcCall;
+    selfParticipant: RtcCallParticipant | null;
+  }>;
+  joinCall(
+    token: string,
+    callId: string,
+  ): Promise<{
+    call: RtcCall;
+    selfParticipant: RtcCallParticipant | null;
+  }>;
+  leaveCall(
+    token: string,
+    callId: string,
+  ): Promise<{
+    call: RtcCall;
+    selfParticipant: RtcCallParticipant | null;
+  }>;
+  endCall(
+    token: string,
+    callId: string,
+  ): Promise<{
+    call: RtcCall;
+    affectedParticipants: RtcCallParticipant[];
+  }>;
+  listCallParticipants(token: string, callId: string): Promise<RtcCallParticipant[]>;
+  sendRtcSignal(
+    token: string,
+    input: {
+      callId: string;
+      targetUserId: string;
+      type: RtcSignalType;
+      payload: Uint8Array;
+    },
+  ): Promise<RtcSignalEnvelope>;
   markDirectChatRead(
     token: string,
     chatId: string,

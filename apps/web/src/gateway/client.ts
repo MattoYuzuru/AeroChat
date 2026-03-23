@@ -60,6 +60,12 @@ import type {
   MessageTombstone,
   Profile,
   ReplyPreview,
+  RtcCall,
+  RtcCallParticipant,
+  RtcConversationScope,
+  RtcConversationScopeInput,
+  RtcSignalEnvelope,
+  RtcSignalType,
   RevokeSessionOrDeviceTarget,
   SearchMessagesInput,
   Session,
@@ -69,6 +75,7 @@ import { GatewayError } from "./types";
 
 const identityServicePath = "aerochat.identity.v1.IdentityService";
 const chatServicePath = "aerochat.chat.v1.ChatService";
+const rtcServicePath = "aerochat.rtc.v1.RtcControlService";
 
 interface FetchLike {
   (input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
@@ -624,6 +631,43 @@ interface DirectChatPresenceStateWire {
   peerPresence?: DirectChatPresenceIndicatorWire;
 }
 
+interface RtcConversationScopeWire {
+  type?: string;
+  directChatId?: string;
+  groupId?: string;
+}
+
+interface RtcCallWire extends TimestampedWire {
+  id?: string;
+  scope?: RtcConversationScopeWire;
+  createdByUserId?: string;
+  status?: string;
+  activeParticipantCount?: number | string;
+  startedAt?: string;
+  endedAt?: string;
+  endedByUserId?: string;
+  endReason?: string;
+}
+
+interface RtcCallParticipantWire extends TimestampedWire {
+  id?: string;
+  callId?: string;
+  userId?: string;
+  state?: string;
+  joinedAt?: string;
+  leftAt?: string;
+  lastSignalAt?: string;
+}
+
+interface RtcSignalEnvelopeWire {
+  callId?: string;
+  fromUserId?: string;
+  targetUserId?: string;
+  type?: string;
+  payload?: string;
+  createdAt?: string;
+}
+
 interface CreateDirectChatResponseWire {
   chat?: DirectChatWire;
 }
@@ -638,6 +682,38 @@ interface GetDirectChatResponseWire {
   encryptedReadState?: EncryptedDirectChatReadStateWire;
   typingState?: DirectChatTypingStateWire;
   presenceState?: DirectChatPresenceStateWire;
+}
+
+interface GetActiveCallResponseWire {
+  call?: RtcCallWire;
+}
+
+interface StartCallResponseWire {
+  call?: RtcCallWire;
+  selfParticipant?: RtcCallParticipantWire;
+}
+
+interface JoinCallResponseWire {
+  call?: RtcCallWire;
+  selfParticipant?: RtcCallParticipantWire;
+}
+
+interface LeaveCallResponseWire {
+  call?: RtcCallWire;
+  selfParticipant?: RtcCallParticipantWire;
+}
+
+interface EndCallResponseWire {
+  call?: RtcCallWire;
+  affectedParticipants?: RtcCallParticipantWire[];
+}
+
+interface ListCallParticipantsResponseWire {
+  participants?: RtcCallParticipantWire[];
+}
+
+interface SendSignalResponseWire {
+  signal?: RtcSignalEnvelopeWire;
 }
 
 interface CreateGroupResponseWire {
@@ -1548,6 +1624,128 @@ export function createGatewayClient(
       );
 
       return normalizeDirectChatSnapshot(response);
+    },
+
+    async getActiveCall(token, scope) {
+      const response = await unaryCall<GetActiveCallResponseWire>(
+        fetchImpl,
+        baseUrl,
+        rtcServicePath,
+        "GetActiveCall",
+        {
+          scope: normalizeRtcConversationScopeInputForWire(scope),
+        },
+        token,
+      );
+
+      return normalizeNullableRtcCall(response.call);
+    },
+
+    async startCall(token, scope) {
+      const response = await unaryCall<StartCallResponseWire>(
+        fetchImpl,
+        baseUrl,
+        rtcServicePath,
+        "StartCall",
+        {
+          scope: normalizeRtcConversationScopeInputForWire(scope),
+        },
+        token,
+      );
+
+      return {
+        call: normalizeRtcCall(response.call),
+        selfParticipant: normalizeNullableRtcCallParticipant(response.selfParticipant),
+      };
+    },
+
+    async joinCall(token, callId) {
+      const response = await unaryCall<JoinCallResponseWire>(
+        fetchImpl,
+        baseUrl,
+        rtcServicePath,
+        "JoinCall",
+        {
+          callId: callId.trim(),
+        },
+        token,
+      );
+
+      return {
+        call: normalizeRtcCall(response.call),
+        selfParticipant: normalizeNullableRtcCallParticipant(response.selfParticipant),
+      };
+    },
+
+    async leaveCall(token, callId) {
+      const response = await unaryCall<LeaveCallResponseWire>(
+        fetchImpl,
+        baseUrl,
+        rtcServicePath,
+        "LeaveCall",
+        {
+          callId: callId.trim(),
+        },
+        token,
+      );
+
+      return {
+        call: normalizeRtcCall(response.call),
+        selfParticipant: normalizeNullableRtcCallParticipant(response.selfParticipant),
+      };
+    },
+
+    async endCall(token, callId) {
+      const response = await unaryCall<EndCallResponseWire>(
+        fetchImpl,
+        baseUrl,
+        rtcServicePath,
+        "EndCall",
+        {
+          callId: callId.trim(),
+        },
+        token,
+      );
+
+      return {
+        call: normalizeRtcCall(response.call),
+        affectedParticipants: (response.affectedParticipants ?? []).map(
+          normalizeRtcCallParticipant,
+        ),
+      };
+    },
+
+    async listCallParticipants(token, callId) {
+      const response = await unaryCall<ListCallParticipantsResponseWire>(
+        fetchImpl,
+        baseUrl,
+        rtcServicePath,
+        "ListCallParticipants",
+        {
+          callId: callId.trim(),
+        },
+        token,
+      );
+
+      return (response.participants ?? []).map(normalizeRtcCallParticipant);
+    },
+
+    async sendRtcSignal(token, input) {
+      const response = await unaryCall<SendSignalResponseWire>(
+        fetchImpl,
+        baseUrl,
+        rtcServicePath,
+        "SendSignal",
+        {
+          callId: input.callId.trim(),
+          targetUserId: input.targetUserId.trim(),
+          type: normalizeRtcSignalTypeForWire(input.type),
+          payload: encodeBytesToBase64(input.payload),
+        },
+        token,
+      );
+
+      return normalizeRtcSignalEnvelope(response.signal);
     },
 
     async markDirectChatRead(token, chatId, messageId) {
@@ -2740,6 +2938,172 @@ function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
   };
 }
 
+function normalizeRtcConversationScopeInputForWire(
+  input: RtcConversationScopeInput,
+): Record<string, string> {
+  if (input.kind === "direct") {
+    return {
+      type: "CONVERSATION_SCOPE_TYPE_DIRECT",
+      directChatId: input.directChatId.trim(),
+    };
+  }
+
+  return {
+    type: "CONVERSATION_SCOPE_TYPE_GROUP",
+    groupId: input.groupId.trim(),
+  };
+}
+
+function normalizeRtcConversationScopeType(value: string | undefined): RtcConversationScope["kind"] {
+  switch (value) {
+    case "CONVERSATION_SCOPE_TYPE_GROUP":
+    case "group":
+      return "group";
+    case "CONVERSATION_SCOPE_TYPE_DIRECT":
+    case "direct":
+    default:
+      return "direct";
+  }
+}
+
+function normalizeRtcCallStatus(value: string | undefined): RtcCall["status"] {
+  switch (value) {
+    case "CALL_STATUS_ENDED":
+    case "ended":
+      return "ended";
+    case "CALL_STATUS_ACTIVE":
+    case "active":
+    default:
+      return "active";
+  }
+}
+
+function normalizeRtcCallEndReason(value: string | undefined): RtcCall["endReason"] {
+  switch (value) {
+    case "CALL_END_REASON_MANUAL":
+    case "manual":
+      return "manual";
+    case "CALL_END_REASON_LAST_PARTICIPANT_LEFT":
+    case "last_participant_left":
+      return "last_participant_left";
+    default:
+      return "unspecified";
+  }
+}
+
+function normalizeRtcParticipantState(value: string | undefined): RtcCallParticipant["state"] {
+  switch (value) {
+    case "PARTICIPANT_STATE_LEFT":
+    case "left":
+      return "left";
+    case "PARTICIPANT_STATE_ACTIVE":
+    case "active":
+    default:
+      return "active";
+  }
+}
+
+function normalizeRtcSignalType(value: string | undefined): RtcSignalEnvelope["type"] {
+  switch (value) {
+    case "SIGNAL_ENVELOPE_TYPE_ANSWER":
+    case "answer":
+      return "answer";
+    case "SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE":
+    case "ice_candidate":
+      return "ice_candidate";
+    case "SIGNAL_ENVELOPE_TYPE_OFFER":
+    case "offer":
+    default:
+      return "offer";
+  }
+}
+
+function normalizeRtcSignalTypeForWire(value: RtcSignalType): string {
+  switch (value) {
+    case "answer":
+      return "SIGNAL_ENVELOPE_TYPE_ANSWER";
+    case "ice_candidate":
+      return "SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE";
+    case "offer":
+    default:
+      return "SIGNAL_ENVELOPE_TYPE_OFFER";
+  }
+}
+
+function normalizeRtcConversationScope(
+  input: RtcConversationScopeWire | undefined,
+): RtcConversationScope {
+  return {
+    kind: normalizeRtcConversationScopeType(input?.type),
+    directChatId: normalizeNullableString(input?.directChatId),
+    groupId: normalizeNullableString(input?.groupId),
+  };
+}
+
+function normalizeRtcCall(input: RtcCallWire | undefined): RtcCall {
+  return {
+    id: input?.id ?? "",
+    scope: normalizeRtcConversationScope(input?.scope),
+    createdByUserId: input?.createdByUserId ?? "",
+    status: normalizeRtcCallStatus(input?.status),
+    activeParticipantCount: normalizeCount(input?.activeParticipantCount),
+    createdAt: input?.createdAt ?? "",
+    updatedAt: input?.updatedAt ?? "",
+    startedAt: input?.startedAt ?? "",
+    endedAt: normalizeNullableString(input?.endedAt),
+    endedByUserId: normalizeNullableString(input?.endedByUserId),
+    endReason: normalizeRtcCallEndReason(input?.endReason),
+  };
+}
+
+function normalizeNullableRtcCall(input: RtcCallWire | undefined): RtcCall | null {
+  const call = normalizeRtcCall(input);
+  if (call.id === "") {
+    return null;
+  }
+
+  return call;
+}
+
+function normalizeRtcCallParticipant(
+  input: RtcCallParticipantWire | undefined,
+): RtcCallParticipant {
+  return {
+    id: input?.id ?? "",
+    callId: input?.callId ?? "",
+    userId: input?.userId ?? "",
+    state: normalizeRtcParticipantState(input?.state),
+    joinedAt: input?.joinedAt ?? "",
+    leftAt: normalizeNullableString(input?.leftAt),
+    updatedAt: input?.updatedAt ?? "",
+    lastSignalAt: normalizeNullableString(input?.lastSignalAt),
+  };
+}
+
+function normalizeNullableRtcCallParticipant(
+  input: RtcCallParticipantWire | undefined,
+): RtcCallParticipant | null {
+  const participant = normalizeRtcCallParticipant(input);
+  if (participant.id === "") {
+    return null;
+  }
+
+  return participant;
+}
+
+function normalizeRtcSignalEnvelope(
+  input: RtcSignalEnvelopeWire | undefined,
+): RtcSignalEnvelope {
+  return {
+    callId: input?.callId ?? "",
+    fromUserId: input?.fromUserId ?? "",
+    targetUserId: input?.targetUserId ?? "",
+    type: normalizeRtcSignalType(input?.type),
+    payload: decodeBase64ToBytes(input?.payload ?? ""),
+    createdAt: input?.createdAt ?? "",
+  };
+}
+
 function normalizeEncryptedDirectMessageV2OperationKindForWire(
   value: "content" | "edit" | "tombstone",
 ): string {
@@ -3320,6 +3684,34 @@ function normalizeEncryptedUnreadState(
   return {
     unreadCount: normalizeUnreadCount(value),
   };
+}
+
+function encodeBytesToBase64(value: Uint8Array): string {
+  if (value.length === 0) {
+    return "";
+  }
+
+  let binary = "";
+  for (const byte of value) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
+function decodeBase64ToBytes(value: string): Uint8Array {
+  if (typeof value !== "string" || value.trim() === "") {
+    return new Uint8Array(0);
+  }
+
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
 }
 
 function normalizeNullableString(value: string | undefined): string | null {

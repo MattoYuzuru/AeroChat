@@ -8,12 +8,12 @@
 identity, social graph, direct chats, groups, media, realtime и bounded encrypted lanes.
 
 Главная задача ближайших этапов:
-доводить encrypted coexistence, platform polish и future RTC readiness без ложных claims о завершённости PWA, calls
+доводить encrypted coexistence, platform polish и RTC polish без ложных claims о завершённости PWA, calls
 или full E2EE parity.
 
 Последний завершённый platform slice:
 
-- [x] RTC signaling and call-control foundation
+- [x] Web audio-only 1:1 direct-call bootstrap
 
 ---
 
@@ -193,7 +193,8 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 - [x] Signaling model
 - [x] Active call and participant control-plane foundation через `aero-rtc-control`
-- [ ] 1:1 calls
+- [x] Web audio-only 1:1 direct-call bootstrap
+- [ ] 1:1 call polish, continuity и richer call UX
 - [ ] Group call control
 - [ ] One-active-call-per-user policy
 - [ ] Device controls

@@ -58,6 +58,7 @@ import {
   readSearchJumpIntent,
 } from "../search/jump";
 import { primeEncryptedDirectLocalSearchIndex } from "../search/encrypted-local-search";
+import { useDirectCallSession } from "../rtc/useDirectCallSession";
 import styles from "./ChatsPage.module.css";
 
 export function ChatsPage() {
@@ -80,6 +81,7 @@ export function ChatsPage() {
   const pendingPeerRef = useRef<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const directCallAudioRef = useRef<HTMLAudioElement | null>(null);
   const isPageVisible = usePageVisibility();
   const sessionToken =
     authState.status === "authenticated" ? authState.token : "";
@@ -222,6 +224,19 @@ export function ChatsPage() {
   );
   const latestEncryptedMessage = encryptedMessageEntries.at(-1) ?? null;
   const activeEncryptedDirectChatId = selectedThread?.chat.id ?? null;
+  const directCall = useDirectCallSession({
+    enabled:
+      authState.status === "authenticated" &&
+      isThreadRouteActive &&
+      selectedThread !== null,
+    token: sessionToken,
+    chat: selectedThread?.chat ?? null,
+    currentUserId: authState.status === "authenticated" ? authState.profile.id : "",
+    pageVisible: isPageVisible,
+    onUnauthenticated: () => expireSession(),
+  });
+  const directCallRemoteAudioStream = directCall.remoteAudioStream;
+  const retryDirectCallRemoteAudioPlayback = directCall.retryRemoteAudioPlayback;
   const shouldAutoMarkEncryptedRead =
     authState.status === "authenticated" &&
     isThreadRouteActive &&
@@ -242,6 +257,29 @@ export function ChatsPage() {
       items: encryptedLane.items,
     });
   }, [encryptedLane.items, encryptedLane.status, selectedThread]);
+
+  useEffect(() => {
+    const audioElement = directCallAudioRef.current;
+    if (audioElement === null) {
+      return;
+    }
+
+    if (directCallRemoteAudioStream === null) {
+      audioElement.pause();
+      audioElement.srcObject = null;
+      return;
+    }
+
+    audioElement.srcObject = directCallRemoteAudioStream;
+    void retryDirectCallRemoteAudioPlayback(audioElement);
+
+    return () => {
+      if (audioElement.srcObject === directCallRemoteAudioStream) {
+        audioElement.pause();
+        audioElement.srcObject = null;
+      }
+    };
+  }, [directCallRemoteAudioStream, retryDirectCallRemoteAudioPlayback]);
 
   useEffect(() => {
     if (searchJumpIntent === null || chats.state.threadStatus !== "ready" || chats.state.thread === null) {
@@ -1152,6 +1190,136 @@ export function ChatsPage() {
                       />
                     )}
                   </div>
+                </section>
+
+                <section className={styles.callCard}>
+                  <div className={styles.blockHeader}>
+                    <div>
+                      <p className={styles.cardLabel}>Audio call</p>
+                      <h3 className={styles.blockTitle}>Прямой аудиозвонок</h3>
+                    </div>
+                    <span className={styles.metaTag}>
+                      {describeDirectCallPhaseLabel(directCall.phase)}
+                    </span>
+                  </div>
+
+                  <div className={styles.callMeta}>
+                    <StatusPill
+                      label={describeDirectCallPeerStatus(
+                        directCall.remoteParticipant !== null,
+                        selectedPeer?.nickname ?? "Собеседник",
+                      )}
+                      tone={directCall.remoteParticipant ? "success" : "neutral"}
+                    />
+                    {directCall.state.call && (
+                      <StatusPill
+                        label={`Control-plane: ${describeDirectCallServerState(directCall.state.call.status)}`}
+                        tone={directCall.state.call.status === "active" ? "accent" : "neutral"}
+                      />
+                    )}
+                    {directCall.isLocallyJoined && (
+                      <StatusPill
+                        label="Вы подключены"
+                        tone="accent"
+                      />
+                    )}
+                  </div>
+
+                  <p className={styles.callDescription}>
+                    Узкий browser bootstrap поверх текущего RTC control plane: только direct
+                    chat, только audio, без video/device scope и без claims про finished call
+                    subsystem.
+                  </p>
+
+                  <div className={styles.callActions}>
+                    {directCall.canStart && (
+                      <button
+                        className={styles.primaryButton}
+                        onClick={() => {
+                          void directCall.startCall();
+                        }}
+                        type="button"
+                      >
+                        Позвонить
+                      </button>
+                    )}
+
+                    {directCall.canJoin && (
+                      <button
+                        className={styles.primaryButton}
+                        onClick={() => {
+                          void directCall.joinCall();
+                        }}
+                        type="button"
+                      >
+                        {directCall.selfParticipant ? "Вернуться в звонок" : "Присоединиться"}
+                      </button>
+                    )}
+
+                    {directCall.canLeave && !directCall.canEnd && (
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={() => {
+                          void directCall.leaveCall();
+                        }}
+                        type="button"
+                      >
+                        Покинуть звонок
+                      </button>
+                    )}
+
+                    {directCall.canEnd && (
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={() => {
+                          void directCall.endCall();
+                        }}
+                        type="button"
+                      >
+                        Завершить звонок
+                      </button>
+                    )}
+                  </div>
+
+                  {directCall.state.errorMessage && (
+                    <div className={styles.callFeedback} data-tone="error">
+                      <p>{directCall.state.errorMessage}</p>
+                      <button
+                        className={styles.ghostButton}
+                        onClick={() => {
+                          directCall.dismissError();
+                        }}
+                        type="button"
+                      >
+                        Скрыть
+                      </button>
+                    </div>
+                  )}
+
+                  {directCall.state.remoteAudioState === "blocked" && (
+                    <div className={styles.callFeedback}>
+                      <p>
+                        Браузер заблокировал autoplay удалённого аудио. Подтвердите воспроизведение
+                        вручную.
+                      </p>
+                      <button
+                        className={styles.ghostButton}
+                        onClick={() => {
+                          void directCall.retryRemoteAudioPlayback(directCallAudioRef.current);
+                        }}
+                        type="button"
+                      >
+                        Включить звук
+                      </button>
+                    </div>
+                  )}
+
+                  <audio
+                    autoPlay
+                    playsInline
+                    ref={directCallAudioRef}
+                    className={styles.hiddenAudio}
+                  />
                 </section>
 
                 {pinnedMessages.length > 0 && (
@@ -2215,6 +2383,50 @@ interface EncryptedReplyTargetDescriptor {
   messageId: string | null;
   authorLabel: string;
   previewText: string;
+}
+
+function describeDirectCallPhaseLabel(
+  phase:
+    | "idle"
+    | "starting"
+    | "ringing"
+    | "connecting"
+    | "connected"
+    | "ending"
+    | "ended"
+    | "failed",
+): string {
+  switch (phase) {
+    case "starting":
+      return "Запускаем";
+    case "ringing":
+      return "Ожидание";
+    case "connecting":
+      return "Соединяем";
+    case "connected":
+      return "Подключён";
+    case "ending":
+      return "Завершаем";
+    case "ended":
+      return "Завершён";
+    case "failed":
+      return "Сбой";
+    case "idle":
+    default:
+      return "Не активен";
+  }
+}
+
+function describeDirectCallPeerStatus(hasRemoteParticipant: boolean, peerName: string): string {
+  if (hasRemoteParticipant) {
+    return `${peerName} уже в звонке`;
+  }
+
+  return `${peerName} ещё не подключился`;
+}
+
+function describeDirectCallServerState(state: "active" | "ended"): string {
+  return state === "active" ? "активен" : "завершён";
 }
 
 function getPeerParticipant(chat: DirectChat, currentUserId: string): ChatUser | null {
