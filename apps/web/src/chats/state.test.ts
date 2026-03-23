@@ -105,8 +105,12 @@ describe("chatsReducer", () => {
       type: "load_succeeded",
       chats: [directChat],
     });
+    const pendingThreadState = chatsReducer(readyState, {
+      type: "thread_load_started",
+      chatId: "chat-1",
+    });
 
-    const nextState = chatsReducer(readyState, {
+    const nextState = chatsReducer(pendingThreadState, {
       type: "thread_load_failed",
       chatId: "chat-1",
       message: "thread unavailable",
@@ -115,6 +119,47 @@ describe("chatsReducer", () => {
     expect(nextState.selectedChatId).toBe("chat-1");
     expect(nextState.threadStatus).toBe("error");
     expect(nextState.threadErrorMessage).toBe("thread unavailable");
+  });
+
+  it("drops stale thread success when a newer chat selection is already pending", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const pendingChatTwoState = chatsReducer(readyState, {
+      type: "thread_load_started",
+      chatId: "chat-2",
+    });
+
+    const nextState = chatsReducer(pendingChatTwoState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+
+    expect(nextState.selectedChatId).toBe("chat-2");
+    expect(nextState.threadStatus).toBe("loading");
+    expect(nextState.thread).toBeNull();
+  });
+
+  it("drops stale thread failure when a newer chat selection is already pending", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const pendingChatTwoState = chatsReducer(readyState, {
+      type: "thread_load_started",
+      chatId: "chat-2",
+    });
+
+    const nextState = chatsReducer(pendingChatTwoState, {
+      type: "thread_load_failed",
+      chatId: "chat-1",
+      message: "thread unavailable",
+    });
+
+    expect(nextState.selectedChatId).toBe("chat-2");
+    expect(nextState.threadStatus).toBe("loading");
+    expect(nextState.threadErrorMessage).toBeNull();
   });
 
   it("updates presence state only for the active loaded thread", () => {

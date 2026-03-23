@@ -214,7 +214,17 @@ export function ChatsPage() {
     };
   }, [highlightedMessageId]);
 
-  const selectedThread = isThreadRouteActive ? chats.state.thread : null;
+  const selectedThread =
+    !isThreadRouteActive || chats.state.thread === null
+      ? null
+      : requestedChatId !== ""
+        ? chats.state.thread.chat.id === requestedChatId
+          ? chats.state.thread
+          : null
+        : chats.state.selectedChatId !== null &&
+            chats.state.thread.chat.id === chats.state.selectedChatId
+          ? chats.state.thread
+          : null;
   const selectedDirectCallAwarenessEntry = directCallAwareness.getEntry(
     selectedThread?.chat.id ?? null,
   );
