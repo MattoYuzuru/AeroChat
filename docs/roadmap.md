@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] Web audio-only 1:1 direct-call bootstrap
+- [x] 1:1 direct-call continuity, reconnect convergence и compact incoming-call surface
 
 ---
 
@@ -194,7 +194,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Signaling model
 - [x] Active call and participant control-plane foundation через `aero-rtc-control`
 - [x] Web audio-only 1:1 direct-call bootstrap
-- [ ] 1:1 call polish, continuity и richer call UX
+- [x] 1:1 call polish, continuity и richer call UX
 - [ ] Group call control
 - [ ] One-active-call-per-user policy
 - [ ] Device controls

@@ -8,6 +8,7 @@ import {
   type RtcSignalEnvelope,
 } from "../gateway/types";
 import { subscribeRealtimeEnvelopes } from "../realtime/events";
+import type { DirectCallAwarenessEntry } from "./awareness";
 import { parseRTCRealtimeEvent } from "./realtime";
 import {
   decodeRTCIceCandidatePayload,
@@ -33,8 +34,11 @@ interface UseDirectCallSessionOptions {
   enabled: boolean;
   token: string;
   chat: DirectChat | null;
+  awarenessEntry: DirectCallAwarenessEntry | null;
+  awarenessSyncStatus: "idle" | "loading" | "ready" | "error";
   currentUserId: string;
   pageVisible: boolean;
+  refreshDirectChatCall(showLoading?: boolean): Promise<void>;
   onUnauthenticated(): void;
 }
 
@@ -62,11 +66,14 @@ export function useDirectCallSession(
   options: UseDirectCallSessionOptions,
 ): DirectCallSession {
   const {
+    awarenessEntry,
+    awarenessSyncStatus,
     chat,
     currentUserId,
     enabled,
     onUnauthenticated,
     pageVisible,
+    refreshDirectChatCall,
     token,
   } = options;
   const [state, dispatch] = useReducer(
@@ -76,11 +83,9 @@ export function useDirectCallSession(
   );
   const [remoteAudioStream, setRemoteAudioStream] = useState<MediaStream | null>(null);
   const stateRef = useRef(state);
-  const scopeKeyRef = useRef("");
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
-  const refreshRequestRef = useRef(0);
 
   useEffect(() => {
     stateRef.current = state;
@@ -139,50 +144,6 @@ export function useDirectCallSession(
 
     return describeGatewayError(error, fallbackMessage);
   }, [onUnauthenticated]);
-
-  const refreshServerState = useCallback(async (showLoading: boolean) => {
-    if (!enabled || activeChatID === null || !isDirectChatSupported) {
-      return;
-    }
-
-    const scopeKey = `${activeChatID}:${token}`;
-    scopeKeyRef.current = scopeKey;
-    const requestID = refreshRequestRef.current + 1;
-    refreshRequestRef.current = requestID;
-    if (showLoading) {
-      dispatch({ type: "sync_started" });
-    }
-
-    try {
-      const call = await gatewayClient.getActiveCall(token, {
-        kind: "direct",
-        directChatId: activeChatID,
-      });
-      const participants =
-        call === null
-          ? []
-          : await gatewayClient.listCallParticipants(token, call.id);
-
-      if (scopeKeyRef.current !== scopeKey || refreshRequestRef.current !== requestID) {
-        return;
-      }
-
-      dispatch({
-        type: "sync_succeeded",
-        call,
-        participants,
-      });
-    } catch (error) {
-      if (scopeKeyRef.current !== scopeKey || refreshRequestRef.current !== requestID) {
-        return;
-      }
-
-      dispatch({
-        type: "sync_failed",
-        message: describeError(error, "Не удалось синхронизировать состояние звонка."),
-      });
-    }
-  }, [activeChatID, describeError, enabled, isDirectChatSupported, token]);
 
   const ensureLocalAudioStream = useCallback(async (): Promise<MediaStream> => {
     if (localStreamRef.current !== null) {
@@ -498,8 +459,8 @@ export function useDirectCallSession(
   const bootstrapJoinedCall = useCallback(async (callId: string) => {
     dispatch({ type: "local_joined", callId });
     ensurePeerConnection();
-    await refreshServerState(false);
-  }, [ensurePeerConnection, refreshServerState]);
+    await refreshDirectChatCall(false);
+  }, [ensurePeerConnection, refreshDirectChatCall]);
 
   async function startCall() {
     if (!enabled || chat === null || !isDirectChatSupported) {
@@ -534,7 +495,7 @@ export function useDirectCallSession(
 
       dispatch({ type: "action_finished" });
       if (isGatewayErrorCode(error, "failed_precondition")) {
-        await refreshServerState(false);
+        await refreshDirectChatCall(false);
         dispatch({
           type: "failure",
           message:
@@ -611,7 +572,7 @@ export function useDirectCallSession(
     } finally {
       dispatch({ type: "action_finished" });
       disposeLocalRuntime();
-      await refreshServerState(false);
+      await refreshDirectChatCall(false);
     }
   }
 
@@ -634,7 +595,7 @@ export function useDirectCallSession(
     } finally {
       dispatch({ type: "action_finished" });
       disposeLocalRuntime();
-      await refreshServerState(false);
+      await refreshDirectChatCall(false);
     }
   }
 
@@ -669,18 +630,55 @@ export function useDirectCallSession(
       return;
     }
 
-    scopeKeyRef.current = `${activeChatID}:${token}`;
-    void refreshServerState(true);
+    dispatch({ type: "sync_started" });
+    void refreshDirectChatCall(true);
 
     return () => {
-      const joinedCallId = stateRef.current.localJoinedCallId;
       disposeLocalRuntime();
-      if (joinedCallId !== null) {
-        void gatewayClient.leaveCall(token, joinedCallId).catch(() => {});
-      }
-      scopeKeyRef.current = "";
     };
-  }, [activeChatID, disposeLocalRuntime, enabled, isDirectChatSupported, refreshServerState, token]);
+  }, [
+    activeChatID,
+    disposeLocalRuntime,
+    enabled,
+    isDirectChatSupported,
+    refreshDirectChatCall,
+  ]);
+
+  useEffect(() => {
+    if (!enabled || activeChatID === null || !isDirectChatSupported) {
+      return;
+    }
+
+    if (awarenessEntry === null) {
+      if (awarenessSyncStatus === "loading") {
+        dispatch({ type: "sync_started" });
+        return;
+      }
+
+      dispatch({
+        type: "sync_succeeded",
+        call: null,
+        participants: [],
+      });
+      return;
+    }
+
+    if (awarenessEntry.syncStatus === "error") {
+      dispatch({
+        type: "sync_failed",
+        message:
+          awarenessEntry.errorMessage ??
+          "Не удалось синхронизировать состояние звонка.",
+      });
+      return;
+    }
+
+    dispatch({
+      type: "sync_succeeded",
+      call: awarenessEntry.call,
+      participants: awarenessEntry.participants,
+    });
+  }, [activeChatID, awarenessEntry, awarenessSyncStatus, enabled, isDirectChatSupported]);
 
   useEffect(() => {
     if (!enabled || activeChatID === null || !isDirectChatSupported) {
@@ -693,29 +691,11 @@ export function useDirectCallSession(
         return;
       }
 
-      if (
-        event.type === "rtc.call.updated" &&
-        event.call.scope.kind === "direct" &&
-        event.call.scope.directChatId === activeChatID
-      ) {
-        void refreshServerState(false);
-        return;
-      }
-
-      if (
-        event.type === "rtc.participant.updated" &&
-        stateRef.current.call !== null &&
-        event.callId === stateRef.current.call.id
-      ) {
-        void refreshServerState(false);
-        return;
-      }
-
       if (event.type === "rtc.signal.received") {
         void applyIncomingRTCSignal(event.signal);
       }
     });
-  }, [activeChatID, applyIncomingRTCSignal, enabled, isDirectChatSupported, refreshServerState, state.call?.id]);
+  }, [activeChatID, applyIncomingRTCSignal, enabled, isDirectChatSupported]);
 
   useEffect(() => {
     if (
@@ -729,7 +709,7 @@ export function useDirectCallSession(
     }
 
     const intervalID = window.setInterval(() => {
-      void refreshServerState(false);
+      void refreshDirectChatCall(false);
     }, directCallRefreshIntervalMs);
 
     return () => {
@@ -741,10 +721,22 @@ export function useDirectCallSession(
     enabled,
     pageVisible,
     token,
-    refreshServerState,
+    refreshDirectChatCall,
     state.call,
     state.localJoinedCallId,
   ]);
+
+  useEffect(() => {
+    if (state.call !== null || state.localJoinedCallId !== null) {
+      return;
+    }
+
+    if (localStreamRef.current === null) {
+      return;
+    }
+
+    disposeLocalRuntime();
+  }, [disposeLocalRuntime, state.call, state.localJoinedCallId]);
 
   useEffect(() => {
     const joinedCall = state.call;

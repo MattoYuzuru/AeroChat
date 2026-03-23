@@ -10,7 +10,10 @@ import {
 } from "../gateway/types";
 import { gatewayClient } from "../gateway/runtime";
 import { connectRealtime, type RealtimeConnection } from "../realtime/client";
-import { publishRealtimeEnvelope } from "../realtime/events";
+import {
+  publishRealtimeEnvelope,
+  publishRealtimeLifecycleEvent,
+} from "../realtime/events";
 const sessionStore = createBrowserSessionStore();
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -91,6 +94,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const connection = connectRealtime({
       token: authenticatedToken,
       onEvent: publishRealtimeEnvelope,
+      onStatusChange: (status) => {
+        publishRealtimeLifecycleEvent({
+          type:
+            status === "connected"
+              ? "realtime.connected"
+              : "realtime.disconnected",
+        });
+      },
     });
     realtimeRef.current = connection;
 

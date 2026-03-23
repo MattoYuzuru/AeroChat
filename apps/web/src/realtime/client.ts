@@ -26,6 +26,7 @@ export interface RealtimeConnectionOptions {
   token: string;
   baseUrl?: string;
   onEvent?: (event: RealtimeEnvelope) => void;
+  onStatusChange?: (status: "connected" | "disconnected") => void;
 }
 
 export function connectRealtime(
@@ -112,6 +113,7 @@ export function connectRealtime(
     const nextSocket = new WebSocket(url, protocols);
     nextSocket.addEventListener("open", () => {
       reconnectAttempt = 0;
+      options.onStatusChange?.("connected");
     });
     nextSocket.addEventListener("message", (event) => {
       const envelope = parseRealtimeEnvelope(event.data);
@@ -123,6 +125,7 @@ export function connectRealtime(
       if (socket === nextSocket) {
         socket = null;
       }
+      options.onStatusChange?.("disconnected");
       scheduleReconnect();
     });
     nextSocket.addEventListener("error", () => {});

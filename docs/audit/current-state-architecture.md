@@ -12,6 +12,7 @@
 - direct chats и groups с realtime, typing, presence, read/unread, replies, edit, delete, pin;
 - attachments, voice notes, video notes, inline preview;
 - web audio-only direct calls в direct chats поверх `aero-rtc-control` и `aero-gateway`;
+- compact direct-call continuity surface в web: active direct call awareness переживает thread switching внутри открытой app session, есть bounded reconnect resync и explicit return/rejoin path;
 - `/app/search` для legacy plaintext search и bounded local encrypted search;
 - bounded encrypted direct lane и bounded encrypted group lane как отдельные timeline рядом с legacy plaintext history.
 
@@ -19,7 +20,7 @@
 
 - `identity`, `social graph`, `legacy direct/group chats`, `media relay`, `deploy/local runtime` уже имеют рабочий user-facing slice;
 - encrypted lanes реализованы как usable, но bounded foundation без full parity и без unified history;
-- `aero-rtc-control` теперь имеет первый user-facing direct-call slice, но calls ещё не являются finished product subsystem;
+- `aero-rtc-control` теперь имеет usable direct-call continuity slice для web, но calls ещё не являются finished product subsystem;
 - `aero-jobs`, PWA, push и desktop/mobile polish пока не реализованы как продуктовые возможности.
 
 ## Monorepo architecture map
@@ -34,6 +35,7 @@
 - web UI для identity, social graph, direct/group chats и settings;
 - attachment composer, voice/video notes и inline preview;
 - audio-only direct-call bootstrap через browser WebRTC + gateway/RTC control plane;
+- shared direct-call awareness layer для compact incoming/active-call surface и reconnect convergence внутри открытой web session;
 - bounded local projection для encrypted direct/group lanes;
 - bounded local encrypted search внутри browser/runtime boundary.
 
