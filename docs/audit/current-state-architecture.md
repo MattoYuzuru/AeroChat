@@ -14,6 +14,7 @@
 - web audio-only direct calls в direct chats поверх `aero-rtc-control` и `aero-gateway`;
 - compact direct-call continuity surface в web: active direct call awareness переживает thread switching внутри открытой app session, есть bounded reconnect resync и explicit return/rejoin path;
 - server-enforced one-active-call-per-user policy: один пользователь не может оставаться active participant более чем в одном active call одновременно;
+- web group call control/lobby bootstrap: group chat показывает active call state, compact roster и start/join/leave/end actions поверх существующего RTC control plane, но без multiparty browser media transport;
 - `/app/search` для legacy plaintext search и bounded local encrypted search;
 - bounded encrypted direct lane и bounded encrypted group lane как отдельные timeline рядом с legacy plaintext history.
 
@@ -37,6 +38,7 @@
 - attachment composer, voice/video notes и inline preview;
 - audio-only direct-call bootstrap через browser WebRTC + gateway/RTC control plane;
 - shared direct-call awareness layer для compact incoming/active-call surface и reconnect convergence внутри открытой web session;
+- group-call awareness внутри `GroupsPage`: compact badge в group list и встроенный lobby/card для server-backed active group call state;
 - bounded local projection для encrypted direct/group lanes;
 - bounded local encrypted search внутри browser/runtime boundary.
 
@@ -279,9 +281,9 @@ Realtime сейчас:
 
 ### RTC / calls
 
-- `implemented`: server-backed RTC signaling/call-control foundation и первый web audio-only direct-call bootstrap.
-- `partial/bootstrap/bounded`: direct-only, audio-only, page-scoped WebRTC UX без group/video/device/push/recovery parity.
-- `not implemented yet`: group calls, richer 1:1 polish, device controls, notifications, durable recovery и policy expansion.
+- `implemented`: server-backed RTC signaling/call-control foundation, web audio-only direct-call bootstrap, one-active-call-per-user policy и group call control/lobby surface в `GroupsPage`.
+- `partial/bootstrap/bounded`: direct media остаётся audio-only и page-scoped; group calls пока ограничены control/lobby semantics без multiparty browser media transport, video, device controls и push/recovery parity.
+- `not implemented yet`: finished group audio/video calling, global call manager, notifications, durable recovery и более богатая switching/policy semantics.
 
 ### PWA / mobile / desktop shell polish
 

@@ -1,6 +1,8 @@
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
+  useReducer,
   useRef,
   useState,
   type Dispatch,
@@ -31,6 +33,7 @@ import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { gatewayClient } from "../gateway/runtime";
 import {
   describeGatewayError,
+  isRTCActiveCallConflict,
   isGatewayErrorCode,
   type CreatedGroupInviteLink,
   type Group,
@@ -38,6 +41,7 @@ import {
   type GroupMemberRole,
   type GroupMessage,
   type GroupTypingState,
+  type RtcCallParticipant,
 } from "../gateway/types";
 import { buildGroupInviteUrl, extractGroupInviteToken } from "../groups/invite-token";
 import { parseGroupRealtimeEvent } from "../groups/realtime";
@@ -67,6 +71,21 @@ import {
 } from "../groups/typing";
 import { subscribeRealtimeEnvelopes } from "../realtime/events";
 import {
+  deriveGroupCallActionAvailability,
+  deriveGroupCallUiPhase,
+  describeGroupCallConflictMessage,
+  type GroupCallActionState,
+  type GroupCallTerminalState,
+} from "../rtc/group-call-state";
+import {
+  createInitialGroupCallAwarenessState,
+  groupCallAwarenessReducer,
+  selectGroupCallAwarenessEntry,
+  selectGroupCallAwarenessGroupIdsByCallId,
+  type GroupCallAwarenessEntry,
+} from "../rtc/group-awareness";
+import { parseRTCRealtimeEvent } from "../rtc/realtime";
+import {
   clearSearchJumpParams,
   findJumpTarget,
   readSearchJumpIntent,
@@ -75,6 +94,7 @@ import { primeEncryptedGroupLocalSearchIndex } from "../search/encrypted-local-s
 import styles from "./GroupsPage.module.css";
 
 export function GroupsPage() {
+  const refreshActiveGroupCallsIntervalMs = 5000;
   const { state: authState, expireSession } = useAuth();
   const cryptoRuntime = useCryptoRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -111,11 +131,24 @@ export function GroupsPage() {
   const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
   const [pendingEditMessageId, setPendingEditMessageId] = useState<string | null>(null);
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
+  const [groupCallActionState, setGroupCallActionState] =
+    useState<GroupCallActionState>("idle");
+  const [groupCallTerminalState, setGroupCallTerminalState] =
+    useState<GroupCallTerminalState>("idle");
+  const [groupCallError, setGroupCallError] = useState<string | null>(null);
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, GroupMemberRole>>({});
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const selectedStateRef = useRef(selectedState);
+  const groupsRef = useRef(groups);
+  const [groupCallAwarenessState, dispatchGroupCallAwareness] = useReducer(
+    groupCallAwarenessReducer,
+    undefined,
+    createInitialGroupCallAwarenessState,
+  );
+  const groupCallAwarenessStateRef = useRef(groupCallAwarenessState);
+  const previousSelectedGroupCallIdRef = useRef<string | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const activeTypingTargetRef = useRef<GroupTypingSessionTarget | null>(null);
@@ -237,6 +270,14 @@ export function GroupsPage() {
   }, [selectedState]);
 
   useEffect(() => {
+    groupsRef.current = groups;
+  }, [groups]);
+
+  useEffect(() => {
+    groupCallAwarenessStateRef.current = groupCallAwarenessState;
+  }, [groupCallAwarenessState]);
+
+  useEffect(() => {
     setEditingMessageId(null);
     setEditingMessageText("");
     setPendingEditMessageId(null);
@@ -245,6 +286,10 @@ export function GroupsPage() {
     setSelectedEncryptedReplyMessageId(null);
     setEncryptedComposerText("");
     setEncryptedComposerError(null);
+    setGroupCallActionState("idle");
+    setGroupCallTerminalState("idle");
+    setGroupCallError(null);
+    previousSelectedGroupCallIdRef.current = null;
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
     discardVoiceNoteRecording();
@@ -309,6 +354,117 @@ export function GroupsPage() {
       active = false;
     };
   }, [authState.status, token, expireSession]);
+
+  const groupMembershipKey = [...groups]
+    .map((group) => group.id)
+    .sort((left, right) => left.localeCompare(right))
+    .join("|");
+
+  const refreshAllActiveGroupCalls = useCallback(
+    async (showLoading = false, explicitGroups: Group[] | null = null) => {
+      if (authState.status !== "authenticated") {
+        return;
+      }
+
+      if (showLoading) {
+        dispatchGroupCallAwareness({ type: "full_sync_started" });
+      }
+
+      try {
+        const targetGroups = explicitGroups ?? groupsRef.current;
+        if (targetGroups.length === 0) {
+          dispatchGroupCallAwareness({
+            type: "full_sync_succeeded",
+            activeEntries: [],
+          });
+          return;
+        }
+
+        const activeEntries = (
+          await Promise.all<GroupCallAwarenessEntry | null>(
+            targetGroups.map(async (group) => {
+              const call = await gatewayClient.getActiveCall(token, {
+                kind: "group",
+                groupId: group.id,
+              });
+              if (call === null || call.scope.kind !== "group") {
+                return null;
+              }
+
+              const participants = await gatewayClient.listCallParticipants(token, call.id);
+              return {
+                groupId: group.id,
+                call,
+                participants,
+                syncStatus: "ready",
+                errorMessage: null,
+              };
+            }),
+          )
+        ).filter((entry): entry is GroupCallAwarenessEntry => entry !== null);
+
+        dispatchGroupCallAwareness({
+          type: "full_sync_succeeded",
+          activeEntries,
+        });
+      } catch (error) {
+        dispatchGroupCallAwareness({
+          type: "full_sync_failed",
+          message: resolveProtectedError(
+            error,
+            "Не удалось обновить active group calls из RTC control plane.",
+            expireSession,
+          ) ?? "Не удалось обновить active group calls из RTC control plane.",
+        });
+      }
+    },
+    [authState.status, expireSession, token],
+  );
+
+  useEffect(() => {
+    if (authState.status !== "authenticated" || groupsStatus !== "ready") {
+      return;
+    }
+
+    void refreshAllActiveGroupCalls(false);
+  }, [authState.status, groupMembershipKey, groupsStatus, refreshAllActiveGroupCalls]);
+
+  const refreshGroupCall = useCallback(
+    async (groupId: string) => {
+      const normalizedGroupId = groupId.trim();
+      if (authState.status !== "authenticated" || normalizedGroupId === "") {
+        return;
+      }
+
+      try {
+        const call = await gatewayClient.getActiveCall(token, {
+          kind: "group",
+          groupId: normalizedGroupId,
+        });
+        const participants =
+          call === null ? [] : await gatewayClient.listCallParticipants(token, call.id);
+
+        dispatchGroupCallAwareness({
+          type: "group_sync_succeeded",
+          groupId: normalizedGroupId,
+          call,
+          participants,
+        });
+      } catch (error) {
+        dispatchGroupCallAwareness({
+          type: "group_sync_failed",
+          groupId: normalizedGroupId,
+          message:
+            resolveProtectedError(
+              error,
+              "Не удалось обновить group-call состояние для выбранной группы.",
+              expireSession,
+            ) ?? "Не удалось обновить group-call состояние для выбранной группы.",
+        });
+      }
+    },
+    [authState.status, expireSession, token],
+  );
 
   useEffect(() => {
     if (authState.status !== "authenticated") {
@@ -468,6 +624,68 @@ export function GroupsPage() {
       setMemberRoleDrafts({});
     });
   }, [authState.status, authenticatedUserId, setSearchParams]);
+
+  useEffect(() => {
+    if (authState.status !== "authenticated") {
+      return;
+    }
+
+    return subscribeRealtimeEnvelopes((envelope) => {
+      const event = parseRTCRealtimeEvent(envelope);
+      if (event === null || event.type === "rtc.signal.received") {
+        return;
+      }
+
+      if (event.type === "rtc.call.updated") {
+        if (event.call.scope.kind === "group" && event.call.scope.groupId !== null) {
+          void refreshGroupCall(event.call.scope.groupId);
+        }
+        return;
+      }
+
+      const groupIdByCallId = selectGroupCallAwarenessGroupIdsByCallId(
+        groupCallAwarenessStateRef.current,
+      );
+      const targetGroupId = groupIdByCallId[event.callId] ?? null;
+      if (targetGroupId !== null) {
+        void refreshGroupCall(targetGroupId);
+        return;
+      }
+
+      void refreshAllActiveGroupCalls(false);
+    });
+  }, [authState.status, refreshAllActiveGroupCalls, refreshGroupCall]);
+
+  useEffect(() => {
+    if (authState.status !== "authenticated" || selectedGroupId === "") {
+      return;
+    }
+
+    void refreshGroupCall(selectedGroupId);
+  }, [authState.status, refreshGroupCall, selectedGroupId]);
+
+  useEffect(() => {
+    if (
+      authState.status !== "authenticated" ||
+      !isPageVisible ||
+      Object.keys(groupCallAwarenessState.activeCallsByGroupId).length === 0
+    ) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshAllActiveGroupCalls(false);
+    }, refreshActiveGroupCallsIntervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    authState.status,
+    groupCallAwarenessState.activeCallsByGroupId,
+    isPageVisible,
+    refreshAllActiveGroupCalls,
+  ]);
 
   useEffect(() => {
     if (authState.status !== "authenticated") {
@@ -907,6 +1125,39 @@ export function GroupsPage() {
 
   const selectedGroupPermissions =
     selectedState.status === "ready" ? selectedState.snapshot.group.permissions : null;
+  const selectedGroupCallEntry = selectGroupCallAwarenessEntry(
+    groupCallAwarenessState,
+    selectedGroupId === "" ? null : selectedGroupId,
+  );
+  const selectedGroupCallParticipants = sortGroupCallParticipants(
+    selectedGroupCallEntry?.participants ?? [],
+    selectedState.status === "ready" ? selectedState.members : [],
+    authState.status === "authenticated" ? authState.profile.id : "",
+  );
+  const selectedGroupCallSelfParticipant =
+    authState.status !== "authenticated"
+      ? null
+      : selectedGroupCallParticipants.find(
+          (participant) =>
+            participant.userId === authState.profile.id && participant.state === "active",
+        ) ?? null;
+  const selectedGroupCallActions =
+    authState.status !== "authenticated" || selectedState.status !== "ready"
+      ? null
+      : deriveGroupCallActionAvailability({
+          actionState: groupCallActionState,
+          call: selectedGroupCallEntry?.call ?? null,
+          currentUserId: authState.profile.id,
+          selfParticipant: selectedGroupCallSelfParticipant,
+          selfRole: selectedState.snapshot.group.selfRole,
+        });
+  const selectedGroupCallPhase = deriveGroupCallUiPhase({
+    actionState: groupCallActionState,
+    call: selectedGroupCallEntry?.call ?? null,
+    selfParticipant: selectedGroupCallSelfParticipant,
+    terminalState: groupCallTerminalState,
+  });
+
   useEffect(() => {
     if (selectedGroupPermissions === null) {
       return;
@@ -922,6 +1173,21 @@ export function GroupsPage() {
       }
     }
   }, [inviteRole, selectedGroupPermissions]);
+
+  useEffect(() => {
+    const currentCallId = selectedGroupCallEntry?.call.id ?? null;
+    const previousCallId = previousSelectedGroupCallIdRef.current;
+    if (
+      previousCallId !== null &&
+      currentCallId === null &&
+      groupCallActionState === "idle" &&
+      groupCallError === null
+    ) {
+      setGroupCallTerminalState("ended");
+    }
+
+    previousSelectedGroupCallIdRef.current = currentCallId;
+  }, [groupCallActionState, groupCallError, selectedGroupCallEntry?.call.id]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -1019,6 +1285,7 @@ export function GroupsPage() {
       setGroups(nextGroups);
       setGroupsStatus("ready");
       setGroupsError(null);
+      await refreshAllActiveGroupCalls(false, nextGroups);
     } catch (error) {
       const message = resolveProtectedError(
         error,
@@ -1031,6 +1298,149 @@ export function GroupsPage() {
       }
     } finally {
       setIsRefreshing(false);
+    }
+  }
+
+  async function handleStartGroupCall() {
+    if (selectedState.status !== "ready" || selectedGroupCallActions?.canStart !== true) {
+      return;
+    }
+
+    setGroupCallActionState("starting");
+    setGroupCallTerminalState("idle");
+    setGroupCallError(null);
+
+    try {
+      await gatewayClient.startCall(token, {
+        kind: "group",
+        groupId: selectedState.snapshot.group.id,
+      });
+      await refreshGroupCall(selectedState.snapshot.group.id);
+    } catch (error) {
+      if (isRTCActiveCallConflict(error)) {
+        setGroupCallTerminalState("failed");
+        setGroupCallError(describeGroupCallConflictMessage("start"));
+        return;
+      }
+      if (isGatewayErrorCode(error, "failed_precondition")) {
+        await refreshGroupCall(selectedState.snapshot.group.id);
+        setGroupCallTerminalState("failed");
+        setGroupCallError(
+          "Для этой группы уже существует активный звонок. Можно открыть lobby и присоединиться.",
+        );
+        return;
+      }
+
+      const message = resolveProtectedError(
+        error,
+        "Не удалось запустить групповой звонок.",
+        expireSession,
+      );
+      if (message !== null) {
+        setGroupCallTerminalState("failed");
+        setGroupCallError(message);
+      }
+    } finally {
+      setGroupCallActionState("idle");
+    }
+  }
+
+  async function handleJoinGroupCall() {
+    if (
+      selectedState.status !== "ready" ||
+      selectedGroupCallEntry === null ||
+      selectedGroupCallActions?.canJoin !== true
+    ) {
+      return;
+    }
+
+    setGroupCallActionState("joining");
+    setGroupCallTerminalState("idle");
+    setGroupCallError(null);
+
+    try {
+      await gatewayClient.joinCall(token, selectedGroupCallEntry.call.id);
+      await refreshGroupCall(selectedState.snapshot.group.id);
+    } catch (error) {
+      if (isRTCActiveCallConflict(error)) {
+        setGroupCallTerminalState("failed");
+        setGroupCallError(describeGroupCallConflictMessage("join"));
+        return;
+      }
+
+      const message = resolveProtectedError(
+        error,
+        "Не удалось присоединиться к групповому звонку.",
+        expireSession,
+      );
+      if (message !== null) {
+        setGroupCallTerminalState("failed");
+        setGroupCallError(message);
+      }
+    } finally {
+      setGroupCallActionState("idle");
+    }
+  }
+
+  async function handleLeaveGroupCall() {
+    if (
+      selectedState.status !== "ready" ||
+      selectedGroupCallEntry === null ||
+      selectedGroupCallActions?.canLeave !== true
+    ) {
+      return;
+    }
+
+    setGroupCallActionState("leaving");
+    setGroupCallTerminalState("idle");
+    setGroupCallError(null);
+
+    try {
+      await gatewayClient.leaveCall(token, selectedGroupCallEntry.call.id);
+      await refreshGroupCall(selectedState.snapshot.group.id);
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось покинуть групповой звонок.",
+        expireSession,
+      );
+      if (message !== null) {
+        setGroupCallTerminalState("failed");
+        setGroupCallError(message);
+      }
+    } finally {
+      setGroupCallActionState("idle");
+    }
+  }
+
+  async function handleEndGroupCall() {
+    if (
+      selectedState.status !== "ready" ||
+      selectedGroupCallEntry === null ||
+      selectedGroupCallActions?.canEnd !== true
+    ) {
+      return;
+    }
+
+    setGroupCallActionState("ending");
+    setGroupCallTerminalState("idle");
+    setGroupCallError(null);
+
+    try {
+      await gatewayClient.endCall(token, selectedGroupCallEntry.call.id);
+      await refreshGroupCall(selectedState.snapshot.group.id);
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось завершить групповой звонок.",
+        expireSession,
+      );
+      if (message !== null) {
+        setGroupCallTerminalState("failed");
+        setGroupCallError(message);
+      }
+    } finally {
+      setGroupCallActionState("idle");
     }
   }
 
@@ -1869,11 +2279,11 @@ export function GroupsPage() {
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Groups</p>
-            <h1 className={styles.title}>Group attachment composer bootstrap</h1>
+            <h1 className={styles.title}>Group workspace и call lobby</h1>
             <p className={styles.subtitle}>
-              Slice делает group chat usable для реальных файлов: upload intent, presigned upload,
-              lazy inline preview для image/audio/video attachments и send через существующий
-              gateway-only flow.
+              Текущий web slice добавляет compact group call control/lobby поверх уже существующего
+              group thread и RTC control plane. Media transport для реального multiparty audio/video
+              по-прежнему отложен.
             </p>
           </div>
 
@@ -2016,41 +2426,51 @@ export function GroupsPage() {
 
             {groupsStatus === "ready" && groups.length > 0 && (
               <div className={styles.list}>
-                {groups.map((group) => (
-                  <button
-                    key={group.id}
-                    className={styles.groupButton}
-                    onClick={() => openGroup(group.id)}
-                    type="button"
-                  >
-                    <article
-                      className={styles.groupCard}
-                      data-active={group.id === selectedGroupId}
+                {groups.map((group) => {
+                  const activeGroupCallEntry =
+                    groupCallAwarenessState.activeCallsByGroupId[group.id] ?? null;
+
+                  return (
+                    <button
+                      key={group.id}
+                      className={styles.groupButton}
+                      onClick={() => openGroup(group.id)}
+                      type="button"
                     >
-                      <div className={styles.groupHeader}>
-                        <div>
-                          <h3 className={styles.groupTitle}>{group.name}</h3>
-                          <p className={styles.groupMeta}>
-                            {group.memberCount} участников • роль {roleLabel(group.selfRole)}
-                          </p>
+                      <article
+                        className={styles.groupCard}
+                        data-active={group.id === selectedGroupId}
+                      >
+                        <div className={styles.groupHeader}>
+                          <div>
+                            <h3 className={styles.groupTitle}>{group.name}</h3>
+                            <p className={styles.groupMeta}>
+                              {group.memberCount} участников • роль {roleLabel(group.selfRole)}
+                            </p>
+                          </div>
+                          <div className={styles.badgeColumn}>
+                            {group.unreadCount > 0 && (
+                              <span className={styles.unreadPill}>
+                                Непрочитано: {group.unreadCount}
+                              </span>
+                            )}
+                            {group.encryptedUnreadCount > 0 && (
+                              <span className={styles.unreadPill}>
+                                Encrypted unread: {group.encryptedUnreadCount}
+                              </span>
+                            )}
+                            {activeGroupCallEntry && (
+                              <span className={styles.callPill}>
+                                Звонок активен · {activeGroupCallEntry.call.activeParticipantCount}
+                              </span>
+                            )}
+                            <span className={styles.rolePill}>{roleLabel(group.selfRole)}</span>
+                          </div>
                         </div>
-                        <div className={styles.badgeColumn}>
-                          {group.unreadCount > 0 && (
-                            <span className={styles.unreadPill}>
-                              Непрочитано: {group.unreadCount}
-                            </span>
-                          )}
-                          {group.encryptedUnreadCount > 0 && (
-                            <span className={styles.unreadPill}>
-                              Encrypted unread: {group.encryptedUnreadCount}
-                            </span>
-                          )}
-                          <span className={styles.rolePill}>{roleLabel(group.selfRole)}</span>
-                        </div>
-                      </div>
-                    </article>
-                  </button>
-                ))}
+                      </article>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </section>
@@ -2130,6 +2550,217 @@ export function GroupsPage() {
                     </button>
                   </div>
                 </div>
+              </section>
+
+              <section className={styles.panelCard}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.cardLabel}>Group call</p>
+                    <h2 className={styles.panelTitle}>Control / lobby bootstrap</h2>
+                  </div>
+                  <div className={styles.badgeColumn}>
+                    <span className={styles.statusPill}>
+                      {describeGroupCallPhaseLabel(selectedGroupCallPhase)}
+                    </span>
+                    {selectedGroupCallEntry && (
+                      <span className={styles.statusPill}>
+                        Active participants: {selectedGroupCallParticipants.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <p className={styles.description}>
+                  Surface честно остаётся group call lobby: можно увидеть активный server-backed
+                  call, стартовать, войти, выйти и завершить его по текущей policy. Multi-party
+                  browser audio/video transport пока не реализован.
+                </p>
+
+                {selectedGroupCallEntry && (
+                  <div className={styles.timelineMeta}>
+                    <span className={styles.statusPill}>
+                      Control-plane:{" "}
+                      {selectedGroupCallEntry.call.status === "active" ? "active" : "ended"}
+                    </span>
+                    <span className={styles.statusPill}>
+                      {selectedGroupCallSelfParticipant !== null
+                        ? "Вы в lobby"
+                        : selectedGroupCallActions?.isReadOnly
+                          ? "Наблюдение"
+                          : "Наблюдение без join"}
+                    </span>
+                    <span className={styles.statusPill}>
+                      Создатель:{" "}
+                      {selectedGroupCallEntry.call.createdByUserId === authState.profile.id
+                        ? "вы"
+                        : "другой участник"}
+                    </span>
+                  </div>
+                )}
+
+                {groupCallError && (
+                  <div className={styles.error}>
+                    <div className={styles.inlineActionRow}>
+                      <span>{groupCallError}</span>
+                      <button
+                        className={styles.ghostButton}
+                        onClick={() => {
+                          setGroupCallError(null);
+                          setGroupCallTerminalState("idle");
+                        }}
+                        type="button"
+                      >
+                        Скрыть
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {selectedGroupCallEntry === null && (
+                  <>
+                    <div className={styles.notice}>
+                      В этой группе сейчас нет активного звонка. Новый call создаётся через
+                      существующий `StartCall`, а UI дальше сходится только от server-backed
+                      refresh.
+                    </div>
+
+                    {selectedGroupCallActions?.isReadOnly ? (
+                      <div className={styles.readOnlyNotice}>
+                        Роль `reader` может видеть будущий active group call и roster участников,
+                        но не может запускать, join'ить или завершать звонок.
+                      </div>
+                    ) : (
+                      <div className={styles.actions}>
+                        <button
+                          className={styles.primaryButton}
+                          disabled={selectedGroupCallActions?.canStart !== true}
+                          onClick={() => {
+                            void handleStartGroupCall();
+                          }}
+                          type="button"
+                        >
+                          {groupCallActionState === "starting"
+                            ? "Запускаем..."
+                            : "Начать звонок"}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {selectedGroupCallEntry !== null && (
+                  <>
+                    {selectedGroupCallActions?.isReadOnly && (
+                      <div className={styles.readOnlyNotice}>
+                        `reader` остаётся observe-only участником: active call и roster видны, но
+                        join/start/end заблокированы текущей серверной policy.
+                      </div>
+                    )}
+
+                    <div className={styles.actions}>
+                      {selectedGroupCallActions?.canJoin && (
+                        <button
+                          className={styles.primaryButton}
+                          disabled={groupCallActionState !== "idle"}
+                          onClick={() => {
+                            void handleJoinGroupCall();
+                          }}
+                          type="button"
+                        >
+                          {groupCallActionState === "joining"
+                            ? "Входим..."
+                            : "Присоединиться"}
+                        </button>
+                      )}
+
+                      {selectedGroupCallActions?.canLeave && (
+                        <button
+                          className={styles.secondaryButton}
+                          disabled={groupCallActionState !== "idle"}
+                          onClick={() => {
+                            void handleLeaveGroupCall();
+                          }}
+                          type="button"
+                        >
+                          {groupCallActionState === "leaving"
+                            ? "Выходим..."
+                            : "Покинуть lobby"}
+                        </button>
+                      )}
+
+                      {selectedGroupCallActions?.canEnd && (
+                        <button
+                          className={styles.dangerButton}
+                          disabled={groupCallActionState !== "idle"}
+                          onClick={() => {
+                            void handleEndGroupCall();
+                          }}
+                          type="button"
+                        >
+                          {groupCallActionState === "ending"
+                            ? "Завершаем..."
+                            : "Завершить звонок"}
+                        </button>
+                      )}
+                    </div>
+
+                    <div className={styles.rosterCard}>
+                      <div className={styles.blockHeader}>
+                        <div>
+                          <p className={styles.cardLabel}>Participants</p>
+                          <h3 className={styles.blockTitle}>Активные участники lobby</h3>
+                        </div>
+                        <span className={styles.metaTag}>
+                          {selectedGroupCallParticipants.length}
+                        </span>
+                      </div>
+
+                      {selectedGroupCallParticipants.length === 0 ? (
+                        <p className={styles.emptyState}>
+                          Серверный call активен, но roster ещё пустой. Следующий refresh уточнит
+                          active participants.
+                        </p>
+                      ) : (
+                        <div className={styles.rosterList}>
+                          {selectedGroupCallParticipants.map((participant) => {
+                            const participantMember =
+                              selectedState.members.find(
+                                (member) => member.user.id === participant.userId,
+                              ) ?? null;
+
+                            return (
+                              <article
+                                className={styles.rosterItem}
+                                key={participant.id}
+                              >
+                                <div>
+                                  <p className={styles.rosterName}>
+                                    {describeGroupCallParticipantName(
+                                      participant,
+                                      participantMember,
+                                      authState.profile.id,
+                                    )}
+                                  </p>
+                                  <p className={styles.rosterMeta}>
+                                    joined {formatDateTime(participant.joinedAt)}
+                                  </p>
+                                </div>
+                                <div className={styles.badgeColumn}>
+                                  {participantMember && (
+                                    <span className={styles.rolePill}>
+                                      {roleLabel(participantMember.role)}
+                                    </span>
+                                  )}
+                                  <span className={styles.statusPill}>active</span>
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </section>
 
               <section className={styles.panelCard}>
@@ -3641,6 +4272,70 @@ function describeGroupMessageKind(message: { text: { text: string } | null; atta
     return "Только файл";
   }
   return "Текст";
+}
+
+function describeGroupCallPhaseLabel(phase: ReturnType<typeof deriveGroupCallUiPhase>): string {
+  switch (phase) {
+    case "starting":
+      return "starting";
+    case "joined":
+      return "joined";
+    case "observing":
+      return "observing";
+    case "ending":
+      return "ending";
+    case "ended":
+      return "ended";
+    case "failed":
+      return "failed";
+    case "active":
+      return "active";
+    case "no_active_call":
+    default:
+      return "no active call";
+  }
+}
+
+function sortGroupCallParticipants(
+  participants: RtcCallParticipant[],
+  members: GroupMember[],
+  currentUserId: string,
+): RtcCallParticipant[] {
+  const membersByUserId = new Map(members.map((member) => [member.user.id, member] as const));
+
+  return [...participants].sort((left, right) => {
+    const leftMember = membersByUserId.get(left.userId) ?? null;
+    const rightMember = membersByUserId.get(right.userId) ?? null;
+    const leftName = describeGroupCallParticipantName(left, leftMember, currentUserId);
+    const rightName = describeGroupCallParticipantName(right, rightMember, currentUserId);
+    const joinedCompare = left.joinedAt.localeCompare(right.joinedAt);
+    if (joinedCompare !== 0) {
+      return joinedCompare;
+    }
+
+    const nameCompare = leftName.localeCompare(rightName, "ru");
+    if (nameCompare !== 0) {
+      return nameCompare;
+    }
+
+    return left.id.localeCompare(right.id);
+  });
+}
+
+function describeGroupCallParticipantName(
+  participant: RtcCallParticipant,
+  member: GroupMember | null,
+  currentUserId: string,
+): string {
+  if (participant.userId === currentUserId) {
+    return "Вы";
+  }
+
+  if (member === null) {
+    return "Участник группы";
+  }
+
+  return member.user.nickname || `@${member.user.login}`;
 }
 
 function isGroupMessageEditable(
