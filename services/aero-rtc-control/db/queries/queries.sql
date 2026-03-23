@@ -137,6 +137,35 @@ INSERT INTO rtc_call_participants (
 )
 RETURNING id, call_id, user_id, state, joined_at, left_at, updated_at, last_signal_at;
 
+-- name: GetActiveParticipationByUserID :one
+SELECT
+    c.id,
+    c.scope_type,
+    c.direct_chat_id,
+    c.group_id,
+    c.created_by_user_id,
+    c.status,
+    c.created_at,
+    c.started_at,
+    c.updated_at,
+    c.ended_at,
+    c.ended_by_user_id,
+    c.end_reason,
+    p.id AS participant_id,
+    p.user_id,
+    p.state,
+    p.joined_at,
+    p.left_at,
+    p.updated_at AS participant_updated_at,
+    p.last_signal_at
+FROM rtc_call_participants p
+JOIN rtc_calls c ON c.id = p.call_id
+WHERE p.user_id = sqlc.arg(user_id)
+  AND p.state = 'active'
+  AND c.status = 'active'
+ORDER BY p.joined_at DESC, p.id DESC
+LIMIT 1;
+
 -- name: GetActiveParticipantByCallIDAndUserID :one
 SELECT id, call_id, user_id, state, joined_at, left_at, updated_at, last_signal_at
 FROM rtc_call_participants

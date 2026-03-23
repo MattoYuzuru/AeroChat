@@ -70,6 +70,7 @@ import type {
   SearchMessagesInput,
   Session,
   TextMessageContent,
+  RTCActiveCallConflictMetadata,
 } from "./types";
 import { GatewayError } from "./types";
 
@@ -2316,7 +2317,7 @@ async function unaryCall<TResponse>(
   const payload = await readPayload(response);
 
   if (!response.ok) {
-    throw createGatewayError(response.status, payload);
+    throw createGatewayError(response.status, payload, response.headers);
   }
 
   return payload as TResponse;
@@ -2356,7 +2357,11 @@ async function readPayload(response: Response): Promise<unknown> {
   }
 }
 
-function createGatewayError(status: number, payload: unknown): GatewayError {
+function createGatewayError(
+  status: number,
+  payload: unknown,
+  headers: Headers,
+): GatewayError {
   const connectError = payload as ConnectErrorPayload | null;
   const code = normalizeErrorCode(connectError?.code);
   const message =
@@ -2364,7 +2369,56 @@ function createGatewayError(status: number, payload: unknown): GatewayError {
       ? connectError.message
       : `Gateway request failed with HTTP ${status}.`;
 
-  return new GatewayError(code, message, status);
+  return new GatewayError(
+    code,
+    message,
+    status,
+    parseRTCActiveCallConflictHeaders(headers),
+  );
+}
+
+function parseRTCActiveCallConflictHeaders(
+  headers: Headers,
+): RTCActiveCallConflictMetadata | null {
+  const reason = headers.get("X-Aerochat-Rtc-Conflict-Reason")?.trim() ?? "";
+  if (reason !== "active_participation_exists") {
+    return null;
+  }
+
+  const callId = headers.get("X-Aerochat-Rtc-Conflict-Call-Id")?.trim() ?? "";
+  if (callId === "") {
+    return null;
+  }
+
+  const scopeType = headers.get("X-Aerochat-Rtc-Conflict-Scope-Type")?.trim() ?? "";
+  const participantId = normalizeHeaderString(
+    headers.get("X-Aerochat-Rtc-Conflict-Participant-Id"),
+  );
+  const directChatId = normalizeHeaderString(
+    headers.get("X-Aerochat-Rtc-Conflict-Direct-Chat-Id"),
+  );
+  const groupId = normalizeHeaderString(
+    headers.get("X-Aerochat-Rtc-Conflict-Group-Id"),
+  );
+
+  return {
+    reason: "active_participation_exists",
+    callId,
+    participantId,
+    scopeKind:
+      scopeType === "direct" || scopeType === "group" ? scopeType : null,
+    directChatId,
+    groupId,
+  };
+}
+
+function normalizeHeaderString(value: string | null): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized === "" ? null : normalized;
 }
 
 function normalizeErrorCode(value: string | undefined): GatewayErrorCode {

@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] 1:1 direct-call continuity, reconnect convergence и compact incoming-call surface
+- [x] server-enforced one-active-call-per-user policy в RTC control plane
 
 ---
 
@@ -195,8 +195,8 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Active call and participant control-plane foundation через `aero-rtc-control`
 - [x] Web audio-only 1:1 direct-call bootstrap
 - [x] 1:1 call polish, continuity и richer call UX
+- [x] One-active-call-per-user policy
 - [ ] Group call control
-- [ ] One-active-call-per-user policy
 - [ ] Device controls
 - [ ] Quality presets
 - [ ] Future screen-share hooks

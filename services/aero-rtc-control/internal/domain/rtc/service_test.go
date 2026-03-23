@@ -67,6 +67,198 @@ func TestStartCallRejectsGroupReader(t *testing.T) {
 	}
 }
 
+func TestStartCallRejectsUserAlreadyActiveInAnotherCall(t *testing.T) {
+	repo := newFakeRepository()
+	now := time.Date(2026, 3, 23, 10, 0, 0, 0, time.UTC)
+	repo.calls["44444444-4444-4444-4444-444444444444"] = &Call{
+		ID:              "44444444-4444-4444-4444-444444444444",
+		Scope:           ConversationScope{Type: ScopeTypeDirect, DirectChatID: "55555555-5555-5555-5555-555555555555"},
+		CreatedByUserID: "11111111-1111-1111-1111-111111111111",
+		Status:          CallStatusActive,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		StartedAt:       now,
+	}
+	repo.addActiveParticipant("66666666-6666-6666-6666-666666666666", "44444444-4444-4444-4444-444444444444", "11111111-1111-1111-1111-111111111111", now)
+
+	service := NewService(
+		repo,
+		&fakeAuthenticator{userID: "11111111-1111-1111-1111-111111111111"},
+		&fakeScopeAuthorizer{
+			accessByScope: map[string]*ScopeAccess{
+				"direct:77777777-7777-7777-7777-777777777777": {
+					Scope: ConversationScope{Type: ScopeTypeDirect, DirectChatID: "77777777-7777-7777-7777-777777777777"},
+				},
+			},
+		},
+		16*1024,
+	)
+
+	_, _, err := service.StartCall(context.Background(), "token", ConversationScope{
+		Type:         ScopeTypeDirect,
+		DirectChatID: "77777777-7777-7777-7777-777777777777",
+	})
+
+	var conflictErr *ActiveCallConflictError
+	if !errors.As(err, &conflictErr) {
+		t.Fatalf("ожидался ActiveCallConflictError, получено: %v", err)
+	}
+	if conflictErr.Call.ID != "44444444-4444-4444-4444-444444444444" {
+		t.Fatalf("ожидался конфликтующий call 4444..., получен %q", conflictErr.Call.ID)
+	}
+}
+
+func TestJoinCallRejectsUserAlreadyActiveInAnotherCall(t *testing.T) {
+	repo := newFakeRepository()
+	now := time.Date(2026, 3, 23, 10, 0, 0, 0, time.UTC)
+	repo.calls["88888888-8888-8888-8888-888888888888"] = &Call{
+		ID:              "88888888-8888-8888-8888-888888888888",
+		Scope:           ConversationScope{Type: ScopeTypeDirect, DirectChatID: "99999999-9999-9999-9999-999999999999"},
+		CreatedByUserID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		Status:          CallStatusActive,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		StartedAt:       now,
+	}
+	repo.calls["12121212-1212-1212-1212-121212121212"] = &Call{
+		ID:              "12121212-1212-1212-1212-121212121212",
+		Scope:           ConversationScope{Type: ScopeTypeGroup, GroupID: "34343434-3434-3434-3434-343434343434"},
+		CreatedByUserID: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+		Status:          CallStatusActive,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		StartedAt:       now,
+	}
+	repo.addActiveParticipant("13131313-1313-1313-1313-131313131313", "88888888-8888-8888-8888-888888888888", "11111111-1111-1111-1111-111111111111", now)
+
+	service := NewService(
+		repo,
+		&fakeAuthenticator{userID: "11111111-1111-1111-1111-111111111111"},
+		&fakeScopeAuthorizer{
+			accessByScope: map[string]*ScopeAccess{
+				"group:34343434-3434-3434-3434-343434343434": {
+					Scope:     ConversationScope{Type: ScopeTypeGroup, GroupID: "34343434-3434-3434-3434-343434343434"},
+					GroupRole: GroupRoleMember,
+				},
+			},
+		},
+		16*1024,
+	)
+
+	_, _, err := service.JoinCall(context.Background(), "token", "12121212-1212-1212-1212-121212121212")
+
+	var conflictErr *ActiveCallConflictError
+	if !errors.As(err, &conflictErr) {
+		t.Fatalf("ожидался ActiveCallConflictError, получено: %v", err)
+	}
+	if conflictErr.Call.ID != "88888888-8888-8888-8888-888888888888" {
+		t.Fatalf("ожидался конфликтующий call 8888..., получен %q", conflictErr.Call.ID)
+	}
+}
+
+func TestUserCanStartAnotherCallAfterLeavingPrevious(t *testing.T) {
+	repo := newFakeRepository()
+	now := time.Date(2026, 3, 23, 10, 0, 0, 0, time.UTC)
+	repo.calls["15151515-1515-1515-1515-151515151515"] = &Call{
+		ID:              "15151515-1515-1515-1515-151515151515",
+		Scope:           ConversationScope{Type: ScopeTypeDirect, DirectChatID: "16161616-1616-1616-1616-161616161616"},
+		CreatedByUserID: "11111111-1111-1111-1111-111111111111",
+		Status:          CallStatusActive,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		StartedAt:       now,
+	}
+	repo.addActiveParticipant("17171717-1717-1717-1717-171717171717", "15151515-1515-1515-1515-151515151515", "11111111-1111-1111-1111-111111111111", now)
+
+	service := NewService(
+		repo,
+		&fakeAuthenticator{userID: "11111111-1111-1111-1111-111111111111"},
+		&fakeScopeAuthorizer{
+			accessByScope: map[string]*ScopeAccess{
+				"direct:16161616-1616-1616-1616-161616161616": {
+					Scope: ConversationScope{Type: ScopeTypeDirect, DirectChatID: "16161616-1616-1616-1616-161616161616"},
+				},
+				"direct:18181818-1818-1818-1818-181818181818": {
+					Scope: ConversationScope{Type: ScopeTypeDirect, DirectChatID: "18181818-1818-1818-1818-181818181818"},
+				},
+			},
+		},
+		16*1024,
+	)
+
+	if _, _, err := service.LeaveCall(context.Background(), "token", "15151515-1515-1515-1515-151515151515"); err != nil {
+		t.Fatalf("leave call: %v", err)
+	}
+
+	call, participant, err := service.StartCall(context.Background(), "token", ConversationScope{
+		Type:         ScopeTypeDirect,
+		DirectChatID: "18181818-1818-1818-1818-181818181818",
+	})
+	if err != nil {
+		t.Fatalf("start next call: %v", err)
+	}
+	if call == nil || participant == nil {
+		t.Fatal("ожидался новый call после leave")
+	}
+}
+
+func TestLeftParticipationHistoryDoesNotBlockFutureJoin(t *testing.T) {
+	repo := newFakeRepository()
+	now := time.Date(2026, 3, 23, 10, 0, 0, 0, time.UTC)
+	leftAt := now.Add(2 * time.Minute)
+	repo.calls["19191919-1919-1919-1919-191919191919"] = &Call{
+		ID:              "19191919-1919-1919-1919-191919191919",
+		Scope:           ConversationScope{Type: ScopeTypeDirect, DirectChatID: "20202020-2020-2020-2020-202020202020"},
+		CreatedByUserID: "11111111-1111-1111-1111-111111111111",
+		Status:          CallStatusEnded,
+		CreatedAt:       now,
+		UpdatedAt:       leftAt,
+		StartedAt:       now,
+		EndedAt:         &leftAt,
+		EndReason:       CallEndReasonLastParticipant,
+	}
+	repo.participants["21212121-2121-2121-2121-212121212121"] = &CallParticipant{
+		ID:        "21212121-2121-2121-2121-212121212121",
+		CallID:    "19191919-1919-1919-1919-191919191919",
+		UserID:    "11111111-1111-1111-1111-111111111111",
+		State:     ParticipantStateLeft,
+		JoinedAt:  now,
+		LeftAt:    &leftAt,
+		UpdatedAt: leftAt,
+	}
+	repo.calls["22222222-2222-2222-2222-222222222222"] = &Call{
+		ID:              "22222222-2222-2222-2222-222222222222",
+		Scope:           ConversationScope{Type: ScopeTypeGroup, GroupID: "23232323-2323-2323-2323-232323232323"},
+		CreatedByUserID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		Status:          CallStatusActive,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		StartedAt:       now,
+	}
+
+	service := NewService(
+		repo,
+		&fakeAuthenticator{userID: "11111111-1111-1111-1111-111111111111"},
+		&fakeScopeAuthorizer{
+			accessByScope: map[string]*ScopeAccess{
+				"group:23232323-2323-2323-2323-232323232323": {
+					Scope:     ConversationScope{Type: ScopeTypeGroup, GroupID: "23232323-2323-2323-2323-232323232323"},
+					GroupRole: GroupRoleMember,
+				},
+			},
+		},
+		16*1024,
+	)
+
+	call, participant, err := service.JoinCall(context.Background(), "token", "22222222-2222-2222-2222-222222222222")
+	if err != nil {
+		t.Fatalf("join call after left history: %v", err)
+	}
+	if call == nil || participant == nil {
+		t.Fatal("ожидался успешный join без блокировки left history")
+	}
+}
+
 func TestLeaveCallAutoEndsWhenLastParticipantLeaves(t *testing.T) {
 	repo := newFakeRepository()
 	now := time.Date(2026, 3, 23, 10, 0, 0, 0, time.UTC)
@@ -246,6 +438,11 @@ func (r *fakeRepository) CreateCallWithParticipant(_ context.Context, call Call,
 			return nil, nil, ErrConflict
 		}
 	}
+	for _, existing := range r.participants {
+		if existing.UserID == participant.UserID && existing.State == ParticipantStateActive {
+			return nil, nil, ErrConflict
+		}
+	}
 
 	call.ActiveParticipantCount = 1
 	r.calls[call.ID] = cloneCall(&call)
@@ -257,6 +454,9 @@ func (r *fakeRepository) CreateCallWithParticipant(_ context.Context, call Call,
 func (r *fakeRepository) CreateParticipant(_ context.Context, participant CallParticipant) (*CallParticipant, error) {
 	for _, existing := range r.participants {
 		if existing.CallID == participant.CallID && existing.UserID == participant.UserID && existing.State == ParticipantStateActive {
+			return nil, ErrConflict
+		}
+		if existing.UserID == participant.UserID && existing.State == ParticipantStateActive {
 			return nil, ErrConflict
 		}
 	}
@@ -272,6 +472,26 @@ func (r *fakeRepository) GetActiveParticipant(_ context.Context, callID string, 
 		if participant.CallID == callID && participant.UserID == userID && participant.State == ParticipantStateActive {
 			return cloneParticipant(participant), nil
 		}
+	}
+
+	return nil, ErrNotFound
+}
+
+func (r *fakeRepository) GetActiveParticipationByUserID(_ context.Context, userID string) (*ActiveParticipation, error) {
+	for _, participant := range r.participants {
+		if participant.UserID != userID || participant.State != ParticipantStateActive {
+			continue
+		}
+
+		call, ok := r.calls[participant.CallID]
+		if !ok || call.Status != CallStatusActive {
+			continue
+		}
+
+		return &ActiveParticipation{
+			Call:        *cloneCall(call),
+			Participant: *cloneParticipant(participant),
+		}, nil
 	}
 
 	return nil, ErrNotFound

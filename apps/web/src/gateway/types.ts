@@ -16,6 +16,15 @@ export type GatewayErrorCode =
   | "unimplemented"
   | "unknown";
 
+export interface RTCActiveCallConflictMetadata {
+  reason: "active_participation_exists";
+  callId: string;
+  participantId: string | null;
+  scopeKind: "direct" | "group" | null;
+  directChatId: string | null;
+  groupId: string | null;
+}
+
 export interface Profile {
   id: string;
   login: string;
@@ -1123,12 +1132,19 @@ export interface GatewayClient {
 export class GatewayError extends Error {
   code: GatewayErrorCode;
   httpStatus: number;
+  rtcActiveCallConflict: RTCActiveCallConflictMetadata | null;
 
-  constructor(code: GatewayErrorCode, message: string, httpStatus: number) {
+  constructor(
+    code: GatewayErrorCode,
+    message: string,
+    httpStatus: number,
+    rtcActiveCallConflict: RTCActiveCallConflictMetadata | null = null,
+  ) {
     super(message);
     this.name = "GatewayError";
     this.code = code;
     this.httpStatus = httpStatus;
+    this.rtcActiveCallConflict = rtcActiveCallConflict;
   }
 }
 
@@ -1169,4 +1185,12 @@ export function describeGatewayError(
     default:
       return error.message || fallbackMessage;
   }
+}
+
+export function isRTCActiveCallConflict(error: unknown): boolean {
+  return (
+    error instanceof GatewayError &&
+    error.code === "failed_precondition" &&
+    error.rtcActiveCallConflict?.reason === "active_participation_exists"
+  );
 }

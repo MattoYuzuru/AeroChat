@@ -56,5 +56,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS rtc_call_participants_active_call_user_idx
     ON rtc_call_participants (call_id, user_id)
     WHERE state = 'active';
 
+CREATE UNIQUE INDEX IF NOT EXISTS rtc_call_participants_active_user_idx
+    ON rtc_call_participants (user_id)
+    WHERE state = 'active';
+
 CREATE INDEX IF NOT EXISTS rtc_call_participants_call_id_idx ON rtc_call_participants (call_id, joined_at DESC);
 CREATE INDEX IF NOT EXISTS rtc_call_participants_user_id_idx ON rtc_call_participants (user_id);

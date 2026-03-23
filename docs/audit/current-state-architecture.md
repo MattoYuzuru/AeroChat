@@ -13,6 +13,7 @@
 - attachments, voice notes, video notes, inline preview;
 - web audio-only direct calls в direct chats поверх `aero-rtc-control` и `aero-gateway`;
 - compact direct-call continuity surface в web: active direct call awareness переживает thread switching внутри открытой app session, есть bounded reconnect resync и explicit return/rejoin path;
+- server-enforced one-active-call-per-user policy: один пользователь не может оставаться active participant более чем в одном active call одновременно;
 - `/app/search` для legacy plaintext search и bounded local encrypted search;
 - bounded encrypted direct lane и bounded encrypted group lane как отдельные timeline рядом с legacy plaintext history.
 
@@ -113,6 +114,7 @@ RTC control-plane service c server-backed active call lifecycle и bounded signa
 
 - active call state для direct/group scope;
 - participant lifecycle;
+- one-active-call-per-user policy и conflict semantics для start/join;
 - bounded signaling relay contract;
 - authorization поверх chat boundaries.
 
@@ -343,6 +345,7 @@ Realtime сейчас:
 
 - active call lifecycle;
 - participant state;
+- global one-active-call-per-user invariant;
 - bounded signal relay contract.
 
 Не владеет:

@@ -124,6 +124,44 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("parses rtc active-call conflict metadata from gateway error headers", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          code: "failed_precondition",
+          message: "user already has active participation in another call",
+        }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Aerochat-Rtc-Conflict-Reason": "active_participation_exists",
+            "X-Aerochat-Rtc-Conflict-Call-Id": "call-1",
+            "X-Aerochat-Rtc-Conflict-Participant-Id": "participant-1",
+            "X-Aerochat-Rtc-Conflict-Scope-Type": "direct",
+            "X-Aerochat-Rtc-Conflict-Direct-Chat-Id": "chat-1",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    await expect(client.startCall("token-1", { kind: "direct", directChatId: "chat-2" })).rejects.toEqual(
+      expect.objectContaining<Partial<GatewayError>>({
+        name: "GatewayError",
+        code: "failed_precondition",
+        rtcActiveCallConflict: {
+          reason: "active_participation_exists",
+          callId: "call-1",
+          participantId: "participant-1",
+          scopeKind: "direct",
+          directChatId: "chat-1",
+          groupId: null,
+        },
+      }),
+    );
+  });
+
   it("sends partial settings patch through gateway identity endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(
