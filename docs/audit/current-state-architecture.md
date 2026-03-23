@@ -11,6 +11,7 @@
 - social graph по точному login без публичного каталога;
 - direct chats и groups с realtime, typing, presence, read/unread, replies, edit, delete, pin;
 - attachments, voice notes, video notes, inline preview;
+- web audio-only direct calls в direct chats поверх `aero-rtc-control` и `aero-gateway`;
 - `/app/search` для legacy plaintext search и bounded local encrypted search;
 - bounded encrypted direct lane и bounded encrypted group lane как отдельные timeline рядом с legacy plaintext history.
 
@@ -18,7 +19,8 @@
 
 - `identity`, `social graph`, `legacy direct/group chats`, `media relay`, `deploy/local runtime` уже имеют рабочий user-facing slice;
 - encrypted lanes реализованы как usable, но bounded foundation без full parity и без unified history;
-- `aero-rtc-control`, `aero-jobs`, PWA, push, desktop/mobile polish и calls пока не реализованы как продуктовые возможности.
+- `aero-rtc-control` теперь имеет первый user-facing direct-call slice, но calls ещё не являются finished product subsystem;
+- `aero-jobs`, PWA, push и desktop/mobile polish пока не реализованы как продуктовые возможности.
 
 ## Monorepo architecture map
 
@@ -31,6 +33,7 @@
 - auth/session bootstrap и protected shell;
 - web UI для identity, social graph, direct/group chats и settings;
 - attachment composer, voice/video notes и inline preview;
+- audio-only direct-call bootstrap через browser WebRTC + gateway/RTC control plane;
 - bounded local projection для encrypted direct/group lanes;
 - bounded local encrypted search внутри browser/runtime boundary.
 
@@ -43,14 +46,14 @@
 
 ### `services/aero-gateway`
 
-Единая внешняя backend edge-точка. Проксирует ConnectRPC в `aero-identity` и `aero-chat`, публикует `/api/realtime`, держит in-memory websocket hub и собирает realtime fan-out для people/chat/group/encrypted delivery событий.
+Единая внешняя backend edge-точка. Проксирует ConnectRPC в `aero-identity`, `aero-chat` и `aero-rtc-control`, публикует `/api/realtime`, держит in-memory websocket hub и собирает realtime fan-out для people/chat/group/encrypted delivery и rtc событий.
 
 Реальная ответственность:
 
 - внешний ConnectRPC entrypoint;
 - auth/session header propagation;
 - websocket upgrade и process-local realtime routing;
-- thin orchestration для realtime fan-out после downstream RPC.
+- thin orchestration для realtime fan-out после downstream RPC, включая RTC call/signal events.
 
 Не отвечает за:
 
@@ -102,11 +105,14 @@
 
 ### `services/aero-rtc-control`
 
-Пока это bootstrap-only service skeleton. В репозитории есть только конфиг, health/base mux и `Ping` в proto.
+RTC control-plane service c server-backed active call lifecycle и bounded signal relay.
 
 Реальная ответственность сегодня:
 
-- отсутствует продуктовая ответственность кроме reserved service name и health-only runtime.
+- active call state для direct/group scope;
+- participant lifecycle;
+- bounded signaling relay contract;
+- authorization поверх chat boundaries.
 
 ### `services/aero-jobs`
 
@@ -127,7 +133,7 @@ Proto-first источник контрактов:
 
 - `identity/v1`: auth/profile/social/crypto-device control-plane;
 - `chat/v1`: direct/group/media/search/encrypted lane API;
-- `rtc/v1`: пока только `Ping`;
+- `rtc/v1`: active call, participant lifecycle и bounded signal relay API;
 - `common/v1`: service meta.
 
 ### `infra/*`
@@ -269,9 +275,9 @@ Realtime сейчас:
 
 ### RTC / calls
 
-- `implemented`: только reserved bounded context `aero-rtc-control` и proto service c `Ping`.
-- `partial/bootstrap/bounded`: архитектурное место под RTC зафиксировано ADR, но signalling/call control в коде отсутствуют.
-- `not implemented yet`: signaling model, 1:1 calls, group calls, call policy/device controls.
+- `implemented`: server-backed RTC signaling/call-control foundation и первый web audio-only direct-call bootstrap.
+- `partial/bootstrap/bounded`: direct-only, audio-only, page-scoped WebRTC UX без group/video/device/push/recovery parity.
+- `not implemented yet`: group calls, richer 1:1 polish, device controls, notifications, durable recovery и policy expansion.
 
 ### PWA / mobile / desktop shell polish
 
@@ -331,7 +337,18 @@ Realtime сейчас:
 
 ### `aero-rtc-control`
 
-Сегодня не владеет ничем продуктовым, кроме зарезервированной сервисной границы.
+Сегодня владеет:
+
+- active call lifecycle;
+- participant state;
+- bounded signal relay contract.
+
+Не владеет:
+
+- media plane;
+- chat membership source of truth;
+- push/ringing semantics;
+- device controls и future SFU concerns.
 
 ### `aero-jobs`
 
@@ -346,7 +363,7 @@ Realtime сейчас:
 - Attachment as first-class entity: attachment имеет отдельный lifecycle, quota semantics, upload session и linkage.
 - Object storage via presigned upload: браузер грузит объект напрямую в MinIO/S3-compatible path.
 - Process-local realtime assumptions: websocket hub в `aero-gateway` хранит сессии в памяти процесса.
-- Future RTC reservation without false claims: `aero-rtc-control` и `proto/aerochat/rtc/v1` резервируют bounded context, но calls не заявляются как реализованные.
+- Server-backed RTC bootstrap without media overreach: `aero-rtc-control` владеет call lifecycle/signaling, а web поднимает только bounded direct audio peer connection.
 
 ## Drift and inconsistencies found
 
@@ -354,7 +371,6 @@ Realtime сейчас:
 - README в формулировках про безопасность слишком легко читался как будто весь messaging уже opaque для сервера, хотя в коде всё ещё есть legacy plaintext direct/group history.
 - `docs/roadmap.md` заметно отставал от репозитория по foundation, identity и social graph: существующие README/AGENTS/ADR/tooling/CI и working account-social flows были оставлены unchecked.
 - Roadmap не показывал, что block list уже реализован в backend/gateway, хотя web UI для него пока отсутствует.
-- Наличие `aero-rtc-control` могло создать ложное впечатление о готовом RTC subsystem, но код подтверждает только health-only skeleton и `Ping`.
 - Наличие `aero-jobs` могло создать ложное впечатление о вынесенном lifecycle worker, но cleanup сейчас фактически живёт внутри `aero-chat`.
 - README и ADR много говорят о PWA-ready/mobile-ready направлении, но в `apps/web` отсутствуют service worker, manifest и install flow.
 - Encrypted search легко переоценить, если читать только roadmap/ADR названия: по коду это локальный bounded search, а не backend parity.
@@ -363,18 +379,18 @@ Realtime сейчас:
 
 ### RTC / calls
 
-Стартовая позиция хорошая только архитектурно:
+Стартовая позиция стала рабочей для первого narrow slice:
 
 - граница bounded context уже выделена;
-- messaging realtime отделён от будущего RTC control plane;
+- call lifecycle и signaling уже server-backed;
 - gateway уже играет роль внешнего edge.
 
 Ограничения:
 
-- нет signalling model;
-- нет call state machine;
-- нет reservation/ownership logic;
-- нет UI surface под calls.
+- есть только direct-only audio-only web UX;
+- нет group/video/device scope;
+- нет durable continuity/replay model;
+- нет NAT traversal operator platform и полноценных notifications.
 
 ### Big UI redesign
 

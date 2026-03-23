@@ -2174,4 +2174,117 @@ describe("createGatewayClient", () => {
       }),
     );
   });
+
+  it("reads active rtc call through gateway rtc endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          call: {
+            id: "call-1",
+            scope: {
+              type: "CONVERSATION_SCOPE_TYPE_DIRECT",
+              directChatId: "chat-1",
+            },
+            createdByUserId: "user-1",
+            status: "CALL_STATUS_ACTIVE",
+            activeParticipantCount: 1,
+            createdAt: "2026-03-23T10:00:00Z",
+            updatedAt: "2026-03-23T10:00:00Z",
+            startedAt: "2026-03-23T10:00:00Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const result = await client.getActiveCall("token-1", {
+      kind: "direct",
+      directChatId: "chat-1",
+    });
+
+    expect(result).toEqual({
+      id: "call-1",
+      scope: {
+        kind: "direct",
+        directChatId: "chat-1",
+        groupId: null,
+      },
+      createdByUserId: "user-1",
+      status: "active",
+      activeParticipantCount: 1,
+      createdAt: "2026-03-23T10:00:00Z",
+      updatedAt: "2026-03-23T10:00:00Z",
+      startedAt: "2026-03-23T10:00:00Z",
+      endedAt: null,
+      endedByUserId: null,
+      endReason: "unspecified",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.rtc.v1.RtcControlService/GetActiveCall",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          scope: {
+            type: "CONVERSATION_SCOPE_TYPE_DIRECT",
+            directChatId: "chat-1",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("encodes rtc signal payload bytes through gateway rtc endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          signal: {
+            callId: "call-1",
+            fromUserId: "user-1",
+            targetUserId: "user-2",
+            type: "SIGNAL_ENVELOPE_TYPE_OFFER",
+            payload: "c2lnbmFs",
+            createdAt: "2026-03-23T10:00:05Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const result = await client.sendRtcSignal("token-1", {
+      callId: "call-1",
+      targetUserId: "user-2",
+      type: "offer",
+      payload: new TextEncoder().encode("signal"),
+    });
+
+    expect(new TextDecoder().decode(result.payload)).toBe("signal");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.rtc.v1.RtcControlService/SendSignal",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          callId: "call-1",
+          targetUserId: "user-2",
+          type: "SIGNAL_ENVELOPE_TYPE_OFFER",
+          payload: "c2lnbmFs",
+        }),
+      }),
+    );
+  });
 });
