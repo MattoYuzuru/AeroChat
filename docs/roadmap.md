@@ -2,11 +2,14 @@
 
 ## Статус проекта
 
-Проект находится на стадии формирования фундамента.
+Проект уже вышел за пределы чистой foundation phase.
 
-Главная задача ближайшего этапа:
-зафиксировать архитектуру, разложить монорепозиторий, настроить tooling и сделать безопасную основу для дальнейшей
-разработки.
+Сейчас в репозитории есть рабочий базовый продуктовый slice:
+identity, social graph, direct chats, groups, media, realtime и bounded encrypted lanes.
+
+Главная задача ближайших этапов:
+доводить encrypted coexistence, platform polish и future RTC readiness без ложных claims о завершённости PWA, calls
+или full E2EE parity.
 
 Последний завершённый platform slice:
 
@@ -21,24 +24,24 @@
 
 Задачи:
 
-- [ ] README
-- [ ] AGENTS
-- [ ] ADR
-- [ ] Monorepo structure
-- [ ] Go modules / go.work
-- [ ] Proto foundation
-- [ ] ConnectRPC setup
-- [ ] sqlc config
-- [ ] golangci-lint config
-- [ ] Taskfile
-- [ ] Frontend shell scaffold
-- [ ] Dev Docker Compose
+- [x] README
+- [x] AGENTS
+- [x] ADR
+- [x] Monorepo structure
+- [x] Go modules / go.work
+- [x] Proto foundation
+- [x] ConnectRPC setup
+- [x] sqlc config
+- [x] golangci-lint config
+- [x] Taskfile
+- [x] Frontend shell scaffold
+- [x] Dev Docker Compose
 - [x] Single-server deploy foundation
 - [x] Image delivery и release bootstrap
 - [x] Server secret model и operator update flow
 - [x] Single-server TLS / domain / edge bootstrap
 - [x] Production rollout automation и first external launch foundation
-- [ ] GitHub Actions CI
+- [x] GitHub Actions CI
 
 ---
 
@@ -49,11 +52,11 @@
 
 Задачи:
 
-- [ ] User model
-- [ ] Immutable login
-- [ ] Mutable nickname
-- [ ] Password auth foundation
-- [ ] Sessions
+- [x] User model
+- [x] Immutable login
+- [x] Mutable nickname
+- [x] Password auth foundation
+- [x] Sessions
 - [x] Devices & sessions UI/data model
 - [x] Privacy flags
 - [x] Crypto device registry foundation
@@ -62,7 +65,7 @@
 - [x] Web secure key storage and crypto worker foundation
 - [x] Proof-bound linked-device approval hardening
 - [x] Proof-bound crypto bundle update and rotation hardening
-- [ ] Block list
+- [x] Block list
 - [ ] Key backup status
 
 ---
@@ -74,11 +77,11 @@
 
 Задачи:
 
-- [ ] Friend requests
-- [ ] Add by login
-- [ ] No public user directory
-- [ ] Block interactions policy
-- [ ] Search by exact login rules
+- [x] Friend requests
+- [x] Add by login
+- [x] No public user directory
+- [x] Block interactions policy
+- [x] Search by exact login rules
 - [x] Web people bootstrap через `aero-gateway`
 - [x] People realtime bootstrap через `aero-gateway`
 
