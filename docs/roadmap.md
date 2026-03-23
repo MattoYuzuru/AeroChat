@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] server-enforced one-active-call-per-user policy в RTC control plane
+- [x] web group call control / lobby bootstrap
 
 ---
 
@@ -196,7 +196,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Web audio-only 1:1 direct-call bootstrap
 - [x] 1:1 call polish, continuity и richer call UX
 - [x] One-active-call-per-user policy
-- [ ] Group call control
+- [x] Group call control
 - [ ] Device controls
 - [ ] Quality presets
 - [ ] Future screen-share hooks
