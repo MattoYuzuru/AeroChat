@@ -428,6 +428,7 @@ Database bootstrap policy описана в `docs/adr/028-first-launch-database-
 - `ghcr.io/<owner>/aerochat-aero-gateway`
 - `ghcr.io/<owner>/aerochat-aero-identity`
 - `ghcr.io/<owner>/aerochat-aero-chat`
+- `ghcr.io/<owner>/aerochat-aero-rtc-control`
 
 Теги выбираются так:
 

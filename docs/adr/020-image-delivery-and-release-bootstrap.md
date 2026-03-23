@@ -47,8 +47,9 @@
 - `aero-gateway`
 - `aero-identity`
 - `aero-chat`
+- `aero-rtc-control`
 
-`aero-rtc-control` и `aero-jobs` в этот release bootstrap не входят, потому что они пока не обязательны для текущего
+`aero-jobs` в этот release bootstrap не входит, потому что он пока не обязателен для текущего
 single-server runtime.
 
 ### 3. Image naming
@@ -59,6 +60,7 @@ single-server runtime.
 - `ghcr.io/<owner>/aerochat-aero-gateway`
 - `ghcr.io/<owner>/aerochat-aero-identity`
 - `ghcr.io/<owner>/aerochat-aero-chat`
+- `ghcr.io/<owner>/aerochat-aero-rtc-control`
 
 Такое именование выбрано как минимальное и явное:
 

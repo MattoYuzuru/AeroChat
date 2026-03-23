@@ -35,6 +35,10 @@ jobs:
             image_name: aerochat-aero-chat
             dockerfile: services/aero-chat/Dockerfile
             build_args: ""
+          - service: aero-rtc-control
+            image_name: aerochat-aero-rtc-control
+            dockerfile: services/aero-rtc-control/Dockerfile
+            build_args: ""
 
     steps:
       - name: Checkout
