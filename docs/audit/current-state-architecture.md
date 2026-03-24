@@ -7,6 +7,12 @@
 Пользовательский usable slice сегодня:
 
 - регистрация, login, session bootstrap и logout;
+- первый desktop shell runtime slice на wide screens:
+  - boot/chooser/login handoff;
+  - daily fast-entry bypass при валидной сессии;
+  - desktop frame с wallpaper/taskbar/start/tray;
+  - singleton-based window registry и bounded 10-window cap notice;
+  - первые route-backed shell windows поверх существующих web screens;
 - профиль, privacy flags, список device/session и revoke;
 - social graph по точному login без публичного каталога;
 - direct chats и groups с realtime, typing, presence, read/unread, replies, edit, delete, pin;
@@ -21,19 +27,22 @@
 По зрелости подсистем:
 
 - `identity`, `social graph`, `legacy direct/group chats`, `media relay`, `deploy/local runtime` уже имеют рабочий user-facing slice;
+- `desktop shell` теперь имеет первый runtime scaffold на desktop/wide screens, но ещё не завершён как full product shell;
 - encrypted lanes реализованы как usable, но bounded foundation без full parity и без unified history;
 - `aero-rtc-control` теперь имеет usable direct-call continuity slice для web, но calls ещё не являются finished product subsystem;
-- `aero-jobs`, PWA, push и desktop/mobile polish пока не реализованы как продуктовые возможности.
+- `aero-jobs`, PWA и push пока не реализованы как продуктовые возможности, а desktop/mobile polish остаётся частично bootstrap-only.
 
 ## Monorepo architecture map
 
 ### `apps/web`
 
-Единственный shipped-клиент. React/Vite SPA с auth bootstrap, страницами `profile`, `people`, `chats`, `groups`, `search`, `settings`, websocket realtime через `aero-gateway` и локальным crypto runtime.
+Единственный shipped-клиент. React/Vite SPA с auth bootstrap, route-backed product pages, новым desktop shell runtime на wide screens, legacy practical fullscreen flow на narrow screens, websocket realtime через `aero-gateway` и локальным crypto runtime.
 
 Реальная ответственность:
 
 - auth/session bootstrap и protected shell;
+- boot/chooser/login handoff и responsive switch между desktop shell runtime и legacy narrow-shell flow;
+- desktop shell runtime scaffold: taskbar/start/tray, bounded window registry и route-backed app hosting;
 - web UI для identity, social graph, direct/group chats и settings;
 - attachment composer, voice/video notes и inline preview;
 - audio-only direct-call bootstrap через browser WebRTC + gateway/RTC control plane;
@@ -206,6 +215,12 @@ Realtime сейчас:
 - `implemented`: register, login, logout, bootstrap текущей сессии, device/session listing и revoke.
 - `partial/bootstrap/bounded`: текущая сессия не помечается отдельно в settings UI; device model создаёт новый device record при новом login.
 - `not implemented yet`: passkeys, MFA, external IdP.
+
+### Desktop shell
+
+- `implemented`: wide-screen desktop shell runtime scaffold, boot/chooser/login handoff, Start/taskbar/tray, singleton window registry, bounded 10-window cap notice, shell-native placeholders для `Я` и `Friend Requests`, route-backed shell windows для текущих page-level surfaces.
+- `partial/bootstrap/bounded`: canonical `direct_chat` / `group_chat` singleton-per-target windows ещё не вынесены из route-backed page workspace; Explorer, custom folders, drag/resize polish и full XP art pass ещё не реализованы.
+- `not implemented yet`: Explorer, custom folders, theme switching, wallpaper manager, pinned/trash model, dedicated media viewers, global call manager.
 
 ### Identity/profile/privacy
 

@@ -214,8 +214,8 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Web message search bootstrap через `aero-gateway`
 - [ ] Push notifications
 - [ ] PWA
-- [ ] Desktop shell XP surface
-- [ ] Boot/login application model внутри нового shell
+- [x] Desktop shell XP runtime scaffold
+- [x] Boot/login application model внутри нового shell
 - [ ] XP-first theme engine
 - [ ] Explorer, folder organization и shell launcher
 - [ ] Mobile practical shell adaptation
