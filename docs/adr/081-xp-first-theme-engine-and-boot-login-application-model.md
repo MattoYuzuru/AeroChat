@@ -68,11 +68,49 @@ Boot surface является полноценной частью app model.
 
 - initial visual entry;
 - session bootstrap state;
-- переход к login app или desktop shell.
+- переход к chooser, login app или desktop shell.
 
 Boot surface не должна выглядеть как generic loading screen из unrelated дизайна.
 
-### 5. Login и register входят в ту же application model
+### 5. Boot flow различает first-run, reboot path и daily fast-entry
+
+Для MVP фиксируются три разные ситуации:
+
+- first-run;
+- explicit reboot-to-boot;
+- обычный ежедневный вход.
+
+Канонический flow выглядит так:
+
+- first-run или explicit reboot-to-boot: `boot -> chooser -> auth app или desktop shell`, в зависимости от валидности сессии;
+- ежедневный вход при валидной сессии и неизменной теме: `boot -> desktop shell` через fast-entry bypass;
+- вход без валидной сессии: `boot` и при необходимости `chooser -> auth app`.
+
+Это нужно, чтобы implementation не показывала chooser и login там, где продукт уже должен входить быстро и предсказуемо.
+
+### 6. Theme chooser является отдельной BIOS-like системной поверхностью
+
+Chooser темы входит в boot model и трактуется как лёгкая BIOS-like поверхность выбора shell theme.
+
+Она:
+
+- не является theme marketplace;
+- не является full theme editor;
+- не обязана показываться на каждый вход;
+- нужна для first-run и explicit reboot-to-boot flow.
+
+### 7. Смена темы применяется только после reboot или logout
+
+Для MVP запрещается hot theme swap поверх уже работающего desktop workspace.
+
+Правило выглядит так:
+
+- пользователь может выбрать следующую тему как pending choice;
+- активный workspace продолжает жить на текущей теме;
+- новая тема применяется только после reboot-to-boot или logout/login;
+- это сохраняет предсказуемость shell chrome и не усложняет window/session state в первом slice.
+
+### 8. Login и register входят в ту же application model
 
 `/login` и `/register` трактуются как состояния auth application внутри общей shell-системы:
 
@@ -82,16 +120,16 @@ Boot surface не должна выглядеть как generic loading screen 
 
 При этом до аутентификации не требуется показывать desktop с taskbar и окнами в полном виде.
 
-### 6. Pre-auth и post-auth различаются по surface, но не по design system
+### 9. Pre-auth и post-auth различаются по surface, но не по design system
 
 Канон выглядит так:
 
-- pre-auth: boot surface и auth app;
+- pre-auth: boot surface, chooser и auth app;
 - post-auth: desktop shell и product apps.
 
 Обе стадии принадлежат одному продукту и одной theme engine.
 
-### 7. Theme engine не должен ломать performance policy
+### 10. Theme engine не должен ломать performance policy
 
 XP-first тема допускает:
 
@@ -112,6 +150,7 @@ XP-first тема допускает:
 ### Положительные
 
 - Shell и auth flow будут ощущаться как части одного продукта.
+- Fast-entry bypass и reboot-to-boot semantics перестают быть предметом догадок в каждом PR.
 - Visual direction фиксируется достаточно рано и перестаёт быть предметом вкусовых споров в каждом PR.
 - Будущие PR могут вводить taskbar/window/login surfaces на общей token базе.
 
@@ -124,6 +163,7 @@ XP-first тема допускает:
 
 - Нельзя превращать текущий shell PR-ряд в theme marketplace project.
 - Нельзя отделять login/register в визуально чуждый мини-продукт.
+- Нельзя применять новую тему hot-swap'ом посреди текущей desktop-сессии в MVP.
 - Нельзя объявлять dark mode, wallpaper personalization или full customization частью MVP без отдельного решения.
 
 ## Альтернативы

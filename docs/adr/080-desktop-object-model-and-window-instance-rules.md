@@ -56,8 +56,10 @@ Shell сознательно не вводит filesystem entity, file handle и
 
 ### 4. Для MVP принимаются следующие launch policies
 
+- `self_chat` — `singleton`;
 - `profile` — `singleton`;
 - `people` — `singleton`;
+- `friend_requests` — `singleton`;
 - `settings` — `singleton`;
 - `search` — `singleton`;
 - `explorer` — `singleton_per_target`;
@@ -66,12 +68,37 @@ Shell сознательно не вводит filesystem entity, file handle и
 
 Это означает:
 
+- self chat `Я`, Friend Requests, Search и Settings являются обязательными системными app targets shell;
 - повторное открытие Settings не создаёт второе окно, а фокусирует/восстанавливает существующее;
 - повторное открытие одного и того же direct chat или group chat не плодит дубликаты;
 - разные direct chats и разные groups могут жить в отдельных окнах;
 - Explorer может иметь отдельные окна для разных folders, если это понадобится конкретному slice.
 
-### 5. Taskbar отражает живые window instances, а не абстрактные приложения
+### 5. Desktop population и persistence подчиняются явным правилам
+
+Desktop entity является shortcut'ом, pinned или auto-populated на рабочую поверхность shell.
+
+Для MVP действуют следующие правила:
+
+- обязательные системные desktop entrypoints включают `Я`, Search, Explorer, Friend Requests и Settings;
+- новый friend/direct target и новая group автоматически появляются на desktop, если для них есть место в видимой grid;
+- desktop entrypoint переживает reload как shell-local persisted state;
+- remove from desktop означает только hide shortcut с desktop;
+- hide/remove from desktop не удаляет chat, friendship, group membership или сам объект;
+- скрытый объект остаётся discoverable через Explorer, Search и системные folders.
+
+Эти правила нужны, чтобы desktop был primary communication surface, а не декоративной обложкой над launcher.
+
+### 6. Переполнение desktop остаётся bounded и shell-local
+
+Для desktop grid принимается консервативная модель:
+
+- видимая desktop area использует фиксированную сетку;
+- иконки не должны бесконечно уменьшаться по мере роста числа объектов;
+- когда видимая desktop grid заполнена, новые friend/direct targets и groups отправляются в системные overflow folders, прежде всего `Контакты` и `Группы`;
+- overflow routing остаётся shell-local presentation state и не создаёт новых backend contracts.
+
+### 7. Taskbar отражает живые window instances, а не абстрактные приложения
 
 Taskbar item привязан к `window_instance`.
 
@@ -80,9 +107,10 @@ Taskbar item привязан к `window_instance`.
 - свернутое окно остаётся в taskbar;
 - закрытое окно исчезает из taskbar;
 - фокус и restore происходят через конкретный window instance;
+- maximized window не скрывает taskbar;
 - shell не обязан с первого MVP вводить сложный app-grouping в taskbar.
 
-### 6. Shortcut открывает target, а не безымянную копию окна
+### 8. Shortcut открывает target, а не безымянную копию окна
 
 Shortcut обязан знать:
 
@@ -96,7 +124,7 @@ Shortcut обязан знать:
 - shortcut системного Search app возвращает существующее search window, если оно уже открыто;
 - shortcut folder в Explorer открывает соответствующий folder target, а не абстрактный пустой Explorer.
 
-### 7. Route остаётся deep-link источником для active target
+### 9. Route остаётся deep-link источником для active target
 
 Для MVP route обязан описывать:
 
@@ -112,7 +140,7 @@ Route не обязан описывать:
 
 Это local shell responsibility.
 
-### 8. Search result и system notifications открывают canonical target window
+### 10. Search result и system notifications открывают canonical target window
 
 Если shell получает action уровня "открыть direct chat", "открыть group", "открыть settings" или "показать message result",
 он обязан:
@@ -121,7 +149,20 @@ Route не обязан описывать:
 - если окно уже существует, сфокусировать и восстановить его;
 - если окна нет, создать новый instance по launch policy.
 
-### 9. Close и minimize имеют разные semantics
+### 11. Window cap для MVP ограничен и не использует скрытый LRU eviction
+
+В MVP shell допускает не более 10 одновременно открытых окон.
+
+Если пользователь пытается открыть 11-е окно:
+
+- shell не закрывает и не сворачивает существующие окна автоматически;
+- shell не применяет скрытый LRU eviction;
+- действие boundedly отклоняется с system notice;
+- пользователь должен явно закрыть, свернуть или сфокусировать нужное окно сам.
+
+Это ограничение не должно ломать future-совместимость с draft recovery и window-state persistence.
+
+### 12. Close и minimize имеют разные semantics
 
 - `minimize` сохраняет окно живым и доступным через taskbar;
 - `close` уничтожает instance и его runtime-only placement state;
@@ -133,6 +174,7 @@ Route не обязан описывать:
 
 - Window model становится предсказуемой и пригодной для маленьких PR.
 - Chat/group/search flows получают единые правила повторного открытия.
+- Desktop population и overflow semantics перестают быть ad hoc решением каждого slice.
 - Local shell state можно строить без попытки сериализовать весь desktop в URL.
 
 ### Отрицательные
@@ -144,6 +186,8 @@ Route не обязан описывать:
 
 - Нельзя делать ad hoc правила инстансов на уровне каждого компонента без общей launch policy.
 - Нельзя плодить дубликаты одного и того же direct/group/search target по умолчанию.
+- Нельзя бесконечно уменьшать desktop icons вместо явной overflow-модели.
+- Нельзя auto-close'ить окно ради открытия 11-го instance без явного решения пользователя.
 - Нельзя требовать, чтобы URL хранил полный desktop layout.
 
 ## Альтернативы

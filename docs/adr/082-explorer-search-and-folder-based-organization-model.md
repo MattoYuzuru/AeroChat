@@ -19,14 +19,21 @@
 
 ### 1. Explorer становится системным навигационным приложением shell
 
-Explorer — это не файловый менеджер и не backend storage browser.
+Explorer — это не файловый менеджер, не backend storage browser и не message-thread reader.
 
 Explorer в AeroChat отвечает за:
 
 - обзор основных категорий объектов;
 - переход к collections и folders;
 - открытие product targets из одной канонической navigational surface;
-- организацию shell entrypoint'ов поверх уже существующих product domains.
+- организацию shell entrypoint'ов поверх уже существующих product domains;
+- messenger-manager сценарии для contacts, groups, requests и files/media entrypoints.
+
+Explorer не обязан:
+
+- читать и рендерить message thread как основную задачу;
+- имитировать filesystem tree;
+- подменять собой отдельные product applications.
 
 ### 2. Folder model описывает navigation/organization, а не storage semantics
 
@@ -34,6 +41,7 @@ Folders в shell — это:
 
 - системные контейнеры;
 - derived collections;
+- custom organizational nodes;
 - организационные узлы интерфейса.
 
 Folders не означают:
@@ -42,14 +50,38 @@ Folders не означают:
 - новый объект хранения для сообщений;
 - новый backend domain для media/files.
 
-### 3. Для MVP фиксируются системные folders
+Дополнительные канонические правила:
+
+- folder хранит references/shortcuts, а не переносит chat или group в другое место хранения;
+- один и тот же chat может существовать в нескольких folders;
+- удаление folder никогда не удаляет chat, group или friendship;
+- nested folders не входят в V1.
+
+### 3. Custom folders являются core shell UX, но остаются shell-local в MVP
+
+Custom folders не считаются garnish-возможностью.
+
+Они нужны как основной пользовательский способ:
+
+- разложить chats и groups по своим логическим наборам;
+- убрать desktop clutter без потери discoverability;
+- строить свой рабочий messenger layout поверх канонических объектов.
+
+Для MVP действуют ограничения:
+
+- custom folders живут как shell-local organization state;
+- server-backed hierarchy и sync между устройствами не вводятся;
+- unread badge folder показывает количество chat targets с unread, а не сумму unread сообщений.
+
+### 4. Для MVP фиксируются системные folders и collections
 
 MVP folder model опирается на системные folders уровня shell:
 
 - `Рабочий стол`;
-- `Чаты`;
+- `Контакты`;
 - `Группы`;
-- `Люди`;
+- `Запросы`;
+- `Файлы и медиа`;
 - `Поиск`;
 - `Настройки`.
 
@@ -59,9 +91,9 @@ MVP folder model опирается на системные folders уровня
 - pinned entrypoints;
 - grouped collections по типу объекта.
 
-Server-backed custom folder hierarchy в MVP не вводится.
+Trash и отдельный pinned-folder surface остаются deferred.
 
-### 4. Search остаётся отдельным приложением, а не omnibox-магией
+### 5. Search остаётся отдельным приложением, а не omnibox-магией
 
 Message search остаётся отдельным `Search` app.
 
@@ -71,7 +103,7 @@ Message search остаётся отдельным `Search` app.
 - shell может искать приложения, folders и shortcuts локально;
 - полноценный message search не должен стартовать на каждый символ ввода в глобальной строке shell.
 
-### 5. Privacy-first search boundaries сохраняются без ослабления
+### 6. Privacy-first search boundaries и lookup semantics сохраняются без ослабления
 
 Shell обязан сохранить уже принятые правила `ADR-071`:
 
@@ -79,9 +111,13 @@ Shell обязан сохранить уже принятые правила `AD
 - encrypted search — local-only и bounded;
 - encrypted query не превращается в скрытый backend request;
 - UI явно различает search paths;
-- нельзя обещать full global parity для encrypted content.
+- точный login всегда приоритизируется в user lookup;
+- похожие результаты допустимы только как bounded assist, а не как public social discovery;
+- invite link input должен открывать preview группы перед join;
+- результат поиска человека там, где это уместно, открывает сначала profile/info surface;
+- нельзя обещать full global parity для encrypted content или публичный каталог пользователей.
 
-### 6. Explorer и Search открывают canonical targets
+### 7. Explorer и Search открывают canonical targets
 
 Explorer folder item, launcher result и Search result должны открывать:
 
@@ -91,7 +127,7 @@ Explorer folder item, launcher result и Search result должны открыв
 
 Это предотвращает дублирование несвязанных окон и делает navigation model предсказуемой.
 
-### 7. Folder organization на desktop сначала остаётся shell-local
+### 8. Folder organization на desktop сначала остаётся shell-local
 
 Любая дополнительная организация shortcut'ов и folder entrypoint'ов в MVP трактуется как shell-local presentation state.
 
@@ -99,7 +135,17 @@ Explorer folder item, launcher result и Search result должны открыв
 
 - новые backend contracts не требуются;
 - существующие direct/group/people/search/settings data models не переписываются;
-- future custom folders можно рассматривать отдельно, если появится реальная продуктовая потребность.
+- future server-backed custom folders можно рассматривать отдельно, если появится реальная продуктовая потребность.
+
+### 9. Explorer scope может расширяться позже, но в понятных границах
+
+После MVP Explorer может получить дополнительные surface'ы:
+
+- trash;
+- pinned folder;
+- richer media management.
+
+Но dedicated media viewer apps остаются отдельным deferred направлением, а не обязанностью MVP Explorer.
 
 ## Последствия
 
@@ -107,6 +153,7 @@ Explorer folder item, launcher result и Search result должны открыв
 
 - Пользователь получает понятный навигационный слой сверх набора иконок.
 - Search остаётся мощным, но честным относительно privacy и encrypted boundaries.
+- Custom folders получают статус core UX и перестают читаться как второстепенный garnish.
 - Реализация Explorer не требует придумывать fake filesystem или новый backend domain.
 
 ### Отрицательные
@@ -118,6 +165,7 @@ Explorer folder item, launcher result и Search result должны открыв
 
 - Нельзя называть Explorer файловым менеджером.
 - Нельзя вводить folder semantics, которые намекают на backend storage migration без ADR.
+- Нельзя трактовать folder deletion как удаление самих chat/group объектов.
 - Нельзя превращать shell search в скрытый server-side encrypted search proxy.
 
 ## Альтернативы
