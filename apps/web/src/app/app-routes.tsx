@@ -5,13 +5,21 @@ import { PeoplePage } from "../pages/PeoplePage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { SearchPage } from "../pages/SearchPage";
 import { SettingsPage } from "../pages/SettingsPage";
-import type { ShellAppDefinition, ShellAppId } from "../shell/runtime";
+import type {
+  ShellAppDefinition,
+  ShellAppId,
+  ShellLaunchTarget,
+} from "../shell/runtime";
 
 export interface RouteBackedShellApp extends ShellAppDefinition {
   path: string;
   shortcutLabel: string;
   shortcutMeta: string;
-  render(): ReactNode;
+}
+
+export interface ResolvedShellRouteEntry {
+  app: ShellAppDefinition;
+  target: ShellLaunchTarget | null;
 }
 
 export const routeBackedShellApps: RouteBackedShellApp[] = [
@@ -23,7 +31,6 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     path: "/app/profile",
     shortcutLabel: "Профиль",
     shortcutMeta: "identity",
-    render: () => <ProfilePage />,
   },
   {
     appId: "people",
@@ -33,7 +40,6 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     path: "/app/people",
     shortcutLabel: "Люди",
     shortcutMeta: "social",
-    render: () => <PeoplePage />,
   },
   {
     appId: "chats",
@@ -43,7 +49,6 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     path: "/app/chats",
     shortcutLabel: "Чаты",
     shortcutMeta: "chat opener",
-    render: () => <ChatsPage />,
   },
   {
     appId: "groups",
@@ -53,7 +58,6 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     path: "/app/groups",
     shortcutLabel: "Группы",
     shortcutMeta: "group chat",
-    render: () => <GroupsPage />,
   },
   {
     appId: "search",
@@ -63,7 +67,6 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     path: "/app/search",
     shortcutLabel: "Поиск",
     shortcutMeta: "message search",
-    render: () => <SearchPage />,
   },
   {
     appId: "settings",
@@ -73,7 +76,6 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     path: "/app/settings",
     shortcutLabel: "Настройки",
     shortcutMeta: "privacy",
-    render: () => <SettingsPage />,
   },
 ];
 
@@ -93,26 +95,151 @@ export const shellAppRegistry: Record<ShellAppId, ShellAppDefinition> = {
   profile: routeBackedShellApps.find((app) => app.appId === "profile")!,
   people: routeBackedShellApps.find((app) => app.appId === "people")!,
   chats: routeBackedShellApps.find((app) => app.appId === "chats")!,
+  direct_chat: {
+    appId: "direct_chat",
+    title: "Личный чат",
+    launchPolicy: "singleton_per_target",
+    routePath: "/app/chats",
+  },
   groups: routeBackedShellApps.find((app) => app.appId === "groups")!,
+  group_chat: {
+    appId: "group_chat",
+    title: "Группа",
+    launchPolicy: "singleton_per_target",
+    routePath: "/app/groups",
+  },
   search: routeBackedShellApps.find((app) => app.appId === "search")!,
   settings: routeBackedShellApps.find((app) => app.appId === "settings")!,
 };
 
-export function resolveRouteBackedShellApp(
+export function buildDirectChatRoutePath(
+  chatId: string,
+  searchParams?: URLSearchParams | null,
+): string {
+  const params = new URLSearchParams(searchParams ?? undefined);
+  params.set("chat", chatId);
+  return buildRoutePath("/app/chats", params);
+}
+
+export function buildGroupChatRoutePath(
+  groupId: string,
+  searchParams?: URLSearchParams | null,
+): string {
+  const params = new URLSearchParams(searchParams ?? undefined);
+  params.set("group", groupId);
+  return buildRoutePath("/app/groups", params);
+}
+
+export function buildDirectChatShellTarget({
+  chatId,
+  searchParams,
+  title,
+}: {
+  chatId: string;
+  searchParams?: URLSearchParams | null;
+  title?: string;
+}): ShellLaunchTarget {
+  return {
+    key: chatId,
+    title: normalizeShellTargetTitle(title, "Личный чат"),
+    routePath: buildDirectChatRoutePath(chatId, searchParams),
+  };
+}
+
+export function buildGroupChatShellTarget({
+  groupId,
+  searchParams,
+  title,
+}: {
+  groupId: string;
+  searchParams?: URLSearchParams | null;
+  title?: string;
+}): ShellLaunchTarget {
+  return {
+    key: groupId,
+    title: normalizeShellTargetTitle(title, "Группа"),
+    routePath: buildGroupChatRoutePath(groupId, searchParams),
+  };
+}
+
+export function resolveShellRouteEntry(
   pathname: string,
-): RouteBackedShellApp | null {
-  return routeBackedShellApps.find((app) => app.path === pathname) ?? null;
+  search: string,
+): ResolvedShellRouteEntry | null {
+  const routeBackedApp = routeBackedShellApps.find((app) => app.path === pathname) ?? null;
+  if (routeBackedApp === null) {
+    return null;
+  }
+
+  const searchParams = new URLSearchParams(search);
+  const requestedChatId = searchParams.get("chat")?.trim() ?? "";
+  const requestedGroupId = searchParams.get("group")?.trim() ?? "";
+
+  if (pathname === "/app/chats" && requestedChatId !== "") {
+    return {
+      app: shellAppRegistry.direct_chat,
+      target: buildDirectChatShellTarget({
+        chatId: requestedChatId,
+        searchParams,
+      }),
+    };
+  }
+
+  if (pathname === "/app/groups" && requestedGroupId !== "") {
+    return {
+      app: shellAppRegistry.group_chat,
+      target: buildGroupChatShellTarget({
+        groupId: requestedGroupId,
+        searchParams,
+      }),
+    };
+  }
+
+  return {
+    app: routeBackedApp,
+    target: {
+      key: routeBackedApp.appId,
+      title: routeBackedApp.title,
+      routePath: buildRoutePath(pathname, searchParams),
+    },
+  };
 }
 
 export function isRouteBackedShellAppId(appId: ShellAppId): boolean {
-  return routeBackedShellApps.some((app) => app.appId === appId);
+  return (
+    routeBackedShellApps.some((app) => app.appId === appId) ||
+    appId === "direct_chat" ||
+    appId === "group_chat"
+  );
 }
 
 export function renderShellAppContent(appId: ShellAppId): ReactNode {
-  const routeBacked = routeBackedShellApps.find((app) => app.appId === appId);
-  if (routeBacked) {
-    return routeBacked.render();
+  switch (appId) {
+    case "profile":
+      return <ProfilePage />;
+    case "people":
+      return <PeoplePage />;
+    case "chats":
+    case "direct_chat":
+      return <ChatsPage />;
+    case "groups":
+    case "group_chat":
+      return <GroupsPage />;
+    case "search":
+      return <SearchPage />;
+    case "settings":
+      return <SettingsPage />;
+    default:
+      return null;
   }
+}
 
-  return null;
+function buildRoutePath(pathname: string, searchParams: URLSearchParams): string {
+  const nextSearch = searchParams.toString();
+  return nextSearch === "" ? pathname : `${pathname}?${nextSearch}`;
+}
+
+function normalizeShellTargetTitle(title: string | undefined, fallbackTitle: string): string {
+  const normalizedTitle = title?.trim() ?? "";
+  return normalizedTitle === "" ? fallbackTitle : normalizedTitle;
 }

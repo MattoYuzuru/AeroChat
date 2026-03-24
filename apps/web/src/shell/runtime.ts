@@ -6,7 +6,9 @@ export type ShellAppId =
   | "profile"
   | "people"
   | "chats"
+  | "direct_chat"
   | "groups"
+  | "group_chat"
   | "search"
   | "settings";
 

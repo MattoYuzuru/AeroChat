@@ -60,10 +60,12 @@ import {
 import { primeEncryptedDirectLocalSearchIndex } from "../search/encrypted-local-search";
 import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import { useDirectCallSession } from "../rtc/useDirectCallSession";
+import { useDesktopShellHost } from "../shell/context";
 import styles from "./ChatsPage.module.css";
 
 export function ChatsPage() {
   const { state: authState, expireSession } = useAuth();
+  const desktopShellHost = useDesktopShellHost();
   const directCallAwareness = useDirectCallAwareness();
   const cryptoRuntime = useCryptoRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -487,16 +489,19 @@ export function ChatsPage() {
     shouldAutoMarkEncryptedRead,
   ]);
 
-  if (authState.status !== "authenticated") {
-    return null;
-  }
+  const currentUserId =
+    authState.status === "authenticated" ? authState.profile.id : "";
   const selectedPeer =
     selectedThread !== null
-      ? getPeerParticipant(selectedThread.chat, authState.profile.id)
+      ? getPeerParticipant(selectedThread.chat, currentUserId)
       : null;
+  const selectedPeerTitle =
+    selectedPeer?.nickname?.trim() ||
+    selectedPeer?.login?.trim() ||
+    "Личный чат";
   const latestOwnMessageId =
     selectedThread !== null
-      ? getLatestOwnMessageId(selectedThread.messages, authState.profile.id)
+      ? getLatestOwnMessageId(selectedThread.messages, currentUserId)
       : null;
   const pinnedMessages =
     selectedThread === null
@@ -605,6 +610,19 @@ export function ChatsPage() {
     isEditingEncryptedMessage: editingEncryptedEntry !== null,
     cryptoRuntimeState: cryptoRuntime.state,
   });
+
+  useEffect(() => {
+    if (desktopShellHost === null || selectedThread === null) {
+      return;
+    }
+
+    desktopShellHost.syncCurrentRouteTitle(selectedPeerTitle);
+  }, [desktopShellHost, selectedPeerTitle, selectedThread]);
+
+  if (authState.status !== "authenticated") {
+    return null;
+  }
+
   async function submitComposer() {
     if (selectedEncryptedReplyEntry !== null || editingEncryptedEntry !== null) {
       setComposerError(
@@ -907,6 +925,13 @@ export function ChatsPage() {
   }
 
   function handleBackToChatsList() {
+    if (desktopShellHost !== null) {
+      desktopShellHost.launchApp("chats");
+      setComposerError(null);
+      chats.clearFeedback();
+      return;
+    }
+
     setSearchParams({}, { replace: true });
     setComposerError(null);
     chats.clearFeedback();
@@ -1106,6 +1131,14 @@ export function ChatsPage() {
                       className={styles.chatItem}
                       data-active={isActive}
                       onClick={() => {
+                        if (desktopShellHost !== null) {
+                          desktopShellHost.openDirectChat({
+                            chatId: chat.id,
+                            title: peer?.nickname ?? peer?.login ?? "Личный чат",
+                          });
+                          return;
+                        }
+
                         setSearchParams({ chat: chat.id });
                       }}
                       type="button"

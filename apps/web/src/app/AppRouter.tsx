@@ -3,7 +3,11 @@ import { useAuth } from "../auth/useAuth";
 import { AuthPage } from "../pages/AuthPage";
 import { StateScreen } from "../ui/StateScreen";
 import { LegacyAppShell } from "./AppShell";
-import { renderShellAppContent, resolveRouteBackedShellApp, routeBackedShellApps } from "./app-routes";
+import {
+  renderShellAppContent,
+  resolveShellRouteEntry,
+  routeBackedShellApps,
+} from "./app-routes";
 import { useDesktopShellViewport } from "../shell/viewport";
 import {
   getBrowserShellPreferencesStorage,
@@ -111,7 +115,7 @@ function ProtectedShellRoute() {
   const location = useLocation();
   const isDesktopViewport = useDesktopShellViewport();
   const shellEntry = useShellEntryState(auth.state);
-  const routeApp = resolveRouteBackedShellApp(location.pathname);
+  const routeEntry = resolveShellRouteEntry(location.pathname, location.search);
 
   if (auth.state.status === "anonymous") {
     return <Navigate replace to="/login" />;
@@ -179,11 +183,11 @@ function ProtectedShellRoute() {
     return <Navigate replace to="/app/profile" />;
   }
 
-  if (routeApp === null) {
+  if (routeEntry === null) {
     return <Navigate replace to="/app/profile" />;
   }
 
-  return <LegacyAppShell>{renderShellAppContent(routeApp.appId)}</LegacyAppShell>;
+  return <LegacyAppShell>{renderShellAppContent(routeEntry.app.appId)}</LegacyAppShell>;
 }
 
 function RouteFallback() {
