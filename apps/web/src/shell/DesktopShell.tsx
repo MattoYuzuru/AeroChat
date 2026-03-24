@@ -4,6 +4,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
@@ -41,7 +42,7 @@ import {
   listCustomFolderDesktopEntities,
   listCustomFolderMemberReferences,
   listDesktopEntitiesForSurface,
-  listDesktopOverflowSummaries,
+  moveDesktopEntityToIndex,
   removeCustomFolderMemberReference,
   readDesktopRegistryState,
   renameCustomFolderDesktopEntity,
@@ -55,6 +56,10 @@ import {
   type DesktopFolderReferenceTarget,
   type DesktopEntity,
 } from "./desktop-registry";
+import {
+  resolveDesktopGridCellIndex,
+  resolveDesktopGridMetrics,
+} from "./desktop-grid";
 import {
   createDesktopBackgroundFolderCreationResult,
   createClosedDesktopContextMenuState,
@@ -107,6 +112,7 @@ import {
   type ShellWindowPlacementStorageState,
   type ShellWindowViewport,
 } from "./window-placement";
+import { shouldSyncDesktopRouteToActiveWindow } from "./route-sync";
 import styles from "./DesktopShell.module.css";
 
 export function DesktopShell({
@@ -158,6 +164,8 @@ export function DesktopShell({
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [clock, setClock] = useState(() => new Date());
+  const [desktopDragEntryId, setDesktopDragEntryId] = useState<string | null>(null);
+  const [desktopDropFolderId, setDesktopDropFolderId] = useState<string | null>(null);
   const [dragState, setDragState] = useState<{
     windowId: string;
     startX: number;
@@ -173,6 +181,7 @@ export function DesktopShell({
   } | null>(null);
   const startMenuAnchorRef = useRef<HTMLDivElement | null>(null);
   const desktopContextMenuRef = useRef<HTMLDivElement | null>(null);
+  const desktopSurfaceRef = useRef<HTMLElement | null>(null);
   const windowLayerRef = useRef<HTMLElement | null>(null);
   const previousRuntimeWindowsRef = useRef(runtimeState.windows);
   const windowPlacementStorageStateRef = useRef(windowPlacementStorageState);
@@ -184,6 +193,9 @@ export function DesktopShell({
   >(null);
   const [windowLayerViewport, setWindowLayerViewport] = useState<ShellWindowViewport>(() =>
     readInitialShellWindowViewport(),
+  );
+  const [desktopGridViewport, setDesktopGridViewport] = useState(() =>
+    readDesktopSurfaceViewport(null),
   );
 
   useEffect(() => {
@@ -224,6 +236,32 @@ export function DesktopShell({
     return () => {
       resizeObserver?.disconnect();
       window.removeEventListener("resize", updateViewport);
+    };
+  }, []);
+
+  useEffect(() => {
+    function updateDesktopGridViewport() {
+      setDesktopGridViewport(readDesktopSurfaceViewport(desktopSurfaceRef.current));
+    }
+
+    updateDesktopGridViewport();
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            updateDesktopGridViewport();
+          });
+
+    if (desktopSurfaceRef.current !== null) {
+      resizeObserver?.observe(desktopSurfaceRef.current);
+    }
+
+    window.addEventListener("resize", updateDesktopGridViewport);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateDesktopGridViewport);
     };
   }, []);
 
@@ -332,6 +370,10 @@ export function DesktopShell({
   }, [runtimeState.windows, windowLayerViewport]);
 
   const activeWindow = selectActiveShellWindow(runtimeState);
+  const desktopGridMetrics = useMemo(
+    () => resolveDesktopGridMetrics(desktopGridViewport),
+    [desktopGridViewport],
+  );
   const desktopUnreadTargetMap = useMemo(
     () => createDesktopUnreadTargetMap(liveDirectChats, liveGroups),
     [liveDirectChats, liveGroups],
@@ -368,12 +410,30 @@ export function DesktopShell({
   useEffect(() => {
     const desiredPath = activeWindow?.routePath ?? "/app";
     const currentPath = `${location.pathname}${location.search}`;
-    if (desiredPath === currentPath) {
+    const routeLaunchKey =
+      routeEntry === null || routeEntry.target === null
+        ? null
+        : buildShellLaunchKey(routeEntry.app, routeEntry.target);
+    if (
+      !shouldSyncDesktopRouteToActiveWindow({
+        activeWindowLaunchKey: activeWindow?.launchKey ?? null,
+        activeWindowRoutePath: desiredPath,
+        currentPath,
+        routeLaunchKey,
+      })
+    ) {
       return;
     }
 
     navigate(desiredPath, { replace: true });
-  }, [activeWindow?.routePath, location.pathname, location.search, navigate]);
+  }, [
+    activeWindow?.launchKey,
+    activeWindow?.routePath,
+    location.pathname,
+    location.search,
+    navigate,
+    routeEntry,
+  ]);
 
   useEffect(() => {
     dispatchDesktopContextMenu({ type: "close" });
@@ -732,8 +792,10 @@ export function DesktopShell({
       (participant) =>
         participant.userId === state.profile.id && participant.state === "active",
     ) ?? false;
-  const desktopEntries = listDesktopEntitiesForSurface(desktopRegistryState);
-  const overflowSummaries = listDesktopOverflowSummaries(desktopRegistryState);
+  const desktopEntries = listDesktopEntitiesForSurface(
+    desktopRegistryState,
+    desktopGridMetrics.capacity,
+  );
   const hiddenFolderCount = Math.max(0, allCustomFolders.length - startFolders.length);
   const startMenuMaxHeight = !startMenuState.isOpen
     ? null
@@ -781,12 +843,14 @@ export function DesktopShell({
   function openDesktopBackgroundContextMenu(position: {
     x: number;
     y: number;
+    targetIndex: number | null;
   }) {
     setSelectedDesktopEntryId(null);
     dispatchDesktopContextMenu({
       type: "open_background",
       x: position.x,
       y: position.y,
+      targetIndex: position.targetIndex,
     });
   }
 
@@ -806,6 +870,13 @@ export function DesktopShell({
     openDesktopBackgroundContextMenu({
       x: clampDesktopContextMenuCoordinate(rect.left + 48, window.innerWidth, 252),
       y: clampDesktopContextMenuCoordinate(rect.top + 112, window.innerHeight, 220),
+      targetIndex: resolveDesktopGridCellIndex(
+        {
+          x: 48,
+          y: 112,
+        },
+        desktopGridMetrics,
+      ),
     });
   }
 
@@ -829,6 +900,10 @@ export function DesktopShell({
     openDesktopBackgroundContextMenu({
       x: clampDesktopContextMenuCoordinate(event.clientX, window.innerWidth, 252),
       y: clampDesktopContextMenuCoordinate(event.clientY, window.innerHeight, 220),
+      targetIndex: resolveDesktopGridCellIndex(
+        readDesktopSurfacePoint(event.currentTarget, event.clientX, event.clientY),
+        desktopGridMetrics,
+      ),
     });
   }
 
@@ -1281,6 +1356,10 @@ export function DesktopShell({
   function handleDesktopBackgroundContextMenuCommand(
     commandId: DesktopBackgroundContextMenuCommandId,
   ) {
+    const targetIndex =
+      desktopContextMenuState.kind === "background"
+        ? desktopContextMenuState.targetIndex
+        : null;
     closeDesktopContextMenu();
 
     if (commandId === "open_explorer") {
@@ -1288,7 +1367,10 @@ export function DesktopShell({
       return;
     }
 
-    const createdFolder = createDesktopBackgroundFolderCreationResult(desktopRegistryState);
+    const createdFolder = createDesktopBackgroundFolderCreationResult(
+      desktopRegistryState,
+      targetIndex,
+    );
     setDesktopRegistryState(createdFolder.registryState);
     setSelectedDesktopEntryId(createdFolder.entryId);
     setFolderRenameDialogState({
@@ -1330,6 +1412,107 @@ export function DesktopShell({
 
   function showDesktopEntry(entryId: string) {
     setDesktopRegistryState((currentState) => showDesktopEntityOnDesktop(currentState, entryId));
+  }
+
+  function handleDesktopEntryDragStart(
+    event: ReactDragEvent<HTMLButtonElement>,
+    entry: DesktopEntity,
+  ) {
+    setSelectedDesktopEntryId(entry.id);
+    setDesktopDragEntryId(entry.id);
+    setDesktopDropFolderId(null);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", entry.id);
+  }
+
+  function handleDesktopEntryDragEnd() {
+    setDesktopDragEntryId(null);
+    setDesktopDropFolderId(null);
+  }
+
+  function handleDesktopGridDragOver(event: ReactDragEvent<HTMLElement>) {
+    if (desktopDragEntryId === null) {
+      return;
+    }
+
+    event.preventDefault();
+    setDesktopDropFolderId(null);
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  function handleDesktopGridDrop(event: ReactDragEvent<HTMLElement>) {
+    const draggedEntryId = readDraggedDesktopEntryId(event, desktopDragEntryId);
+    if (draggedEntryId === null) {
+      return;
+    }
+
+    event.preventDefault();
+    setDesktopDropFolderId(null);
+    setDesktopDragEntryId(null);
+    setDesktopRegistryState((currentState) =>
+      moveDesktopEntityToIndex(
+        currentState,
+        draggedEntryId,
+        resolveDesktopGridCellIndex(
+          readDesktopSurfacePoint(
+            desktopSurfaceRef.current ?? event.currentTarget,
+            event.clientX,
+            event.clientY,
+          ),
+          desktopGridMetrics,
+        ),
+      ),
+    );
+  }
+
+  function handleDesktopFolderDragOver(
+    event: ReactDragEvent<HTMLButtonElement>,
+    entry: DesktopEntity,
+  ) {
+    const draggedEntryId = readDraggedDesktopEntryId(event, desktopDragEntryId);
+    const draggedEntry =
+      draggedEntryId === null
+        ? null
+        : (desktopRegistryState.entries.find((item) => item.id === draggedEntryId) ?? null);
+    if (
+      entry.kind !== "custom_folder" ||
+      draggedEntry === null ||
+      (draggedEntry.kind !== "direct_chat" && draggedEntry.kind !== "group_chat")
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    setDesktopDropFolderId(entry.folderId);
+    event.dataTransfer.dropEffect = "move";
+  }
+
+  function handleDesktopFolderDrop(
+    event: ReactDragEvent<HTMLButtonElement>,
+    entry: DesktopEntity,
+  ) {
+    const draggedEntryId = readDraggedDesktopEntryId(event, desktopDragEntryId);
+    const draggedEntry =
+      draggedEntryId === null
+        ? null
+        : (desktopRegistryState.entries.find((item) => item.id === draggedEntryId) ?? null);
+    if (
+      entry.kind !== "custom_folder" ||
+      draggedEntry === null ||
+      (draggedEntry.kind !== "direct_chat" && draggedEntry.kind !== "group_chat")
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    addFolderMember(entry.folderId, {
+      kind: draggedEntry.kind,
+      targetKey: draggedEntry.targetKey,
+    });
+    setDesktopDropFolderId(null);
+    setDesktopDragEntryId(null);
   }
 
   function submitFolderRenameDialog() {
@@ -1378,6 +1561,7 @@ export function DesktopShell({
         isDesktopShell: true,
         activeWindowId: activeWindow?.windowId ?? null,
         activeWindowContentMode: activeWindow?.contentMode ?? null,
+        desktopGridCapacity: desktopGridMetrics.capacity,
         desktopRegistryState,
         desktopUnreadTargetMap,
         launchApp,
@@ -1406,6 +1590,7 @@ export function DesktopShell({
           onClick={handleDesktopSurfaceClick}
           onContextMenu={handleDesktopSurfaceContextMenu}
           onKeyDown={handleDesktopSurfaceKeyDown}
+          ref={desktopSurfaceRef}
           tabIndex={0}
         >
           <div className={styles.desktopProfileTag} data-desktop-background-blocker="true">
@@ -1477,31 +1662,17 @@ export function DesktopShell({
                 </button>
               </section>
             )}
-
-            {overflowSummaries.length > 0 && (
-              <section aria-label="Desktop overflow" className={styles.overflowPanel}>
-                <div className={styles.overflowCopy}>
-                  <strong className={styles.overflowTitle}>Overflow</strong>
-                  <p className={styles.overflowText}>
-                    {overflowSummaries
-                      .map((entry) => `${entry.title}: ${entry.count}`)
-                      .join(" · ")}
-                  </p>
-                </div>
-                <button
-                  className={styles.shellGhostButton}
-                  onClick={() => {
-                    openExplorerSection("overflow", "Explorer · Overflow");
-                  }}
-                  type="button"
-                >
-                  Explorer
-                </button>
-              </section>
-            )}
           </div>
 
-          <section className={styles.desktopGrid} aria-label="Desktop entrypoints">
+          <section
+            aria-label="Desktop entrypoints"
+            className={styles.desktopGrid}
+            onDragOver={handleDesktopGridDragOver}
+            onDrop={handleDesktopGridDrop}
+            style={{
+              gridTemplateColumns: `repeat(${desktopGridMetrics.columns}, minmax(6.9rem, 7.6rem))`,
+            }}
+          >
             {desktopEntries.map((entry) => {
               const folderUnreadCount =
                 entry.kind === "custom_folder"
@@ -1527,11 +1698,18 @@ export function DesktopShell({
                       ? styles.desktopIconCardSelected
                       : styles.desktopIconCard
                   }
+                  data-dragging={desktopDragEntryId === entry.id || undefined}
+                  data-drop-target={
+                    entry.kind === "custom_folder" && desktopDropFolderId === entry.folderId
+                      ? "folder"
+                      : undefined
+                  }
                 >
                   <button
                     aria-pressed={selectedDesktopEntryId === entry.id}
                     className={styles.desktopIcon}
                     data-desktop-entry="true"
+                    draggable
                     onClick={() => {
                       setSelectedDesktopEntryId(entry.id);
                       closeDesktopContextMenu();
@@ -1553,6 +1731,16 @@ export function DesktopShell({
                     }}
                     onDoubleClick={() => {
                       openDesktopEntity(entry);
+                    }}
+                    onDragEnd={handleDesktopEntryDragEnd}
+                    onDragOver={(event) => {
+                      handleDesktopFolderDragOver(event, entry);
+                    }}
+                    onDragStart={(event) => {
+                      handleDesktopEntryDragStart(event, entry);
+                    }}
+                    onDrop={(event) => {
+                      handleDesktopFolderDrop(event, entry);
                     }}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -1716,31 +1904,36 @@ export function DesktopShell({
                     </div>
                     <div className={styles.windowControls}>
                       <button
+                        aria-label="Свернуть"
                         className={styles.windowControl}
                         onClick={() => {
                           dispatch({ type: "minimize", windowId: window.windowId });
                         }}
                         type="button"
                       >
-                        _
+                        <WindowControlGlyph kind="minimize" />
                       </button>
                       <button
+                        aria-label={window.state === "maximized" ? "Восстановить" : "Развернуть"}
                         className={styles.windowControl}
                         onClick={() => {
                           toggleWindowMaximize(window);
                         }}
                         type="button"
                       >
-                        []
+                        <WindowControlGlyph
+                          kind={window.state === "maximized" ? "restore" : "maximize"}
+                        />
                       </button>
                       <button
+                        aria-label="Закрыть"
                         className={styles.windowControlDanger}
                         onClick={() => {
                           dispatch({ type: "close", windowId: window.windowId });
                         }}
                         type="button"
                       >
-                        X
+                        <WindowControlGlyph kind="close" />
                       </button>
                     </div>
                   </div>
@@ -2426,6 +2619,18 @@ function clampDesktopContextMenuCoordinate(
   return Math.max(safeStart, Math.min(value, viewportSize - menuSize - safeStart));
 }
 
+function readDraggedDesktopEntryId(
+  event: ReactDragEvent<HTMLElement>,
+  fallbackEntryId: string | null,
+): string | null {
+  const transferredEntryId = event.dataTransfer.getData("text/plain").trim();
+  if (transferredEntryId !== "") {
+    return transferredEntryId;
+  }
+
+  return fallbackEntryId;
+}
+
 function readInitialShellWindowViewport(): ShellWindowViewport {
   if (typeof window === "undefined") {
     return {
@@ -2451,6 +2656,46 @@ function readShellWindowViewport(
   return {
     width: Math.max(1, Math.round(rect.width)),
     height: Math.max(1, Math.round(rect.height)),
+  };
+}
+
+function readDesktopSurfaceViewport(element: HTMLElement | null): {
+  width: number;
+  height: number;
+} {
+  if (element === null) {
+    if (typeof window === "undefined") {
+      return {
+        width: 1280,
+        height: 720,
+      };
+    }
+
+    return {
+      width: Math.max(1, Math.round(window.innerWidth)),
+      height: Math.max(1, Math.round(window.innerHeight - 56)),
+    };
+  }
+
+  const rect = element.getBoundingClientRect();
+  return {
+    width: Math.max(1, Math.round(rect.width)),
+    height: Math.max(1, Math.round(rect.height)),
+  };
+}
+
+function readDesktopSurfacePoint(
+  element: HTMLElement,
+  clientX: number,
+  clientY: number,
+): {
+  x: number;
+  y: number;
+} {
+  const rect = element.getBoundingClientRect();
+  return {
+    x: clientX - rect.left,
+    y: clientY - rect.top,
   };
 }
 
@@ -2550,4 +2795,18 @@ function formatDate(date: Date): string {
     month: "2-digit",
     year: "numeric",
   }).format(date);
+}
+
+function WindowControlGlyph({
+  kind,
+}: {
+  kind: "minimize" | "maximize" | "restore" | "close";
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={styles.windowControlGlyph}
+      data-kind={kind}
+    />
+  );
 }

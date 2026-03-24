@@ -3,8 +3,6 @@ import type { ShellPreferencesStorageLike } from "./preferences";
 
 const desktopRegistryStorageKey = "aerochat.shell.desktop-registry.v1";
 
-export const MAX_VISIBLE_DESKTOP_ENTRIES = 10;
-
 export type DesktopEntityKind =
   | "system_app"
   | "direct_chat"
@@ -232,9 +230,16 @@ export function createCustomFolderDesktopEntity(
   state: DesktopRegistryState,
   name: string,
 ): DesktopRegistryState {
-  const folderId = `folder-${state.nextFolderSequence}`;
+  return createCustomFolderDesktopEntityAtIndex(state, name);
+}
 
-  return normalizeDesktopRegistryState({
+export function createCustomFolderDesktopEntityAtIndex(
+  state: DesktopRegistryState,
+  name: string,
+  targetIndex?: number,
+): DesktopRegistryState {
+  const folderId = `folder-${state.nextFolderSequence}`;
+  const nextState = normalizeDesktopRegistryState({
     entries: [
       ...state.entries,
       {
@@ -247,14 +252,22 @@ export function createCustomFolderDesktopEntity(
         visibility: "visible",
         placement: "desktop",
         overflowBucket: null,
-        order: resolveNextCreatedFolderOrder(state),
+        order: state.nextOrder,
       },
     ],
     folderMembers: state.folderMembers,
-    nextOrder: state.nextOrder,
+    nextOrder: state.nextOrder + 1,
     nextFolderSequence: state.nextFolderSequence + 1,
     nextFolderMemberSequence: state.nextFolderMemberSequence,
   });
+
+  return typeof targetIndex === "number"
+    ? moveDesktopEntityToIndex(
+        nextState,
+        buildDesktopEntityId("custom_folder", folderId),
+        targetIndex,
+      )
+    : nextState;
 }
 
 export function renameCustomFolderDesktopEntity(
@@ -369,13 +382,13 @@ export function hideDesktopEntity(
 export function showDesktopEntityOnDesktop(
   state: DesktopRegistryState,
   entryId: string,
+  targetIndex?: number,
 ): DesktopRegistryState {
   const targetEntry = state.entries.find((entry) => entry.id === entryId) ?? null;
   if (targetEntry === null || targetEntry.kind === "system_app") {
     return state;
   }
 
-  const promotedOrder = resolvePromotedDesktopOrder(state, targetEntry.id);
   const nextEntries = state.entries.map((entry) =>
     entry.id !== entryId || entry.kind === "system_app"
       ? entry
@@ -384,14 +397,17 @@ export function showDesktopEntityOnDesktop(
           visibility: "visible" as const,
           placement: "desktop" as const,
           overflowBucket: null,
-          order: promotedOrder,
         },
   );
 
-  return normalizeDesktopRegistryState({
+  const nextState = normalizeDesktopRegistryState({
     ...state,
     entries: nextEntries,
   });
+
+  return typeof targetIndex === "number"
+    ? moveDesktopEntityToIndex(nextState, entryId, targetIndex)
+    : nextState;
 }
 
 export function syncDirectChatDesktopEntities(
@@ -439,10 +455,9 @@ export function removeGroupChatDesktopEntity(
 
 export function listDesktopEntitiesForSurface(
   state: DesktopRegistryState,
+  visibleCapacity = Number.POSITIVE_INFINITY,
 ): DesktopEntity[] {
-  return state.entries
-    .filter((entry) => entry.visibility === "visible" && entry.placement === "desktop")
-    .sort(compareDesktopEntities);
+  return listVisibleDesktopEntries(state).slice(0, normalizeVisibleCapacity(visibleCapacity));
 }
 
 export function listDesktopRegistryEntities(
@@ -461,33 +476,63 @@ export function listHiddenDesktopEntities(
 
 export function listDesktopOverflowEntities(
   state: DesktopRegistryState,
+  visibleCapacity = Number.POSITIVE_INFINITY,
   bucket?: Exclude<DesktopOverflowBucket, null>,
 ): DesktopEntity[] {
-  return state.entries
-    .filter(
-      (entry) =>
-        entry.visibility === "visible" &&
-        entry.placement === "overflow" &&
-        (bucket === undefined || entry.overflowBucket === bucket),
-    )
-    .sort(compareDesktopEntities);
+  return listVisibleDesktopEntries(state)
+    .slice(normalizeVisibleCapacity(visibleCapacity))
+    .filter((entry) => bucket === undefined || resolveDesktopOverflowBucketForEntry(entry) === bucket)
+    .map((entry) =>
+      entry.kind === "system_app" ? entry : placeDynamicEntryOnOverflow(entry),
+    );
 }
 
 export function listDesktopOverflowSummaries(
   state: DesktopRegistryState,
+  visibleCapacity = Number.POSITIVE_INFINITY,
 ): DesktopOverflowSummary[] {
   return (["contacts", "groups", "folders"] as const)
     .map((bucket) => ({
       bucket,
       title: describeOverflowBucket(bucket),
-      count: state.entries.filter(
-        (entry) =>
-          entry.visibility === "visible" &&
-          entry.placement === "overflow" &&
-          entry.overflowBucket === bucket,
-      ).length,
+      count: listDesktopOverflowEntities(state, visibleCapacity, bucket).length,
     }))
     .filter((entry) => entry.count > 0);
+}
+
+export function moveDesktopEntityToIndex(
+  state: DesktopRegistryState,
+  entryId: string,
+  targetIndex: number,
+): DesktopRegistryState {
+  const orderedEntries = listDesktopRegistryEntities(state);
+  const visibleDesktopEntries = orderedEntries.filter(
+    (entry) => entry.visibility === "visible" && entry.placement === "desktop",
+  );
+  const movingEntry = visibleDesktopEntries.find((entry) => entry.id === entryId) ?? null;
+  if (movingEntry === null) {
+    return state;
+  }
+
+  const reorderedVisibleEntries = visibleDesktopEntries.filter((entry) => entry.id !== entryId);
+  const clampedTargetIndex = clampDesktopIndex(targetIndex, reorderedVisibleEntries.length);
+  reorderedVisibleEntries.splice(clampedTargetIndex, 0, movingEntry);
+
+  return normalizeDesktopRegistryState({
+    entries: [
+      ...reassignDesktopEntityOrders(reorderedVisibleEntries, 1),
+      ...reassignDesktopEntityOrders(
+        orderedEntries.filter(
+          (entry) => !(entry.visibility === "visible" && entry.placement === "desktop"),
+        ),
+        reorderedVisibleEntries.length + 1,
+      ),
+    ],
+    folderMembers: state.folderMembers,
+    nextOrder: state.nextOrder,
+    nextFolderSequence: state.nextFolderSequence,
+    nextFolderMemberSequence: state.nextFolderMemberSequence,
+  });
 }
 
 export function listCustomFolderDesktopEntities(
@@ -689,27 +734,22 @@ function normalizeDesktopRegistryState(
     const currentEntry =
       byId.get(buildDesktopEntityId("system_app", entry.appId)) ??
       createSystemEntity(entry.appId, entry.title, entry.order);
-    return createSystemEntity(entry.appId, currentEntry.title, entry.order);
+    return {
+      ...createSystemEntity(entry.appId, currentEntry.title, entry.order),
+      order: readPositiveNumber(currentEntry.order, entry.order),
+    };
   });
 
   const dynamicEntries = [...byId.values()]
     .filter((entry) => entry.kind !== "system_app")
     .sort(compareDesktopEntities);
 
-  const availableDesktopSlots = Math.max(0, MAX_VISIBLE_DESKTOP_ENTRIES - systemEntries.length);
-  let usedDesktopSlots = 0;
-
   const normalizedDynamicEntries: DesktopEntity[] = dynamicEntries.map((entry): DesktopEntity => {
     if (entry.visibility === "hidden") {
       return normalizeHiddenDynamicEntry(entry);
     }
 
-    if (usedDesktopSlots < availableDesktopSlots) {
-      usedDesktopSlots += 1;
-      return placeDynamicEntryOnDesktop(entry);
-    }
-
-    return placeDynamicEntryOnOverflow(entry);
+    return placeDynamicEntryOnDesktop(entry);
   });
 
   const validFolderIds = new Set(
@@ -760,6 +800,7 @@ function normalizeDesktopRegistryState(
   const nextOrder = Math.max(
     readPositiveNumber(input.nextOrder, mandatorySystemEntries.length + 1),
     mandatorySystemEntries.length + 1,
+    ...systemEntries.map((entry) => entry.order + 1),
     ...normalizedDynamicEntries.map((entry) => entry.order + 1),
   );
 
@@ -784,35 +825,13 @@ function normalizeDesktopRegistryState(
   };
 }
 
-function resolvePromotedDesktopOrder(
-  state: DesktopRegistryState,
-  entryId: string,
-): number {
-  const dynamicEntries = state.entries.filter(
-    (entry) => entry.kind !== "system_app" && entry.id !== entryId,
-  );
-  if (dynamicEntries.length === 0) {
-    return mandatorySystemEntries.length + 1;
-  }
-
-  return Math.min(...dynamicEntries.map((entry) => entry.order)) - 1;
-}
-
-function resolveNextCreatedFolderOrder(state: DesktopRegistryState): number {
-  const dynamicEntries = state.entries.filter((entry) => entry.kind !== "system_app");
-  if (dynamicEntries.length === 0) {
-    return mandatorySystemEntries.length + 1;
-  }
-
-  return Math.min(...dynamicEntries.map((entry) => entry.order)) - 1;
-}
-
 function normalizeHiddenDynamicEntry(
   entry: DesktopDirectChatEntity | DesktopGroupChatEntity | DesktopCustomFolderEntity,
 ): DesktopDirectChatEntity | DesktopGroupChatEntity | DesktopCustomFolderEntity {
   return {
     ...entry,
-    overflowBucket: describeDefaultOverflowBucket(entry.kind),
+    placement: "desktop",
+    overflowBucket: null,
   };
 }
 
@@ -865,6 +884,52 @@ function compareFolderMemberReferences(
   }
 
   return left.order - right.order;
+}
+
+function resolveDesktopOverflowBucketForEntry(
+  entry: DesktopEntity,
+): Exclude<DesktopOverflowBucket, null> {
+  if (entry.kind === "direct_chat") {
+    return "contacts";
+  }
+
+  if (entry.kind === "group_chat") {
+    return "groups";
+  }
+
+  return "folders";
+}
+
+function listVisibleDesktopEntries(state: DesktopRegistryState): DesktopEntity[] {
+  return state.entries
+    .filter((entry) => entry.visibility === "visible" && entry.placement === "desktop")
+    .sort(compareDesktopEntities);
+}
+
+function reassignDesktopEntityOrders(
+  entries: DesktopEntity[],
+  startOrder: number,
+): DesktopEntity[] {
+  return entries.map((entry, index) => ({
+    ...entry,
+    order: startOrder + index,
+  }));
+}
+
+function clampDesktopIndex(index: number, maxIndex: number): number {
+  if (!Number.isFinite(index)) {
+    return maxIndex;
+  }
+
+  return Math.max(0, Math.min(maxIndex, Math.round(index)));
+}
+
+function normalizeVisibleCapacity(value: number): number {
+  if (!Number.isFinite(value)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return Math.max(0, Math.floor(value));
 }
 
 function normalizeDesktopEntity(

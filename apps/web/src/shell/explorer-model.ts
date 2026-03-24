@@ -105,47 +105,47 @@ export const explorerSections: readonly ExplorerSectionDefinition[] = [
   {
     id: "desktop",
     label: "Рабочий стол",
-    description: "Видимые entrypoints текущего shell-local desktop.",
+    description: "Ярлыки на рабочем столе.",
   },
   {
     id: "folders",
     label: "Папки",
-    description: "Shell-local custom folders и их организационное состояние.",
+    description: "Ваши папки и ярлыки.",
   },
   {
     id: "contacts",
     label: "Контакты",
-    description: "Direct chat entrypoints и их текущее shell-local состояние.",
+    description: "Личные чаты.",
   },
   {
     id: "groups",
     label: "Группы",
-    description: "Group chat entrypoints и их текущее shell-local состояние.",
+    description: "Группы.",
   },
   {
     id: "hidden",
     label: "Скрытые",
-    description: "Entrypoints, убранные с рабочего стола без удаления объектов.",
+    description: "Скрытые ярлыки.",
   },
   {
     id: "overflow",
     label: "Переполнение",
-    description: "Bounded overflow buckets для текущей desktop grid.",
+    description: "Ярлыки, которые не поместились на экран.",
   },
   {
     id: "requests",
     label: "Заявки",
-    description: "Канонический системный entrypoint friend requests.",
+    description: "Входящие и исходящие заявки.",
   },
   {
     id: "search",
     label: "Поиск",
-    description: "Отдельное Search app без смешивания privacy boundaries.",
+    description: "Поиск сообщений.",
   },
   {
     id: "settings",
     label: "Настройки",
-    description: "Системный singleton для account, privacy и devices.",
+    description: "Параметры приложения.",
   },
 ];
 
@@ -185,6 +185,7 @@ export function buildExplorerSectionViewModel(
   registryState: DesktopRegistryState,
   sectionId: ExplorerSectionId,
   unreadByTarget: DesktopUnreadTargetMap = emptyUnreadTargetMap,
+  visibleDesktopCapacity = Number.POSITIVE_INFINITY,
 ): ExplorerSectionViewModel {
   const section = explorerSectionById.get(sectionId) ?? explorerSections[0]!;
 
@@ -192,67 +193,92 @@ export function buildExplorerSectionViewModel(
     case "desktop":
       return {
         section,
-        entities: listDesktopEntitiesForSurface(registryState).map((entry) =>
-          createExplorerEntityRecord(registryState, entry, unreadByTarget),
+        entities: listDesktopEntitiesForSurface(registryState, visibleDesktopCapacity).map(
+          (entry) =>
+            createExplorerEntityRecord(
+              registryState,
+              entry,
+              unreadByTarget,
+              visibleDesktopCapacity,
+            ),
         ),
         folders: [],
         buckets: [],
         appLinks: [],
         emptyTitle: "Рабочий стол пуст",
-        emptyDescription:
-          "Системные entrypoints всегда остаются на месте, а новые chats/groups и custom folders появятся здесь при наличии места.",
+        emptyDescription: "Здесь появятся приложения, чаты, группы и папки.",
       };
     case "folders":
       return {
         section,
         entities: [],
         folders: listCustomFolderDesktopEntities(registryState).map((folder) =>
-          createExplorerFolderRecord(registryState, folder, unreadByTarget),
+          createExplorerFolderRecord(
+            registryState,
+            folder,
+            unreadByTarget,
+            visibleDesktopCapacity,
+          ),
         ),
         buckets: [],
         appLinks: [],
         emptyTitle: "Папок пока нет",
-        emptyDescription:
-          "Custom folders живут только внутри shell-local organizer state и хранят shortcut-ссылки на canonical chats и groups.",
+        emptyDescription: "Создайте папку, чтобы собрать нужные ярлыки в одном месте.",
       };
     case "contacts":
       return {
         section,
         entities: listDesktopRegistryEntities(registryState)
           .filter((entry) => entry.kind === "direct_chat")
-          .map((entry) => createExplorerEntityRecord(registryState, entry, unreadByTarget)),
+          .map((entry) =>
+            createExplorerEntityRecord(
+              registryState,
+              entry,
+              unreadByTarget,
+              visibleDesktopCapacity,
+            ),
+          ),
         folders: [],
         buckets: [],
         appLinks: [],
         emptyTitle: "Контактов пока нет",
-        emptyDescription:
-          "Здесь появятся canonical direct chat entrypoints из shell-local desktop registry.",
+        emptyDescription: "Личные чаты появятся здесь автоматически.",
       };
     case "groups":
       return {
         section,
         entities: listDesktopRegistryEntities(registryState)
           .filter((entry) => entry.kind === "group_chat")
-          .map((entry) => createExplorerEntityRecord(registryState, entry, unreadByTarget)),
+          .map((entry) =>
+            createExplorerEntityRecord(
+              registryState,
+              entry,
+              unreadByTarget,
+              visibleDesktopCapacity,
+            ),
+          ),
         folders: [],
         buckets: [],
         appLinks: [],
         emptyTitle: "Групп пока нет",
-        emptyDescription:
-          "Здесь появятся canonical group chat entrypoints из shell-local desktop registry.",
+        emptyDescription: "Группы появятся здесь автоматически.",
       };
     case "hidden":
       return {
         section,
         entities: listHiddenDesktopEntities(registryState).map((entry) =>
-          createExplorerEntityRecord(registryState, entry, unreadByTarget),
+          createExplorerEntityRecord(
+            registryState,
+            entry,
+            unreadByTarget,
+            visibleDesktopCapacity,
+          ),
         ),
         folders: [],
         buckets: [],
         appLinks: [],
         emptyTitle: "Скрытых entrypoints нет",
-        emptyDescription:
-          "Если убрать chat, group или folder с рабочего стола, recovery action появится здесь.",
+        emptyDescription: "Скрытые ярлыки можно вернуть обратно на рабочий стол.",
       };
     case "overflow":
       return {
@@ -263,15 +289,23 @@ export function buildExplorerSectionViewModel(
           .map((bucket) => ({
             bucket,
             title: describeOverflowBucketTitle(bucket),
-            entities: listDesktopOverflowEntities(registryState, bucket).map((entry) =>
-              createExplorerEntityRecord(registryState, entry, unreadByTarget),
+            entities: listDesktopOverflowEntities(
+              registryState,
+              visibleDesktopCapacity,
+              bucket,
+            ).map((entry) =>
+              createExplorerEntityRecord(
+                registryState,
+                entry,
+                unreadByTarget,
+                visibleDesktopCapacity,
+              ),
             ),
           }))
           .filter((bucket) => bucket.entities.length > 0),
         appLinks: [],
         emptyTitle: "Переполнения нет",
-        emptyDescription:
-          "Когда desktop grid заполнится, новые chats, groups и custom folders появятся здесь в bounded buckets.",
+        emptyDescription: "Все ярлыки помещаются на рабочем столе.",
       };
     case "requests":
       return {
@@ -283,8 +317,7 @@ export function buildExplorerSectionViewModel(
           {
             appId: "friend_requests",
             title: "Заявки",
-            description:
-              "Открывает canonical singleton window для входящих и исходящих friend requests.",
+            description: "Открыть заявки в друзья.",
           },
         ],
         emptyTitle: "",
@@ -300,8 +333,7 @@ export function buildExplorerSectionViewModel(
           {
             appId: "search",
             title: "Поиск",
-            description:
-              "Запускает отдельное Search app с честным разделением server plaintext и local encrypted search.",
+            description: "Открыть поиск сообщений.",
           },
         ],
         emptyTitle: "",
@@ -317,8 +349,7 @@ export function buildExplorerSectionViewModel(
           {
             appId: "settings",
             title: "Настройки",
-            description:
-              "Открывает canonical singleton surface для privacy, devices и account preferences.",
+            description: "Открыть параметры AeroChat.",
           },
         ],
         emptyTitle: "",
@@ -327,15 +358,20 @@ export function buildExplorerSectionViewModel(
     default:
       return {
         section: explorerSections[0]!,
-        entities: listDesktopEntitiesForSurface(registryState).map((entry) =>
-          createExplorerEntityRecord(registryState, entry, unreadByTarget),
+        entities: listDesktopEntitiesForSurface(registryState, visibleDesktopCapacity).map(
+          (entry) =>
+            createExplorerEntityRecord(
+              registryState,
+              entry,
+              unreadByTarget,
+              visibleDesktopCapacity,
+            ),
         ),
         folders: [],
         buckets: [],
         appLinks: [],
         emptyTitle: "Рабочий стол пуст",
-        emptyDescription:
-          "Системные entrypoints всегда остаются на месте, а новые chats/groups и custom folders появятся здесь при наличии места.",
+        emptyDescription: "Здесь появятся приложения, чаты, группы и папки.",
       };
   }
 }
@@ -344,6 +380,7 @@ export function buildExplorerFolderViewModel(
   registryState: DesktopRegistryState,
   folderId: string,
   unreadByTarget: DesktopUnreadTargetMap = emptyUnreadTargetMap,
+  visibleDesktopCapacity = Number.POSITIVE_INFINITY,
 ): ExplorerFolderViewModel | null {
   const folder = getCustomFolderDesktopEntity(registryState, folderId);
   if (folder === null) {
@@ -351,13 +388,17 @@ export function buildExplorerFolderViewModel(
   }
 
   return {
-    folder: createExplorerFolderRecord(registryState, folder, unreadByTarget),
+    folder: createExplorerFolderRecord(
+      registryState,
+      folder,
+      unreadByTarget,
+      visibleDesktopCapacity,
+    ),
     members: listCustomFolderMemberEntryRecords(registryState, folderId).map((record) =>
       createExplorerFolderMemberRecord(record, unreadByTarget),
     ),
     emptyTitle: "Папка пуста",
-    emptyDescription:
-      "Добавьте сюда direct chats или groups через Explorer. Папка хранит только shell-local shortcut-ссылки.",
+    emptyDescription: "Перетащите сюда чат или группу с рабочего стола.",
   };
 }
 
@@ -365,6 +406,7 @@ function createExplorerEntityRecord(
   registryState: DesktopRegistryState,
   entry: DesktopEntity,
   unreadByTarget: DesktopUnreadTargetMap,
+  visibleDesktopCapacity: number,
 ): ExplorerEntityRecord {
   const unreadCount =
     entry.kind === "custom_folder"
@@ -374,7 +416,10 @@ function createExplorerEntityRecord(
   return {
     entry,
     typeLabel: describeExplorerEntityType(entry),
-    stateLabel: describeExplorerEntityState(entry),
+    stateLabel: describeExplorerEntityState(
+      entry,
+      isEntryOverflowedOnDesktop(registryState, entry, visibleDesktopCapacity),
+    ),
     accent: describeExplorerEntityAccent(entry),
     unreadCount,
     supplementalLabel:
@@ -390,6 +435,7 @@ function createExplorerFolderRecord(
   registryState: DesktopRegistryState,
   folder: DesktopCustomFolderEntity,
   unreadByTarget: DesktopUnreadTargetMap,
+  visibleDesktopCapacity: number,
 ): ExplorerFolderRecord {
   const memberCount = listCustomFolderMemberEntryRecords(registryState, folder.folderId).length;
 
@@ -397,7 +443,10 @@ function createExplorerFolderRecord(
     folder,
     memberCount,
     unreadCount: getCustomFolderUnreadCount(registryState, folder.folderId, unreadByTarget),
-    stateLabel: describeExplorerEntityState(folder),
+    stateLabel: describeExplorerEntityState(
+      folder,
+      isEntryOverflowedOnDesktop(registryState, folder, visibleDesktopCapacity),
+    ),
     accent: describeExplorerEntityAccent(folder),
   };
 }
@@ -410,7 +459,7 @@ function createExplorerFolderMemberRecord(
     referenceId: record.reference.id,
     entry: record.entry,
     typeLabel: record.entry.kind === "direct_chat" ? "Личный чат" : "Группа",
-    stateLabel: describeExplorerEntityState(record.entry),
+    stateLabel: describeExplorerEntityState(record.entry, false),
     accent: describeExplorerEntityAccent(record.entry),
     hasUnread: hasDesktopTargetUnread(unreadByTarget, record.reference.target),
   };
@@ -430,7 +479,7 @@ function describeExplorerEntityType(entry: DesktopEntity): string {
   }
 
   if (entry.appId === "explorer") {
-    return "Organizer";
+    return "Explorer";
   }
 
   if (entry.appId === "friend_requests") {
@@ -448,13 +497,16 @@ function describeExplorerEntityType(entry: DesktopEntity): string {
   return "Системное";
 }
 
-function describeExplorerEntityState(entry: DesktopEntity): string {
+function describeExplorerEntityState(
+  entry: DesktopEntity,
+  isOverflowedOnDesktop: boolean,
+): string {
   if (entry.visibility === "hidden") {
     return "Скрыт";
   }
 
-  if (entry.placement === "overflow") {
-    return `В переполнении: ${describeOverflowBucketTitle(entry.overflowBucket ?? "contacts").toLowerCase()}`;
+  if (entry.placement === "overflow" || isOverflowedOnDesktop) {
+    return `Не помещается: ${describeOverflowBucketTitle(resolveEntryOverflowBucket(entry)).toLowerCase()}`;
   }
 
   return "На рабочем столе";
@@ -510,4 +562,32 @@ function describeOverflowBucketTitle(
   }
 
   return "Папки";
+}
+
+function resolveEntryOverflowBucket(
+  entry: DesktopEntity,
+): Exclude<DesktopOverflowBucket, null> {
+  if (entry.kind === "direct_chat") {
+    return "contacts";
+  }
+
+  if (entry.kind === "group_chat") {
+    return "groups";
+  }
+
+  return "folders";
+}
+
+function isEntryOverflowedOnDesktop(
+  registryState: DesktopRegistryState,
+  entry: DesktopEntity,
+  visibleDesktopCapacity: number,
+): boolean {
+  if (entry.visibility !== "visible" || entry.placement !== "desktop") {
+    return false;
+  }
+
+  return listDesktopOverflowEntities(registryState, visibleDesktopCapacity).some(
+    (currentEntry) => currentEntry.id === entry.id,
+  );
 }

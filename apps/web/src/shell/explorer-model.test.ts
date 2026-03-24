@@ -14,7 +14,6 @@ import {
   showDesktopEntityOnDesktop,
   upsertDirectChatDesktopEntity,
   upsertGroupChatDesktopEntity,
-  MAX_VISIBLE_DESKTOP_ENTRIES,
 } from "./desktop-registry";
 
 describe("resolveExplorerSection", () => {
@@ -65,7 +64,7 @@ describe("buildExplorerSectionViewModel", () => {
   it("groups visible overflow entries by bucket", () => {
     let state = createInitialDesktopRegistryState();
 
-    for (let index = 1; index <= MAX_VISIBLE_DESKTOP_ENTRIES; index += 1) {
+    for (let index = 1; index <= 12; index += 1) {
       state = upsertDirectChatDesktopEntity(state, `chat-${index}`, `Chat ${index}`);
     }
     state = upsertGroupChatDesktopEntity(state, "group-1", "Design Team");
@@ -73,7 +72,7 @@ describe("buildExplorerSectionViewModel", () => {
       state = createCustomFolderDesktopEntity(state, `Папка ${index}`);
     }
 
-    const viewModel = buildExplorerSectionViewModel(state, "overflow");
+    const viewModel = buildExplorerSectionViewModel(state, "overflow", undefined, 10);
 
     expect(viewModel.buckets).toEqual([
       expect.objectContaining({
@@ -145,19 +144,14 @@ describe("buildExplorerSectionViewModel", () => {
   it("shows promoted entry as desktop-visible again after recovery", () => {
     let state = createInitialDesktopRegistryState();
 
-    for (let index = 1; index <= MAX_VISIBLE_DESKTOP_ENTRIES; index += 1) {
+    for (let index = 1; index <= 12; index += 1) {
       state = upsertDirectChatDesktopEntity(state, `chat-${index}`, `Chat ${index}`);
     }
 
-    const overflowEntry = state.entries.find(
-      (entry) => entry.kind === "direct_chat" && entry.placement === "overflow",
-    );
-    state = showDesktopEntityOnDesktop(state, overflowEntry!.id);
+    state = showDesktopEntityOnDesktop(state, "direct_chat:chat-12");
 
-    const contactsView = buildExplorerSectionViewModel(state, "contacts");
-    const promotedEntry = contactsView.entities.find(
-      (record) => record.entry.id === overflowEntry!.id,
-    );
+    const contactsView = buildExplorerSectionViewModel(state, "contacts", undefined, 20);
+    const promotedEntry = contactsView.entities.find((record) => record.entry.id === "direct_chat:chat-12");
 
     expect(promotedEntry?.stateLabel).toBe("На рабочем столе");
   });

@@ -12,9 +12,8 @@ import {
   listCustomFolderDesktopEntities,
   listCustomFolderMemberEntryRecords,
   listDesktopEntitiesForSurface,
-  listDesktopOverflowEntities,
   listDesktopOverflowSummaries,
-  MAX_VISIBLE_DESKTOP_ENTRIES,
+  moveDesktopEntityToIndex,
   readDesktopRegistryState,
   renameCustomFolderDesktopEntity,
   showDesktopEntityOnDesktop,
@@ -97,38 +96,39 @@ describe("desktop registry", () => {
     expect(state.entries.filter((entry) => entry.targetKey === "chat-1")).toHaveLength(1);
   });
 
-  it("routes excess direct and group entities into bounded overflow buckets", () => {
+  it("derives overflow from the provided visible desktop capacity", () => {
     let state = createInitialDesktopRegistryState();
 
-    for (let index = 1; index <= MAX_VISIBLE_DESKTOP_ENTRIES; index += 1) {
+    for (let index = 1; index <= 12; index += 1) {
       state = upsertDirectChatDesktopEntity(state, `chat-${index}`, `Chat ${index}`);
     }
     state = syncGroupChatDesktopEntities(state, [createGroup("group-1", "Design Team")]);
 
-    const visibleEntries = listDesktopEntitiesForSurface(state);
-    const overflow = listDesktopOverflowSummaries(state);
+    const visibleEntries = listDesktopEntitiesForSurface(state, 10);
+    const overflow = listDesktopOverflowSummaries(state, 10);
 
-    expect(visibleEntries).toHaveLength(MAX_VISIBLE_DESKTOP_ENTRIES);
+    expect(visibleEntries).toHaveLength(10);
     expect(overflow).toEqual([
-      { bucket: "contacts", title: "Контакты", count: 5 },
+      { bucket: "contacts", title: "Контакты", count: 7 },
       { bucket: "groups", title: "Группы", count: 1 },
     ]);
   });
 
-  it("can promote overflow entry back to desktop while keeping bounded overflow", () => {
+  it("can move a desktop entry to another grid index", () => {
     let state = createInitialDesktopRegistryState();
 
-    for (let index = 1; index <= MAX_VISIBLE_DESKTOP_ENTRIES; index += 1) {
+    for (let index = 1; index <= 3; index += 1) {
       state = upsertDirectChatDesktopEntity(state, `chat-${index}`, `Chat ${index}`);
     }
 
-    const overflowEntry = listDesktopOverflowEntities(state, "contacts")[0];
-    state = showDesktopEntityOnDesktop(state, overflowEntry!.id);
+    state = moveDesktopEntityToIndex(state, "direct_chat:chat-3", 1);
 
-    expect(
-      listDesktopEntitiesForSurface(state).some((entry) => entry.id === overflowEntry!.id),
-    ).toBe(true);
-    expect(listDesktopOverflowEntities(state, "contacts")).toHaveLength(5);
+    expect(listDesktopEntitiesForSurface(state).map((entry) => entry.id).slice(0, 4)).toEqual([
+      "system_app:self_chat",
+      "direct_chat:chat-3",
+      "system_app:search",
+      "system_app:explorer",
+    ]);
   });
 
   it("removes stale group entries when the current source no longer returns them", () => {
@@ -222,6 +222,25 @@ describe("desktop registry", () => {
     expect(
       state.entries.filter((entry) => entry.kind === "direct_chat" && entry.targetKey === "chat-1"),
     ).toHaveLength(1);
+  });
+
+  it("prevents duplicate folder references inside the same folder", () => {
+    let state = createInitialDesktopRegistryState();
+
+    state = upsertDirectChatDesktopEntity(state, "chat-1", "Алиса");
+    state = createCustomFolderDesktopEntity(state, "Работа");
+    const folder = listCustomFolderDesktopEntities(state)[0]!;
+
+    state = addCustomFolderMemberReference(state, folder.folderId, {
+      kind: "direct_chat",
+      targetKey: "chat-1",
+    });
+    state = addCustomFolderMemberReference(state, folder.folderId, {
+      kind: "direct_chat",
+      targetKey: "chat-1",
+    });
+
+    expect(listCustomFolderMemberEntryRecords(state, folder.folderId)).toHaveLength(1);
   });
 
   it("counts unread by referenced chat targets instead of summing message counters", () => {

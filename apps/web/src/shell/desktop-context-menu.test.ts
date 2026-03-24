@@ -61,6 +61,7 @@ describe("desktop context menu", () => {
         type: "open_background",
         x: 84,
         y: 140,
+        targetIndex: 6,
       },
     );
 
@@ -68,6 +69,7 @@ describe("desktop context menu", () => {
       kind: "background",
       x: 84,
       y: 140,
+      targetIndex: 6,
     });
 
     expect(
@@ -104,7 +106,7 @@ describe("desktop context menu", () => {
 
   it("creates a shell-local folder from desktop background with immediate naming draft", () => {
     const initialState = createInitialDesktopRegistryState();
-    const result = createDesktopBackgroundFolderCreationResult(initialState);
+    const result = createDesktopBackgroundFolderCreationResult(initialState, 2);
 
     expect(result.folderId).toBe("folder-1");
     expect(result.entryId).toBe("custom_folder:folder-1");
@@ -117,6 +119,11 @@ describe("desktop context menu", () => {
       visibility: "visible",
       placement: "desktop",
     });
+    expect(
+      result.registryState.entries
+        .filter((entry) => entry.visibility === "visible" && entry.placement === "desktop")
+        .map((entry) => entry.id),
+    ).toContain("custom_folder:folder-1");
 
     const storage = new Map<string, string>();
     const storageApi = {

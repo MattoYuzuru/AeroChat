@@ -28,6 +28,7 @@ export interface DesktopShellHost {
   isDesktopShell: true;
   activeWindowId: string | null;
   activeWindowContentMode: ShellWindowContentMode | null;
+  desktopGridCapacity: number;
   desktopRegistryState: DesktopRegistryState;
   desktopUnreadTargetMap: DesktopUnreadTargetMap;
   launchApp(appId: ShellAppId): void;

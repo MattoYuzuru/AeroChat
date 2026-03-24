@@ -1,5 +1,6 @@
 import {
   createCustomFolderDesktopEntity,
+  createCustomFolderDesktopEntityAtIndex,
   isDesktopEntityHideable,
   listCustomFolderDesktopEntities,
   listCustomFolderMemberReferences,
@@ -23,6 +24,7 @@ export type DesktopContextMenuState =
       kind: "background";
       x: number;
       y: number;
+      targetIndex: number | null;
     };
 
 export type DesktopEntryContextMenuCommandId =
@@ -70,6 +72,7 @@ export type DesktopContextMenuEvent =
       type: "open_background";
       x: number;
       y: number;
+      targetIndex: number | null;
     }
   | {
       type: "close";
@@ -111,6 +114,7 @@ export function reduceDesktopContextMenuState(
         kind: "background",
         x: event.x,
         y: event.y,
+        targetIndex: event.targetIndex,
       };
     case "close":
       return createClosedDesktopContextMenuState();
@@ -175,6 +179,7 @@ export function listDesktopBackgroundContextMenuItems(): DesktopContextMenuComma
 
 export function createDesktopBackgroundFolderCreationResult(
   registryState: DesktopRegistryState,
+  targetIndex?: number | null,
 ): DesktopBackgroundFolderCreationResult {
   const folderId = `folder-${registryState.nextFolderSequence}`;
   const name = DEFAULT_DESKTOP_BACKGROUND_FOLDER_NAME;
@@ -183,7 +188,10 @@ export function createDesktopBackgroundFolderCreationResult(
     folderId,
     entryId: `custom_folder:${folderId}`,
     name,
-    registryState: createCustomFolderDesktopEntity(registryState, name),
+    registryState:
+      typeof targetIndex === "number"
+        ? createCustomFolderDesktopEntityAtIndex(registryState, name, targetIndex)
+        : createCustomFolderDesktopEntity(registryState, name),
   };
 }
 
