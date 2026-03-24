@@ -1,5 +1,5 @@
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useState, type PropsWithChildren } from "react";
 import { getAuthErrorMessage, useAuth } from "../auth/useAuth";
 import { selectVisibleDirectCallSurfaceEntry } from "../rtc/awareness";
 import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
@@ -25,7 +25,7 @@ const statusItems = [
   "settings",
 ];
 
-export function AppShell() {
+export function LegacyAppShell({ children }: PropsWithChildren) {
   const location = useLocation();
   const navigate = useNavigate();
   const { state, logout } = useAuth();
@@ -219,7 +219,7 @@ export function AppShell() {
             </div>
 
             <div className={styles.windowBody}>
-              <Outlet />
+              {children}
             </div>
           </div>
         </section>

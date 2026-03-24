@@ -34,7 +34,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         await login(form);
       }
 
-      navigate("/app/profile", { replace: true });
+      navigate("/app", { replace: true });
     } catch (error) {
       setErrorMessage(
         getAuthErrorMessage(
@@ -53,16 +53,16 @@ export function AuthPage({ mode }: AuthPageProps) {
     <main className={styles.viewport}>
       <section className={styles.heroPanel}>
         <p className={styles.eyebrow}>AeroChat</p>
-        <h1 className={styles.title}>Web gateway auth bootstrap</h1>
+        <h1 className={styles.title}>Login application</h1>
         <p className={styles.copy}>
-          Первый web slice остаётся лёгким: frontend работает только через
-          `aero-gateway`, поднимает текущую сессию на старте и готовит будущий
-          shell без прямого доступа к downstream-сервисам.
+          Текущий auth flow уже входит в новую shell-направленность: вход и регистрация живут в
+          том же визуальном языке, что и desktop runtime, но по-прежнему идут только через
+          `aero-gateway`.
         </p>
         <ul className={styles.highlights}>
-          <li>единая edge-точка входа для всех auth/profile запросов</li>
-          <li>минимальный session bootstrap через isolated storage-адаптер</li>
-          <li>защищённый shell и базовая навигация под следующие slices</li>
+          <li>boot и chooser уже отделены от ежедневного fast-entry</li>
+          <li>логин и регистрация остаются bounded app surfaces, а не marketing landing</li>
+          <li>после валидного входа desktop shell становится primary desktop entrypoint</li>
         </ul>
       </section>
 
