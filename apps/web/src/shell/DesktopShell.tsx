@@ -150,6 +150,12 @@ export function DesktopShell({
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [clock, setClock] = useState(() => new Date());
+  const [dragState, setDragState] = useState<{
+    windowId: string;
+    startX: number;
+    startY: number;
+    initialBounds: ShellWindow["bounds"];
+  } | null>(null);
   const startMenuAnchorRef = useRef<HTMLDivElement | null>(null);
   const desktopContextMenuRef = useRef<HTMLDivElement | null>(null);
   const windowLayerRef = useRef<HTMLElement | null>(null);
@@ -499,6 +505,53 @@ export function DesktopShell({
       cancelled = true;
     };
   }, [state]);
+
+  useEffect(() => {
+    if (dragState === null) {
+      return;
+    }
+
+    const activeDrag = dragState;
+
+    function handleWindowMouseMove(event: MouseEvent) {
+      const deltaX = event.clientX - activeDrag.startX;
+      const deltaY = event.clientY - activeDrag.startY;
+
+      dispatch({
+        type: "set_bounds",
+        windowId: activeDrag.windowId,
+        bounds: normalizeShellWindowBounds(
+          {
+            ...activeDrag.initialBounds,
+            x: activeDrag.initialBounds.x + deltaX,
+            y: activeDrag.initialBounds.y + deltaY,
+          },
+          windowLayerViewport,
+        ),
+      });
+    }
+
+    function stopWindowDrag() {
+      setDragState(null);
+    }
+
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "move";
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", stopWindowDrag);
+    window.addEventListener("blur", stopWindowDrag);
+
+    return () => {
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", stopWindowDrag);
+      window.removeEventListener("blur", stopWindowDrag);
+    };
+  }, [dragState, windowLayerViewport]);
 
   useEffect(() => {
     if (state.status !== "authenticated") {
@@ -1024,6 +1077,45 @@ export function DesktopShell({
     }
   }
 
+  function focusWindow(window: ShellWindow) {
+    dispatch({ type: "focus", windowId: window.windowId });
+    if (window.routePath) {
+      navigate(window.routePath);
+    }
+  }
+
+  function toggleWindowMaximize(window: ShellWindow) {
+    dispatch({
+      type: window.state === "maximized" ? "restore" : "maximize",
+      windowId: window.windowId,
+    });
+    if (window.routePath) {
+      navigate(window.routePath);
+    }
+  }
+
+  function beginWindowDrag(
+    event: ReactMouseEvent<HTMLDivElement>,
+    window: ShellWindow,
+  ) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    focusWindow(window);
+    if (window.state === "maximized") {
+      return;
+    }
+
+    event.preventDefault();
+    setDragState({
+      windowId: window.windowId,
+      startX: event.clientX,
+      startY: event.clientY,
+      initialBounds: normalizeShellWindowBounds(window.bounds, windowLayerViewport),
+    });
+  }
+
   function openDesktopEntity(entry: DesktopEntity) {
     setSelectedDesktopEntryId(entry.id);
     closeDesktopContextMenu();
@@ -1218,90 +1310,98 @@ export function DesktopShell({
           onKeyDown={handleDesktopSurfaceKeyDown}
           tabIndex={0}
         >
-          <header className={styles.desktopHeader} data-desktop-background-blocker="true">
-            <div>
-              <p className={styles.brandEyebrow}>AeroChat</p>
-              <h1 className={styles.desktopTitle}>Рабочий стол AeroChat</h1>
-              <p className={styles.desktopSubtitle}>
-                @{state.profile.login} · {state.profile.nickname}
-              </p>
-            </div>
-            <div className={styles.headerBadges}>
-              <span className={styles.headerBadge}>XP-first</span>
-              <span className={styles.headerBadge}>Primary desktop surface</span>
-              <span className={styles.headerBadge}>Entry registry: {desktopEntries.length}</span>
-            </div>
-          </header>
+          <div className={styles.desktopProfileTag} data-desktop-background-blocker="true">
+            <span className={styles.desktopProfileBrand}>AeroChat</span>
+            <span className={styles.desktopProfileUser}>
+              @{state.profile.login} · {state.profile.nickname}
+            </span>
+          </div>
 
-          {visibleDirectCallSurface && (
-            <section
-              className={styles.callNotice}
-              data-desktop-background-blocker="true"
-            >
-              <div>
-                <p className={styles.callLabel}>Активный direct call</p>
-                <h2 className={styles.callTitle}>
-                  {visibleDirectCallPeer?.nickname ?? "Direct chat"}
-                </h2>
-                <p className={styles.callText}>
-                  {canReturnToCall
-                    ? "Звонок ещё активен. Можно вернуться в thread без потери shell context."
-                    : "В одном из direct chats уже есть активный звонок. Можно открыть thread или присоединиться."}
-                </p>
-              </div>
-              <div className={styles.callActions}>
+          <div className={styles.desktopStatusArea} data-desktop-background-blocker="true">
+            {visibleDirectCallSurface && (
+              <section className={styles.callNotice}>
+                <div className={styles.callNoticeBody}>
+                  <strong className={styles.callTitle}>
+                    {visibleDirectCallPeer?.nickname ?? "Direct chat"}
+                  </strong>
+                  <p className={styles.callText}>
+                    {canReturnToCall
+                      ? "Звонок активен."
+                      : "Есть active call в другом direct chat."}
+                  </p>
+                </div>
+                <div className={styles.callActions}>
+                  <button
+                    className={styles.shellGhostButton}
+                    onClick={() => {
+                      openDirectCallThread(false);
+                    }}
+                    type="button"
+                  >
+                    Открыть чат
+                  </button>
+                  <button
+                    className={styles.shellPrimaryButton}
+                    onClick={() => {
+                      openDirectCallThread(true);
+                    }}
+                    type="button"
+                  >
+                    {canReturnToCall ? "Вернуться" : "Войти"}
+                  </button>
+                  <button
+                    className={styles.shellGhostButton}
+                    onClick={() => {
+                      directCallAwareness.dismissSurface(
+                        visibleDirectCallSurface.chat.id,
+                        visibleDirectCallSurface.call.id,
+                      );
+                    }}
+                    type="button"
+                  >
+                    Скрыть
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {runtimeState.notice && (
+              <section className={styles.noticeBar} role="status">
+                <span>{runtimeState.notice.message}</span>
+                <button
+                  className={styles.noticeDismiss}
+                  onClick={() => {
+                    dispatch({ type: "dismiss_notice" });
+                  }}
+                  type="button"
+                >
+                  OK
+                </button>
+              </section>
+            )}
+
+            {overflowSummaries.length > 0 && (
+              <section aria-label="Desktop overflow" className={styles.overflowPanel}>
+                <div className={styles.overflowCopy}>
+                  <strong className={styles.overflowTitle}>Overflow</strong>
+                  <p className={styles.overflowText}>
+                    {overflowSummaries
+                      .map((entry) => `${entry.title}: ${entry.count}`)
+                      .join(" · ")}
+                  </p>
+                </div>
                 <button
                   className={styles.shellGhostButton}
                   onClick={() => {
-                    openDirectCallThread(false);
+                    openExplorerSection("overflow", "Explorer · Overflow");
                   }}
                   type="button"
                 >
-                  Открыть чат
+                  Explorer
                 </button>
-                <button
-                  className={styles.shellPrimaryButton}
-                  onClick={() => {
-                    openDirectCallThread(true);
-                  }}
-                  type="button"
-                >
-                  {canReturnToCall ? "Вернуться в звонок" : "Присоединиться"}
-                </button>
-                <button
-                  className={styles.shellGhostButton}
-                  onClick={() => {
-                    directCallAwareness.dismissSurface(
-                      visibleDirectCallSurface.chat.id,
-                      visibleDirectCallSurface.call.id,
-                    );
-                  }}
-                  type="button"
-                >
-                  Скрыть
-                </button>
-              </div>
-            </section>
-          )}
-
-          {runtimeState.notice && (
-            <section
-              className={styles.noticeBar}
-              data-desktop-background-blocker="true"
-              role="status"
-            >
-              <span>{runtimeState.notice.message}</span>
-              <button
-                className={styles.noticeDismiss}
-                onClick={() => {
-                  dispatch({ type: "dismiss_notice" });
-                }}
-                type="button"
-              >
-                Закрыть
-              </button>
-            </section>
-          )}
+              </section>
+            )}
+          </div>
 
           <section className={styles.desktopGrid} aria-label="Desktop entrypoints">
             {desktopEntries.map((entry) => {
@@ -1432,41 +1532,6 @@ export function DesktopShell({
             />
           )}
 
-          {overflowSummaries.length > 0 && (
-            <section
-              aria-label="Desktop overflow"
-              className={styles.overflowPanel}
-              data-desktop-background-blocker="true"
-            >
-              <div>
-                <p className={styles.placeholderLabel}>Desktop overflow</p>
-                <h2 className={styles.placeholderTitle}>
-                  Часть entrypoints вынесена в shell-local buckets
-                </h2>
-                <p className={styles.placeholderText}>
-                  Детальная навигация по hidden и overflow entrypoints теперь доступна через Explorer.
-                </p>
-              </div>
-              <div className={styles.overflowSummaryList}>
-                {overflowSummaries.map((entry) => (
-                  <article key={entry.bucket} className={styles.overflowSummaryCard}>
-                    <strong>{entry.title}</strong>
-                    <span>{entry.count}</span>
-                  </article>
-                ))}
-              </div>
-              <button
-                className={styles.shellGhostButton}
-                onClick={() => {
-                  openExplorerSection("overflow", "Explorer · Overflow");
-                }}
-                type="button"
-              >
-                Открыть Explorer
-              </button>
-            </section>
-          )}
-
           <section
             aria-label="Shell windows"
             className={styles.windowLayer}
@@ -1489,6 +1554,15 @@ export function DesktopShell({
                         ? styles.windowMaximized
                         : styles.windowFrame
                   }
+                  data-active={runtimeState.activeWindowId === window.windowId || undefined}
+                  data-dragging={dragState?.windowId === window.windowId || undefined}
+                  onMouseDown={() => {
+                    if (window.state === "minimized") {
+                      return;
+                    }
+
+                    focusWindow(window);
+                  }}
                   style={
                     window.state === "maximized"
                       ? undefined
@@ -1501,18 +1575,35 @@ export function DesktopShell({
                   }
                 >
                   <div className={styles.windowChrome}>
-                    <button
-                      className={styles.windowTitleButton}
-                      onClick={() => {
-                        dispatch({ type: "focus", windowId: window.windowId });
-                        if (window.routePath) {
-                          navigate(window.routePath);
+                    <div
+                      aria-label={`Окно ${window.title}`}
+                      className={styles.windowTitleBar}
+                      onDoubleClick={() => {
+                        toggleWindowMaximize(window);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          focusWindow(window);
+                          return;
+                        }
+
+                        if (event.key === "F10") {
+                          event.preventDefault();
+                          toggleWindowMaximize(window);
                         }
                       }}
-                      type="button"
+                      onMouseDown={(event) => {
+                        beginWindowDrag(event, window);
+                      }}
+                      role="button"
+                      tabIndex={0}
                     >
-                      {window.title}
-                    </button>
+                      <span className={styles.windowAppMark} aria-hidden="true">
+                        {window.title.slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className={styles.windowTitleText}>{window.title}</span>
+                    </div>
                     <div className={styles.windowControls}>
                       <button
                         className={styles.windowControl}
@@ -1526,15 +1617,11 @@ export function DesktopShell({
                       <button
                         className={styles.windowControl}
                         onClick={() => {
-                          dispatch({
-                            type:
-                              window.state === "maximized" ? "restore" : "maximize",
-                            windowId: window.windowId,
-                          });
+                          toggleWindowMaximize(window);
                         }}
                         type="button"
                       >
-                        □
+                        []
                       </button>
                       <button
                         className={styles.windowControlDanger}
@@ -1543,7 +1630,7 @@ export function DesktopShell({
                         }}
                         type="button"
                       >
-                        ×
+                        X
                       </button>
                     </div>
                   </div>
@@ -2175,8 +2262,8 @@ function readInitialShellWindowViewport(): ShellWindowViewport {
   }
 
   return {
-    width: Math.max(1, Math.round(window.innerWidth - 18 * 16)),
-    height: Math.max(1, Math.round(window.innerHeight - 12.1 * 16)),
+    width: Math.max(1, Math.round(window.innerWidth)),
+    height: Math.max(1, Math.round(window.innerHeight - 56)),
   };
 }
 

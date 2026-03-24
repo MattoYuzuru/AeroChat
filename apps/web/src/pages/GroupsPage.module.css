@@ -3,6 +3,11 @@
   gap: 1rem;
 }
 
+.desktopWindowLayout {
+  min-height: 100%;
+  gap: 0.75rem;
+}
+
 .heroCard,
 .panelCard,
 .stateCard,
@@ -222,10 +227,51 @@
   opacity: 0.72;
 }
 
+.desktopWindowLayout .panelCard,
+.desktopWindowLayout .stateCard,
+.desktopWindowLayout .groupCard,
+.desktopWindowLayout .memberCard,
+.desktopWindowLayout .inviteCard,
+.desktopWindowLayout .joinCard,
+.desktopWindowLayout .messageCard,
+.desktopWindowLayout .composer,
+.desktopWindowLayout .replyComposerCard,
+.desktopWindowLayout .attachmentDraftCard,
+.desktopWindowLayout .rosterCard,
+.desktopWindowLayout .rosterItem {
+  border-color: #8aa8c3;
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(226, 236, 244, 0.96));
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.9),
+    inset -1px -1px 0 rgba(106, 131, 152, 0.72);
+  backdrop-filter: none;
+}
+
+.desktopWindowLayout .primaryButton,
+.desktopWindowLayout .secondaryButton,
+.desktopWindowLayout .dangerButton,
+.desktopWindowLayout .ghostButton {
+  border-radius: 0;
+}
+
+.desktopWindowLayout .rolePill,
+.desktopWindowLayout .unreadPill,
+.desktopWindowLayout .statusPill,
+.desktopWindowLayout .callPill,
+.desktopWindowLayout .metaTag {
+  border-radius: 0.3rem;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
   gap: 1rem;
+}
+
+.desktopWindowWorkspace {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100%;
 }
 
 .sideColumn,
@@ -233,6 +279,10 @@
   display: grid;
   gap: 1rem;
   align-content: start;
+}
+
+.desktopMainColumn {
+  min-height: 100%;
 }
 
 .list,

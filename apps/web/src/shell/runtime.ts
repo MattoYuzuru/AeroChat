@@ -112,6 +112,11 @@ export type ShellRuntimeAction =
       windowId: string;
     }
   | {
+      type: "set_bounds";
+      windowId: string;
+      bounds: ShellWindowBounds;
+    }
+  | {
       type: "sync_target";
       app: ShellAppDefinition;
       target?: ShellLaunchTarget | null;
@@ -175,6 +180,8 @@ export function shellRuntimeReducer(
       return maximizeShellWindow(state, action.windowId);
     case "restore":
       return restoreShellWindow(state, action.windowId);
+    case "set_bounds":
+      return setShellWindowBounds(state, action.windowId, action.bounds);
     case "sync_target":
       return syncShellWindowTarget(state, action.app, action.target ?? null);
     case "set_content_mode":
@@ -442,6 +449,46 @@ function setShellWindowContentMode(
     ...state,
     windows,
   };
+}
+
+function setShellWindowBounds(
+  state: ShellRuntimeState,
+  windowId: string,
+  bounds: ShellWindowBounds,
+): ShellRuntimeState {
+  let changed = false;
+  const windows = state.windows.map((window) => {
+    if (window.windowId !== windowId || window.state === "maximized") {
+      return window;
+    }
+
+    if (
+      window.bounds.x === bounds.x &&
+      window.bounds.y === bounds.y &&
+      window.bounds.width === bounds.width &&
+      window.bounds.height === bounds.height
+    ) {
+      return window;
+    }
+
+    changed = true;
+    return {
+      ...window,
+      bounds,
+    };
+  });
+
+  if (!changed) {
+    return state;
+  }
+
+  return focusShellWindow(
+    {
+      ...state,
+      windows,
+    },
+    windowId,
+  );
 }
 
 function closeShellWindow(

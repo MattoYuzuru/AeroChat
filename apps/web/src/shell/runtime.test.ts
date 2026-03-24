@@ -267,6 +267,97 @@ describe("shellRuntimeReducer", () => {
     expect(state.activeWindowId).toBe(settingsWindowId);
   });
 
+  it("updates window bounds for drag without losing focus or identity", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.direct_chat,
+      target: {
+        key: "chat-1",
+        title: "Alice",
+        routePath: "/app/chats?chat=chat-1",
+      },
+      placement: {
+        bounds: {
+          x: 24,
+          y: 20,
+          width: 920,
+          height: 640,
+        },
+        restoredState: "open",
+      },
+    });
+    const windowId = state.activeWindowId!;
+
+    state = shellRuntimeReducer(state, {
+      type: "set_bounds",
+      windowId,
+      bounds: {
+        x: 108,
+        y: 82,
+        width: 920,
+        height: 640,
+      },
+    });
+
+    expect(state.activeWindowId).toBe(windowId);
+    expect(state.windows).toHaveLength(1);
+    expect(state.windows[0]?.windowId).toBe(windowId);
+    expect(state.windows[0]?.bounds).toEqual({
+      x: 108,
+      y: 82,
+      width: 920,
+      height: 640,
+    });
+    expect(state.windows[0]?.state).toBe("focused");
+  });
+
+  it("maximizes into a dedicated state and restores the previous normal bounds", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.search,
+      placement: {
+        bounds: {
+          x: 64,
+          y: 48,
+          width: 860,
+          height: 620,
+        },
+        restoredState: "open",
+      },
+    });
+    const windowId = state.activeWindowId!;
+
+    state = shellRuntimeReducer(state, {
+      type: "maximize",
+      windowId,
+    });
+
+    expect(state.windows[0]?.state).toBe("maximized");
+    expect(state.windows[0]?.bounds).toEqual({
+      x: 64,
+      y: 48,
+      width: 860,
+      height: 620,
+    });
+
+    state = shellRuntimeReducer(state, {
+      type: "restore",
+      windowId,
+    });
+
+    expect(state.windows[0]?.state).toBe("focused");
+    expect(state.windows[0]?.bounds).toEqual({
+      x: 64,
+      y: 48,
+      width: 860,
+      height: 620,
+    });
+  });
+
   it("restores a reopened maximized target back to its persisted normal bounds", () => {
     let state = createInitialShellRuntimeState();
 
