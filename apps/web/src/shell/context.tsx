@@ -1,5 +1,9 @@
 import { createContext, useContext } from "react";
-import type { DesktopRegistryState } from "./desktop-registry";
+import type {
+  DesktopFolderReferenceTarget,
+  DesktopRegistryState,
+  DesktopUnreadTargetMap,
+} from "./desktop-registry";
 import type { ShellAppId, ShellWindowContentMode } from "./runtime";
 
 export interface OpenDirectChatWindowOptions {
@@ -25,10 +29,17 @@ export interface DesktopShellHost {
   activeWindowId: string | null;
   activeWindowContentMode: ShellWindowContentMode | null;
   desktopRegistryState: DesktopRegistryState;
+  desktopUnreadTargetMap: DesktopUnreadTargetMap;
   launchApp(appId: ShellAppId): void;
   openDirectChat(options: OpenDirectChatWindowOptions): void;
   openGroupChat(options: OpenGroupChatWindowOptions): void;
+  openCustomFolder(folderId: string): void;
   openPersonProfile(options: OpenPersonProfileWindowOptions): void;
+  createCustomFolder(name: string): string;
+  renameCustomFolder(folderId: string, name: string): void;
+  deleteCustomFolder(folderId: string): void;
+  addFolderMember(folderId: string, target: DesktopFolderReferenceTarget): void;
+  removeFolderMember(referenceId: string): void;
   hideDesktopEntry(entryId: string): void;
   showDesktopEntry(entryId: string): void;
   setActiveWindowContentMode(contentMode: ShellWindowContentMode): void;
