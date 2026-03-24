@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDirectChatRoutePath,
+  buildFriendRequestsRoutePath,
   buildGroupChatRoutePath,
   buildPersonProfileRoutePath,
   resolveShellRouteEntry,
@@ -56,6 +57,18 @@ describe("resolveShellRouteEntry", () => {
       routePath: "/app/people?person=user-7&from=search",
     });
   });
+
+  it("maps friend requests route to the canonical singleton target", () => {
+    const resolved = resolveShellRouteEntry("/app/friend-requests", "?from=desktop");
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.app.appId).toBe("friend_requests");
+    expect(resolved?.target).toEqual({
+      key: "friend_requests",
+      title: "Заявки",
+      routePath: "/app/friend-requests?from=desktop",
+    });
+  });
 });
 
 describe("chat route builders", () => {
@@ -89,5 +102,13 @@ describe("chat route builders", () => {
     expect(buildPersonProfileRoutePath("user-9", params)).toBe(
       "/app/people?from=search&person=user-9",
     );
+  });
+
+  it("keeps extra friend requests params on the singleton route", () => {
+    const params = new URLSearchParams({
+      from: "desktop",
+    });
+
+    expect(buildFriendRequestsRoutePath(params)).toBe("/app/friend-requests?from=desktop");
   });
 });

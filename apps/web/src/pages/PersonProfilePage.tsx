@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { buildDirectChatRoutePath } from "../app/app-routes";
+import {
+  buildDirectChatRoutePath,
+  buildFriendRequestsRoutePath,
+} from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
 import { gatewayClient } from "../gateway/runtime";
 import {
@@ -26,6 +29,7 @@ export function PersonProfilePage() {
   const [isOpeningChat, setIsOpeningChat] = useState(false);
   const [chatActionError, setChatActionError] = useState<string | null>(null);
   const personId = searchParams.get("person")?.trim() ?? "";
+  const sourceSurface = searchParams.get("from")?.trim() ?? "";
   const sessionToken = authState.status === "authenticated" ? authState.token : "";
   const people = usePeople({
     enabled: authState.status === "authenticated",
@@ -55,13 +59,17 @@ export function PersonProfilePage() {
   }
 
   function handleBackToPeople() {
+    const targetAppId = sourceSurface === "requests" ? "friend_requests" : "people";
+    const targetRoutePath =
+      sourceSurface === "requests" ? buildFriendRequestsRoutePath() : "/app/people";
+
     if (desktopShellHost !== null) {
-      desktopShellHost.launchApp("people");
-      navigate("/app/people");
+      desktopShellHost.launchApp(targetAppId);
+      navigate(targetRoutePath);
       return;
     }
 
-    navigate("/app/people");
+    navigate(targetRoutePath);
   }
 
   async function handleOpenChat() {
@@ -123,7 +131,7 @@ export function PersonProfilePage() {
             onClick={handleBackToPeople}
             type="button"
           >
-            Назад к людям
+            {sourceSurface === "requests" ? "Назад к заявкам" : "Назад к людям"}
           </button>
         </div>
 
