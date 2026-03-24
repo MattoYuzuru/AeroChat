@@ -38,7 +38,7 @@ const desktopEntryItems: Array<{
 }> = [
   { appId: "search", label: "Поиск", meta: "message search" },
   { appId: "settings", label: "Настройки", meta: "privacy" },
-  { appId: "self_chat", label: "Я", meta: "self chat" },
+  { appId: "self_chat", label: "Я", meta: "self workspace" },
   { appId: "friend_requests", label: "Заявки", meta: "social" },
   { appId: "chats", label: "Чаты", meta: "chat opener" },
 ];
@@ -50,7 +50,10 @@ const startMenuItems: Array<{
   { appId: "search", description: "Поиск сообщений и быстрый jump в текущие conversations." },
   { appId: "chats", description: "Текущий route-backed direct chat workspace как bridge slice." },
   { appId: "settings", description: "Privacy, devices, sessions и account preferences." },
-  { appId: "self_chat", description: "Shell-native placeholder для будущего канонического Я-чата." },
+  {
+    appId: "self_chat",
+    description: "Канонический self-facing singleton target для текущего пользователя.",
+  },
   {
     appId: "friend_requests",
     description: "Каноническое окно входящих и исходящих friend requests.",
@@ -485,7 +488,6 @@ export function DesktopShell({
                 <div className={styles.windowBody}>
                   <ShellWindowBody
                     activeWindowId={runtimeState.activeWindowId}
-                    onLaunchApp={launchApp}
                     window={window}
                   />
                 </div>
@@ -592,36 +594,12 @@ export function DesktopShell({
 
 function ShellWindowBody({
   activeWindowId,
-  onLaunchApp,
   window,
 }: {
   activeWindowId: string | null;
-  onLaunchApp(appId: ShellAppId): void;
   window: ShellWindow;
 }) {
   const { appId } = window;
-
-  if (appId === "self_chat") {
-    return (
-      <div className={styles.placeholderCard}>
-        <p className={styles.placeholderLabel}>Self Chat / Я</p>
-        <h2 className={styles.placeholderTitle}>Канонический self-chat ещё не выделен в отдельный runtime target.</h2>
-        <p className={styles.placeholderText}>
-          В этом slice окно `Я` служит системным placeholder-entrypoint. Следующий chat-target PR
-          должен дать отдельный self/direct target без привязки к старому sidebar shell.
-        </p>
-        <button
-          className={styles.shellPrimaryButton}
-          onClick={() => {
-            onLaunchApp("chats");
-          }}
-          type="button"
-        >
-          Открыть текущий chat workspace
-        </button>
-      </div>
-    );
-  }
 
   if (!isRouteBackedShellAppId(appId)) {
     return null;

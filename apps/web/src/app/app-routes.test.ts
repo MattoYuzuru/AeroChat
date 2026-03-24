@@ -4,6 +4,7 @@ import {
   buildFriendRequestsRoutePath,
   buildGroupChatRoutePath,
   buildPersonProfileRoutePath,
+  buildSelfChatRoutePath,
   resolveShellRouteEntry,
 } from "./app-routes";
 
@@ -69,6 +70,18 @@ describe("resolveShellRouteEntry", () => {
       routePath: "/app/friend-requests?from=desktop",
     });
   });
+
+  it("maps self chat route to the canonical singleton target", () => {
+    const resolved = resolveShellRouteEntry("/app/self", "?from=desktop");
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.app.appId).toBe("self_chat");
+    expect(resolved?.target).toEqual({
+      key: "self_chat",
+      title: "Я",
+      routePath: "/app/self?from=desktop",
+    });
+  });
 });
 
 describe("chat route builders", () => {
@@ -110,5 +123,13 @@ describe("chat route builders", () => {
     });
 
     expect(buildFriendRequestsRoutePath(params)).toBe("/app/friend-requests?from=desktop");
+  });
+
+  it("keeps extra self chat params on the singleton route", () => {
+    const params = new URLSearchParams({
+      from: "desktop",
+    });
+
+    expect(buildSelfChatRoutePath(params)).toBe("/app/self?from=desktop");
   });
 });

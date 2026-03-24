@@ -6,6 +6,7 @@ import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import styles from "./AppShell.module.css";
 
 const navigationItems = [
+  { to: "/app/self", label: "Я", meta: "self workspace" },
   { to: "/app/profile", label: "Профиль", meta: "identity" },
   { to: "/app/chats", label: "Чаты", meta: "direct" },
   { to: "/app/groups", label: "Группы", meta: "group chat bootstrap" },
@@ -18,6 +19,7 @@ const navigationItems = [
 const statusItems = [
   "gateway edge",
   "light shell",
+  "self chat",
   "profile",
   "people",
   "direct chats",
