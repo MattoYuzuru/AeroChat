@@ -53,6 +53,12 @@ import {
   type DesktopFolderReferenceTarget,
   type DesktopEntity,
 } from "./desktop-registry";
+import {
+  createClosedDesktopContextMenuState,
+  listDesktopContextMenuItems,
+  reduceDesktopContextMenuState,
+  type DesktopContextMenuCommandId,
+} from "./desktop-context-menu";
 import { getBrowserShellPreferencesStorage } from "./preferences";
 import {
   buildShellLaunchKey,
@@ -103,16 +109,30 @@ export function DesktopShell({
   const [desktopRegistryState, setDesktopRegistryState] = useState(() =>
     readDesktopRegistryState(storage),
   );
+  const [desktopContextMenuState, dispatchDesktopContextMenu] = useReducer(
+    reduceDesktopContextMenuState,
+    undefined,
+    createClosedDesktopContextMenuState,
+  );
   const [recentItems, setRecentItems] = useState<StartMenuRecentItem[]>(() =>
     readStartMenuRecentItems(storage),
   );
   const [liveDirectChats, setLiveDirectChats] = useState<DirectChat[]>([]);
   const [liveGroups, setLiveGroups] = useState<Group[]>([]);
   const [selectedDesktopEntryId, setSelectedDesktopEntryId] = useState<string | null>(null);
+  const [folderRenameDialogState, setFolderRenameDialogState] = useState<{
+    folderId: string;
+    name: string;
+  } | null>(null);
+  const [folderDeleteDialogState, setFolderDeleteDialogState] = useState<{
+    folderId: string;
+    title: string;
+  } | null>(null);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [clock, setClock] = useState(() => new Date());
   const startMenuAnchorRef = useRef<HTMLDivElement | null>(null);
+  const desktopContextMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -184,6 +204,22 @@ export function DesktopShell({
     () => allCustomFolders.slice(0, MAX_START_MENU_FOLDER_ITEMS),
     [allCustomFolders],
   );
+  const desktopContextMenuEntry = useMemo(
+    () =>
+      desktopContextMenuState.kind !== "open"
+        ? null
+        : (desktopRegistryState.entries.find(
+            (entry) => entry.id === desktopContextMenuState.entryId,
+          ) ?? null),
+    [desktopContextMenuState, desktopRegistryState.entries],
+  );
+  const desktopContextMenuItems = useMemo(
+    () =>
+      desktopContextMenuEntry === null
+        ? []
+        : listDesktopContextMenuItems(desktopContextMenuEntry, desktopRegistryState),
+    [desktopContextMenuEntry, desktopRegistryState],
+  );
 
   useEffect(() => {
     const desiredPath = activeWindow?.routePath ?? "/app";
@@ -194,6 +230,10 @@ export function DesktopShell({
 
     navigate(desiredPath, { replace: true });
   }, [activeWindow?.routePath, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    dispatchDesktopContextMenu({ type: "close" });
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (activeWindow === null) {
@@ -237,6 +277,70 @@ export function DesktopShell({
       document.removeEventListener("keydown", handleDocumentKeyDown);
     };
   }, [startMenuState.isOpen]);
+
+  useEffect(() => {
+    if (desktopContextMenuState.kind !== "open") {
+      return;
+    }
+
+    function handleDocumentMouseDown(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (desktopContextMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      dispatchDesktopContextMenu({ type: "close" });
+    }
+
+    function handleDocumentKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      dispatchDesktopContextMenu({ type: "close" });
+    }
+
+    document.addEventListener("mousedown", handleDocumentMouseDown);
+    document.addEventListener("keydown", handleDocumentKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentMouseDown);
+      document.removeEventListener("keydown", handleDocumentKeyDown);
+    };
+  }, [desktopContextMenuState.kind]);
+
+  useEffect(() => {
+    if (folderRenameDialogState === null && folderDeleteDialogState === null) {
+      return;
+    }
+
+    function handleDocumentKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      setFolderRenameDialogState(null);
+      setFolderDeleteDialogState(null);
+    }
+
+    document.addEventListener("keydown", handleDocumentKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleDocumentKeyDown);
+    };
+  }, [folderDeleteDialogState, folderRenameDialogState]);
+
+  useEffect(() => {
+    if (desktopContextMenuState.kind !== "open" || desktopContextMenuEntry !== null) {
+      return;
+    }
+
+    dispatchDesktopContextMenu({ type: "close" });
+  }, [desktopContextMenuEntry, desktopContextMenuState.kind]);
 
   useEffect(() => {
     if (state.status !== "authenticated") {
@@ -402,6 +506,42 @@ export function DesktopShell({
     dispatchStartMenu({ type: "close" });
   }
 
+  function closeDesktopContextMenu() {
+    dispatchDesktopContextMenu({ type: "close" });
+  }
+
+  function closeFolderDialogs() {
+    setFolderRenameDialogState(null);
+    setFolderDeleteDialogState(null);
+  }
+
+  function openDesktopContextMenu(
+    entry: DesktopEntity,
+    position: {
+      x: number;
+      y: number;
+    },
+  ) {
+    setSelectedDesktopEntryId(entry.id);
+    dispatchDesktopContextMenu({
+      type: "open",
+      entryId: entry.id,
+      x: position.x,
+      y: position.y,
+    });
+  }
+
+  function openDesktopContextMenuFromButton(
+    entry: DesktopEntity,
+    buttonElement: HTMLButtonElement,
+  ) {
+    const rect = buttonElement.getBoundingClientRect();
+    openDesktopContextMenu(entry, {
+      x: clampDesktopContextMenuCoordinate(rect.left + rect.width / 2, window.innerWidth, 252),
+      y: clampDesktopContextMenuCoordinate(rect.top + rect.height / 2, window.innerHeight, 320),
+    });
+  }
+
   function launchApp(
     appId: ShellAppId,
     options?: {
@@ -426,6 +566,7 @@ export function DesktopShell({
       target: routeTarget,
     });
     closeStartMenu();
+    closeDesktopContextMenu();
 
     if (routeTarget?.routePath) {
       navigate(routeTarget.routePath);
@@ -450,6 +591,7 @@ export function DesktopShell({
       app: shellAppRegistry.direct_chat,
       target,
     });
+    closeDesktopContextMenu();
     navigate(target.routePath ?? "/app/chats");
     closeStartMenu();
   }
@@ -472,6 +614,7 @@ export function DesktopShell({
       app: shellAppRegistry.group_chat,
       target,
     });
+    closeDesktopContextMenu();
     navigate(target.routePath ?? "/app/groups");
     closeStartMenu();
   }
@@ -489,6 +632,7 @@ export function DesktopShell({
         routePath,
       },
     });
+    closeDesktopContextMenu();
     navigate(routePath);
     closeStartMenu();
   }
@@ -514,6 +658,19 @@ export function DesktopShell({
     setSelectedDesktopEntryId((currentEntryId) =>
       currentEntryId === `custom_folder:${folderId}` ? null : currentEntryId,
     );
+
+    if (
+      location.pathname === "/app/explorer" &&
+      new URLSearchParams(location.search).get("folder") === folderId
+    ) {
+      navigate(
+        buildExplorerRoutePath(
+          new URLSearchParams([
+            ["section", "folders"],
+          ]),
+        ),
+      );
+    }
   }
 
   function addFolderMember(
@@ -542,6 +699,7 @@ export function DesktopShell({
       app: shellAppRegistry.person_profile,
       target,
     });
+    closeDesktopContextMenu();
     navigate(target.routePath ?? "/app/people");
     closeStartMenu();
   }
@@ -674,6 +832,7 @@ export function DesktopShell({
 
   function openDesktopEntity(entry: DesktopEntity) {
     setSelectedDesktopEntryId(entry.id);
+    closeDesktopContextMenu();
 
     if (entry.kind === "system_app") {
       launchApp(entry.appId);
@@ -699,11 +858,63 @@ export function DesktopShell({
     });
   }
 
+  function handleDesktopContextMenuCommand(
+    entry: DesktopEntity,
+    commandId: DesktopContextMenuCommandId,
+  ) {
+    closeDesktopContextMenu();
+
+    if (commandId === "open") {
+      openDesktopEntity(entry);
+      return;
+    }
+
+    if (commandId === "hide") {
+      handleHideDesktopEntity(entry);
+      return;
+    }
+
+    if (entry.kind !== "custom_folder") {
+      return;
+    }
+
+    if (commandId === "rename_folder") {
+      setFolderRenameDialogState({
+        folderId: entry.folderId,
+        name: entry.title,
+      });
+      return;
+    }
+
+    if (commandId === "delete_folder") {
+      setFolderDeleteDialogState({
+        folderId: entry.folderId,
+        title: entry.title,
+      });
+    }
+  }
+
+  function handleAddDesktopTargetToFolderFromMenu(
+    entry: DesktopEntity,
+    folderId: string,
+  ) {
+    if (entry.kind !== "direct_chat" && entry.kind !== "group_chat") {
+      return;
+    }
+
+    addFolderMember(folderId, {
+      kind: entry.kind,
+      targetKey: entry.targetKey,
+    });
+    closeDesktopContextMenu();
+  }
+
   function handleHideDesktopEntity(entry: DesktopEntity) {
     if (!isDesktopEntityHideable(entry)) {
       return;
     }
 
+    closeDesktopContextMenu();
     hideDesktopEntry(entry.id);
     setSelectedDesktopEntryId((currentEntryId) =>
       currentEntryId === entry.id ? null : currentEntryId,
@@ -716,6 +927,29 @@ export function DesktopShell({
 
   function showDesktopEntry(entryId: string) {
     setDesktopRegistryState((currentState) => showDesktopEntityOnDesktop(currentState, entryId));
+  }
+
+  function submitFolderRenameDialog() {
+    if (folderRenameDialogState === null) {
+      return;
+    }
+
+    const normalizedName = folderRenameDialogState.name.trim();
+    if (normalizedName === "") {
+      return;
+    }
+
+    renameCustomFolder(folderRenameDialogState.folderId, normalizedName);
+    closeFolderDialogs();
+  }
+
+  function confirmFolderDeleteDialog() {
+    if (folderDeleteDialogState === null) {
+      return;
+    }
+
+    deleteCustomFolder(folderDeleteDialogState.folderId);
+    closeFolderDialogs();
   }
 
   async function handleLogout() {
@@ -867,17 +1101,37 @@ export function DesktopShell({
                     className={styles.desktopIcon}
                     onClick={() => {
                       setSelectedDesktopEntryId(entry.id);
+                      closeDesktopContextMenu();
+                    }}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      openDesktopContextMenu(entry, {
+                        x: clampDesktopContextMenuCoordinate(
+                          event.clientX,
+                          window.innerWidth,
+                          252,
+                        ),
+                        y: clampDesktopContextMenuCoordinate(
+                          event.clientY,
+                          window.innerHeight,
+                          320,
+                        ),
+                      });
                     }}
                     onDoubleClick={() => {
                       openDesktopEntity(entry);
                     }}
                     onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openDesktopEntity(entry);
                         return;
                       }
 
-                      event.preventDefault();
-                      openDesktopEntity(entry);
+                      if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                        event.preventDefault();
+                        openDesktopContextMenuFromButton(entry, event.currentTarget);
+                      }
                     }}
                     type="button"
                   >
@@ -896,35 +1150,34 @@ export function DesktopShell({
                       {describeDesktopEntityMeta(entry, desktopRegistryState)}
                     </small>
                   </button>
-
-                  {selectedDesktopEntryId === entry.id && (
-                    <div className={styles.desktopIconActions}>
-                      <button
-                        className={styles.desktopIconAction}
-                        onClick={() => {
-                          openDesktopEntity(entry);
-                        }}
-                        type="button"
-                      >
-                        Открыть
-                      </button>
-                      {isDesktopEntityHideable(entry) && (
-                        <button
-                          className={styles.desktopIconActionGhost}
-                          onClick={() => {
-                            handleHideDesktopEntity(entry);
-                          }}
-                          type="button"
-                        >
-                          Убрать с рабочего стола
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </article>
               );
             })}
           </section>
+
+          {desktopContextMenuState.kind === "open" && desktopContextMenuEntry !== null && (
+            <DesktopContextMenuPanel
+              entry={desktopContextMenuEntry}
+              isAddToFolderExpanded={desktopContextMenuState.isAddToFolderExpanded}
+              items={desktopContextMenuItems}
+              menuRef={desktopContextMenuRef}
+              registryState={desktopRegistryState}
+              onAddToFolderToggle={() => {
+                dispatchDesktopContextMenu({ type: "toggle_add_to_folder" });
+              }}
+              onClose={closeDesktopContextMenu}
+              onCommand={(commandId) => {
+                handleDesktopContextMenuCommand(desktopContextMenuEntry, commandId);
+              }}
+              onSelectFolder={(folderId) => {
+                handleAddDesktopTargetToFolderFromMenu(desktopContextMenuEntry, folderId);
+              }}
+              position={{
+                x: desktopContextMenuState.x,
+                y: desktopContextMenuState.y,
+              }}
+            />
+          )}
 
           {overflowSummaries.length > 0 && (
             <section className={styles.overflowPanel} aria-label="Desktop overflow">
@@ -1034,6 +1287,116 @@ export function DesktopShell({
             ))}
           </section>
         </section>
+
+        {folderRenameDialogState !== null && (
+          <div
+            className={styles.dialogOverlay}
+            onMouseDown={(event) => {
+              if (event.target !== event.currentTarget) {
+                return;
+              }
+
+              closeFolderDialogs();
+            }}
+            role="presentation"
+          >
+            <form
+              aria-label="Переименовать папку"
+              className={styles.dialogCard}
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitFolderRenameDialog();
+              }}
+              role="dialog"
+            >
+              <p className={styles.placeholderLabel}>Desktop folder</p>
+              <h2 className={styles.placeholderTitle}>Переименовать папку</h2>
+              <p className={styles.placeholderText}>
+                Изменится только shell-local label. Ссылки на chats и groups сохранятся.
+              </p>
+              <label className={styles.dialogField}>
+                <span>Название папки</span>
+                <input
+                  autoFocus
+                  className={styles.dialogInput}
+                  onChange={(event) => {
+                    setFolderRenameDialogState((currentState) =>
+                      currentState === null
+                        ? null
+                        : {
+                            ...currentState,
+                            name: event.target.value,
+                          },
+                    );
+                  }}
+                  type="text"
+                  value={folderRenameDialogState.name}
+                />
+              </label>
+              <div className={styles.actions}>
+                <button
+                  className={styles.shellGhostButton}
+                  onClick={() => {
+                    closeFolderDialogs();
+                  }}
+                  type="button"
+                >
+                  Отмена
+                </button>
+                <button className={styles.shellPrimaryButton} type="submit">
+                  Сохранить
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {folderDeleteDialogState !== null && (
+          <div
+            className={styles.dialogOverlay}
+            onMouseDown={(event) => {
+              if (event.target !== event.currentTarget) {
+                return;
+              }
+
+              closeFolderDialogs();
+            }}
+            role="presentation"
+          >
+            <section
+              aria-label="Удалить папку"
+              className={styles.dialogCard}
+              role="dialog"
+            >
+              <p className={styles.placeholderLabel}>Desktop folder</p>
+              <h2 className={styles.placeholderTitle}>Удалить папку «{folderDeleteDialogState.title}»?</h2>
+              <p className={styles.placeholderText}>
+                Будет удалён только shell-local folder object и его shortcut-ссылки. Сами chats и
+                groups останутся без изменений.
+              </p>
+              <div className={styles.actions}>
+                <button
+                  className={styles.shellGhostButton}
+                  onClick={() => {
+                    closeFolderDialogs();
+                  }}
+                  type="button"
+                >
+                  Отмена
+                </button>
+                <button
+                  className={styles.dialogDangerButton}
+                  onClick={() => {
+                    confirmFolderDeleteDialog();
+                  }}
+                  type="button"
+                >
+                  Удалить папку
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
 
         <footer className={styles.taskbar}>
           <div className={styles.taskbarLeft}>
@@ -1301,6 +1664,136 @@ function ShellWindowBody({
   );
 }
 
+function DesktopContextMenuPanel({
+  entry,
+  isAddToFolderExpanded,
+  items,
+  menuRef,
+  registryState,
+  onAddToFolderToggle,
+  onClose,
+  onCommand,
+  onSelectFolder,
+  position,
+}: {
+  entry: DesktopEntity;
+  isAddToFolderExpanded: boolean;
+  items: ReturnType<typeof listDesktopContextMenuItems>;
+  menuRef: {
+    current: HTMLDivElement | null;
+  };
+  registryState: {
+    entries: DesktopEntity[];
+    folderMembers: Array<{ folderId: string }>;
+  };
+  onAddToFolderToggle(): void;
+  onClose(): void;
+  onCommand(commandId: DesktopContextMenuCommandId): void;
+  onSelectFolder(folderId: string): void;
+  position: {
+    x: number;
+    y: number;
+  };
+}) {
+  return (
+    <div
+      aria-label={`Контекстное меню ${entry.title}`}
+      className={styles.contextMenu}
+      ref={menuRef}
+      role="menu"
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+      }}
+    >
+      <div className={styles.contextMenuHeader}>
+        <strong>{entry.title}</strong>
+        <small>{describeDesktopEntityMeta(entry, registryState)}</small>
+      </div>
+
+      <div className={styles.contextMenuList}>
+        {items.map((item) => {
+          if (item.kind === "command") {
+            return (
+              <button
+                key={item.id}
+                className={
+                  item.tone === "danger"
+                    ? styles.contextMenuButtonDanger
+                    : styles.contextMenuButton
+                }
+                onClick={() => {
+                  onCommand(item.id);
+                }}
+                role="menuitem"
+                type="button"
+              >
+                {item.label}
+              </button>
+            );
+          }
+
+          return (
+            <div key={item.id} className={styles.contextMenuFolderGroup}>
+              <button
+                aria-expanded={isAddToFolderExpanded}
+                aria-haspopup="true"
+                className={styles.contextMenuButton}
+                onClick={() => {
+                  onAddToFolderToggle();
+                }}
+                role="menuitem"
+                type="button"
+              >
+                {item.label}
+              </button>
+
+              {isAddToFolderExpanded && (
+                <div className={styles.contextMenuSubmenu}>
+                  {item.folders.length > 0 ? (
+                    item.folders.map((folder) => (
+                      <button
+                        key={folder.folderId}
+                        className={styles.contextMenuFolderButton}
+                        disabled={folder.isDisabled}
+                        onClick={() => {
+                          if (folder.isDisabled) {
+                            return;
+                          }
+
+                          onSelectFolder(folder.folderId);
+                        }}
+                        type="button"
+                      >
+                        <span>{folder.title}</span>
+                        <small>{folder.isDisabled ? "Уже добавлено" : "Добавить"}</small>
+                      </button>
+                    ))
+                  ) : (
+                    <p className={styles.contextMenuEmptyState}>
+                      Создайте папку в Explorer, чтобы добавить сюда этот target.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        className={styles.contextMenuFooter}
+        onClick={() => {
+          onClose();
+        }}
+        type="button"
+      >
+        Закрыть
+      </button>
+    </div>
+  );
+}
+
 function describeDesktopEntityBadge(entry: DesktopEntity): string {
   if (entry.kind === "custom_folder") {
     return "П";
@@ -1360,6 +1853,15 @@ function describeDesktopEntityMeta(
   }
 
   return "Системное";
+}
+
+function clampDesktopContextMenuCoordinate(
+  value: number,
+  viewportSize: number,
+  menuSize: number,
+): number {
+  const safeStart = 12;
+  return Math.max(safeStart, Math.min(value, viewportSize - menuSize - safeStart));
 }
 
 function upsertLiveDirectChat(

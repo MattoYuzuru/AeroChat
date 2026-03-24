@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] Mobile launcher/home adaptation over canonical targets, recent items and custom folders
+- [x] Desktop context menus and bounded shell actions over desktop entities and custom folders
 
 ---
 
