@@ -71,6 +71,8 @@ export function ExplorerPage() {
     section: searchParams.get("section"),
     folder: searchParams.get("folder"),
   });
+  const visibleDesktopCapacity =
+    desktopShellHost?.desktopGridCapacity ?? Number.POSITIVE_INFINITY;
   const registryState = desktopShellHost?.desktopRegistryState ?? localRegistryState;
   const unreadTargetMap =
     desktopShellHost?.desktopUnreadTargetMap ??
@@ -81,6 +83,7 @@ export function ExplorerPage() {
           registryState,
           navigationTarget.sectionId,
           unreadTargetMap,
+          visibleDesktopCapacity,
         )
       : null;
   const folderViewModel =
@@ -89,6 +92,7 @@ export function ExplorerPage() {
           registryState,
           navigationTarget.folderId,
           unreadTargetMap,
+          visibleDesktopCapacity,
         )
       : null;
   const customFolders = listCustomFolderDesktopEntities(registryState);
@@ -473,10 +477,7 @@ export function ExplorerPage() {
       <aside className={styles.sidebar} aria-label="Explorer navigation">
         <div className={styles.sidebarHeader}>
           <p className={styles.sidebarEyebrow}>Explorer</p>
-          <h1 className={styles.sidebarTitle}>Организация shell entrypoints</h1>
-          <p className={styles.sidebarText}>
-            Explorer остаётся честным organizer surface поверх shell-local registry и custom folders.
-          </p>
+          <h1 className={styles.sidebarTitle}>Проводник AeroChat</h1>
         </div>
 
         <nav className={styles.sectionList}>
@@ -502,14 +503,12 @@ export function ExplorerPage() {
 
         <section className={styles.folderNav}>
           <div className={styles.folderNavHeader}>
-            <strong>Custom folders</strong>
+            <strong>Папки</strong>
             <span>{customFolders.length}</span>
           </div>
 
           {customFolders.length === 0 ? (
-            <p className={styles.folderNavEmpty}>
-              Создайте первую shell-local папку в секции «Папки».
-            </p>
+            <p className={styles.folderNavEmpty}>Создайте первую папку.</p>
           ) : (
             <div className={styles.folderNavList}>
               {customFolders.map((folder) => {
@@ -517,6 +516,7 @@ export function ExplorerPage() {
                   registryState,
                   folder.folderId,
                   unreadTargetMap,
+                  visibleDesktopCapacity,
                 )?.folder;
 
                 return (
@@ -550,87 +550,76 @@ export function ExplorerPage() {
         {navigationTarget.kind === "folder" ? (
           folderViewModel === null ? (
             <section className={styles.emptyState}>
-              <p className={styles.contentEyebrow}>Folder target</p>
               <h3 className={styles.emptyTitle}>Папка не найдена</h3>
-              <p className={styles.emptyText}>
-                Этот shell-local folder target больше не существует или был удалён.
-              </p>
+              <p className={styles.emptyText}>Папка была удалена или ещё не создана.</p>
               <div className={styles.integrityActions}>
-                <button
-                  className={styles.secondaryAction}
+                <ExplorerActionButton
+                  action="back"
                   onClick={() => {
                     openSection("folders");
                   }}
-                  type="button"
+                  tone="secondary"
                 >
-                  Вернуться к папкам
-                </button>
+                  К папкам
+                </ExplorerActionButton>
               </div>
             </section>
           ) : (
             <>
               <header className={styles.contentHeader}>
                 <div>
-                  <p className={styles.contentEyebrow}>Custom folder</p>
+                  <p className={styles.contentEyebrow}>Папка</p>
                   <h2 className={styles.contentTitle}>{folderViewModel.folder.folder.title}</h2>
-                  <p className={styles.contentText}>
-                    Папка хранит только shell-local shortcut-ссылки на canonical chats и groups.
-                  </p>
                 </div>
                 <div className={styles.headerBadges}>
+                  <span className={styles.headerBadge}>{folderViewModel.folder.memberCount} объектов</span>
                   <span className={styles.headerBadge}>
-                    Объекты: {folderViewModel.folder.memberCount}
-                  </span>
-                  <span className={styles.headerBadge}>
-                    Непрочитано: {folderViewModel.folder.unreadCount}
-                  </span>
-                  <span className={styles.headerBadge}>
-                    {folderViewModel.folder.stateLabel}
+                    Непрочитано {folderViewModel.folder.unreadCount}
                   </span>
                 </div>
               </header>
 
               <section className={styles.toolbarCard}>
                 <div className={styles.entityActions}>
-                  <button
-                    className={styles.primaryAction}
+                  <ExplorerActionButton
+                    action="rename"
                     onClick={() => {
                       startRenamingFolder(folderViewModel.folder);
                     }}
-                    type="button"
+                    tone="primary"
                   >
                     Переименовать
-                  </button>
-                  <button
-                    className={styles.secondaryAction}
+                  </ExplorerActionButton>
+                  <ExplorerActionButton
+                    action="delete"
                     onClick={() => {
                       handleDeleteFolder(folderViewModel.folder.folder.folderId);
                     }}
-                    type="button"
+                    tone="secondary"
                   >
                     Удалить папку
-                  </button>
+                  </ExplorerActionButton>
                   {canShowDesktopEntry(folderViewModel.folder.folder) && (
-                    <button
-                      className={styles.secondaryAction}
+                    <ExplorerActionButton
+                      action="show"
                       onClick={() => {
                         showEntry(folderViewModel.folder.folder.id);
                       }}
-                      type="button"
+                      tone="secondary"
                     >
                       Показать на рабочем столе
-                    </button>
+                    </ExplorerActionButton>
                   )}
                   {canHideDesktopEntry(folderViewModel.folder.folder) && (
-                    <button
-                      className={styles.secondaryAction}
+                    <ExplorerActionButton
+                      action="hide"
                       onClick={() => {
                         hideEntry(folderViewModel.folder.folder.id);
                       }}
-                      type="button"
+                      tone="secondary"
                     >
                       Скрыть с рабочего стола
-                    </button>
+                    </ExplorerActionButton>
                   )}
                 </div>
 
@@ -645,22 +634,22 @@ export function ExplorerPage() {
                       type="text"
                       value={renamingFolderName}
                     />
-                    <button
-                      className={styles.primaryAction}
+                    <ExplorerActionButton
+                      action="save"
                       onClick={() => {
                         handleRenameFolder(folderViewModel.folder.folder.folderId);
                       }}
-                      type="button"
+                      tone="primary"
                     >
                       Сохранить
-                    </button>
-                    <button
-                      className={styles.secondaryAction}
+                    </ExplorerActionButton>
+                    <ExplorerActionButton
+                      action="cancel"
                       onClick={cancelRenamingFolder}
-                      type="button"
+                      tone="secondary"
                     >
                       Отмена
-                    </button>
+                    </ExplorerActionButton>
                   </div>
                 )}
               </section>
@@ -685,31 +674,30 @@ export function ExplorerPage() {
                         {record.hasUnread && (
                           <span className={styles.inlineBadge}>Непрочитано</span>
                         )}
-                        <button
-                          className={styles.primaryAction}
+                        <ExplorerActionButton
+                          action="open"
                           onClick={() => {
                             openEntry(record.entry);
                           }}
-                          type="button"
+                          tone="primary"
                         >
                           Открыть
-                        </button>
-                        <button
-                          className={styles.secondaryAction}
+                        </ExplorerActionButton>
+                        <ExplorerActionButton
+                          action="remove"
                           onClick={() => {
                             handleRemoveFolderMember(record.referenceId);
                           }}
-                          type="button"
+                          tone="secondary"
                         >
                           Убрать из папки
-                        </button>
+                        </ExplorerActionButton>
                       </div>
                     </article>
                   ))}
                 </div>
               ) : (
                 <section className={styles.emptyState}>
-                  <p className={styles.contentEyebrow}>Пусто</p>
                   <h3 className={styles.emptyTitle}>{folderViewModel.emptyTitle}</h3>
                   <p className={styles.emptyText}>{folderViewModel.emptyDescription}</p>
                 </section>
@@ -720,26 +708,24 @@ export function ExplorerPage() {
           <>
             <header className={styles.contentHeader}>
               <div>
-                <p className={styles.contentEyebrow}>Shell organizer</p>
                 <h2 className={styles.contentTitle}>{sectionViewModel?.section.label}</h2>
                 <p className={styles.contentText}>{sectionViewModel?.section.description}</p>
               </div>
               <div className={styles.headerBadges}>
                 <span className={styles.headerBadge}>
-                  Registry entries: {registryState.entries.length}
-                </span>
-                <span className={styles.headerBadge}>Folders: {customFolders.length}</span>
-                <span className={styles.headerBadge}>
-                  Section: {sectionViewModel?.section.label}
+                  {(sectionViewModel?.entities.length ?? 0) +
+                    (sectionViewModel?.folders.length ?? 0) +
+                    (sectionViewModel?.buckets.reduce(
+                      (count, bucket) => count + bucket.entities.length,
+                      0,
+                    ) ?? 0)}
+                  {" "}объектов
                 </span>
               </div>
             </header>
 
             {sectionViewModel?.section.id === "folders" && (
               <section className={styles.toolbarCard}>
-                <p className={styles.contentText}>
-                  В этой версии custom folders остаются browser-local organizer objects без server sync и без nested hierarchy.
-                </p>
                 <div className={styles.inlineForm}>
                   <input
                     className={styles.textInput}
@@ -750,13 +736,13 @@ export function ExplorerPage() {
                     type="text"
                     value={newFolderName}
                   />
-                  <button
-                    className={styles.primaryAction}
+                  <ExplorerActionButton
+                    action="create"
                     onClick={handleCreateFolder}
-                    type="button"
+                    tone="primary"
                   >
                     Создать папку
-                  </button>
+                  </ExplorerActionButton>
                 </div>
               </section>
             )}
@@ -783,33 +769,33 @@ export function ExplorerPage() {
                           Непрочитано {folder.unreadCount}
                         </span>
                       )}
-                      <button
-                        className={styles.primaryAction}
+                      <ExplorerActionButton
+                        action="open"
                         onClick={() => {
                           openFolder(folder.folder.folderId);
                         }}
-                        type="button"
+                        tone="primary"
                       >
                         Открыть
-                      </button>
-                      <button
-                        className={styles.secondaryAction}
+                      </ExplorerActionButton>
+                      <ExplorerActionButton
+                        action="rename"
                         onClick={() => {
                           startRenamingFolder(folder);
                         }}
-                        type="button"
+                        tone="secondary"
                       >
                         Переименовать
-                      </button>
-                      <button
-                        className={styles.secondaryAction}
+                      </ExplorerActionButton>
+                      <ExplorerActionButton
+                        action="delete"
                         onClick={() => {
                           handleDeleteFolder(folder.folder.folderId);
                         }}
-                        type="button"
+                        tone="secondary"
                       >
                         Удалить
-                      </button>
+                      </ExplorerActionButton>
                     </div>
                   </article>
                 ))}
@@ -828,22 +814,22 @@ export function ExplorerPage() {
                     type="text"
                     value={renamingFolderName}
                   />
-                  <button
-                    className={styles.primaryAction}
+                  <ExplorerActionButton
+                    action="save"
                     onClick={() => {
                       handleRenameFolder(renamingFolderId);
                     }}
-                    type="button"
+                    tone="primary"
                   >
                     Сохранить
-                  </button>
-                  <button
-                    className={styles.secondaryAction}
+                  </ExplorerActionButton>
+                  <ExplorerActionButton
+                    action="cancel"
                     onClick={cancelRenamingFolder}
-                    type="button"
+                    tone="secondary"
                   >
                     Отмена
-                  </button>
+                  </ExplorerActionButton>
                 </div>
               </section>
             )}
@@ -873,36 +859,36 @@ export function ExplorerPage() {
                           Непрочитано {record.unreadCount}
                         </span>
                       )}
-                      <button
-                        className={styles.primaryAction}
+                      <ExplorerActionButton
+                        action="open"
                         onClick={() => {
                           openEntry(record.entry);
                         }}
-                        type="button"
+                        tone="primary"
                       >
                         Открыть
-                      </button>
+                      </ExplorerActionButton>
                       {canShowDesktopEntry(record.entry) && (
-                        <button
-                          className={styles.secondaryAction}
+                        <ExplorerActionButton
+                          action="show"
                           onClick={() => {
                             showEntry(record.entry.id);
                           }}
-                          type="button"
+                          tone="secondary"
                         >
                           Показать на рабочем столе
-                        </button>
+                        </ExplorerActionButton>
                       )}
                       {canHideDesktopEntry(record.entry) && (
-                        <button
-                          className={styles.secondaryAction}
+                        <ExplorerActionButton
+                          action="hide"
                           onClick={() => {
                             hideEntry(record.entry.id);
                           }}
-                          type="button"
+                          tone="secondary"
                         >
                           Скрыть с рабочего стола
-                        </button>
+                        </ExplorerActionButton>
                       )}
                       {canAddEntryToFolder(record, customFolders) && (
                         <>
@@ -926,15 +912,15 @@ export function ExplorerPage() {
                               </option>
                             ))}
                           </select>
-                          <button
-                            className={styles.secondaryAction}
+                          <ExplorerActionButton
+                            action="add"
                             onClick={() => {
                               handleAddEntryToFolder(record.entry);
                             }}
-                            type="button"
+                            tone="secondary"
                           >
                             Добавить в папку
-                          </button>
+                          </ExplorerActionButton>
                         </>
                       )}
                     </div>
@@ -949,7 +935,6 @@ export function ExplorerPage() {
                   <section key={bucket.bucket} className={styles.bucketCard}>
                     <header className={styles.bucketHeader}>
                       <div>
-                        <p className={styles.bucketEyebrow}>Overflow bucket</p>
                         <h3 className={styles.bucketTitle}>{bucket.title}</h3>
                       </div>
                       <span className={styles.bucketCount}>{bucket.entities.length}</span>
@@ -968,24 +953,24 @@ export function ExplorerPage() {
                                 Непрочитано {record.unreadCount}
                               </span>
                             )}
-                            <button
-                              className={styles.primaryAction}
+                            <ExplorerActionButton
+                              action="open"
                               onClick={() => {
                                 openEntry(record.entry);
                               }}
-                              type="button"
+                              tone="primary"
                             >
                               Открыть
-                            </button>
-                            <button
-                              className={styles.secondaryAction}
+                            </ExplorerActionButton>
+                            <ExplorerActionButton
+                              action="show"
                               onClick={() => {
                                 showEntry(record.entry.id);
                               }}
-                              type="button"
+                              tone="secondary"
                             >
                               Показать на рабочем столе
-                            </button>
+                            </ExplorerActionButton>
                           </div>
                         </article>
                       ))}
@@ -1009,15 +994,15 @@ export function ExplorerPage() {
                       </div>
                     </div>
                     <div className={styles.entityActions}>
-                      <button
-                        className={styles.primaryAction}
+                      <ExplorerActionButton
+                        action="open"
                         onClick={() => {
                           openSystemApp(link.appId);
                         }}
-                        type="button"
+                        tone="primary"
                       >
                         Открыть
-                      </button>
+                      </ExplorerActionButton>
                     </div>
                   </article>
                 ))}
@@ -1030,53 +1015,50 @@ export function ExplorerPage() {
               sectionViewModel.buckets.length === 0 &&
               sectionViewModel.appLinks.length === 0 && (
                 <section className={styles.emptyState}>
-                  <p className={styles.contentEyebrow}>Пусто</p>
                   <h3 className={styles.emptyTitle}>{sectionViewModel.emptyTitle}</h3>
                   <p className={styles.emptyText}>{sectionViewModel.emptyDescription}</p>
                 </section>
               )}
           </>
         )}
-
-        <section className={styles.integrityCard}>
-          <p className={styles.contentEyebrow}>Privacy boundary</p>
-          <h3 className={styles.integrityTitle}>Explorer не подменяет Search</h3>
-          <p className={styles.integrityText}>
-            Organizer surface только открывает canonical Search app и не делает hidden omnibox,
-            server discovery или fake encrypted global search.
-          </p>
-          <div className={styles.integrityActions}>
-            <button
-              className={styles.secondaryAction}
-              onClick={() => {
-                openSystemApp("search");
-              }}
-              type="button"
-            >
-              Открыть Search app
-            </button>
-            <button
-              className={styles.secondaryAction}
-              onClick={() => {
-                openSystemApp("friend_requests");
-              }}
-              type="button"
-            >
-              Открыть заявки
-            </button>
-            <button
-              className={styles.secondaryAction}
-              onClick={() => {
-                openSystemApp("settings");
-              }}
-              type="button"
-            >
-              Открыть настройки
-            </button>
-          </div>
-        </section>
       </section>
     </div>
+  );
+}
+
+function ExplorerActionButton({
+  action,
+  children,
+  onClick,
+  tone,
+}: {
+  action:
+    | "add"
+    | "back"
+    | "cancel"
+    | "create"
+    | "delete"
+    | "hide"
+    | "open"
+    | "remove"
+    | "rename"
+    | "save"
+    | "show";
+  children: string;
+  onClick(): void;
+  tone: "primary" | "secondary";
+}) {
+  return (
+    <button
+      className={tone === "primary" ? styles.primaryAction : styles.secondaryAction}
+      data-action={action}
+      onClick={onClick}
+      title={children}
+      type="button"
+    >
+      <span aria-hidden="true" className={styles.actionGlyph} data-action={action} />
+      <span className={styles.actionLabel}>{children}</span>
+    </button>
   );
 }
 
