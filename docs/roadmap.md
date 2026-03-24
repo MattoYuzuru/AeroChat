@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] web group call control / lobby bootstrap
+- [x] canonical shell direct/group chat windows
 
 ---
 
@@ -216,6 +216,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [ ] PWA
 - [x] Desktop shell XP runtime scaffold
 - [x] Boot/login application model внутри нового shell
+- [x] Canonical direct/group shell windows
 - [ ] XP-first theme engine
 - [ ] Explorer, folder organization и shell launcher
 - [ ] Mobile practical shell adaptation

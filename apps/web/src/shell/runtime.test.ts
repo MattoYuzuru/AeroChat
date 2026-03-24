@@ -29,7 +29,7 @@ describe("shellRuntimeReducer", () => {
   it("allows different singleton_per_target launch keys when runtime policy needs it", () => {
     let state = createInitialShellRuntimeState();
     const directChatApp: ShellAppDefinition = {
-      appId: "chats",
+      appId: "direct_chat",
       title: "Direct chat",
       launchPolicy: "singleton_per_target",
       routePath: "/app/chats",
@@ -56,8 +56,8 @@ describe("shellRuntimeReducer", () => {
 
     expect(state.windows).toHaveLength(2);
     expect(state.windows.map((window) => window.launchKey)).toEqual([
-      "chats:chat-1",
-      "chats:chat-2",
+      "direct_chat:chat-1",
+      "direct_chat:chat-2",
     ]);
   });
 
@@ -91,7 +91,7 @@ describe("shellRuntimeReducer", () => {
       state = shellRuntimeReducer(state, {
         type: "launch",
         app: {
-          appId: "chats",
+          appId: "direct_chat",
           title: `Chat ${index + 1}`,
           launchPolicy: "singleton_per_target",
           routePath: "/app/chats",
@@ -107,7 +107,7 @@ describe("shellRuntimeReducer", () => {
     state = shellRuntimeReducer(state, {
       type: "launch",
       app: {
-        appId: "groups",
+        appId: "group_chat",
         title: "Group 11",
         launchPolicy: "singleton_per_target",
         routePath: "/app/groups",

@@ -91,11 +91,13 @@ import {
   readSearchJumpIntent,
 } from "../search/jump";
 import { primeEncryptedGroupLocalSearchIndex } from "../search/encrypted-local-search";
+import { useDesktopShellHost } from "../shell/context";
 import styles from "./GroupsPage.module.css";
 
 export function GroupsPage() {
   const refreshActiveGroupCallsIntervalMs = 5000;
   const { state: authState, expireSession } = useAuth();
+  const desktopShellHost = useDesktopShellHost();
   const cryptoRuntime = useCryptoRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
   const [groups, setGroups] = useState<Group[]>([]);
@@ -1189,6 +1191,19 @@ export function GroupsPage() {
     previousSelectedGroupCallIdRef.current = currentCallId;
   }, [groupCallActionState, groupCallError, selectedGroupCallEntry?.call.id]);
 
+  const selectedGroupTitle =
+    selectedState.status === "ready"
+      ? selectedState.snapshot.group.name
+      : "Группа";
+
+  useEffect(() => {
+    if (desktopShellHost === null || selectedState.status !== "ready") {
+      return;
+    }
+
+    desktopShellHost.syncCurrentRouteTitle(selectedGroupTitle);
+  }, [desktopShellHost, selectedGroupTitle, selectedState]);
+
   if (authState.status !== "authenticated") {
     return null;
   }
@@ -2263,12 +2278,27 @@ export function GroupsPage() {
   }
 
   function openGroup(groupId: string) {
+    if (desktopShellHost !== null) {
+      const group = groups.find((entry) => entry.id === groupId) ?? null;
+      desktopShellHost.openGroupChat({
+        groupId,
+        title: group?.name ?? "Группа",
+      });
+      return;
+    }
+
     const params = new URLSearchParams();
     params.set("group", groupId);
     setSearchParams(params, { replace: true });
   }
 
   function clearGroupSelection() {
+    if (desktopShellHost !== null) {
+      desktopShellHost.launchApp("groups");
+      setComposerText("");
+      return;
+    }
+
     setSearchParams(new URLSearchParams(), { replace: true });
     setComposerText("");
   }
