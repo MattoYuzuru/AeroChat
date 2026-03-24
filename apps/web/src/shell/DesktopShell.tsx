@@ -20,10 +20,12 @@ import { DesktopShellHostContext } from "./context";
 import {
   buildShellLaunchKey,
   createInitialShellRuntimeState,
+  getDefaultShellWindowContentMode,
   listTaskbarShellWindows,
   selectActiveShellWindow,
   shellRuntimeReducer,
   type ShellAppId,
+  type ShellWindowContentMode,
   type ShellWindow,
 } from "./runtime";
 import styles from "./DesktopShell.module.css";
@@ -208,13 +210,25 @@ export function DesktopShell({
     }
 
     dispatch({
-      type: "launch",
+      type: "sync_target",
       app: routeEntry.app,
       target: {
         ...routeEntry.target,
         title: normalizedTitle,
         routePath: `${location.pathname}${location.search}`,
       },
+    });
+  }
+
+  function setActiveWindowContentMode(contentMode: ShellWindowContentMode) {
+    if (activeWindow === null || activeWindow.contentMode === null) {
+      return;
+    }
+
+    dispatch({
+      type: "set_content_mode",
+      windowId: activeWindow.windowId,
+      contentMode,
     });
   }
 
@@ -275,9 +289,12 @@ export function DesktopShell({
     <DesktopShellHostContext.Provider
       value={{
         isDesktopShell: true,
+        activeWindowId: activeWindow?.windowId ?? null,
+        activeWindowContentMode: activeWindow?.contentMode ?? null,
         launchApp,
         openDirectChat,
         openGroupChat,
+        setActiveWindowContentMode,
         syncCurrentRouteTitle,
       }}
     >
@@ -629,7 +646,13 @@ function ShellWindowBody({
   }
 
   return (
-    <div className={styles.routeHost} data-active-route-app={appId}>
+    <div
+      className={styles.routeHost}
+      data-active-route-app={appId}
+      data-window-content-mode={
+        window.contentMode ?? getDefaultShellWindowContentMode(window.appId) ?? undefined
+      }
+    >
       {renderShellAppContent(appId)}
     </div>
   );

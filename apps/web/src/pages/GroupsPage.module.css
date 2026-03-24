@@ -41,6 +41,15 @@
   gap: 1rem;
 }
 
+.groupIdentityButton {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
 .cardLabel {
   margin: 0;
   font-size: 0.78rem;
@@ -72,6 +81,11 @@
 .messageMeta {
   margin: 0.8rem 0 0;
   color: rgba(3, 50, 82, 0.78);
+}
+
+.infoActionHint {
+  margin: 0.8rem 0 0;
+  color: rgba(18, 89, 146, 0.9);
 }
 
 .metrics {

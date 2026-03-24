@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { shellAppRegistry } from "../app/app-routes";
 import {
   createInitialShellRuntimeState,
+  listTaskbarShellWindows,
   MAX_OPEN_SHELL_WINDOWS,
   shellRuntimeReducer,
   type ShellAppDefinition,
@@ -82,6 +83,131 @@ describe("shellRuntimeReducer", () => {
     });
     expect(state.windows[0]?.state).toBe("focused");
     expect(state.activeWindowId).toBe(settingsWindowId);
+  });
+
+  it("keeps same direct chat window instance while preserving live info mode across minimize/restore", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.direct_chat,
+      target: {
+        key: "chat-1",
+        title: "Alice",
+        routePath: "/app/chats?chat=chat-1",
+      },
+    });
+    const directWindow = state.windows[0]!;
+
+    state = shellRuntimeReducer(state, {
+      type: "set_content_mode",
+      windowId: directWindow.windowId,
+      contentMode: "info",
+    });
+    state = shellRuntimeReducer(state, {
+      type: "minimize",
+      windowId: directWindow.windowId,
+    });
+    state = shellRuntimeReducer(state, {
+      type: "restore",
+      windowId: directWindow.windowId,
+    });
+
+    expect(state.windows).toHaveLength(1);
+    expect(state.windows[0]?.windowId).toBe(directWindow.windowId);
+    expect(state.windows[0]?.launchKey).toBe(directWindow.launchKey);
+    expect(state.windows[0]?.contentMode).toBe("info");
+    expect(state.windows[0]?.state).toBe("focused");
+  });
+
+  it("resets an already open direct chat back to thread mode on canonical relaunch without duplicating taskbar identity", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.direct_chat,
+      target: {
+        key: "chat-1",
+        title: "Alice",
+        routePath: "/app/chats?chat=chat-1",
+      },
+    });
+    const directWindow = state.windows[0]!;
+
+    state = shellRuntimeReducer(state, {
+      type: "set_content_mode",
+      windowId: directWindow.windowId,
+      contentMode: "info",
+    });
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.direct_chat,
+      target: {
+        key: "chat-1",
+        title: "Alice",
+        routePath: "/app/chats?chat=chat-1&message=message-7",
+      },
+    });
+
+    expect(state.windows).toHaveLength(1);
+    expect(listTaskbarShellWindows(state)).toHaveLength(1);
+    expect(state.windows[0]?.windowId).toBe(directWindow.windowId);
+    expect(state.windows[0]?.launchKey).toBe(directWindow.launchKey);
+    expect(state.windows[0]?.contentMode).toBe("thread");
+    expect(state.windows[0]?.routePath).toBe("/app/chats?chat=chat-1&message=message-7");
+  });
+
+  it("keeps live info mode on route target sync but returns to default thread after close and reopen", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.group_chat,
+      target: {
+        key: "group-4",
+        title: "Design",
+        routePath: "/app/groups?group=group-4",
+      },
+    });
+    const groupWindow = state.windows[0]!;
+
+    state = shellRuntimeReducer(state, {
+      type: "set_content_mode",
+      windowId: groupWindow.windowId,
+      contentMode: "info",
+    });
+    state = shellRuntimeReducer(state, {
+      type: "sync_target",
+      app: shellAppRegistry.group_chat,
+      target: {
+        key: "group-4",
+        title: "Design Team",
+        routePath: "/app/groups?group=group-4",
+      },
+    });
+
+    expect(state.windows[0]?.windowId).toBe(groupWindow.windowId);
+    expect(state.windows[0]?.contentMode).toBe("info");
+    expect(state.windows[0]?.title).toBe("Design Team");
+
+    state = shellRuntimeReducer(state, {
+      type: "close",
+      windowId: groupWindow.windowId,
+    });
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.group_chat,
+      target: {
+        key: "group-4",
+        title: "Design Team",
+        routePath: "/app/groups?group=group-4",
+      },
+    });
+
+    expect(state.windows).toHaveLength(1);
+    expect(state.windows[0]?.windowId).not.toBe(groupWindow.windowId);
+    expect(state.windows[0]?.launchKey).toBe(groupWindow.launchKey);
+    expect(state.windows[0]?.contentMode).toBe("thread");
   });
 
   it("refuses the eleventh window with a bounded notice", () => {

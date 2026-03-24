@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { ShellAppId } from "./runtime";
+import type { ShellAppId, ShellWindowContentMode } from "./runtime";
 
 export interface OpenDirectChatWindowOptions {
   chatId: string;
@@ -15,9 +15,12 @@ export interface OpenGroupChatWindowOptions {
 
 export interface DesktopShellHost {
   isDesktopShell: true;
+  activeWindowId: string | null;
+  activeWindowContentMode: ShellWindowContentMode | null;
   launchApp(appId: ShellAppId): void;
   openDirectChat(options: OpenDirectChatWindowOptions): void;
   openGroupChat(options: OpenGroupChatWindowOptions): void;
+  setActiveWindowContentMode(contentMode: ShellWindowContentMode): void;
   syncCurrentRouteTitle(title: string): void;
 }
 
