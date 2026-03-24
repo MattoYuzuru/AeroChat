@@ -1,14 +1,26 @@
 :root {
   color-scheme: light;
   font-family:
-    "Segoe UI Variable",
-    "Segoe UI",
-    "Trebuchet MS",
+    "PT Sans",
+    "Liberation Sans",
+    "Nimbus Sans",
+    "Noto Sans",
     sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #043252;
   background: #a9e4ff;
+  --font-shell-ui:
+    "PT Sans",
+    "Liberation Sans",
+    "Nimbus Sans",
+    "Noto Sans",
+    sans-serif;
+  --font-shell-mono:
+    "IBM Plex Mono",
+    "Liberation Mono",
+    "Nimbus Mono PS",
+    monospace;
 
   --color-ink: #043252;
   --color-muted: rgba(4, 50, 82, 0.72);

@@ -10,6 +10,7 @@ const startMenuRecentStorageKey = "aerochat.shell.start-menu.recent.v1";
 
 export const MAX_START_MENU_RECENT_ITEMS = 7;
 export const MAX_START_MENU_FOLDER_ITEMS = 4;
+export const START_MENU_VIEWPORT_EDGE_GAP = 12;
 
 export type StartMenuLauncherAppId =
   | "self_chat"
@@ -268,6 +269,21 @@ export function describeStartMenuRecentItemBadge(item: StartMenuRecentItem): str
   }
 
   return "Ч";
+}
+
+export function resolveStartMenuMaxHeight(options: {
+  anchorTop: number;
+  viewportHeight: number;
+  edgeGap?: number;
+}): number {
+  const edgeGap = Math.max(0, Math.round(options.edgeGap ?? START_MENU_VIEWPORT_EDGE_GAP));
+  const viewportHeight = Math.max(1, Math.round(options.viewportHeight));
+  const anchorTop = Math.max(0, Math.round(options.anchorTop));
+
+  return Math.max(
+    1,
+    Math.min(viewportHeight - edgeGap * 2, anchorTop - edgeGap),
+  );
 }
 
 export function resolveStartMenuRecentItemRoutePath(

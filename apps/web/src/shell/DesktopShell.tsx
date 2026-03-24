@@ -78,11 +78,11 @@ import {
 } from "./runtime";
 import {
   createInitialStartMenuPanelState,
-  describeStartMenuRecentItemBadge,
   describeStartMenuRecentItemMeta,
   extractSearchParamsFromRoutePath,
   MAX_START_MENU_FOLDER_ITEMS,
   readStartMenuRecentItems,
+  resolveStartMenuMaxHeight,
   startMenuLauncherApps,
   startMenuPanelReducer,
   trackStartMenuRecentWindow,
@@ -90,12 +90,20 @@ import {
   type StartMenuRecentItem,
 } from "./start-menu";
 import {
+  resolveDesktopEntityIconKey,
+  resolveRecentItemIconKey,
+  resolveShellAppIconKey,
+  ShellIcon,
+} from "./shell-icons";
+import {
   createStoredShellWindowPlacementRecord,
   normalizeShellWindowBounds,
   planShellWindowPlacementForLaunch,
   readShellWindowPlacementStorageState,
+  resizeShellWindowBounds,
   upsertShellWindowPlacementRecord,
   writeShellWindowPlacementStorageState,
+  type ShellWindowResizeHandle,
   type ShellWindowPlacementStorageState,
   type ShellWindowViewport,
 } from "./window-placement";
@@ -152,6 +160,13 @@ export function DesktopShell({
   const [clock, setClock] = useState(() => new Date());
   const [dragState, setDragState] = useState<{
     windowId: string;
+    startX: number;
+    startY: number;
+    initialBounds: ShellWindow["bounds"];
+  } | null>(null);
+  const [resizeState, setResizeState] = useState<{
+    windowId: string;
+    handle: ShellWindowResizeHandle;
     startX: number;
     startY: number;
     initialBounds: ShellWindow["bounds"];
@@ -554,6 +569,49 @@ export function DesktopShell({
   }, [dragState, windowLayerViewport]);
 
   useEffect(() => {
+    if (resizeState === null) {
+      return;
+    }
+
+    const activeResize = resizeState;
+
+    function handleWindowMouseMove(event: MouseEvent) {
+      dispatch({
+        type: "set_bounds",
+        windowId: activeResize.windowId,
+        bounds: resizeShellWindowBounds(
+          activeResize.initialBounds,
+          windowLayerViewport,
+          activeResize.handle,
+          event.clientX - activeResize.startX,
+          event.clientY - activeResize.startY,
+        ),
+      });
+    }
+
+    function stopWindowResize() {
+      setResizeState(null);
+    }
+
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = describeResizeCursor(activeResize.handle);
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", stopWindowResize);
+    window.addEventListener("blur", stopWindowResize);
+
+    return () => {
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", stopWindowResize);
+      window.removeEventListener("blur", stopWindowResize);
+    };
+  }, [resizeState, windowLayerViewport]);
+
+  useEffect(() => {
     if (state.status !== "authenticated") {
       return;
     }
@@ -677,6 +735,19 @@ export function DesktopShell({
   const desktopEntries = listDesktopEntitiesForSurface(desktopRegistryState);
   const overflowSummaries = listDesktopOverflowSummaries(desktopRegistryState);
   const hiddenFolderCount = Math.max(0, allCustomFolders.length - startFolders.length);
+  const startMenuMaxHeight = !startMenuState.isOpen
+    ? null
+    : resolveStartMenuMaxHeight({
+        anchorTop:
+          startMenuAnchorRef.current?.getBoundingClientRect().top ??
+          (typeof window === "undefined"
+            ? windowLayerViewport.height
+            : Math.max(1, Math.round(window.innerHeight))),
+        viewportHeight:
+          typeof window === "undefined"
+            ? windowLayerViewport.height
+            : Math.max(1, Math.round(window.innerHeight)),
+      });
 
   function closeStartMenu() {
     dispatchStartMenu({ type: "close" });
@@ -1108,8 +1179,35 @@ export function DesktopShell({
     }
 
     event.preventDefault();
+    setResizeState(null);
     setDragState({
       windowId: window.windowId,
+      startX: event.clientX,
+      startY: event.clientY,
+      initialBounds: normalizeShellWindowBounds(window.bounds, windowLayerViewport),
+    });
+  }
+
+  function beginWindowResize(
+    event: ReactMouseEvent<HTMLDivElement>,
+    window: ShellWindow,
+    handle: ShellWindowResizeHandle,
+  ) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    focusWindow(window);
+    if (window.state === "maximized") {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    setDragState(null);
+    setResizeState({
+      windowId: window.windowId,
+      handle,
       startX: event.clientX,
       startY: event.clientY,
       initialBounds: normalizeShellWindowBounds(window.bounds, windowLayerViewport),
@@ -1413,6 +1511,13 @@ export function DesktopShell({
                       desktopUnreadTargetMap,
                     )
                   : 0;
+              const folderMemberCount =
+                entry.kind === "custom_folder"
+                  ? listCustomFolderMemberReferences(
+                      desktopRegistryState,
+                      entry.folderId,
+                    ).length
+                  : 0;
 
               return (
                 <article
@@ -1464,9 +1569,11 @@ export function DesktopShell({
                     type="button"
                   >
                     <span className={styles.desktopIconBadgeWrap}>
-                      <span className={styles.desktopIconBadge}>
-                        {describeDesktopEntityBadge(entry)}
-                      </span>
+                      <ShellIcon
+                        className={styles.desktopIconBadge}
+                        iconKey={resolveDesktopEntityIconKey(entry, folderMemberCount)}
+                        title={entry.title}
+                      />
                       {folderUnreadCount > 0 && (
                         <span className={styles.desktopUnreadBadge}>
                           {folderUnreadCount}
@@ -1556,6 +1663,7 @@ export function DesktopShell({
                   }
                   data-active={runtimeState.activeWindowId === window.windowId || undefined}
                   data-dragging={dragState?.windowId === window.windowId || undefined}
+                  data-resizing={resizeState?.windowId === window.windowId || undefined}
                   onMouseDown={() => {
                     if (window.state === "minimized") {
                       return;
@@ -1599,9 +1707,11 @@ export function DesktopShell({
                       role="button"
                       tabIndex={0}
                     >
-                      <span className={styles.windowAppMark} aria-hidden="true">
-                        {window.title.slice(0, 1).toUpperCase()}
-                      </span>
+                      <ShellIcon
+                        className={styles.windowAppMark}
+                        iconKey={resolveShellAppIconKey(window.appId)}
+                        title={window.title}
+                      />
                       <span className={styles.windowTitleText}>{window.title}</span>
                     </div>
                     <div className={styles.windowControls}>
@@ -1640,6 +1750,20 @@ export function DesktopShell({
                       window={window}
                     />
                   </div>
+                  {window.state !== "maximized" &&
+                    windowResizeHandles.map((handle) => (
+                      <div
+                        key={handle}
+                        aria-hidden="true"
+                        className={`${styles.windowResizeHandle} ${describeWindowResizeHandleClass(
+                          handle,
+                          styles,
+                        )}`}
+                        onMouseDown={(event) => {
+                          beginWindowResize(event, window, handle);
+                        }}
+                      />
+                    ))}
                 </div>
               );
             })}
@@ -1776,6 +1900,13 @@ export function DesktopShell({
                   aria-label="Start launcher"
                   className={styles.startMenu}
                   id="shell-start-menu"
+                  style={
+                    startMenuMaxHeight === null
+                      ? undefined
+                      : {
+                          maxHeight: `${startMenuMaxHeight}px`,
+                        }
+                  }
                 >
                   <div className={styles.startMenuHeader}>
                     <div>
@@ -1801,7 +1932,11 @@ export function DesktopShell({
                             }}
                             type="button"
                           >
-                            <span className={styles.startMenuItemBadge}>{item.badge}</span>
+                            <ShellIcon
+                              className={styles.startMenuItemBadge}
+                              iconKey={resolveShellAppIconKey(item.appId)}
+                              title={item.title}
+                            />
                             <span className={styles.startMenuItemContent}>
                               <span className={styles.startMenuItemTitle}>{item.title}</span>
                               <small>{item.description}</small>
@@ -1827,9 +1962,11 @@ export function DesktopShell({
                               }}
                               type="button"
                             >
-                              <span className={styles.startMenuItemBadge}>
-                                {describeStartMenuRecentItemBadge(item)}
-                              </span>
+                              <ShellIcon
+                                className={styles.startMenuItemBadge}
+                                iconKey={resolveRecentItemIconKey(item)}
+                                title={item.title}
+                              />
                               <span className={styles.startMenuItemContent}>
                                 <span className={styles.startMenuItemTitle}>{item.title}</span>
                                 <small>{describeStartMenuRecentItemMeta(item)}</small>
@@ -1871,7 +2008,11 @@ export function DesktopShell({
                                 }}
                                 type="button"
                               >
-                                <span className={styles.startMenuItemBadge}>П</span>
+                                <ShellIcon
+                                  className={styles.startMenuItemBadge}
+                                  iconKey={memberCount > 0 ? "folder_full" : "folder_empty"}
+                                  title={folder.title}
+                                />
                                 <span className={styles.startMenuItemContent}>
                                   <span className={styles.startMenuItemTitle}>{folder.title}</span>
                                   <small>
@@ -1969,8 +2110,8 @@ export function DesktopShell({
             <span className={styles.trayBadge} aria-label="UI sounds placeholder">
               UI
             </span>
-            <span className={styles.trayBadge} aria-label="Network placeholder">
-              NET
+            <span className={styles.trayBadge} aria-label="Сетевой статус">
+              <ShellIcon className={styles.trayIcon} iconKey="network" title="Сеть" />
             </span>
             <div className={styles.clock}>
               <strong>{formatClock(clock)}</strong>
@@ -2158,24 +2299,56 @@ function DesktopContextMenuPanel({
   );
 }
 
-function describeDesktopEntityBadge(entry: DesktopEntity): string {
-  if (entry.kind === "custom_folder") {
-    return "П";
-  }
+const windowResizeHandles: readonly ShellWindowResizeHandle[] = [
+  "north",
+  "east",
+  "south",
+  "west",
+  "north_east",
+  "south_east",
+  "south_west",
+  "north_west",
+];
 
-  if (entry.kind === "direct_chat" || entry.kind === "group_chat") {
-    return entry.title.slice(0, 1).toUpperCase();
+function describeResizeCursor(handle: ShellWindowResizeHandle): string {
+  switch (handle) {
+    case "north":
+    case "south":
+      return "ns-resize";
+    case "east":
+    case "west":
+      return "ew-resize";
+    case "north_east":
+    case "south_west":
+      return "nesw-resize";
+    case "north_west":
+    case "south_east":
+      return "nwse-resize";
   }
+}
 
-  if (entry.appId === "friend_requests") {
-    return "З";
+function describeWindowResizeHandleClass(
+  handle: ShellWindowResizeHandle,
+  classNames: Record<string, string>,
+): string {
+  switch (handle) {
+    case "north":
+      return classNames.windowResizeNorth!;
+    case "east":
+      return classNames.windowResizeEast!;
+    case "south":
+      return classNames.windowResizeSouth!;
+    case "west":
+      return classNames.windowResizeWest!;
+    case "north_east":
+      return classNames.windowResizeNorthEast!;
+    case "south_east":
+      return classNames.windowResizeSouthEast!;
+    case "south_west":
+      return classNames.windowResizeSouthWest!;
+    case "north_west":
+      return classNames.windowResizeNorthWest!;
   }
-
-  if (entry.appId === "self_chat") {
-    return "Я";
-  }
-
-  return entry.title.slice(0, 1).toUpperCase();
 }
 
 function describeDesktopEntityMeta(

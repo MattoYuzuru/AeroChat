@@ -6,6 +6,7 @@ import {
   normalizeShellWindowBounds,
   planShellWindowPlacementForLaunch,
   readShellWindowPlacementStorageState,
+  resizeShellWindowBounds,
   upsertShellWindowPlacementRecord,
   writeShellWindowPlacementStorageState,
 } from "./window-placement";
@@ -180,5 +181,55 @@ describe("window placement", () => {
         },
       ).restoredState,
     ).toBe("open");
+  });
+
+  it("resizes east and south edges without leaving the viewport", () => {
+    expect(
+      resizeShellWindowBounds(
+        {
+          x: 40,
+          y: 28,
+          width: 780,
+          height: 560,
+        },
+        {
+          width: 980,
+          height: 720,
+        },
+        "south_east",
+        260,
+        220,
+      ),
+    ).toEqual({
+      x: 40,
+      y: 28,
+      width: 940,
+      height: 692,
+    });
+  });
+
+  it("keeps the opposite edge stable when resizing from north-west and respects minimum bounds", () => {
+    expect(
+      resizeShellWindowBounds(
+        {
+          x: 120,
+          y: 96,
+          width: 520,
+          height: 410,
+        },
+        {
+          width: 1280,
+          height: 820,
+        },
+        "north_west",
+        280,
+        220,
+      ),
+    ).toEqual({
+      x: 256,
+      y: 186,
+      width: 384,
+      height: 320,
+    });
   });
 });
