@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { buildPersonProfileRoutePath } from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { gatewayClient } from "../gateway/runtime";
@@ -11,6 +12,14 @@ import {
   type MessageSearchCursor,
   type MessageSearchResult,
 } from "../gateway/types";
+import {
+  describePersonProfileSummary,
+  describePersonRelationship,
+  findExactKnownPeopleEntries,
+  getPersonProfileLaunchTitle,
+  type PersonProfileEntry,
+} from "../people/profile-model";
+import { usePeople } from "../people/usePeople";
 import {
   searchEncryptedLocalMessages,
   type EncryptedLocalSearchResult,
@@ -27,6 +36,7 @@ import {
   type SearchResultLike,
   type SearchScopeSelection,
 } from "../search/model";
+import { useDesktopShellHost } from "../shell/context";
 import styles from "./SearchPage.module.css";
 
 const SEARCH_PAGE_SIZE = 20;
@@ -43,6 +53,7 @@ type EncryptedSearchPathStatus = SearchPathStatus | "unavailable";
 export function SearchPage() {
   const { state: authState, expireSession } = useAuth();
   const cryptoRuntime = useCryptoRuntime();
+  const desktopShellHost = useDesktopShellHost();
   const [query, setQuery] = useState("");
   const [scopeSelection, setScopeSelection] = useState<SearchScopeSelection>("all-direct");
   const [selectedDirectChatId, setSelectedDirectChatId] = useState("");
@@ -71,6 +82,11 @@ export function SearchPage() {
   const token = authState.status === "authenticated" ? authState.token : "";
   const currentUserId =
     authState.status === "authenticated" ? authState.profile.id : "";
+  const people = usePeople({
+    enabled: authState.status === "authenticated",
+    token,
+    onUnauthenticated: expireSession,
+  });
   const isRunningSearch =
     legacySearchStatus === "loading" || encryptedSearchStatus === "loading" || isLoadingMore;
 
@@ -348,9 +364,27 @@ export function SearchPage() {
           groups,
           currentUserId,
         );
+  const exactPeopleMatches =
+    submittedSearch === null || people.state.status !== "ready"
+      ? []
+      : findExactKnownPeopleEntries(people.state.snapshot, submittedSearch.query);
 
   if (authState.status !== "authenticated") {
     return null;
+  }
+
+  function openPersonProfile(entry: PersonProfileEntry) {
+    const title = getPersonProfileLaunchTitle(entry.profile);
+
+    if (desktopShellHost !== null) {
+      desktopShellHost.openPersonProfile({
+        userId: entry.profile.id,
+        title,
+        searchParams: new URLSearchParams({
+          from: "search",
+        }),
+      });
+    }
   }
 
   return (
@@ -556,6 +590,68 @@ export function SearchPage() {
             </div>
           )}
 
+          {submittedSearch !== null && (
+            <section className={styles.pathSection}>
+              <div className={styles.pathHeader}>
+                <div>
+                  <p className={styles.cardLabel}>People Path</p>
+                  <h3 className={styles.pathTitle}>Exact login по известным людям</h3>
+                  <p className={styles.pathDescription}>
+                    Этот path не делает публичный user discovery и не шлёт hidden lookup на
+                    backend. Он показывает только exact-login совпадения по уже известному
+                    social graph snapshot: друзья и активные friend requests.
+                  </p>
+                </div>
+                <span className={styles.metaTag}>
+                  {people.state.status === "loading"
+                    ? "Готовим..."
+                    : exactPeopleMatches.length === 0
+                      ? "0 совпадений"
+                      : `${exactPeopleMatches.length} совпадений`}
+                </span>
+              </div>
+
+              {people.state.status === "loading" && (
+                <InlineState
+                  title="Подтягиваем known people snapshot"
+                  message="Для user-result path используем только уже доступные friendships и friend requests."
+                />
+              )}
+
+              {people.state.status === "error" && (
+                <InlineState
+                  title="People path недоступен"
+                  message={
+                    people.state.screenErrorMessage ??
+                    "Не удалось загрузить current people snapshot для exact-login result."
+                  }
+                  tone="error"
+                />
+              )}
+
+              {people.state.status === "ready" && exactPeopleMatches.length === 0 && (
+                <InlineState
+                  title="Точных user-result совпадений нет"
+                  message="Search по людям в этом slice ограничен уже известным social graph snapshot и срабатывает только по exact login."
+                />
+              )}
+
+              {people.state.status === "ready" && exactPeopleMatches.length > 0 && (
+                <div className={styles.resultList}>
+                  {exactPeopleMatches.map((entry) => (
+                    <KnownPersonResultCard
+                      entry={entry}
+                      key={`${entry.relationshipKind}:${entry.profile.id}`}
+                      onOpenProfile={() => {
+                        openPersonProfile(entry);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {submittedSearch === null && (
             <InlineState
               title="Поиск ещё не запускался"
@@ -727,6 +823,54 @@ export function SearchPage() {
         </section>
       )}
     </div>
+  );
+}
+
+function KnownPersonResultCard({
+  entry,
+  onOpenProfile,
+}: {
+  entry: PersonProfileEntry;
+  onOpenProfile(): void;
+}) {
+  return (
+    <article className={styles.resultCard}>
+      <div className={styles.resultHeaderRow}>
+        <div>
+          <div className={styles.badgeRow}>
+            <span className={styles.scopeBadge}>user</span>
+            <span className={styles.pathBadge}>Known people</span>
+          </div>
+          <h3 className={styles.resultTitle}>{entry.profile.nickname}</h3>
+          <p className={styles.resultMeta}>
+            @{entry.profile.login} · {describePersonRelationship(entry)}
+          </p>
+        </div>
+      </div>
+
+      <p className={styles.fragment}>{describePersonProfileSummary(entry.profile)}</p>
+
+      <div className={styles.resultFooter}>
+        <Link
+          className={styles.resultLink}
+          onClick={(event) => {
+            if (event.defaultPrevented) {
+              return;
+            }
+
+            onOpenProfile();
+          }}
+          to={buildPersonProfileRoutePath(
+            entry.profile.id,
+            new URLSearchParams({
+              from: "search",
+            }),
+          )}
+        >
+          Открыть профиль
+        </Link>
+      </div>
+    </article>
   );
 }
 

@@ -9,6 +9,7 @@ import { getAuthErrorMessage, useAuth } from "../auth/useAuth";
 import {
   buildDirectChatShellTarget,
   buildGroupChatShellTarget,
+  buildPersonProfileShellTarget,
   isRouteBackedShellAppId,
   renderShellAppContent,
   resolveShellRouteEntry,
@@ -192,6 +193,21 @@ export function DesktopShell({
     setIsStartOpen(false);
   }
 
+  function openPersonProfile(options: {
+    userId: string;
+    title?: string;
+    searchParams?: URLSearchParams | null;
+  }) {
+    const target = buildPersonProfileShellTarget(options);
+    dispatch({
+      type: "launch",
+      app: shellAppRegistry.person_profile,
+      target,
+    });
+    navigate(target.routePath ?? "/app/people");
+    setIsStartOpen(false);
+  }
+
   function syncCurrentRouteTitle(title: string) {
     if (routeEntry?.target === null || routeEntry === null) {
       return;
@@ -294,6 +310,7 @@ export function DesktopShell({
         launchApp,
         openDirectChat,
         openGroupChat,
+        openPersonProfile,
         setActiveWindowContentMode,
         syncCurrentRouteTitle,
       }}

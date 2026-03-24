@@ -62,6 +62,51 @@ describe("shellRuntimeReducer", () => {
     ]);
   });
 
+  it("reuses the same person_profile window for the same user while keeping chat windows separate", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.person_profile,
+      target: {
+        key: "user-7",
+        title: "Alice",
+        routePath: "/app/people?person=user-7",
+      },
+    });
+    const firstProfileWindowId = state.activeWindowId;
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.person_profile,
+      target: {
+        key: "user-7",
+        title: "Alice A.",
+        routePath: "/app/people?person=user-7&from=search",
+      },
+    });
+
+    expect(state.windows).toHaveLength(1);
+    expect(state.activeWindowId).toBe(firstProfileWindowId);
+    expect(state.windows[0]?.routePath).toBe("/app/people?person=user-7&from=search");
+    expect(state.windows[0]?.title).toBe("Alice A.");
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.direct_chat,
+      target: {
+        key: "chat-3",
+        title: "Alice",
+        routePath: "/app/chats?chat=chat-3",
+      },
+    });
+
+    expect(listTaskbarShellWindows(state).map((window) => window.appId)).toEqual([
+      "person_profile",
+      "direct_chat",
+    ]);
+  });
+
   it("restores a minimized window when it is focused from taskbar", () => {
     let state = createInitialShellRuntimeState();
 

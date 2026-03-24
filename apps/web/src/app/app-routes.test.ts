@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildDirectChatRoutePath,
   buildGroupChatRoutePath,
+  buildPersonProfileRoutePath,
   resolveShellRouteEntry,
 } from "./app-routes";
 
@@ -43,6 +44,18 @@ describe("resolveShellRouteEntry", () => {
     expect(resolved?.app.appId).toBe("chats");
     expect(resolved?.target?.routePath).toBe("/app/chats?peer=user-7");
   });
+
+  it("maps person profile deep-links to canonical person_profile targets", () => {
+    const resolved = resolveShellRouteEntry("/app/people", "?person=user-7&from=search");
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.app.appId).toBe("person_profile");
+    expect(resolved?.target).toEqual({
+      key: "user-7",
+      title: "Профиль контакта",
+      routePath: "/app/people?person=user-7&from=search",
+    });
+  });
 });
 
 describe("chat route builders", () => {
@@ -65,6 +78,16 @@ describe("chat route builders", () => {
 
     expect(buildGroupChatRoutePath("group-9", params)).toBe(
       "/app/groups?join=ginv_123&from=invite&group=group-9",
+    );
+  });
+
+  it("preserves extra person params while normalizing profile identity", () => {
+    const params = new URLSearchParams({
+      from: "search",
+    });
+
+    expect(buildPersonProfileRoutePath("user-9", params)).toBe(
+      "/app/people?from=search&person=user-9",
     );
   });
 });
