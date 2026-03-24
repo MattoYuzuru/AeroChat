@@ -223,6 +223,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Explorer organizer bootstrap over shell-local desktop registry
 - [x] Shell-local custom folders V1 over desktop registry and Explorer
 - [x] Контекстное меню фона рабочего стола с bounded shell-local действиями
+- [x] Shell-local persistence для window placement и bounded cascade opening
 - [ ] XP-first theme engine
 - [x] Explorer, folder organization и shell launcher
 - [x] Mobile practical shell adaptation

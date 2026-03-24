@@ -41,6 +41,28 @@ export interface ShellNotice {
   message: string;
 }
 
+export interface ShellWindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ShellWindowPlacement {
+  bounds: ShellWindowBounds;
+  restoredState: "open" | "maximized";
+}
+
+const defaultShellWindowPlacement: ShellWindowPlacement = {
+  bounds: {
+    x: 20,
+    y: 18,
+    width: 960,
+    height: 680,
+  },
+  restoredState: "open",
+};
+
 export interface ShellWindow {
   windowId: string;
   appId: ShellAppId;
@@ -50,6 +72,7 @@ export interface ShellWindow {
   target: ShellLaunchTarget | null;
   contentMode: ShellWindowContentMode | null;
   state: ShellWindowState;
+  bounds: ShellWindowBounds;
 }
 
 export interface ShellRuntimeState {
@@ -70,6 +93,7 @@ export type ShellRuntimeAction =
       type: "launch";
       app: ShellAppDefinition;
       target?: ShellLaunchTarget | null;
+      placement?: ShellWindowPlacement;
     }
   | {
       type: "focus";
@@ -137,7 +161,12 @@ export function shellRuntimeReducer(
 ): ShellRuntimeState {
   switch (action.type) {
     case "launch":
-      return launchShellWindow(state, action.app, action.target ?? null);
+      return launchShellWindow(
+        state,
+        action.app,
+        action.target ?? null,
+        action.placement,
+      );
     case "focus":
       return focusShellWindow(state, action.windowId);
     case "minimize":
@@ -192,7 +221,9 @@ function launchShellWindow(
   state: ShellRuntimeState,
   app: ShellAppDefinition,
   target: ShellLaunchTarget | null,
+  placement: ShellWindowPlacement | undefined,
 ): ShellRuntimeState {
+  const nextPlacement = placement ?? defaultShellWindowPlacement;
   const launchKey = buildShellLaunchKey(app, target);
   const existingWindow = state.windows.find((window) => window.launchKey === launchKey);
   if (existingWindow) {
@@ -236,7 +267,11 @@ function launchShellWindow(
     routePath: target?.routePath ?? app.routePath,
     target,
     contentMode: getDefaultShellWindowContentMode(app.appId),
-    state: "focused",
+    state:
+      nextPlacement.restoredState === "maximized"
+        ? ("maximized" satisfies ShellWindowState)
+        : ("focused" satisfies ShellWindowState),
+    bounds: nextPlacement.bounds,
   };
 
   return {
