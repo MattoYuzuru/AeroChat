@@ -1,5 +1,4 @@
 import type { DirectChat, Group } from "../gateway/types";
-import { shellAppRegistry } from "../app/app-routes";
 import type { ShellPreferencesStorageLike } from "./preferences";
 
 const desktopRegistryStorageKey = "aerochat.shell.desktop-registry.v1";
@@ -67,16 +66,24 @@ interface DesktopSourceEntry {
   title: string;
 }
 
+const desktopSystemAppTitles: Record<DesktopSystemAppId, string> = {
+  self_chat: "Я",
+  search: "Поиск",
+  explorer: "Explorer",
+  friend_requests: "Заявки",
+  settings: "Настройки",
+};
+
 const mandatorySystemEntries: readonly {
   appId: DesktopSystemAppId;
   title: string;
   order: number;
 }[] = [
-  { appId: "self_chat", title: shellAppRegistry.self_chat.title, order: 1 },
-  { appId: "search", title: shellAppRegistry.search.title, order: 2 },
-  { appId: "explorer", title: shellAppRegistry.explorer.title, order: 3 },
-  { appId: "friend_requests", title: shellAppRegistry.friend_requests.title, order: 4 },
-  { appId: "settings", title: shellAppRegistry.settings.title, order: 5 },
+  { appId: "self_chat", title: desktopSystemAppTitles.self_chat, order: 1 },
+  { appId: "search", title: desktopSystemAppTitles.search, order: 2 },
+  { appId: "explorer", title: desktopSystemAppTitles.explorer, order: 3 },
+  { appId: "friend_requests", title: desktopSystemAppTitles.friend_requests, order: 4 },
+  { appId: "settings", title: desktopSystemAppTitles.settings, order: 5 },
 ];
 
 export function createInitialDesktopRegistryState(): DesktopRegistryState {
@@ -191,6 +198,34 @@ export function hideDesktopEntity(
   });
 }
 
+export function showDesktopEntityOnDesktop(
+  state: DesktopRegistryState,
+  entryId: string,
+): DesktopRegistryState {
+  const targetEntry = state.entries.find((entry) => entry.id === entryId) ?? null;
+  if (targetEntry === null || targetEntry.kind === "system_app") {
+    return state;
+  }
+
+  const promotedOrder = resolvePromotedDesktopOrder(state, targetEntry.id);
+  const nextEntries = state.entries.map((entry) =>
+    entry.id !== entryId || entry.kind === "system_app"
+      ? entry
+      : {
+          ...entry,
+          visibility: "visible" as const,
+          placement: "desktop" as const,
+          overflowBucket: null,
+          order: promotedOrder,
+        },
+  );
+
+  return normalizeDesktopRegistryState({
+    entries: nextEntries,
+    nextOrder: state.nextOrder,
+  });
+}
+
 export function syncDirectChatDesktopEntities(
   state: DesktopRegistryState,
   chats: DirectChat[],
@@ -239,6 +274,34 @@ export function listDesktopEntitiesForSurface(
 ): DesktopEntity[] {
   return state.entries
     .filter((entry) => entry.visibility === "visible" && entry.placement === "desktop")
+    .sort(compareDesktopEntities);
+}
+
+export function listDesktopRegistryEntities(
+  state: DesktopRegistryState,
+): DesktopEntity[] {
+  return [...state.entries].sort(compareDesktopEntities);
+}
+
+export function listHiddenDesktopEntities(
+  state: DesktopRegistryState,
+): DesktopEntity[] {
+  return state.entries
+    .filter((entry) => entry.visibility === "hidden")
+    .sort(compareDesktopEntities);
+}
+
+export function listDesktopOverflowEntities(
+  state: DesktopRegistryState,
+  bucket?: Exclude<DesktopOverflowBucket, null>,
+): DesktopEntity[] {
+  return state.entries
+    .filter(
+      (entry) =>
+        entry.visibility === "visible" &&
+        entry.placement === "overflow" &&
+        (bucket === undefined || entry.overflowBucket === bucket),
+    )
     .sort(compareDesktopEntities);
 }
 
@@ -393,6 +456,20 @@ function normalizeDesktopRegistryState(
   };
 }
 
+function resolvePromotedDesktopOrder(
+  state: DesktopRegistryState,
+  entryId: string,
+): number {
+  const dynamicEntries = state.entries.filter(
+    (entry) => entry.kind !== "system_app" && entry.id !== entryId,
+  );
+  if (dynamicEntries.length === 0) {
+    return mandatorySystemEntries.length + 1;
+  }
+
+  return Math.min(...dynamicEntries.map((entry) => entry.order)) - 1;
+}
+
 function normalizeHiddenDynamicEntry(
   entry: DesktopDirectChatEntity | DesktopGroupChatEntity,
 ): DesktopDirectChatEntity | DesktopGroupChatEntity {
@@ -479,7 +556,7 @@ function normalizeDesktopEntity(
       kind,
       appId,
       targetKey: appId,
-      title: normalizeDesktopEntityTitle(title, shellAppRegistry[appId].title),
+      title: normalizeDesktopEntityTitle(title, desktopSystemAppTitles[appId]),
       visibility: "visible",
       placement: "desktop",
       overflowBucket: null,
@@ -528,7 +605,7 @@ function createSystemEntity(
     kind: "system_app",
     appId,
     targetKey: appId,
-    title: normalizeDesktopEntityTitle(title, shellAppRegistry[appId].title),
+    title: normalizeDesktopEntityTitle(title, desktopSystemAppTitles[appId]),
     visibility: "visible",
     placement: "desktop",
     overflowBucket: null,

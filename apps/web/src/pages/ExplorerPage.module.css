@@ -1,0 +1,311 @@
+.surface {
+  display: grid;
+  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+  gap: 1rem;
+  min-height: 100%;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(222, 235, 252, 0.9)),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.86), transparent 48%);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid rgba(85, 129, 191, 0.28);
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, rgba(244, 248, 255, 0.96), rgba(220, 234, 251, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 12px 30px rgba(62, 102, 153, 0.16);
+}
+
+.sidebarHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sidebarEyebrow,
+.contentEyebrow,
+.bucketEyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(39, 71, 114, 0.68);
+}
+
+.sidebarTitle,
+.contentTitle,
+.bucketTitle,
+.integrityTitle,
+.emptyTitle {
+  margin: 0;
+  color: rgba(20, 38, 73, 0.94);
+}
+
+.sidebarText,
+.contentText,
+.integrityText,
+.emptyText {
+  margin: 0;
+  color: rgba(40, 60, 96, 0.78);
+  line-height: 1.5;
+}
+
+.sectionList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.sectionButton,
+.sectionButtonActive {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(91, 125, 178, 0.18);
+  background: rgba(255, 255, 255, 0.7);
+  color: rgba(27, 44, 81, 0.9);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sectionButton span,
+.sectionButtonActive span {
+  font-size: 0.84rem;
+  line-height: 1.35;
+  color: rgba(49, 73, 112, 0.78);
+}
+
+.sectionButton:hover,
+.sectionButtonActive {
+  border-color: rgba(62, 110, 179, 0.34);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(217, 232, 251, 0.94));
+  box-shadow: 0 10px 22px rgba(66, 103, 149, 0.12);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.contentHeader,
+.integrityCard,
+.emptyState,
+.bucketCard {
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(89, 130, 188, 0.22);
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(228, 238, 252, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 12px 28px rgba(68, 104, 149, 0.12);
+}
+
+.contentHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.headerBadges,
+.integrityActions,
+.entityActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.headerBadge,
+.bucketCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(42, 108, 196, 0.12);
+  color: rgba(28, 69, 134, 0.92);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.cardList,
+.bucketGrid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.entityCard,
+.bucketItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(87, 127, 180, 0.2);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(234, 242, 253, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 10px 22px rgba(62, 99, 145, 0.1);
+}
+
+.entityLead {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.entityAccent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.85rem;
+  background: linear-gradient(180deg, rgba(118, 182, 255, 0.52), rgba(52, 115, 196, 0.88));
+  color: white;
+  font-weight: 800;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    0 8px 18px rgba(49, 92, 159, 0.18);
+}
+
+.entityBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.entityTitle {
+  margin: 0;
+  color: rgba(18, 36, 74, 0.96);
+}
+
+.entityMeta,
+.bucketItem p {
+  margin: 0;
+  color: rgba(46, 69, 108, 0.74);
+  line-height: 1.45;
+}
+
+.primaryAction,
+.secondaryAction {
+  min-height: 2.25rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.8rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.primaryAction {
+  border: 1px solid rgba(51, 104, 179, 0.42);
+  background: linear-gradient(180deg, rgba(119, 186, 255, 0.95), rgba(47, 115, 201, 0.96));
+  color: white;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 10px 22px rgba(55, 104, 168, 0.18);
+}
+
+.secondaryAction {
+  border: 1px solid rgba(78, 118, 171, 0.22);
+  background: rgba(255, 255, 255, 0.76);
+  color: rgba(24, 45, 87, 0.92);
+}
+
+.primaryAction:hover,
+.secondaryAction:hover {
+  transform: translateY(-1px);
+}
+
+.bucketGrid {
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.bucketHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.bucketItems {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.integrityCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+@media (max-width: 960px) {
+  .surface {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    padding-bottom: 0.8rem;
+  }
+
+  .sectionList {
+    overflow-x: auto;
+    flex-direction: row;
+    padding-bottom: 0.2rem;
+  }
+
+  .sectionButton,
+  .sectionButtonActive {
+    min-width: 14rem;
+  }
+
+  .contentHeader,
+  .entityCard,
+  .bucketItem {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .surface {
+    padding: 0.7rem;
+  }
+
+  .sidebar,
+  .contentHeader,
+  .integrityCard,
+  .emptyState,
+  .bucketCard,
+  .entityCard,
+  .bucketItem {
+    border-radius: 0.95rem;
+  }
+
+  .entityActions,
+  .integrityActions {
+    width: 100%;
+  }
+
+  .primaryAction,
+  .secondaryAction {
+    width: 100%;
+  }
+}

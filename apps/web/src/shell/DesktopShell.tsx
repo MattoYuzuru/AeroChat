@@ -30,6 +30,7 @@ import {
   listDesktopOverflowSummaries,
   readDesktopRegistryState,
   removeGroupChatDesktopEntity,
+  showDesktopEntityOnDesktop,
   syncDirectChatDesktopEntities,
   syncGroupChatDesktopEntities,
   upsertDirectChatDesktopEntity,
@@ -58,7 +59,7 @@ const startMenuItems: Array<{
   { appId: "search", description: "Поиск сообщений и быстрый переход в текущие conversations." },
   {
     appId: "explorer",
-    description: "Системный organizer entrypoint для будущих Explorer и folder surfaces.",
+    description: "Системный organizer surface для desktop entrypoints, скрытых объектов и overflow.",
   },
   { appId: "settings", description: "Privacy, devices, sessions и account preferences." },
   {
@@ -485,10 +486,18 @@ export function DesktopShell({
       return;
     }
 
-    setDesktopRegistryState((currentState) => hideDesktopEntity(currentState, entry.id));
+    hideDesktopEntry(entry.id);
     setSelectedDesktopEntryId((currentEntryId) =>
       currentEntryId === entry.id ? null : currentEntryId,
     );
+  }
+
+  function hideDesktopEntry(entryId: string) {
+    setDesktopRegistryState((currentState) => hideDesktopEntity(currentState, entryId));
+  }
+
+  function showDesktopEntry(entryId: string) {
+    setDesktopRegistryState((currentState) => showDesktopEntityOnDesktop(currentState, entryId));
   }
 
   async function handleLogout() {
@@ -513,10 +522,13 @@ export function DesktopShell({
         isDesktopShell: true,
         activeWindowId: activeWindow?.windowId ?? null,
         activeWindowContentMode: activeWindow?.contentMode ?? null,
+        desktopRegistryState,
         launchApp,
         openDirectChat,
         openGroupChat,
         openPersonProfile,
+        hideDesktopEntry,
+        showDesktopEntry,
         setActiveWindowContentMode,
         syncCurrentRouteTitle,
       }}
@@ -678,7 +690,7 @@ export function DesktopShell({
                   Часть entrypoints вынесена в shell-local buckets
                 </h2>
                 <p className={styles.placeholderText}>
-                  Этот slice держит переполнение bounded без кастомных folders и без fake Explorer UX.
+                  Детальная навигация по hidden и overflow entrypoints теперь доступна через Explorer.
                 </p>
               </div>
               <div className={styles.overflowSummaryList}>
@@ -689,6 +701,15 @@ export function DesktopShell({
                   </article>
                 ))}
               </div>
+              <button
+                className={styles.shellGhostButton}
+                onClick={() => {
+                  launchApp("explorer");
+                }}
+                type="button"
+              >
+                Открыть Explorer
+              </button>
             </section>
           )}
 

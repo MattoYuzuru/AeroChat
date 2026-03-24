@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] canonical self chat shell target with dedicated singleton window and route-backed self workspace
+- [x] Explorer shell organizer bootstrap over shell-local desktop registry
 
 ---
 
@@ -220,6 +220,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Canonical direct/group shell windows
 - [x] Canonical person profile shell target для people/search/request flows
 - [x] Canonical friend requests shell target
+- [x] Explorer organizer bootstrap over shell-local desktop registry
 - [ ] XP-first theme engine
 - [ ] Explorer, folder organization и shell launcher
 - [ ] Mobile practical shell adaptation

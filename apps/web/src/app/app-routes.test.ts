@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDirectChatRoutePath,
+  buildExplorerRoutePath,
   buildFriendRequestsRoutePath,
   buildGroupChatRoutePath,
   buildPersonProfileRoutePath,
@@ -82,6 +83,18 @@ describe("resolveShellRouteEntry", () => {
       routePath: "/app/self?from=desktop",
     });
   });
+
+  it("maps explorer route to the canonical singleton target while preserving section deep-link", () => {
+    const resolved = resolveShellRouteEntry("/app/explorer", "?section=overflow");
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.app.appId).toBe("explorer");
+    expect(resolved?.target).toEqual({
+      key: "explorer",
+      title: "Explorer",
+      routePath: "/app/explorer?section=overflow",
+    });
+  });
 });
 
 describe("chat route builders", () => {
@@ -131,5 +144,13 @@ describe("chat route builders", () => {
     });
 
     expect(buildSelfChatRoutePath(params)).toBe("/app/self?from=desktop");
+  });
+
+  it("keeps explorer section params on the singleton route", () => {
+    const params = new URLSearchParams({
+      section: "hidden",
+    });
+
+    expect(buildExplorerRoutePath(params)).toBe("/app/explorer?section=hidden");
   });
 });
