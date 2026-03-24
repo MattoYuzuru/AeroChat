@@ -2,12 +2,14 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getAuthErrorMessage, useAuth } from "../auth/useAuth";
 import {
   buildDirectChatShellTarget,
+  buildExplorerRoutePath,
   buildExplorerFolderRoutePath,
   buildGroupChatShellTarget,
   buildPersonProfileShellTarget,
@@ -34,6 +36,8 @@ import {
   getCustomFolderUnreadCount,
   hideDesktopEntity,
   isDesktopEntityHideable,
+  listCustomFolderDesktopEntities,
+  listCustomFolderMemberReferences,
   listDesktopEntitiesForSurface,
   listDesktopOverflowSummaries,
   removeCustomFolderMemberReference,
@@ -61,27 +65,20 @@ import {
   type ShellWindowContentMode,
   type ShellWindow,
 } from "./runtime";
+import {
+  createInitialStartMenuPanelState,
+  describeStartMenuRecentItemBadge,
+  describeStartMenuRecentItemMeta,
+  extractSearchParamsFromRoutePath,
+  MAX_START_MENU_FOLDER_ITEMS,
+  readStartMenuRecentItems,
+  startMenuLauncherApps,
+  startMenuPanelReducer,
+  trackStartMenuRecentWindow,
+  writeStartMenuRecentItems,
+  type StartMenuRecentItem,
+} from "./start-menu";
 import styles from "./DesktopShell.module.css";
-
-const startMenuItems: Array<{
-  appId: ShellAppId;
-  description: string;
-}> = [
-  { appId: "search", description: "Поиск сообщений и быстрый переход в текущие conversations." },
-  {
-    appId: "explorer",
-    description: "Системный organizer surface для desktop entrypoints, скрытых объектов и overflow.",
-  },
-  { appId: "settings", description: "Privacy, devices, sessions и account preferences." },
-  {
-    appId: "self_chat",
-    description: "Канонический self-facing singleton target для текущего пользователя.",
-  },
-  {
-    appId: "friend_requests",
-    description: "Каноническое окно входящих и исходящих friend requests.",
-  },
-];
 
 export function DesktopShell({
   onRequestRebootToBoot,
@@ -97,17 +94,25 @@ export function DesktopShell({
     undefined,
     createInitialShellRuntimeState,
   );
+  const [startMenuState, dispatchStartMenu] = useReducer(
+    startMenuPanelReducer,
+    undefined,
+    createInitialStartMenuPanelState,
+  );
   const [storage] = useState(() => getBrowserShellPreferencesStorage());
   const [desktopRegistryState, setDesktopRegistryState] = useState(() =>
     readDesktopRegistryState(storage),
   );
+  const [recentItems, setRecentItems] = useState<StartMenuRecentItem[]>(() =>
+    readStartMenuRecentItems(storage),
+  );
   const [liveDirectChats, setLiveDirectChats] = useState<DirectChat[]>([]);
   const [liveGroups, setLiveGroups] = useState<Group[]>([]);
   const [selectedDesktopEntryId, setSelectedDesktopEntryId] = useState<string | null>(null);
-  const [isStartOpen, setIsStartOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [clock, setClock] = useState(() => new Date());
+  const startMenuAnchorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -162,10 +167,22 @@ export function DesktopShell({
     writeDesktopRegistryState(storage, desktopRegistryState);
   }, [desktopRegistryState, storage]);
 
+  useEffect(() => {
+    writeStartMenuRecentItems(storage, recentItems);
+  }, [recentItems, storage]);
+
   const activeWindow = selectActiveShellWindow(runtimeState);
   const desktopUnreadTargetMap = useMemo(
     () => createDesktopUnreadTargetMap(liveDirectChats, liveGroups),
     [liveDirectChats, liveGroups],
+  );
+  const allCustomFolders = useMemo(
+    () => listCustomFolderDesktopEntities(desktopRegistryState),
+    [desktopRegistryState],
+  );
+  const startFolders = useMemo(
+    () => allCustomFolders.slice(0, MAX_START_MENU_FOLDER_ITEMS),
+    [allCustomFolders],
   );
 
   useEffect(() => {
@@ -177,6 +194,49 @@ export function DesktopShell({
 
     navigate(desiredPath, { replace: true });
   }, [activeWindow?.routePath, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    if (activeWindow === null) {
+      return;
+    }
+
+    setRecentItems((currentItems) => trackStartMenuRecentWindow(currentItems, activeWindow));
+  }, [activeWindow]);
+
+  useEffect(() => {
+    if (!startMenuState.isOpen) {
+      return;
+    }
+
+    function handleDocumentMouseDown(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (startMenuAnchorRef.current?.contains(target)) {
+        return;
+      }
+
+      dispatchStartMenu({ type: "close" });
+    }
+
+    function handleDocumentKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      dispatchStartMenu({ type: "close" });
+    }
+
+    document.addEventListener("mousedown", handleDocumentMouseDown);
+    document.addEventListener("keydown", handleDocumentKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentMouseDown);
+      document.removeEventListener("keydown", handleDocumentKeyDown);
+    };
+  }, [startMenuState.isOpen]);
 
   useEffect(() => {
     if (state.status !== "authenticated") {
@@ -336,16 +396,28 @@ export function DesktopShell({
     ) ?? false;
   const desktopEntries = listDesktopEntitiesForSurface(desktopRegistryState);
   const overflowSummaries = listDesktopOverflowSummaries(desktopRegistryState);
+  const hiddenFolderCount = Math.max(0, allCustomFolders.length - startFolders.length);
 
-  function launchApp(appId: ShellAppId) {
+  function closeStartMenu() {
+    dispatchStartMenu({ type: "close" });
+  }
+
+  function launchApp(
+    appId: ShellAppId,
+    options?: {
+      routePath?: string | null;
+      title?: string;
+    },
+  ) {
     const app = shellAppRegistry[appId];
+    const routePath = options?.routePath ?? app.routePath;
     const routeTarget =
-      app.routePath === null
+      routePath === null
         ? null
         : {
             key: app.appId,
-            title: app.title,
-            routePath: app.routePath,
+            title: options?.title?.trim() || app.title,
+            routePath,
           };
 
     dispatch({
@@ -353,7 +425,7 @@ export function DesktopShell({
       app,
       target: routeTarget,
     });
-    setIsStartOpen(false);
+    closeStartMenu();
 
     if (routeTarget?.routePath) {
       navigate(routeTarget.routePath);
@@ -379,7 +451,7 @@ export function DesktopShell({
       target,
     });
     navigate(target.routePath ?? "/app/chats");
-    setIsStartOpen(false);
+    closeStartMenu();
   }
 
   function openGroupChat(options: {
@@ -401,7 +473,7 @@ export function DesktopShell({
       target,
     });
     navigate(target.routePath ?? "/app/groups");
-    setIsStartOpen(false);
+    closeStartMenu();
   }
 
   function openCustomFolder(folderId: string) {
@@ -418,7 +490,7 @@ export function DesktopShell({
       },
     });
     navigate(routePath);
-    setIsStartOpen(false);
+    closeStartMenu();
   }
 
   function createCustomFolder(name: string): string {
@@ -471,7 +543,43 @@ export function DesktopShell({
       target,
     });
     navigate(target.routePath ?? "/app/people");
-    setIsStartOpen(false);
+    closeStartMenu();
+  }
+
+  function openExplorerSection(sectionId: string, title: string) {
+    launchApp("explorer", {
+      routePath: buildExplorerRoutePath(
+        new URLSearchParams([
+          ["section", sectionId],
+        ]),
+      ),
+      title,
+    });
+  }
+
+  function openRecentItem(item: StartMenuRecentItem) {
+    if (item.kind === "app") {
+      launchApp(item.appId, {
+        routePath: item.routePath,
+        title: item.title,
+      });
+      return;
+    }
+
+    if (item.kind === "direct_chat") {
+      openDirectChat({
+        chatId: item.targetKey,
+        title: item.title,
+        searchParams: extractSearchParamsFromRoutePath(item.routePath),
+      });
+      return;
+    }
+
+    openGroupChat({
+      groupId: item.targetKey,
+      title: item.title,
+      searchParams: extractSearchParamsFromRoutePath(item.routePath),
+    });
   }
 
   function syncCurrentRouteTitle(title: string) {
@@ -616,6 +724,7 @@ export function DesktopShell({
 
     try {
       await logout();
+      closeStartMenu();
       navigate("/login", { replace: true });
     } catch (error) {
       setLogoutError(
@@ -839,7 +948,7 @@ export function DesktopShell({
               <button
                 className={styles.shellGhostButton}
                 onClick={() => {
-                  launchApp("explorer");
+                  openExplorerSection("overflow", "Explorer · Overflow");
                 }}
                 type="button"
               >
@@ -928,61 +1037,192 @@ export function DesktopShell({
 
         <footer className={styles.taskbar}>
           <div className={styles.taskbarLeft}>
-            <button
-              className={styles.startButton}
-              onClick={() => {
-                setIsStartOpen((current) => !current);
-              }}
-              type="button"
-            >
-              Start
-            </button>
+            <div className={styles.startMenuAnchor} ref={startMenuAnchorRef}>
+              <button
+                aria-controls="shell-start-menu"
+                aria-expanded={startMenuState.isOpen}
+                className={styles.startButton}
+                onClick={() => {
+                  dispatchStartMenu({ type: "toggle" });
+                }}
+                type="button"
+              >
+                Start
+              </button>
 
-            {isStartOpen && (
-              <section className={styles.startMenu}>
-                <div className={styles.startMenuHeader}>
-                  <strong>{state.profile.nickname}</strong>
-                  <span>@{state.profile.login}</span>
-                </div>
+              {startMenuState.isOpen && (
+                <section
+                  aria-label="Start launcher"
+                  className={styles.startMenu}
+                  id="shell-start-menu"
+                >
+                  <div className={styles.startMenuHeader}>
+                    <div>
+                      <strong>{state.profile.nickname}</strong>
+                      <span>@{state.profile.login}</span>
+                    </div>
+                    <small>Launcher-first surface</small>
+                  </div>
 
-                <div className={styles.startMenuList}>
-                  {startMenuItems.map((item) => (
-                    <button
-                      key={item.appId}
-                      className={styles.startMenuItem}
-                      onClick={() => {
-                        launchApp(item.appId);
-                      }}
-                      type="button"
-                    >
-                      <span>{shellAppRegistry[item.appId].title}</span>
-                      <small>{item.description}</small>
-                    </button>
-                  ))}
-                </div>
+                  <div className={styles.startMenuBody}>
+                    <section className={styles.startMenuSection}>
+                      <div className={styles.startMenuSectionHeader}>
+                        <p className={styles.startMenuSectionEyebrow}>Приложения</p>
+                        <span>{startMenuLauncherApps.length}</span>
+                      </div>
+                      <div className={styles.startMenuList}>
+                        {startMenuLauncherApps.map((item) => (
+                          <button
+                            key={item.appId}
+                            className={styles.startMenuItem}
+                            onClick={() => {
+                              launchApp(item.appId);
+                            }}
+                            type="button"
+                          >
+                            <span className={styles.startMenuItemBadge}>{item.badge}</span>
+                            <span className={styles.startMenuItemContent}>
+                              <span className={styles.startMenuItemTitle}>{item.title}</span>
+                              <small>{item.description}</small>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
 
-                <div className={styles.startMenuFooter}>
-                  <button
-                    className={styles.startMenuAction}
-                    onClick={onRequestRebootToBoot}
-                    type="button"
-                  >
-                    Перезапуск в boot
-                  </button>
-                  <button
-                    className={styles.startMenuAction}
-                    disabled={isLoggingOut}
-                    onClick={() => {
-                      void handleLogout();
-                    }}
-                    type="button"
-                  >
-                    {isLoggingOut ? "Выход..." : "Выйти"}
-                  </button>
-                </div>
-                {logoutError && <p className={styles.startMenuError}>{logoutError}</p>}
-              </section>
-            )}
+                    <section className={styles.startMenuSection}>
+                      <div className={styles.startMenuSectionHeader}>
+                        <p className={styles.startMenuSectionEyebrow}>Недавние</p>
+                        <span>{recentItems.length}</span>
+                      </div>
+                      {recentItems.length > 0 ? (
+                        <div className={styles.startMenuStack}>
+                          {recentItems.map((item) => (
+                            <button
+                              key={item.id}
+                              className={styles.startMenuCompactItem}
+                              onClick={() => {
+                                openRecentItem(item);
+                              }}
+                              type="button"
+                            >
+                              <span className={styles.startMenuItemBadge}>
+                                {describeStartMenuRecentItemBadge(item)}
+                              </span>
+                              <span className={styles.startMenuItemContent}>
+                                <span className={styles.startMenuItemTitle}>{item.title}</span>
+                                <small>{describeStartMenuRecentItemMeta(item)}</small>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className={styles.startMenuEmptyState}>
+                          Здесь появятся recent apps, direct chats и groups после реального запуска или фокуса.
+                        </p>
+                      )}
+                    </section>
+
+                    <section className={styles.startMenuSection}>
+                      <div className={styles.startMenuSectionHeader}>
+                        <p className={styles.startMenuSectionEyebrow}>Папки</p>
+                        <span>{allCustomFolders.length}</span>
+                      </div>
+                      {startFolders.length > 0 ? (
+                        <div className={styles.startMenuStack}>
+                          {startFolders.map((folder) => {
+                            const unreadCount = getCustomFolderUnreadCount(
+                              desktopRegistryState,
+                              folder.folderId,
+                              desktopUnreadTargetMap,
+                            );
+                            const memberCount = listCustomFolderMemberReferences(
+                              desktopRegistryState,
+                              folder.folderId,
+                            ).length;
+
+                            return (
+                              <button
+                                key={folder.id}
+                                className={styles.startMenuCompactItem}
+                                onClick={() => {
+                                  openCustomFolder(folder.folderId);
+                                }}
+                                type="button"
+                              >
+                                <span className={styles.startMenuItemBadge}>П</span>
+                                <span className={styles.startMenuItemContent}>
+                                  <span className={styles.startMenuItemTitle}>{folder.title}</span>
+                                  <small>
+                                    {memberCount === 0
+                                      ? "Папка пуста"
+                                      : `Объектов: ${memberCount}${unreadCount > 0 ? ` · unread: ${unreadCount}` : ""}`}
+                                  </small>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className={styles.startMenuEmptyState}>
+                          Custom folders остаются shell-local organizer objects без отдельного Start management UI.
+                        </p>
+                      )}
+                      {hiddenFolderCount > 0 && (
+                        <button
+                          className={styles.startMenuSectionLink}
+                          onClick={() => {
+                            openExplorerSection("folders", "Explorer · Папки");
+                          }}
+                          type="button"
+                        >
+                          Показать ещё папки: {hiddenFolderCount}
+                        </button>
+                      )}
+                    </section>
+
+                    <section className={styles.startMenuSection}>
+                      <div className={styles.startMenuSectionHeader}>
+                        <p className={styles.startMenuSectionEyebrow}>Система</p>
+                        <span>3</span>
+                      </div>
+                      <div className={styles.startMenuActions}>
+                        <button
+                          className={styles.startMenuAction}
+                          onClick={() => {
+                            launchApp("settings");
+                          }}
+                          type="button"
+                        >
+                          Настройки
+                        </button>
+                        <button
+                          className={styles.startMenuAction}
+                          onClick={() => {
+                            closeStartMenu();
+                            onRequestRebootToBoot();
+                          }}
+                          type="button"
+                        >
+                          Перезапуск в boot
+                        </button>
+                        <button
+                          className={styles.startMenuAction}
+                          disabled={isLoggingOut}
+                          onClick={() => {
+                            void handleLogout();
+                          }}
+                          type="button"
+                        >
+                          {isLoggingOut ? "Выход..." : "Выйти"}
+                        </button>
+                      </div>
+                    </section>
+                  </div>
+                  {logoutError && <p className={styles.startMenuError}>{logoutError}</p>}
+                </section>
+              )}
+            </div>
 
             <div className={styles.taskbarWindows}>
               {listTaskbarShellWindows(runtimeState).map((window) => (
