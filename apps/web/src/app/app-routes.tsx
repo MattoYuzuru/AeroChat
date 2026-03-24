@@ -6,6 +6,7 @@ import { PeoplePage } from "../pages/PeoplePage";
 import { PersonProfilePage } from "../pages/PersonProfilePage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { SearchPage } from "../pages/SearchPage";
+import { SectionPlaceholder } from "../pages/SectionPlaceholder";
 import { SelfChatPage } from "../pages/SelfChatPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import type {
@@ -103,6 +104,12 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
 export const shellAppRegistry: Record<ShellAppId, ShellAppDefinition> = {
   self_chat: routeBackedShellApps.find((app) => app.appId === "self_chat")!,
   friend_requests: routeBackedShellApps.find((app) => app.appId === "friend_requests")!,
+  explorer: {
+    appId: "explorer",
+    title: "Explorer",
+    launchPolicy: "singleton",
+    routePath: null,
+  },
   profile: routeBackedShellApps.find((app) => app.appId === "profile")!,
   people: routeBackedShellApps.find((app) => app.appId === "people")!,
   person_profile: {
@@ -289,6 +296,14 @@ export function renderShellAppContent(appId: ShellAppId): ReactNode {
       return <ProfilePage />;
     case "friend_requests":
       return <FriendRequestsPage />;
+    case "explorer":
+      return (
+        <SectionPlaceholder
+          title="Explorer"
+          description="Системный shell entrypoint уже существует, но полноценно organizer/folder surface будет добавлен отдельным узким slice без fake filesystem semantics."
+          nextSlice="Следующий PR: Explorer, folder organization и shell launcher."
+        />
+      );
     case "people":
       return <PeoplePage />;
     case "person_profile":

@@ -99,6 +99,30 @@ describe("shellRuntimeReducer", () => {
     expect(listTaskbarShellWindows(state)[0]?.appId).toBe("self_chat");
   });
 
+  it("keeps explorer as a canonical singleton placeholder window on relaunch", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.explorer,
+    });
+    const explorerWindowId = state.activeWindowId;
+
+    state = shellRuntimeReducer(state, {
+      type: "minimize",
+      windowId: explorerWindowId!,
+    });
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.explorer,
+    });
+
+    expect(state.windows).toHaveLength(1);
+    expect(state.windows[0]?.windowId).toBe(explorerWindowId);
+    expect(state.windows[0]?.appId).toBe("explorer");
+    expect(state.windows[0]?.state).toBe("focused");
+  });
+
   it("allows different singleton_per_target launch keys when runtime policy needs it", () => {
     let state = createInitialShellRuntimeState();
     const directChatApp: ShellAppDefinition = {

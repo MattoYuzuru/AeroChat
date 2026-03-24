@@ -15,9 +15,29 @@ import {
   resolveShellRouteEntry,
   shellAppRegistry,
 } from "../app/app-routes";
+import { gatewayClient } from "../gateway/runtime";
+import { parseDirectChatRealtimeEvent } from "../chats/realtime";
+import { parseGroupRealtimeEvent } from "../groups/realtime";
+import { subscribeRealtimeEnvelopes } from "../realtime/events";
 import { selectVisibleDirectCallSurfaceEntry } from "../rtc/awareness";
 import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import { DesktopShellHostContext } from "./context";
+import {
+  describeDirectChatDesktopTitle,
+  hideDesktopEntity,
+  isDesktopEntityHideable,
+  listDesktopEntitiesForSurface,
+  listDesktopOverflowSummaries,
+  readDesktopRegistryState,
+  removeGroupChatDesktopEntity,
+  syncDirectChatDesktopEntities,
+  syncGroupChatDesktopEntities,
+  upsertDirectChatDesktopEntity,
+  upsertGroupChatDesktopEntity,
+  writeDesktopRegistryState,
+  type DesktopEntity,
+} from "./desktop-registry";
+import { getBrowserShellPreferencesStorage } from "./preferences";
 import {
   buildShellLaunchKey,
   createInitialShellRuntimeState,
@@ -31,24 +51,15 @@ import {
 } from "./runtime";
 import styles from "./DesktopShell.module.css";
 
-const desktopEntryItems: Array<{
-  appId: ShellAppId;
-  label: string;
-  meta: string;
-}> = [
-  { appId: "search", label: "Поиск", meta: "message search" },
-  { appId: "settings", label: "Настройки", meta: "privacy" },
-  { appId: "self_chat", label: "Я", meta: "self workspace" },
-  { appId: "friend_requests", label: "Заявки", meta: "social" },
-  { appId: "chats", label: "Чаты", meta: "chat opener" },
-];
-
 const startMenuItems: Array<{
   appId: ShellAppId;
   description: string;
 }> = [
-  { appId: "search", description: "Поиск сообщений и быстрый jump в текущие conversations." },
-  { appId: "chats", description: "Текущий route-backed direct chat workspace как bridge slice." },
+  { appId: "search", description: "Поиск сообщений и быстрый переход в текущие conversations." },
+  {
+    appId: "explorer",
+    description: "Системный organizer entrypoint для будущих Explorer и folder surfaces.",
+  },
   { appId: "settings", description: "Privacy, devices, sessions и account preferences." },
   {
     appId: "self_chat",
@@ -74,6 +85,11 @@ export function DesktopShell({
     undefined,
     createInitialShellRuntimeState,
   );
+  const [storage] = useState(() => getBrowserShellPreferencesStorage());
+  const [desktopRegistryState, setDesktopRegistryState] = useState(() =>
+    readDesktopRegistryState(storage),
+  );
+  const [selectedDesktopEntryId, setSelectedDesktopEntryId] = useState<string | null>(null);
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -99,12 +115,38 @@ export function DesktopShell({
       return;
     }
 
+    const routeTarget = routeEntry.target;
+
+    if (routeEntry.app.appId === "direct_chat" && routeTarget !== null) {
+      setDesktopRegistryState((currentState) =>
+        upsertDirectChatDesktopEntity(
+          currentState,
+          routeTarget.key,
+          routeTarget.title ?? "Личный чат",
+        ),
+      );
+    }
+
+    if (routeEntry.app.appId === "group_chat" && routeTarget !== null) {
+      setDesktopRegistryState((currentState) =>
+        upsertGroupChatDesktopEntity(
+          currentState,
+          routeTarget.key,
+          routeTarget.title ?? "Группа",
+        ),
+      );
+    }
+
     dispatch({
       type: "launch",
       app: routeEntry.app,
       target: routeEntry.target,
     });
   }, [routeEntry]);
+
+  useEffect(() => {
+    writeDesktopRegistryState(storage, desktopRegistryState);
+  }, [desktopRegistryState, storage]);
 
   const activeWindow = selectActiveShellWindow(runtimeState);
 
@@ -117,6 +159,105 @@ export function DesktopShell({
 
     navigate(desiredPath, { replace: true });
   }, [activeWindow?.routePath, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    if (state.status !== "authenticated") {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const [directChats, groups] = await Promise.all([
+          gatewayClient.listDirectChats(state.token),
+          gatewayClient.listGroups(state.token),
+        ]);
+        if (cancelled) {
+          return;
+        }
+
+        setDesktopRegistryState((currentState) =>
+          syncGroupChatDesktopEntities(
+            syncDirectChatDesktopEntities(currentState, directChats, state.profile.id),
+            groups,
+          ),
+        );
+      } catch {
+        // Desktop registry остаётся локальным UX-слоем и не должен ломать shell при деградации list bootstrap.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state]);
+
+  useEffect(() => {
+    if (state.status !== "authenticated") {
+      return;
+    }
+
+    return subscribeRealtimeEnvelopes((envelope) => {
+      const directEvent = parseDirectChatRealtimeEvent(envelope);
+      if (directEvent?.type === "direct_chat.message.updated") {
+        setDesktopRegistryState((currentState) =>
+          upsertDirectChatDesktopEntity(
+            currentState,
+            directEvent.chat.id,
+            describeDirectChatDesktopTitle(directEvent.chat, state.profile.id),
+          ),
+        );
+        return;
+      }
+
+      const groupEvent = parseGroupRealtimeEvent(envelope);
+      if (groupEvent === null) {
+        return;
+      }
+
+      if (groupEvent.type === "group.message.updated") {
+        setDesktopRegistryState((currentState) =>
+          upsertGroupChatDesktopEntity(
+            currentState,
+            groupEvent.group.id,
+            groupEvent.group.name,
+          ),
+        );
+        return;
+      }
+
+      if (groupEvent.type === "group.membership.updated") {
+        if (groupEvent.group === null || groupEvent.selfMember === null) {
+          setDesktopRegistryState((currentState) =>
+            removeGroupChatDesktopEntity(currentState, groupEvent.groupId),
+          );
+          return;
+        }
+
+        const nextGroup = groupEvent.group;
+        setDesktopRegistryState((currentState) =>
+          upsertGroupChatDesktopEntity(
+            currentState,
+            nextGroup.id,
+            nextGroup.name,
+          ),
+        );
+        return;
+      }
+
+      if ("group" in groupEvent && groupEvent.group !== null) {
+        const nextGroup = groupEvent.group;
+        setDesktopRegistryState((currentState) =>
+          upsertGroupChatDesktopEntity(
+            currentState,
+            nextGroup.id,
+            nextGroup.name,
+          ),
+        );
+      }
+    });
+  }, [state]);
 
   if (state.status !== "authenticated") {
     return null;
@@ -142,6 +283,8 @@ export function DesktopShell({
       (participant) =>
         participant.userId === state.profile.id && participant.state === "active",
     ) ?? false;
+  const desktopEntries = listDesktopEntitiesForSurface(desktopRegistryState);
+  const overflowSummaries = listDesktopOverflowSummaries(desktopRegistryState);
 
   function launchApp(appId: ShellAppId) {
     const app = shellAppRegistry[appId];
@@ -172,6 +315,13 @@ export function DesktopShell({
     searchParams?: URLSearchParams | null;
   }) {
     const target = buildDirectChatShellTarget(options);
+    setDesktopRegistryState((currentState) =>
+      upsertDirectChatDesktopEntity(
+        currentState,
+        options.chatId,
+        target.title ?? options.title ?? "Личный чат",
+      ),
+    );
     dispatch({
       type: "launch",
       app: shellAppRegistry.direct_chat,
@@ -187,6 +337,13 @@ export function DesktopShell({
     searchParams?: URLSearchParams | null;
   }) {
     const target = buildGroupChatShellTarget(options);
+    setDesktopRegistryState((currentState) =>
+      upsertGroupChatDesktopEntity(
+        currentState,
+        options.groupId,
+        target.title ?? options.title ?? "Группа",
+      ),
+    );
     dispatch({
       type: "launch",
       app: shellAppRegistry.group_chat,
@@ -212,16 +369,17 @@ export function DesktopShell({
   }
 
   function syncCurrentRouteTitle(title: string) {
-    if (routeEntry?.target === null || routeEntry === null) {
+    if (routeEntry === null || routeEntry.target === null) {
       return;
     }
 
+    const routeTarget = routeEntry.target;
     const normalizedTitle = title.trim();
     if (normalizedTitle === "") {
       return;
     }
 
-    const launchKey = buildShellLaunchKey(routeEntry.app, routeEntry.target);
+    const launchKey = buildShellLaunchKey(routeEntry.app, routeTarget);
     const currentWindow =
       runtimeState.windows.find((window) => window.launchKey === launchKey) ?? null;
     if (currentWindow?.title === normalizedTitle) {
@@ -232,11 +390,23 @@ export function DesktopShell({
       type: "sync_target",
       app: routeEntry.app,
       target: {
-        ...routeEntry.target,
+        ...routeTarget,
         title: normalizedTitle,
         routePath: `${location.pathname}${location.search}`,
       },
     });
+
+    if (routeEntry.app.appId === "direct_chat") {
+      setDesktopRegistryState((currentState) =>
+        upsertDirectChatDesktopEntity(currentState, routeTarget.key, normalizedTitle),
+      );
+    }
+
+    if (routeEntry.app.appId === "group_chat") {
+      setDesktopRegistryState((currentState) =>
+        upsertGroupChatDesktopEntity(currentState, routeTarget.key, normalizedTitle),
+      );
+    }
   }
 
   function setActiveWindowContentMode(contentMode: ShellWindowContentMode) {
@@ -288,6 +458,39 @@ export function DesktopShell({
     }
   }
 
+  function openDesktopEntity(entry: DesktopEntity) {
+    setSelectedDesktopEntryId(entry.id);
+
+    if (entry.kind === "system_app") {
+      launchApp(entry.appId);
+      return;
+    }
+
+    if (entry.kind === "direct_chat") {
+      openDirectChat({
+        chatId: entry.targetKey,
+        title: entry.title,
+      });
+      return;
+    }
+
+    openGroupChat({
+      groupId: entry.targetKey,
+      title: entry.title,
+    });
+  }
+
+  function handleHideDesktopEntity(entry: DesktopEntity) {
+    if (!isDesktopEntityHideable(entry)) {
+      return;
+    }
+
+    setDesktopRegistryState((currentState) => hideDesktopEntity(currentState, entry.id));
+    setSelectedDesktopEntryId((currentEntryId) =>
+      currentEntryId === entry.id ? null : currentEntryId,
+    );
+  }
+
   async function handleLogout() {
     setIsLoggingOut(true);
     setLogoutError(null);
@@ -326,15 +529,15 @@ export function DesktopShell({
           <header className={styles.desktopHeader}>
             <div>
               <p className={styles.brandEyebrow}>AeroChat</p>
-              <h1 className={styles.desktopTitle}>Desktop shell runtime</h1>
+              <h1 className={styles.desktopTitle}>Рабочий стол AeroChat</h1>
               <p className={styles.desktopSubtitle}>
                 @{state.profile.login} · {state.profile.nickname}
               </p>
             </div>
             <div className={styles.headerBadges}>
               <span className={styles.headerBadge}>XP-first</span>
-              <span className={styles.headerBadge}>wide-screen shell</span>
-              <span className={styles.headerBadge}>window registry</span>
+              <span className={styles.headerBadge}>Primary desktop surface</span>
+              <span className={styles.headerBadge}>Entry registry: {desktopEntries.length}</span>
             </div>
           </header>
 
@@ -402,21 +605,92 @@ export function DesktopShell({
           )}
 
           <section className={styles.desktopGrid} aria-label="Desktop entrypoints">
-            {desktopEntryItems.map((item) => (
-              <button
-                key={item.appId}
-                className={styles.desktopIcon}
-                onClick={() => {
-                  launchApp(item.appId);
-                }}
-                type="button"
+            {desktopEntries.map((entry) => (
+              <article
+                key={entry.id}
+                className={
+                  selectedDesktopEntryId === entry.id
+                    ? styles.desktopIconCardSelected
+                    : styles.desktopIconCard
+                }
               >
-                <span className={styles.desktopIconBadge}>{item.label.slice(0, 1)}</span>
-                <span className={styles.desktopIconLabel}>{item.label}</span>
-                <small className={styles.desktopIconMeta}>{item.meta}</small>
-              </button>
+                <button
+                  aria-pressed={selectedDesktopEntryId === entry.id}
+                  className={styles.desktopIcon}
+                  onClick={() => {
+                    setSelectedDesktopEntryId(entry.id);
+                  }}
+                  onDoubleClick={() => {
+                    openDesktopEntity(entry);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    openDesktopEntity(entry);
+                  }}
+                  type="button"
+                >
+                  <span className={styles.desktopIconBadge}>
+                    {describeDesktopEntityBadge(entry)}
+                  </span>
+                  <span className={styles.desktopIconLabel}>{entry.title}</span>
+                  <small className={styles.desktopIconMeta}>
+                    {describeDesktopEntityMeta(entry)}
+                  </small>
+                </button>
+
+                {selectedDesktopEntryId === entry.id && (
+                  <div className={styles.desktopIconActions}>
+                    <button
+                      className={styles.desktopIconAction}
+                      onClick={() => {
+                        openDesktopEntity(entry);
+                      }}
+                      type="button"
+                    >
+                      Открыть
+                    </button>
+                    {isDesktopEntityHideable(entry) && (
+                      <button
+                        className={styles.desktopIconActionGhost}
+                        onClick={() => {
+                          handleHideDesktopEntity(entry);
+                        }}
+                        type="button"
+                      >
+                        Убрать с рабочего стола
+                      </button>
+                    )}
+                  </div>
+                )}
+              </article>
             ))}
           </section>
+
+          {overflowSummaries.length > 0 && (
+            <section className={styles.overflowPanel} aria-label="Desktop overflow">
+              <div>
+                <p className={styles.placeholderLabel}>Desktop overflow</p>
+                <h2 className={styles.placeholderTitle}>
+                  Часть entrypoints вынесена в shell-local buckets
+                </h2>
+                <p className={styles.placeholderText}>
+                  Этот slice держит переполнение bounded без кастомных folders и без fake Explorer UX.
+                </p>
+              </div>
+              <div className={styles.overflowSummaryList}>
+                {overflowSummaries.map((entry) => (
+                  <article key={entry.bucket} className={styles.overflowSummaryCard}>
+                    <strong>{entry.title}</strong>
+                    <span>{entry.count}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className={styles.windowLayer} aria-label="Shell windows">
             {runtimeState.windows.map((window, index) => (
@@ -602,7 +876,7 @@ function ShellWindowBody({
   const { appId } = window;
 
   if (!isRouteBackedShellAppId(appId)) {
-    return null;
+    return <div className={styles.routeHost}>{renderShellAppContent(appId)}</div>;
   }
 
   if (window.windowId !== activeWindowId) {
@@ -629,6 +903,50 @@ function ShellWindowBody({
       {renderShellAppContent(appId)}
     </div>
   );
+}
+
+function describeDesktopEntityBadge(entry: DesktopEntity): string {
+  if (entry.kind === "direct_chat" || entry.kind === "group_chat") {
+    return entry.title.slice(0, 1).toUpperCase();
+  }
+
+  if (entry.appId === "friend_requests") {
+    return "З";
+  }
+
+  if (entry.appId === "self_chat") {
+    return "Я";
+  }
+
+  return entry.title.slice(0, 1).toUpperCase();
+}
+
+function describeDesktopEntityMeta(entry: DesktopEntity): string {
+  if (entry.kind === "direct_chat") {
+    return "Личный чат";
+  }
+
+  if (entry.kind === "group_chat") {
+    return "Группа";
+  }
+
+  if (entry.appId === "search") {
+    return "Поиск";
+  }
+
+  if (entry.appId === "explorer") {
+    return "Organizer";
+  }
+
+  if (entry.appId === "friend_requests") {
+    return "Заявки";
+  }
+
+  if (entry.appId === "settings") {
+    return "Настройки";
+  }
+
+  return "Системное";
 }
 
 function formatClock(date: Date): string {

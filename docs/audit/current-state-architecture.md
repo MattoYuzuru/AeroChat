@@ -223,8 +223,8 @@ Realtime сейчас:
 
 ### Desktop shell
 
-- `implemented`: wide-screen desktop shell runtime scaffold, boot/chooser/login handoff, Start/taskbar/tray, singleton window registry, bounded 10-window cap notice, route-backed shell windows для текущих page-level surfaces, canonical `self_chat` / `direct_chat` / `group_chat` / `person_profile` / `friend_requests` targets с taskbar/live-window semantics, deep-link handoff, honest self-facing workspace для `Я` без self-direct backend rewrite и same-window `thread/info` switching внутри direct/group без нового window target.
-- `partial/bootstrap/bounded`: отдельные launcher/list surfaces `Chats` и `Groups` ещё coexist'ят с canonical chat/group windows, а Explorer, custom folders, drag/resize polish и full XP art pass ещё не реализованы.
+- `implemented`: wide-screen desktop shell runtime scaffold, boot/chooser/login handoff, Start/taskbar/tray, singleton window registry, bounded 10-window cap notice, route-backed shell windows для текущих page-level surfaces, canonical `self_chat` / `direct_chat` / `group_chat` / `person_profile` / `friend_requests` targets с taskbar/live-window semantics, deep-link handoff, honest self-facing workspace для `Я` без self-direct backend rewrite и same-window `thread/info` switching внутри direct/group без нового window target, плюс shell-local desktop entity registry с browser-local persistence для системных entrypoints и canonical direct/group targets, auto-population текущих direct chats/groups, hide-from-desktop semantics без удаления underlying target и bounded overflow routing в `Контакты` / `Группы`.
+- `partial/bootstrap/bounded`: отдельные launcher/list surfaces `Chats` и `Groups` ещё coexist'ят с canonical chat/group windows, Explorer пока остаётся placeholder singleton app без organizer UX, а custom folders, drag/resize polish и full XP art pass ещё не реализованы.
 - `not implemented yet`: Explorer, custom folders, theme switching, wallpaper manager, pinned/trash model, dedicated media viewers, global call manager.
 
 ### Identity/profile/privacy
