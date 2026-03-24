@@ -1,3 +1,8 @@
+import {
+  buildDirectChatRoutePath,
+  buildGroupChatRoutePath,
+  shellAppRegistry,
+} from "../app/app-routes";
 import type { ShellPreferencesStorageLike } from "./preferences";
 import type { ShellWindow } from "./runtime";
 
@@ -263,6 +268,20 @@ export function describeStartMenuRecentItemBadge(item: StartMenuRecentItem): str
   }
 
   return "Ч";
+}
+
+export function resolveStartMenuRecentItemRoutePath(
+  item: StartMenuRecentItem,
+): string | null {
+  if (item.kind === "app") {
+    return item.routePath ?? shellAppRegistry[item.appId].routePath;
+  }
+
+  if (item.kind === "direct_chat") {
+    return item.routePath ?? buildDirectChatRoutePath(item.targetKey);
+  }
+
+  return item.routePath ?? buildGroupChatRoutePath(item.targetKey);
 }
 
 function resolveStartMenuRecentItem(

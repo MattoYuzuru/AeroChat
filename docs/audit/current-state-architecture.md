@@ -23,6 +23,11 @@
     - показывает bounded recent apps/direct chats/groups по реальным launch/focus событиям;
     - в bounded виде surfac'ит custom folders и ведёт в canonical Explorer folder route;
     - даёт консервативные system actions `Настройки`, `Перезапуск в boot` и `Выйти`;
+  - на narrow/mobile viewport появился practical launcher/home surface:
+    - `/app` теперь ведёт не в случайный profile fallback, а в dedicated home launcher;
+    - home показывает touch-friendly entrypoints в `Я`, `Чаты`, `Группы`, `Поиск`, `Explorer`, `Заявки`, `Настройки`;
+    - reuse'ит тот же shell-local recent model для recent apps/direct chats/groups;
+    - даёт bounded entry path в custom folders через canonical Explorer folder route;
   - shell-local custom folders V1 поверх desktop registry:
     - folder object живёт только browser-local и переживает reload;
     - folder хранит shortcut references на canonical direct/group targets, а не backend storage semantics;
@@ -43,7 +48,7 @@
 
 - `identity`, `social graph`, `legacy direct/group chats`, `media relay`, `deploy/local runtime` уже имеют рабочий user-facing slice;
 - `desktop shell` теперь имеет первый runtime scaffold на desktop/wide screens, но ещё не завершён как full product shell;
-- `desktop shell` теперь уже умеет canonical self-chat, direct/group chat, person-profile, friend-requests и explorer organizer windows с dedicated launch semantics, shell-local custom folders V1 и real Start launcher surface с bounded recents/folder access, но всё ещё не завершён как full product shell;
+- `desktop shell` теперь уже умеет canonical self-chat, direct/group chat, person-profile, friend-requests и explorer organizer windows с dedicated launch semantics, shell-local custom folders V1, real Start launcher surface с bounded recents/folder access и narrow/mobile launcher home surface, но всё ещё не завершён как full product shell;
 - encrypted lanes реализованы как usable, но bounded foundation без full parity и без unified history;
 - `aero-rtc-control` теперь имеет usable direct-call continuity slice для web, но calls ещё не являются finished product subsystem;
 - `aero-jobs`, PWA и push пока не реализованы как продуктовые возможности, а desktop/mobile polish остаётся частично bootstrap-only.
@@ -52,12 +57,12 @@
 
 ### `apps/web`
 
-Единственный shipped-клиент. React/Vite SPA с auth bootstrap, route-backed product pages, новым desktop shell runtime на wide screens, legacy practical fullscreen flow на narrow screens, websocket realtime через `aero-gateway` и локальным crypto runtime.
+Единственный shipped-клиент. React/Vite SPA с auth bootstrap, route-backed product pages, новым desktop shell runtime на wide screens, practical launcher/home fullscreen flow на narrow screens, websocket realtime через `aero-gateway` и локальным crypto runtime.
 
 Реальная ответственность:
 
 - auth/session bootstrap и protected shell;
-- boot/chooser/login handoff и responsive switch между desktop shell runtime и legacy narrow-shell flow;
+- boot/chooser/login handoff и responsive switch между desktop shell runtime и practical narrow/mobile launcher flow;
 - desktop shell runtime scaffold: taskbar/start/tray, bounded window registry, launcher-first Start surface и route-backed app hosting;
 - web UI для identity, social graph, direct/group chats и settings;
 - attachment composer, voice/video notes и inline preview;
@@ -318,9 +323,9 @@ Realtime сейчас:
 
 ### PWA / mobile / desktop shell polish
 
-- `implemented`: responsive SPA shell с route-based workspace.
-- `partial/bootstrap/bounded`: UI shell уже имеет первые реальные desktop slices, включая organizer Explorer, но это всё ещё не PWA и не fully polished desktop/mobile product slice.
-- `not implemented yet`: service worker, manifest/install flow, push, desktop wrapper, отдельный mobile polish slice.
+- `implemented`: responsive SPA shell с route-based workspace, real desktop shell на wide screens и dedicated mobile launcher/home surface на narrow screens.
+- `partial/bootstrap/bounded`: mobile launcher уже reuse'ит canonical targets, recent items и folder entry path, но нижняя mobile navigation, richer call-aware mobile shell chrome и более глубокий mobile productivity polish ещё не доведены.
+- `not implemented yet`: service worker, manifest/install flow, push, desktop wrapper, richer mobile shell/navigation polish beyond current launcher slice.
 
 ## Service ownership and boundaries
 
