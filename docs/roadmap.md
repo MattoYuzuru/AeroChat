@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] Desktop context menus and bounded shell actions over desktop entities and custom folders
+- [x] Контекстное меню фона рабочего стола с bounded-действиями создания папки и открытия Explorer
 
 ---
 
@@ -222,6 +222,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Canonical friend requests shell target
 - [x] Explorer organizer bootstrap over shell-local desktop registry
 - [x] Shell-local custom folders V1 over desktop registry and Explorer
+- [x] Контекстное меню фона рабочего стола с bounded shell-local действиями
 - [ ] XP-first theme engine
 - [x] Explorer, folder organization и shell launcher
 - [x] Mobile practical shell adaptation

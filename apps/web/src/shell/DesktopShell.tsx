@@ -4,6 +4,8 @@ import {
   useReducer,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getAuthErrorMessage, useAuth } from "../auth/useAuth";
@@ -54,10 +56,13 @@ import {
   type DesktopEntity,
 } from "./desktop-registry";
 import {
+  createDesktopBackgroundFolderCreationResult,
   createClosedDesktopContextMenuState,
+  listDesktopBackgroundContextMenuItems,
   listDesktopContextMenuItems,
   reduceDesktopContextMenuState,
-  type DesktopContextMenuCommandId,
+  type DesktopBackgroundContextMenuCommandId,
+  type DesktopEntryContextMenuCommandId,
 } from "./desktop-context-menu";
 import { getBrowserShellPreferencesStorage } from "./preferences";
 import {
@@ -206,7 +211,7 @@ export function DesktopShell({
   );
   const desktopContextMenuEntry = useMemo(
     () =>
-      desktopContextMenuState.kind !== "open"
+      desktopContextMenuState.kind !== "entry"
         ? null
         : (desktopRegistryState.entries.find(
             (entry) => entry.id === desktopContextMenuState.entryId,
@@ -219,6 +224,10 @@ export function DesktopShell({
         ? []
         : listDesktopContextMenuItems(desktopContextMenuEntry, desktopRegistryState),
     [desktopContextMenuEntry, desktopRegistryState],
+  );
+  const desktopBackgroundContextMenuItems = useMemo(
+    () => listDesktopBackgroundContextMenuItems(),
+    [],
   );
 
   useEffect(() => {
@@ -279,7 +288,7 @@ export function DesktopShell({
   }, [startMenuState.isOpen]);
 
   useEffect(() => {
-    if (desktopContextMenuState.kind !== "open") {
+    if (desktopContextMenuState.kind === "closed") {
       return;
     }
 
@@ -335,7 +344,7 @@ export function DesktopShell({
   }, [folderDeleteDialogState, folderRenameDialogState]);
 
   useEffect(() => {
-    if (desktopContextMenuState.kind !== "open" || desktopContextMenuEntry !== null) {
+    if (desktopContextMenuState.kind !== "entry" || desktopContextMenuEntry !== null) {
       return;
     }
 
@@ -524,8 +533,20 @@ export function DesktopShell({
   ) {
     setSelectedDesktopEntryId(entry.id);
     dispatchDesktopContextMenu({
-      type: "open",
+      type: "open_entry",
       entryId: entry.id,
+      x: position.x,
+      y: position.y,
+    });
+  }
+
+  function openDesktopBackgroundContextMenu(position: {
+    x: number;
+    y: number;
+  }) {
+    setSelectedDesktopEntryId(null);
+    dispatchDesktopContextMenu({
+      type: "open_background",
       x: position.x,
       y: position.y,
     });
@@ -540,6 +561,50 @@ export function DesktopShell({
       x: clampDesktopContextMenuCoordinate(rect.left + rect.width / 2, window.innerWidth, 252),
       y: clampDesktopContextMenuCoordinate(rect.top + rect.height / 2, window.innerHeight, 320),
     });
+  }
+
+  function openDesktopBackgroundContextMenuFromSurface(surfaceElement: HTMLElement) {
+    const rect = surfaceElement.getBoundingClientRect();
+    openDesktopBackgroundContextMenu({
+      x: clampDesktopContextMenuCoordinate(rect.left + 48, window.innerWidth, 252),
+      y: clampDesktopContextMenuCoordinate(rect.top + 112, window.innerHeight, 220),
+    });
+  }
+
+  function handleDesktopSurfaceClick(event: ReactMouseEvent<HTMLElement>) {
+    if (!isDesktopBackgroundTriggerTarget(event.target)) {
+      return;
+    }
+
+    setSelectedDesktopEntryId(null);
+    closeDesktopContextMenu();
+    event.currentTarget.focus();
+  }
+
+  function handleDesktopSurfaceContextMenu(event: ReactMouseEvent<HTMLElement>) {
+    if (!isDesktopBackgroundTriggerTarget(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.focus();
+    openDesktopBackgroundContextMenu({
+      x: clampDesktopContextMenuCoordinate(event.clientX, window.innerWidth, 252),
+      y: clampDesktopContextMenuCoordinate(event.clientY, window.innerHeight, 220),
+    });
+  }
+
+  function handleDesktopSurfaceKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) {
+      return;
+    }
+
+    event.preventDefault();
+    openDesktopBackgroundContextMenuFromSurface(event.currentTarget);
   }
 
   function launchApp(
@@ -860,7 +925,7 @@ export function DesktopShell({
 
   function handleDesktopContextMenuCommand(
     entry: DesktopEntity,
-    commandId: DesktopContextMenuCommandId,
+    commandId: DesktopEntryContextMenuCommandId,
   ) {
     closeDesktopContextMenu();
 
@@ -892,6 +957,25 @@ export function DesktopShell({
         title: entry.title,
       });
     }
+  }
+
+  function handleDesktopBackgroundContextMenuCommand(
+    commandId: DesktopBackgroundContextMenuCommandId,
+  ) {
+    closeDesktopContextMenu();
+
+    if (commandId === "open_explorer") {
+      launchApp("explorer");
+      return;
+    }
+
+    const createdFolder = createDesktopBackgroundFolderCreationResult(desktopRegistryState);
+    setDesktopRegistryState(createdFolder.registryState);
+    setSelectedDesktopEntryId(createdFolder.entryId);
+    setFolderRenameDialogState({
+      folderId: createdFolder.folderId,
+      name: createdFolder.name,
+    });
   }
 
   function handleAddDesktopTargetToFolderFromMenu(
@@ -997,8 +1081,15 @@ export function DesktopShell({
         <div className={styles.wallpaper} aria-hidden="true" />
         <div className={styles.wallpaperGlow} aria-hidden="true" />
 
-        <section className={styles.desktopSurface}>
-          <header className={styles.desktopHeader}>
+        <section
+          aria-label="Рабочий стол AeroChat"
+          className={styles.desktopSurface}
+          onClick={handleDesktopSurfaceClick}
+          onContextMenu={handleDesktopSurfaceContextMenu}
+          onKeyDown={handleDesktopSurfaceKeyDown}
+          tabIndex={0}
+        >
+          <header className={styles.desktopHeader} data-desktop-background-blocker="true">
             <div>
               <p className={styles.brandEyebrow}>AeroChat</p>
               <h1 className={styles.desktopTitle}>Рабочий стол AeroChat</h1>
@@ -1014,7 +1105,10 @@ export function DesktopShell({
           </header>
 
           {visibleDirectCallSurface && (
-            <section className={styles.callNotice}>
+            <section
+              className={styles.callNotice}
+              data-desktop-background-blocker="true"
+            >
               <div>
                 <p className={styles.callLabel}>Активный direct call</p>
                 <h2 className={styles.callTitle}>
@@ -1062,7 +1156,11 @@ export function DesktopShell({
           )}
 
           {runtimeState.notice && (
-            <section className={styles.noticeBar} role="status">
+            <section
+              className={styles.noticeBar}
+              data-desktop-background-blocker="true"
+              role="status"
+            >
               <span>{runtimeState.notice.message}</span>
               <button
                 className={styles.noticeDismiss}
@@ -1099,6 +1197,7 @@ export function DesktopShell({
                   <button
                     aria-pressed={selectedDesktopEntryId === entry.id}
                     className={styles.desktopIcon}
+                    data-desktop-entry="true"
                     onClick={() => {
                       setSelectedDesktopEntryId(entry.id);
                       closeDesktopContextMenu();
@@ -1155,19 +1254,23 @@ export function DesktopShell({
             })}
           </section>
 
-          {desktopContextMenuState.kind === "open" && desktopContextMenuEntry !== null && (
+          {desktopContextMenuState.kind === "entry" && desktopContextMenuEntry !== null && (
             <DesktopContextMenuPanel
-              entry={desktopContextMenuEntry}
+              ariaLabel={`Контекстное меню ${desktopContextMenuEntry.title}`}
+              headerMeta={describeDesktopEntityMeta(desktopContextMenuEntry, desktopRegistryState)}
+              headerTitle={desktopContextMenuEntry.title}
               isAddToFolderExpanded={desktopContextMenuState.isAddToFolderExpanded}
               items={desktopContextMenuItems}
               menuRef={desktopContextMenuRef}
-              registryState={desktopRegistryState}
               onAddToFolderToggle={() => {
                 dispatchDesktopContextMenu({ type: "toggle_add_to_folder" });
               }}
               onClose={closeDesktopContextMenu}
               onCommand={(commandId) => {
-                handleDesktopContextMenuCommand(desktopContextMenuEntry, commandId);
+                handleDesktopContextMenuCommand(
+                  desktopContextMenuEntry,
+                  commandId as DesktopEntryContextMenuCommandId,
+                );
               }}
               onSelectFolder={(folderId) => {
                 handleAddDesktopTargetToFolderFromMenu(desktopContextMenuEntry, folderId);
@@ -1179,8 +1282,33 @@ export function DesktopShell({
             />
           )}
 
+          {desktopContextMenuState.kind === "background" && (
+            <DesktopContextMenuPanel
+              ariaLabel="Контекстное меню рабочего стола"
+              headerMeta="Канонические shell-local действия"
+              headerTitle="Рабочий стол"
+              isAddToFolderExpanded={false}
+              items={desktopBackgroundContextMenuItems}
+              menuRef={desktopContextMenuRef}
+              onClose={closeDesktopContextMenu}
+              onCommand={(commandId) => {
+                handleDesktopBackgroundContextMenuCommand(
+                  commandId as DesktopBackgroundContextMenuCommandId,
+                );
+              }}
+              position={{
+                x: desktopContextMenuState.x,
+                y: desktopContextMenuState.y,
+              }}
+            />
+          )}
+
           {overflowSummaries.length > 0 && (
-            <section className={styles.overflowPanel} aria-label="Desktop overflow">
+            <section
+              aria-label="Desktop overflow"
+              className={styles.overflowPanel}
+              data-desktop-background-blocker="true"
+            >
               <div>
                 <p className={styles.placeholderLabel}>Desktop overflow</p>
                 <h2 className={styles.placeholderTitle}>
@@ -1210,7 +1338,11 @@ export function DesktopShell({
             </section>
           )}
 
-          <section className={styles.windowLayer} aria-label="Shell windows">
+          <section
+            aria-label="Shell windows"
+            className={styles.windowLayer}
+            data-desktop-background-blocker="true"
+          >
             {runtimeState.windows.map((window, index) => (
               <div
                 key={window.windowId}
@@ -1665,31 +1797,36 @@ function ShellWindowBody({
 }
 
 function DesktopContextMenuPanel({
-  entry,
+  ariaLabel,
+  headerMeta,
+  headerTitle,
   isAddToFolderExpanded,
   items,
   menuRef,
-  registryState,
   onAddToFolderToggle,
   onClose,
   onCommand,
   onSelectFolder,
   position,
 }: {
-  entry: DesktopEntity;
+  ariaLabel: string;
+  headerMeta: string;
+  headerTitle: string;
   isAddToFolderExpanded: boolean;
-  items: ReturnType<typeof listDesktopContextMenuItems>;
+  items: Array<
+    ReturnType<typeof listDesktopContextMenuItems>[number] | ReturnType<
+      typeof listDesktopBackgroundContextMenuItems
+    >[number]
+  >;
   menuRef: {
     current: HTMLDivElement | null;
   };
-  registryState: {
-    entries: DesktopEntity[];
-    folderMembers: Array<{ folderId: string }>;
-  };
-  onAddToFolderToggle(): void;
+  onAddToFolderToggle?(): void;
   onClose(): void;
-  onCommand(commandId: DesktopContextMenuCommandId): void;
-  onSelectFolder(folderId: string): void;
+  onCommand(
+    commandId: DesktopEntryContextMenuCommandId | DesktopBackgroundContextMenuCommandId,
+  ): void;
+  onSelectFolder?(folderId: string): void;
   position: {
     x: number;
     y: number;
@@ -1697,8 +1834,9 @@ function DesktopContextMenuPanel({
 }) {
   return (
     <div
-      aria-label={`Контекстное меню ${entry.title}`}
+      aria-label={ariaLabel}
       className={styles.contextMenu}
+      data-desktop-background-blocker="true"
       ref={menuRef}
       role="menu"
       style={{
@@ -1707,8 +1845,8 @@ function DesktopContextMenuPanel({
       }}
     >
       <div className={styles.contextMenuHeader}>
-        <strong>{entry.title}</strong>
-        <small>{describeDesktopEntityMeta(entry, registryState)}</small>
+        <strong>{headerTitle}</strong>
+        <small>{headerMeta}</small>
       </div>
 
       <div className={styles.contextMenuList}>
@@ -1740,7 +1878,7 @@ function DesktopContextMenuPanel({
                 aria-haspopup="true"
                 className={styles.contextMenuButton}
                 onClick={() => {
-                  onAddToFolderToggle();
+                  onAddToFolderToggle?.();
                 }}
                 role="menuitem"
                 type="button"
@@ -1761,7 +1899,7 @@ function DesktopContextMenuPanel({
                             return;
                           }
 
-                          onSelectFolder(folder.folderId);
+                          onSelectFolder?.(folder.folderId);
                         }}
                         type="button"
                       >
@@ -1853,6 +1991,31 @@ function describeDesktopEntityMeta(
   }
 
   return "Системное";
+}
+
+function isDesktopBackgroundTriggerTarget(target: EventTarget | null): boolean {
+  const element = resolveEventTargetElement(target);
+  if (element === null) {
+    return false;
+  }
+
+  return (
+    element.closest(
+      "[data-desktop-entry='true'], [data-desktop-background-blocker='true']",
+    ) === null
+  );
+}
+
+function resolveEventTargetElement(target: EventTarget | null): HTMLElement | null {
+  if (target instanceof HTMLElement) {
+    return target;
+  }
+
+  if (target instanceof Node) {
+    return target.parentElement;
+  }
+
+  return null;
 }
 
 function clampDesktopContextMenuCoordinate(

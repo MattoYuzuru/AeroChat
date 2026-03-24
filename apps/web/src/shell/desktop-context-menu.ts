@@ -1,4 +1,5 @@
 import {
+  createCustomFolderDesktopEntity,
   isDesktopEntityHideable,
   listCustomFolderDesktopEntities,
   listCustomFolderMemberReferences,
@@ -12,18 +13,27 @@ export type DesktopContextMenuState =
       kind: "closed";
     }
   | {
-      kind: "open";
+      kind: "entry";
       entryId: string;
       x: number;
       y: number;
       isAddToFolderExpanded: boolean;
+    }
+  | {
+      kind: "background";
+      x: number;
+      y: number;
     };
 
-export type DesktopContextMenuCommandId =
+export type DesktopEntryContextMenuCommandId =
   | "open"
   | "hide"
   | "rename_folder"
   | "delete_folder";
+export type DesktopBackgroundContextMenuCommandId = "create_folder" | "open_explorer";
+export type DesktopContextMenuCommandId =
+  | DesktopEntryContextMenuCommandId
+  | DesktopBackgroundContextMenuCommandId;
 
 export interface DesktopContextMenuCommandItem {
   kind: "command";
@@ -51,8 +61,13 @@ export type DesktopContextMenuItem =
 
 export type DesktopContextMenuEvent =
   | {
-      type: "open";
+      type: "open_entry";
       entryId: string;
+      x: number;
+      y: number;
+    }
+  | {
+      type: "open_background";
       x: number;
       y: number;
     }
@@ -62,6 +77,15 @@ export type DesktopContextMenuEvent =
   | {
       type: "toggle_add_to_folder";
     };
+
+export interface DesktopBackgroundFolderCreationResult {
+  folderId: string;
+  entryId: string;
+  name: string;
+  registryState: DesktopRegistryState;
+}
+
+export const DEFAULT_DESKTOP_BACKGROUND_FOLDER_NAME = "Новая папка";
 
 export function createClosedDesktopContextMenuState(): DesktopContextMenuState {
   return {
@@ -74,18 +98,24 @@ export function reduceDesktopContextMenuState(
   event: DesktopContextMenuEvent,
 ): DesktopContextMenuState {
   switch (event.type) {
-    case "open":
+    case "open_entry":
       return {
-        kind: "open",
+        kind: "entry",
         entryId: event.entryId,
         x: event.x,
         y: event.y,
         isAddToFolderExpanded: false,
       };
+    case "open_background":
+      return {
+        kind: "background",
+        x: event.x,
+        y: event.y,
+      };
     case "close":
       return createClosedDesktopContextMenuState();
     case "toggle_add_to_folder":
-      if (state.kind !== "open") {
+      if (state.kind !== "entry") {
         return state;
       }
 
@@ -134,6 +164,27 @@ export function listDesktopContextMenuItems(
       })),
     },
   ];
+}
+
+export function listDesktopBackgroundContextMenuItems(): DesktopContextMenuCommandItem[] {
+  return [
+    createCommandItem("create_folder", "Создать папку"),
+    createCommandItem("open_explorer", "Открыть Explorer"),
+  ];
+}
+
+export function createDesktopBackgroundFolderCreationResult(
+  registryState: DesktopRegistryState,
+): DesktopBackgroundFolderCreationResult {
+  const folderId = `folder-${registryState.nextFolderSequence}`;
+  const name = DEFAULT_DESKTOP_BACKGROUND_FOLDER_NAME;
+
+  return {
+    folderId,
+    entryId: `custom_folder:${folderId}`,
+    name,
+    registryState: createCustomFolderDesktopEntity(registryState, name),
+  };
 }
 
 function createCommandItem(

@@ -167,6 +167,10 @@ describe("chat route builders", () => {
     expect(buildExplorerRoutePath(params)).toBe("/app/explorer?section=hidden");
   });
 
+  it("keeps background-launch Explorer handoff on the canonical singleton route", () => {
+    expect(buildExplorerRoutePath()).toBe("/app/explorer");
+  });
+
   it("builds explorer folder route and drops section query in favor of folder target", () => {
     const params = new URLSearchParams({
       section: "hidden",
