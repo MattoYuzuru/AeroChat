@@ -21,6 +21,16 @@ export interface ShellWindowViewport {
   height: number;
 }
 
+export type ShellWindowResizeHandle =
+  | "north"
+  | "east"
+  | "south"
+  | "west"
+  | "north_east"
+  | "south_east"
+  | "south_west"
+  | "north_west";
+
 export interface StoredShellWindowPlacementRecord {
   bounds: ShellWindowBounds;
   restoredState: ShellWindowPlacement["restoredState"];
@@ -224,6 +234,63 @@ export function normalizeShellWindowBounds(
     y: clamp(Math.round(bounds.y), 0, Math.max(0, safeViewportHeight - height)),
     width,
     height,
+  };
+}
+
+export function resizeShellWindowBounds(
+  bounds: ShellWindowBounds,
+  viewport: ShellWindowViewport,
+  handle: ShellWindowResizeHandle,
+  deltaX: number,
+  deltaY: number,
+): ShellWindowBounds {
+  const safeViewportWidth = Math.max(1, Math.round(viewport.width));
+  const safeViewportHeight = Math.max(1, Math.round(viewport.height));
+  const minimumWidth = Math.min(MIN_WINDOW_WIDTH, safeViewportWidth);
+  const minimumHeight = Math.min(MIN_WINDOW_HEIGHT, safeViewportHeight);
+
+  let left = Math.round(bounds.x);
+  let top = Math.round(bounds.y);
+  let right = Math.round(bounds.x + bounds.width);
+  let bottom = Math.round(bounds.y + bounds.height);
+
+  if (handle === "east" || handle === "north_east" || handle === "south_east") {
+    right += deltaX;
+  }
+
+  if (handle === "south" || handle === "south_east" || handle === "south_west") {
+    bottom += deltaY;
+  }
+
+  if (handle === "west" || handle === "north_west" || handle === "south_west") {
+    left += deltaX;
+  }
+
+  if (handle === "north" || handle === "north_east" || handle === "north_west") {
+    top += deltaY;
+  }
+
+  if (handle === "east" || handle === "north_east" || handle === "south_east") {
+    right = clamp(right, left + minimumWidth, safeViewportWidth);
+  }
+
+  if (handle === "south" || handle === "south_east" || handle === "south_west") {
+    bottom = clamp(bottom, top + minimumHeight, safeViewportHeight);
+  }
+
+  if (handle === "west" || handle === "north_west" || handle === "south_west") {
+    left = clamp(left, 0, right - minimumWidth);
+  }
+
+  if (handle === "north" || handle === "north_east" || handle === "north_west") {
+    top = clamp(top, 0, bottom - minimumHeight);
+  }
+
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
   };
 }
 

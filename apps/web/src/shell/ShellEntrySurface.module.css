@@ -7,7 +7,7 @@
     radial-gradient(circle at 50% 50%, rgba(18, 28, 42, 0.42), transparent 48%),
     #020508;
   color: #d6ddd7;
-  font-family: "Lucida Console", "Courier New", monospace;
+  font-family: var(--font-shell-mono);
 }
 
 .screen {

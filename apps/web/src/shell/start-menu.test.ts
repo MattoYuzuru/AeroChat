@@ -5,6 +5,7 @@ import {
   extractSearchParamsFromRoutePath,
   MAX_START_MENU_RECENT_ITEMS,
   readStartMenuRecentItems,
+  resolveStartMenuMaxHeight,
   resolveStartMenuRecentItemRoutePath,
   startMenuPanelReducer,
   trackStartMenuRecentWindow,
@@ -150,5 +151,25 @@ describe("resolveStartMenuRecentItemRoutePath", () => {
         routePath: null,
       }),
     ).toBe("/app/chats?chat=chat-9");
+  });
+});
+
+describe("resolveStartMenuMaxHeight", () => {
+  it("keeps the launcher inside the visible viewport above the taskbar anchor", () => {
+    expect(
+      resolveStartMenuMaxHeight({
+        anchorTop: 842,
+        viewportHeight: 900,
+      }),
+    ).toBe(830);
+  });
+
+  it("shrinks to the remaining space instead of forcing page overflow", () => {
+    expect(
+      resolveStartMenuMaxHeight({
+        anchorTop: 188,
+        viewportHeight: 900,
+      }),
+    ).toBe(176);
   });
 });
