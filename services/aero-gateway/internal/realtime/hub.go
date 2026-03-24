@@ -432,7 +432,11 @@ func (s *session) ping(timeout time.Duration) error {
 
 func (s *session) close(code websocket.StatusCode, reason string) {
 	s.closeOnce.Do(func() {
-		s.cancel()
-		_ = s.conn.Close(code, reason)
+		go func() {
+			// Закрываем соединение вне вызывающего стека, чтобы shutdown не блокировался
+			// на ожидании close handshake и не превращался в hard close из-за отмены ctx.
+			defer s.cancel()
+			_ = s.conn.Close(code, reason)
+		}()
 	})
 }
