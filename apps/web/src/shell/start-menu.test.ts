@@ -5,6 +5,7 @@ import {
   extractSearchParamsFromRoutePath,
   MAX_START_MENU_RECENT_ITEMS,
   readStartMenuRecentItems,
+  resolveStartMenuRecentItemRoutePath,
   startMenuPanelReducer,
   trackStartMenuRecentWindow,
   writeStartMenuRecentItems,
@@ -135,5 +136,19 @@ describe("extractSearchParamsFromRoutePath", () => {
 
     expect(params?.get("chat")).toBe("chat-7");
     expect(params?.get("call")).toBe("return");
+  });
+});
+
+describe("resolveStartMenuRecentItemRoutePath", () => {
+  it("builds canonical fallback route for recent direct chats without stored path", () => {
+    expect(
+      resolveStartMenuRecentItemRoutePath({
+        id: "direct_chat:chat-9",
+        kind: "direct_chat",
+        targetKey: "chat-9",
+        title: "Алиса",
+        routePath: null,
+      }),
+    ).toBe("/app/chats?chat=chat-9");
   });
 });

@@ -15,9 +15,15 @@ import {
   writeShellBootPreferences,
   type ShellBootPreferences,
 } from "../shell/preferences";
+import {
+  readStartMenuRecentItems,
+  trackStartMenuRecentWindow,
+  writeStartMenuRecentItems,
+} from "../shell/start-menu";
 import { resolveShellEntrySurface } from "../shell/entry";
 import { ShellEntrySurface } from "../shell/ShellEntrySurface";
 import { DesktopShell } from "../shell/DesktopShell";
+import { MobileLauncherHome } from "../shell/MobileLauncherHome";
 import { useEffect, useState } from "react";
 
 export function AppRouter() {
@@ -116,6 +122,34 @@ function ProtectedShellRoute() {
   const isDesktopViewport = useDesktopShellViewport();
   const shellEntry = useShellEntryState(auth.state);
   const routeEntry = resolveShellRouteEntry(location.pathname, location.search);
+  const [storage] = useState(() => getBrowserShellPreferencesStorage());
+
+  useEffect(() => {
+    if (auth.state.status !== "authenticated" || isDesktopViewport || routeEntry === null) {
+      return;
+    }
+
+    const currentItems = readStartMenuRecentItems(storage);
+    const nextItems = trackStartMenuRecentWindow(currentItems, {
+      appId: routeEntry.app.appId,
+      title: routeEntry.target?.title ?? routeEntry.app.title,
+      routePath: routeEntry.target?.routePath ?? routeEntry.app.routePath,
+      target: routeEntry.target,
+    });
+
+    if (nextItems === currentItems) {
+      return;
+    }
+
+    writeStartMenuRecentItems(storage, nextItems);
+  }, [
+    auth.state.status,
+    isDesktopViewport,
+    location.pathname,
+    location.search,
+    routeEntry,
+    storage,
+  ]);
 
   if (auth.state.status === "anonymous") {
     return <Navigate replace to="/login" />;
@@ -180,11 +214,15 @@ function ProtectedShellRoute() {
   }
 
   if (location.pathname === "/app") {
-    return <Navigate replace to="/app/profile" />;
+    return (
+      <LegacyAppShell>
+        <MobileLauncherHome />
+      </LegacyAppShell>
+    );
   }
 
   if (routeEntry === null) {
-    return <Navigate replace to="/app/profile" />;
+    return <Navigate replace to="/app" />;
   }
 
   return <LegacyAppShell>{renderShellAppContent(routeEntry.app.appId)}</LegacyAppShell>;

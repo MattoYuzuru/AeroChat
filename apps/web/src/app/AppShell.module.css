@@ -311,6 +311,19 @@
     display: grid;
   }
 
+  .navList {
+    display: flex;
+    gap: 0.65rem;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+  }
+
+  .navItem,
+  .navItemActive {
+    min-width: 9.5rem;
+    flex: 0 0 auto;
+  }
+
   .callSurface {
     flex-direction: column;
     align-items: stretch;
@@ -318,5 +331,54 @@
 
   .callSurfaceActions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    overflow: visible;
+  }
+
+  .topBar {
+    gap: 1rem;
+    padding: 1rem 1rem 0.85rem;
+  }
+
+  .title {
+    font-size: clamp(1.6rem, 8vw, 2.2rem);
+  }
+
+  .statusCluster {
+    display: none;
+  }
+
+  .workspace {
+    gap: 0.9rem;
+    padding: 0 1rem 1rem;
+  }
+
+  .callSurface {
+    margin: 0 1rem 0.9rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .sidebar {
+    gap: 0.8rem;
+  }
+
+  .sidebarCard {
+    padding: 0.95rem;
+  }
+
+  .metaGrid {
+    display: none;
+  }
+
+  .windowHeader {
+    padding: 0.72rem 0.9rem;
+  }
+
+  .windowBody {
+    padding: 1rem;
   }
 }

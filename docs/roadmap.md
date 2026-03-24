@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] Shell launcher / Start menu polish over canonical targets, recent items and custom folders
+- [x] Mobile launcher/home adaptation over canonical targets, recent items and custom folders
 
 ---
 
@@ -224,7 +224,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Shell-local custom folders V1 over desktop registry and Explorer
 - [ ] XP-first theme engine
 - [x] Explorer, folder organization и shell launcher
-- [ ] Mobile practical shell adaptation
+- [x] Mobile practical shell adaptation
 - [x] Settings and privacy bootstrap через `aero-gateway`
 - [ ] Trash model
 

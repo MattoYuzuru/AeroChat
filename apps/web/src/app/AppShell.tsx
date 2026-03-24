@@ -6,6 +6,7 @@ import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import styles from "./AppShell.module.css";
 
 const navigationItems = [
+  { to: "/app", label: "Домой", meta: "launcher", exact: true },
   { to: "/app/self", label: "Я", meta: "self workspace" },
   { to: "/app/profile", label: "Профиль", meta: "identity" },
   { to: "/app/chats", label: "Чаты", meta: "direct" },
@@ -19,7 +20,7 @@ const navigationItems = [
 
 const statusItems = [
   "gateway edge",
-  "light shell",
+  "launcher home",
   "self chat",
   "profile",
   "people",
@@ -183,6 +184,7 @@ export function LegacyAppShell({ children }: PropsWithChildren) {
             <nav className={styles.navList} aria-label="Основные разделы">
               {navigationItems.map((item) => (
                 <NavLink
+                  end={item.exact === true}
                   key={item.to}
                   className={({ isActive }) =>
                     isActive ? styles.navItemActive : styles.navItem
