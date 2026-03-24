@@ -1,0 +1,238 @@
+.layout {
+  display: grid;
+  gap: 20px;
+}
+
+.heroCard,
+.summaryCard,
+.metaCard,
+.stateCard {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(231, 241, 255, 0.88));
+  border: 1px solid rgba(86, 134, 197, 0.35);
+  border-radius: 22px;
+  box-shadow:
+    0 18px 36px rgba(34, 73, 138, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  padding: 24px;
+}
+
+.heroHeader,
+.sectionHeader,
+.identityRow,
+.actions,
+.stateActions {
+  display: flex;
+  gap: 16px;
+}
+
+.heroHeader,
+.sectionHeader,
+.identityRow {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.cardLabel {
+  color: rgba(31, 73, 125, 0.72);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.title,
+.identityTitle,
+.sectionTitle,
+.stateTitle {
+  color: #154379;
+  margin: 0;
+}
+
+.title {
+  font-size: clamp(1.9rem, 2vw, 2.6rem);
+}
+
+.identityTitle,
+.sectionTitle,
+.stateTitle {
+  font-size: 1.3rem;
+}
+
+.subtitle,
+.identityLogin,
+.identitySummary,
+.stateMessage {
+  color: rgba(21, 67, 121, 0.82);
+  margin: 10px 0 0;
+}
+
+.notice,
+.error {
+  border-radius: 16px;
+  margin-top: 16px;
+  padding: 12px 14px;
+}
+
+.notice {
+  background: rgba(227, 242, 255, 0.92);
+  border: 1px solid rgba(86, 134, 197, 0.3);
+  color: #21548d;
+}
+
+.error {
+  background: rgba(255, 233, 236, 0.95);
+  border: 1px solid rgba(208, 97, 111, 0.25);
+  color: #8a3241;
+}
+
+.contentGrid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+}
+
+.summaryCard {
+  display: grid;
+  gap: 20px;
+  grid-column: 1 / -1;
+}
+
+.identityRow {
+  align-items: center;
+}
+
+.identityBody {
+  flex: 1;
+}
+
+.avatarBadge,
+.avatarImage {
+  border: 1px solid rgba(86, 134, 197, 0.34);
+  border-radius: 28px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  flex: 0 0 auto;
+  height: 96px;
+  width: 96px;
+}
+
+.avatarBadge {
+  align-items: center;
+  background: linear-gradient(180deg, #f7fbff, #c6dcf8);
+  color: #1e4f88;
+  display: flex;
+  font-size: 1.6rem;
+  font-weight: 800;
+  justify-content: center;
+}
+
+.avatarImage {
+  background: #d7e8fb;
+  object-fit: cover;
+}
+
+.relationshipBadge {
+  color: #2b5f9e;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.actions {
+  flex-wrap: wrap;
+}
+
+.primaryButton,
+.secondaryButton {
+  border-radius: 14px;
+  cursor: pointer;
+  font: inherit;
+  padding: 10px 16px;
+}
+
+.primaryButton {
+  background: linear-gradient(180deg, #4f98f7, #2a73d9);
+  border: 1px solid rgba(21, 77, 151, 0.52);
+  color: #f9fcff;
+}
+
+.secondaryButton {
+  background: linear-gradient(180deg, rgba(252, 253, 255, 0.96), rgba(216, 231, 249, 0.92));
+  border: 1px solid rgba(86, 134, 197, 0.32);
+  color: #1f4c83;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.pendingText {
+  color: rgba(31, 76, 131, 0.78);
+  margin: 0;
+}
+
+.metaGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 0;
+}
+
+.metaItem {
+  background: rgba(247, 251, 255, 0.88);
+  border: 1px solid rgba(128, 167, 214, 0.24);
+  border-radius: 16px;
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+.metaItem dt {
+  color: rgba(31, 73, 125, 0.72);
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.metaItem dd {
+  color: #154379;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.stateCard[data-tone="error"] {
+  background:
+    linear-gradient(180deg, rgba(255, 247, 248, 0.97), rgba(255, 236, 239, 0.9));
+  border-color: rgba(208, 97, 111, 0.25);
+}
+
+@media (max-width: 980px) {
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .heroCard,
+  .summaryCard,
+  .metaCard,
+  .stateCard {
+    border-radius: 18px;
+    padding: 18px;
+  }
+
+  .heroHeader,
+  .sectionHeader,
+  .identityRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .avatarBadge,
+  .avatarImage {
+    height: 84px;
+    width: 84px;
+  }
+}

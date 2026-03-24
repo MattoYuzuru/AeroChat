@@ -1,12 +1,19 @@
 import { Children, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { buildPersonProfileRoutePath } from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
 import type { Profile } from "../gateway/types";
+import {
+  describePersonProfileSummary,
+  getPersonProfileLaunchTitle,
+} from "../people/profile-model";
 import { usePeople } from "../people/usePeople";
+import { useDesktopShellHost } from "../shell/context";
 import styles from "./PeoplePage.module.css";
 
 export function PeoplePage() {
   const navigate = useNavigate();
+  const desktopShellHost = useDesktopShellHost();
   const { state: authState, expireSession } = useAuth();
   const [login, setLogin] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -18,6 +25,19 @@ export function PeoplePage() {
 
   if (authState.status !== "authenticated") {
     return null;
+  }
+
+  function openPersonProfile(profile: Profile) {
+    const title = getPersonProfileLaunchTitle(profile);
+
+    if (desktopShellHost !== null) {
+      desktopShellHost.openPersonProfile({
+        userId: profile.id,
+        title,
+      });
+    }
+
+    navigate(buildPersonProfileRoutePath(profile.id));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -145,6 +165,9 @@ export function PeoplePage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Запрос: ${formatDateTime(request.requestedAt)}`}
+                  onOpenProfile={() => {
+                    openPersonProfile(request.profile);
+                  }}
                   pendingLabel={pendingLabel}
                   profile={request.profile}
                   primaryAction={{
@@ -176,6 +199,9 @@ export function PeoplePage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Отправлено: ${formatDateTime(request.requestedAt)}`}
+                  onOpenProfile={() => {
+                    openPersonProfile(request.profile);
+                  }}
                   pendingLabel={pendingLabel}
                   profile={request.profile}
                   primaryAction={{
@@ -201,6 +227,9 @@ export function PeoplePage() {
                 <ProfileCard
                   key={friend.profile.id || friend.profile.login}
                   metaLabel={`Друзья с ${formatDateTime(friend.friendsSince)}`}
+                  onOpenProfile={() => {
+                    openPersonProfile(friend.profile);
+                  }}
                   pendingLabel={pendingLabel}
                   profile={friend.profile}
                   primaryAction={{
@@ -304,6 +333,7 @@ interface ActionConfig {
 interface ProfileCardProps {
   profile: Profile;
   metaLabel: string;
+  onOpenProfile(): void;
   pendingLabel?: string;
   primaryAction?: ActionConfig;
   secondaryAction?: ActionConfig;
@@ -312,6 +342,7 @@ interface ProfileCardProps {
 function ProfileCard({
   profile,
   metaLabel,
+  onOpenProfile,
   pendingLabel,
   primaryAction,
   secondaryAction,
@@ -325,10 +356,20 @@ function ProfileCard({
           <h3 className={styles.personTitle}>{profile.nickname}</h3>
           <p className={styles.personLogin}>@{profile.login}</p>
         </div>
-        <span className={styles.metaTag}>{metaLabel}</span>
+        <div className={styles.actions}>
+          <span className={styles.metaTag}>{metaLabel}</span>
+          <button
+            className={styles.secondaryButton}
+            disabled={isPending}
+            onClick={onOpenProfile}
+            type="button"
+          >
+            Профиль
+          </button>
+        </div>
       </div>
 
-      <p className={styles.personDescription}>{describeProfile(profile)}</p>
+      <p className={styles.personDescription}>{describePersonProfileSummary(profile)}</p>
 
       <div className={styles.actions}>
         {primaryAction && (
@@ -357,31 +398,6 @@ function ProfileCard({
     </article>
   );
 }
-
-function describeProfile(profile: Profile): string {
-  if (profile.statusText && profile.statusText.trim() !== "") {
-    return profile.statusText;
-  }
-
-  if (profile.bio && profile.bio.trim() !== "") {
-    return profile.bio;
-  }
-
-  if (profile.city && profile.country) {
-    return `${profile.city}, ${profile.country}`;
-  }
-
-  if (profile.city) {
-    return profile.city;
-  }
-
-  if (profile.country) {
-    return profile.country;
-  }
-
-  return "Базовый social graph-контакт без публичного discovery.";
-}
-
 function formatDateTime(value: string): string {
   if (value.trim() === "") {
     return "неизвестно";

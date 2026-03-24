@@ -4,6 +4,7 @@ export type ShellAppId =
   | "self_chat"
   | "friend_requests"
   | "profile"
+  | "person_profile"
   | "people"
   | "chats"
   | "direct_chat"

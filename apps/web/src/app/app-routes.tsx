@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ChatsPage } from "../pages/ChatsPage";
 import { GroupsPage } from "../pages/GroupsPage";
 import { PeoplePage } from "../pages/PeoplePage";
+import { PersonProfilePage } from "../pages/PersonProfilePage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { SearchPage } from "../pages/SearchPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -94,6 +95,12 @@ export const shellAppRegistry: Record<ShellAppId, ShellAppDefinition> = {
   },
   profile: routeBackedShellApps.find((app) => app.appId === "profile")!,
   people: routeBackedShellApps.find((app) => app.appId === "people")!,
+  person_profile: {
+    appId: "person_profile",
+    title: "Профиль контакта",
+    launchPolicy: "singleton_per_target",
+    routePath: "/app/people",
+  },
   chats: routeBackedShellApps.find((app) => app.appId === "chats")!,
   direct_chat: {
     appId: "direct_chat",
@@ -121,6 +128,15 @@ export function buildDirectChatRoutePath(
   return buildRoutePath("/app/chats", params);
 }
 
+export function buildPersonProfileRoutePath(
+  userId: string,
+  searchParams?: URLSearchParams | null,
+): string {
+  const params = new URLSearchParams(searchParams ?? undefined);
+  params.set("person", userId);
+  return buildRoutePath("/app/people", params);
+}
+
 export function buildGroupChatRoutePath(
   groupId: string,
   searchParams?: URLSearchParams | null,
@@ -143,6 +159,22 @@ export function buildDirectChatShellTarget({
     key: chatId,
     title: normalizeShellTargetTitle(title, "Личный чат"),
     routePath: buildDirectChatRoutePath(chatId, searchParams),
+  };
+}
+
+export function buildPersonProfileShellTarget({
+  userId,
+  searchParams,
+  title,
+}: {
+  userId: string;
+  searchParams?: URLSearchParams | null;
+  title?: string;
+}): ShellLaunchTarget {
+  return {
+    key: userId,
+    title: normalizeShellTargetTitle(title, "Профиль контакта"),
+    routePath: buildPersonProfileRoutePath(userId, searchParams),
   };
 }
 
@@ -174,6 +206,17 @@ export function resolveShellRouteEntry(
   const searchParams = new URLSearchParams(search);
   const requestedChatId = searchParams.get("chat")?.trim() ?? "";
   const requestedGroupId = searchParams.get("group")?.trim() ?? "";
+  const requestedPersonId = searchParams.get("person")?.trim() ?? "";
+
+  if (pathname === "/app/people" && requestedPersonId !== "") {
+    return {
+      app: shellAppRegistry.person_profile,
+      target: buildPersonProfileShellTarget({
+        userId: requestedPersonId,
+        searchParams,
+      }),
+    };
+  }
 
   if (pathname === "/app/chats" && requestedChatId !== "") {
     return {
@@ -208,6 +251,7 @@ export function resolveShellRouteEntry(
 export function isRouteBackedShellAppId(appId: ShellAppId): boolean {
   return (
     routeBackedShellApps.some((app) => app.appId === appId) ||
+    appId === "person_profile" ||
     appId === "direct_chat" ||
     appId === "group_chat"
   );
@@ -219,6 +263,8 @@ export function renderShellAppContent(appId: ShellAppId): ReactNode {
       return <ProfilePage />;
     case "people":
       return <PeoplePage />;
+    case "person_profile":
+      return <PersonProfilePage />;
     case "chats":
     case "direct_chat":
       return <ChatsPage />;

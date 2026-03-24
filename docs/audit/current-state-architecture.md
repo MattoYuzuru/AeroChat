@@ -14,6 +14,7 @@
   - singleton-based window registry и bounded 10-window cap notice;
   - первые route-backed shell windows поверх существующих web screens;
   - canonical `direct_chat` / `group_chat` windows c `singleton_per_target`, taskbar integration, deep-link handoff и same-window `thread/info` mode для direct/group info semantics;
+  - canonical `person_profile` windows c `singleton_per_target` для people, known-user search и friend-request entrypoints, при сохранении direct-chat same-window info mode;
 - профиль, privacy flags, список device/session и revoke;
 - social graph по точному login без публичного каталога;
 - direct chats и groups с realtime, typing, presence, read/unread, replies, edit, delete, pin;
@@ -29,7 +30,7 @@
 
 - `identity`, `social graph`, `legacy direct/group chats`, `media relay`, `deploy/local runtime` уже имеют рабочий user-facing slice;
 - `desktop shell` теперь имеет первый runtime scaffold на desktop/wide screens, но ещё не завершён как full product shell;
-- `desktop shell` теперь уже умеет canonical direct/group chat windows и same-window info semantics, но всё ещё не завершён как full product shell;
+- `desktop shell` теперь уже умеет canonical direct/group chat windows, separate canonical person-profile windows и same-window info semantics внутри direct/group, но всё ещё не завершён как full product shell;
 - encrypted lanes реализованы как usable, но bounded foundation без full parity и без unified history;
 - `aero-rtc-control` теперь имеет usable direct-call continuity slice для web, но calls ещё не являются finished product subsystem;
 - `aero-jobs`, PWA и push пока не реализованы как продуктовые возможности, а desktop/mobile polish остаётся частично bootstrap-only.
@@ -220,8 +221,8 @@ Realtime сейчас:
 
 ### Desktop shell
 
-- `implemented`: wide-screen desktop shell runtime scaffold, boot/chooser/login handoff, Start/taskbar/tray, singleton window registry, bounded 10-window cap notice, shell-native placeholders для `Я` и `Friend Requests`, route-backed shell windows для текущих page-level surfaces, canonical `direct_chat` / `group_chat` singleton-per-target windows c taskbar/live-window semantics, deep-link handoff и same-window `thread/info` switching без нового window target.
-- `partial/bootstrap/bounded`: отдельные launcher/list surfaces `Chats` и `Groups` ещё coexist'ят с canonical chat/group windows; direct profile info и group info/management уже живут в том же окне, но Explorer, custom folders, drag/resize polish и full XP art pass ещё не реализованы.
+- `implemented`: wide-screen desktop shell runtime scaffold, boot/chooser/login handoff, Start/taskbar/tray, singleton window registry, bounded 10-window cap notice, shell-native placeholders для `Я` и `Friend Requests`, route-backed shell windows для текущих page-level surfaces, canonical `direct_chat` / `group_chat` / `person_profile` targets с taskbar/live-window semantics, deep-link handoff, separate profile-first person window для people/search/request flows и same-window `thread/info` switching внутри direct/group без нового window target.
+- `partial/bootstrap/bounded`: отдельные launcher/list surfaces `Chats` и `Groups` ещё coexist'ят с canonical chat/group windows; `Friend Requests` остаётся shell placeholder-entrypoint поверх существующего `People` screen, а Explorer, custom folders, drag/resize polish и full XP art pass ещё не реализованы.
 - `not implemented yet`: Explorer, custom folders, theme switching, wallpaper manager, pinned/trash model, dedicated media viewers, global call manager.
 
 ### Identity/profile/privacy
@@ -250,7 +251,7 @@ Realtime сейчас:
 
 ### Search
 
-- `implemented`: plaintext search через backend `SearchMessages` и `/app/search`.
+- `implemented`: plaintext search через backend `SearchMessages` и `/app/search`, плюс bounded exact-login known-user result для already-known social graph entrypoints в canonical `person_profile`.
 - `partial/bootstrap/bounded`: encrypted search только local-only, session-local, bounded by fetched/decrypted windows.
 - `not implemented yet`: server-side encrypted search parity или deep history encrypted indexing.
 

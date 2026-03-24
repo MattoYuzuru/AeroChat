@@ -13,6 +13,12 @@ export interface OpenGroupChatWindowOptions {
   searchParams?: URLSearchParams | null;
 }
 
+export interface OpenPersonProfileWindowOptions {
+  userId: string;
+  title?: string;
+  searchParams?: URLSearchParams | null;
+}
+
 export interface DesktopShellHost {
   isDesktopShell: true;
   activeWindowId: string | null;
@@ -20,6 +26,7 @@ export interface DesktopShellHost {
   launchApp(appId: ShellAppId): void;
   openDirectChat(options: OpenDirectChatWindowOptions): void;
   openGroupChat(options: OpenGroupChatWindowOptions): void;
+  openPersonProfile(options: OpenPersonProfileWindowOptions): void;
   setActiveWindowContentMode(contentMode: ShellWindowContentMode): void;
   syncCurrentRouteTitle(title: string): void;
 }
