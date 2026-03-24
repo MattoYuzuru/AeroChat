@@ -267,6 +267,45 @@ describe("shellRuntimeReducer", () => {
     expect(state.activeWindowId).toBe(settingsWindowId);
   });
 
+  it("restores a reopened maximized target back to its persisted normal bounds", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.settings,
+      placement: {
+        bounds: {
+          x: 72,
+          y: 54,
+          width: 880,
+          height: 640,
+        },
+        restoredState: "maximized",
+      },
+    });
+
+    expect(state.windows[0]?.state).toBe("maximized");
+    expect(state.windows[0]?.bounds).toEqual({
+      x: 72,
+      y: 54,
+      width: 880,
+      height: 640,
+    });
+
+    state = shellRuntimeReducer(state, {
+      type: "restore",
+      windowId: state.windows[0]!.windowId,
+    });
+
+    expect(state.windows[0]?.state).toBe("focused");
+    expect(state.windows[0]?.bounds).toEqual({
+      x: 72,
+      y: 54,
+      width: 880,
+      height: 640,
+    });
+  });
+
   it("keeps same direct chat window instance while preserving live info mode across minimize/restore", () => {
     let state = createInitialShellRuntimeState();
 

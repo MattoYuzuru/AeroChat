@@ -89,6 +89,16 @@ import {
   writeStartMenuRecentItems,
   type StartMenuRecentItem,
 } from "./start-menu";
+import {
+  createStoredShellWindowPlacementRecord,
+  normalizeShellWindowBounds,
+  planShellWindowPlacementForLaunch,
+  readShellWindowPlacementStorageState,
+  upsertShellWindowPlacementRecord,
+  writeShellWindowPlacementStorageState,
+  type ShellWindowPlacementStorageState,
+  type ShellWindowViewport,
+} from "./window-placement";
 import styles from "./DesktopShell.module.css";
 
 export function DesktopShell({
@@ -122,6 +132,10 @@ export function DesktopShell({
   const [recentItems, setRecentItems] = useState<StartMenuRecentItem[]>(() =>
     readStartMenuRecentItems(storage),
   );
+  const [windowPlacementStorageState, setWindowPlacementStorageState] =
+    useState<ShellWindowPlacementStorageState>(() =>
+      readShellWindowPlacementStorageState(storage),
+    );
   const [liveDirectChats, setLiveDirectChats] = useState<DirectChat[]>([]);
   const [liveGroups, setLiveGroups] = useState<Group[]>([]);
   const [selectedDesktopEntryId, setSelectedDesktopEntryId] = useState<string | null>(null);
@@ -138,6 +152,18 @@ export function DesktopShell({
   const [clock, setClock] = useState(() => new Date());
   const startMenuAnchorRef = useRef<HTMLDivElement | null>(null);
   const desktopContextMenuRef = useRef<HTMLDivElement | null>(null);
+  const windowLayerRef = useRef<HTMLElement | null>(null);
+  const previousRuntimeWindowsRef = useRef(runtimeState.windows);
+  const windowPlacementStorageStateRef = useRef(windowPlacementStorageState);
+  const launchShellAppWindowRef = useRef<
+    ((
+      app: (typeof shellAppRegistry)[ShellAppId],
+      target: Parameters<typeof buildShellLaunchKey>[1],
+    ) => void) | null
+  >(null);
+  const [windowLayerViewport, setWindowLayerViewport] = useState<ShellWindowViewport>(() =>
+    readInitialShellWindowViewport(),
+  );
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -153,6 +179,32 @@ export function DesktopShell({
     () => resolveShellRouteEntry(location.pathname, location.search),
     [location.pathname, location.search],
   );
+
+  useEffect(() => {
+    function updateViewport() {
+      setWindowLayerViewport(readShellWindowViewport(windowLayerRef.current));
+    }
+
+    updateViewport();
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            updateViewport();
+          });
+
+    if (windowLayerRef.current !== null) {
+      resizeObserver?.observe(windowLayerRef.current);
+    }
+
+    window.addEventListener("resize", updateViewport);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateViewport);
+    };
+  }, []);
 
   useEffect(() => {
     if (routeEntry === null) {
@@ -181,11 +233,7 @@ export function DesktopShell({
       );
     }
 
-    dispatch({
-      type: "launch",
-      app: routeEntry.app,
-      target: routeEntry.target,
-    });
+    launchShellAppWindowRef.current?.(routeEntry.app, routeEntry.target);
   }, [routeEntry]);
 
   useEffect(() => {
@@ -195,6 +243,72 @@ export function DesktopShell({
   useEffect(() => {
     writeStartMenuRecentItems(storage, recentItems);
   }, [recentItems, storage]);
+
+  useEffect(() => {
+    windowPlacementStorageStateRef.current = windowPlacementStorageState;
+    writeShellWindowPlacementStorageState(storage, windowPlacementStorageState);
+  }, [storage, windowPlacementStorageState]);
+
+  useEffect(() => {
+    const previousWindows = previousRuntimeWindowsRef.current;
+    let nextPlacementState = windowPlacementStorageStateRef.current;
+    let changed = false;
+
+    for (const window of runtimeState.windows) {
+      const nextRecord = createStoredShellWindowPlacementRecord(
+        {
+          bounds: normalizeShellWindowBounds(window.bounds, windowLayerViewport),
+          state: window.state,
+        },
+        windowLayerViewport,
+      );
+      const currentRecord = nextPlacementState.placements[window.launchKey];
+      if (areStoredWindowPlacementRecordsEqual(currentRecord, nextRecord)) {
+        continue;
+      }
+
+      nextPlacementState = upsertShellWindowPlacementRecord(
+        nextPlacementState,
+        window.launchKey,
+        nextRecord,
+      );
+      changed = true;
+    }
+
+    for (const window of previousWindows) {
+      if (runtimeState.windows.some((entry) => entry.windowId === window.windowId)) {
+        continue;
+      }
+
+      const nextRecord = createStoredShellWindowPlacementRecord(
+        {
+          bounds: normalizeShellWindowBounds(window.bounds, windowLayerViewport),
+          state: window.state,
+        },
+        windowLayerViewport,
+      );
+      const currentRecord = nextPlacementState.placements[window.launchKey];
+      if (areStoredWindowPlacementRecordsEqual(currentRecord, nextRecord)) {
+        continue;
+      }
+
+      nextPlacementState = upsertShellWindowPlacementRecord(
+        nextPlacementState,
+        window.launchKey,
+        nextRecord,
+      );
+      changed = true;
+    }
+
+    previousRuntimeWindowsRef.current = runtimeState.windows;
+
+    if (!changed) {
+      return;
+    }
+
+    windowPlacementStorageStateRef.current = nextPlacementState;
+    setWindowPlacementStorageState(nextPlacementState);
+  }, [runtimeState.windows, windowLayerViewport]);
 
   const activeWindow = selectActiveShellWindow(runtimeState);
   const desktopUnreadTargetMap = useMemo(
@@ -607,6 +721,41 @@ export function DesktopShell({
     openDesktopBackgroundContextMenuFromSurface(event.currentTarget);
   }
 
+  function launchShellAppWindow(
+    app: (typeof shellAppRegistry)[ShellAppId],
+    target: Parameters<typeof buildShellLaunchKey>[1],
+  ) {
+    const launchKey = buildShellLaunchKey(app, target);
+    const liveWindow =
+      runtimeState.windows.find((window) => window.launchKey === launchKey) ?? null;
+
+    if (liveWindow !== null) {
+      dispatch({
+        type: "launch",
+        app,
+        target,
+        placement: createLiveWindowPlacement(windowLayerViewport, liveWindow),
+      });
+      return;
+    }
+
+    const launchPlan = planShellWindowPlacementForLaunch(
+      windowPlacementStorageStateRef.current,
+      launchKey,
+      windowLayerViewport,
+    );
+    windowPlacementStorageStateRef.current = launchPlan.storageState;
+    setWindowPlacementStorageState(launchPlan.storageState);
+    dispatch({
+      type: "launch",
+      app,
+      target,
+      placement: launchPlan.placement,
+    });
+  }
+
+  launchShellAppWindowRef.current = launchShellAppWindow;
+
   function launchApp(
     appId: ShellAppId,
     options?: {
@@ -625,11 +774,7 @@ export function DesktopShell({
             routePath,
           };
 
-    dispatch({
-      type: "launch",
-      app,
-      target: routeTarget,
-    });
+    launchShellAppWindow(app, routeTarget);
     closeStartMenu();
     closeDesktopContextMenu();
 
@@ -651,11 +796,7 @@ export function DesktopShell({
         target.title ?? options.title ?? "Личный чат",
       ),
     );
-    dispatch({
-      type: "launch",
-      app: shellAppRegistry.direct_chat,
-      target,
-    });
+    launchShellAppWindow(shellAppRegistry.direct_chat, target);
     closeDesktopContextMenu();
     navigate(target.routePath ?? "/app/chats");
     closeStartMenu();
@@ -674,11 +815,7 @@ export function DesktopShell({
         target.title ?? options.title ?? "Группа",
       ),
     );
-    dispatch({
-      type: "launch",
-      app: shellAppRegistry.group_chat,
-      target,
-    });
+    launchShellAppWindow(shellAppRegistry.group_chat, target);
     closeDesktopContextMenu();
     navigate(target.routePath ?? "/app/groups");
     closeStartMenu();
@@ -688,14 +825,10 @@ export function DesktopShell({
     const folder = getCustomFolderDesktopEntity(desktopRegistryState, folderId);
     const routePath = buildExplorerFolderRoutePath(folderId);
 
-    dispatch({
-      type: "launch",
-      app: shellAppRegistry.explorer,
-      target: {
-        key: "explorer",
-        title: folder === null ? "Explorer" : `Explorer · ${folder.title}`,
-        routePath,
-      },
+    launchShellAppWindow(shellAppRegistry.explorer, {
+      key: "explorer",
+      title: folder === null ? "Explorer" : `Explorer · ${folder.title}`,
+      routePath,
     });
     closeDesktopContextMenu();
     navigate(routePath);
@@ -759,11 +892,7 @@ export function DesktopShell({
     searchParams?: URLSearchParams | null;
   }) {
     const target = buildPersonProfileShellTarget(options);
-    dispatch({
-      type: "launch",
-      app: shellAppRegistry.person_profile,
-      target,
-    });
+    launchShellAppWindow(shellAppRegistry.person_profile, target);
     closeDesktopContextMenu();
     navigate(target.routePath ?? "/app/people");
     closeStartMenu();
@@ -1342,81 +1471,91 @@ export function DesktopShell({
             aria-label="Shell windows"
             className={styles.windowLayer}
             data-desktop-background-blocker="true"
+            ref={windowLayerRef}
           >
-            {runtimeState.windows.map((window, index) => (
-              <div
-                key={window.windowId}
-                className={
-                  window.state === "minimized"
-                    ? styles.windowHidden
-                    : window.state === "maximized"
-                      ? styles.windowMaximized
-                      : styles.windowFrame
-                }
-                style={
-                  window.state === "maximized"
-                    ? undefined
-                    : {
-                        top: `${5 + index * 3}%`,
-                        left: `${6 + index * 4}%`,
-                      }
-                }
-              >
-                <div className={styles.windowChrome}>
-                  <button
-                    className={styles.windowTitleButton}
-                    onClick={() => {
-                      dispatch({ type: "focus", windowId: window.windowId });
-                      if (window.routePath) {
-                        navigate(window.routePath);
-                      }
-                    }}
-                    type="button"
-                  >
-                    {window.title}
-                  </button>
-                  <div className={styles.windowControls}>
+            {runtimeState.windows.map((window) => {
+              const renderedBounds = normalizeShellWindowBounds(
+                window.bounds,
+                windowLayerViewport,
+              );
+
+              return (
+                <div
+                  key={window.windowId}
+                  className={
+                    window.state === "minimized"
+                      ? styles.windowHidden
+                      : window.state === "maximized"
+                        ? styles.windowMaximized
+                        : styles.windowFrame
+                  }
+                  style={
+                    window.state === "maximized"
+                      ? undefined
+                      : {
+                          top: `${renderedBounds.y}px`,
+                          left: `${renderedBounds.x}px`,
+                          width: `${renderedBounds.width}px`,
+                          height: `${renderedBounds.height}px`,
+                        }
+                  }
+                >
+                  <div className={styles.windowChrome}>
                     <button
-                      className={styles.windowControl}
+                      className={styles.windowTitleButton}
                       onClick={() => {
-                        dispatch({ type: "minimize", windowId: window.windowId });
+                        dispatch({ type: "focus", windowId: window.windowId });
+                        if (window.routePath) {
+                          navigate(window.routePath);
+                        }
                       }}
                       type="button"
                     >
-                      _
+                      {window.title}
                     </button>
-                    <button
-                      className={styles.windowControl}
-                      onClick={() => {
-                        dispatch({
-                          type:
-                            window.state === "maximized" ? "restore" : "maximize",
-                          windowId: window.windowId,
-                        });
-                      }}
-                      type="button"
-                    >
-                      □
-                    </button>
-                    <button
-                      className={styles.windowControlDanger}
-                      onClick={() => {
-                        dispatch({ type: "close", windowId: window.windowId });
-                      }}
-                      type="button"
-                    >
-                      ×
-                    </button>
+                    <div className={styles.windowControls}>
+                      <button
+                        className={styles.windowControl}
+                        onClick={() => {
+                          dispatch({ type: "minimize", windowId: window.windowId });
+                        }}
+                        type="button"
+                      >
+                        _
+                      </button>
+                      <button
+                        className={styles.windowControl}
+                        onClick={() => {
+                          dispatch({
+                            type:
+                              window.state === "maximized" ? "restore" : "maximize",
+                            windowId: window.windowId,
+                          });
+                        }}
+                        type="button"
+                      >
+                        □
+                      </button>
+                      <button
+                        className={styles.windowControlDanger}
+                        onClick={() => {
+                          dispatch({ type: "close", windowId: window.windowId });
+                        }}
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                  <div className={styles.windowBody}>
+                    <ShellWindowBody
+                      activeWindowId={runtimeState.activeWindowId}
+                      window={window}
+                    />
                   </div>
                 </div>
-                <div className={styles.windowBody}>
-                  <ShellWindowBody
-                    activeWindowId={runtimeState.activeWindowId}
-                    window={window}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </section>
         </section>
 
@@ -2025,6 +2164,57 @@ function clampDesktopContextMenuCoordinate(
 ): number {
   const safeStart = 12;
   return Math.max(safeStart, Math.min(value, viewportSize - menuSize - safeStart));
+}
+
+function readInitialShellWindowViewport(): ShellWindowViewport {
+  if (typeof window === "undefined") {
+    return {
+      width: 1120,
+      height: 760,
+    };
+  }
+
+  return {
+    width: Math.max(1, Math.round(window.innerWidth - 18 * 16)),
+    height: Math.max(1, Math.round(window.innerHeight - 12.1 * 16)),
+  };
+}
+
+function readShellWindowViewport(
+  element: HTMLElement | null,
+): ShellWindowViewport {
+  if (element === null) {
+    return readInitialShellWindowViewport();
+  }
+
+  const rect = element.getBoundingClientRect();
+  return {
+    width: Math.max(1, Math.round(rect.width)),
+    height: Math.max(1, Math.round(rect.height)),
+  };
+}
+
+function createLiveWindowPlacement(
+  viewport: ShellWindowViewport,
+  window: Pick<ShellWindow, "bounds" | "state">,
+) {
+  return {
+    bounds: normalizeShellWindowBounds(window.bounds, viewport),
+    restoredState: window.state === "maximized" ? "maximized" : "open",
+  } as const;
+}
+
+function areStoredWindowPlacementRecordsEqual(
+  left: ReturnType<typeof createStoredShellWindowPlacementRecord> | undefined,
+  right: ReturnType<typeof createStoredShellWindowPlacementRecord>,
+): boolean {
+  return (
+    left?.restoredState === right.restoredState &&
+    left?.bounds.x === right.bounds.x &&
+    left?.bounds.y === right.bounds.y &&
+    left?.bounds.width === right.bounds.width &&
+    left?.bounds.height === right.bounds.height
+  );
 }
 
 function upsertLiveDirectChat(
