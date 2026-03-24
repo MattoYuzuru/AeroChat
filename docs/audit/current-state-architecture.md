@@ -17,6 +17,7 @@
   - canonical `direct_chat` / `group_chat` windows c `singleton_per_target`, taskbar integration, deep-link handoff и same-window `thread/info` mode для direct/group info semantics;
   - canonical `person_profile` windows c `singleton_per_target` для people, known-user search и friend-request entrypoints, при сохранении direct-chat same-window info mode;
   - canonical `friend_requests` window c `singleton`, route-backed deep-link handoff и stable taskbar identity;
+  - canonical `explorer` window c `singleton`, route-backed section handoff, shell-local organizer sidebar, derived desktop/hidden/overflow views и bounded recovery actions для hidden desktop entrypoints;
 - профиль, privacy flags, список device/session и revoke;
 - social graph по точному login без публичного каталога;
 - direct chats и groups с realtime, typing, presence, read/unread, replies, edit, delete, pin;
@@ -32,7 +33,7 @@
 
 - `identity`, `social graph`, `legacy direct/group chats`, `media relay`, `deploy/local runtime` уже имеют рабочий user-facing slice;
 - `desktop shell` теперь имеет первый runtime scaffold на desktop/wide screens, но ещё не завершён как full product shell;
-- `desktop shell` теперь уже умеет canonical self-chat, direct/group chat, person-profile и friend-requests windows с dedicated launch semantics, но всё ещё не завершён как full product shell;
+- `desktop shell` теперь уже умеет canonical self-chat, direct/group chat, person-profile, friend-requests и explorer organizer windows с dedicated launch semantics, но всё ещё не завершён как full product shell;
 - encrypted lanes реализованы как usable, но bounded foundation без full parity и без unified history;
 - `aero-rtc-control` теперь имеет usable direct-call continuity slice для web, но calls ещё не являются finished product subsystem;
 - `aero-jobs`, PWA и push пока не реализованы как продуктовые возможности, а desktop/mobile polish остаётся частично bootstrap-only.
@@ -223,9 +224,9 @@ Realtime сейчас:
 
 ### Desktop shell
 
-- `implemented`: wide-screen desktop shell runtime scaffold, boot/chooser/login handoff, Start/taskbar/tray, singleton window registry, bounded 10-window cap notice, route-backed shell windows для текущих page-level surfaces, canonical `self_chat` / `direct_chat` / `group_chat` / `person_profile` / `friend_requests` targets с taskbar/live-window semantics, deep-link handoff, honest self-facing workspace для `Я` без self-direct backend rewrite и same-window `thread/info` switching внутри direct/group без нового window target, плюс shell-local desktop entity registry с browser-local persistence для системных entrypoints и canonical direct/group targets, auto-population текущих direct chats/groups, hide-from-desktop semantics без удаления underlying target и bounded overflow routing в `Контакты` / `Группы`.
-- `partial/bootstrap/bounded`: отдельные launcher/list surfaces `Chats` и `Groups` ещё coexist'ят с canonical chat/group windows, Explorer пока остаётся placeholder singleton app без organizer UX, а custom folders, drag/resize polish и full XP art pass ещё не реализованы.
-- `not implemented yet`: Explorer, custom folders, theme switching, wallpaper manager, pinned/trash model, dedicated media viewers, global call manager.
+- `implemented`: wide-screen desktop shell runtime scaffold, boot/chooser/login handoff, Start/taskbar/tray, singleton window registry, bounded 10-window cap notice, route-backed shell windows для текущих page-level surfaces, canonical `self_chat` / `direct_chat` / `group_chat` / `person_profile` / `friend_requests` / `explorer` targets с taskbar/live-window semantics, deep-link handoff, honest self-facing workspace для `Я` без self-direct backend rewrite и same-window `thread/info` switching внутри direct/group без нового window target, shell-local Explorer organizer surface с sidebar sections для desktop/contacts/groups/hidden/overflow/system entrypoints, плюс shell-local desktop entity registry с browser-local persistence для системных entrypoints и canonical direct/group targets, auto-population текущих direct chats/groups, hide-from-desktop semantics без удаления underlying target, bounded hidden-entry recovery и bounded overflow routing в `Контакты` / `Группы`.
+- `partial/bootstrap/bounded`: отдельные launcher/list surfaces `Chats` и `Groups` ещё coexist'ят с canonical chat/group windows, Explorer пока не получил custom folders, media manager или richer launcher semantics, а custom folders, drag/resize polish и full XP art pass ещё не реализованы.
+- `not implemented yet`: custom folders, theme switching, wallpaper manager, pinned/trash model, dedicated media viewers, global call manager.
 
 ### Identity/profile/privacy
 
@@ -308,7 +309,7 @@ Realtime сейчас:
 ### PWA / mobile / desktop shell polish
 
 - `implemented`: responsive SPA shell с route-based workspace.
-- `partial/bootstrap/bounded`: UI shell есть, но это не PWA и не desktop/mobile polished product slice; новый shell canon теперь задокументирован в `docs/product/web-shell-xp.md` и `ADR-079`...`ADR-083`, однако реализация этого направления ещё не началась.
+- `partial/bootstrap/bounded`: UI shell уже имеет первые реальные desktop slices, включая organizer Explorer, но это всё ещё не PWA и не fully polished desktop/mobile product slice.
 - `not implemented yet`: service worker, manifest/install flow, push, desktop wrapper, отдельный mobile polish slice.
 
 ## Service ownership and boundaries

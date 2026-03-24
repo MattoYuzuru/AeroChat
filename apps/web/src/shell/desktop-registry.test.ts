@@ -4,10 +4,12 @@ import type { ShellPreferencesStorageLike } from "./preferences";
 import {
   createInitialDesktopRegistryState,
   hideDesktopEntity,
+  listDesktopOverflowEntities,
   listDesktopEntitiesForSurface,
   listDesktopOverflowSummaries,
   MAX_VISIBLE_DESKTOP_ENTRIES,
   readDesktopRegistryState,
+  showDesktopEntityOnDesktop,
   syncDirectChatDesktopEntities,
   syncGroupChatDesktopEntities,
   upsertDirectChatDesktopEntity,
@@ -76,6 +78,20 @@ describe("desktop registry", () => {
     expect(chatEntries[0]?.title).toBe("Alice Cooper");
   });
 
+  it("restores hidden entry back into desktop-visible organizer state without duplicates", () => {
+    let state = createInitialDesktopRegistryState();
+
+    state = upsertDirectChatDesktopEntity(state, "chat-1", "Алиса");
+    const hiddenEntry = state.entries.find((entry) => entry.targetKey === "chat-1");
+    state = hideDesktopEntity(state, hiddenEntry!.id);
+    state = showDesktopEntityOnDesktop(state, hiddenEntry!.id);
+
+    const restoredEntry = state.entries.find((entry) => entry.targetKey === "chat-1");
+    expect(restoredEntry?.visibility).toBe("visible");
+    expect(restoredEntry?.placement).toBe("desktop");
+    expect(state.entries.filter((entry) => entry.targetKey === "chat-1")).toHaveLength(1);
+  });
+
   it("routes excess direct and group entities into bounded overflow buckets", () => {
     let state = createInitialDesktopRegistryState();
 
@@ -92,6 +108,20 @@ describe("desktop registry", () => {
       { bucket: "contacts", title: "Контакты", count: 5 },
       { bucket: "groups", title: "Группы", count: 1 },
     ]);
+  });
+
+  it("can promote overflow entry back to desktop while keeping bounded overflow", () => {
+    let state = createInitialDesktopRegistryState();
+
+    for (let index = 1; index <= MAX_VISIBLE_DESKTOP_ENTRIES; index += 1) {
+      state = upsertDirectChatDesktopEntity(state, `chat-${index}`, `Chat ${index}`);
+    }
+
+    const overflowEntry = listDesktopOverflowEntities(state, "contacts")[0];
+    state = showDesktopEntityOnDesktop(state, overflowEntry!.id);
+
+    expect(listDesktopEntitiesForSurface(state).some((entry) => entry.id === overflowEntry!.id)).toBe(true);
+    expect(listDesktopOverflowEntities(state, "contacts")).toHaveLength(5);
   });
 
   it("removes stale group entries when the current source no longer returns them", () => {

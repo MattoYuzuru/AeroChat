@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { ChatsPage } from "../pages/ChatsPage";
+import { ExplorerPage } from "../pages/ExplorerPage";
 import { FriendRequestsPage } from "../pages/FriendRequestsPage";
 import { GroupsPage } from "../pages/GroupsPage";
 import { PeoplePage } from "../pages/PeoplePage";
 import { PersonProfilePage } from "../pages/PersonProfilePage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { SearchPage } from "../pages/SearchPage";
-import { SectionPlaceholder } from "../pages/SectionPlaceholder";
 import { SelfChatPage } from "../pages/SelfChatPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import type {
@@ -82,6 +82,15 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     shortcutMeta: "group chat",
   },
   {
+    appId: "explorer",
+    title: "Explorer",
+    launchPolicy: "singleton",
+    routePath: "/app/explorer",
+    path: "/app/explorer",
+    shortcutLabel: "Explorer",
+    shortcutMeta: "shell organizer",
+  },
+  {
     appId: "search",
     title: "Поиск",
     launchPolicy: "singleton",
@@ -104,12 +113,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
 export const shellAppRegistry: Record<ShellAppId, ShellAppDefinition> = {
   self_chat: routeBackedShellApps.find((app) => app.appId === "self_chat")!,
   friend_requests: routeBackedShellApps.find((app) => app.appId === "friend_requests")!,
-  explorer: {
-    appId: "explorer",
-    title: "Explorer",
-    launchPolicy: "singleton",
-    routePath: null,
-  },
+  explorer: routeBackedShellApps.find((app) => app.appId === "explorer")!,
   profile: routeBackedShellApps.find((app) => app.appId === "profile")!,
   people: routeBackedShellApps.find((app) => app.appId === "people")!,
   person_profile: {
@@ -157,6 +161,13 @@ export function buildFriendRequestsRoutePath(
 ): string {
   const params = new URLSearchParams(searchParams ?? undefined);
   return buildRoutePath("/app/friend-requests", params);
+}
+
+export function buildExplorerRoutePath(
+  searchParams?: URLSearchParams | null,
+): string {
+  const params = new URLSearchParams(searchParams ?? undefined);
+  return buildRoutePath("/app/explorer", params);
 }
 
 export function buildPersonProfileRoutePath(
@@ -297,13 +308,7 @@ export function renderShellAppContent(appId: ShellAppId): ReactNode {
     case "friend_requests":
       return <FriendRequestsPage />;
     case "explorer":
-      return (
-        <SectionPlaceholder
-          title="Explorer"
-          description="Системный shell entrypoint уже существует, но полноценно organizer/folder surface будет добавлен отдельным узким slice без fake filesystem semantics."
-          nextSlice="Следующий PR: Explorer, folder organization и shell launcher."
-        />
-      );
+      return <ExplorerPage />;
     case "people":
       return <PeoplePage />;
     case "person_profile":

@@ -99,12 +99,17 @@ describe("shellRuntimeReducer", () => {
     expect(listTaskbarShellWindows(state)[0]?.appId).toBe("self_chat");
   });
 
-  it("keeps explorer as a canonical singleton placeholder window on relaunch", () => {
+  it("keeps explorer as one singleton organizer window while updating section route", () => {
     let state = createInitialShellRuntimeState();
 
     state = shellRuntimeReducer(state, {
       type: "launch",
       app: shellAppRegistry.explorer,
+      target: {
+        key: "explorer",
+        title: "Explorer",
+        routePath: "/app/explorer",
+      },
     });
     const explorerWindowId = state.activeWindowId;
 
@@ -115,11 +120,17 @@ describe("shellRuntimeReducer", () => {
     state = shellRuntimeReducer(state, {
       type: "launch",
       app: shellAppRegistry.explorer,
+      target: {
+        key: "explorer",
+        title: "Explorer",
+        routePath: "/app/explorer?section=overflow",
+      },
     });
 
     expect(state.windows).toHaveLength(1);
     expect(state.windows[0]?.windowId).toBe(explorerWindowId);
     expect(state.windows[0]?.appId).toBe("explorer");
+    expect(state.windows[0]?.routePath).toBe("/app/explorer?section=overflow");
     expect(state.windows[0]?.state).toBe("focused");
   });
 
