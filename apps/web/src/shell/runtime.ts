@@ -195,23 +195,24 @@ function launchShellWindow(
   const launchKey = buildShellLaunchKey(app, target);
   const existingWindow = state.windows.find((window) => window.launchKey === launchKey);
   if (existingWindow) {
-    return focusShellWindow(
-      {
-        ...state,
-        windows: state.windows.map((window) =>
-          window.launchKey === launchKey
-            ? {
-                ...window,
-                title: target?.title?.trim() || window.title,
-                routePath: target?.routePath ?? window.routePath,
-                target: target ?? window.target,
-                contentMode: getDefaultShellWindowContentMode(window.appId) ?? window.contentMode,
-              }
-            : window,
-        ),
-      },
-      existingWindow.windowId,
-    );
+    const nextState = {
+      ...state,
+      windows: state.windows.map((window) =>
+        window.launchKey === launchKey
+          ? {
+              ...window,
+              title: target?.title?.trim() || window.title,
+              routePath: target?.routePath ?? window.routePath,
+              target: target ?? window.target,
+              contentMode: getDefaultShellWindowContentMode(window.appId) ?? window.contentMode,
+            }
+          : window,
+      ),
+    };
+
+    return existingWindow.state === "minimized"
+      ? restoreShellWindow(nextState, existingWindow.windowId)
+      : focusShellWindow(nextState, existingWindow.windowId);
   }
 
   if (state.windows.length >= MAX_OPEN_SHELL_WINDOWS) {

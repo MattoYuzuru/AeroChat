@@ -1,4 +1,3 @@
-import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { buildPersonProfileRoutePath } from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
@@ -15,12 +14,10 @@ import {
 import { formatDateTime } from "./PeopleFormatting";
 import styles from "./PeoplePage.module.css";
 
-export function PeoplePage() {
+export function FriendRequestsPage() {
   const navigate = useNavigate();
   const desktopShellHost = useDesktopShellHost();
   const { state: authState, expireSession } = useAuth();
-  const [login, setLogin] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
   const people = usePeople({
     enabled: authState.status === "authenticated",
     token: authState.status === "authenticated" ? authState.token : "",
@@ -33,32 +30,27 @@ export function PeoplePage() {
 
   function openPersonProfile(profile: Profile) {
     const title = getPersonProfileLaunchTitle(profile);
+    const searchParams = new URLSearchParams({
+      from: "requests",
+    });
 
     if (desktopShellHost !== null) {
       desktopShellHost.openPersonProfile({
         userId: profile.id,
         title,
+        searchParams,
       });
     }
 
-    navigate(buildPersonProfileRoutePath(profile.id));
+    navigate(buildPersonProfileRoutePath(profile.id, searchParams));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const normalizedLogin = login.trim();
-
-    if (normalizedLogin === "") {
-      setFormError("Введите точный неизменяемый login, чтобы отправить заявку.");
-      people.clearFeedback();
-      return;
+  function openPeopleWorkspace() {
+    if (desktopShellHost !== null) {
+      desktopShellHost.launchApp("people");
     }
 
-    setFormError(null);
-    const success = await people.sendFriendRequest(normalizedLogin);
-    if (success) {
-      setLogin("");
-    }
+    navigate("/app/people");
   }
 
   return (
@@ -66,80 +58,62 @@ export function PeoplePage() {
       <section className={styles.heroCard}>
         <div className={styles.heroHeader}>
           <div>
-            <p className={styles.cardLabel}>People</p>
-            <h1 className={styles.title}>Друзья по точному login</h1>
+            <p className={styles.cardLabel}>Friend Requests</p>
+            <h1 className={styles.title}>Заявки в друзья</h1>
             <p className={styles.subtitle}>
-              Frontend social graph bootstrap идёт только через aero-gateway. Публичного каталога
-              и fuzzy search здесь нет, а direct chat создаётся только явным действием из карточки
-              друга.
+              Канонический singleton target для входящих и исходящих заявок. Здесь остаются только
+              bounded request-actions и переход в canonical person-profile окно без скрытого
+              создания чата или public discovery.
             </p>
           </div>
 
-          <button
-            className={styles.secondaryButton}
-            disabled={people.state.status === "loading" || people.state.isRefreshing}
-            onClick={() => {
-              void people.reload();
-            }}
-            type="button"
-          >
-            {people.state.isRefreshing ? "Обновляем..." : "Обновить"}
-          </button>
+          <div className={styles.actions}>
+            <button
+              className={styles.secondaryButton}
+              disabled={people.state.status === "loading" || people.state.isRefreshing}
+              onClick={() => {
+                void people.reload();
+              }}
+              type="button"
+            >
+              {people.state.isRefreshing ? "Обновляем..." : "Обновить"}
+            </button>
+            <button
+              className={styles.secondaryButton}
+              onClick={openPeopleWorkspace}
+              type="button"
+            >
+              Люди
+            </button>
+          </div>
         </div>
 
         <div className={styles.metrics}>
           <Metric label="Входящие" value={people.state.snapshot.incoming.length} />
           <Metric label="Исходящие" value={people.state.snapshot.outgoing.length} />
-          <Metric label="Друзья" value={people.state.snapshot.friends.length} />
+          <Metric
+            label="Всего активных"
+            value={people.state.snapshot.incoming.length + people.state.snapshot.outgoing.length}
+          />
         </div>
 
         {people.state.notice && <div className={styles.notice}>{people.state.notice}</div>}
-        {(formError || people.state.actionErrorMessage) && (
-          <div className={styles.error}>
-            {formError ?? people.state.actionErrorMessage}
-          </div>
+        {people.state.actionErrorMessage && (
+          <div className={styles.error}>{people.state.actionErrorMessage}</div>
         )}
-
-        <form className={styles.form} onSubmit={handleSubmit}>
-          <label className={styles.field}>
-            <span>Точный неизменяемый login</span>
-            <input
-              autoCapitalize="none"
-              autoComplete="off"
-              autoCorrect="off"
-              disabled={people.state.isSendingRequest}
-              onChange={(event) => {
-                setLogin(event.target.value);
-                setFormError(null);
-                people.clearFeedback();
-              }}
-              placeholder="alice"
-              spellCheck={false}
-              value={login}
-            />
-          </label>
-
-          <button
-            className={styles.primaryButton}
-            disabled={people.state.isSendingRequest}
-            type="submit"
-          >
-            {people.state.isSendingRequest ? "Отправляем..." : "Отправить заявку"}
-          </button>
-        </form>
       </section>
 
       {people.state.status === "loading" && (
         <StateCard
-          title="Загружаем social graph"
-          message="Получаем входящие, исходящие и текущих друзей через gateway."
+          title="Загружаем заявки"
+          message="Получаем входящие и исходящие friend requests через gateway."
         />
       )}
 
       {people.state.status === "error" && (
         <StateCard
-          title="People раздел недоступен"
-          message={people.state.screenErrorMessage ?? "Не удалось загрузить данные."}
+          title="Раздел заявок недоступен"
+          message={people.state.screenErrorMessage ?? "Не удалось загрузить заявки."}
           action={
             <button
               className={styles.primaryButton}
@@ -159,7 +133,7 @@ export function PeoplePage() {
         <div className={styles.grid}>
           <PeopleSection
             title="Входящие заявки"
-            description="Только точные friend requests без скрытого создания чата."
+            description="Принятие и отклонение reuse'ят текущие people hooks и gateway mutations."
             emptyMessage="Сейчас нет входящих заявок."
           >
             {people.state.snapshot.incoming.map((request) => {
@@ -193,7 +167,7 @@ export function PeoplePage() {
 
           <PeopleSection
             title="Исходящие заявки"
-            description="Можно отменить до принятия второй стороной."
+            description="До принятия второй стороной заявку можно отменить в том же canonical app."
             emptyMessage="Исходящих заявок пока нет."
           >
             {people.state.snapshot.outgoing.map((request) => {
@@ -212,40 +186,6 @@ export function PeoplePage() {
                     label: "Отменить",
                     onClick: () => {
                       void people.cancelOutgoingFriendRequest(request.profile.login);
-                    },
-                  }}
-                />
-              );
-            })}
-          </PeopleSection>
-
-          <PeopleSection
-            title="Друзья"
-            description="Direct chat создаётся только явным действием из карточки друга."
-            emptyMessage="Список друзей пока пуст."
-          >
-            {people.state.snapshot.friends.map((friend) => {
-              const pendingLabel = people.state.pendingLogins[friend.profile.login];
-
-              return (
-                <ProfileCard
-                  key={friend.profile.id || friend.profile.login}
-                  metaLabel={`Друзья с ${formatDateTime(friend.friendsSince)}`}
-                  onOpenProfile={() => {
-                    openPersonProfile(friend.profile);
-                  }}
-                  pendingLabel={pendingLabel}
-                  profile={friend.profile}
-                  primaryAction={{
-                    label: "Открыть чат",
-                    onClick: () => {
-                      navigate(`/app/chats?peer=${encodeURIComponent(friend.profile.id)}`);
-                    },
-                  }}
-                  secondaryAction={{
-                    label: "Удалить из друзей",
-                    onClick: () => {
-                      void people.removeFriend(friend.profile.login);
                     },
                   }}
                 />

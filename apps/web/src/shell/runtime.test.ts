@@ -27,6 +27,42 @@ describe("shellRuntimeReducer", () => {
     expect(state.activeWindowId).toBe(firstWindowId);
   });
 
+  it("keeps friend_requests as one singleton window with stable taskbar identity on relaunch", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.friend_requests,
+      target: {
+        key: "friend_requests",
+        title: "Заявки",
+        routePath: "/app/friend-requests",
+      },
+    });
+    const friendRequestsWindowId = state.activeWindowId;
+
+    state = shellRuntimeReducer(state, {
+      type: "minimize",
+      windowId: friendRequestsWindowId!,
+    });
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.friend_requests,
+      target: {
+        key: "friend_requests",
+        title: "Заявки",
+        routePath: "/app/friend-requests?from=desktop",
+      },
+    });
+
+    expect(state.windows).toHaveLength(1);
+    expect(state.windows[0]?.windowId).toBe(friendRequestsWindowId);
+    expect(state.windows[0]?.routePath).toBe("/app/friend-requests?from=desktop");
+    expect(state.windows[0]?.state).toBe("focused");
+    expect(listTaskbarShellWindows(state)).toHaveLength(1);
+    expect(listTaskbarShellWindows(state)[0]?.appId).toBe("friend_requests");
+  });
+
   it("allows different singleton_per_target launch keys when runtime policy needs it", () => {
     let state = createInitialShellRuntimeState();
     const directChatApp: ShellAppDefinition = {

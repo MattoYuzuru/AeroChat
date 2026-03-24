@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ChatsPage } from "../pages/ChatsPage";
+import { FriendRequestsPage } from "../pages/FriendRequestsPage";
 import { GroupsPage } from "../pages/GroupsPage";
 import { PeoplePage } from "../pages/PeoplePage";
 import { PersonProfilePage } from "../pages/PersonProfilePage";
@@ -32,6 +33,15 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     path: "/app/profile",
     shortcutLabel: "Профиль",
     shortcutMeta: "identity",
+  },
+  {
+    appId: "friend_requests",
+    title: "Заявки",
+    launchPolicy: "singleton",
+    routePath: "/app/friend-requests",
+    path: "/app/friend-requests",
+    shortcutLabel: "Заявки",
+    shortcutMeta: "social requests",
   },
   {
     appId: "people",
@@ -87,12 +97,7 @@ export const shellAppRegistry: Record<ShellAppId, ShellAppDefinition> = {
     launchPolicy: "singleton",
     routePath: null,
   },
-  friend_requests: {
-    appId: "friend_requests",
-    title: "Заявки",
-    launchPolicy: "singleton",
-    routePath: null,
-  },
+  friend_requests: routeBackedShellApps.find((app) => app.appId === "friend_requests")!,
   profile: routeBackedShellApps.find((app) => app.appId === "profile")!,
   people: routeBackedShellApps.find((app) => app.appId === "people")!,
   person_profile: {
@@ -126,6 +131,13 @@ export function buildDirectChatRoutePath(
   const params = new URLSearchParams(searchParams ?? undefined);
   params.set("chat", chatId);
   return buildRoutePath("/app/chats", params);
+}
+
+export function buildFriendRequestsRoutePath(
+  searchParams?: URLSearchParams | null,
+): string {
+  const params = new URLSearchParams(searchParams ?? undefined);
+  return buildRoutePath("/app/friend-requests", params);
 }
 
 export function buildPersonProfileRoutePath(
@@ -261,6 +273,8 @@ export function renderShellAppContent(appId: ShellAppId): ReactNode {
   switch (appId) {
     case "profile":
       return <ProfilePage />;
+    case "friend_requests":
+      return <FriendRequestsPage />;
     case "people":
       return <PeoplePage />;
     case "person_profile":

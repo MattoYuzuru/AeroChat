@@ -53,7 +53,7 @@ const startMenuItems: Array<{
   { appId: "self_chat", description: "Shell-native placeholder для будущего канонического Я-чата." },
   {
     appId: "friend_requests",
-    description: "Shell-native placeholder для выделенного системного app заявок.",
+    description: "Каноническое окно входящих и исходящих friend requests.",
   },
 ];
 
@@ -618,28 +618,6 @@ function ShellWindowBody({
           type="button"
         >
           Открыть текущий chat workspace
-        </button>
-      </div>
-    );
-  }
-
-  if (appId === "friend_requests") {
-    return (
-      <div className={styles.placeholderCard}>
-        <p className={styles.placeholderLabel}>Friend Requests</p>
-        <h2 className={styles.placeholderTitle}>Выделенное системное приложение заявок ещё не вынесено из раздела людей.</h2>
-        <p className={styles.placeholderText}>
-          В текущем runtime заявки остаются продуктово доступными через существующий People screen,
-          а shell уже резервирует отдельный системный entrypoint под следующий slice.
-        </p>
-        <button
-          className={styles.shellPrimaryButton}
-          onClick={() => {
-            onLaunchApp("people");
-          }}
-          type="button"
-        >
-          Открыть Люди
         </button>
       </div>
     );

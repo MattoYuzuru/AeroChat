@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] canonical profile shell target for people, known-user search и friend-request flows
+- [x] canonical friend requests shell target with dedicated singleton window and person_profile handoff
 
 ---
 
@@ -218,6 +218,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Boot/login application model внутри нового shell
 - [x] Canonical direct/group shell windows
 - [x] Canonical person profile shell target для people/search/request flows
+- [x] Canonical friend requests shell target
 - [ ] XP-first theme engine
 - [ ] Explorer, folder organization и shell launcher
 - [ ] Mobile practical shell adaptation
