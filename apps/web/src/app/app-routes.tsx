@@ -6,6 +6,7 @@ import { PeoplePage } from "../pages/PeoplePage";
 import { PersonProfilePage } from "../pages/PersonProfilePage";
 import { ProfilePage } from "../pages/ProfilePage";
 import { SearchPage } from "../pages/SearchPage";
+import { SelfChatPage } from "../pages/SelfChatPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import type {
   ShellAppDefinition,
@@ -25,6 +26,15 @@ export interface ResolvedShellRouteEntry {
 }
 
 export const routeBackedShellApps: RouteBackedShellApp[] = [
+  {
+    appId: "self_chat",
+    title: "Я",
+    launchPolicy: "singleton",
+    routePath: "/app/self",
+    path: "/app/self",
+    shortcutLabel: "Я",
+    shortcutMeta: "self workspace",
+  },
   {
     appId: "profile",
     title: "Профиль",
@@ -91,12 +101,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
 ];
 
 export const shellAppRegistry: Record<ShellAppId, ShellAppDefinition> = {
-  self_chat: {
-    appId: "self_chat",
-    title: "Я",
-    launchPolicy: "singleton",
-    routePath: null,
-  },
+  self_chat: routeBackedShellApps.find((app) => app.appId === "self_chat")!,
   friend_requests: routeBackedShellApps.find((app) => app.appId === "friend_requests")!,
   profile: routeBackedShellApps.find((app) => app.appId === "profile")!,
   people: routeBackedShellApps.find((app) => app.appId === "people")!,
@@ -131,6 +136,13 @@ export function buildDirectChatRoutePath(
   const params = new URLSearchParams(searchParams ?? undefined);
   params.set("chat", chatId);
   return buildRoutePath("/app/chats", params);
+}
+
+export function buildSelfChatRoutePath(
+  searchParams?: URLSearchParams | null,
+): string {
+  const params = new URLSearchParams(searchParams ?? undefined);
+  return buildRoutePath("/app/self", params);
 }
 
 export function buildFriendRequestsRoutePath(
@@ -271,6 +283,8 @@ export function isRouteBackedShellAppId(appId: ShellAppId): boolean {
 
 export function renderShellAppContent(appId: ShellAppId): ReactNode {
   switch (appId) {
+    case "self_chat":
+      return <SelfChatPage />;
     case "profile":
       return <ProfilePage />;
     case "friend_requests":
