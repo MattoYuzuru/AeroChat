@@ -288,7 +288,7 @@ Realtime сейчас:
 ### PWA / mobile / desktop shell polish
 
 - `implemented`: responsive SPA shell с route-based workspace.
-- `partial/bootstrap/bounded`: UI shell есть, но это не PWA и не desktop/mobile polished product slice.
+- `partial/bootstrap/bounded`: UI shell есть, но это не PWA и не desktop/mobile polished product slice; новый shell canon теперь задокументирован в `docs/product/web-shell-xp.md` и `ADR-079`...`ADR-083`, однако реализация этого направления ещё не началась.
 - `not implemented yet`: service worker, manifest/install flow, push, desktop wrapper, отдельный mobile polish slice.
 
 ## Service ownership and boundaries
@@ -405,7 +405,8 @@ Realtime сейчас:
 
 - маршруты и page-level разделение уже есть;
 - direct/group/search/settings изолированы по своим state/hooks;
-- current shell можно менять без перестройки backend.
+- current shell можно менять без перестройки backend;
+- для нового desktop shell уже есть зафиксированный продуктовый и архитектурный канон, поэтому будущие PR могут идти маленькими slice'ами.
 
 Ограничения:
 
