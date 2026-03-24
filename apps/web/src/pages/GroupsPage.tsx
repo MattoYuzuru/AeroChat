@@ -1200,6 +1200,7 @@ export function GroupsPage() {
       : "Группа";
   const groupWindowContentMode =
     desktopShellHost?.activeWindowContentMode ?? mobileWindowContentMode;
+  const isDesktopTargetWindow = desktopShellHost !== null && selectedGroupId !== "";
 
   useEffect(() => {
     if (desktopShellHost === null || selectedState.status !== "ready") {
@@ -2322,8 +2323,11 @@ export function GroupsPage() {
   }
 
   return (
-    <div className={styles.layout}>
-      <section className={styles.heroCard}>
+    <div
+      className={`${styles.layout} ${isDesktopTargetWindow ? styles.desktopWindowLayout : ""}`}
+    >
+      {!isDesktopTargetWindow && (
+        <section className={styles.heroCard}>
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Groups</p>
@@ -2424,10 +2428,14 @@ export function GroupsPage() {
             </div>
           </form>
         </div>
-      </section>
+        </section>
+      )}
 
-      <div className={styles.workspace}>
-        <aside className={styles.sideColumn}>
+      <div
+        className={`${styles.workspace} ${isDesktopTargetWindow ? styles.desktopWindowWorkspace : ""}`}
+      >
+        {!isDesktopTargetWindow && (
+          <aside className={styles.sideColumn}>
           <section className={styles.panelCard}>
             <div className={styles.panelHeader}>
               <div>
@@ -2522,9 +2530,18 @@ export function GroupsPage() {
               </div>
             )}
           </section>
-        </aside>
+          </aside>
+        )}
 
-        <section className={styles.mainColumn}>
+        <section
+          className={`${styles.mainColumn} ${isDesktopTargetWindow ? styles.desktopMainColumn : ""}`}
+        >
+          {isDesktopTargetWindow && notice && <div className={styles.notice}>{notice}</div>}
+          {isDesktopTargetWindow && searchJumpNotice && (
+            <div className={styles.notice}>{searchJumpNotice}</div>
+          )}
+          {isDesktopTargetWindow && actionError && <div className={styles.error}>{actionError}</div>}
+
           {selectedState.status === "idle" && (
             <InlineState
               title="Группа не выбрана"

@@ -502,6 +502,7 @@ export function ChatsPage() {
   );
   const directWindowContentMode =
     desktopShellHost?.activeWindowContentMode ?? mobileWindowContentMode;
+  const isDesktopTargetWindow = desktopShellHost !== null && isThreadRouteActive;
   const people = usePeople({
     enabled:
       authState.status === "authenticated" &&
@@ -1050,8 +1051,11 @@ export function ChatsPage() {
   }
 
   return (
-    <div className={styles.layout}>
-      <section className={styles.heroCard}>
+    <div
+      className={`${styles.layout} ${isDesktopTargetWindow ? styles.desktopWindowLayout : ""}`}
+    >
+      {!isDesktopTargetWindow && (
+        <section className={styles.heroCard}>
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Chats</p>
@@ -1094,13 +1098,17 @@ export function ChatsPage() {
             {composerError ?? chats.state.actionErrorMessage}
           </div>
         )}
-      </section>
+        </section>
+      )}
 
-      <div className={styles.workspace}>
-        <section
-          className={styles.listPane}
-          data-mobile-hidden={isThreadRouteActive}
-        >
+      <div
+        className={`${styles.workspace} ${isDesktopTargetWindow ? styles.desktopWindowWorkspace : ""}`}
+      >
+        {!isDesktopTargetWindow && (
+          <section
+            className={styles.listPane}
+            data-mobile-hidden={isThreadRouteActive}
+          >
           <div className={styles.sectionCard}>
             <div className={styles.panelHeader}>
               <div>
@@ -1240,50 +1248,70 @@ export function ChatsPage() {
               </div>
             )}
           </div>
-        </section>
+          </section>
+        )}
 
         <section
-          className={styles.threadPane}
+          className={`${styles.threadPane} ${isDesktopTargetWindow ? styles.desktopThreadPane : ""}`}
           data-mobile-hidden={!isThreadRouteActive && chats.state.chats.length > 0}
         >
-          <div className={styles.sectionCard}>
-            <div className={styles.panelHeader}>
-              <div>
-                <p className={styles.cardLabel}>Thread</p>
-                <h2 className={styles.sectionTitle}>
-                  {selectedPeer ? selectedPeer.nickname : "Выберите чат"}
-                </h2>
-              </div>
+          <div
+            className={`${styles.sectionCard} ${isDesktopTargetWindow ? styles.desktopThreadSection : ""}`}
+          >
+            {!isDesktopTargetWindow && (
+              <div className={styles.panelHeader}>
+                <div>
+                  <p className={styles.cardLabel}>Thread</p>
+                  <h2 className={styles.sectionTitle}>
+                    {selectedPeer ? selectedPeer.nickname : "Выберите чат"}
+                  </h2>
+                </div>
 
-              <div className={styles.headerActions}>
-                <button
-                  className={styles.secondaryButton}
-                  onClick={handleBackToChatsList}
-                  type="button"
-                >
-                  Назад к списку
-                </button>
-
-                {selectedThread && (
+                <div className={styles.headerActions}>
                   <button
                     className={styles.secondaryButton}
-                    onClick={() => {
-                      void chats.openChat(selectedThread.chat.id);
-                    }}
+                    onClick={handleBackToChatsList}
                     type="button"
                   >
-                    Обновить thread
+                    Назад к списку
                   </button>
-                )}
-              </div>
-            </div>
 
-            {!isThreadRouteActive && chats.state.status === "ready" && chats.state.chats.length > 0 && (
+                  {selectedThread && (
+                    <button
+                      className={styles.secondaryButton}
+                      onClick={() => {
+                        void chats.openChat(selectedThread.chat.id);
+                      }}
+                      type="button"
+                    >
+                      Обновить thread
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {isDesktopTargetWindow && chats.state.notice && (
+              <div className={styles.notice}>{chats.state.notice}</div>
+            )}
+            {isDesktopTargetWindow && searchJumpNotice && (
+              <div className={styles.notice}>{searchJumpNotice}</div>
+            )}
+            {isDesktopTargetWindow && (composerError || chats.state.actionErrorMessage) && (
+              <div className={styles.error}>
+                {composerError ?? chats.state.actionErrorMessage}
+              </div>
+            )}
+
+            {!isDesktopTargetWindow &&
+              !isThreadRouteActive &&
+              chats.state.status === "ready" &&
+              chats.state.chats.length > 0 && (
               <StateCard
                 title="Чат ещё не выбран"
                 message="На широком экране можно держать список и пустой thread рядом. На узком экране сначала показываем обзор чатов."
               />
-            )}
+              )}
 
             {requestedPeerUserId !== "" && chats.state.isCreatingChat && (
               <StateCard
@@ -1343,13 +1371,15 @@ export function ChatsPage() {
                         >
                           Назад к переписке
                         </button>
-                        <button
-                          className={styles.secondaryButton}
-                          onClick={handleBackToChatsList}
-                          type="button"
-                        >
-                          Назад к списку
-                        </button>
+                        {!isDesktopTargetWindow && (
+                          <button
+                            className={styles.secondaryButton}
+                            onClick={handleBackToChatsList}
+                            type="button"
+                          >
+                            Назад к списку
+                          </button>
+                        )}
                       </div>
                     </div>
 
