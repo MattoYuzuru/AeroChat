@@ -100,6 +100,9 @@ export function GroupsPage() {
   const desktopShellHost = useDesktopShellHost();
   const cryptoRuntime = useCryptoRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [mobileWindowContentMode, setMobileWindowContentMode] = useState<"thread" | "info">(
+    "thread",
+  );
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupsStatus, setGroupsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [groupsError, setGroupsError] = useState<string | null>(null);
@@ -1195,6 +1198,8 @@ export function GroupsPage() {
     selectedState.status === "ready"
       ? selectedState.snapshot.group.name
       : "Группа";
+  const groupWindowContentMode =
+    desktopShellHost?.activeWindowContentMode ?? mobileWindowContentMode;
 
   useEffect(() => {
     if (desktopShellHost === null || selectedState.status !== "ready") {
@@ -1203,6 +1208,10 @@ export function GroupsPage() {
 
     desktopShellHost.syncCurrentRouteTitle(selectedGroupTitle);
   }, [desktopShellHost, selectedGroupTitle, selectedState]);
+
+  useEffect(() => {
+    setMobileWindowContentMode("thread");
+  }, [selectedGroupId]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -2303,6 +2312,15 @@ export function GroupsPage() {
     setComposerText("");
   }
 
+  function setGroupInfoMode(nextMode: "thread" | "info") {
+    if (desktopShellHost !== null) {
+      desktopShellHost.setActiveWindowContentMode(nextMode);
+      return;
+    }
+
+    setMobileWindowContentMode(nextMode);
+  }
+
   return (
     <div className={styles.layout}>
       <section className={styles.heroCard}>
@@ -2542,16 +2560,47 @@ export function GroupsPage() {
             <>
               <section className={styles.panelCard}>
                 <div className={styles.splitHeader}>
-                  <div>
-                    <p className={styles.cardLabel}>Group shell</p>
-                    <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
-                    <p className={styles.description}>
-                      Текущая роль: {roleLabel(selectedState.snapshot.group.selfRole)}. Thread key:{" "}
-                      `{selectedState.snapshot.thread.threadKey}`.
-                    </p>
-                  </div>
+                  {groupWindowContentMode === "thread" ? (
+                    <button
+                      className={styles.groupIdentityButton}
+                      onClick={() => {
+                        setGroupInfoMode("info");
+                      }}
+                      type="button"
+                    >
+                      <p className={styles.cardLabel}>Group shell</p>
+                      <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
+                      <p className={styles.description}>
+                        Текущая роль: {roleLabel(selectedState.snapshot.group.selfRole)}. Thread
+                        key: `{selectedState.snapshot.thread.threadKey}`.
+                      </p>
+                      <p className={styles.infoActionHint}>
+                        Открыть участников, роли, invite links и действия группы в этом же окне
+                      </p>
+                    </button>
+                  ) : (
+                    <div>
+                      <p className={styles.cardLabel}>Group info</p>
+                      <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
+                      <p className={styles.description}>
+                        Управление группой остаётся в том же canonical window без нового target.
+                        Текущая роль: {roleLabel(selectedState.snapshot.group.selfRole)}.
+                      </p>
+                    </div>
+                  )}
 
                   <div className={styles.badgeColumn}>
+                    {groupWindowContentMode === "info" && (
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={() => {
+                          setGroupInfoMode("thread");
+                        }}
+                        type="button"
+                      >
+                        Назад к переписке
+                      </button>
+                    )}
                     <span className={styles.statusPill}>
                       {selectedState.snapshot.thread.canSendMessages
                         ? "write allowed"
@@ -2582,6 +2631,8 @@ export function GroupsPage() {
                 </div>
               </section>
 
+              {groupWindowContentMode === "thread" && (
+                <>
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
@@ -3767,7 +3818,11 @@ export function GroupsPage() {
                   </div>
                 </form>
               </section>
+                </>
+              )}
 
+              {groupWindowContentMode === "info" && (
+                <>
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
@@ -4082,6 +4137,8 @@ export function GroupsPage() {
                   </>
                 )}
               </section>
+                </>
+              )}
             </>
           )}
         </section>

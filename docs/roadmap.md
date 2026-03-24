@@ -13,7 +13,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 
 Последний завершённый platform slice:
 
-- [x] canonical shell direct/group chat windows
+- [x] in-window profile/info semantics for canonical direct/group shell windows
 
 ---
 

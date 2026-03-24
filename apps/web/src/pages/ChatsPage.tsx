@@ -51,7 +51,9 @@ import {
   type DirectChatReadState,
   type DirectChatTypingState,
   type EncryptedDirectChatReadState,
+  type Profile,
 } from "../gateway/types";
+import { usePeople } from "../people/usePeople";
 import {
   clearSearchJumpParams,
   findJumpTarget,
@@ -89,10 +91,12 @@ export function ChatsPage() {
   const isPageVisible = usePageVisibility();
   const sessionToken =
     authState.status === "authenticated" ? authState.token : "";
+  const currentUserId =
+    authState.status === "authenticated" ? authState.profile.id : "";
   const chats = useChats({
     enabled: authState.status === "authenticated",
     token: sessionToken,
-    currentUserId: authState.status === "authenticated" ? authState.profile.id : "",
+    currentUserId,
     composerText,
     onUnauthenticated: () => expireSession(),
   });
@@ -489,12 +493,35 @@ export function ChatsPage() {
     shouldAutoMarkEncryptedRead,
   ]);
 
-  const currentUserId =
-    authState.status === "authenticated" ? authState.profile.id : "";
   const selectedPeer =
     selectedThread !== null
       ? getPeerParticipant(selectedThread.chat, currentUserId)
       : null;
+  const [mobileWindowContentMode, setMobileWindowContentMode] = useState<"thread" | "info">(
+    "thread",
+  );
+  const directWindowContentMode =
+    desktopShellHost?.activeWindowContentMode ?? mobileWindowContentMode;
+  const people = usePeople({
+    enabled:
+      authState.status === "authenticated" &&
+      directWindowContentMode === "info" &&
+      selectedPeer !== null,
+    token: sessionToken,
+    onUnauthenticated: expireSession,
+  });
+  const selectedFriend =
+    selectedPeer !== null && people.state.status === "ready"
+      ? people.state.snapshot.friends.find(
+          (friend) =>
+            friend.profile.id === selectedPeer.id || friend.profile.login === selectedPeer.login,
+        ) ?? null
+      : null;
+  const selectedDirectProfile = selectedFriend?.profile ?? null;
+  const pendingRemoveFriendLabel =
+    selectedDirectProfile === null
+      ? null
+      : people.state.pendingLogins[selectedDirectProfile.login] ?? null;
   const selectedPeerTitle =
     selectedPeer?.nickname?.trim() ||
     selectedPeer?.login?.trim() ||
@@ -618,6 +645,10 @@ export function ChatsPage() {
 
     desktopShellHost.syncCurrentRouteTitle(selectedPeerTitle);
   }, [desktopShellHost, selectedPeerTitle, selectedThread]);
+
+  useEffect(() => {
+    setMobileWindowContentMode("thread");
+  }, [requestedChatId, requestedPeerUserId]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -935,6 +966,15 @@ export function ChatsPage() {
     setSearchParams({}, { replace: true });
     setComposerError(null);
     chats.clearFeedback();
+  }
+
+  function setDirectInfoMode(nextMode: "thread" | "info") {
+    if (desktopShellHost !== null) {
+      desktopShellHost.setActiveWindowContentMode(nextMode);
+      return;
+    }
+
+    setMobileWindowContentMode(nextMode);
   }
 
   async function handleAttachmentSelection(file: File | null) {
@@ -1279,23 +1319,236 @@ export function ChatsPage() {
             )}
 
             {selectedThread && chats.state.threadStatus === "ready" && (
+              directWindowContentMode === "info" ? (
+                <div className={styles.threadLayout}>
+                  <section className={styles.profilePanel}>
+                    <div className={styles.panelHeader}>
+                      <div>
+                        <p className={styles.cardLabel}>Direct info</p>
+                        <h3 className={styles.blockTitle}>
+                          {selectedDirectProfile?.nickname ?? selectedPeer?.nickname ?? "Собеседник"}
+                        </h3>
+                        <p className={styles.threadDescription}>
+                          @{selectedDirectProfile?.login ?? selectedPeer?.login ?? "unknown"}
+                        </p>
+                      </div>
+
+                      <div className={styles.headerActions}>
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={() => {
+                            setDirectInfoMode("thread");
+                          }}
+                          type="button"
+                        >
+                          Назад к переписке
+                        </button>
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={handleBackToChatsList}
+                          type="button"
+                        >
+                          Назад к списку
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className={styles.profileHero}>
+                      <div className={styles.threadIdentity}>
+                        <span
+                          className={`${styles.avatarBadge} ${styles.avatarBadgeLarge}`}
+                          aria-hidden="true"
+                        >
+                          {getParticipantInitials(selectedPeer)}
+                        </span>
+
+                        <div>
+                          <p className={styles.threadEyebrow}>Профиль и информация</p>
+                          <h3 className={styles.threadTitle}>
+                            {selectedDirectProfile?.nickname ?? selectedPeer?.nickname ?? "Собеседник"}
+                          </h3>
+                          <p className={styles.threadDescription}>
+                            {describeDirectProfileSummary(selectedDirectProfile)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className={styles.profileActions}>
+                        {selectedDirectProfile !== null && (
+                          <button
+                            className={styles.secondaryButton}
+                            disabled={pendingRemoveFriendLabel !== null}
+                            onClick={() => {
+                              void people.removeFriend(selectedDirectProfile.login);
+                            }}
+                            type="button"
+                          >
+                            {pendingRemoveFriendLabel ?? "Удалить из друзей"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={styles.threadStatusRow}>
+                      <StatusPill
+                        label={describePresenceStatus(selectedThread.presenceState)}
+                        tone={selectedThread.presenceState?.peerPresence ? "success" : "neutral"}
+                      />
+                      <StatusPill
+                        label={describeReadStatus(selectedThread.readState)}
+                        tone={selectedThread.readState?.peerPosition ? "accent" : "neutral"}
+                      />
+                      {selectedThread.typingState?.peerTyping && (
+                        <StatusPill
+                          label={describeTypingStatus(selectedThread.typingState)}
+                          tone="accent"
+                        />
+                      )}
+                    </div>
+
+                    {people.state.status === "loading" && (
+                      <div className={styles.notice}>
+                        Подтягиваем friends/profile snapshot, чтобы показать актуальную карточку
+                        контакта без открытия отдельного окна.
+                      </div>
+                    )}
+
+                    {people.state.status === "error" && (
+                      <div className={styles.error}>
+                        {people.state.screenErrorMessage ??
+                          "Не удалось загрузить данные контакта через people surface."}
+                      </div>
+                    )}
+
+                    {people.state.actionErrorMessage && (
+                      <div className={styles.error}>{people.state.actionErrorMessage}</div>
+                    )}
+
+                    {people.state.notice && <div className={styles.notice}>{people.state.notice}</div>}
+
+                    <div className={styles.profileFactsGrid}>
+                      <article className={styles.profileFactCard}>
+                        <p className={styles.cardLabel}>Контакт</p>
+                        <dl className={styles.profileFactList}>
+                          <div>
+                            <dt>Login</dt>
+                            <dd>@{selectedDirectProfile?.login ?? selectedPeer?.login ?? "unknown"}</dd>
+                          </div>
+                          <div>
+                            <dt>В чате с</dt>
+                            <dd>{formatDateTime(selectedThread.chat.createdAt)}</dd>
+                          </div>
+                          <div>
+                            <dt>Последняя активность</dt>
+                            <dd>{formatDateTime(selectedThread.chat.updatedAt)}</dd>
+                          </div>
+                          <div>
+                            <dt>Друзья с</dt>
+                            <dd>
+                              {selectedFriend === null
+                                ? "нет friend snapshot"
+                                : formatDateTime(selectedFriend.friendsSince)}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+
+                      <article className={styles.profileFactCard}>
+                        <p className={styles.cardLabel}>Публичный профиль</p>
+                        <dl className={styles.profileFactList}>
+                          <div>
+                            <dt>Status</dt>
+                            <dd>{selectedDirectProfile?.statusText ?? "не задан"}</dd>
+                          </div>
+                          <div>
+                            <dt>Bio</dt>
+                            <dd>{selectedDirectProfile?.bio ?? "не задано"}</dd>
+                          </div>
+                          <div>
+                            <dt>Локация</dt>
+                            <dd>{describeDirectProfileLocation(selectedDirectProfile)}</dd>
+                          </div>
+                          <div>
+                            <dt>День рождения</dt>
+                            <dd>{selectedDirectProfile?.birthday ?? "не задан"}</dd>
+                          </div>
+                        </dl>
+                      </article>
+
+                      <article className={styles.profileFactCard}>
+                        <p className={styles.cardLabel}>Приватность и thread</p>
+                        <dl className={styles.profileFactList}>
+                          <div>
+                            <dt>Read receipts</dt>
+                            <dd>
+                              {selectedDirectProfile === null
+                                ? "нет profile snapshot"
+                                : selectedDirectProfile.readReceiptsEnabled
+                                  ? "включены"
+                                  : "скрыты"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Presence</dt>
+                            <dd>
+                              {selectedDirectProfile === null
+                                ? "нет profile snapshot"
+                                : selectedDirectProfile.presenceEnabled
+                                  ? "разрешён"
+                                  : "скрыт"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Typing visibility</dt>
+                            <dd>
+                              {selectedDirectProfile === null
+                                ? "нет profile snapshot"
+                                : selectedDirectProfile.typingVisibilityEnabled
+                                  ? "видима"
+                                  : "скрыта"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Закрепления</dt>
+                            <dd>
+                              {selectedThread.chat.pinnedMessageIds.length +
+                                selectedThread.chat.encryptedPinnedMessageIds.length}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+                    </div>
+                  </section>
+                </div>
+              ) : (
               <div className={styles.threadLayout}>
                 <section className={styles.threadHero}>
-                  <div className={styles.threadIdentity}>
-                    <span className={`${styles.avatarBadge} ${styles.avatarBadgeLarge}`} aria-hidden="true">
-                      {getParticipantInitials(selectedPeer)}
-                    </span>
+                  <button
+                    className={styles.threadIdentityButton}
+                    onClick={() => {
+                      setDirectInfoMode("info");
+                    }}
+                    type="button"
+                  >
+                    <div className={styles.threadIdentity}>
+                      <span className={`${styles.avatarBadge} ${styles.avatarBadgeLarge}`} aria-hidden="true">
+                        {getParticipantInitials(selectedPeer)}
+                      </span>
 
-                    <div>
-                      <p className={styles.threadEyebrow}>Direct thread</p>
-                      <h3 className={styles.threadTitle}>
-                        {selectedPeer?.nickname ?? "Собеседник"}
-                      </h3>
-                      <p className={styles.threadDescription}>
-                        {selectedPeer ? `@${selectedPeer.login}` : "Участник недоступен"}
-                      </p>
+                      <div>
+                        <p className={styles.threadEyebrow}>Direct thread</p>
+                        <h3 className={styles.threadTitle}>
+                          {selectedPeer?.nickname ?? "Собеседник"}
+                        </h3>
+                        <p className={styles.threadDescription}>
+                          {selectedPeer ? `@${selectedPeer.login}` : "Участник недоступен"}
+                        </p>
+                        <p className={styles.identityActionHint}>
+                          Открыть профиль и информацию в этом же окне
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  </button>
 
                   <div className={styles.threadStatusRow}>
                     <StatusPill
@@ -2290,6 +2543,7 @@ export function ChatsPage() {
                   </form>
                 </section>
               </div>
+              )
             )}
           </div>
         </section>
@@ -2641,6 +2895,37 @@ function describePresenceStatus(presenceState: DirectChatPresenceState | null): 
   }
 
   return `В сети · ${formatDateTime(presenceState.peerPresence.heartbeatAt)}`;
+}
+
+function describeDirectProfileSummary(profile: Profile | null): string {
+  if (profile === null) {
+    return "Карточка контакта использует уже доступные данные чата и догружает people snapshot только при открытии info mode.";
+  }
+  if (profile.statusText && profile.statusText.trim() !== "") {
+    return profile.statusText;
+  }
+  if (profile.bio && profile.bio.trim() !== "") {
+    return profile.bio;
+  }
+
+  return describeDirectProfileLocation(profile);
+}
+
+function describeDirectProfileLocation(profile: Profile | null): string {
+  if (profile === null) {
+    return "Локация не загружена";
+  }
+  if (profile.city && profile.country) {
+    return `${profile.city}, ${profile.country}`;
+  }
+  if (profile.city) {
+    return profile.city;
+  }
+  if (profile.country) {
+    return profile.country;
+  }
+
+  return "Не указана";
 }
 
 function describeOwnMessageReadLabel(

@@ -259,7 +259,8 @@
 .threadHero,
 .callCard,
 .composerCard,
-.messagesPanel {
+.messagesPanel,
+.profilePanel {
   display: grid;
   gap: 1rem;
   border: 1px solid var(--color-border-soft);
@@ -272,8 +273,18 @@
 .threadHero,
 .callCard,
 .messagesPanel,
-.composerCard {
+.composerCard,
+.profilePanel {
   padding: 1.15rem;
+}
+
+.threadIdentityButton {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
 .threadIdentity {
@@ -293,6 +304,65 @@
 
 .threadDescription {
   margin-top: 0.35rem;
+}
+
+.identityActionHint {
+  margin: 0.55rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(18, 89, 146, 0.9);
+}
+
+.profileHero {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.profileActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.profileFactsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.85rem;
+}
+
+.profileFactCard {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid rgba(91, 132, 176, 0.22);
+  border-radius: 1.1rem;
+  background: rgba(246, 251, 255, 0.88);
+}
+
+.profileFactList,
+.profileFactList div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.profileFactList {
+  margin: 0;
+}
+
+.profileFactList dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(34, 77, 118, 0.74);
+}
+
+.profileFactList dd {
+  margin: 0;
+  color: rgba(3, 50, 82, 0.88);
 }
 
 .pinnedStrip {
@@ -639,7 +709,8 @@
   }
 
   .threadIdentity,
-  .chatItem {
+  .chatItem,
+  .profileHero {
     align-items: flex-start;
   }
 

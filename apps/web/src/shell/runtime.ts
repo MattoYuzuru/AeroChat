@@ -19,6 +19,7 @@ export type ShellWindowState =
   | "minimized"
   | "maximized"
   | "closed";
+export type ShellWindowContentMode = "thread" | "info";
 
 export interface ShellLaunchTarget {
   key: string;
@@ -45,6 +46,7 @@ export interface ShellWindow {
   title: string;
   routePath: string | null;
   target: ShellLaunchTarget | null;
+  contentMode: ShellWindowContentMode | null;
   state: ShellWindowState;
 }
 
@@ -82,6 +84,16 @@ export type ShellRuntimeAction =
   | {
       type: "restore";
       windowId: string;
+    }
+  | {
+      type: "sync_target";
+      app: ShellAppDefinition;
+      target?: ShellLaunchTarget | null;
+    }
+  | {
+      type: "set_content_mode";
+      windowId: string;
+      contentMode: ShellWindowContentMode;
     }
   | {
       type: "close";
@@ -132,6 +144,10 @@ export function shellRuntimeReducer(
       return maximizeShellWindow(state, action.windowId);
     case "restore":
       return restoreShellWindow(state, action.windowId);
+    case "sync_target":
+      return syncShellWindowTarget(state, action.app, action.target ?? null);
+    case "set_content_mode":
+      return setShellWindowContentMode(state, action.windowId, action.contentMode);
     case "close":
       return closeShellWindow(state, action.windowId);
     case "dismiss_notice":
@@ -160,6 +176,16 @@ export function listTaskbarShellWindows(
   return state.windows.filter((window) => window.state !== "closed");
 }
 
+export function getDefaultShellWindowContentMode(
+  appId: ShellAppId,
+): ShellWindowContentMode | null {
+  if (appId === "direct_chat" || appId === "group_chat") {
+    return "thread";
+  }
+
+  return null;
+}
+
 function launchShellWindow(
   state: ShellRuntimeState,
   app: ShellAppDefinition,
@@ -178,6 +204,7 @@ function launchShellWindow(
                 title: target?.title?.trim() || window.title,
                 routePath: target?.routePath ?? window.routePath,
                 target: target ?? window.target,
+                contentMode: getDefaultShellWindowContentMode(window.appId) ?? window.contentMode,
               }
             : window,
         ),
@@ -205,6 +232,7 @@ function launchShellWindow(
     title: target?.title?.trim() || app.title,
     routePath: target?.routePath ?? app.routePath,
     target,
+    contentMode: getDefaultShellWindowContentMode(app.appId),
     state: "focused",
   };
 
@@ -214,6 +242,32 @@ function launchShellWindow(
     activeWindowId: nextWindow.windowId,
     notice: null,
     nextWindowSequence: state.nextWindowSequence + 1,
+  };
+}
+
+function syncShellWindowTarget(
+  state: ShellRuntimeState,
+  app: ShellAppDefinition,
+  target: ShellLaunchTarget | null,
+): ShellRuntimeState {
+  const launchKey = buildShellLaunchKey(app, target);
+  const existingWindow = state.windows.find((window) => window.launchKey === launchKey);
+  if (!existingWindow) {
+    return state;
+  }
+
+  return {
+    ...state,
+    windows: state.windows.map((window) =>
+      window.launchKey === launchKey
+        ? {
+            ...window,
+            title: target?.title?.trim() || window.title,
+            routePath: target?.routePath ?? window.routePath,
+            target: target ?? window.target,
+          }
+        : window,
+    ),
   };
 }
 
@@ -318,6 +372,38 @@ function restoreShellWindow(
     },
     windowId,
   );
+}
+
+function setShellWindowContentMode(
+  state: ShellRuntimeState,
+  windowId: string,
+  contentMode: ShellWindowContentMode,
+): ShellRuntimeState {
+  let changed = false;
+  const windows = state.windows.map((window) => {
+    if (window.windowId !== windowId || window.contentMode === null) {
+      return window;
+    }
+
+    if (window.contentMode === contentMode) {
+      return window;
+    }
+
+    changed = true;
+    return {
+      ...window,
+      contentMode,
+    };
+  });
+
+  if (!changed) {
+    return state;
+  }
+
+  return {
+    ...state,
+    windows,
+  };
 }
 
 function closeShellWindow(
