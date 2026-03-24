@@ -2,13 +2,21 @@ import { describe, expect, it } from "vitest";
 import type { DirectChat, Group } from "../gateway/types";
 import type { ShellPreferencesStorageLike } from "./preferences";
 import {
+  addCustomFolderMemberReference,
+  createCustomFolderDesktopEntity,
+  createDesktopUnreadTargetMap,
   createInitialDesktopRegistryState,
+  deleteCustomFolderDesktopEntity,
+  getCustomFolderUnreadCount,
   hideDesktopEntity,
-  listDesktopOverflowEntities,
+  listCustomFolderDesktopEntities,
+  listCustomFolderMemberEntryRecords,
   listDesktopEntitiesForSurface,
+  listDesktopOverflowEntities,
   listDesktopOverflowSummaries,
   MAX_VISIBLE_DESKTOP_ENTRIES,
   readDesktopRegistryState,
+  renameCustomFolderDesktopEntity,
   showDesktopEntityOnDesktop,
   syncDirectChatDesktopEntities,
   syncGroupChatDesktopEntities,
@@ -32,10 +40,7 @@ describe("desktop registry", () => {
   it("always restores mandatory system apps on desktop", () => {
     const storage = new MemoryStorage();
 
-    writeDesktopRegistryState(storage, {
-      entries: [],
-      nextOrder: 1,
-    });
+    writeDesktopRegistryState(storage, createInitialDesktopRegistryState());
 
     const state = readDesktopRegistryState(storage);
     const visibleTitles = listDesktopEntitiesForSurface(state).map((entry) => entry.title);
@@ -120,7 +125,9 @@ describe("desktop registry", () => {
     const overflowEntry = listDesktopOverflowEntities(state, "contacts")[0];
     state = showDesktopEntityOnDesktop(state, overflowEntry!.id);
 
-    expect(listDesktopEntitiesForSurface(state).some((entry) => entry.id === overflowEntry!.id)).toBe(true);
+    expect(
+      listDesktopEntitiesForSurface(state).some((entry) => entry.id === overflowEntry!.id),
+    ).toBe(true);
     expect(listDesktopOverflowEntities(state, "contacts")).toHaveLength(5);
   });
 
@@ -140,12 +147,145 @@ describe("desktop registry", () => {
       state.entries.some((entry) => entry.kind === "group_chat" && entry.targetKey === "group-2"),
     ).toBe(true);
   });
+
+  it("creates, renames and deletes custom folders without deleting underlying targets", () => {
+    let state = createInitialDesktopRegistryState();
+
+    state = upsertDirectChatDesktopEntity(state, "chat-1", "Алиса");
+    state = createCustomFolderDesktopEntity(state, "Работа");
+    const folder = listCustomFolderDesktopEntities(state)[0]!;
+
+    state = addCustomFolderMemberReference(state, folder.folderId, {
+      kind: "direct_chat",
+      targetKey: "chat-1",
+    });
+    state = renameCustomFolderDesktopEntity(state, folder.folderId, "Фокус");
+
+    expect(listCustomFolderDesktopEntities(state)[0]?.title).toBe("Фокус");
+
+    state = deleteCustomFolderDesktopEntity(state, folder.folderId);
+
+    expect(listCustomFolderDesktopEntities(state)).toHaveLength(0);
+    expect(
+      state.entries.some((entry) => entry.kind === "direct_chat" && entry.targetKey === "chat-1"),
+    ).toBe(true);
+  });
+
+  it("persists custom folder membership across reload", () => {
+    const storage = new MemoryStorage();
+    let state = createInitialDesktopRegistryState();
+
+    state = upsertDirectChatDesktopEntity(state, "chat-1", "Алиса");
+    state = syncGroupChatDesktopEntities(state, [createGroup("group-1", "Design Team")]);
+    state = createCustomFolderDesktopEntity(state, "Работа");
+    const folder = listCustomFolderDesktopEntities(state)[0]!;
+
+    state = addCustomFolderMemberReference(state, folder.folderId, {
+      kind: "direct_chat",
+      targetKey: "chat-1",
+    });
+    state = addCustomFolderMemberReference(state, folder.folderId, {
+      kind: "group_chat",
+      targetKey: "group-1",
+    });
+
+    writeDesktopRegistryState(storage, state);
+    const restoredState = readDesktopRegistryState(storage);
+
+    expect(listCustomFolderDesktopEntities(restoredState)).toHaveLength(1);
+    expect(
+      listCustomFolderMemberEntryRecords(restoredState, folder.folderId).map(
+        (record) => record.entry.targetKey,
+      ),
+    ).toEqual(["chat-1", "group-1"]);
+  });
+
+  it("allows the same target to exist in multiple folders without duplicating underlying entities", () => {
+    let state = createInitialDesktopRegistryState();
+
+    state = upsertDirectChatDesktopEntity(state, "chat-1", "Алиса");
+    state = createCustomFolderDesktopEntity(state, "Работа");
+    state = createCustomFolderDesktopEntity(state, "Личное");
+    const [firstFolder, secondFolder] = listCustomFolderDesktopEntities(state);
+
+    state = addCustomFolderMemberReference(state, firstFolder!.folderId, {
+      kind: "direct_chat",
+      targetKey: "chat-1",
+    });
+    state = addCustomFolderMemberReference(state, secondFolder!.folderId, {
+      kind: "direct_chat",
+      targetKey: "chat-1",
+    });
+
+    expect(listCustomFolderMemberEntryRecords(state, firstFolder!.folderId)).toHaveLength(1);
+    expect(listCustomFolderMemberEntryRecords(state, secondFolder!.folderId)).toHaveLength(1);
+    expect(
+      state.entries.filter((entry) => entry.kind === "direct_chat" && entry.targetKey === "chat-1"),
+    ).toHaveLength(1);
+  });
+
+  it("counts unread by referenced chat targets instead of summing message counters", () => {
+    let state = createInitialDesktopRegistryState();
+
+    state = syncDirectChatDesktopEntities(
+      state,
+      [
+        createDirectChat("chat-1", "user-self", "Alice", {
+          unreadCount: 3,
+          encryptedUnreadCount: 0,
+        }),
+        createDirectChat("chat-2", "user-self", "Bob", {
+          unreadCount: 0,
+          encryptedUnreadCount: 0,
+        }),
+      ],
+      "user-self",
+    );
+    state = syncGroupChatDesktopEntities(state, [
+      createGroup("group-1", "Design Team", {
+        unreadCount: 0,
+        encryptedUnreadCount: 4,
+      }),
+    ]);
+    state = createCustomFolderDesktopEntity(state, "Unread");
+    const folder = listCustomFolderDesktopEntities(state)[0]!;
+
+    state = addCustomFolderMemberReference(state, folder.folderId, {
+      kind: "direct_chat",
+      targetKey: "chat-1",
+    });
+    state = addCustomFolderMemberReference(state, folder.folderId, {
+      kind: "direct_chat",
+      targetKey: "chat-2",
+    });
+    state = addCustomFolderMemberReference(state, folder.folderId, {
+      kind: "group_chat",
+      targetKey: "group-1",
+    });
+
+    const unreadMap = createDesktopUnreadTargetMap(
+      [
+        createDirectChat("chat-1", "user-self", "Alice", {
+          unreadCount: 3,
+          encryptedUnreadCount: 0,
+        }),
+        createDirectChat("chat-2", "user-self", "Bob", {
+          unreadCount: 0,
+          encryptedUnreadCount: 0,
+        }),
+      ],
+      [createGroup("group-1", "Design Team", { unreadCount: 0, encryptedUnreadCount: 4 })],
+    );
+
+    expect(getCustomFolderUnreadCount(state, folder.folderId, unreadMap)).toBe(2);
+  });
 });
 
 function createDirectChat(
   id: string,
   currentUserId: string,
   peerNickname: string,
+  overrides?: Partial<Pick<DirectChat, "unreadCount" | "encryptedUnreadCount">>,
 ): DirectChat {
   return {
     id,
@@ -166,14 +306,18 @@ function createDirectChat(
     ],
     pinnedMessageIds: [],
     encryptedPinnedMessageIds: [],
-    unreadCount: 0,
-    encryptedUnreadCount: 0,
+    unreadCount: overrides?.unreadCount ?? 0,
+    encryptedUnreadCount: overrides?.encryptedUnreadCount ?? 0,
     createdAt: "2026-03-24T10:00:00Z",
     updatedAt: "2026-03-24T10:00:00Z",
   };
 }
 
-function createGroup(id: string, name: string): Group {
+function createGroup(
+  id: string,
+  name: string,
+  overrides?: Partial<Pick<Group, "unreadCount" | "encryptedUnreadCount">>,
+): Group {
   return {
     id,
     name,
@@ -181,8 +325,8 @@ function createGroup(id: string, name: string): Group {
     selfRole: "member",
     memberCount: 4,
     encryptedPinnedMessageIds: [],
-    unreadCount: 0,
-    encryptedUnreadCount: 0,
+    unreadCount: overrides?.unreadCount ?? 0,
+    encryptedUnreadCount: overrides?.encryptedUnreadCount ?? 0,
     permissions: {
       canManageInviteLinks: false,
       creatableInviteRoles: [],

@@ -134,6 +134,36 @@ describe("shellRuntimeReducer", () => {
     expect(state.windows[0]?.state).toBe("focused");
   });
 
+  it("reuses the same explorer singleton window when opening a custom folder target", () => {
+    let state = createInitialShellRuntimeState();
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.explorer,
+      target: {
+        key: "explorer",
+        title: "Explorer",
+        routePath: "/app/explorer?section=folders",
+      },
+    });
+    const explorerWindowId = state.activeWindowId;
+
+    state = shellRuntimeReducer(state, {
+      type: "launch",
+      app: shellAppRegistry.explorer,
+      target: {
+        key: "explorer",
+        title: "Explorer · Работа",
+        routePath: "/app/explorer?folder=folder-1",
+      },
+    });
+
+    expect(state.windows).toHaveLength(1);
+    expect(state.windows[0]?.windowId).toBe(explorerWindowId);
+    expect(state.windows[0]?.routePath).toBe("/app/explorer?folder=folder-1");
+    expect(state.windows[0]?.title).toBe("Explorer · Работа");
+  });
+
   it("allows different singleton_per_target launch keys when runtime policy needs it", () => {
     let state = createInitialShellRuntimeState();
     const directChatApp: ShellAppDefinition = {

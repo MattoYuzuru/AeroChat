@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDirectChatRoutePath,
+  buildExplorerFolderRoutePath,
   buildExplorerRoutePath,
   buildFriendRequestsRoutePath,
   buildGroupChatRoutePath,
@@ -95,6 +96,18 @@ describe("resolveShellRouteEntry", () => {
       routePath: "/app/explorer?section=overflow",
     });
   });
+
+  it("maps explorer folder route to the same canonical singleton target", () => {
+    const resolved = resolveShellRouteEntry("/app/explorer", "?folder=folder-7");
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.app.appId).toBe("explorer");
+    expect(resolved?.target).toEqual({
+      key: "explorer",
+      title: "Explorer",
+      routePath: "/app/explorer?folder=folder-7",
+    });
+  });
 });
 
 describe("chat route builders", () => {
@@ -152,5 +165,16 @@ describe("chat route builders", () => {
     });
 
     expect(buildExplorerRoutePath(params)).toBe("/app/explorer?section=hidden");
+  });
+
+  it("builds explorer folder route and drops section query in favor of folder target", () => {
+    const params = new URLSearchParams({
+      section: "hidden",
+      from: "desktop",
+    });
+
+    expect(buildExplorerFolderRoutePath("folder-4", params)).toBe(
+      "/app/explorer?from=desktop&folder=folder-4",
+    );
   });
 });

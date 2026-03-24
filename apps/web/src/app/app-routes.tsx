@@ -170,6 +170,16 @@ export function buildExplorerRoutePath(
   return buildRoutePath("/app/explorer", params);
 }
 
+export function buildExplorerFolderRoutePath(
+  folderId: string,
+  searchParams?: URLSearchParams | null,
+): string {
+  const params = new URLSearchParams(searchParams ?? undefined);
+  params.delete("section");
+  params.set("folder", folderId);
+  return buildExplorerRoutePath(params);
+}
+
 export function buildPersonProfileRoutePath(
   userId: string,
   searchParams?: URLSearchParams | null,

@@ -5,10 +5,15 @@ const desktopRegistryStorageKey = "aerochat.shell.desktop-registry.v1";
 
 export const MAX_VISIBLE_DESKTOP_ENTRIES = 10;
 
-export type DesktopEntityKind = "system_app" | "direct_chat" | "group_chat";
+export type DesktopEntityKind =
+  | "system_app"
+  | "direct_chat"
+  | "group_chat"
+  | "custom_folder";
 export type DesktopEntityVisibility = "visible" | "hidden";
 export type DesktopEntityPlacement = "desktop" | "overflow";
-export type DesktopOverflowBucket = "contacts" | "groups" | null;
+export type DesktopOverflowBucket = "contacts" | "groups" | "folders" | null;
+export type DesktopFolderReferenceTargetKind = "direct_chat" | "group_chat";
 
 interface DesktopEntityBase {
   id: string;
@@ -38,14 +43,42 @@ export interface DesktopGroupChatEntity extends DesktopEntityBase {
   targetKey: string;
 }
 
+export interface DesktopCustomFolderEntity extends DesktopEntityBase {
+  kind: "custom_folder";
+  appId: "explorer";
+  targetKey: string;
+  folderId: string;
+}
+
 export type DesktopEntity =
   | DesktopSystemAppEntity
   | DesktopDirectChatEntity
-  | DesktopGroupChatEntity;
+  | DesktopGroupChatEntity
+  | DesktopCustomFolderEntity;
+
+export interface DesktopFolderReferenceTarget {
+  kind: DesktopFolderReferenceTargetKind;
+  targetKey: string;
+}
+
+export interface DesktopFolderMemberReference {
+  id: string;
+  folderId: string;
+  target: DesktopFolderReferenceTarget;
+  order: number;
+}
+
+export interface DesktopFolderMemberEntryRecord {
+  reference: DesktopFolderMemberReference;
+  entry: DesktopDirectChatEntity | DesktopGroupChatEntity;
+}
 
 export interface DesktopRegistryState {
   entries: DesktopEntity[];
+  folderMembers: DesktopFolderMemberReference[];
   nextOrder: number;
+  nextFolderSequence: number;
+  nextFolderMemberSequence: number;
 }
 
 export interface DesktopOverflowSummary {
@@ -60,6 +93,8 @@ export type DesktopSystemAppId =
   | "explorer"
   | "friend_requests"
   | "settings";
+
+export type DesktopUnreadTargetMap = ReadonlyMap<string, boolean>;
 
 interface DesktopSourceEntry {
   id: string;
@@ -88,8 +123,13 @@ const mandatorySystemEntries: readonly {
 
 export function createInitialDesktopRegistryState(): DesktopRegistryState {
   return normalizeDesktopRegistryState({
-    entries: mandatorySystemEntries.map((entry) => createSystemEntity(entry.appId, entry.title, entry.order)),
+    entries: mandatorySystemEntries.map((entry) =>
+      createSystemEntity(entry.appId, entry.title, entry.order),
+    ),
+    folderMembers: [],
     nextOrder: mandatorySystemEntries.length + 1,
+    nextFolderSequence: 1,
+    nextFolderMemberSequence: 1,
   });
 }
 
@@ -108,20 +148,29 @@ export function readDesktopRegistryState(
 
     const parsed = JSON.parse(raw) as {
       entries?: unknown;
+      folderMembers?: unknown;
       nextOrder?: unknown;
+      nextFolderSequence?: unknown;
+      nextFolderMemberSequence?: unknown;
     };
 
     const entries = Array.isArray(parsed.entries)
-      ? parsed.entries.map(normalizeDesktopEntity).filter((entry): entry is DesktopEntity => entry !== null)
+      ? parsed.entries
+          .map(normalizeDesktopEntity)
+          .filter((entry): entry is DesktopEntity => entry !== null)
       : [];
-    const nextOrder =
-      typeof parsed.nextOrder === "number" && Number.isFinite(parsed.nextOrder)
-        ? parsed.nextOrder
-        : mandatorySystemEntries.length + 1;
+    const folderMembers = Array.isArray(parsed.folderMembers)
+      ? parsed.folderMembers
+          .map(normalizeDesktopFolderMemberReference)
+          .filter((reference): reference is DesktopFolderMemberReference => reference !== null)
+      : [];
 
     return normalizeDesktopRegistryState({
       entries,
-      nextOrder,
+      folderMembers,
+      nextOrder: readPositiveNumber(parsed.nextOrder, mandatorySystemEntries.length + 1),
+      nextFolderSequence: readPositiveNumber(parsed.nextFolderSequence, 1),
+      nextFolderMemberSequence: readPositiveNumber(parsed.nextFolderMemberSequence, 1),
     });
   } catch {
     return createInitialDesktopRegistryState();
@@ -179,6 +228,125 @@ export function upsertGroupChatDesktopEntity(
   });
 }
 
+export function createCustomFolderDesktopEntity(
+  state: DesktopRegistryState,
+  name: string,
+): DesktopRegistryState {
+  const folderId = `folder-${state.nextFolderSequence}`;
+
+  return normalizeDesktopRegistryState({
+    entries: [
+      ...state.entries,
+      {
+        id: buildDesktopEntityId("custom_folder", folderId),
+        kind: "custom_folder",
+        appId: "explorer",
+        folderId,
+        targetKey: folderId,
+        title: normalizeDesktopEntityTitle(name, "Новая папка"),
+        visibility: "visible",
+        placement: "desktop",
+        overflowBucket: null,
+        order: resolveNextCreatedFolderOrder(state),
+      },
+    ],
+    folderMembers: state.folderMembers,
+    nextOrder: state.nextOrder,
+    nextFolderSequence: state.nextFolderSequence + 1,
+    nextFolderMemberSequence: state.nextFolderMemberSequence,
+  });
+}
+
+export function renameCustomFolderDesktopEntity(
+  state: DesktopRegistryState,
+  folderId: string,
+  name: string,
+): DesktopRegistryState {
+  const nextEntries = state.entries.map((entry) =>
+    entry.kind !== "custom_folder" || entry.folderId !== folderId
+      ? entry
+      : {
+          ...entry,
+          title: normalizeDesktopEntityTitle(name, entry.title),
+        },
+  );
+
+  return normalizeDesktopRegistryState({
+    ...state,
+    entries: nextEntries,
+  });
+}
+
+export function deleteCustomFolderDesktopEntity(
+  state: DesktopRegistryState,
+  folderId: string,
+): DesktopRegistryState {
+  return normalizeDesktopRegistryState({
+    entries: state.entries.filter(
+      (entry) => entry.kind !== "custom_folder" || entry.folderId !== folderId,
+    ),
+    folderMembers: state.folderMembers.filter((reference) => reference.folderId !== folderId),
+    nextOrder: state.nextOrder,
+    nextFolderSequence: state.nextFolderSequence,
+    nextFolderMemberSequence: state.nextFolderMemberSequence,
+  });
+}
+
+export function addCustomFolderMemberReference(
+  state: DesktopRegistryState,
+  folderId: string,
+  target: DesktopFolderReferenceTarget,
+): DesktopRegistryState {
+  const folder = getCustomFolderDesktopEntity(state, folderId);
+  if (folder === null) {
+    return state;
+  }
+
+  const normalizedTarget = normalizeFolderReferenceTarget(target);
+  if (normalizedTarget === null || resolveDesktopTargetEntry(state, normalizedTarget) === null) {
+    return state;
+  }
+
+  const existingReference = state.folderMembers.find(
+    (reference) =>
+      reference.folderId === folder.folderId &&
+      reference.target.kind === normalizedTarget.kind &&
+      reference.target.targetKey === normalizedTarget.targetKey,
+  );
+  if (existingReference) {
+    return state;
+  }
+
+  return normalizeDesktopRegistryState({
+    entries: state.entries,
+    folderMembers: [
+      ...state.folderMembers,
+      {
+        id: `folder-member-${state.nextFolderMemberSequence}`,
+        folderId: folder.folderId,
+        target: normalizedTarget,
+        order: state.nextFolderMemberSequence,
+      },
+    ],
+    nextOrder: state.nextOrder,
+    nextFolderSequence: state.nextFolderSequence,
+    nextFolderMemberSequence: state.nextFolderMemberSequence + 1,
+  });
+}
+
+export function removeCustomFolderMemberReference(
+  state: DesktopRegistryState,
+  referenceId: string,
+): DesktopRegistryState {
+  return normalizeDesktopRegistryState({
+    entries: state.entries,
+    folderMembers: state.folderMembers.filter((reference) => reference.id !== referenceId),
+    nextOrder: state.nextOrder,
+    nextFolderSequence: state.nextFolderSequence,
+    nextFolderMemberSequence: state.nextFolderMemberSequence,
+  });
+}
+
 export function hideDesktopEntity(
   state: DesktopRegistryState,
   entryId: string,
@@ -193,8 +361,8 @@ export function hideDesktopEntity(
   );
 
   return normalizeDesktopRegistryState({
+    ...state,
     entries: nextEntries,
-    nextOrder: state.nextOrder,
   });
 }
 
@@ -221,8 +389,8 @@ export function showDesktopEntityOnDesktop(
   );
 
   return normalizeDesktopRegistryState({
+    ...state,
     entries: nextEntries,
-    nextOrder: state.nextOrder,
   });
 }
 
@@ -308,10 +476,10 @@ export function listDesktopOverflowEntities(
 export function listDesktopOverflowSummaries(
   state: DesktopRegistryState,
 ): DesktopOverflowSummary[] {
-  return (["contacts", "groups"] as const)
+  return (["contacts", "groups", "folders"] as const)
     .map((bucket) => ({
       bucket,
-      title: bucket === "contacts" ? "Контакты" : "Группы",
+      title: describeOverflowBucket(bucket),
       count: state.entries.filter(
         (entry) =>
           entry.visibility === "visible" &&
@@ -320,6 +488,108 @@ export function listDesktopOverflowSummaries(
       ).length,
     }))
     .filter((entry) => entry.count > 0);
+}
+
+export function listCustomFolderDesktopEntities(
+  state: DesktopRegistryState,
+): DesktopCustomFolderEntity[] {
+  return state.entries
+    .filter((entry): entry is DesktopCustomFolderEntity => entry.kind === "custom_folder")
+    .sort(compareDesktopEntities);
+}
+
+export function getCustomFolderDesktopEntity(
+  state: DesktopRegistryState,
+  folderId: string,
+): DesktopCustomFolderEntity | null {
+  return (
+    state.entries.find(
+      (entry): entry is DesktopCustomFolderEntity =>
+        entry.kind === "custom_folder" && entry.folderId === folderId,
+    ) ?? null
+  );
+}
+
+export function listCustomFolderMemberReferences(
+  state: DesktopRegistryState,
+  folderId: string,
+): DesktopFolderMemberReference[] {
+  return state.folderMembers
+    .filter((reference) => reference.folderId === folderId)
+    .sort(compareFolderMemberReferences);
+}
+
+export function listCustomFolderMemberEntryRecords(
+  state: DesktopRegistryState,
+  folderId: string,
+): DesktopFolderMemberEntryRecord[] {
+  return listCustomFolderMemberReferences(state, folderId)
+    .map((reference) => {
+      const entry = resolveDesktopTargetEntry(state, reference.target);
+      if (entry === null) {
+        return null;
+      }
+
+      return {
+        reference,
+        entry,
+      };
+    })
+    .filter((record): record is DesktopFolderMemberEntryRecord => record !== null);
+}
+
+export function createDesktopUnreadTargetMap(
+  chats: DirectChat[],
+  groups: Group[],
+): DesktopUnreadTargetMap {
+  const unreadByTarget = new Map<string, boolean>();
+
+  for (const chat of chats) {
+    unreadByTarget.set(
+      buildDesktopTargetReferenceKey({
+        kind: "direct_chat",
+        targetKey: chat.id,
+      }),
+      chat.unreadCount + chat.encryptedUnreadCount > 0,
+    );
+  }
+
+  for (const group of groups) {
+    unreadByTarget.set(
+      buildDesktopTargetReferenceKey({
+        kind: "group_chat",
+        targetKey: group.id,
+      }),
+      group.unreadCount + group.encryptedUnreadCount > 0,
+    );
+  }
+
+  return unreadByTarget;
+}
+
+export function hasCustomFolderUnreadTargets(
+  state: DesktopRegistryState,
+  folderId: string,
+  unreadByTarget: DesktopUnreadTargetMap,
+): boolean {
+  return getCustomFolderUnreadCount(state, folderId, unreadByTarget) > 0;
+}
+
+export function getCustomFolderUnreadCount(
+  state: DesktopRegistryState,
+  folderId: string,
+  unreadByTarget: DesktopUnreadTargetMap,
+): number {
+  return listCustomFolderMemberReferences(state, folderId).reduce((count, reference) => {
+    return hasDesktopTargetUnread(unreadByTarget, reference.target) ? count + 1 : count;
+  }, 0);
+}
+
+export function hasDesktopTargetUnread(
+  unreadByTarget: DesktopUnreadTargetMap,
+  target: DesktopFolderReferenceTarget,
+): boolean {
+  return unreadByTarget.get(buildDesktopTargetReferenceKey(target)) === true;
 }
 
 export function isDesktopEntityHideable(entry: DesktopEntity): boolean {
@@ -332,10 +602,7 @@ export function describeDirectChatDesktopTitle(
 ): string {
   const peer =
     chat.participants.find((participant) => participant.id !== currentUserId) ?? null;
-  return normalizeDesktopEntityTitle(
-    peer?.nickname ?? peer?.login ?? "",
-    "Личный чат",
-  );
+  return normalizeDesktopEntityTitle(peer?.nickname ?? peer?.login ?? "", "Личный чат");
 }
 
 function syncSourceEntities(
@@ -366,7 +633,8 @@ function upsertEntity(
   state: DesktopRegistryState,
   entry: DesktopDirectChatEntity | DesktopGroupChatEntity,
 ): DesktopRegistryState {
-  const existingEntry = state.entries.find((currentEntry) => currentEntry.id === entry.id) ?? null;
+  const existingEntry =
+    state.entries.find((currentEntry) => currentEntry.id === entry.id) ?? null;
   const nextEntries =
     existingEntry === null
       ? [...state.entries, entry]
@@ -381,7 +649,10 @@ function upsertEntity(
 
   return normalizeDesktopRegistryState({
     entries: nextEntries,
+    folderMembers: state.folderMembers,
     nextOrder: existingEntry === null ? state.nextOrder + 1 : state.nextOrder,
+    nextFolderSequence: state.nextFolderSequence,
+    nextFolderMemberSequence: state.nextFolderMemberSequence,
   });
 }
 
@@ -391,7 +662,10 @@ function removeDesktopEntity(
 ): DesktopRegistryState {
   return normalizeDesktopRegistryState({
     entries: state.entries.filter((entry) => entry.id !== entryId),
+    folderMembers: state.folderMembers,
     nextOrder: state.nextOrder,
+    nextFolderSequence: state.nextFolderSequence,
+    nextFolderMemberSequence: state.nextFolderMemberSequence,
   });
 }
 
@@ -413,22 +687,16 @@ function normalizeDesktopRegistryState(
 
   const systemEntries: DesktopSystemAppEntity[] = mandatorySystemEntries.map((entry) => {
     const currentEntry =
-      byId.get(buildDesktopEntityId("system_app", entry.appId)) ?? createSystemEntity(entry.appId, entry.title, entry.order);
-    return createSystemEntity(
-      entry.appId,
-      currentEntry.title,
-      entry.order,
-    );
+      byId.get(buildDesktopEntityId("system_app", entry.appId)) ??
+      createSystemEntity(entry.appId, entry.title, entry.order);
+    return createSystemEntity(entry.appId, currentEntry.title, entry.order);
   });
 
   const dynamicEntries = [...byId.values()]
     .filter((entry) => entry.kind !== "system_app")
     .sort(compareDesktopEntities);
 
-  const availableDesktopSlots = Math.max(
-    0,
-    MAX_VISIBLE_DESKTOP_ENTRIES - systemEntries.length,
-  );
+  const availableDesktopSlots = Math.max(0, MAX_VISIBLE_DESKTOP_ENTRIES - systemEntries.length);
   let usedDesktopSlots = 0;
 
   const normalizedDynamicEntries: DesktopEntity[] = dynamicEntries.map((entry): DesktopEntity => {
@@ -444,15 +712,75 @@ function normalizeDesktopRegistryState(
     return placeDynamicEntryOnOverflow(entry);
   });
 
+  const validFolderIds = new Set(
+    normalizedDynamicEntries
+      .filter((entry): entry is DesktopCustomFolderEntity => entry.kind === "custom_folder")
+      .map((entry) => entry.folderId),
+  );
+  const validTargetKeys = new Set(
+    normalizedDynamicEntries
+      .filter(
+        (entry): entry is DesktopDirectChatEntity | DesktopGroupChatEntity =>
+          entry.kind === "direct_chat" || entry.kind === "group_chat",
+      )
+      .map((entry) =>
+        buildDesktopTargetReferenceKey({
+          kind: entry.kind,
+          targetKey: entry.targetKey,
+        }),
+      ),
+  );
+
+  const referenceByIdentity = new Map<string, DesktopFolderMemberReference>();
+  for (const reference of [...input.folderMembers].sort(compareFolderMemberReferences)) {
+    if (!validFolderIds.has(reference.folderId)) {
+      continue;
+    }
+
+    const normalizedTarget = normalizeFolderReferenceTarget(reference.target);
+    if (
+      normalizedTarget === null ||
+      !validTargetKeys.has(buildDesktopTargetReferenceKey(normalizedTarget))
+    ) {
+      continue;
+    }
+
+    const identity = `${reference.folderId}:${normalizedTarget.kind}:${normalizedTarget.targetKey}`;
+    if (referenceByIdentity.has(identity)) {
+      continue;
+    }
+
+    referenceByIdentity.set(identity, {
+      ...reference,
+      target: normalizedTarget,
+    });
+  }
+
+  const folderMembers = [...referenceByIdentity.values()].sort(compareFolderMemberReferences);
   const nextOrder = Math.max(
-    input.nextOrder,
+    readPositiveNumber(input.nextOrder, mandatorySystemEntries.length + 1),
     mandatorySystemEntries.length + 1,
     ...normalizedDynamicEntries.map((entry) => entry.order + 1),
   );
 
   return {
     entries: [...systemEntries, ...normalizedDynamicEntries],
+    folderMembers,
     nextOrder,
+    nextFolderSequence: Math.max(
+      readPositiveNumber(input.nextFolderSequence, 1),
+      listCustomFolderDesktopEntities({
+        entries: [...systemEntries, ...normalizedDynamicEntries],
+        folderMembers,
+        nextOrder,
+        nextFolderSequence: 1,
+        nextFolderMemberSequence: 1,
+      }).length + 1,
+    ),
+    nextFolderMemberSequence: Math.max(
+      readPositiveNumber(input.nextFolderMemberSequence, 1),
+      ...folderMembers.map((reference) => reference.order + 1),
+    ),
   };
 }
 
@@ -470,25 +798,27 @@ function resolvePromotedDesktopOrder(
   return Math.min(...dynamicEntries.map((entry) => entry.order)) - 1;
 }
 
-function normalizeHiddenDynamicEntry(
-  entry: DesktopDirectChatEntity | DesktopGroupChatEntity,
-): DesktopDirectChatEntity | DesktopGroupChatEntity {
-  if (entry.kind === "direct_chat") {
-    return {
-      ...entry,
-      overflowBucket: entry.overflowBucket ?? "contacts",
-    };
+function resolveNextCreatedFolderOrder(state: DesktopRegistryState): number {
+  const dynamicEntries = state.entries.filter((entry) => entry.kind !== "system_app");
+  if (dynamicEntries.length === 0) {
+    return mandatorySystemEntries.length + 1;
   }
 
+  return Math.min(...dynamicEntries.map((entry) => entry.order)) - 1;
+}
+
+function normalizeHiddenDynamicEntry(
+  entry: DesktopDirectChatEntity | DesktopGroupChatEntity | DesktopCustomFolderEntity,
+): DesktopDirectChatEntity | DesktopGroupChatEntity | DesktopCustomFolderEntity {
   return {
     ...entry,
-    overflowBucket: entry.overflowBucket ?? "groups",
+    overflowBucket: describeDefaultOverflowBucket(entry.kind),
   };
 }
 
 function placeDynamicEntryOnDesktop(
-  entry: DesktopDirectChatEntity | DesktopGroupChatEntity,
-): DesktopDirectChatEntity | DesktopGroupChatEntity {
+  entry: DesktopDirectChatEntity | DesktopGroupChatEntity | DesktopCustomFolderEntity,
+): DesktopDirectChatEntity | DesktopGroupChatEntity | DesktopCustomFolderEntity {
   return {
     ...entry,
     placement: "desktop",
@@ -497,24 +827,39 @@ function placeDynamicEntryOnDesktop(
 }
 
 function placeDynamicEntryOnOverflow(
-  entry: DesktopDirectChatEntity | DesktopGroupChatEntity,
-): DesktopDirectChatEntity | DesktopGroupChatEntity {
-  if (entry.kind === "direct_chat") {
-    return {
-      ...entry,
-      placement: "overflow",
-      overflowBucket: "contacts",
-    };
-  }
-
+  entry: DesktopDirectChatEntity | DesktopGroupChatEntity | DesktopCustomFolderEntity,
+): DesktopDirectChatEntity | DesktopGroupChatEntity | DesktopCustomFolderEntity {
   return {
     ...entry,
     placement: "overflow",
-    overflowBucket: "groups",
+    overflowBucket: describeDefaultOverflowBucket(entry.kind),
   };
 }
 
+function resolveDesktopTargetEntry(
+  state: DesktopRegistryState,
+  target: DesktopFolderReferenceTarget,
+): DesktopDirectChatEntity | DesktopGroupChatEntity | null {
+  return (
+    state.entries.find(
+      (entry): entry is DesktopDirectChatEntity | DesktopGroupChatEntity =>
+        entry.kind === target.kind && entry.targetKey === target.targetKey,
+    ) ?? null
+  );
+}
+
 function compareDesktopEntities(left: DesktopEntity, right: DesktopEntity): number {
+  if (left.order === right.order) {
+    return left.id.localeCompare(right.id);
+  }
+
+  return left.order - right.order;
+}
+
+function compareFolderMemberReferences(
+  left: DesktopFolderMemberReference,
+  right: DesktopFolderMemberReference,
+): number {
   if (left.order === right.order) {
     return left.id.localeCompare(right.id);
   }
@@ -538,8 +883,7 @@ function normalizeDesktopEntity(
   const id = typeof value.id === "string" ? value.id : "";
   const targetKey = typeof value.targetKey === "string" ? value.targetKey : "";
   const title = typeof value.title === "string" ? value.title : "";
-  const order =
-    typeof value.order === "number" && Number.isFinite(value.order) ? value.order : 0;
+  const order = readPositiveNumber(value.order, 0);
   const visibility = value.visibility === "hidden" ? "hidden" : "visible";
   const placement = value.placement === "overflow" ? "overflow" : "desktop";
   const overflowBucket = readDesktopOverflowBucket(value.overflowBucket);
@@ -551,8 +895,7 @@ function normalizeDesktopEntity(
     }
 
     return {
-      id:
-        id === "" ? buildDesktopEntityId("system_app", appId) : id,
+      id: id === "" ? buildDesktopEntityId("system_app", appId) : id,
       kind,
       appId,
       targetKey: appId,
@@ -582,16 +925,84 @@ function normalizeDesktopEntity(
     };
   }
 
+  if (kind === "group_chat") {
+    return {
+      id: id === "" ? buildDesktopEntityId(kind, targetKey) : id,
+      kind,
+      appId: "group_chat",
+      targetKey,
+      title: normalizeDesktopEntityTitle(title, "Группа"),
+      visibility,
+      placement,
+      overflowBucket,
+      order,
+    };
+  }
+
+  const folderId =
+    typeof (value as { folderId?: unknown }).folderId === "string"
+      ? ((value as { folderId?: string }).folderId ?? "")
+      : targetKey;
+
+  if (folderId === "") {
+    return null;
+  }
+
   return {
-    id: id === "" ? buildDesktopEntityId(kind, targetKey) : id,
+    id: id === "" ? buildDesktopEntityId(kind, folderId) : id,
     kind,
-    appId: "group_chat",
-    targetKey,
-    title: normalizeDesktopEntityTitle(title, "Группа"),
+    appId: "explorer",
+    folderId,
+    targetKey: folderId,
+    title: normalizeDesktopEntityTitle(title, "Папка"),
     visibility,
     placement,
     overflowBucket,
     order,
+  };
+}
+
+function normalizeDesktopFolderMemberReference(
+  input: unknown,
+): DesktopFolderMemberReference | null {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const value = input as Partial<DesktopFolderMemberReference>;
+  const id = typeof value.id === "string" ? value.id : "";
+  const folderId = typeof value.folderId === "string" ? value.folderId : "";
+  const target = normalizeFolderReferenceTarget(value.target);
+  if (id === "" || folderId === "" || target === null) {
+    return null;
+  }
+
+  return {
+    id,
+    folderId,
+    target,
+    order: readPositiveNumber(value.order, 0),
+  };
+}
+
+function normalizeFolderReferenceTarget(
+  input: unknown,
+): DesktopFolderReferenceTarget | null {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const value = input as Partial<DesktopFolderReferenceTarget>;
+  const kind =
+    value.kind === "direct_chat" || value.kind === "group_chat" ? value.kind : null;
+  const targetKey = typeof value.targetKey === "string" ? value.targetKey.trim() : "";
+  if (kind === null || targetKey === "") {
+    return null;
+  }
+
+  return {
+    kind,
+    targetKey,
   };
 }
 
@@ -620,13 +1031,20 @@ function buildDesktopEntityId(
   return `${kind}:${targetKey}`;
 }
 
+function buildDesktopTargetReferenceKey(target: DesktopFolderReferenceTarget): string {
+  return `${target.kind}:${target.targetKey}`;
+}
+
 function normalizeDesktopEntityTitle(title: string, fallbackTitle: string): string {
   const normalizedTitle = title.trim();
   return normalizedTitle === "" ? fallbackTitle : normalizedTitle;
 }
 
 function readDesktopEntityKind(value: unknown): DesktopEntityKind | null {
-  return value === "system_app" || value === "direct_chat" || value === "group_chat"
+  return value === "system_app" ||
+    value === "direct_chat" ||
+    value === "group_chat" ||
+    value === "custom_folder"
     ? value
     : null;
 }
@@ -642,9 +1060,41 @@ function readSystemAppId(value: unknown): DesktopSystemAppId | null {
 }
 
 function readDesktopOverflowBucket(value: unknown): DesktopOverflowBucket {
-  if (value === "contacts" || value === "groups") {
+  if (value === "contacts" || value === "groups" || value === "folders") {
     return value;
   }
 
   return null;
+}
+
+function readPositiveNumber(value: unknown, fallbackValue: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallbackValue;
+}
+
+function describeDefaultOverflowBucket(
+  kind: Exclude<DesktopEntityKind, "system_app">,
+): Exclude<DesktopOverflowBucket, null> {
+  if (kind === "direct_chat") {
+    return "contacts";
+  }
+
+  if (kind === "group_chat") {
+    return "groups";
+  }
+
+  return "folders";
+}
+
+function describeOverflowBucket(
+  bucket: Exclude<DesktopOverflowBucket, null>,
+): string {
+  if (bucket === "contacts") {
+    return "Контакты";
+  }
+
+  if (bucket === "groups") {
+    return "Группы";
+  }
+
+  return "Папки";
 }

@@ -8,6 +8,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { getAuthErrorMessage, useAuth } from "../auth/useAuth";
 import {
   buildDirectChatShellTarget,
+  buildExplorerFolderRoutePath,
   buildGroupChatShellTarget,
   buildPersonProfileShellTarget,
   isRouteBackedShellAppId,
@@ -17,18 +18,27 @@ import {
 } from "../app/app-routes";
 import { gatewayClient } from "../gateway/runtime";
 import { parseDirectChatRealtimeEvent } from "../chats/realtime";
+import type { DirectChat, Group } from "../gateway/types";
 import { parseGroupRealtimeEvent } from "../groups/realtime";
 import { subscribeRealtimeEnvelopes } from "../realtime/events";
 import { selectVisibleDirectCallSurfaceEntry } from "../rtc/awareness";
 import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import { DesktopShellHostContext } from "./context";
 import {
+  addCustomFolderMemberReference,
+  createCustomFolderDesktopEntity,
+  createDesktopUnreadTargetMap,
+  deleteCustomFolderDesktopEntity,
   describeDirectChatDesktopTitle,
+  getCustomFolderDesktopEntity,
+  getCustomFolderUnreadCount,
   hideDesktopEntity,
   isDesktopEntityHideable,
   listDesktopEntitiesForSurface,
   listDesktopOverflowSummaries,
+  removeCustomFolderMemberReference,
   readDesktopRegistryState,
+  renameCustomFolderDesktopEntity,
   removeGroupChatDesktopEntity,
   showDesktopEntityOnDesktop,
   syncDirectChatDesktopEntities,
@@ -36,6 +46,7 @@ import {
   upsertDirectChatDesktopEntity,
   upsertGroupChatDesktopEntity,
   writeDesktopRegistryState,
+  type DesktopFolderReferenceTarget,
   type DesktopEntity,
 } from "./desktop-registry";
 import { getBrowserShellPreferencesStorage } from "./preferences";
@@ -90,6 +101,8 @@ export function DesktopShell({
   const [desktopRegistryState, setDesktopRegistryState] = useState(() =>
     readDesktopRegistryState(storage),
   );
+  const [liveDirectChats, setLiveDirectChats] = useState<DirectChat[]>([]);
+  const [liveGroups, setLiveGroups] = useState<Group[]>([]);
   const [selectedDesktopEntryId, setSelectedDesktopEntryId] = useState<string | null>(null);
   const [isStartOpen, setIsStartOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
@@ -150,6 +163,10 @@ export function DesktopShell({
   }, [desktopRegistryState, storage]);
 
   const activeWindow = selectActiveShellWindow(runtimeState);
+  const desktopUnreadTargetMap = useMemo(
+    () => createDesktopUnreadTargetMap(liveDirectChats, liveGroups),
+    [liveDirectChats, liveGroups],
+  );
 
   useEffect(() => {
     const desiredPath = activeWindow?.routePath ?? "/app";
@@ -178,6 +195,8 @@ export function DesktopShell({
           return;
         }
 
+        setLiveDirectChats(directChats);
+        setLiveGroups(groups);
         setDesktopRegistryState((currentState) =>
           syncGroupChatDesktopEntities(
             syncDirectChatDesktopEntities(currentState, directChats, state.profile.id),
@@ -202,11 +221,24 @@ export function DesktopShell({
     return subscribeRealtimeEnvelopes((envelope) => {
       const directEvent = parseDirectChatRealtimeEvent(envelope);
       if (directEvent?.type === "direct_chat.message.updated") {
+        setLiveDirectChats((currentChats) => upsertLiveDirectChat(currentChats, directEvent.chat));
         setDesktopRegistryState((currentState) =>
           upsertDirectChatDesktopEntity(
             currentState,
             directEvent.chat.id,
             describeDirectChatDesktopTitle(directEvent.chat, state.profile.id),
+          ),
+        );
+        return;
+      }
+
+      if (directEvent?.type === "direct_chat.read.updated") {
+        setLiveDirectChats((currentChats) =>
+          patchLiveDirectChatUnread(
+            currentChats,
+            directEvent.chatId,
+            directEvent.unreadCount,
+            directEvent.encryptedUnreadCount,
           ),
         );
         return;
@@ -218,6 +250,7 @@ export function DesktopShell({
       }
 
       if (groupEvent.type === "group.message.updated") {
+        setLiveGroups((currentGroups) => upsertLiveGroup(currentGroups, groupEvent.group));
         setDesktopRegistryState((currentState) =>
           upsertGroupChatDesktopEntity(
             currentState,
@@ -228,8 +261,23 @@ export function DesktopShell({
         return;
       }
 
+      if (groupEvent.type === "group.read.updated") {
+        setLiveGroups((currentGroups) =>
+          patchLiveGroupUnread(
+            currentGroups,
+            groupEvent.groupId,
+            groupEvent.unreadCount,
+            groupEvent.encryptedUnreadCount,
+          ),
+        );
+        return;
+      }
+
       if (groupEvent.type === "group.membership.updated") {
         if (groupEvent.group === null || groupEvent.selfMember === null) {
+          setLiveGroups((currentGroups) =>
+            currentGroups.filter((group) => group.id !== groupEvent.groupId),
+          );
           setDesktopRegistryState((currentState) =>
             removeGroupChatDesktopEntity(currentState, groupEvent.groupId),
           );
@@ -237,6 +285,7 @@ export function DesktopShell({
         }
 
         const nextGroup = groupEvent.group;
+        setLiveGroups((currentGroups) => upsertLiveGroup(currentGroups, nextGroup));
         setDesktopRegistryState((currentState) =>
           upsertGroupChatDesktopEntity(
             currentState,
@@ -249,6 +298,7 @@ export function DesktopShell({
 
       if ("group" in groupEvent && groupEvent.group !== null) {
         const nextGroup = groupEvent.group;
+        setLiveGroups((currentGroups) => upsertLiveGroup(currentGroups, nextGroup));
         setDesktopRegistryState((currentState) =>
           upsertGroupChatDesktopEntity(
             currentState,
@@ -352,6 +402,61 @@ export function DesktopShell({
     });
     navigate(target.routePath ?? "/app/groups");
     setIsStartOpen(false);
+  }
+
+  function openCustomFolder(folderId: string) {
+    const folder = getCustomFolderDesktopEntity(desktopRegistryState, folderId);
+    const routePath = buildExplorerFolderRoutePath(folderId);
+
+    dispatch({
+      type: "launch",
+      app: shellAppRegistry.explorer,
+      target: {
+        key: "explorer",
+        title: folder === null ? "Explorer" : `Explorer · ${folder.title}`,
+        routePath,
+      },
+    });
+    navigate(routePath);
+    setIsStartOpen(false);
+  }
+
+  function createCustomFolder(name: string): string {
+    const folderId = `folder-${desktopRegistryState.nextFolderSequence}`;
+    setDesktopRegistryState((currentState) =>
+      createCustomFolderDesktopEntity(currentState, name),
+    );
+    return folderId;
+  }
+
+  function renameCustomFolder(folderId: string, name: string) {
+    setDesktopRegistryState((currentState) =>
+      renameCustomFolderDesktopEntity(currentState, folderId, name),
+    );
+  }
+
+  function deleteCustomFolder(folderId: string) {
+    setDesktopRegistryState((currentState) =>
+      deleteCustomFolderDesktopEntity(currentState, folderId),
+    );
+    setSelectedDesktopEntryId((currentEntryId) =>
+      currentEntryId === `custom_folder:${folderId}` ? null : currentEntryId,
+    );
+  }
+
+  function addFolderMember(
+    folderId: string,
+    target: DesktopFolderReferenceTarget,
+  ) {
+    setDesktopRegistryState((currentState) =>
+      addCustomFolderMemberReference(currentState, folderId, target),
+    );
+  }
+
+  function removeFolderMember(referenceId: string) {
+    setDesktopRegistryState((currentState) =>
+      removeCustomFolderMemberReference(currentState, referenceId),
+    );
   }
 
   function openPersonProfile(options: {
@@ -475,6 +580,11 @@ export function DesktopShell({
       return;
     }
 
+    if (entry.kind === "custom_folder") {
+      openCustomFolder(entry.folderId);
+      return;
+    }
+
     openGroupChat({
       groupId: entry.targetKey,
       title: entry.title,
@@ -523,10 +633,17 @@ export function DesktopShell({
         activeWindowId: activeWindow?.windowId ?? null,
         activeWindowContentMode: activeWindow?.contentMode ?? null,
         desktopRegistryState,
+        desktopUnreadTargetMap,
         launchApp,
         openDirectChat,
         openGroupChat,
+        openCustomFolder,
         openPersonProfile,
+        createCustomFolder,
+        renameCustomFolder,
+        deleteCustomFolder,
+        addFolderMember,
+        removeFolderMember,
         hideDesktopEntry,
         showDesktopEntry,
         setActiveWindowContentMode,
@@ -617,69 +734,87 @@ export function DesktopShell({
           )}
 
           <section className={styles.desktopGrid} aria-label="Desktop entrypoints">
-            {desktopEntries.map((entry) => (
-              <article
-                key={entry.id}
-                className={
-                  selectedDesktopEntryId === entry.id
-                    ? styles.desktopIconCardSelected
-                    : styles.desktopIconCard
-                }
-              >
-                <button
-                  aria-pressed={selectedDesktopEntryId === entry.id}
-                  className={styles.desktopIcon}
-                  onClick={() => {
-                    setSelectedDesktopEntryId(entry.id);
-                  }}
-                  onDoubleClick={() => {
-                    openDesktopEntity(entry);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key !== "Enter" && event.key !== " ") {
-                      return;
-                    }
+            {desktopEntries.map((entry) => {
+              const folderUnreadCount =
+                entry.kind === "custom_folder"
+                  ? getCustomFolderUnreadCount(
+                      desktopRegistryState,
+                      entry.folderId,
+                      desktopUnreadTargetMap,
+                    )
+                  : 0;
 
-                    event.preventDefault();
-                    openDesktopEntity(entry);
-                  }}
-                  type="button"
+              return (
+                <article
+                  key={entry.id}
+                  className={
+                    selectedDesktopEntryId === entry.id
+                      ? styles.desktopIconCardSelected
+                      : styles.desktopIconCard
+                  }
                 >
-                  <span className={styles.desktopIconBadge}>
-                    {describeDesktopEntityBadge(entry)}
-                  </span>
-                  <span className={styles.desktopIconLabel}>{entry.title}</span>
-                  <small className={styles.desktopIconMeta}>
-                    {describeDesktopEntityMeta(entry)}
-                  </small>
-                </button>
+                  <button
+                    aria-pressed={selectedDesktopEntryId === entry.id}
+                    className={styles.desktopIcon}
+                    onClick={() => {
+                      setSelectedDesktopEntryId(entry.id);
+                    }}
+                    onDoubleClick={() => {
+                      openDesktopEntity(entry);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") {
+                        return;
+                      }
 
-                {selectedDesktopEntryId === entry.id && (
-                  <div className={styles.desktopIconActions}>
-                    <button
-                      className={styles.desktopIconAction}
-                      onClick={() => {
-                        openDesktopEntity(entry);
-                      }}
-                      type="button"
-                    >
-                      Открыть
-                    </button>
-                    {isDesktopEntityHideable(entry) && (
+                      event.preventDefault();
+                      openDesktopEntity(entry);
+                    }}
+                    type="button"
+                  >
+                    <span className={styles.desktopIconBadgeWrap}>
+                      <span className={styles.desktopIconBadge}>
+                        {describeDesktopEntityBadge(entry)}
+                      </span>
+                      {folderUnreadCount > 0 && (
+                        <span className={styles.desktopUnreadBadge}>
+                          {folderUnreadCount}
+                        </span>
+                      )}
+                    </span>
+                    <span className={styles.desktopIconLabel}>{entry.title}</span>
+                    <small className={styles.desktopIconMeta}>
+                      {describeDesktopEntityMeta(entry, desktopRegistryState)}
+                    </small>
+                  </button>
+
+                  {selectedDesktopEntryId === entry.id && (
+                    <div className={styles.desktopIconActions}>
                       <button
-                        className={styles.desktopIconActionGhost}
+                        className={styles.desktopIconAction}
                         onClick={() => {
-                          handleHideDesktopEntity(entry);
+                          openDesktopEntity(entry);
                         }}
                         type="button"
                       >
-                        Убрать с рабочего стола
+                        Открыть
                       </button>
-                    )}
-                  </div>
-                )}
-              </article>
-            ))}
+                      {isDesktopEntityHideable(entry) && (
+                        <button
+                          className={styles.desktopIconActionGhost}
+                          onClick={() => {
+                            handleHideDesktopEntity(entry);
+                          }}
+                          type="button"
+                        >
+                          Убрать с рабочего стола
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </section>
 
           {overflowSummaries.length > 0 && (
@@ -927,6 +1062,10 @@ function ShellWindowBody({
 }
 
 function describeDesktopEntityBadge(entry: DesktopEntity): string {
+  if (entry.kind === "custom_folder") {
+    return "П";
+  }
+
   if (entry.kind === "direct_chat" || entry.kind === "group_chat") {
     return entry.title.slice(0, 1).toUpperCase();
   }
@@ -942,13 +1081,26 @@ function describeDesktopEntityBadge(entry: DesktopEntity): string {
   return entry.title.slice(0, 1).toUpperCase();
 }
 
-function describeDesktopEntityMeta(entry: DesktopEntity): string {
+function describeDesktopEntityMeta(
+  entry: DesktopEntity,
+  registryState: {
+    entries: DesktopEntity[];
+    folderMembers: Array<{ folderId: string }>;
+  },
+): string {
   if (entry.kind === "direct_chat") {
     return "Личный чат";
   }
 
   if (entry.kind === "group_chat") {
     return "Группа";
+  }
+
+  if (entry.kind === "custom_folder") {
+    const memberCount = registryState.folderMembers.filter(
+      (reference) => reference.folderId === entry.folderId,
+    ).length;
+    return memberCount === 0 ? "Папка пуста" : `Папка · ${memberCount} объектов`;
   }
 
   if (entry.appId === "search") {
@@ -968,6 +1120,66 @@ function describeDesktopEntityMeta(entry: DesktopEntity): string {
   }
 
   return "Системное";
+}
+
+function upsertLiveDirectChat(
+  chats: DirectChat[],
+  nextChat: DirectChat,
+): DirectChat[] {
+  return upsertLiveTargetById(chats, nextChat);
+}
+
+function patchLiveDirectChatUnread(
+  chats: DirectChat[],
+  chatId: string,
+  unreadCount: number | null,
+  encryptedUnreadCount: number | null,
+): DirectChat[] {
+  return chats.map((chat) =>
+    chat.id !== chatId
+      ? chat
+      : {
+          ...chat,
+          unreadCount: unreadCount ?? chat.unreadCount,
+          encryptedUnreadCount: encryptedUnreadCount ?? chat.encryptedUnreadCount,
+        },
+  );
+}
+
+function upsertLiveGroup(groups: Group[], nextGroup: Group): Group[] {
+  return upsertLiveTargetById(groups, nextGroup);
+}
+
+function patchLiveGroupUnread(
+  groups: Group[],
+  groupId: string,
+  unreadCount: number,
+  encryptedUnreadCount: number | null,
+): Group[] {
+  return groups.map((group) =>
+    group.id !== groupId
+      ? group
+      : {
+          ...group,
+          unreadCount,
+          encryptedUnreadCount:
+            encryptedUnreadCount === null
+              ? group.encryptedUnreadCount
+              : encryptedUnreadCount,
+        },
+  );
+}
+
+function upsertLiveTargetById<T extends { id: string }>(
+  items: T[],
+  nextItem: T,
+): T[] {
+  const existingIndex = items.findIndex((item) => item.id === nextItem.id);
+  if (existingIndex === -1) {
+    return [...items, nextItem];
+  }
+
+  return items.map((item) => (item.id === nextItem.id ? nextItem : item));
 }
 
 function formatClock(date: Date): string {

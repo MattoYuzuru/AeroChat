@@ -92,6 +92,75 @@
   box-shadow: 0 10px 22px rgba(66, 103, 149, 0.12);
 }
 
+.folderNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-top: 0.2rem;
+  border-top: 1px solid rgba(93, 129, 179, 0.16);
+}
+
+.folderNavHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: rgba(24, 46, 85, 0.9);
+}
+
+.folderNavHeader span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: rgba(42, 108, 196, 0.12);
+  color: rgba(28, 69, 134, 0.92);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.folderNavEmpty {
+  margin: 0;
+  color: rgba(52, 77, 118, 0.76);
+  line-height: 1.45;
+}
+
+.folderNavList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.folderNavButton,
+.folderNavButtonActive {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.18rem;
+  padding: 0.72rem 0.85rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(87, 122, 173, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(27, 44, 81, 0.92);
+  text-align: left;
+  cursor: pointer;
+}
+
+.folderNavButton small,
+.folderNavButtonActive small {
+  color: rgba(51, 77, 116, 0.7);
+}
+
+.folderNavButton:hover,
+.folderNavButtonActive {
+  border-color: rgba(62, 110, 179, 0.34);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(217, 232, 251, 0.94));
+  box-shadow: 0 10px 22px rgba(66, 103, 149, 0.12);
+}
+
 .content {
   display: flex;
   flex-direction: column;
@@ -102,6 +171,7 @@
 .contentHeader,
 .integrityCard,
 .emptyState,
+.toolbarCard,
 .bucketCard {
   padding: 1rem 1.1rem;
   border: 1px solid rgba(89, 130, 188, 0.22);
@@ -139,6 +209,12 @@
   color: rgba(28, 69, 134, 0.92);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.toolbarCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
 .cardList,
@@ -232,6 +308,48 @@
   transform: translateY(-1px);
 }
 
+.inlineForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.textInput,
+.selectInput {
+  min-height: 2.35rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid rgba(82, 122, 176, 0.24);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.88);
+  color: rgba(23, 43, 82, 0.96);
+  font: inherit;
+}
+
+.textInput {
+  min-width: min(100%, 16rem);
+  flex: 1 1 14rem;
+}
+
+.selectInput {
+  min-width: 11rem;
+}
+
+.inlineBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  color: #ffffff;
+  background: linear-gradient(180deg, rgba(239, 109, 109, 0.96), rgba(183, 36, 36, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 10px 18px rgba(116, 30, 30, 0.18);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .bucketGrid {
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
 }
@@ -271,12 +389,21 @@
     padding-bottom: 0.2rem;
   }
 
+  .folderNavList {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+  }
+
   .sectionButton,
-  .sectionButtonActive {
+  .sectionButtonActive,
+  .folderNavButton,
+  .folderNavButtonActive {
     min-width: 14rem;
   }
 
   .contentHeader,
+  .toolbarCard,
   .entityCard,
   .bucketItem {
     flex-direction: column;
@@ -293,6 +420,7 @@
   .contentHeader,
   .integrityCard,
   .emptyState,
+  .toolbarCard,
   .bucketCard,
   .entityCard,
   .bucketItem {
@@ -300,12 +428,15 @@
   }
 
   .entityActions,
-  .integrityActions {
+  .integrityActions,
+  .inlineForm {
     width: 100%;
   }
 
   .primaryAction,
-  .secondaryAction {
+  .secondaryAction,
+  .textInput,
+  .selectInput {
     width: 100%;
   }
 }
