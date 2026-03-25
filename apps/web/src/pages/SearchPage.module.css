@@ -11,14 +11,10 @@
 .previewCard,
 .inlineState,
 .sectionNote {
-  border: 1px solid #6c86b2;
-  border-radius: 10px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(224, 236, 255, 0.92));
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.94),
-    inset -1px -1px 0 rgba(112, 140, 185, 0.28),
-    0 8px 18px rgba(24, 58, 103, 0.12);
+  border: 1px solid var(--xp-panel-border);
+  border-radius: 8px;
+  background: var(--xp-panel-surface);
+  box-shadow: var(--xp-panel-shadow);
 }
 
 .primarySection,
@@ -95,8 +91,7 @@
   display: grid;
   gap: 0.15rem;
   padding: 0.75rem 0.9rem;
-  background:
-    linear-gradient(180deg, rgba(246, 250, 255, 0.98), rgba(202, 222, 248, 0.9));
+  background: var(--xp-panel-surface-soft);
 }
 
 .metricCard span {
@@ -118,13 +113,10 @@
 }
 
 .pathSection {
-  border: 1px solid #8fa7cf;
-  border-radius: 10px;
-  background:
-    linear-gradient(180deg, rgba(252, 254, 255, 0.97), rgba(235, 243, 255, 0.93));
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.96),
-    inset -1px -1px 0 rgba(120, 145, 188, 0.24);
+  border: 1px solid var(--xp-panel-border-soft);
+  border-radius: 7px;
+  background: var(--xp-panel-surface-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
 
 .form,
@@ -149,21 +141,37 @@
 .field select {
   min-height: 2.75rem;
   padding: 0.62rem 0.72rem;
-  border: 1px solid #6f8bb8;
-  border-radius: 4px;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
+  border: 1px solid var(--xp-field-border);
+  border-radius: 3px;
+  background: var(--xp-field-surface);
   color: #11345a;
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.98),
-    inset -1px -1px 0 rgba(146, 168, 205, 0.35);
+  box-shadow: var(--xp-field-shadow);
+}
+
+.field select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #315783 50%),
+    linear-gradient(135deg, #315783 50%, transparent 50%),
+    linear-gradient(180deg, transparent 0%, transparent 100%);
+  background-position:
+    calc(100% - 1rem) calc(50% - 0.14rem),
+    calc(100% - 0.7rem) calc(50% - 0.14rem),
+    100% 0;
+  background-size:
+    0.3rem 0.3rem,
+    0.3rem 0.3rem,
+    2.4rem 100%;
+  background-repeat: no-repeat;
+  padding-right: 2.6rem;
 }
 
 .field input:focus-visible,
 .field select:focus-visible {
-  outline: 2px solid #f3c45d;
-  outline-offset: 1px;
-  border-color: #2d61ab;
+  border-color: var(--xp-field-border-strong);
+  box-shadow:
+    var(--xp-focus-ring),
+    var(--xp-field-shadow);
 }
 
 .inlineActions,
@@ -188,23 +196,19 @@
 .linkButton {
   min-height: 2.5rem;
   padding: 0.52rem 0.92rem;
-  border-radius: 4px;
-  border: 1px solid #6a82ab;
+  border-radius: 3px;
+  border: 1px solid var(--xp-panel-border-strong);
   cursor: pointer;
   color: #14355c;
-  background:
-    linear-gradient(180deg, #fefefe 0%, #d5e5ff 48%, #c2d9ff 49%, #a8c4f3 100%);
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.98),
-    inset -1px -1px 0 rgba(84, 111, 156, 0.28);
+  background: var(--xp-button-surface);
+  box-shadow: var(--xp-button-shadow);
   font-weight: 700;
 }
 
 .primaryButton {
   border-color: #4474ba;
   color: #ffffff;
-  background:
-    linear-gradient(180deg, #7fb4ff 0%, #4c8de4 48%, #3c78cf 49%, #2f66b7 100%);
+  background: var(--xp-button-surface-primary);
   text-shadow: 0 1px 0 rgba(20, 48, 91, 0.45);
 }
 
@@ -226,13 +230,13 @@
 .error,
 .sectionNote {
   padding: 0.72rem 0.82rem;
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
 .notice,
 .sectionNote {
-  border: 1px solid #86a4d4;
-  background: rgba(221, 235, 255, 0.92);
+  border: 1px solid var(--xp-note-border);
+  background: var(--xp-note-surface);
   color: #294c78;
 }
 
@@ -277,8 +281,8 @@
   align-self: start;
   padding: 0.24rem 0.55rem;
   border-radius: 999px;
-  border: 1px solid #8ba4cd;
-  background: rgba(229, 239, 255, 0.98);
+  border: 1px solid var(--xp-badge-border);
+  background: var(--xp-badge-surface);
   color: #23496f;
   font-size: 0.78rem;
 }
@@ -293,6 +297,13 @@
 
 .pathBadge {
   background: rgba(246, 249, 255, 0.98);
+}
+
+.primaryButton:active:not(:disabled),
+.secondaryButton:active:not(:disabled),
+.linkButton:active:not(:disabled) {
+  box-shadow: var(--xp-field-shadow-pressed);
+  transform: translateY(1px);
 }
 
 .loadMoreRow {

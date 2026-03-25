@@ -26,21 +26,21 @@ import styles from "./SettingsPage.module.css";
 const privacyItems = [
   {
     key: "readReceiptsEnabled",
-    title: "Чеки чтения",
+    title: "Отчёты о прочтении",
     description:
-      "Разрешить собеседникам видеть, что вы дочитали сообщение до конкретной позиции.",
+      "Показывать собеседникам, что вы прочитали сообщение.",
   },
   {
     key: "presenceEnabled",
-    title: "Presence",
+    title: "Статус в сети",
     description:
-      "Показывать snapshot вашего присутствия в direct chats без claims про realtime-поток.",
+      "Разрешить показывать, что вы сейчас в сети.",
   },
   {
     key: "typingVisibilityEnabled",
-    title: "Видимость набора",
+    title: "Индикатор набора",
     description:
-      "Разрешить показывать собеседнику, что вы сейчас печатаете сообщение.",
+      "Показывать, когда вы печатаете ответ в личном чате.",
   },
 ] satisfies Array<{
   key: keyof Pick<
@@ -96,7 +96,7 @@ export function SettingsPage() {
         setLoadError(
           getAuthErrorMessage(
             error,
-            "Не удалось загрузить актуальные настройки через gateway.",
+            "Не удалось загрузить настройки.",
           ),
         );
       }
@@ -159,12 +159,12 @@ export function SettingsPage() {
       const profile = await updateProfile(buildSettingsPatch(form));
       setForm(createSettingsForm(profile));
     } catch (error) {
-      setSaveError(
-        getAuthErrorMessage(
-          error,
-          "Не удалось сохранить настройки приватности и профиля.",
-        ),
-      );
+        setSaveError(
+          getAuthErrorMessage(
+            error,
+            "Не удалось сохранить изменения.",
+          ),
+        );
     } finally {
       setIsSaving(false);
     }
@@ -183,7 +183,7 @@ export function SettingsPage() {
 
   async function handleRevokeSession(session: Session) {
     const confirmed = window.confirm(
-      `Закрыть выбранную сессию ${formatShortId(session.id)}? Она больше не сможет использовать текущий token.`,
+      `Закрыть выбранную сессию ${formatShortId(session.id)}? После этого потребуется войти снова.`,
     );
     if (!confirmed) {
       return;
@@ -197,20 +197,19 @@ export function SettingsPage() {
       <section className={styles.heroCard}>
         <div className={styles.heroHeader}>
           <div>
-            <p className={styles.cardLabel}>Settings</p>
-            <h1 className={styles.title}>Приватность, preferences и доступ</h1>
+            <p className={styles.cardLabel}>Панель управления</p>
+            <h1 className={styles.title}>Настройки</h1>
             <p className={styles.subtitle}>
-              Этот экран управляет privacy flags, лёгкими account preferences и snapshot списком
-              устройств только через `aero-gateway`.
+              Приватность, профиль устройства и доступ к учётной записи в одном окне.
             </p>
           </div>
 
           <div className={styles.heroMeta}>
             <span className={styles.statusBadge}>
-              {isDirty ? "есть несохранённые изменения" : "синхронизировано"}
+              {isDirty ? "есть несохранённые изменения" : "всё сохранено"}
             </span>
-            <span className={styles.statusBadge}>gateway only</span>
-            <span className={styles.statusBadge}>devices & sessions</span>
+            <span className={styles.statusBadge}>приватность</span>
+            <span className={styles.statusBadge}>устройства и доступ</span>
           </div>
         </div>
 
@@ -222,10 +221,9 @@ export function SettingsPage() {
       {isLoading ? (
         <section className={styles.stateCard}>
           <p className={styles.cardLabel}>Загрузка</p>
-          <h2 className={styles.stateTitle}>Подтягиваем текущие настройки</h2>
+          <h2 className={styles.stateTitle}>Загружаем настройки</h2>
           <p className={styles.stateMessage}>
-            Запрашиваем актуальный профиль через gateway, чтобы экран не работал со старым
-            snapshot.
+            Получаем актуальные данные профиля и устройств.
           </p>
         </section>
       ) : loadError ? (
@@ -233,7 +231,7 @@ export function SettingsPage() {
           <p className={styles.cardLabel}>Ошибка</p>
           <h2 className={styles.stateTitle}>Настройки не загрузились</h2>
           <p className={styles.stateMessage}>
-            Gateway ответил ошибкой. Можно повторить загрузку без выхода из защищённого shell.
+            Можно повторить загрузку без выхода из рабочего стола.
           </p>
           <div className={styles.actions}>
             <button
@@ -253,11 +251,11 @@ export function SettingsPage() {
             <section className={styles.sectionCard}>
               <div className={styles.sectionHeader}>
                 <div>
-                  <p className={styles.cardLabel}>Privacy</p>
-                  <h2 className={styles.sectionTitle}>Поведение в direct chats</h2>
+                  <p className={styles.cardLabel}>Приватность</p>
+                  <h2 className={styles.sectionTitle}>Что видно собеседникам</h2>
                 </div>
                 <p className={styles.sectionDescription}>
-                  Эти флаги уже поддерживаются backend и влияют на snapshot-модель чатов.
+                  Эти параметры управляют тем, что другие люди видят в личных чатах.
                 </p>
               </div>
 
@@ -270,7 +268,7 @@ export function SettingsPage() {
                     </div>
                     <input
                       checked={form[item.key]}
-                      className={styles.toggleInput}
+                      className={`${styles.toggleInput} xpCheckbox`}
                       onChange={(event) => handlePrivacyChange(event, item.key)}
                       type="checkbox"
                     />
@@ -282,12 +280,11 @@ export function SettingsPage() {
             <section className={styles.sectionCard}>
               <div className={styles.sectionHeader}>
                 <div>
-                  <p className={styles.cardLabel}>Preferences</p>
-                  <h2 className={styles.sectionTitle}>Личное оформление и статус</h2>
+                  <p className={styles.cardLabel}>Личные данные</p>
+                  <h2 className={styles.sectionTitle}>Оформление профиля</h2>
                 </div>
                 <p className={styles.sectionDescription}>
-                  Здесь остаются поля, которые естественно выглядят как settings, а не как
-                  публичная profile card.
+                  Небольшие настройки, которые меняют только ваш профиль.
                 </p>
               </div>
 
@@ -332,7 +329,7 @@ export function SettingsPage() {
                         statusText: event.target.value,
                       }))
                     }
-                    placeholder="Короткая строка, которую можно показать в people и profile snapshot."
+                    placeholder="Короткая подпись, которую увидят ваши контакты."
                     rows={3}
                     value={form.statusText}
                   />
@@ -343,16 +340,13 @@ export function SettingsPage() {
             <section className={styles.sectionCard}>
               <div className={styles.sectionHeader}>
                 <div>
-                  <p className={styles.cardLabel}>Devices</p>
+                  <p className={styles.cardLabel}>Устройства</p>
                   <h2 className={styles.sectionTitle}>Устройства и сессии</h2>
                 </div>
                 <div className={styles.sectionToolbar}>
                   <p className={styles.sectionDescription}>
-                    Список загружается только через `IdentityService` на gateway. Текущая сессия
-                    не выделяется, потому что web bootstrap хранит только bearer token, а не
-                    hydrated session/device snapshot. Повторный вход с той же меткой вроде
-                    `Laptop` создаёт новую device record, поэтому ориентируйтесь по `Device ID` и
-                    времени создания, а не только по label.
+                    Если вы входили на одном и том же компьютере несколько раз, ориентируйтесь по
+                    идентификатору и времени активности.
                   </p>
                   <button
                     className={styles.secondaryButton}
@@ -383,7 +377,7 @@ export function SettingsPage() {
                 <MetricCard
                   label="Всего записей"
                   value={devices.state.devices.length}
-                  detail="device cards"
+                  detail="в списке"
                 />
               </div>
 
@@ -394,18 +388,17 @@ export function SettingsPage() {
 
               {devices.state.status === "loading" && (
                 <SectionStateCard
-                  title="Подтягиваем список устройств"
-                  message="Запрашиваем текущий snapshot устройств и связанных сессий через gateway."
+                  eyebrow="Устройства"
+                  title="Загружаем список устройств"
+                  message="Получаем актуальные устройства и связанные с ними сессии."
                 />
               )}
 
               {devices.state.status === "error" && (
                 <SectionStateCard
+                  eyebrow="Устройства"
                   title="Устройства сейчас недоступны"
-                  message={
-                    devices.state.screenErrorMessage ??
-                    "Не удалось получить список устройств через gateway."
-                  }
+                  message={devices.state.screenErrorMessage ?? "Не удалось получить список."}
                   action={
                     <button
                       className={styles.primaryButton}
@@ -423,8 +416,9 @@ export function SettingsPage() {
 
               {devices.state.status === "ready" && devices.state.devices.length === 0 && (
                 <SectionStateCard
+                  eyebrow="Устройства"
                   title="Список устройств пуст"
-                  message="Backend не вернул ни одного устройства для текущего аккаунта. В этом slice данные не придумываются локально."
+                  message="Для этой учётной записи пока нет отдельных записей об устройствах."
                 />
               )}
 
@@ -447,11 +441,11 @@ export function SettingsPage() {
                               <h3 className={styles.deviceTitle}>{entry.device.label}</h3>
                               <StatusPill
                                 tone={entry.device.revokedAt ? "danger" : "default"}
-                                value={entry.device.revokedAt ? "отозвано" : "активно"}
+                                value={entry.device.revokedAt ? "отозвано" : "доступно"}
                               />
                             </div>
                             <p className={styles.deviceMeta}>
-                              Device ID: {formatShortId(entry.device.id)} · создано{" "}
+                              ID: {formatShortId(entry.device.id)} · добавлено{" "}
                               {formatDateTime(entry.device.createdAt)}
                             </p>
                           </div>
@@ -497,7 +491,7 @@ export function SettingsPage() {
 
                           {entry.sessions.length === 0 ? (
                             <div className={styles.sessionEmpty}>
-                              Для этого устройства backend пока не вернул отдельных session rows.
+                              Для этого устройства пока нет отдельных записей о сессиях.
                             </div>
                           ) : (
                             <div className={styles.sessionList}>
@@ -520,7 +514,7 @@ export function SettingsPage() {
                                           value={session.revokedAt ? "закрыта" : "активна"}
                                         />
                                       </div>
-                                      <span>Session ID: {formatShortId(session.id)}</span>
+                                      <span>ID: {formatShortId(session.id)}</span>
                                       <span>Создана: {formatDateTime(session.createdAt)}</span>
                                       <span>
                                         Последняя активность: {formatDateTime(session.lastSeenAt)}
@@ -560,7 +554,7 @@ export function SettingsPage() {
 
           <aside className={styles.sideColumn}>
             <section className={styles.summaryCard}>
-              <p className={styles.cardLabel}>Текущий контекст</p>
+              <p className={styles.cardLabel}>Учётная запись</p>
               <h2 className={styles.summaryTitle}>{profile.nickname}</h2>
               <p className={styles.summarySubtitle}>@{profile.login}</p>
 
@@ -581,18 +575,18 @@ export function SettingsPage() {
 
               <div className={styles.chipGroup}>
                 <span className={styles.metaChip}>
-                  {form.timezone.trim() === "" ? "timezone не задан" : form.timezone}
+                  {form.timezone.trim() === "" ? "часовой пояс не указан" : form.timezone}
                 </span>
                 <span className={styles.metaChip}>
                   {form.profileAccent.trim() === ""
-                    ? "accent по умолчанию"
+                    ? "акцент по умолчанию"
                     : form.profileAccent}
                 </span>
               </div>
             </section>
 
             <section className={styles.summaryCard}>
-              <p className={styles.cardLabel}>Session snapshot</p>
+              <p className={styles.cardLabel}>Сводка доступа</p>
               <div className={styles.metaGrid}>
                 <div>
                   <dt>Активные устройства</dt>
@@ -604,41 +598,41 @@ export function SettingsPage() {
                 </div>
                 <div>
                   <dt>Текущая сессия</dt>
-                  <dd>Не определяется в этом slice</dd>
+                  <dd>Пока не выделяется отдельно</dd>
                 </div>
               </div>
             </section>
 
             <section className={styles.summaryCard}>
-              <p className={styles.cardLabel}>Crypto runtime</p>
-              <h2 className={styles.summaryTitle}>Локальный crypto-device foundation</h2>
+              <p className={styles.cardLabel}>Шифрование</p>
+              <h2 className={styles.summaryTitle}>Локальное устройство шифрования</h2>
               <p className={styles.summarySubtitle}>
-                Здесь visible только keystore/runtime bootstrap и registry control-plane.
-                Сообщения и trust verification ещё не шифруются в этом PR.
+                Этот блок показывает состояние локального устройства шифрования в браузере и
+                связанных устройств аккаунта.
               </p>
 
               {cryptoRuntime.state.status === "bootstrapping" ? (
                 <SectionStateCard
-                  eyebrow="Crypto runtime"
-                  title="Поднимаем crypto runtime"
-                  message="Проверяем persistent keystore, читаем account registry и синхронизируем browser profile с текущим crypto-device state."
+                  eyebrow="Шифрование"
+                  title="Готовим локальное устройство"
+                  message="Проверяем локальное хранилище ключей и список связанных устройств."
                 />
               ) : cryptoRuntime.state.status === "ready" &&
                 cryptoRuntime.state.snapshot !== null ? (
                 <>
                   <div className={styles.metaGrid}>
                     <div>
-                      <dt>Локальный device</dt>
+                      <dt>Устройство в браузере</dt>
                       <dd>
                         {describeLocalCryptoDevice(cryptoRuntime.state.snapshot.localDevice)}
                       </dd>
                     </div>
                     <div>
-                      <dt>Registry devices</dt>
+                      <dt>Связанные устройства</dt>
                       <dd>{cryptoRuntime.state.snapshot.devices.length}</dd>
                     </div>
                     <div>
-                      <dt>Pending intents</dt>
+                      <dt>Ожидают подтверждения</dt>
                       <dd>
                         {
                           cryptoRuntime.state.snapshot.linkIntents.filter(
@@ -662,10 +656,10 @@ export function SettingsPage() {
 
                   <div className={styles.chipGroup}>
                     <span className={styles.metaChip}>
-                      support: {cryptoRuntime.state.snapshot.support}
+                      поддержка: {cryptoRuntime.state.snapshot.support}
                     </span>
                     <span className={styles.metaChip}>
-                      phase: {cryptoRuntime.state.snapshot.phase}
+                      режим: {cryptoRuntime.state.snapshot.phase}
                     </span>
                     {cryptoRuntime.state.snapshot.localDevice && (
                       <span className={styles.metaChip}>
@@ -719,9 +713,9 @@ export function SettingsPage() {
                             <div className={styles.runtimeIntentRow} key={intent.id}>
                               <div className={styles.runtimeIntentCopy}>
                                 <strong>
-                                  Pending device {formatShortId(intent.pendingCryptoDeviceId)}
+                                  Новое устройство {formatShortId(intent.pendingCryptoDeviceId)}
                                 </strong>
-                                <span>Intent ID: {formatShortId(intent.id)}</span>
+                                <span>Запрос: {formatShortId(intent.id)}</span>
                                 <span>Истекает: {formatDateTime(intent.expiresAt)}</span>
                               </div>
                               <button
@@ -732,7 +726,7 @@ export function SettingsPage() {
                                 }}
                                 type="button"
                               >
-                                Одобрить
+                                Подтвердить
                               </button>
                             </div>
                           ))}
@@ -751,7 +745,7 @@ export function SettingsPage() {
                       {cryptoRuntime.state.pendingLabel ===
                       "Синхронизируем crypto runtime..."
                         ? cryptoRuntime.state.pendingLabel
-                        : "Обновить crypto runtime"}
+                        : "Обновить состояние"}
                     </button>
                     <button
                       className={styles.secondaryButton}
@@ -767,7 +761,7 @@ export function SettingsPage() {
                       {cryptoRuntime.state.pendingLabel ===
                       "Создаём pending crypto-device..."
                         ? cryptoRuntime.state.pendingLabel
-                        : "Создать pending device"}
+                        : "Подготовить новое устройство"}
                     </button>
                     <button
                       className={styles.secondaryButton}
@@ -783,7 +777,7 @@ export function SettingsPage() {
                       {cryptoRuntime.state.pendingLabel ===
                       "Публикуем текущий bundle..."
                         ? cryptoRuntime.state.pendingLabel
-                        : "Опубликовать bundle"}
+                        : "Опубликовать пакет"}
                     </button>
                   </div>
                 </>
@@ -806,7 +800,7 @@ export function SettingsPage() {
                   onClick={handleReset}
                   type="button"
                 >
-                  Сбросить локальные изменения
+                  Отменить изменения
                 </button>
                 <button
                   className={styles.secondaryButton}
@@ -816,7 +810,7 @@ export function SettingsPage() {
                   }}
                   type="button"
                 >
-                  Обновить профиль из gateway
+                  Обновить данные
                 </button>
               </div>
             </section>
@@ -852,7 +846,7 @@ interface SectionStateCardProps {
 }
 
 function SectionStateCard({
-  eyebrow = "Devices state",
+  eyebrow = "Состояние",
   title,
   message,
   action,
@@ -924,11 +918,11 @@ function describeLocalCryptoDevice(
 
   switch (device.status) {
     case "active":
-      return `${device.deviceLabel} · active`;
+      return `${device.deviceLabel} · готово`;
     case "pending_link":
-      return `${device.deviceLabel} · pending link`;
+      return `${device.deviceLabel} · ожидает привязки`;
     case "revoked":
-      return `${device.deviceLabel} · revoked`;
+      return `${device.deviceLabel} · отозвано`;
     default:
       return device.deviceLabel;
   }
