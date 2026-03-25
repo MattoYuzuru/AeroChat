@@ -1,7 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import type { Profile } from "../gateway/types";
-import { getPersonProfileLaunchTitle } from "../people/profile-model";
+import {
+  describePersonRelationshipState,
+  getPersonProfileLaunchTitle,
+} from "../people/profile-model";
 import { buildPersonProfileNavigationIntent } from "../people/navigation";
 import { resolvePersonRelationshipActions } from "../people/relationship-actions";
 import { usePeople } from "../people/usePeople";
@@ -129,7 +132,7 @@ export function FriendRequestsPage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Запрос: ${formatDateTime(request.requestedAt)}`}
-                  statusLabel="Входящая заявка"
+                  statusLabel={describePersonRelationshipState("incoming_request")}
                   onOpenProfile={() => {
                     openPersonProfile(request.profile);
                   }}
@@ -166,7 +169,7 @@ export function FriendRequestsPage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Отправлено: ${formatDateTime(request.requestedAt)}`}
-                  statusLabel="Исходящая заявка"
+                  statusLabel={describePersonRelationshipState("outgoing_request")}
                   onOpenProfile={() => {
                     openPersonProfile(request.profile);
                   }}

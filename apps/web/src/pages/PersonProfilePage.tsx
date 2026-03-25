@@ -6,6 +6,7 @@ import { describeGatewayError, isGatewayErrorCode } from "../gateway/types";
 import {
   describePersonProfileSummary,
   describePersonRelationship,
+  describePersonRelationshipState,
   getPersonProfileLaunchTitle,
   resolvePersonProfileEntry,
 } from "../people/profile-model";
@@ -221,7 +222,7 @@ export function PersonProfilePage() {
               <div className={styles.identityBody}>
                 <div className={styles.identityMetaRow}>
                   <span className={styles.relationshipBadge}>
-                    {describeRelationshipState(personEntry.relationshipKind)}
+                    {describePersonRelationshipState(personEntry.relationshipKind)}
                   </span>
                   <span className={styles.identityContext}>
                     {describePersonRelationship(personEntry)}
@@ -352,7 +353,7 @@ export function PersonProfilePage() {
             <dl className={styles.metaGrid}>
               <MetaItem
                 label="Состояние"
-                value={describeRelationshipState(personEntry.relationshipKind)}
+                value={describePersonRelationshipState(personEntry.relationshipKind)}
               />
               <MetaItem
                 label="Дата связи"
@@ -406,21 +407,6 @@ function StateCard({
       {action && <div className={styles.stateActions}>{action}</div>}
     </section>
   );
-}
-
-function describeRelationshipState(
-  relationshipKind: "friend" | "incoming_request" | "outgoing_request",
-): string {
-  switch (relationshipKind) {
-    case "friend":
-      return "Друг";
-    case "incoming_request":
-      return "Входящая заявка";
-    case "outgoing_request":
-      return "Исходящая заявка";
-    default:
-      return "Контакт";
-  }
 }
 
 function getProfileInitials(profile: { nickname: string; login: string }): string {

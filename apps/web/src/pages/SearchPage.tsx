@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  buildGroupChatRoutePath,
-} from "../app/app-routes";
+import { buildGroupChatRoutePath } from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { gatewayClient } from "../gateway/runtime";
@@ -17,8 +15,8 @@ import {
 } from "../gateway/types";
 import { extractGroupInviteToken } from "../groups/invite-token";
 import {
-  describePersonProfileSummary,
   describePersonRelationship,
+  describePersonRelationshipState,
   findExactKnownPeopleEntries,
   findSimilarKnownPeopleEntries,
   getPersonProfileLaunchTitle,
@@ -26,7 +24,11 @@ import {
   normalizeExactLoginQuery,
   type PersonProfileEntry,
 } from "../people/profile-model";
-import { buildPersonProfileNavigationIntent } from "../people/navigation";
+import {
+  buildDirectChatNavigationIntent,
+  buildPersonProfileNavigationIntent,
+  ensureDirectChatForPeer,
+} from "../people/navigation";
 import { usePeople } from "../people/usePeople";
 import {
   searchEncryptedLocalMessages,
@@ -44,7 +46,12 @@ import {
   type SearchResultLike,
   type SearchScopeSelection,
 } from "../search/model";
+import {
+  resolveKnownPersonPrimaryAction,
+  resolveKnownPersonSecondaryAction,
+} from "../search/known-person-actions";
 import { useDesktopShellHost } from "../shell/context";
+import { ProfileCard } from "./PeopleShared";
 import styles from "./SearchPage.module.css";
 
 const SEARCH_PAGE_SIZE = 20;
@@ -67,6 +74,10 @@ export function SearchPage() {
   const desktopShellHost = useDesktopShellHost();
   const [peopleLogin, setPeopleLogin] = useState("");
   const [peopleFormError, setPeopleFormError] = useState<string | null>(null);
+  const [knownPersonChatError, setKnownPersonChatError] = useState<string | null>(null);
+  const [openingKnownPersonChatLogin, setOpeningKnownPersonChatLogin] = useState<string | null>(
+    null,
+  );
   const [inviteInput, setInviteInput] = useState("");
   const [invitePreviewStatus, setInvitePreviewStatus] = useState<InvitePreviewStatus>("idle");
   const [invitePreviewError, setInvitePreviewError] = useState<string | null>(null);
@@ -237,6 +248,7 @@ export function SearchPage() {
   }
 
   function openPersonProfile(entry: PersonProfileEntry) {
+    setKnownPersonChatError(null);
     const intent = buildPersonProfileNavigationIntent({
       userId: entry.profile.id,
       title: getPersonProfileLaunchTitle(entry.profile),
@@ -271,10 +283,56 @@ export function SearchPage() {
       return;
     }
 
+    if (exactPeopleMatches.length > 0) {
+      setPeopleFormError(null);
+      setKnownPersonChatError(null);
+      people.clearFeedback();
+      openPersonProfile(exactPeopleMatches[0]!);
+      return;
+    }
+
     setPeopleFormError(null);
     const success = await people.sendFriendRequest(normalizedLogin);
     if (success) {
       setPeopleLogin("");
+    }
+  }
+
+  async function handleOpenKnownPersonChat(entry: PersonProfileEntry) {
+    if (
+      entry.relationshipKind !== "friend" ||
+      openingKnownPersonChatLogin !== null
+    ) {
+      return;
+    }
+
+    setOpeningKnownPersonChatLogin(entry.profile.login);
+    setKnownPersonChatError(null);
+    people.clearFeedback();
+
+    try {
+      const chat = await ensureDirectChatForPeer(token, entry.profile.id);
+      const intent = buildDirectChatNavigationIntent({
+        chatId: chat.id,
+        title: getPersonProfileLaunchTitle(entry.profile),
+      });
+
+      if (desktopShellHost !== null) {
+        desktopShellHost.openDirectChat(intent.shellOptions);
+      }
+
+      navigate(intent.routePath);
+    } catch (error) {
+      if (isGatewayErrorCode(error, "unauthenticated")) {
+        expireSession();
+        return;
+      }
+
+      setKnownPersonChatError(
+        describeGatewayError(error, "Не удалось открыть личный чат для выбранного контакта."),
+      );
+    } finally {
+      setOpeningKnownPersonChatLogin(null);
     }
   }
 
@@ -506,7 +564,7 @@ export function SearchPage() {
       <section className={styles.primarySection}>
         <div className={styles.sectionHeader}>
           <div>
-            <p className={styles.cardLabel}>People</p>
+            <p className={styles.cardLabel}>Люди</p>
             <h1 className={styles.title}>Люди и invite links</h1>
             <p className={styles.subtitle}>
               Сначала точный login, уже знакомые контакты и приглашения в группы. Поиск по
@@ -541,15 +599,19 @@ export function SearchPage() {
                 <p className={styles.cardLabel}>Точный login</p>
                 <h2 className={styles.panelTitle}>Найти или добавить человека</h2>
                 <p className={styles.panelDescription}>
-                  Точный login остаётся основным путём. Уже известные контакты показываются
-                  первыми, а похожие known-only подсказки остаются ограниченными.
+                  Точный login остаётся основным путём. Уже известные люди показываются первыми,
+                  а похожие совпадения остаются только среди ваших текущих контактов и заявок.
                 </p>
               </div>
             </div>
 
-            {(peopleFormError || people.state.actionErrorMessage || people.state.notice) && (
+            {(peopleFormError ||
+              knownPersonChatError ||
+              people.state.actionErrorMessage ||
+              people.state.notice) && (
               <div className={styles.stack}>
                 {peopleFormError && <div className={styles.error}>{peopleFormError}</div>}
+                {knownPersonChatError && <div className={styles.error}>{knownPersonChatError}</div>}
                 {people.state.actionErrorMessage && (
                   <div className={styles.error}>{people.state.actionErrorMessage}</div>
                 )}
@@ -568,6 +630,7 @@ export function SearchPage() {
                   onChange={(event) => {
                     setPeopleLogin(event.target.value);
                     setPeopleFormError(null);
+                    setKnownPersonChatError(null);
                     people.clearFeedback();
                   }}
                   placeholder="alice"
@@ -577,22 +640,13 @@ export function SearchPage() {
               </label>
 
               <div className={styles.inlineActions}>
-                <button
-                  className={styles.primaryButton}
-                  disabled={people.state.isSendingRequest}
-                  type="submit"
-                >
-                  {people.state.isSendingRequest ? "Отправляем..." : "Отправить заявку"}
-                </button>
-                {normalizedPeopleLogin !== "" && exactPeopleMatches.length > 0 && (
+                {exactPeopleMatches.length === 0 && (
                   <button
-                    className={styles.secondaryButton}
-                    onClick={() => {
-                      openPersonProfile(exactPeopleMatches[0]!);
-                    }}
-                    type="button"
+                    className={styles.primaryButton}
+                    disabled={people.state.isSendingRequest}
+                    type="submit"
                   >
-                    Открыть профиль
+                    {people.state.isSendingRequest ? "Отправляем..." : "Отправить заявку"}
                   </button>
                 )}
               </div>
@@ -619,16 +673,37 @@ export function SearchPage() {
                   <>
                     <SectionNote
                       title="Точное совпадение"
-                      message="Откройте профиль контакта."
+                      message="Откройте профиль или выполните действие прямо с карточки."
                     />
                     <div className={styles.cardList}>
                       {exactPeopleMatches.map((entry) => (
                         <KnownPersonCard
                           entry={entry}
                           key={`${entry.relationshipKind}:${entry.profile.id}`}
+                          onAccept={() => {
+                            setKnownPersonChatError(null);
+                            void people.acceptFriendRequest(entry.profile.login);
+                          }}
+                          onCancelOutgoing={() => {
+                            setKnownPersonChatError(null);
+                            void people.cancelOutgoingFriendRequest(entry.profile.login);
+                          }}
+                          onDecline={() => {
+                            setKnownPersonChatError(null);
+                            void people.declineFriendRequest(entry.profile.login);
+                          }}
+                          onOpenChat={() => {
+                            void handleOpenKnownPersonChat(entry);
+                          }}
                           onOpenProfile={() => {
                             openPersonProfile(entry);
                           }}
+                          onRemoveFriend={() => {
+                            setKnownPersonChatError(null);
+                            void people.removeFriend(entry.profile.login);
+                          }}
+                          openingKnownPersonChatLogin={openingKnownPersonChatLogin}
+                          pendingLabel={people.state.pendingLogins[entry.profile.login] ?? null}
                         />
                       ))}
                     </div>
@@ -646,9 +721,30 @@ export function SearchPage() {
                         <KnownPersonCard
                           entry={entry}
                           key={`${entry.relationshipKind}:${entry.profile.id}`}
+                          onAccept={() => {
+                            setKnownPersonChatError(null);
+                            void people.acceptFriendRequest(entry.profile.login);
+                          }}
+                          onCancelOutgoing={() => {
+                            setKnownPersonChatError(null);
+                            void people.cancelOutgoingFriendRequest(entry.profile.login);
+                          }}
+                          onDecline={() => {
+                            setKnownPersonChatError(null);
+                            void people.declineFriendRequest(entry.profile.login);
+                          }}
+                          onOpenChat={() => {
+                            void handleOpenKnownPersonChat(entry);
+                          }}
                           onOpenProfile={() => {
                             openPersonProfile(entry);
                           }}
+                          onRemoveFriend={() => {
+                            setKnownPersonChatError(null);
+                            void people.removeFriend(entry.profile.login);
+                          }}
+                          openingKnownPersonChatLogin={openingKnownPersonChatLogin}
+                          pendingLabel={people.state.pendingLogins[entry.profile.login] ?? null}
                         />
                       ))}
                     </div>
@@ -666,9 +762,30 @@ export function SearchPage() {
                         <KnownPersonCard
                           entry={entry}
                           key={`${entry.relationshipKind}:${entry.profile.id}`}
+                          onAccept={() => {
+                            setKnownPersonChatError(null);
+                            void people.acceptFriendRequest(entry.profile.login);
+                          }}
+                          onCancelOutgoing={() => {
+                            setKnownPersonChatError(null);
+                            void people.cancelOutgoingFriendRequest(entry.profile.login);
+                          }}
+                          onDecline={() => {
+                            setKnownPersonChatError(null);
+                            void people.declineFriendRequest(entry.profile.login);
+                          }}
+                          onOpenChat={() => {
+                            void handleOpenKnownPersonChat(entry);
+                          }}
                           onOpenProfile={() => {
                             openPersonProfile(entry);
                           }}
+                          onRemoveFriend={() => {
+                            setKnownPersonChatError(null);
+                            void people.removeFriend(entry.profile.login);
+                          }}
+                          openingKnownPersonChatLogin={openingKnownPersonChatLogin}
+                          pendingLabel={people.state.pendingLogins[entry.profile.login] ?? null}
                         />
                       ))}
                     </div>
@@ -1072,32 +1189,50 @@ export function SearchPage() {
 
 function KnownPersonCard({
   entry,
+  onAccept,
+  onCancelOutgoing,
+  onDecline,
+  onOpenChat,
   onOpenProfile,
+  onRemoveFriend,
+  openingKnownPersonChatLogin,
+  pendingLabel,
 }: {
   entry: PersonProfileEntry;
+  onAccept(): void;
+  onCancelOutgoing(): void;
+  onDecline(): void;
+  onOpenChat(): void;
   onOpenProfile(): void;
+  onRemoveFriend(): void;
+  openingKnownPersonChatLogin: string | null;
+  pendingLabel: string | null;
 }) {
+  const isOpeningChat = openingKnownPersonChatLogin === entry.profile.login;
+  const isChatBusy = openingKnownPersonChatLogin !== null;
+
   return (
-    <article className={styles.resultCard}>
-      <div className={styles.resultHeaderRow}>
-        <div>
-          <div className={styles.badgeRow}>
-            <span className={styles.scopeBadge}>Люди</span>
-            <span className={styles.metaBadge}>{describeShortRelationship(entry)}</span>
-          </div>
-          <h3 className={styles.resultTitle}>{entry.profile.nickname}</h3>
-          <p className={styles.resultMeta}>
-            @{entry.profile.login} · {describePersonRelationship(entry)}
-          </p>
-        </div>
-
-        <button className={styles.linkButton} onClick={onOpenProfile} type="button">
-          Профиль
-        </button>
-      </div>
-
-      <p className={styles.fragment}>{describePersonProfileSummary(entry.profile)}</p>
-    </article>
+    <ProfileCard
+      metaLabel={describePersonRelationship(entry)}
+      onOpenProfile={onOpenProfile}
+      pendingLabel={pendingLabel ?? undefined}
+      primaryAction={resolveKnownPersonPrimaryAction({
+        entry,
+        isChatBusy,
+        isOpeningChat,
+        onAccept,
+        onCancelOutgoing,
+        onOpenChat,
+      })}
+      profile={entry.profile}
+      secondaryAction={resolveKnownPersonSecondaryAction({
+        entry,
+        isChatBusy,
+        onDecline,
+        onRemoveFriend,
+      })}
+      statusLabel={describePersonRelationshipState(entry.relationshipKind)}
+    />
   );
 }
 
@@ -1271,19 +1406,6 @@ function describeMemberCount(count: number): string {
   }
 
   return `${count} участников`;
-}
-
-function describeShortRelationship(entry: PersonProfileEntry): string {
-  switch (entry.relationshipKind) {
-    case "friend":
-      return "Друг";
-    case "incoming_request":
-      return "Входящая";
-    case "outgoing_request":
-      return "Исходящая";
-    default:
-      return "Контакт";
-  }
 }
 
 function formatDateTime(value: string): string {
