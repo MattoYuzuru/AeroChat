@@ -91,7 +91,7 @@ export function describeLegacySearchPath(selection: SearchScopeSelection): strin
       return "Серверный поиск по содержимому legacy direct-сообщений больше не поддерживается.";
     case "all-groups":
     case "group":
-      return "Серверный поиск остаётся только для legacy group history в выбранной области.";
+      return "Серверный поиск по содержимому legacy group-сообщений больше не поддерживается.";
   }
 }
 
@@ -102,7 +102,7 @@ export function describeLegacySearchEmptyState(selection: SearchScopeSelection):
       return "Legacy direct content search на сервере честно де-скоуплен. Для direct остаётся только локальный encrypted поиск текущей сессии.";
     case "all-groups":
     case "group":
-      return "В этой области подходящих сообщений нет.";
+      return "Legacy group content search на сервере честно де-скоуплен. Для групп остаётся только локальный encrypted поиск текущей сессии.";
   }
 }
 

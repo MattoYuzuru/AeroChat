@@ -921,44 +921,14 @@ func (r *Repository) ListGroupMessages(ctx context.Context, userID string, group
 }
 
 func (r *Repository) SearchGroupMessages(ctx context.Context, userID string, params chat.SearchGroupMessagesParams) ([]chat.MessageSearchResult, error) {
-	// Legacy server-side group search остаётся plaintext-only:
-	// backend ищет только по group_messages.text_content/search_vector.
-	rows, err := r.queries.SearchGroupMessages(ctx, chatsqlc.SearchGroupMessagesParams{
-		UserID:          mustParseUUID(userID),
-		GroupID:         nullableUUID(params.GroupID),
-		CursorCreatedAt: nullableTimestamptz(searchCursorCreatedAt(params.Cursor)),
-		CursorMessageID: nullableUUID(searchCursorMessageID(params.Cursor)),
-		LimitCount:      params.PageSize + 1,
-		QueryText:       params.Query,
-	})
-	if err != nil {
-		return nil, convertError(err)
-	}
+	_ = ctx
+	_ = userID
+	_ = params
 
-	result := make([]chat.MessageSearchResult, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, chat.MessageSearchResult{
-			Scope:         chat.ChatKindGroup,
-			GroupID:       row.GroupID.String(),
-			GroupThreadID: row.ThreadID.String(),
-			MessageID:     row.MessageID.String(),
-			Author: chat.UserSummary{
-				ID:        row.SenderUserID.String(),
-				Login:     row.Login,
-				Nickname:  row.Nickname,
-				AvatarURL: textPointer(row.AvatarUrl),
-			},
-			CreatedAt:     timestampValue(row.CreatedAt),
-			EditedAt:      timestamptzPointer(row.EditedAt),
-			MatchFragment: stringValue(row.MatchFragment),
-			Position: chat.MessageSearchPosition{
-				MessageID:        row.MessageID.String(),
-				MessageCreatedAt: timestampValue(row.CreatedAt),
-			},
-		})
-	}
-
-	return result, nil
+	// Backend group content search сознательно де-скоуплен:
+	// legacy SearchMessages больше не использует plaintext text_content/search_vector,
+	// а encrypted group search остаётся только локальным в browser runtime.
+	return []chat.MessageSearchResult{}, nil
 }
 
 func (r *Repository) ListDirectChatReadStateEntries(ctx context.Context, userID string, chatID string) ([]chat.DirectChatReadStateEntry, error) {
@@ -2752,24 +2722,6 @@ func mustParseUUID(value string) uuid.UUID {
 	return parsed
 }
 
-func searchCursorCreatedAt(value *chat.MessageSearchCursor) *time.Time {
-	if value == nil {
-		return nil
-	}
-
-	at := value.MessageCreatedAt.UTC()
-	return &at
-}
-
-func searchCursorMessageID(value *chat.MessageSearchCursor) *string {
-	if value == nil {
-		return nil
-	}
-
-	messageID := value.MessageID
-	return &messageID
-}
-
 func timestamptzValue(value time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: value.UTC(), Valid: true}
 }
@@ -2794,19 +2746,6 @@ func textPointer(value pgtype.Text) *string {
 
 	result := value.String
 	return &result
-}
-
-func stringValue(value any) string {
-	switch resolved := value.(type) {
-	case nil:
-		return ""
-	case string:
-		return resolved
-	case []byte:
-		return string(resolved)
-	default:
-		return fmt.Sprint(resolved)
-	}
 }
 
 func uuidSliceToStrings(values []uuid.UUID) []string {
