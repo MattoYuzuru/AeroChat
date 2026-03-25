@@ -2639,8 +2639,8 @@ func (r *Repository) listDirectReplyPreviewsByMessageIDs(ctx context.Context, us
 }
 
 func (r *Repository) listGroupReplyPreviewsByMessageIDs(ctx context.Context, userID string, groupID string, messageIDs []uuid.UUID) (map[string]*chat.ReplyPreview, error) {
-	// Legacy group reply preview тоже зависит от server-readable target message
-	// и не пытается угадывать fallback вне legacy history.
+	// Legacy group reply preview больше не читает plaintext body target message.
+	// Group path сохраняет только metadata-only linkage либо explicit unavailable state.
 	result := make(map[string]*chat.ReplyPreview, len(messageIDs))
 	if len(messageIDs) == 0 {
 		return result, nil
@@ -2664,8 +2664,6 @@ func (r *Repository) listGroupReplyPreviewsByMessageIDs(ctx context.Context, use
 				Nickname:  row.Nickname,
 				AvatarURL: textPointer(row.AvatarUrl),
 			},
-			HasText:         row.TextContent != "",
-			TextPreview:     buildReplyPreviewText(row.TextContent),
 			AttachmentCount: row.AttachmentCount,
 		}
 	}
@@ -2736,22 +2734,6 @@ func unavailableReplyPreview(messageID string) *chat.ReplyPreview {
 		MessageID:     messageID,
 		IsUnavailable: true,
 	}
-}
-
-func buildReplyPreviewText(value string) string {
-	const maxPreviewRunes = 140
-
-	normalized := strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
-	if normalized == "" {
-		return ""
-	}
-
-	runes := []rune(normalized)
-	if len(runes) <= maxPreviewRunes {
-		return normalized
-	}
-
-	return string(runes[:maxPreviewRunes]) + "..."
 }
 
 func nullableUUID(value *string) pgtype.UUID {

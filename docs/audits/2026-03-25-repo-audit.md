@@ -144,7 +144,7 @@
   - legacy direct/group message RPC и gateway realtime продолжают отдавать readable plaintext payload для старых lanes.
 - Previews:
   - legacy direct reply preview больше не строит `text_preview` из `text_content` и теперь возвращает только honest metadata-only/deleted/unavailable state;
-  - legacy group reply preview всё ещё строится из server-readable `text_content`.
+  - legacy group reply preview тоже больше не строит `text_preview` из `text_content` и теперь возвращает только honest metadata-only/unavailable state.
 - Search:
   - server-side search для legacy direct/group lanes индексирует `text_content` через Postgres `tsvector`.
 - Media:
@@ -173,7 +173,8 @@
 - Reply preview:
   - legacy direct reply preview на list/get/send flow больше не зависит от plaintext body target message:
     сохраняется stable `reply_to_message_id`, author/attachment metadata при наличии target и explicit `is_deleted` / `is_unavailable` degradation;
-  - legacy group reply preview по-прежнему собирается только если сервер всё ещё может прочитать target message в legacy history;
+  - legacy group reply preview теперь тоже не зависит от plaintext body target message:
+    сохраняется stable `reply_to_message_id`, author/attachment metadata при наличии target и explicit `is_unavailable` degradation;
   - direct preview честно деградирует в `is_deleted`, если target tombstoned;
   - direct/group preview честно деградирует в `is_unavailable`, если target больше нельзя материализовать из legacy history.
 - History/bootstrap:
@@ -185,7 +186,8 @@
 - Следующий минимальный slice после этого guardrail PR:
   - отдельно убрать одну legacy plaintext dependency за раз;
   - direct legacy reply preview degradation/removal slice уже выполнен;
-  - следующий маленький безопасный кандидат сейчас — group legacy reply preview или отдельный slice по server-side search, без смешивания этих работ.
+  - group legacy reply preview degradation/removal slice теперь тоже выполнен;
+  - следующий маленький безопасный кандидат сейчас — отдельный slice по server-side search, без смешивания этих работ.
 
 ### Areas that need manual runtime verification
 

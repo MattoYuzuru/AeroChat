@@ -4486,7 +4486,7 @@ function describeReplyPreviewText(preview: GroupMessage["replyPreview"]): string
       ? "Вложение"
       : `Вложения: ${preview.attachmentCount}`;
   }
-  return "Пустой preview";
+  return "Текст предпросмотра недоступен.";
 }
 
 function describeGroupComposerReplyTarget(message: GroupMessage): string {

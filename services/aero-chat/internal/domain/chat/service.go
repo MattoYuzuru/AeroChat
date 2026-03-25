@@ -3027,7 +3027,7 @@ func buildGroupReplyPreview(message GroupMessage, members []GroupMember) *ReplyP
 	return buildReplyPreview(
 		message.ID,
 		findGroupMemberUserByID(members, message.SenderUserID),
-		message.Text,
+		nil,
 		len(message.Attachments),
 		false,
 		false,
