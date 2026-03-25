@@ -37,6 +37,48 @@
   --color-success-soft: rgba(46, 142, 106, 0.13);
   --color-warn-soft: rgba(230, 161, 57, 0.18);
   --color-chip: rgba(255, 255, 255, 0.68);
+  --xp-panel-border: #6c86b2;
+  --xp-panel-border-strong: #4d648e;
+  --xp-panel-border-soft: #8fa7cf;
+  --xp-panel-highlight: rgba(255, 255, 255, 0.96);
+  --xp-panel-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.94),
+    inset -1px -1px 0 rgba(112, 140, 185, 0.28),
+    0 10px 22px rgba(24, 58, 103, 0.12);
+  --xp-panel-surface:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(224, 236, 255, 0.92));
+  --xp-panel-surface-strong:
+    linear-gradient(180deg, rgba(252, 254, 255, 0.98), rgba(235, 243, 255, 0.93));
+  --xp-panel-surface-soft:
+    linear-gradient(180deg, rgba(246, 250, 255, 0.98), rgba(202, 222, 248, 0.9));
+  --xp-note-surface:
+    linear-gradient(180deg, rgba(239, 248, 255, 0.98), rgba(214, 233, 255, 0.92));
+  --xp-note-border: #8da9d2;
+  --xp-field-border: #6f8bb8;
+  --xp-field-border-strong: #2d61ab;
+  --xp-field-surface: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
+  --xp-field-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.98),
+    inset -1px -1px 0 rgba(146, 168, 205, 0.35);
+  --xp-field-shadow-pressed:
+    inset 1px 1px 0 rgba(158, 181, 214, 0.28),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.72);
+  --xp-button-surface:
+    linear-gradient(180deg, #fefefe 0%, #d5e5ff 48%, #c2d9ff 49%, #a8c4f3 100%);
+  --xp-button-surface-primary:
+    linear-gradient(180deg, #7fb4ff 0%, #4c8de4 48%, #3c78cf 49%, #2f66b7 100%);
+  --xp-button-surface-danger:
+    linear-gradient(180deg, #f6b3bb 0%, #de7d88 48%, #cd6571 49%, #b74f5b 100%);
+  --xp-button-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.98),
+    inset -1px -1px 0 rgba(84, 111, 156, 0.28);
+  --xp-badge-surface:
+    linear-gradient(180deg, rgba(247, 251, 255, 0.98), rgba(220, 232, 251, 0.92));
+  --xp-badge-border: #8fa7cf;
+  --xp-focus-outline: #f3c45d;
+  --xp-focus-ring:
+    0 0 0 1px #2d61ab,
+    0 0 0 3px rgba(243, 196, 93, 0.45);
   --surface-panel:
     linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(229, 245, 255, 0.56));
   --surface-panel-strong:

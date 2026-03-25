@@ -35,6 +35,41 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 a:focus-visible {
-  outline: 2px solid rgba(12, 93, 153, 0.38);
-  outline-offset: 2px;
+  outline: 2px solid var(--xp-focus-outline);
+  outline-offset: 1px;
+}
+
+input[type="checkbox"].xpCheckbox {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid var(--xp-field-border);
+  background: var(--xp-field-surface);
+  box-shadow: var(--xp-field-shadow-pressed);
+  position: relative;
+}
+
+input[type="checkbox"].xpCheckbox::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 0.25rem;
+  height: 0.5rem;
+  border-right: 2px solid #163964;
+  border-bottom: 2px solid #163964;
+  transform: rotate(45deg) scale(0);
+  transform-origin: center;
+}
+
+input[type="checkbox"].xpCheckbox:checked::after {
+  transform: rotate(45deg) scale(1);
+}
+
+input[type="checkbox"].xpCheckbox:focus-visible {
+  box-shadow:
+    var(--xp-focus-ring),
+    var(--xp-field-shadow-pressed);
 }

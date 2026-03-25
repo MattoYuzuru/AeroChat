@@ -565,7 +565,7 @@ export function SearchPage() {
         <div className={styles.sectionHeader}>
           <div>
             <p className={styles.cardLabel}>Люди</p>
-            <h1 className={styles.title}>Люди и invite links</h1>
+            <h1 className={styles.title}>Люди и приглашения</h1>
             <p className={styles.subtitle}>
               Сначала точный login, уже знакомые контакты и приглашения в группы. Поиск по
               сообщениям остаётся ниже как отдельный вторичный блок.
@@ -807,8 +807,8 @@ export function SearchPage() {
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <div>
-                <p className={styles.cardLabel}>Invite link</p>
-                <h2 className={styles.panelTitle}>Посмотреть группу перед входом</h2>
+                <p className={styles.cardLabel}>Приглашение</p>
+                <h2 className={styles.panelTitle}>Открыть приглашение в группу</h2>
                 <p className={styles.panelDescription}>
                   Сначала превью, потом явное действие. Автовхода по вставленной ссылке нет.
                 </p>
@@ -913,7 +913,7 @@ export function SearchPage() {
           </div>
 
           <span className={styles.metaTag}>
-            {submittedSearch ? `${legacyResults.length} / ${encryptedResults.length}` : "Вторично"}
+            {submittedSearch ? `${legacyResults.length} / ${encryptedResults.length}` : "По желанию"}
           </span>
         </div>
 
@@ -932,7 +932,7 @@ export function SearchPage() {
                 setMessageQuery(event.target.value);
                 setContentSearchFormError(null);
               }}
-              placeholder="Например: release notes"
+              placeholder="Например: созвон"
               value={messageQuery}
             />
           </label>
@@ -1052,9 +1052,9 @@ export function SearchPage() {
               <div className={styles.pathHeader}>
                 <div>
                   <p className={styles.cardLabel}>Обычные сообщения</p>
-                  <h3 className={styles.pathTitle}>Server-backed</h3>
+                  <h3 className={styles.pathTitle}>Серверный поиск</h3>
                   <p className={styles.pathDescription}>
-                    {searchScopeSummary ?? "Поиск по plaintext истории в выбранной области."}
+                    {searchScopeSummary ?? "Поиск по обычной истории в выбранной области."}
                   </p>
                 </div>
                 <span className={styles.metaTag}>
@@ -1095,7 +1095,7 @@ export function SearchPage() {
                         directChats={directChats}
                         groups={groups}
                         key={`legacy:${result.messageId}:${result.createdAt}`}
-                        pathLabel="Server"
+                        pathLabel="Сервер"
                         result={result}
                       />
                     ))}
@@ -1122,10 +1122,10 @@ export function SearchPage() {
             <section className={styles.pathSection}>
               <div className={styles.pathHeader}>
                 <div>
-                  <p className={styles.cardLabel}>Encrypted</p>
-                  <h3 className={styles.pathTitle}>Локально в браузере</h3>
+                  <p className={styles.cardLabel}>Зашифрованные</p>
+                  <h3 className={styles.pathTitle}>Локальный поиск</h3>
                   <p className={styles.pathDescription}>
-                    Только локально расшифрованное bounded окно текущей сессии.
+                    Только локально расшифрованные сообщения текущей сессии.
                   </p>
                 </div>
                 <span className={styles.metaTag}>
@@ -1173,7 +1173,7 @@ export function SearchPage() {
                       directChats={directChats}
                       groups={groups}
                       key={`encrypted:${result.messageId}:${result.createdAt}`}
-                      pathLabel="Encrypted local"
+                      pathLabel="Локально"
                       result={result}
                     />
                   ))}
