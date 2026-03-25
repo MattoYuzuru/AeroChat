@@ -265,6 +265,55 @@ func TestGroupMessagesSupportReplyPreview(t *testing.T) {
 	}
 }
 
+func TestGroupReplyPreviewBecomesUnavailableWhenTargetLeavesLegacyHistory(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{9}, 64))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	group := mustCreateGroup(t, service, alice.Token, "Reply group missing target")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	target := mustSendGroupMessage(t, service, bob.Token, group.ID, "group reply target")
+	reply, err := service.SendGroupTextMessage(context.Background(), alice.Token, group.ID, "reply", nil, target.ID)
+	if err != nil {
+		t.Fatalf("send group reply: %v", err)
+	}
+
+	delete(repo.groupMessages, target.ID)
+
+	messages, err := service.ListGroupMessages(context.Background(), alice.Token, group.ID, 0)
+	if err != nil {
+		t.Fatalf("list group messages: %v", err)
+	}
+	if len(messages) != 1 || messages[0].ID != reply.ID {
+		t.Fatalf("ожидался только reply после удаления target из legacy history, получено %+v", messages)
+	}
+	if messages[0].ReplyPreview == nil || !messages[0].ReplyPreview.IsUnavailable {
+		t.Fatalf("ожидался unavailable reply preview в group history, получено %+v", messages[0].ReplyPreview)
+	}
+	if messages[0].ReplyPreview.HasText || messages[0].ReplyPreview.TextPreview != "" {
+		t.Fatalf("unavailable group reply preview не должен возвращать plaintext text, получено %+v", messages[0].ReplyPreview)
+	}
+
+	fetchedReply, err := repo.GetGroupMessage(context.Background(), alice.User.ID, group.ID, reply.ID)
+	if err != nil {
+		t.Fatalf("get group reply from repository: %v", err)
+	}
+	if fetchedReply.ReplyPreview == nil || !fetchedReply.ReplyPreview.IsUnavailable {
+		t.Fatalf("ожидался unavailable preview в group get flow, получено %+v", fetchedReply.ReplyPreview)
+	}
+}
+
 func TestGroupMessagesRejectRawHTMLAndRequireMembership(t *testing.T) {
 	t.Parallel()
 

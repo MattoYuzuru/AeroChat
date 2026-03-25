@@ -164,6 +164,25 @@
   - call metadata, participant roster и signaling envelopes проходят через backend services и gateway realtime;
   - для direct calls media plane идёт браузер-браузер, но SDP/ICE payload не скрыт приложенческим E2EE-слоем.
 
+### Plaintext dependency guardrails
+
+- Server-side search:
+  - текущий backend path `SearchMessages` зависит только от legacy `direct_chat_messages.text_content` / `group_messages.text_content` и Postgres `search_vector`;
+  - encrypted direct/group lanes в backend search не участвуют и не должны описываться как parity-ready.
+- Reply preview:
+  - legacy direct/group reply preview на list/get flow собирается только если сервер всё ещё может прочитать target message в legacy history;
+  - direct preview честно деградирует в `is_deleted`, если target tombstoned;
+  - direct/group preview честно деградирует в `is_unavailable`, если target больше нельзя материализовать из legacy history.
+- History/bootstrap:
+  - `ListDirectChatMessages` / `GetDirectChatMessage` и `ListGroupMessages` / `GetGroupMessage` остаются legacy plaintext history APIs;
+  - encrypted direct/group history читается только через отдельные opaque list/get/bootstrap методы и не merge'ится server-side в те же message payloads.
+- Search UX boundary:
+  - `/app/search` сохраняет coexistence-модель: legacy plaintext results приходят с сервера, encrypted results строятся только из local/session-local decrypted index в браузере;
+  - удаление plaintext без replacement search/reply/history strategy сломает текущий product surface, а не просто storage detail.
+- Следующий минимальный slice после этого guardrail PR:
+  - отдельно убрать одну legacy plaintext dependency за раз;
+  - самый маленький безопасный кандидат сейчас — direct legacy reply preview degradation/removal slice без одновременного redesign server-side search.
+
 ### Areas that need manual runtime verification
 
 - Logs:
