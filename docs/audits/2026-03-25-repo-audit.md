@@ -143,7 +143,8 @@
 - Message transport:
   - legacy direct/group message RPC и gateway realtime продолжают отдавать readable plaintext payload для старых lanes.
 - Previews:
-  - server-side reply preview для legacy direct/group сообщений строится из `text_content`.
+  - legacy direct reply preview больше не строит `text_preview` из `text_content` и теперь возвращает только honest metadata-only/deleted/unavailable state;
+  - legacy group reply preview всё ещё строится из server-readable `text_content`.
 - Search:
   - server-side search для legacy direct/group lanes индексирует `text_content` через Postgres `tsvector`.
 - Media:
@@ -170,7 +171,9 @@
   - текущий backend path `SearchMessages` зависит только от legacy `direct_chat_messages.text_content` / `group_messages.text_content` и Postgres `search_vector`;
   - encrypted direct/group lanes в backend search не участвуют и не должны описываться как parity-ready.
 - Reply preview:
-  - legacy direct/group reply preview на list/get flow собирается только если сервер всё ещё может прочитать target message в legacy history;
+  - legacy direct reply preview на list/get/send flow больше не зависит от plaintext body target message:
+    сохраняется stable `reply_to_message_id`, author/attachment metadata при наличии target и explicit `is_deleted` / `is_unavailable` degradation;
+  - legacy group reply preview по-прежнему собирается только если сервер всё ещё может прочитать target message в legacy history;
   - direct preview честно деградирует в `is_deleted`, если target tombstoned;
   - direct/group preview честно деградирует в `is_unavailable`, если target больше нельзя материализовать из legacy history.
 - History/bootstrap:
@@ -181,7 +184,8 @@
   - удаление plaintext без replacement search/reply/history strategy сломает текущий product surface, а не просто storage detail.
 - Следующий минимальный slice после этого guardrail PR:
   - отдельно убрать одну legacy plaintext dependency за раз;
-  - самый маленький безопасный кандидат сейчас — direct legacy reply preview degradation/removal slice без одновременного redesign server-side search.
+  - direct legacy reply preview degradation/removal slice уже выполнен;
+  - следующий маленький безопасный кандидат сейчас — group legacy reply preview или отдельный slice по server-side search, без смешивания этих работ.
 
 ### Areas that need manual runtime verification
 
