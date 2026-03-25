@@ -220,7 +220,7 @@ func TestRestrictedGroupMemberKeepsReadAccessButCannotSendOrType(t *testing.T) {
 	}
 }
 
-func TestGroupMessagesSupportReplyPreview(t *testing.T) {
+func TestGroupMessagesUseMetadataOnlyReplyPreview(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -252,6 +252,12 @@ func TestGroupMessagesSupportReplyPreview(t *testing.T) {
 	if reply.ReplyPreview.Author == nil || reply.ReplyPreview.Author.ID != bob.User.ID {
 		t.Fatalf("ожидался author summary Bob в group reply preview, получено %+v", reply.ReplyPreview)
 	}
+	if reply.ReplyPreview.HasText || reply.ReplyPreview.TextPreview != "" {
+		t.Fatalf("legacy group reply preview больше не должен возвращать plaintext body, получено %+v", reply.ReplyPreview)
+	}
+	if reply.ReplyPreview.AttachmentCount != 0 {
+		t.Fatalf("для text-only group target не ожидался attachment metadata preview, получено %+v", reply.ReplyPreview)
+	}
 
 	messages, err := service.ListGroupMessages(context.Background(), alice.Token, group.ID, 0)
 	if err != nil {
@@ -262,6 +268,20 @@ func TestGroupMessagesSupportReplyPreview(t *testing.T) {
 	}
 	if messages[0].ReplyPreview == nil || messages[0].ReplyPreview.MessageID != target.ID {
 		t.Fatalf("ожидался reply preview в group history, получено %+v", messages[0].ReplyPreview)
+	}
+	if messages[0].ReplyPreview.HasText || messages[0].ReplyPreview.TextPreview != "" {
+		t.Fatalf("group history reply preview не должен раскрывать plaintext body, получено %+v", messages[0].ReplyPreview)
+	}
+
+	fetchedReply, err := repo.GetGroupMessage(context.Background(), alice.User.ID, group.ID, reply.ID)
+	if err != nil {
+		t.Fatalf("get group reply from repository: %v", err)
+	}
+	if fetchedReply.ReplyPreview == nil || fetchedReply.ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался group get reply preview, получено %+v", fetchedReply.ReplyPreview)
+	}
+	if fetchedReply.ReplyPreview.HasText || fetchedReply.ReplyPreview.TextPreview != "" {
+		t.Fatalf("group get reply preview не должен возвращать plaintext body, получено %+v", fetchedReply.ReplyPreview)
 	}
 }
 
@@ -301,6 +321,9 @@ func TestGroupReplyPreviewBecomesUnavailableWhenTargetLeavesLegacyHistory(t *tes
 	if messages[0].ReplyPreview == nil || !messages[0].ReplyPreview.IsUnavailable {
 		t.Fatalf("ожидался unavailable reply preview в group history, получено %+v", messages[0].ReplyPreview)
 	}
+	if messages[0].ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался stable reply target id %q, получено %+v", target.ID, messages[0].ReplyPreview)
+	}
 	if messages[0].ReplyPreview.HasText || messages[0].ReplyPreview.TextPreview != "" {
 		t.Fatalf("unavailable group reply preview не должен возвращать plaintext text, получено %+v", messages[0].ReplyPreview)
 	}
@@ -311,6 +334,9 @@ func TestGroupReplyPreviewBecomesUnavailableWhenTargetLeavesLegacyHistory(t *tes
 	}
 	if fetchedReply.ReplyPreview == nil || !fetchedReply.ReplyPreview.IsUnavailable {
 		t.Fatalf("ожидался unavailable preview в group get flow, получено %+v", fetchedReply.ReplyPreview)
+	}
+	if fetchedReply.ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался stable reply target id %q в group get flow, получено %+v", target.ID, fetchedReply.ReplyPreview)
 	}
 }
 

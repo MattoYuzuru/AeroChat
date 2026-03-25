@@ -1514,7 +1514,6 @@ SELECT
     u.login,
     u.nickname,
     u.avatar_url,
-    m.text_content,
     COALESCE((
         SELECT COUNT(*)::INT
         FROM message_attachments AS ma

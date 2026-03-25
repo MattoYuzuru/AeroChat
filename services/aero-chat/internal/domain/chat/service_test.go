@@ -4347,10 +4347,6 @@ func (r *fakeRepository) buildGroupReplyPreviewForTest(messageID string) *ReplyP
 		Author:          copyUserSummaryForReplyPreviewForTest(r.users[target.SenderUserID]),
 		AttachmentCount: int32(len(target.Attachments)),
 	}
-	if target.Text != nil {
-		preview.HasText = true
-		preview.TextPreview = buildReplyTextPreview(target.Text.Text)
-	}
 
 	return preview
 }

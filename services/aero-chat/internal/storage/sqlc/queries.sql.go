@@ -4106,7 +4106,6 @@ SELECT
     u.login,
     u.nickname,
     u.avatar_url,
-    m.text_content,
     COALESCE((
         SELECT COUNT(*)::INT
         FROM message_attachments AS ma
@@ -4134,7 +4133,6 @@ type ListGroupReplyPreviewRowsRow struct {
 	Login           string      `db:"login" json:"login"`
 	Nickname        string      `db:"nickname" json:"nickname"`
 	AvatarUrl       pgtype.Text `db:"avatar_url" json:"avatar_url"`
-	TextContent     string      `db:"text_content" json:"text_content"`
 	AttachmentCount int32       `db:"attachment_count" json:"attachment_count"`
 }
 
@@ -4153,7 +4151,6 @@ func (q *Queries) ListGroupReplyPreviewRows(ctx context.Context, arg ListGroupRe
 			&i.Login,
 			&i.Nickname,
 			&i.AvatarUrl,
-			&i.TextContent,
 			&i.AttachmentCount,
 		); err != nil {
 			return nil, err
