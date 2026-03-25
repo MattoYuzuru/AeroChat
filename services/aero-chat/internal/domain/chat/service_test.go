@@ -1392,7 +1392,7 @@ func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *tes
 	}
 }
 
-func TestGroupCoexistenceKeepsPlaintextHistorySearchAndEncryptedFetchSeparate(t *testing.T) {
+func TestGroupCoexistenceKeepsPlaintextHistoryWhileSearchIsDescopedAndEncryptedFetchSeparate(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -1462,10 +1462,10 @@ func TestGroupCoexistenceKeepsPlaintextHistorySearchAndEncryptedFetchSeparate(t 
 		t.Fatalf("search legacy group messages: %v", err)
 	}
 	if hasMore || nextCursor != nil {
-		t.Fatalf("не ожидалась пагинация для одного legacy group hit, hasMore=%v nextCursor=%+v", hasMore, nextCursor)
+		t.Fatalf("не ожидалась пагинация для de-scoped legacy group search, hasMore=%v nextCursor=%+v", hasMore, nextCursor)
 	}
-	if len(legacyResults) != 1 || legacyResults[0].MessageID != legacy.ID {
-		t.Fatalf("server-side group search должна возвращать только legacy plaintext hit, получено %+v", legacyResults)
+	if len(legacyResults) != 0 {
+		t.Fatalf("server-side group search должна честно возвращать empty result после de-scope, получено %+v", legacyResults)
 	}
 
 	encryptedResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
@@ -1868,7 +1868,7 @@ func TestSearchDirectMessagesAreDescopedForAllAndSpecificScopes(t *testing.T) {
 	}
 }
 
-func TestSearchGroupMessagesHonorsMembershipBoundaries(t *testing.T) {
+func TestSearchGroupMessagesAreDescopedForAllAndSpecificScopes(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -1912,13 +1912,35 @@ func TestSearchGroupMessagesHonorsMembershipBoundaries(t *testing.T) {
 		t.Fatalf("search all groups for Bob: %v", err)
 	}
 	if hasMore || nextCursor != nil {
-		t.Fatal("не ожидалась пагинация для одного group search hit")
+		t.Fatal("не ожидалась пагинация для de-scoped all-groups search")
 	}
-	if len(results) != 1 || results[0].MessageID != firstMessage.ID {
-		t.Fatalf("ожидался только hit из доступной группы, получено %+v", results)
+	if len(results) != 0 {
+		t.Fatalf("ожидался честный empty result для all-groups legacy search, получено %+v", results)
 	}
-	if results[0].GroupID != groupOne.ID || results[0].GroupThreadID == "" {
-		t.Fatalf("ожидались explicit group identifiers, получено %+v", results[0])
+
+	groupHistory, err := service.ListGroupMessages(context.Background(), bob.Token, groupOne.ID, 0)
+	if err != nil {
+		t.Fatalf("list accessible group history: %v", err)
+	}
+	if len(groupHistory) != 1 || groupHistory[0].ID != firstMessage.ID {
+		t.Fatalf("group history не должна меняться из-за de-scoped search, получено %+v", groupHistory)
+	}
+
+	scopedResults, scopedNextCursor, scopedHasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "group search",
+		Group: &SearchGroupMessagesScope{
+			GroupID: &groupOne.ID,
+		},
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("search specific accessible group: %v", err)
+	}
+	if scopedHasMore || scopedNextCursor != nil {
+		t.Fatal("не ожидалась пагинация для de-scoped specific group search")
+	}
+	if len(scopedResults) != 0 {
+		t.Fatalf("ожидался честный empty result для specific group legacy search, получено %+v", scopedResults)
 	}
 
 	if _, _, _, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
@@ -1932,7 +1954,7 @@ func TestSearchGroupMessagesHonorsMembershipBoundaries(t *testing.T) {
 	}
 }
 
-func TestSearchGroupMessagesUseCursorPagination(t *testing.T) {
+func TestSearchGroupMessagesKeepEmptyPaginationWhenDescoped(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -1962,35 +1984,22 @@ func TestSearchGroupMessagesUseCursorPagination(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search first page: %v", err)
 	}
-	if !hasMore {
-		t.Fatal("ожидался второй page для cursor search")
+	if hasMore {
+		t.Fatal("не ожидалась пагинация для de-scoped group search")
 	}
-	if nextCursor == nil {
-		t.Fatal("ожидался next cursor для первого page")
+	if nextCursor != nil {
+		t.Fatalf("не ожидался next cursor для de-scoped group search, получено %+v", nextCursor)
 	}
-	if len(pageOne) != 2 || pageOne[0].MessageID != third.ID || pageOne[1].MessageID != second.ID {
-		t.Fatalf("ожидались два newest hits на первой странице, получено %+v", pageOne)
+	if len(pageOne) != 0 {
+		t.Fatalf("ожидался пустой первый page для de-scoped group search, получено %+v", pageOne)
 	}
 
-	pageTwo, nextCursorTwo, hasMoreTwo, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
-		Query: "cursor foundation",
-		Group: &SearchGroupMessagesScope{
-			GroupID: &group.ID,
-		},
-		PageSize: 2,
-		Cursor:   nextCursor,
-	})
+	groupHistory, err := service.ListGroupMessages(context.Background(), bob.Token, group.ID, 0)
 	if err != nil {
-		t.Fatalf("search second page: %v", err)
+		t.Fatalf("list group history after de-scoped search: %v", err)
 	}
-	if hasMoreTwo {
-		t.Fatal("не ожидался третий page")
-	}
-	if nextCursorTwo != nil {
-		t.Fatalf("не ожидался next cursor после последней страницы, получено %+v", nextCursorTwo)
-	}
-	if len(pageTwo) != 1 || pageTwo[0].MessageID != first.ID {
-		t.Fatalf("ожидался один remaining hit на второй странице, получено %+v", pageTwo)
+	if len(groupHistory) != 3 || groupHistory[0].ID != third.ID || groupHistory[1].ID != second.ID || groupHistory[2].ID != first.ID {
+		t.Fatalf("history группы должна оставаться доступной и упорядоченной, получено %+v", groupHistory)
 	}
 }
 
@@ -3441,36 +3450,8 @@ func (r *fakeRepository) SearchGroupMessages(_ context.Context, userID string, p
 		}
 	}
 
-	result := make([]MessageSearchResult, 0)
-	for _, message := range r.groupMessages {
-		if params.GroupID != nil && message.GroupID != *params.GroupID {
-			continue
-		}
-		if _, ok := r.groupMembers[message.GroupID][userID]; !ok {
-			continue
-		}
-		if !searchMessageMatches(message.Text, params.Query) || !searchBeforeCursor(message.CreatedAt, message.ID, params.Cursor) {
-			continue
-		}
-
-		result = append(result, MessageSearchResult{
-			Scope:         ChatKindGroup,
-			GroupID:       message.GroupID,
-			GroupThreadID: message.ThreadID,
-			MessageID:     message.ID,
-			Author:        searchAuthorForTest(r.users[message.SenderUserID]),
-			CreatedAt:     message.CreatedAt,
-			EditedAt:      message.EditedAt,
-			MatchFragment: searchFragmentForTest(message.Text),
-			Position: MessageSearchPosition{
-				MessageID:        message.ID,
-				MessageCreatedAt: message.CreatedAt,
-			},
-		})
-	}
-
-	sortSearchResultsForTest(result)
-	return result, nil
+	// Legacy group backend search больше не использует plaintext message body даже в test double.
+	return []MessageSearchResult{}, nil
 }
 
 func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, params CreateEncryptedDirectMessageV2Params) (*EncryptedDirectMessageV2StoredEnvelope, error) {
@@ -4280,15 +4261,6 @@ func groupReadPositionKey(groupID string, userID string) string {
 	return groupID + ":" + userID
 }
 
-func searchAuthorForTest(user UserSummary) UserSummary {
-	return UserSummary{
-		ID:        user.ID,
-		Login:     user.Login,
-		Nickname:  user.Nickname,
-		AvatarURL: user.AvatarURL,
-	}
-}
-
 func (r *fakeRepository) buildDirectReplyPreviewForTest(messageID string) *ReplyPreview {
 	target, ok := r.messages[messageID]
 	if !ok {
@@ -4337,51 +4309,6 @@ func copyUserSummaryForReplyPreviewForTest(user UserSummary) *UserSummary {
 		Nickname:  user.Nickname,
 		AvatarURL: user.AvatarURL,
 	}
-}
-
-func searchMessageMatches(text *TextMessageContent, query string) bool {
-	if text == nil {
-		return false
-	}
-
-	normalizedText := strings.ToLower(strings.TrimSpace(text.Text))
-	normalizedQuery := strings.ToLower(strings.TrimSpace(query))
-	if normalizedText == "" || normalizedQuery == "" {
-		return false
-	}
-
-	return strings.Contains(normalizedText, normalizedQuery)
-}
-
-func searchFragmentForTest(text *TextMessageContent) string {
-	if text == nil {
-		return ""
-	}
-
-	return buildReplyTextPreview(text.Text)
-}
-
-func searchBeforeCursor(createdAt time.Time, messageID string, cursor *MessageSearchCursor) bool {
-	if cursor == nil {
-		return true
-	}
-	if createdAt.Before(cursor.MessageCreatedAt) {
-		return true
-	}
-	if createdAt.Equal(cursor.MessageCreatedAt) && strings.Compare(messageID, cursor.MessageID) < 0 {
-		return true
-	}
-
-	return false
-}
-
-func sortSearchResultsForTest(results []MessageSearchResult) {
-	sort.Slice(results, func(i, j int) bool {
-		if results[i].CreatedAt.Equal(results[j].CreatedAt) {
-			return results[i].MessageID > results[j].MessageID
-		}
-		return results[i].CreatedAt.After(results[j].CreatedAt)
-	})
 }
 
 func (r *fakeRepository) directUnreadCount(chatID string, userID string) int32 {

@@ -170,8 +170,8 @@ encrypted group lane остаётся forward-only coexistence slice повер�
 Это foundation под MLS-ориентированный поток, а не claim о full encrypted group parity или завершённом
 MLS client.
 Legacy group reply preview уже деградирован до honest metadata-only/unavailable state без server-side
-plaintext body preview, но server-side search по legacy group history всё ещё остаётся
-plaintext-dependent.
+plaintext body preview, а server-side search по содержимому legacy group history теперь тоже
+честно de-scoped вместо зависимости от plaintext body/search_vector.
 
 ---
 

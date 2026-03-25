@@ -217,12 +217,12 @@ describe("legacy search boundary copy", () => {
     );
   });
 
-  it("keeps group server-side search described as legacy-only", () => {
+  it("makes group server-side de-scope explicit", () => {
     expect(describeLegacySearchPath("group")).toBe(
-      "Серверный поиск остаётся только для legacy group history в выбранной области.",
+      "Серверный поиск по содержимому legacy group-сообщений больше не поддерживается.",
     );
     expect(describeLegacySearchEmptyState("all-groups")).toBe(
-      "В этой области подходящих сообщений нет.",
+      "Legacy group content search на сервере честно де-скоуплен. Для групп остаётся только локальный encrypted поиск текущей сессии.",
     );
   });
 });

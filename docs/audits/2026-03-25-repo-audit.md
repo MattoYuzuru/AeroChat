@@ -146,9 +146,10 @@
   - legacy direct reply preview больше не строит `text_preview` из `text_content` и теперь возвращает только honest metadata-only/deleted/unavailable state;
   - legacy group reply preview тоже больше не строит `text_preview` из `text_content` и теперь возвращает только honest metadata-only/unavailable state.
 - Search:
-  - server-side search для legacy groups всё ещё индексирует `text_content` через Postgres `tsvector`;
   - server-side search по содержимому legacy direct messages больше не используется:
     backend path честно de-scoped и не опирается на `direct_chat_messages.text_content` или direct `search_vector`.
+  - server-side search по содержимому legacy group messages тоже больше не используется:
+    backend path честно de-scoped и не опирается на `group_messages.text_content` или group `search_vector`.
 - Media:
   - attachment relay поддерживает `relay_schema = 'legacy_plaintext'`;
   - legacy attachment metadata остаётся server-visible: `file_name`, `mime_type`, `size_bytes`, `object_key`.
@@ -172,7 +173,8 @@
 - Server-side search:
   - backend `SearchMessages` для direct scope больше не ищет по legacy plaintext body:
     direct server-side content search честно de-scoped и не использует `direct_chat_messages.text_content` / direct `search_vector`;
-  - backend `SearchMessages` для group scope всё ещё зависит от legacy `group_messages.text_content` и Postgres `search_vector`;
+  - backend `SearchMessages` для group scope тоже больше не ищет по legacy plaintext body:
+    group server-side content search честно de-scoped и не использует `group_messages.text_content` / group `search_vector`;
   - encrypted direct/group lanes в backend search не участвуют и не должны описываться как parity-ready.
 - Reply preview:
   - legacy direct reply preview на list/get/send flow больше не зависит от plaintext body target message:
@@ -185,14 +187,15 @@
   - `ListDirectChatMessages` / `GetDirectChatMessage` и `ListGroupMessages` / `GetGroupMessage` остаются legacy plaintext history APIs;
   - encrypted direct/group history читается только через отдельные opaque list/get/bootstrap методы и не merge'ится server-side в те же message payloads.
 - Search UX boundary:
-  - `/app/search` сохраняет coexistence-модель: legacy group server-side results приходят с сервера, direct legacy content search там честно de-scoped, а encrypted results строятся только из local/session-local decrypted index в браузере;
+  - `/app/search` сохраняет coexistence-модель: legacy direct/group content search на сервере честно de-scoped, а encrypted results строятся только из local/session-local decrypted index в браузере;
   - удаление plaintext без replacement search/reply/history strategy сломает текущий product surface, а не просто storage detail.
 - Следующий минимальный slice после этого guardrail PR:
   - отдельно убрать одну legacy plaintext dependency за раз;
   - direct legacy reply preview degradation/removal slice уже выполнен;
   - group legacy reply preview degradation/removal slice теперь тоже выполнен;
   - direct legacy server-side search plaintext dependency теперь тоже удалена через честный de-scope backend path;
-  - следующий маленький безопасный кандидат сейчас — отдельный slice по legacy group server-side search, без смешивания этих работ.
+  - legacy group server-side search plaintext dependency теперь тоже удалена через честный de-scope backend path;
+  - этот slice не убирает legacy plaintext history/storage/realtime APIs и не меняет bounded local encrypted search model.
 
 ### Areas that need manual runtime verification
 
