@@ -129,8 +129,10 @@ history и не даёт full parity с server-side search/preview. Encrypted se
 session-scoped. Legacy direct reply preview уже деградирован до honest metadata-only/deleted/unavailable
 state без server-side plaintext body preview, а server-side search по содержимому legacy direct history
 теперь честно de-scoped вместо зависимости от plaintext body/search_vector. Legacy direct readable
-history/list/get transport тоже уже de-scoped как активный direct content path; pending остаются
-readable direct realtime payloads и другие legacy plaintext compatibility surfaces.
+history/list/get transport тоже уже de-scoped как активный direct content path. Readable legacy
+direct realtime payload и active web/runtime usage legacy plaintext direct compatibility RPC surfaces
+теперь тоже de-scoped; pending остаются group compatibility RPC surfaces, legacy plaintext attachment
+path и отдельные RTC/call slices.
 
 ---
 
@@ -176,8 +178,8 @@ plaintext body preview, а server-side search по содержимому legacy
 честно de-scoped вместо зависимости от plaintext body/search_vector.
 Readable legacy group history/list/get transport теперь тоже честно de-scoped как активный
 group content path, а readable legacy group realtime plaintext payload тоже уже de-scoped как
-активный group thread content path; pending остаются readable direct realtime payloads,
-compatibility RPC surfaces и legacy plaintext attachment path.
+активный group thread content path. Для coexistence-модели pending остаются group compatibility RPC
+surfaces, legacy plaintext attachment path и отдельные RTC/call follow-up slices.
 
 ---
 

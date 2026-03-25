@@ -8,6 +8,8 @@ import {
   buildGroupChatRoutePath,
   buildSelfChatRoutePath,
 } from "../app/app-routes";
+import { subscribeEncryptedDirectMessageV2RealtimeEvents } from "../chats/encrypted-v2-realtime";
+import { patchLiveEncryptedDirectChatActivity } from "../chats/live-direct-activity";
 import { parseDirectChatRealtimeEvent } from "../chats/realtime";
 import { gatewayClient } from "../gateway/runtime";
 import type { DirectChat, Group } from "../gateway/types";
@@ -28,7 +30,6 @@ import {
   createCustomFolderDesktopEntity,
   createDesktopUnreadTargetMap,
   deleteCustomFolderDesktopEntity,
-  describeDirectChatDesktopTitle,
   hideDesktopEntity,
   listCustomFolderDesktopEntities,
   readDesktopRegistryState,
@@ -38,7 +39,6 @@ import {
   showDesktopEntityOnDesktop,
   syncDirectChatDesktopEntities,
   syncGroupChatDesktopEntities,
-  upsertDirectChatDesktopEntity,
   upsertGroupChatDesktopEntity,
   writeDesktopRegistryState,
   type DesktopEntity,
@@ -146,14 +146,8 @@ export function ExplorerPage() {
     return subscribeRealtimeEnvelopes((envelope) => {
       const directEvent = parseDirectChatRealtimeEvent(envelope);
       if (directEvent?.type === "direct_chat.message.updated") {
-        setLocalDirectChats((currentChats) => upsertLiveDirectChat(currentChats, directEvent.chat));
-        setLocalRegistryState((currentState) =>
-          upsertDirectChatDesktopEntity(
-            currentState,
-            directEvent.chat.id,
-            describeDirectChatDesktopTitle(directEvent.chat, authenticatedState.profile.id),
-          ),
-        );
+        // Legacy direct plaintext realtime payload больше не должен влиять
+        // на live direct surfaces внутри Explorer/runtime.
         return;
       }
 
@@ -231,6 +225,18 @@ export function ExplorerPage() {
           ),
         );
       }
+    });
+  }, [authenticatedState, desktopShellHost]);
+
+  useEffect(() => {
+    if (desktopShellHost !== null || authenticatedState === null) {
+      return;
+    }
+
+    return subscribeEncryptedDirectMessageV2RealtimeEvents((event) => {
+      setLocalDirectChats((currentChats) =>
+        patchLiveEncryptedDirectChatActivity(currentChats, event),
+      );
     });
   }, [authenticatedState, desktopShellHost]);
 
@@ -1079,13 +1085,6 @@ function canAddEntryToFolder(
     folders.length > 0 &&
     (record.entry.kind === "direct_chat" || record.entry.kind === "group_chat")
   );
-}
-
-function upsertLiveDirectChat(
-  chats: DirectChat[],
-  nextChat: DirectChat,
-): DirectChat[] {
-  return upsertLiveTargetById(chats, nextChat);
 }
 
 function patchLiveDirectChatUnread(

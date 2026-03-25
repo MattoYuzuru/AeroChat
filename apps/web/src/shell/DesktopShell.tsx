@@ -22,6 +22,8 @@ import {
   shellAppRegistry,
 } from "../app/app-routes";
 import { gatewayClient } from "../gateway/runtime";
+import { subscribeEncryptedDirectMessageV2RealtimeEvents } from "../chats/encrypted-v2-realtime";
+import { patchLiveEncryptedDirectChatActivity } from "../chats/live-direct-activity";
 import { parseDirectChatRealtimeEvent } from "../chats/realtime";
 import type { DirectChat, Group } from "../gateway/types";
 import { parseGroupRealtimeEvent } from "../groups/realtime";
@@ -34,7 +36,6 @@ import {
   createCustomFolderDesktopEntity,
   createDesktopUnreadTargetMap,
   deleteCustomFolderDesktopEntity,
-  describeDirectChatDesktopTitle,
   getCustomFolderDesktopEntity,
   getCustomFolderUnreadCount,
   hideDesktopEntity,
@@ -679,14 +680,8 @@ export function DesktopShell({
     return subscribeRealtimeEnvelopes((envelope) => {
       const directEvent = parseDirectChatRealtimeEvent(envelope);
       if (directEvent?.type === "direct_chat.message.updated") {
-        setLiveDirectChats((currentChats) => upsertLiveDirectChat(currentChats, directEvent.chat));
-        setDesktopRegistryState((currentState) =>
-          upsertDirectChatDesktopEntity(
-            currentState,
-            directEvent.chat.id,
-            describeDirectChatDesktopTitle(directEvent.chat, state.profile.id),
-          ),
-        );
+        // Legacy direct plaintext realtime payload больше не должен влиять
+        // на активные direct shell surfaces после de-scope content path.
         return;
       }
 
@@ -759,6 +754,18 @@ export function DesktopShell({
           ),
         );
       }
+    });
+  }, [state]);
+
+  useEffect(() => {
+    if (state.status !== "authenticated") {
+      return;
+    }
+
+    return subscribeEncryptedDirectMessageV2RealtimeEvents((event) => {
+      setLiveDirectChats((currentChats) =>
+        patchLiveEncryptedDirectChatActivity(currentChats, event),
+      );
     });
   }, [state]);
 
@@ -2714,13 +2721,6 @@ function areStoredWindowPlacementRecordsEqual(
     left?.bounds.width === right.bounds.width &&
     left?.bounds.height === right.bounds.height
   );
-}
-
-function upsertLiveDirectChat(
-  chats: DirectChat[],
-  nextChat: DirectChat,
-): DirectChat[] {
-  return upsertLiveTargetById(chats, nextChat);
 }
 
 function patchLiveDirectChatUnread(

@@ -141,7 +141,9 @@
   - legacy direct messages хранят `text_content` в `direct_chat_messages`.
   - legacy group messages хранят `text_content` в `group_messages`.
 - Message transport:
-  - legacy direct/group message RPC и gateway realtime продолжают отдавать readable plaintext payload для старых lanes.
+  - legacy direct/group message RPC и gateway realtime продолжают отдавать readable plaintext payload для старых lanes;
+  - direct active runtime больше не использует readable legacy direct realtime payload и legacy plaintext
+    direct compatibility RPC как активный content-bearing product path.
 - Previews:
   - legacy direct reply preview больше не строит `text_preview` из `text_content` и теперь возвращает только honest metadata-only/deleted/unavailable state;
   - legacy group reply preview тоже больше не строит `text_preview` из `text_content` и теперь возвращает только honest metadata-only/unavailable state.
@@ -154,6 +156,13 @@
   - legacy direct readable history/list/get transport больше не должен считаться активным product path:
     `ListDirectChatMessages` теперь честно de-scoped для content-bearing timeline поведения, а web direct bootstrap не рендерит legacy plaintext timeline как активную direct surface;
   - encrypted direct fetch/projection остаётся отдельным активным path для direct content.
+- Direct realtime/runtime:
+  - readable legacy direct realtime payload теперь тоже честно de-scoped как активный direct content path:
+    web direct thread, desktop shell и Explorer больше не обновляют активные direct surfaces из
+    `direct_chat.message.updated`, а live activity для direct lane продвигается только через encrypted
+    direct realtime metadata или отдельные non-content control-plane события;
+  - active web/runtime usage legacy plaintext direct compatibility RPC surfaces для composer/edit/delete/pin/reply
+    теперь тоже de-scoped и не должен трактоваться как продуктовый path для readable direct content.
 - Group history/bootstrap:
   - legacy group readable history/list/get transport теперь тоже больше не должен считаться активным product path:
     `ListGroupMessages` честно de-scoped для content-bearing timeline поведения, а web group bootstrap не рендерит legacy plaintext timeline как активную group surface;
@@ -208,11 +217,12 @@
   - group legacy reply preview degradation/removal slice теперь тоже выполнен;
   - direct legacy server-side search plaintext dependency теперь тоже удалена через честный de-scope backend path;
   - direct legacy readable history/list/get transport теперь тоже удалён как активный product path для direct content;
+  - readable direct realtime compatibility payload теперь тоже удалён как активный product path для direct runtime;
+  - active web/runtime usage legacy plaintext direct compatibility RPC surfaces теперь тоже de-scoped;
   - legacy group server-side search plaintext dependency теперь тоже удалена через честный de-scope backend path;
   - legacy group readable history/list/get transport теперь тоже удалён как активный product path для group content;
   - legacy group readable realtime plaintext content path теперь тоже удалён как активный product path для group thread;
-  - readable direct realtime compatibility payload всё ещё остаётся pending;
-  - legacy plaintext compatibility RPC surfaces и legacy plaintext attachment path всё ещё остаются pending;
+  - group compatibility RPC surfaces и legacy plaintext attachment path всё ещё остаются pending;
   - этот slice не убирает RTC issues и не меняет bounded local encrypted search model.
 
 ### Areas that need manual runtime verification
