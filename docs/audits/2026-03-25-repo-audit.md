@@ -127,7 +127,7 @@
 | Groups | `Implemented` | Group creation, roles, moderation, invite links, replies, pins, unread, search и group UI wired. | `services/aero-chat/internal/domain/chat/service.go`, `apps/web/src/pages/GroupsPage.tsx`, `docs/adr/030-*.md` ... `docs/adr/047-*.md` |
 | Encrypted direct lane | `Implemented but partial` | Real opaque storage, per-device delivery, realtime, local decrypt/projection, reply/edit/tombstone/pin/read flows есть; lane отдельна от legacy history, encrypted search только local/session. | `services/aero-chat/db/schema/000014_*.sql`, `services/aero-gateway/internal/realtime/encrypted_direct_message_v2_events.go`, `apps/web/src/chats/useEncryptedDirectMessageV2Lane.ts`, `docs/adr/060-*.md` ... `docs/adr/071-*.md` |
 | Encrypted group lane | `Implemented but partial` | MLS-oriented control plane, opaque storage, web projection, outbound text/media, mutations и encrypted read state есть; full MLS client completeness и unified parity отсутствуют. | `services/aero-chat/db/schema/000016_*.sql` ... `000019_*.sql`, `apps/web/src/groups/useEncryptedGroupLane.ts`, `docs/adr/066-*.md` ... `docs/adr/072-*.md` |
-| Media | `Implemented but partial` | Upload intent, presigned upload, attachment rendering, voice/video notes, cleanup/quota wired; encrypted relay есть, но legacy plaintext attachment path остаётся. | `services/aero-chat/cmd/aero-chat/main.go`, `services/aero-chat/db/schema/000005_*.sql`, `000015_*.sql`, `apps/web/src/attachments/*`, `docs/adr/035-*.md` ... `docs/adr/073-*.md` |
+| Media | `Implemented but partial` | Upload intent, presigned upload, attachment rendering, voice/video notes, cleanup/quota wired; encrypted relay есть, а legacy plaintext group attachment visible runtime path уже de-scoped, но coexistence storage/model и bounded compatibility reads ещё остаются. | `services/aero-chat/cmd/aero-chat/main.go`, `services/aero-chat/db/schema/000005_*.sql`, `000015_*.sql`, `apps/web/src/attachments/*`, `docs/adr/035-*.md` ... `docs/adr/073-*.md` |
 | RTC / calls | `Implemented but partial` | Signaling и call control-plane есть, web 1:1 audio bootstrap есть, group call только control/lobby; production-grade call stack не собран. | `services/aero-rtc-control/internal/domain/rtc/service.go`, `apps/web/src/rtc/useDirectCallSession.ts`, `apps/web/src/pages/GroupsPage.tsx`, `docs/adr/074-*.md` ... `docs/adr/078-*.md` |
 | Desktop shell | `Implemented` | XP-style desktop runtime, singleton/singleton-per-target windows, explorer/folders/start menu и placement persistence реально wired. | `apps/web/src/shell/DesktopShell.tsx`, `apps/web/src/shell/runtime.ts`, `apps/web/src/app/app-routes.tsx`, `docs/adr/079-*.md` ... `docs/adr/082-*.md` |
 | Mobile UX | `Implemented but partial` | Practical adaptation есть: launcher home и route-backed pages на mobile; PWA/push/mobile-specific product polish нет. | `apps/web/src/app/AppRouter.tsx`, `apps/web/src/shell/MobileLauncherHome.tsx`, `apps/web/src/shell/viewport.ts`, `docs/adr/083-mobile-practical-shell-adaptation.md` |
@@ -174,6 +174,11 @@
     а group encrypted lane остаётся единственным честным runtime path для visible content authoring/update;
   - allowed coexistence по-прежнему ограничивается metadata/control-plane и bounded internal compatibility reads,
     а не возвратом readable plaintext group bodies в active UX.
+- Group attachment/media runtime:
+  - visible legacy plaintext group attachment/file/voice/video send path теперь тоже de-scoped;
+  - web group runtime больше не должен восстанавливать legacy plaintext attachment draft для `group` scope
+    и не должен оживлять hidden fallback через старый single-file attachment composer;
+  - активным visible group media path остаётся только encrypted group media composer с ciphertext-only relay upload.
 - Media:
   - attachment relay поддерживает `relay_schema = 'legacy_plaintext'`;
   - legacy attachment metadata остаётся server-visible: `file_name`, `mime_type`, `size_bytes`, `object_key`.
@@ -232,8 +237,9 @@
   - legacy group readable history/list/get transport теперь тоже удалён как активный product path для group content;
   - legacy group readable realtime plaintext content path теперь тоже удалён как активный product path для group thread;
   - active web/runtime usage legacy plaintext group compatibility RPC surfaces теперь тоже de-scoped;
-  - legacy plaintext attachment path и bounded internal compatibility reads всё ещё остаются pending;
-  - этот slice не убирает RTC issues и не меняет bounded local encrypted search model.
+  - visible legacy plaintext group attachment runtime path теперь тоже de-scoped;
+  - bounded internal compatibility reads и underlying coexistence storage/model всё ещё остаются pending;
+  - этот slice не убирает RTC/call issues, не меняет self chat и не меняет bounded local encrypted search model.
 
 ### Areas that need manual runtime verification
 

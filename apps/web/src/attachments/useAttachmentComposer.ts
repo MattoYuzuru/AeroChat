@@ -60,6 +60,11 @@ export function useAttachmentComposer({
       dispatch({ type: "draft_removed" });
       return;
     }
+    if (isLegacyPlaintextGroupAttachmentComposerDescoped(nextScope)) {
+      clearStoredUploadedAttachment(nextScope);
+      dispatch({ type: "draft_removed" });
+      return;
+    }
 
     const restoredAttachment = loadStoredUploadedAttachment(nextScope);
     if (restoredAttachment === null) {
@@ -75,6 +80,22 @@ export function useAttachmentComposer({
 
   async function selectFile(file: File): Promise<Attachment | null> {
     if (!enabled || scopeRef.current === null) {
+      return null;
+    }
+    if (isLegacyPlaintextGroupAttachmentComposerDescoped(scopeRef.current)) {
+      abortActiveUpload(abortControllerRef);
+      fileRef.current = null;
+      clearStoredUploadedAttachment(scopeRef.current);
+      dispatch({
+        type: "file_selected",
+        fileName: file.name,
+        mimeType: resolveMimeType(file),
+        sizeBytes: file.size,
+      });
+      dispatch({
+        type: "upload_failed",
+        message: LEGACY_GROUP_ATTACHMENT_COMPOSER_DESCOPED_MESSAGE,
+      });
       return null;
     }
 
@@ -97,6 +118,14 @@ export function useAttachmentComposer({
       dispatch({
         type: "upload_failed",
         message: "Повторная загрузка недоступна после перезагрузки страницы.",
+      });
+      return null;
+    }
+    if (isLegacyPlaintextGroupAttachmentComposerDescoped(scopeRef.current)) {
+      clearStoredUploadedAttachment(scopeRef.current);
+      dispatch({
+        type: "upload_failed",
+        message: LEGACY_GROUP_ATTACHMENT_COMPOSER_DESCOPED_MESSAGE,
       });
       return null;
     }
@@ -253,4 +282,15 @@ function resolveStableScope(
     kind,
     id,
   };
+}
+
+export const LEGACY_GROUP_ATTACHMENT_COMPOSER_DESCOPED_MESSAGE =
+  "Legacy plaintext group attachment path больше не является активным runtime UX. Для groups используйте encrypted media composer.";
+
+export function isLegacyPlaintextGroupAttachmentComposerDescoped(
+  scope: AttachmentComposerScope | null,
+): scope is AttachmentComposerScope & { kind: "group" } {
+  // Групповой plaintext attachment composer больше не должен оживать из session restore
+  // или через скрытые voice/video/file fallback entrypoints.
+  return scope?.kind === "group";
 }
