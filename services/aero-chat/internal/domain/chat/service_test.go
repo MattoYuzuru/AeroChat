@@ -597,7 +597,7 @@ func TestSendTextMessageRejectsEmptyMessageWithoutTextOrAttachments(t *testing.T
 	}
 }
 
-func TestSendTextMessageSupportsReplyPreview(t *testing.T) {
+func TestSendTextMessageUsesMetadataOnlyDirectReplyPreview(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -624,8 +624,11 @@ func TestSendTextMessageSupportsReplyPreview(t *testing.T) {
 	if reply.ReplyPreview.Author == nil || reply.ReplyPreview.Author.ID != bob.User.ID {
 		t.Fatalf("ожидался author summary Bob, получено %+v", reply.ReplyPreview.Author)
 	}
-	if !reply.ReplyPreview.HasText || reply.ReplyPreview.TextPreview != "foundation reply target" {
-		t.Fatalf("ожидался text preview target message, получено %+v", reply.ReplyPreview)
+	if reply.ReplyPreview.HasText || reply.ReplyPreview.TextPreview != "" {
+		t.Fatalf("direct legacy reply preview больше не должен возвращать plaintext body, получено %+v", reply.ReplyPreview)
+	}
+	if reply.ReplyPreview.AttachmentCount != 0 {
+		t.Fatalf("для text-only target не ожидался attachment metadata preview, получено %+v", reply.ReplyPreview)
 	}
 
 	messages, err := service.ListDirectChatMessages(context.Background(), bob.Token, directChat.ID, 0)
@@ -644,6 +647,20 @@ func TestSendTextMessageSupportsReplyPreview(t *testing.T) {
 	}
 	if listedReply == nil || listedReply.ReplyPreview == nil || listedReply.ReplyPreview.MessageID != target.ID {
 		t.Fatalf("ожидался reply preview в истории, получено %+v", listedReply)
+	}
+	if listedReply.ReplyPreview.HasText || listedReply.ReplyPreview.TextPreview != "" {
+		t.Fatalf("history direct reply preview не должен раскрывать plaintext body, получено %+v", listedReply.ReplyPreview)
+	}
+
+	fetchedReply, err := repo.GetDirectChatMessage(context.Background(), bob.User.ID, directChat.ID, reply.ID)
+	if err != nil {
+		t.Fatalf("get direct reply from repository: %v", err)
+	}
+	if fetchedReply.ReplyPreview == nil || fetchedReply.ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался direct get reply preview, получено %+v", fetchedReply.ReplyPreview)
+	}
+	if fetchedReply.ReplyPreview.HasText || fetchedReply.ReplyPreview.TextPreview != "" {
+		t.Fatalf("direct get reply preview не должен возвращать plaintext body, получено %+v", fetchedReply.ReplyPreview)
 	}
 }
 
@@ -694,6 +711,52 @@ func TestDirectReplyPreviewDegradesAfterTargetTombstone(t *testing.T) {
 	}
 	if fetchedReply.ReplyPreview == nil || !fetchedReply.ReplyPreview.IsDeleted {
 		t.Fatalf("ожидался deleted-state preview в direct get flow, получено %+v", fetchedReply.ReplyPreview)
+	}
+}
+
+func TestDirectReplyPreviewBecomesUnavailableWhenTargetLeavesLegacyHistory(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	target := mustSendMessage(t, service, bob.Token, directChat.ID, "reply target that will disappear")
+	reply, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "reply", nil, target.ID)
+	if err != nil {
+		t.Fatalf("send reply message: %v", err)
+	}
+
+	delete(repo.messages, target.ID)
+
+	messages, err := service.ListDirectChatMessages(context.Background(), alice.Token, directChat.ID, 10)
+	if err != nil {
+		t.Fatalf("list direct chat messages: %v", err)
+	}
+	if len(messages) != 1 || messages[0].ID != reply.ID {
+		t.Fatalf("ожидался только reply после выпадения target из legacy history, получено %+v", messages)
+	}
+	if messages[0].ReplyPreview == nil || !messages[0].ReplyPreview.IsUnavailable {
+		t.Fatalf("ожидался unavailable reply preview в direct history, получено %+v", messages[0].ReplyPreview)
+	}
+	if messages[0].ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался stable reply target id %q, получено %+v", target.ID, messages[0].ReplyPreview)
+	}
+	if messages[0].ReplyPreview.HasText || messages[0].ReplyPreview.TextPreview != "" || messages[0].ReplyPreview.AttachmentCount != 0 {
+		t.Fatalf("unavailable direct reply preview не должен возвращать plaintext body, получено %+v", messages[0].ReplyPreview)
+	}
+
+	fetchedReply, err := repo.GetDirectChatMessage(context.Background(), alice.User.ID, directChat.ID, reply.ID)
+	if err != nil {
+		t.Fatalf("get direct reply from repository: %v", err)
+	}
+	if fetchedReply.ReplyPreview == nil || !fetchedReply.ReplyPreview.IsUnavailable {
+		t.Fatalf("ожидался unavailable preview в direct get flow, получено %+v", fetchedReply.ReplyPreview)
+	}
+	if fetchedReply.ReplyPreview.MessageID != target.ID {
+		t.Fatalf("ожидался stable reply target id %q в get flow, получено %+v", target.ID, fetchedReply.ReplyPreview)
 	}
 }
 
@@ -3843,6 +3906,20 @@ func (r *fakeRepository) SearchDirectMessages(_ context.Context, userID string, 
 	return result, nil
 }
 
+func (r *fakeRepository) GetDirectReplyPreview(_ context.Context, userID string, chatID string, messageID string) (*ReplyPreview, error) {
+	directChat, ok := r.chats[chatID]
+	if !ok || !isParticipant(directChat, userID) {
+		return nil, ErrNotFound
+	}
+
+	message, ok := r.messages[messageID]
+	if !ok || message.ChatID != chatID {
+		return nil, ErrNotFound
+	}
+
+	return copyReplyPreviewForTest(r.buildDirectReplyPreviewForTest(messageID)), nil
+}
+
 func (r *fakeRepository) GetDirectChatMessage(_ context.Context, userID string, chatID string, messageID string) (*DirectChatMessage, error) {
 	directChat, ok := r.chats[chatID]
 	if !ok || !isParticipant(directChat, userID) {
@@ -4243,18 +4320,15 @@ func (r *fakeRepository) buildDirectReplyPreviewForTest(messageID string) *Reply
 	}
 
 	preview := &ReplyPreview{
-		MessageID: messageID,
-		Author:    copyUserSummaryForReplyPreviewForTest(r.users[target.SenderUserID]),
+		MessageID:       messageID,
+		Author:          copyUserSummaryForReplyPreviewForTest(r.users[target.SenderUserID]),
+		AttachmentCount: int32(len(target.Attachments)),
 	}
 	if target.Tombstone != nil {
 		preview.IsDeleted = true
+		preview.AttachmentCount = 0
 		return preview
 	}
-	if target.Text != nil {
-		preview.HasText = true
-		preview.TextPreview = buildReplyTextPreview(target.Text.Text)
-	}
-	preview.AttachmentCount = int32(len(target.Attachments))
 
 	return preview
 }
