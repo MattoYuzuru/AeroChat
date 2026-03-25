@@ -580,6 +580,9 @@ export function ChatsPage() {
           selectedThread.readState,
           selectedThread.encryptedReadState,
           encryptedLane.status === "ready" ? latestEncryptedMessage : null,
+          encryptedMessageIndex,
+          currentUserId,
+          selectedPeer?.nickname ?? "Собеседник",
         );
   const activeReadStatusTone =
     selectedThread === null
@@ -2293,6 +2296,9 @@ function describeActiveDirectReadStatus(
   legacyReadState: DirectChatReadState | null,
   encryptedReadState: EncryptedDirectChatReadState | null,
   latestEncryptedMessage: EncryptedDirectMessageV2ProjectedMessageEntry | null,
+  encryptedMessageIndex: Map<string, EncryptedDirectMessageV2ProjectedMessageEntry>,
+  currentUserId: string,
+  fallbackPeerName: string,
 ): string {
   if (latestEncryptedMessage === null) {
     return describeReadStatus(legacyReadState);
@@ -2302,11 +2308,13 @@ function describeActiveDirectReadStatus(
   if (peerPosition === null || peerPosition === undefined) {
     return "Encrypted read state не виден";
   }
+
+  const readTarget = encryptedMessageIndex.get(peerPosition.messageId) ?? null;
   if (peerPosition.messageId === latestEncryptedMessage.messageId) {
-    return `Прочитано · ${formatDateTime(peerPosition.updatedAt)}`;
+    return `Прочитано последнее: ${describeEncryptedReadTarget(readTarget, currentUserId, fallbackPeerName)} · ${formatDateTime(peerPosition.updatedAt)}`;
   }
 
-  return `Прочитано до ${formatDateTime(peerPosition.updatedAt)}`;
+  return `Прочитано до: ${describeEncryptedReadTarget(readTarget, currentUserId, fallbackPeerName)} · ${formatDateTime(peerPosition.updatedAt)}`;
 }
 
 function describeReadStatus(readState: DirectChatReadState | null): string {
@@ -2428,6 +2436,23 @@ function describeEncryptedPinnedPreview(
   }
 
   return describeEncryptedDirectComposerReplyTarget(entry);
+}
+
+function describeEncryptedReadTarget(
+  entry: EncryptedDirectMessageV2ProjectedMessageEntry | null,
+  currentUserId: string,
+  fallbackPeerName: string,
+): string {
+  if (entry === null) {
+    return "локально недоступное сообщение";
+  }
+  if (entry.isTombstone) {
+    return "удалённое сообщение";
+  }
+
+  const preview = describeEncryptedDirectComposerReplyTarget(entry);
+  const authorLabel = entry.senderUserId === currentUserId ? "вы" : fallbackPeerName;
+  return `${authorLabel}: ${preview}`;
 }
 
 function describeEncryptedBootstrapSendHint(input: {
