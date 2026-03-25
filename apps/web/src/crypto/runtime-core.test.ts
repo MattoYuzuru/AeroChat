@@ -390,6 +390,7 @@ describe("createCryptoRuntimeCore", () => {
       baseSession.token,
       expect.objectContaining({
         chatId: "chat-1",
+        messageCreatedAt: expect.any(String),
         senderCryptoDeviceId: "crypto-1",
         operationKind: "content",
         revision: 1,
@@ -531,6 +532,7 @@ describe("createCryptoRuntimeCore", () => {
       baseSession.token,
       expect.objectContaining({
         groupId: "group-1",
+        messageCreatedAt: expect.any(String),
         mlsGroupId: "mls-1",
         rosterVersion: 7,
         senderCryptoDeviceId: "crypto-1",
@@ -655,6 +657,7 @@ describe("createCryptoRuntimeCore", () => {
       baseSession.token,
       expect.objectContaining({
         groupId: "group-1",
+        messageCreatedAt: expect.any(String),
         operationKind: "content",
         attachmentIds: ["attachment-1"],
       }),

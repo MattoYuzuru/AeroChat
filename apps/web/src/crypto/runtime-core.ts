@@ -848,6 +848,7 @@ async function sendEncryptedDirectMessageV2Mutation(
     {
       chatId: normalizedChatId,
       messageId,
+      messageCreatedAt: createdAt,
       senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,
       operationKind,
       targetMessageId,
@@ -1055,6 +1056,7 @@ async function sendEncryptedGroupMutation(
     {
       groupId: normalizedGroupId,
       messageId,
+      messageCreatedAt: createdAt,
       mlsGroupId: bootstrap.lane.mlsGroupId,
       rosterVersion: bootstrap.lane.rosterVersion,
       senderCryptoDeviceId: localMaterial.record.cryptoDeviceId,

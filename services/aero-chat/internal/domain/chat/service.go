@@ -1083,6 +1083,10 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 	if err != nil {
 		return nil, err
 	}
+	normalizedMessageCreatedAt, err := normalizeRequiredTimestamp(params.MessageCreatedAt, "message_created_at")
+	if err != nil {
+		return nil, err
+	}
 	normalizedSenderCryptoDeviceID, err := normalizeID(params.SenderCryptoDeviceID, "sender_crypto_device_id")
 	if err != nil {
 		return nil, err
@@ -1165,7 +1169,7 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 		Revision:             normalizedRevision,
 		AttachmentIDs:        normalizedAttachmentIDs,
 		Deliveries:           targetDeliveries,
-		CreatedAt:            now,
+		CreatedAt:            normalizedMessageCreatedAt,
 		StoredAt:             now,
 	})
 }
@@ -1308,6 +1312,10 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 	if err != nil {
 		return nil, err
 	}
+	normalizedMessageCreatedAt, err := normalizeRequiredTimestamp(params.MessageCreatedAt, "message_created_at")
+	if err != nil {
+		return nil, err
+	}
 	normalizedMLSGroupID, err := normalizeID(params.MLSGroupID, "mls_group_id")
 	if err != nil {
 		return nil, err
@@ -1399,7 +1407,7 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 		AttachmentIDs:        normalizedAttachmentIDs,
 		Ciphertext:           normalizedCiphertext,
 		Deliveries:           deliveries,
-		CreatedAt:            now,
+		CreatedAt:            normalizedMessageCreatedAt,
 		StoredAt:             now,
 	})
 }
@@ -3220,6 +3228,14 @@ func normalizeSearchCursor(value *MessageSearchCursor) (*MessageSearchCursor, er
 		MessageCreatedAt: value.MessageCreatedAt.UTC(),
 		MessageID:        normalizedMessageID,
 	}, nil
+}
+
+func normalizeRequiredTimestamp(value time.Time, field string) (time.Time, error) {
+	if value.IsZero() {
+		return time.Time{}, fmt.Errorf("%w: %s is required", ErrInvalidArgument, field)
+	}
+
+	return value.UTC(), nil
 }
 
 func normalizeOptionalScopeID(value *string, field string) (*string, error) {

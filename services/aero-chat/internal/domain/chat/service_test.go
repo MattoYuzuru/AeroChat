@@ -243,6 +243,7 @@ func TestEncryptedDirectUnreadCountAndReadProgressionAreViewerRelative(t *testin
 	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
 		ChatID:               directChat.ID,
 		MessageID:            testUUID(701),
+		MessageCreatedAt:     time.Date(2026, time.March, 22, 12, 0, 0, 0, time.UTC),
 		SenderCryptoDeviceID: aliceSender.ID,
 		OperationKind:        EncryptedDirectMessageV2OperationContent,
 		Revision:             1,
@@ -821,9 +822,11 @@ func TestSendEncryptedDirectMessageV2CreatesDeviceScopedDeliveries(t *testing.T)
 	bobSecond := repo.mustAddActiveCryptoDevice(bob.User.ID)
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	messageCreatedAt := time.Date(2026, time.March, 25, 18, 4, 5, 0, time.UTC)
 	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
 		ChatID:               directChat.ID,
 		MessageID:            testUUID(700),
+		MessageCreatedAt:     messageCreatedAt,
 		SenderCryptoDeviceID: aliceSender.ID,
 		OperationKind:        EncryptedDirectMessageV2OperationContent,
 		Revision:             1,
@@ -858,6 +861,9 @@ func TestSendEncryptedDirectMessageV2CreatesDeviceScopedDeliveries(t *testing.T)
 	}
 	if receipt.OperationKind != EncryptedDirectMessageV2OperationContent {
 		t.Fatalf("ожидался content operation, получено %q", receipt.OperationKind)
+	}
+	if !receipt.CreatedAt.Equal(messageCreatedAt) {
+		t.Fatalf("ожидался client-assigned created_at %v, получено %v", messageCreatedAt, receipt.CreatedAt)
 	}
 
 	aliceSenderView, err := service.ListEncryptedDirectMessageV2(context.Background(), alice.Token, directChat.ID, aliceSender.ID, 0)
@@ -969,6 +975,7 @@ func TestSendEncryptedDirectMessageV2RejectsRosterMismatch(t *testing.T) {
 	_, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
 		ChatID:               directChat.ID,
 		MessageID:            testUUID(701),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 7, 0, 0, time.UTC),
 		SenderCryptoDeviceID: aliceSender.ID,
 		OperationKind:        EncryptedDirectMessageV2OperationContent,
 		Revision:             1,
@@ -1000,6 +1007,7 @@ func TestListEncryptedDirectMessageV2RequiresActiveViewerDevice(t *testing.T) {
 	if _, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
 		ChatID:               directChat.ID,
 		MessageID:            testUUID(702),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 8, 0, 0, time.UTC),
 		SenderCryptoDeviceID: aliceSender.ID,
 		OperationKind:        EncryptedDirectMessageV2OperationContent,
 		Revision:             1,
@@ -1040,6 +1048,7 @@ func TestGetEncryptedDirectMessageV2ReturnsViewerScopedEnvelope(t *testing.T) {
 	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
 		ChatID:               directChat.ID,
 		MessageID:            testUUID(703),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 9, 0, 0, time.UTC),
 		SenderCryptoDeviceID: aliceSender.ID,
 		OperationKind:        EncryptedDirectMessageV2OperationContent,
 		Revision:             1,
@@ -1096,6 +1105,7 @@ func TestDirectCoexistenceKeepsHistorySeparateAndServerSearchDescoped(t *testing
 	if _, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
 		ChatID:               directChat.ID,
 		MessageID:            testUUID(706),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 10, 0, 0, time.UTC),
 		SenderCryptoDeviceID: aliceSender.ID,
 		OperationKind:        EncryptedDirectMessageV2OperationContent,
 		Revision:             1,
@@ -1315,6 +1325,7 @@ func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *tes
 	receipt, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
 		GroupID:              group.ID,
 		MessageID:            testUUID(704),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 6, 7, 0, time.UTC),
 		MLSGroupID:           bootstrap.Lane.MLSGroupID,
 		RosterVersion:        bootstrap.Lane.RosterVersion,
 		SenderCryptoDeviceID: aliceSender.ID,
@@ -1327,6 +1338,9 @@ func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *tes
 	}
 	if receipt.StoredDeliveryCount != 3 {
 		t.Fatalf("ожидалось 3 group delivery records, получено %d", receipt.StoredDeliveryCount)
+	}
+	if !receipt.CreatedAt.Equal(time.Date(2026, time.March, 25, 18, 6, 7, 0, time.UTC)) {
+		t.Fatalf("ожидался sender-assigned group created_at, получено %v", receipt.CreatedAt)
 	}
 
 	bobView, err := service.ListEncryptedGroupMessages(context.Background(), bob.Token, group.ID, bobFirst.ID, 0)
@@ -1390,6 +1404,7 @@ func TestGroupCoexistenceDescopesLegacyHistoryWhileEncryptedFetchRemainsSeparate
 	if _, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
 		GroupID:              group.ID,
 		MessageID:            testUUID(707),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 11, 0, 0, time.UTC),
 		MLSGroupID:           bootstrap.Lane.MLSGroupID,
 		RosterVersion:        bootstrap.Lane.RosterVersion,
 		SenderCryptoDeviceID: aliceSender.ID,
@@ -1484,6 +1499,7 @@ func TestEncryptedGroupUnreadCountAndReadProgressionAreViewerRelative(t *testing
 	receipt, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
 		GroupID:              group.ID,
 		MessageID:            testUUID(705),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 12, 0, 0, time.UTC),
 		MLSGroupID:           bootstrap.Lane.MLSGroupID,
 		RosterVersion:        bootstrap.Lane.RosterVersion,
 		SenderCryptoDeviceID: aliceSender.ID,
@@ -1563,6 +1579,7 @@ func TestSendEncryptedGroupMessageRejectsStaleRosterVersion(t *testing.T) {
 	if _, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
 		GroupID:              group.ID,
 		MessageID:            testUUID(705),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 13, 0, 0, time.UTC),
 		MLSGroupID:           bootstrap.Lane.MLSGroupID,
 		RosterVersion:        bootstrap.Lane.RosterVersion,
 		SenderCryptoDeviceID: aliceSender.ID,
