@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildAttachmentComposerScopeKey } from "./useAttachmentComposer";
+import {
+  buildAttachmentComposerScopeKey,
+  isLegacyPlaintextGroupAttachmentComposerDescoped,
+  LEGACY_GROUP_ATTACHMENT_COMPOSER_DESCOPED_MESSAGE,
+} from "./useAttachmentComposer";
 
 describe("buildAttachmentComposerScopeKey", () => {
   it("returns the same key for semantically identical direct scopes", () => {
@@ -32,5 +36,26 @@ describe("buildAttachmentComposerScopeKey", () => {
 
   it("returns null when composer scope is absent", () => {
     expect(buildAttachmentComposerScopeKey(null)).toBeNull();
+  });
+
+  it("marks group legacy attachment composer scope as de-scoped", () => {
+    expect(
+      isLegacyPlaintextGroupAttachmentComposerDescoped({
+        kind: "group",
+        id: "group-1",
+      }),
+    ).toBe(true);
+    expect(LEGACY_GROUP_ATTACHMENT_COMPOSER_DESCOPED_MESSAGE).toContain(
+      "plaintext group attachment path",
+    );
+  });
+
+  it("keeps direct legacy attachment composer scope available", () => {
+    expect(
+      isLegacyPlaintextGroupAttachmentComposerDescoped({
+        kind: "direct",
+        id: "chat-1",
+      }),
+    ).toBe(false);
   });
 });
