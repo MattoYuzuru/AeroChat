@@ -69,6 +69,7 @@ export function useEncryptedMediaAttachmentDraft({
   const [draft, setDraft] = useState<EncryptedMediaAttachmentDraftState | null>(null);
   const preparedUploadRef = useRef<PreparedEncryptedUploadRefValue | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const scopeKey = buildEncryptedMediaAttachmentDraftScopeKey(scope);
   const scopeRef = useRef<UseEncryptedMediaAttachmentDraftOptions["scope"]>(scope);
   const onUnauthenticatedRef = useRef(onUnauthenticated);
 
@@ -78,13 +79,13 @@ export function useEncryptedMediaAttachmentDraft({
 
   useEffect(() => {
     scopeRef.current = scope;
-  }, [scope]);
+  }, [scope, scopeKey]);
 
   useEffect(() => {
     abortActiveUpload(abortControllerRef);
     preparedUploadRef.current = null;
     setDraft(null);
-  }, [enabled, scope]);
+  }, [enabled, scopeKey]);
 
   async function selectFile(file: File): Promise<{
     draftId: string;
@@ -314,4 +315,14 @@ function abortActiveUpload(ref: { current: AbortController | null }) {
 
   ref.current.abort();
   ref.current = null;
+}
+
+export function buildEncryptedMediaAttachmentDraftScopeKey(
+  scope: UseEncryptedMediaAttachmentDraftOptions["scope"],
+): string | null {
+  if (scope === null) {
+    return null;
+  }
+
+  return `${scope.kind}:${scope.id}`;
 }

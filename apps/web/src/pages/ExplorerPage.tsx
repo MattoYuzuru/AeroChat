@@ -8,7 +8,7 @@ import {
   buildGroupChatRoutePath,
   buildSelfChatRoutePath,
 } from "../app/app-routes";
-import { subscribeEncryptedDirectMessageV2RealtimeEvents } from "../chats/encrypted-v2-realtime";
+import { parseEncryptedDirectMessageV2RealtimeEvent } from "../chats/encrypted-v2-realtime";
 import { patchLiveEncryptedDirectChatActivity } from "../chats/live-direct-activity";
 import { parseDirectChatRealtimeEvent } from "../chats/realtime";
 import { gatewayClient } from "../gateway/runtime";
@@ -233,7 +233,12 @@ export function ExplorerPage() {
       return;
     }
 
-    return subscribeEncryptedDirectMessageV2RealtimeEvents((event) => {
+    return subscribeRealtimeEnvelopes((envelope) => {
+      const event = parseEncryptedDirectMessageV2RealtimeEvent(envelope);
+      if (event === null) {
+        return;
+      }
+
       setLocalDirectChats((currentChats) =>
         patchLiveEncryptedDirectChatActivity(currentChats, event),
       );

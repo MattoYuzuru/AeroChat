@@ -24,7 +24,7 @@ import {
   createInitialChatsState,
   type ChatThreadSnapshot,
 } from "./state";
-import { subscribeEncryptedDirectMessageV2RealtimeEvents } from "./encrypted-v2-realtime";
+import { parseEncryptedDirectMessageV2RealtimeEvent } from "./encrypted-v2-realtime";
 
 interface UseChatsOptions {
   enabled: boolean;
@@ -155,8 +155,13 @@ export function useChats({
       return;
     }
 
-    return subscribeEncryptedDirectMessageV2RealtimeEvents((event) => {
+    return subscribeRealtimeEnvelopes((envelope) => {
       if (!mountedRef.current) {
+        return;
+      }
+
+      const event = parseEncryptedDirectMessageV2RealtimeEvent(envelope);
+      if (event === null) {
         return;
       }
 

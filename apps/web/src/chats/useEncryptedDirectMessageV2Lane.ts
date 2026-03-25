@@ -9,8 +9,8 @@ import {
 import { gatewayClient } from "../gateway/runtime";
 import { type EncryptedDirectMessageV2Envelope } from "../gateway/types";
 import {
+  parseEncryptedDirectMessageV2RealtimeEvent,
   listBufferedEncryptedDirectMessageV2RealtimeEvents,
-  subscribeEncryptedDirectMessageV2RealtimeEvents,
 } from "./encrypted-v2-realtime";
 import {
   discardBufferedLocalEncryptedDirectMessageV2Projection,
@@ -18,6 +18,7 @@ import {
   subscribeLocalEncryptedDirectMessageV2Projection,
 } from "./encrypted-v2-local-outbound";
 import { resolveActiveRealtimeCryptoDeviceId } from "../crypto/realtime-bridge-helpers";
+import { subscribeRealtimeEnvelopes } from "../realtime/events";
 
 interface UseEncryptedDirectMessageV2LaneOptions {
   enabled: boolean;
@@ -117,9 +118,10 @@ export function useEncryptedDirectMessageV2Lane({
     }
 
     let cancelled = false;
-
-    const unsubscribe = subscribeEncryptedDirectMessageV2RealtimeEvents((event) => {
+    const unsubscribe = subscribeRealtimeEnvelopes((envelope) => {
+      const event = parseEncryptedDirectMessageV2RealtimeEvent(envelope);
       if (
+        event === null ||
         cancelled ||
         event.envelope.chatId !== loadDescriptor.chatId ||
         event.envelope.viewerDelivery.recipientCryptoDeviceId !==
@@ -226,9 +228,17 @@ export function useEncryptedDirectMessageV2Lane({
     };
   }
 
+  const items =
+    loadDescriptor.kind !== "load"
+      ? loadedState.items
+      : mergeEncryptedDirectMessageV2Projection(
+          loadedState.items,
+          listBufferedLocalEncryptedDirectMessageV2Projection(loadDescriptor.chatId),
+        );
+
   return {
     status: loadedState.status,
-    items: loadedState.items,
+    items,
     errorMessage: loadedState.errorMessage,
   };
 }
