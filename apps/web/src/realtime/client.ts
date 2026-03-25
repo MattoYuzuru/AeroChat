@@ -4,6 +4,7 @@ const realtimeProtocol = "aerochat.realtime.v1";
 const realtimeAuthProtocolPrefix = "aerochat.auth.";
 const reconnectBaseDelayMs = 1000;
 const reconnectMaxDelayMs = 10000;
+const maxPendingRealtimeClientEnvelopes = 8;
 
 export interface RealtimeEnvelope {
   id: string;
@@ -28,6 +29,8 @@ export interface RealtimeConnectionOptions {
   onEvent?: (event: RealtimeEnvelope) => void;
   onStatusChange?: (status: "connected" | "disconnected") => void;
 }
+
+let pendingRealtimeClientEnvelopes: RealtimeClientEnvelope[] = [];
 
 export function connectRealtime(
   options: RealtimeConnectionOptions,
@@ -113,6 +116,7 @@ export function connectRealtime(
     const nextSocket = new WebSocket(url, protocols);
     nextSocket.addEventListener("open", () => {
       reconnectAttempt = 0;
+      flushPendingRealtimeClientEnvelopes(connection);
       options.onStatusChange?.("connected");
     });
     nextSocket.addEventListener("message", (event) => {
@@ -158,7 +162,46 @@ export function buildRealtimeProtocols(token: string): string[] {
 let activeRealtimeConnection: RealtimeConnection | null = null;
 
 export function sendRealtimeClientEnvelope(envelope: RealtimeClientEnvelope): boolean {
-  return activeRealtimeConnection?.send(envelope) ?? false;
+  if (
+    typeof envelope.type !== "string" ||
+    envelope.type.trim() === ""
+  ) {
+    return false;
+  }
+
+  const delivered = activeRealtimeConnection?.send(envelope) ?? false;
+  if (!delivered) {
+    enqueuePendingRealtimeClientEnvelope(envelope);
+  }
+
+  return delivered;
+}
+
+function enqueuePendingRealtimeClientEnvelope(envelope: RealtimeClientEnvelope) {
+  pendingRealtimeClientEnvelopes = [
+    ...pendingRealtimeClientEnvelopes.filter(
+      (candidate) => candidate.type !== envelope.type,
+    ),
+    envelope,
+  ].slice(-maxPendingRealtimeClientEnvelopes);
+}
+
+function flushPendingRealtimeClientEnvelopes(connection: RealtimeConnection) {
+  if (pendingRealtimeClientEnvelopes.length === 0) {
+    return;
+  }
+
+  const queued = pendingRealtimeClientEnvelopes;
+  pendingRealtimeClientEnvelopes = [];
+
+  for (const envelope of queued) {
+    if (connection.send(envelope)) {
+      continue;
+    }
+
+    enqueuePendingRealtimeClientEnvelope(envelope);
+    return;
+  }
 }
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -193,4 +236,8 @@ function parseRealtimeEnvelope(input: unknown): RealtimeEnvelope | null {
   } catch {
     return null;
   }
+}
+
+export function clearPendingRealtimeClientEnvelopesForTest() {
+  pendingRealtimeClientEnvelopes = [];
 }
