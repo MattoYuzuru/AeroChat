@@ -210,7 +210,9 @@
   - direct legacy readable history/list/get transport теперь тоже удалён как активный product path для direct content;
   - legacy group server-side search plaintext dependency теперь тоже удалена через честный de-scope backend path;
   - legacy group readable history/list/get transport теперь тоже удалён как активный product path для group content;
-  - readable direct/group realtime compatibility payloads, legacy plaintext compatibility RPC surfaces и legacy plaintext attachment path всё ещё остаются pending;
+  - legacy group readable realtime plaintext content path теперь тоже удалён как активный product path для group thread;
+  - readable direct realtime compatibility payload всё ещё остаётся pending;
+  - legacy plaintext compatibility RPC surfaces и legacy plaintext attachment path всё ещё остаются pending;
   - этот slice не убирает RTC issues и не меняет bounded local encrypted search model.
 
 ### Areas that need manual runtime verification
