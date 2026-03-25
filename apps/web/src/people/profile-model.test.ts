@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Profile } from "../gateway/types";
 import {
+  describePersonRelationshipState,
   describePersonProfileSummary,
   findExactKnownPeopleEntries,
   findSimilarKnownPeopleEntries,
@@ -77,6 +78,12 @@ describe("person profile text helpers", () => {
 
     expect(getPersonProfileLaunchTitle(profile)).toBe("Carol");
     expect(describePersonProfileSummary(profile)).toBe("online");
+  });
+
+  it("keeps relationship state labels stable across person-facing surfaces", () => {
+    expect(describePersonRelationshipState("friend")).toBe("Друг");
+    expect(describePersonRelationshipState("incoming_request")).toBe("Входящая заявка");
+    expect(describePersonRelationshipState("outgoing_request")).toBe("Исходящая заявка");
   });
 });
 

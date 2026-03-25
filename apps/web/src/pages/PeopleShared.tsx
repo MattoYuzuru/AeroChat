@@ -78,6 +78,7 @@ export interface ActionConfig {
   label: string;
   onClick(): void;
   tone?: "primary" | "secondary" | "danger";
+  disabled?: boolean;
 }
 
 export interface ProfileCardProps {
@@ -143,7 +144,7 @@ export function ProfileCard({
         {primaryAction && (
           <button
             className={resolveButtonClassName(primaryAction.tone ?? "primary")}
-            disabled={isPending}
+            disabled={isPending || primaryAction.disabled === true}
             onClick={primaryAction.onClick}
             type="button"
           >
@@ -153,7 +154,7 @@ export function ProfileCard({
         {secondaryAction && (
           <button
             className={resolveButtonClassName(secondaryAction.tone ?? "secondary")}
-            disabled={isPending}
+            disabled={isPending || secondaryAction.disabled === true}
             onClick={secondaryAction.onClick}
             type="button"
           >

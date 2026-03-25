@@ -7,7 +7,10 @@ import {
   isGatewayErrorCode,
   type Profile,
 } from "../gateway/types";
-import { getPersonProfileLaunchTitle } from "../people/profile-model";
+import {
+  describePersonRelationshipState,
+  getPersonProfileLaunchTitle,
+} from "../people/profile-model";
 import {
   buildDirectChatNavigationIntent,
   buildPersonProfileNavigationIntent,
@@ -225,7 +228,7 @@ export function PeoplePage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Запрос: ${formatDateTime(request.requestedAt)}`}
-                  statusLabel="Входящая заявка"
+                  statusLabel={describePersonRelationshipState("incoming_request")}
                   onOpenProfile={() => {
                     openPersonProfile(request.profile);
                   }}
@@ -262,7 +265,7 @@ export function PeoplePage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Отправлено: ${formatDateTime(request.requestedAt)}`}
-                  statusLabel="Исходящая заявка"
+                  statusLabel={describePersonRelationshipState("outgoing_request")}
                   onOpenProfile={() => {
                     openPersonProfile(request.profile);
                   }}
@@ -293,7 +296,7 @@ export function PeoplePage() {
                 <ProfileCard
                   key={friend.profile.id || friend.profile.login}
                   metaLabel={`Друзья с ${formatDateTime(friend.friendsSince)}`}
-                  statusLabel="Друг"
+                  statusLabel={describePersonRelationshipState("friend")}
                   onOpenProfile={() => {
                     openPersonProfile(friend.profile);
                   }}

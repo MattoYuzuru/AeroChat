@@ -170,6 +170,21 @@ export function describePersonRelationship(entry: PersonProfileEntry): string {
   }
 }
 
+export function describePersonRelationshipState(
+  relationshipKind: PersonProfileRelationshipKind,
+): string {
+  switch (relationshipKind) {
+    case "friend":
+      return "Друг";
+    case "incoming_request":
+      return "Входящая заявка";
+    case "outgoing_request":
+      return "Исходящая заявка";
+    default:
+      return "Контакт";
+  }
+}
+
 export function normalizeExactLoginQuery(query: string): string {
   const normalized = query.trim().toLowerCase();
   if (normalized.startsWith("@")) {
