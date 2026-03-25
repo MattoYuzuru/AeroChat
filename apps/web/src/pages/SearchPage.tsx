@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   buildGroupChatRoutePath,
-  buildPersonProfileRoutePath,
 } from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
@@ -27,6 +26,7 @@ import {
   normalizeExactLoginQuery,
   type PersonProfileEntry,
 } from "../people/profile-model";
+import { buildPersonProfileNavigationIntent } from "../people/navigation";
 import { usePeople } from "../people/usePeople";
 import {
   searchEncryptedLocalMessages,
@@ -237,20 +237,17 @@ export function SearchPage() {
   }
 
   function openPersonProfile(entry: PersonProfileEntry) {
-    const title = getPersonProfileLaunchTitle(entry.profile);
-    const searchParams = new URLSearchParams({
-      from: "search",
+    const intent = buildPersonProfileNavigationIntent({
+      userId: entry.profile.id,
+      title: getPersonProfileLaunchTitle(entry.profile),
+      source: "search",
     });
 
     if (desktopShellHost !== null) {
-      desktopShellHost.openPersonProfile({
-        userId: entry.profile.id,
-        title,
-        searchParams,
-      });
+      desktopShellHost.openPersonProfile(intent.shellOptions);
     }
 
-    navigate(buildPersonProfileRoutePath(entry.profile.id, searchParams));
+    navigate(intent.routePath);
   }
 
   function openGroupTarget(groupId: string, title: string) {
@@ -622,7 +619,7 @@ export function SearchPage() {
                   <>
                     <SectionNote
                       title="Точное совпадение"
-                      message="Откройте canonical профиль контакта."
+                      message="Откройте профиль контакта."
                     />
                     <div className={styles.cardList}>
                       {exactPeopleMatches.map((entry) => (

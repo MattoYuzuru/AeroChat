@@ -32,7 +32,7 @@ export function StateCard({
 }: StateCardProps) {
   return (
     <section className={styles.stateCard} data-tone={tone}>
-      <p className={styles.cardLabel}>People state</p>
+      <p className={styles.cardLabel}>Люди</p>
       <h2 className={styles.stateTitle}>{title}</h2>
       <p className={styles.stateMessage}>{message}</p>
       {action && <div className={styles.stateActions}>{action}</div>}
@@ -77,10 +77,12 @@ export function PeopleSection({
 export interface ActionConfig {
   label: string;
   onClick(): void;
+  tone?: "primary" | "secondary" | "danger";
 }
 
 export interface ProfileCardProps {
   profile: Profile;
+  statusLabel: string;
   metaLabel: string;
   onOpenProfile(): void;
   pendingLabel?: string;
@@ -90,6 +92,7 @@ export interface ProfileCardProps {
 
 export function ProfileCard({
   profile,
+  statusLabel,
   metaLabel,
   onOpenProfile,
   pendingLabel,
@@ -101,29 +104,45 @@ export function ProfileCard({
   return (
     <article className={styles.personCard}>
       <div className={styles.personHeader}>
-        <div>
-          <h3 className={styles.personTitle}>{profile.nickname}</h3>
-          <p className={styles.personLogin}>@{profile.login}</p>
+        <div className={styles.personIdentity}>
+          {profile.avatarUrl ? (
+            <img
+              alt={`Аватар ${profile.nickname}`}
+              className={styles.avatarImage}
+              src={profile.avatarUrl}
+            />
+          ) : (
+            <div className={styles.avatarBadge} aria-hidden="true">
+              {getProfileInitials(profile)}
+            </div>
+          )}
+
+          <div className={styles.personBody}>
+            <div className={styles.personMetaRow}>
+              <span className={styles.statusTag}>{statusLabel}</span>
+              <span className={styles.metaTag}>{metaLabel}</span>
+            </div>
+            <h3 className={styles.personTitle}>{profile.nickname}</h3>
+            <p className={styles.personLogin}>@{profile.login}</p>
+            <p className={styles.personDescription}>{describePersonProfileSummary(profile)}</p>
+          </div>
         </div>
-        <div className={styles.actions}>
-          <span className={styles.metaTag}>{metaLabel}</span>
+        <div className={styles.profileAction}>
           <button
             className={styles.secondaryButton}
             disabled={isPending}
             onClick={onOpenProfile}
             type="button"
           >
-            Профиль
+            Открыть профиль
           </button>
         </div>
       </div>
 
-      <p className={styles.personDescription}>{describePersonProfileSummary(profile)}</p>
-
       <div className={styles.actions}>
         {primaryAction && (
           <button
-            className={styles.primaryButton}
+            className={resolveButtonClassName(primaryAction.tone ?? "primary")}
             disabled={isPending}
             onClick={primaryAction.onClick}
             type="button"
@@ -133,7 +152,7 @@ export function ProfileCard({
         )}
         {secondaryAction && (
           <button
-            className={styles.secondaryButton}
+            className={resolveButtonClassName(secondaryAction.tone ?? "secondary")}
             disabled={isPending}
             onClick={secondaryAction.onClick}
             type="button"
@@ -146,4 +165,26 @@ export function ProfileCard({
       {pendingLabel && <p className={styles.pendingText}>{pendingLabel}</p>}
     </article>
   );
+}
+
+function resolveButtonClassName(tone: "primary" | "secondary" | "danger"): string {
+  switch (tone) {
+    case "danger":
+      return styles.dangerButton!;
+    case "secondary":
+      return styles.secondaryButton!;
+    case "primary":
+    default:
+      return styles.primaryButton!;
+  }
+}
+
+function getProfileInitials(profile: Profile): string {
+  const source = profile.nickname.trim() || profile.login.trim() || "P";
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return parts[0]!.slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
 }

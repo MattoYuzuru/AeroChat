@@ -1,22 +1,19 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  buildDirectChatRoutePath,
-  buildFriendRequestsRoutePath,
-} from "../app/app-routes";
+import { buildFriendRequestsRoutePath } from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
-import { gatewayClient } from "../gateway/runtime";
-import {
-  describeGatewayError,
-  isGatewayErrorCode,
-  type DirectChat,
-} from "../gateway/types";
+import { describeGatewayError, isGatewayErrorCode } from "../gateway/types";
 import {
   describePersonProfileSummary,
   describePersonRelationship,
   getPersonProfileLaunchTitle,
   resolvePersonProfileEntry,
 } from "../people/profile-model";
+import {
+  buildDirectChatNavigationIntent,
+  ensureDirectChatForPeer,
+} from "../people/navigation";
+import { resolvePersonRelationshipActions } from "../people/relationship-actions";
 import { usePeople } from "../people/usePeople";
 import { useDesktopShellHost } from "../shell/context";
 import styles from "./PersonProfilePage.module.css";
@@ -45,6 +42,10 @@ export function PersonProfilePage() {
   );
   const pendingLabel =
     personEntry === null ? null : people.state.pendingLogins[personEntry.profile.login] ?? null;
+  const relationshipActions =
+    personEntry === null
+      ? null
+      : resolvePersonRelationshipActions(personEntry.relationshipKind);
 
   useEffect(() => {
     if (desktopShellHost === null || personEntry === null) {
@@ -82,20 +83,17 @@ export function PersonProfilePage() {
     people.clearFeedback();
 
     try {
-      const existingChats = await gatewayClient.listDirectChats(sessionToken);
-      const existingChat = findDirectChatByPeerUserId(existingChats, personEntry.profile.id);
-      const chat =
-        existingChat ?? (await gatewayClient.createDirectChat(sessionToken, personEntry.profile.id));
-      const title = getPersonProfileLaunchTitle(personEntry.profile);
+      const chat = await ensureDirectChatForPeer(sessionToken, personEntry.profile.id);
+      const intent = buildDirectChatNavigationIntent({
+        chatId: chat.id,
+        title: getPersonProfileLaunchTitle(personEntry.profile),
+      });
 
       if (desktopShellHost !== null) {
-        desktopShellHost.openDirectChat({
-          chatId: chat.id,
-          title,
-        });
+        desktopShellHost.openDirectChat(intent.shellOptions);
       }
 
-      navigate(buildDirectChatRoutePath(chat.id));
+      navigate(intent.routePath);
     } catch (error) {
       if (isGatewayErrorCode(error, "unauthenticated")) {
         expireSession();
@@ -115,13 +113,13 @@ export function PersonProfilePage() {
       <section className={styles.heroCard}>
         <div className={styles.heroHeader}>
           <div>
-            <p className={styles.cardLabel}>Person profile</p>
+            <p className={styles.cardLabel}>Контакт</p>
             <h1 className={styles.title}>
               {personEntry?.profile.nickname ?? "Профиль контакта"}
             </h1>
             <p className={styles.subtitle}>
               {personEntry === null
-                ? "Канонический person-profile target остаётся привязан к already-known social graph snapshot и не превращается в публичный каталог."
+                ? "Профиль открывается для ваших друзей и заявок."
                 : `@${personEntry.profile.login} · ${describePersonRelationship(personEntry)}`}
             </p>
           </div>
@@ -144,15 +142,15 @@ export function PersonProfilePage() {
 
       {personId === "" && (
         <StateCard
-          title="Person target не указан"
-          message="Route должен содержать стабильный `person` identity key, иначе shell не сможет честно восстановить foreground target."
+          title="Профиль не найден"
+          message="Не удалось определить, чей профиль нужно открыть."
           action={
             <button
               className={styles.primaryButton}
               onClick={handleBackToPeople}
               type="button"
             >
-              Открыть People
+              Открыть людей
             </button>
           }
           tone="error"
@@ -162,7 +160,7 @@ export function PersonProfilePage() {
       {personId !== "" && people.state.status === "loading" && (
         <StateCard
           title="Загружаем профиль контакта"
-          message="Подтягиваем current people snapshot через gateway, чтобы собрать profile-first окно без отдельного identity lookup."
+          message="Собираем данные контакта."
         />
       )}
 
@@ -170,8 +168,7 @@ export function PersonProfilePage() {
         <StateCard
           title="Профиль контакта недоступен"
           message={
-            people.state.screenErrorMessage ??
-            "Не удалось загрузить bounded social graph snapshot."
+            people.state.screenErrorMessage ?? "Не удалось загрузить профиль."
           }
           action={
             <button
@@ -191,14 +188,14 @@ export function PersonProfilePage() {
       {personId !== "" && people.state.status === "ready" && personEntry === null && (
         <StateCard
           title="Контакт больше не доступен"
-          message="Этот person-profile target показывает только already-known friend/request entries. Если relationship уже изменилась, окно честно не притворяется глобальным profile lookup."
+          message="Этот профиль больше не отображается среди ваших друзей и заявок."
           action={
             <button
               className={styles.primaryButton}
               onClick={handleBackToPeople}
               type="button"
             >
-              Вернуться к People
+              Вернуться к людям
             </button>
           }
           tone="error"
@@ -222,9 +219,14 @@ export function PersonProfilePage() {
               )}
 
               <div className={styles.identityBody}>
-                <p className={styles.relationshipBadge}>
-                  {describePersonRelationship(personEntry)}
-                </p>
+                <div className={styles.identityMetaRow}>
+                  <span className={styles.relationshipBadge}>
+                    {describeRelationshipState(personEntry.relationshipKind)}
+                  </span>
+                  <span className={styles.identityContext}>
+                    {describePersonRelationship(personEntry)}
+                  </span>
+                </div>
                 <h2 className={styles.identityTitle}>{personEntry.profile.nickname}</h2>
                 <p className={styles.identityLogin}>@{personEntry.profile.login}</p>
                 <p className={styles.identitySummary}>
@@ -244,10 +246,10 @@ export function PersonProfilePage() {
                     }}
                     type="button"
                   >
-                    {isOpeningChat ? "Открываем чат..." : "Открыть чат"}
+                    {isOpeningChat ? "Открываем чат..." : relationshipActions?.primary.label}
                   </button>
                   <button
-                    className={styles.secondaryButton}
+                    className={styles.dangerButton}
                     disabled={pendingLabel !== null || isOpeningChat}
                     onClick={() => {
                       setChatActionError(null);
@@ -255,7 +257,7 @@ export function PersonProfilePage() {
                     }}
                     type="button"
                   >
-                    {pendingLabel ?? "Удалить из друзей"}
+                    {pendingLabel ?? relationshipActions?.secondary?.label}
                   </button>
                 </>
               )}
@@ -271,7 +273,9 @@ export function PersonProfilePage() {
                     }}
                     type="button"
                   >
-                    {pendingLabel === "Принимаем..." ? pendingLabel : "Принять заявку"}
+                    {pendingLabel === "Принимаем..."
+                      ? pendingLabel
+                      : relationshipActions?.primary.label}
                   </button>
                   <button
                     className={styles.secondaryButton}
@@ -282,14 +286,16 @@ export function PersonProfilePage() {
                     }}
                     type="button"
                   >
-                    {pendingLabel === "Отклоняем..." ? pendingLabel : "Отклонить"}
+                    {pendingLabel === "Отклоняем..."
+                      ? pendingLabel
+                      : relationshipActions?.secondary?.label}
                   </button>
                 </>
               )}
 
               {personEntry.relationshipKind === "outgoing_request" && (
                 <button
-                  className={styles.primaryButton}
+                  className={styles.secondaryButton}
                   disabled={pendingLabel !== null}
                   onClick={() => {
                     setChatActionError(null);
@@ -297,7 +303,7 @@ export function PersonProfilePage() {
                   }}
                   type="button"
                 >
-                  {pendingLabel ?? "Отменить заявку"}
+                  {pendingLabel ?? relationshipActions?.primary.label}
                 </button>
               )}
             </div>
@@ -308,13 +314,13 @@ export function PersonProfilePage() {
           <section className={styles.metaCard}>
             <div className={styles.sectionHeader}>
               <div>
-                <p className={styles.cardLabel}>Публичные поля</p>
-                <h3 className={styles.sectionTitle}>Профиль</h3>
+                <p className={styles.cardLabel}>Основное</p>
+                <h3 className={styles.sectionTitle}>О человеке</h3>
               </div>
             </div>
 
             <dl className={styles.metaGrid}>
-              <MetaItem label="Login" value={`@${personEntry.profile.login}`} />
+              <MetaItem label="Логин" value={`@${personEntry.profile.login}`} />
               <MetaItem label="Статус" value={personEntry.profile.statusText ?? "не задан"} />
               <MetaItem
                 label="Город"
@@ -338,8 +344,8 @@ export function PersonProfilePage() {
           <section className={styles.metaCard}>
             <div className={styles.sectionHeader}>
               <div>
-                <p className={styles.cardLabel}>Social graph</p>
-                <h3 className={styles.sectionTitle}>Контекст отношения</h3>
+                <p className={styles.cardLabel}>Связь</p>
+                <h3 className={styles.sectionTitle}>Текущий статус</h3>
               </div>
             </div>
 
@@ -361,7 +367,7 @@ export function PersonProfilePage() {
                 value={formatDateTime(personEntry.profile.createdAt)}
               />
               <MetaItem
-                label="Bio"
+                label="О себе"
                 value={personEntry.profile.bio?.trim() || "не заполнено"}
               />
             </dl>
@@ -394,7 +400,7 @@ function StateCard({
 }) {
   return (
     <section className={styles.stateCard} data-tone={tone}>
-      <p className={styles.cardLabel}>Person state</p>
+      <p className={styles.cardLabel}>Контакт</p>
       <h2 className={styles.stateTitle}>{title}</h2>
       <p className={styles.stateMessage}>{message}</p>
       {action && <div className={styles.stateActions}>{action}</div>}
@@ -441,11 +447,4 @@ function formatDateTime(value: string | null): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
-}
-
-function findDirectChatByPeerUserId(chats: DirectChat[], peerUserId: string): DirectChat | null {
-  return (
-    chats.find((chat) => chat.participants.some((participant) => participant.id === peerUserId)) ??
-    null
-  );
 }
