@@ -12,13 +12,7 @@ import {
   normalizeComposerMessageText,
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
-import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
-import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
-import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
-import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
-import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
-import { createMarkdownPreview } from "../chats/createMarkdownPreview";
 import {
   describeEncryptedDirectMessageV2Failure,
   type EncryptedDirectMessageV2ProjectionEntry,
@@ -42,7 +36,6 @@ import {
   isGatewayErrorCode,
   type ChatUser,
   type DirectChat,
-  type DirectChatMessage,
   type DirectChatPresenceState,
   type DirectChatReadState,
   type DirectChatTypingState,
@@ -70,15 +63,11 @@ export function ChatsPage() {
   const [composerText, setComposerText] = useState("");
   const [composerError, setComposerError] = useState<string | null>(null);
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
-  const [isSendingVoiceNote, setIsSendingVoiceNote] = useState(false);
-  const [isSendingVideoNote, setIsSendingVideoNote] = useState(false);
-  const [selectedReplyMessage, setSelectedReplyMessage] = useState<DirectChatMessage | null>(null);
   const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
     useState<string | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const pendingPeerRef = useRef<string | null>(null);
-  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const directCallAudioRef = useRef<HTMLAudioElement | null>(null);
   const isPageVisible = usePageVisibility();
@@ -93,18 +82,6 @@ export function ChatsPage() {
     composerText,
     onUnauthenticated: () => expireSession(),
   });
-  const attachmentComposer = useAttachmentComposer({
-    enabled: authState.status === "authenticated",
-    token: sessionToken,
-    scope:
-      chats.state.thread?.chat.id
-        ? {
-            kind: "direct",
-            id: chats.state.thread.chat.id,
-          }
-        : null,
-    onUnauthenticated: () => expireSession(),
-  });
   const encryptedMediaAttachmentDraft = useEncryptedMediaAttachmentDraft({
     enabled: authState.status === "authenticated",
     token: sessionToken,
@@ -116,18 +93,6 @@ export function ChatsPage() {
             id: chats.state.thread.chat.id,
           },
     onUnauthenticated: () => expireSession(),
-  });
-  const voiceNoteRecorder = useVoiceNoteRecorder({
-    enabled: authState.status === "authenticated",
-  });
-  const videoNoteRecorder = useVideoNoteRecorder({
-    enabled: authState.status === "authenticated",
-  });
-  const discardVoiceNoteRecording = useEffectEvent(() => {
-    voiceNoteRecorder.discardRecording();
-  });
-  const discardVideoNoteRecording = useEffectEvent(() => {
-    videoNoteRecorder.discardRecording();
   });
   const applyEncryptedReadState = useEffectEvent(
     (
@@ -190,12 +155,9 @@ export function ChatsPage() {
   useEffect(() => {
     const timeoutID = window.setTimeout(() => {
       setEditingEncryptedMessageId(null);
-      setSelectedReplyMessage(null);
       setSelectedEncryptedReplyMessageId(null);
       setSearchJumpNotice(null);
       setHighlightedMessageId(null);
-      discardVoiceNoteRecording();
-      discardVideoNoteRecording();
     }, 0);
 
     return () => {
@@ -594,66 +556,27 @@ export function ChatsPage() {
           messageId,
           entry: encryptedMessageIndex.get(messageId) ?? null,
         }));
-  const encryptedFailureCount = encryptedLane.items.filter(
-    (item) => item.kind === "failure",
-  ).length;
-  const uploadedAttachmentId = attachmentComposer.uploadedAttachmentId;
-  const attachmentDraft = attachmentComposer.state.draft;
   const encryptedAttachmentDraft = encryptedMediaAttachmentDraft.draft;
   const uploadedEncryptedAttachmentDraft = encryptedMediaAttachmentDraft.uploadedDraft;
-  const voiceNoteStatus = voiceNoteRecorder.state.status;
-  const hasPendingVoiceNote =
-    voiceNoteStatus === "requesting_permission" ||
-    voiceNoteStatus === "recording" ||
-    voiceNoteStatus === "processing" ||
-    voiceNoteStatus === "recorded";
-  const videoNoteStatus = videoNoteRecorder.state.status;
-  const hasPendingVideoNote =
-    videoNoteStatus === "requesting_permission" ||
-    videoNoteStatus === "recording" ||
-    videoNoteStatus === "processing" ||
-    videoNoteStatus === "recorded";
-  const isSendingRecordedNote = isSendingVoiceNote || isSendingVideoNote;
-  const canPickAttachment =
-    !chats.state.isSendingMessage &&
-    !isSendingRecordedNote &&
-    !attachmentComposer.isUploading &&
-    !encryptedMediaAttachmentDraft.isUploading &&
-    !hasPendingVoiceNote &&
-    !hasPendingVideoNote;
   const canPickEncryptedAttachment =
     !chats.state.isSendingMessage &&
-    !isSendingRecordedNote &&
-    !attachmentComposer.isUploading &&
     !encryptedMediaAttachmentDraft.isUploading &&
-    attachmentDraft === null &&
-    uploadedAttachmentId === null &&
-    !hasPendingVoiceNote &&
-    !hasPendingVideoNote;
+    editingEncryptedEntry === null;
   const canSendEncryptedDirectMessageV2 =
     selectedThread !== null &&
     !chats.state.isSendingMessage &&
     !cryptoRuntime.state.isActionPending &&
-    !isSendingRecordedNote &&
-    !attachmentComposer.isUploading &&
     !encryptedMediaAttachmentDraft.isUploading &&
-    attachmentDraft === null &&
-    uploadedAttachmentId === null &&
     (normalizeComposerMessageText(composerText) !== "" ||
       uploadedEncryptedAttachmentDraft !== null);
   const encryptedSendHint = describeEncryptedBootstrapSendHint({
     chatSelected: selectedThread !== null,
     composerText,
-    legacyAttachmentDraftPresent: attachmentDraft !== null || uploadedAttachmentId !== null,
     encryptedAttachmentDraft,
-    hasPendingVoiceNote,
-    hasPendingVideoNote,
-    hasLegacyReplyTarget: selectedReplyMessage !== null,
     hasEncryptedReplyTarget: selectedEncryptedReplyEntry !== null,
     isEditingEncryptedMessage: editingEncryptedEntry !== null,
     cryptoRuntimeState: cryptoRuntime.state,
   });
-  const legacyDirectHistoryDescoped = true;
 
   useEffect(() => {
     if (desktopShellHost === null || selectedThread === null) {
@@ -682,32 +605,10 @@ export function ChatsPage() {
       return;
     }
 
-    if (attachmentDraft !== null || uploadedAttachmentId !== null) {
-      setComposerError(
-        "Legacy attachment composer не подключён к encrypted DM v2 send. Используйте отдельный encrypted media draft.",
-      );
-      chats.clearFeedback();
-      return;
-    }
-    if (selectedReplyMessage !== null) {
-      setComposerError(
-        "Encrypted DM v2 reply в этом slice работает только по encrypted message id внутри local encrypted lane.",
-      );
-      chats.clearFeedback();
-      return;
-    }
-    if (hasPendingVoiceNote || hasPendingVideoNote || isSendingRecordedNote) {
-      setComposerError(
-        "Encrypted DM v2 bootstrap send пока не расширяется на voice/video notes.",
-      );
-      chats.clearFeedback();
-      return;
-    }
-
     const normalizedText = normalizeComposerMessageText(composerText);
     if (normalizedText === "" && uploadedEncryptedAttachmentDraft === null) {
       setComposerError(
-        "Добавьте текст или готовый encrypted attachment для encrypted DM v2 send.",
+        "Добавьте текст или подготовьте файл для отправки.",
       );
       chats.clearFeedback();
       return;
@@ -741,7 +642,6 @@ export function ChatsPage() {
 
       publishLocalEncryptedDirectMessageV2Projection(result.localProjection);
       setComposerText("");
-      setSelectedReplyMessage(null);
       setSelectedEncryptedReplyMessageId(null);
       setEditingEncryptedMessageId(null);
       encryptedMediaAttachmentDraft.markSendSucceeded();
@@ -750,7 +650,7 @@ export function ChatsPage() {
       setComposerError(
         error instanceof Error && error.message.trim() !== ""
           ? error.message
-          : "Не удалось отправить encrypted DM v2 через crypto runtime.",
+          : "Не удалось отправить сообщение.",
       );
     }
   }
@@ -787,7 +687,7 @@ export function ChatsPage() {
       setComposerError(
         error instanceof Error && error.message.trim() !== ""
           ? error.message
-          : "Не удалось опубликовать encrypted tombstone.",
+          : "Не удалось удалить сообщение для всех.",
       );
     }
   }
@@ -821,52 +721,10 @@ export function ChatsPage() {
         error instanceof Error && error.message.trim() !== ""
           ? error.message
           : pinned
-            ? "Не удалось снять encrypted pin."
-            : "Не удалось закрепить encrypted message.",
+            ? "Не удалось снять закрепление."
+            : "Не удалось закрепить сообщение.",
       );
     }
-  }
-
-  async function handleSendVoiceNote() {
-    const voiceNoteDraft = voiceNoteRecorder.state.draft;
-    if (
-      voiceNoteDraft === null ||
-      chats.state.thread === null ||
-      chats.state.isSendingMessage ||
-      isSendingRecordedNote ||
-      attachmentComposer.isUploading ||
-      encryptedMediaAttachmentDraft.isUploading
-    ) {
-      return;
-    }
-
-    voiceNoteRecorder.discardRecording();
-    setComposerError(
-      "Legacy direct voice note path в runtime больше не активен. Для direct chats в этом slice остаётся только encrypted DM v2 content path.",
-    );
-    chats.clearFeedback();
-    setIsSendingVoiceNote(false);
-  }
-
-  async function handleSendVideoNote() {
-    const videoNoteDraft = videoNoteRecorder.state.draft;
-    if (
-      videoNoteDraft === null ||
-      chats.state.thread === null ||
-      chats.state.isSendingMessage ||
-      isSendingRecordedNote ||
-      attachmentComposer.isUploading ||
-      encryptedMediaAttachmentDraft.isUploading
-    ) {
-      return;
-    }
-
-    videoNoteRecorder.discardRecording();
-    setComposerError(
-      "Legacy direct video note path в runtime больше не активен. Для direct chats в этом slice остаётся только encrypted DM v2 content path.",
-    );
-    chats.clearFeedback();
-    setIsSendingVideoNote(false);
   }
 
   async function handleComposerSubmit(event: FormEvent<HTMLFormElement>) {
@@ -905,17 +763,6 @@ export function ChatsPage() {
     setMobileWindowContentMode(nextMode);
   }
 
-  async function handleAttachmentSelection(file: File | null) {
-    if (file === null) {
-      return;
-    }
-
-    setComposerError(
-      "Legacy direct attachment composer больше не подключён к активному runtime path. Используйте encrypted attachment draft.",
-    );
-    chats.clearFeedback();
-  }
-
   async function handleEncryptedAttachmentSelection(file: File | null) {
     if (file === null) {
       return;
@@ -937,10 +784,8 @@ export function ChatsPage() {
             <p className={styles.cardLabel}>Chats</p>
             <h1 className={styles.title}>Личные чаты AeroChat</h1>
             <p className={styles.subtitle}>
-              Direct chat shell остаётся gateway-only, но readable legacy plaintext history для
-              1:1 чатов в этом slice честно de-scoped. Активный content path для direct chats
-              теперь показывается через encrypted DM v2 local projection без скрытого fallback на
-              legacy timeline bootstrap.
+              Окно личного чата показывает текущую переписку и обычный composer без разделения на
+              разные пользовательские режимы отправки.
             </p>
           </div>
 
@@ -962,8 +807,7 @@ export function ChatsPage() {
 
         <div className={styles.metrics}>
           <Metric label="Чаты" value={chats.state.chats.length} />
-          <Metric label="Legacy history" value={selectedThread?.messages.length ?? 0} />
-          <Metric label="Encrypted unread" value={selectedThread?.chat.encryptedUnreadCount ?? 0} />
+          <Metric label="Новых" value={selectedThread?.chat.encryptedUnreadCount ?? 0} />
           <Metric label="Закреплено" value={pinnedMessages.length} />
         </div>
 
@@ -1103,7 +947,7 @@ export function ChatsPage() {
                           )}
                           {chat.encryptedUnreadCount > 0 && (
                             <span className={styles.statusBadge} data-tone="accent">
-                              Encrypted unread: {chat.encryptedUnreadCount}
+                              Новых: {chat.encryptedUnreadCount}
                             </span>
                           )}
                           {chat.pinnedMessageIds.length > 0 && (
@@ -1608,8 +1452,8 @@ export function ChatsPage() {
                   <section className={styles.pinnedStrip}>
                     <div className={styles.blockHeader}>
                       <div>
-                        <p className={styles.cardLabel}>Encrypted pinned</p>
-                        <h3 className={styles.blockTitle}>Закрепления encrypted DM v2</h3>
+                        <p className={styles.cardLabel}>Закреплённые</p>
+                        <h3 className={styles.blockTitle}>Закреплённые сообщения</h3>
                       </div>
                       <span className={styles.metaTag}>
                         {selectedThread.chat.encryptedPinnedMessageIds.length}
@@ -1622,7 +1466,7 @@ export function ChatsPage() {
                           <div className={styles.pinnedHeader}>
                             <strong>
                               {entry === null
-                                ? "Encrypted message"
+                                ? "Сообщение"
                                 : entry.senderUserId === authState.profile.id
                                   ? "Вы"
                                   : selectedPeer?.nickname ?? "Собеседник"}
@@ -1645,55 +1489,54 @@ export function ChatsPage() {
                 <section className={styles.messagesPanel}>
                   <div className={styles.blockHeader}>
                     <div>
-                      <p className={styles.cardLabel}>Encrypted DM v2</p>
-                      <h3 className={styles.blockTitle}>Локальная decrypted projection</h3>
+                      <p className={styles.cardLabel}>Сообщения</p>
+                      <h3 className={styles.blockTitle}>Переписка</h3>
                     </div>
                     <div className={styles.headerActions}>
                       {selectedThread.chat.encryptedUnreadCount > 0 && (
                         <span className={styles.statusBadge} data-tone="accent">
-                          Encrypted unread: {selectedThread.chat.encryptedUnreadCount}
+                          Новых: {selectedThread.chat.encryptedUnreadCount}
                         </span>
                       )}
                       <span className={styles.metaTag}>
                         {encryptedLane.status === "ready"
-                          ? `${encryptedMessageCount} msg / ${encryptedFailureCount} fail`
+                          ? `${encryptedMessageCount} сообщений`
                           : encryptedLane.status === "unavailable"
                             ? "Недоступно"
-                            : "Подготавливаем"}
+                            : "Загружаем"}
                       </span>
                     </div>
                   </div>
 
                   <p className={styles.encryptedLaneDescription}>
-                    Эта секция показывает только client-side decrypted projection из opaque
-                    encrypted envelopes для текущего local crypto-device. Legacy plaintext
-                    timeline остаётся ниже без скрытого merge.
+                    Текущая переписка открывается в обычном чате. Если часть истории недоступна,
+                    это показывается отдельным честным состоянием ниже.
                   </p>
 
                   <div className={styles.messagesList}>
                     {encryptedLane.status === "loading" && (
                       <StateCard
-                        title="Готовим encrypted DM v2"
-                        message="Загружаем opaque envelopes из storage и пропускаем их через crypto runtime worker."
+                        title="Загружаем сообщения"
+                        message="Подготавливаем текущую переписку для чтения."
                       />
                     )}
 
                     {encryptedLane.status === "unavailable" && (
                       <StateCard
-                        title="Encrypted DM v2 недоступен"
+                        title="Сообщения недоступны"
                         message={
                           encryptedLane.errorMessage ??
-                          "Для этого browser profile encrypted DM v2 local projection пока недоступен."
+                          "Для этого браузера не удалось подготовить переписку."
                         }
                       />
                     )}
 
                     {encryptedLane.status === "error" && (
                       <StateCard
-                        title="Encrypted DM v2 не загрузился"
+                        title="Не удалось загрузить сообщения"
                         message={
                           encryptedLane.errorMessage ??
-                          "Не удалось собрать local projection для encrypted DM v2."
+                          "Не удалось подготовить переписку."
                         }
                         tone="error"
                       />
@@ -1702,7 +1545,7 @@ export function ChatsPage() {
                     {encryptedLane.status === "ready" &&
                       encryptedLane.items.length === 0 && (
                         <StateCard
-                          title="Encrypted envelopes пока не видны"
+                          title="Сообщений пока нет"
                           message={describeEncryptedDirectMessageV2LaneEmptyState(0)}
                         />
                       )}
@@ -1735,7 +1578,6 @@ export function ChatsPage() {
                             item.kind !== "message"
                               ? undefined
                               : () => {
-                                  setSelectedReplyMessage(null);
                                   setSelectedEncryptedReplyMessageId(item.messageId);
                                   setEditingEncryptedMessageId(null);
                                   setComposerError(null);
@@ -1747,7 +1589,6 @@ export function ChatsPage() {
                             item.isTombstone
                               ? undefined
                               : () => {
-                                  setSelectedReplyMessage(null);
                                   setEditingEncryptedMessageId(item.messageId);
                                   setSelectedEncryptedReplyMessageId(item.replyToMessageId);
                                   setComposerText(item.text ?? "");
@@ -1781,18 +1622,18 @@ export function ChatsPage() {
                 <section className={styles.messagesPanel}>
                   <div className={styles.blockHeader}>
                     <div>
-                      <p className={styles.cardLabel}>Legacy direct history</p>
-                      <h3 className={styles.blockTitle}>Plaintext timeline de-scoped</h3>
+                      <p className={styles.cardLabel}>История</p>
+                      <h3 className={styles.blockTitle}>Ранние сообщения недоступны</h3>
                     </div>
                     <span className={styles.metaTag}>
-                      {legacyDirectHistoryDescoped ? "De-scoped" : `${selectedThread.messages.length} шт.`}
+                      Недоступно
                     </span>
                   </div>
 
                   <div className={styles.messagesList}>
                     <StateCard
-                      title="Legacy direct history недоступна"
-                      message="Readable legacy plaintext list/get/history path для direct chats в этом slice намеренно de-scoped. Открытый контент для direct chat теперь нужно смотреть через encrypted DM v2 local projection выше. Group history этим изменением не затрагивается."
+                      title="История недоступна"
+                      message="В этом окне доступны текущие сообщения. Более ранняя история здесь сейчас не открывается."
                     />
                   </div>
                 </section>
@@ -1800,11 +1641,11 @@ export function ChatsPage() {
                 <section className={styles.composerCard}>
                   <div className={styles.blockHeader}>
                     <div>
-                      <p className={styles.cardLabel}>Encrypted composer</p>
-                      <h3 className={styles.blockTitle}>Encrypted DM v2</h3>
+                      <p className={styles.cardLabel}>Сообщение</p>
+                      <h3 className={styles.blockTitle}>Написать сообщение</h3>
                     </div>
                     <span className={styles.composerHint}>
-                      Enter отправляет encrypted message, Shift+Enter переносит строку
+                      Enter отправляет сообщение, Shift+Enter переносит строку
                     </span>
                   </div>
 
@@ -1831,7 +1672,7 @@ export function ChatsPage() {
                           }}
                           type="button"
                         >
-                          Отменить encrypted reply
+                          Отменить ответ
                         </button>
                       </div>
                     )}
@@ -1855,48 +1696,12 @@ export function ChatsPage() {
                           }}
                           type="button"
                         >
-                          Отменить encrypted edit
-                        </button>
-                      </div>
-                    )}
-
-                    {selectedReplyMessage && (
-                      <div className={styles.replyComposerCard}>
-                        <div>
-                          <p className={styles.replyPreviewAuthor}>
-                            Ответ на {selectedReplyMessage.senderUserId === authState.profile.id ? "ваше сообщение" : selectedPeer?.nickname ?? "сообщение собеседника"}
-                          </p>
-                          <p className={styles.replyPreviewText}>
-                            {describeDirectComposerReplyTarget(
-                              selectedReplyMessage,
-                              authState.profile.id,
-                            )}
-                          </p>
-                        </div>
-                        <button
-                          className={styles.ghostButton}
-                          onClick={() => {
-                            setSelectedReplyMessage(null);
-                          }}
-                          type="button"
-                        >
-                          Отменить reply
+                          Отменить редактирование
                         </button>
                       </div>
                     )}
 
                     <div className={styles.attachmentActions}>
-                      <input
-                        accept="*/*"
-                        className={styles.attachmentInput}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0] ?? null;
-                          void handleAttachmentSelection(file);
-                          event.target.value = "";
-                        }}
-                        ref={attachmentInputRef}
-                        type="file"
-                      />
                       <input
                         accept="*/*"
                         className={styles.attachmentInput}
@@ -1910,16 +1715,6 @@ export function ChatsPage() {
                       />
                       <button
                         className={styles.secondaryButton}
-                        disabled={legacyDirectHistoryDescoped || !canPickAttachment}
-                        onClick={() => {
-                          attachmentInputRef.current?.click();
-                        }}
-                        type="button"
-                      >
-                        Legacy файл de-scoped
-                      </button>
-                      <button
-                        className={styles.secondaryButton}
                         disabled={!canPickEncryptedAttachment}
                         onClick={() => {
                           encryptedAttachmentInputRef.current?.click();
@@ -1927,112 +1722,14 @@ export function ChatsPage() {
                         type="button"
                       >
                         {encryptedAttachmentDraft === null
-                          ? "Выбрать encrypted файл"
-                          : "Заменить encrypted файл"}
+                          ? "Добавить файл"
+                          : "Заменить файл"}
                       </button>
                       <span className={styles.attachmentHint}>
-                        Legacy plaintext composer, legacy attachment path и voice/video notes для
-                        direct chats в этом slice честно de-scoped. Активным остаётся только
-                        encrypted DM v2 path с отдельным encrypted attachment draft.
+                        Прикрепите файл к следующему сообщению. Дополнительных режимов отправки в
+                        этом окне нет.
                       </span>
                     </div>
-
-                    <VoiceNoteRecorderPanel
-                      discardDisabled
-                      isSending={isSendingVoiceNote}
-                      onDiscard={() => {
-                        voiceNoteRecorder.discardRecording();
-                      }}
-                      onSend={() => {
-                        void handleSendVoiceNote();
-                      }}
-                      onStart={() => {
-                        void voiceNoteRecorder.startRecording();
-                      }}
-                      onStop={() => {
-                        voiceNoteRecorder.stopRecording();
-                      }}
-                      sendDisabled
-                      startDisabled
-                      state={voiceNoteRecorder.state}
-                      stopDisabled
-                    />
-
-                    <VideoNoteRecorderPanel
-                      discardDisabled
-                      isSending={isSendingVideoNote}
-                      onDiscard={() => {
-                        videoNoteRecorder.discardRecording();
-                      }}
-                      onSend={() => {
-                        void handleSendVideoNote();
-                      }}
-                      onStart={() => {
-                        void videoNoteRecorder.startRecording();
-                      }}
-                      onStop={() => {
-                        videoNoteRecorder.stopRecording();
-                      }}
-                      sendDisabled
-                      startDisabled
-                      state={videoNoteRecorder.state}
-                      stopDisabled
-                    />
-
-                    {attachmentDraft && (
-                      <div className={styles.attachmentDraftCard}>
-                        <div>
-                          <p className={styles.attachmentDraftTitle}>{attachmentDraft.fileName}</p>
-                          <p className={styles.attachmentDraftMeta}>
-                            {formatAttachmentSize(attachmentDraft.sizeBytes)} •{" "}
-                            {describeAttachmentMimeType(attachmentDraft.mimeType)}
-                          </p>
-                          {attachmentDraft.status === "uploading" && (
-                            <p className={styles.attachmentDraftStatus}>
-                              Загружаем: {attachmentDraft.progress}%
-                            </p>
-                          )}
-                          {attachmentDraft.status === "preparing" && (
-                            <p className={styles.attachmentDraftStatus}>
-                              Подготавливаем upload intent...
-                            </p>
-                          )}
-                          {attachmentDraft.status === "uploaded" && (
-                            <p className={styles.attachmentDraftStatus}>
-                              Файл загружен и будет прикреплён к следующему сообщению.
-                            </p>
-                          )}
-                          {attachmentDraft.status === "error" && (
-                            <p className={styles.attachmentDraftError}>
-                              {attachmentDraft.errorMessage ?? "Не удалось загрузить файл."}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className={styles.attachmentDraftActions}>
-                          {attachmentDraft.status === "error" && (
-                            <button
-                              className={styles.ghostButton}
-                              onClick={() => {
-                                void attachmentComposer.retryUpload();
-                              }}
-                              type="button"
-                            >
-                              Повторить upload
-                            </button>
-                          )}
-                          <button
-                            className={styles.ghostButton}
-                            onClick={() => {
-                              attachmentComposer.removeDraft();
-                            }}
-                            type="button"
-                          >
-                            Убрать
-                          </button>
-                        </div>
-                      </div>
-                    )}
 
                     {encryptedAttachmentDraft && (
                       <div className={styles.attachmentDraftCard}>
@@ -2043,28 +1740,27 @@ export function ChatsPage() {
                           <p className={styles.attachmentDraftMeta}>
                             {formatAttachmentSize(
                               encryptedAttachmentDraft.plaintextSizeBytes,
-                            )}{" "}
-                            plaintext •{" "}
+                            )}
                             {encryptedAttachmentDraft.ciphertextSizeBytes > 0 &&
-                              `${formatAttachmentSize(
+                              ` • ${formatAttachmentSize(
                                 encryptedAttachmentDraft.ciphertextSizeBytes,
-                              )} ciphertext • `}
+                              )} после подготовки`}
+                            {" • "}
                             {describeAttachmentMimeType(encryptedAttachmentDraft.mimeType)}
                           </p>
                           {encryptedAttachmentDraft.status === "preparing" && (
                             <p className={styles.attachmentDraftStatus}>
-                              Шифруем файл внутри crypto runtime перед upload...
+                              Подготавливаем файл...
                             </p>
                           )}
                           {encryptedAttachmentDraft.status === "uploading" && (
                             <p className={styles.attachmentDraftStatus}>
-                              Загружаем ciphertext blob: {encryptedAttachmentDraft.progress}%
+                              Загружаем файл: {encryptedAttachmentDraft.progress}%
                             </p>
                           )}
                           {encryptedAttachmentDraft.status === "uploaded" && (
                             <p className={styles.attachmentDraftStatus}>
-                              Ciphertext blob загружен. Descriptor будет отправлен только через
-                              Encrypted DM v2.
+                              Файл готов к отправке.
                             </p>
                           )}
                           {encryptedAttachmentDraft.status === "error" && (
@@ -2104,8 +1800,6 @@ export function ChatsPage() {
                       <textarea
                         disabled={
                           chats.state.isSendingMessage ||
-                          isSendingVoiceNote ||
-                          attachmentComposer.isUploading ||
                           encryptedMediaAttachmentDraft.isUploading
                         }
                         maxLength={4000}
@@ -2138,8 +1832,8 @@ export function ChatsPage() {
                           {cryptoRuntime.state.isActionPending
                             ? "Собираем..."
                             : editingEncryptedEntry !== null
-                              ? "Сохранить encrypted edit"
-                              : "Encrypted DM v2"}
+                              ? "Сохранить правки"
+                              : "Отправить"}
                         </button>
                       </div>
                     </div>
@@ -2273,7 +1967,7 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
         </div>
         <div className={styles.messageBody}>
           {input.item.isTombstone ? (
-            <p className={styles.tombstoneText}>Encrypted сообщение удалено для всех.</p>
+            <p className={styles.tombstoneText}>Сообщение удалено для всех.</p>
           ) : (
             <>
               {input.replyTarget && (
@@ -2310,7 +2004,7 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
               )}
               {!input.item.text && input.item.attachments.length === 0 && (
                 <p className={styles.encryptedFailureText}>
-                  Payload расшифровался, но renderable content для этого slice отсутствует.
+                  У сообщения нет доступного содержимого для показа.
                 </p>
               )}
             </>
@@ -2324,7 +2018,7 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
                 onClick={input.onTogglePin}
                 type="button"
               >
-                {input.isPinned ? "Снять encrypted pin" : "Закрепить"}
+                {input.isPinned ? "Снять закрепление" : "Закрепить"}
               </button>
             )}
             {input.onReply && (
@@ -2352,7 +2046,7 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
           stored {formatDateTime(input.item.storedAt)}
           {input.item.editedAt ? ` • edited ${formatDateTime(input.item.editedAt)}` : ""}
           {input.item.deletedAt
-            ? ` • tombstone ${formatDateTime(input.item.deletedAt)}`
+            ? ` • удалено ${formatDateTime(input.item.deletedAt)}`
             : ""}
         </p>
       </div>
@@ -2494,25 +2188,6 @@ function describeDirectProfileLocation(profile: Profile | null): string {
   return "Не указана";
 }
 
-function describeDirectComposerReplyTarget(
-  message: DirectChatMessage,
-  currentUserId: string,
-): string {
-  if (message.tombstone) {
-    return "Сообщение удалено для всех.";
-  }
-  const textPreview = createMarkdownPreview(message.text?.text ?? "");
-  if (textPreview !== "") {
-    return textPreview.length > 140 ? `${textPreview.slice(0, 137)}...` : textPreview;
-  }
-  if (message.attachments.length > 0) {
-    return message.attachments.length === 1
-      ? "Вложение"
-      : `Вложения: ${message.attachments.length}`;
-  }
-  return message.senderUserId === currentUserId ? "Ваше сообщение" : "Сообщение собеседника";
-}
-
 function resolveEncryptedDirectReplyTarget(
   entries: Map<string, EncryptedDirectMessageV2ProjectedMessageEntry>,
   messageId: string | null,
@@ -2527,16 +2202,16 @@ function resolveEncryptedDirectReplyTarget(
   if (target === undefined) {
     return {
       messageId: null,
-      authorLabel: "Недоступное encrypted сообщение",
-      previewText: "Reply target пока не разрешён в текущем локальном bounded окне.",
+      authorLabel: "Недоступное сообщение",
+      previewText: "Исходное сообщение пока недоступно в этом окне.",
     };
   }
 
   if (target.isTombstone) {
     return {
       messageId: target.messageId,
-      authorLabel: "Удалённое encrypted сообщение",
-      previewText: "Сообщение удалено для всех локальным tombstone.",
+      authorLabel: "Удалённое сообщение",
+      previewText: "Сообщение удалено для всех.",
     };
   }
 
@@ -2559,21 +2234,21 @@ function describeEncryptedDirectComposerReplyTarget(
   }
   if (entry.attachments.length > 0) {
     return entry.attachments.length === 1
-      ? "Encrypted вложение"
-      : `Encrypted вложения: ${entry.attachments.length}`;
+      ? "Вложение"
+      : `Вложения: ${entry.attachments.length}`;
   }
 
-  return "Encrypted сообщение без renderable content.";
+  return "Сообщение без доступного содержимого.";
 }
 
 function describeEncryptedPinnedPreview(
   entry: EncryptedDirectMessageV2ProjectedMessageEntry | null,
 ): string {
   if (entry === null) {
-    return "Серверный pin уже сохранён, но содержимое сообщения ещё не разрешено локальной encrypted projection.";
+    return "Сообщение закреплено, но его содержимое пока недоступно в этом окне.";
   }
   if (entry.isTombstone) {
-    return "Сообщение закреплено по logical id, но его текущее состояние tombstone.";
+    return "Сообщение закреплено, но уже удалено для всех.";
   }
 
   return describeEncryptedDirectComposerReplyTarget(entry);
@@ -2582,22 +2257,18 @@ function describeEncryptedPinnedPreview(
 function describeEncryptedBootstrapSendHint(input: {
   chatSelected: boolean;
   composerText: string;
-  legacyAttachmentDraftPresent: boolean;
   encryptedAttachmentDraft: ReturnType<
     typeof useEncryptedMediaAttachmentDraft
   >["draft"];
-  hasPendingVoiceNote: boolean;
-  hasPendingVideoNote: boolean;
-  hasLegacyReplyTarget: boolean;
   hasEncryptedReplyTarget: boolean;
   isEditingEncryptedMessage: boolean;
   cryptoRuntimeState: CryptoContextState;
 }): string {
   if (!input.chatSelected) {
-    return "Encrypted DM v2 bootstrap send доступен только внутри открытого direct chat.";
+    return "Откройте чат, чтобы отправить сообщение.";
   }
   if (input.cryptoRuntimeState.status !== "ready") {
-    return "Crypto runtime ещё не готов. Encrypted DM v2 bootstrap send ждёт worker bootstrap.";
+    return "Подготавливаем защищённый режим отправки.";
   }
   const snapshot = input.cryptoRuntimeState.snapshot;
   if (
@@ -2608,44 +2279,35 @@ function describeEncryptedBootstrapSendHint(input: {
   ) {
     return (
       snapshot?.errorMessage ??
-      "Для encrypted DM v2 bootstrap send нужен active local crypto-device."
+      "Для отправки сообщений нужно активное локальное устройство."
     );
   }
-  if (input.legacyAttachmentDraftPresent) {
-    return "Legacy attachment draft отправляется только обычным composer path. Для encrypted media используйте отдельный encrypted draft.";
-  }
   if (input.encryptedAttachmentDraft?.status === "preparing") {
-    return "Файл шифруется внутри crypto runtime перед presigned upload.";
+    return "Подготавливаем файл перед загрузкой.";
   }
   if (input.encryptedAttachmentDraft?.status === "uploading") {
-    return "Загружаем ciphertext blob в object storage. Descriptor уйдёт позже внутри encrypted DM v2 payload.";
+    return "Загружаем файл и готовим его к отправке.";
   }
   if (input.encryptedAttachmentDraft?.status === "error") {
-    return "Encrypted media draft не готов: исправьте ошибку upload и повторите.";
-  }
-  if (input.hasLegacyReplyTarget) {
-    return "Plaintext reply target не используется внутри encrypted DM v2 slice. Выберите reply в encrypted lane.";
+    return "Не удалось подготовить файл. Исправьте ошибку и повторите.";
   }
   if (input.isEditingEncryptedMessage) {
-    return "Кнопка Encrypted DM v2 опубликует новую opaque edit revision для выбранного logical message id.";
+    return "Следующее действие сохранит изменения сообщения.";
   }
   if (input.hasEncryptedReplyTarget) {
-    return "Reply reference уйдёт только внутри ciphertext payload. Preview строится локально после decrypt без server-side plaintext quote.";
-  }
-  if (input.hasPendingVoiceNote || input.hasPendingVideoNote) {
-    return "Voice/video note path остаётся legacy attachment flow и не входит в encrypted bootstrap send.";
+    return "Следующее сообщение будет отправлено как ответ.";
   }
   if (
     normalizeComposerMessageText(input.composerText) === "" &&
     input.encryptedAttachmentDraft?.status !== "uploaded"
   ) {
-    return "Введите текст или подготовьте encrypted attachment, чтобы отправить bounded encrypted DM v2 envelope.";
+    return "Введите текст или подготовьте файл для отправки.";
   }
   if (input.encryptedAttachmentDraft?.status === "uploaded") {
-    return "Ciphertext blob уже загружен. Кнопка Encrypted DM v2 отправит attachment descriptor внутри opaque message payload без plaintext metadata на сервере.";
+    return "Файл готов. Можно отправлять сообщение.";
   }
 
-  return "Отдельное явное действие: worker соберёт encrypted DM v2 envelope и отправит opaque deliveries без plaintext shadow write.";
+  return "Сообщение будет отправлено обычным действием из этого окна.";
 }
 
 function jumpToMessage(elementId: string) {

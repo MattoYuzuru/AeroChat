@@ -45,8 +45,8 @@ describe("buildAttachmentComposerScopeKey", () => {
         id: "group-1",
       }),
     ).toBe(true);
-    expect(LEGACY_GROUP_ATTACHMENT_COMPOSER_DESCOPED_MESSAGE).toContain(
-      "plaintext group attachment path",
+    expect(LEGACY_GROUP_ATTACHMENT_COMPOSER_DESCOPED_MESSAGE).toBe(
+      "Обычный старый путь вложений для групп больше недоступен. Используйте текущее окно отправки сообщения.",
     );
   });
 

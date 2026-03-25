@@ -548,7 +548,7 @@ export function SearchPage() {
         setEncryptedSearchError(
           describeGatewayError(
             encryptedResult.reason,
-            "Не удалось выполнить локальный поиск по encrypted окну.",
+            "Не удалось выполнить локальный поиск по доступным сообщениям.",
           ),
         );
         setEncryptedResults([]);
@@ -909,9 +909,8 @@ export function SearchPage() {
             <p className={styles.cardLabel}>Messages</p>
             <h2 className={styles.sectionTitle}>Поиск по сообщениям</h2>
             <p className={styles.sectionDescription}>
-              Legacy group history всё ещё ищется через сервер, а server-side поиск по содержимому
-              legacy direct-сообщений честно де-скоуплен. Encrypted сообщения ищутся только
-              локально и в пределах текущего окна.
+              Результаты из текущей сессии ищутся локально. Если серверный поиск недоступен, это
+              показывается ниже без дополнительных режимов и переключателей.
             </p>
           </div>
 
@@ -1054,7 +1053,7 @@ export function SearchPage() {
             <section className={styles.pathSection}>
               <div className={styles.pathHeader}>
                 <div>
-                  <p className={styles.cardLabel}>Обычные сообщения</p>
+                  <p className={styles.cardLabel}>Сервер</p>
                   <h3 className={styles.pathTitle}>Серверный поиск</h3>
                   <p className={styles.pathDescription}>
                     {submittedSearch
@@ -1127,10 +1126,10 @@ export function SearchPage() {
             <section className={styles.pathSection}>
               <div className={styles.pathHeader}>
                 <div>
-                  <p className={styles.cardLabel}>Зашифрованные</p>
+                  <p className={styles.cardLabel}>Локально</p>
                   <h3 className={styles.pathTitle}>Локальный поиск</h3>
                   <p className={styles.pathDescription}>
-                    Только локально расшифрованные сообщения текущей сессии.
+                    Только сообщения, доступные в текущей сессии.
                   </p>
                 </div>
                 <span className={styles.metaTag}>
@@ -1149,15 +1148,15 @@ export function SearchPage() {
               {encryptedSearchStatus === "loading" && (
                 <InlineState
                   title="Готовим локальный индекс"
-                  message="Поиск идёт только по доступному encrypted окну."
+                  message="Поиск идёт по сообщениям, доступным в этой сессии."
                 />
               )}
 
               {(encryptedSearchStatus === "unavailable" || encryptedSearchStatus === "error") && (
                 <InlineState
-                  title="Локальный encrypted поиск недоступен"
+                  title="Локальный поиск недоступен"
                   message={
-                    encryptedSearchError ?? "Текущий браузерный профиль не смог подготовить окно."
+                    encryptedSearchError ?? "Текущий браузер не смог подготовить сообщения для поиска."
                   }
                   tone="error"
                 />
@@ -1166,7 +1165,7 @@ export function SearchPage() {
               {encryptedSearchStatus === "ready" && encryptedResults.length === 0 && (
                 <InlineState
                   title="Совпадений нет"
-                  message="В локальном encrypted окне ничего не найдено."
+                  message="В доступных сообщениях ничего не найдено."
                 />
               )}
 
@@ -1356,17 +1355,17 @@ function describeEncryptedSummary(
   const base =
     scopeSelection === "direct" || scopeSelection === "group"
       ? `Просмотрено до ${summary.laneMessageLimit} локально расшифрованных сообщений.`
-      : `Просмотрено ${summary.searchedLaneCount} из ${summary.availableLaneCount} recent encrypted lanes, до ${summary.laneMessageLimit} сообщений на lane.`;
+      : `Просмотрено ${summary.searchedLaneCount} из ${summary.availableLaneCount} недавних переписок, до ${summary.laneMessageLimit} сообщений в каждой.`;
 
   const limited = summary.limitedByLaneBudget
-    ? ` Ограничение all-scope: ${summary.laneLimit} lanes.`
+    ? ` Ограничение по области: ${summary.laneLimit} переписок.`
     : "";
   const failures =
     summary.failedLaneCount > 0
-      ? ` Не удалось подготовить ${summary.failedLaneCount} lanes.`
+      ? ` Не удалось подготовить ${summary.failedLaneCount} переписок.`
       : "";
 
-  return `${base} Локальный кэш ограничен ${summary.cacheLaneLimit} lanes.${limited}${failures}`;
+  return `${base} Локальный кэш ограничен ${summary.cacheLaneLimit} переписками.${limited}${failures}`;
 }
 
 function normalizeMatchFragment(value: string): string {
