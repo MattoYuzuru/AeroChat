@@ -231,6 +231,10 @@ func (h *ChatHandler) DisableGroupInviteLink(ctx context.Context, req *connect.R
 	return forwardUnary(ctx, req, h.client.DisableGroupInviteLink)
 }
 
+func (h *ChatHandler) PreviewGroupByInviteLink(ctx context.Context, req *connect.Request[chatv1.PreviewGroupByInviteLinkRequest]) (*connect.Response[chatv1.PreviewGroupByInviteLinkResponse], error) {
+	return forwardUnary(ctx, req, h.client.PreviewGroupByInviteLink)
+}
+
 func (h *ChatHandler) JoinGroupByInviteLink(ctx context.Context, req *connect.Request[chatv1.JoinGroupByInviteLinkRequest]) (*connect.Response[chatv1.JoinGroupByInviteLinkResponse], error) {
 	response, err := forwardUnary(ctx, req, h.client.JoinGroupByInviteLink)
 	if err != nil {

@@ -84,7 +84,7 @@ export const startMenuLauncherApps: readonly StartMenuLauncherAppEntry[] = [
     appId: "search",
     badge: "По",
     title: "Поиск",
-    description: "Отдельное search-приложение с текущими privacy и encrypted boundaries.",
+    description: "People-first поиск: контакты, invite links и вторичный поиск по сообщениям.",
   },
   {
     appId: "friend_requests",

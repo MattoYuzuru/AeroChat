@@ -49,7 +49,10 @@
 - compact direct-call continuity surface в web: active direct call awareness переживает thread switching внутри открытой app session, есть bounded reconnect resync и explicit return/rejoin path;
 - server-enforced one-active-call-per-user policy: один пользователь не может оставаться active participant более чем в одном active call одновременно;
 - web group call control/lobby bootstrap: group chat показывает active call state, compact roster и start/join/leave/end actions поверх существующего RTC control plane, но без multiparty browser media transport;
-- `/app/search` для legacy plaintext search и bounded local encrypted search;
+- `/app/search` как People-first shell app:
+  - exact-login-first lookup/add contact без public discovery;
+  - invite-link preview для группы до явного join;
+  - вторичный legacy plaintext search и bounded local encrypted search;
 - bounded encrypted direct lane и bounded encrypted group lane как отдельные timeline рядом с legacy plaintext history.
 
 По зрелости подсистем:
@@ -277,7 +280,7 @@ Realtime сейчас:
 
 ### Search
 
-- `implemented`: plaintext search через backend `SearchMessages` и `/app/search`, плюс bounded exact-login known-user result для already-known social graph entrypoints в canonical `person_profile`.
+- `implemented`: People-first `/app/search` с exact-login-first known-user lookup, bounded invite-link preview и plaintext search через backend `SearchMessages`, при сохранении canonical `person_profile` / `group_chat` handoff.
 - `partial/bootstrap/bounded`: encrypted search только local-only, session-local, bounded by fetched/decrypted windows.
 - `not implemented yet`: server-side encrypted search parity или deep history encrypted indexing.
 

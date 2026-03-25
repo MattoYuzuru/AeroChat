@@ -418,6 +418,22 @@ func (h *Handler) JoinGroupByInviteLink(ctx context.Context, req *connect.Reques
 	}), nil
 }
 
+func (h *Handler) PreviewGroupByInviteLink(ctx context.Context, req *connect.Request[chatv1.PreviewGroupByInviteLinkRequest]) (*connect.Response[chatv1.PreviewGroupByInviteLinkResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	preview, err := h.service.PreviewGroupByInviteLink(ctx, token, req.Msg.InviteToken)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.PreviewGroupByInviteLinkResponse{
+		Preview: toProtoGroupInvitePreview(*preview),
+	}), nil
+}
+
 func (h *Handler) SetGroupTyping(ctx context.Context, req *connect.Request[chatv1.SetGroupTypingRequest]) (*connect.Response[chatv1.SetGroupTypingResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -1176,6 +1192,16 @@ func toProtoGroupInviteLink(value chat.GroupInviteLink) *chatv1.GroupInviteLink 
 	}
 
 	return result
+}
+
+func toProtoGroupInvitePreview(value chat.GroupInvitePreview) *chatv1.GroupInvitePreview {
+	return &chatv1.GroupInvitePreview{
+		GroupId:       value.GroupID,
+		GroupName:     value.GroupName,
+		InviteRole:    toProtoGroupMemberRole(value.InviteRole),
+		MemberCount:   uint32(value.MemberCount),
+		AlreadyJoined: value.AlreadyJoined,
+	}
 }
 
 func toProtoChatUser(value chat.UserSummary) *chatv1.ChatUser {

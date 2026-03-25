@@ -29,6 +29,7 @@ service ChatService {
   rpc CreateGroupInviteLink(CreateGroupInviteLinkRequest) returns (CreateGroupInviteLinkResponse);
   rpc ListGroupInviteLinks(ListGroupInviteLinksRequest) returns (ListGroupInviteLinksResponse);
   rpc DisableGroupInviteLink(DisableGroupInviteLinkRequest) returns (DisableGroupInviteLinkResponse);
+  rpc PreviewGroupByInviteLink(PreviewGroupByInviteLinkRequest) returns (PreviewGroupByInviteLinkResponse);
   rpc JoinGroupByInviteLink(JoinGroupByInviteLinkRequest) returns (JoinGroupByInviteLinkResponse);
   rpc SetGroupTyping(SetGroupTypingRequest) returns (SetGroupTypingResponse);
   rpc ClearGroupTyping(ClearGroupTypingRequest) returns (ClearGroupTypingResponse);
@@ -731,6 +732,22 @@ message DisableGroupInviteLinkRequest {
 
 message DisableGroupInviteLinkResponse {
   GroupInviteLink invite_link = 1;
+}
+
+message GroupInvitePreview {
+  string group_id = 1;
+  string group_name = 2;
+  GroupMemberRole invite_role = 3;
+  uint32 member_count = 4;
+  bool already_joined = 5;
+}
+
+message PreviewGroupByInviteLinkRequest {
+  string invite_token = 1;
+}
+
+message PreviewGroupByInviteLinkResponse {
+  GroupInvitePreview preview = 1;
 }
 
 message JoinGroupByInviteLinkRequest {

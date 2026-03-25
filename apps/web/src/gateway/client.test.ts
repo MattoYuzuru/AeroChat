@@ -2325,4 +2325,48 @@ describe("createGatewayClient", () => {
       }),
     );
   });
+
+  it("previews group invite link before join", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          preview: {
+            groupId: "group-1",
+            groupName: "Aero Team",
+            inviteRole: "GROUP_MEMBER_ROLE_MEMBER",
+            memberCount: 5,
+            alreadyJoined: false,
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const preview = await client.previewGroupByInviteLink("token-1", "  ginv_demo  ");
+
+    expect(preview).toEqual({
+      groupId: "group-1",
+      groupName: "Aero Team",
+      inviteRole: "member",
+      memberCount: 5,
+      alreadyJoined: false,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.chat.v1.ChatService/PreviewGroupByInviteLink",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          inviteToken: "ginv_demo",
+        }),
+      }),
+    );
+  });
 });

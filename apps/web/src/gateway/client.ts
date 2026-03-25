@@ -43,6 +43,7 @@ import type {
   GroupChatSnapshot,
   GroupChatThread,
   GroupInviteLink,
+  GroupInvitePreview,
   GroupMessage,
   GroupMember,
   GroupMemberRole,
@@ -803,6 +804,18 @@ interface DisableGroupInviteLinkResponseWire {
   inviteLink?: GroupInviteLinkWire;
 }
 
+interface GroupInvitePreviewWire {
+  groupId?: string;
+  groupName?: string;
+  inviteRole?: string;
+  memberCount?: number | string;
+  alreadyJoined?: boolean;
+}
+
+interface PreviewGroupByInviteLinkResponseWire {
+  preview?: GroupInvitePreviewWire;
+}
+
 interface JoinGroupByInviteLinkResponseWire {
   group?: GroupWire;
 }
@@ -1510,6 +1523,21 @@ export function createGatewayClient(
       );
 
       return normalizeGroupInviteLink(response.inviteLink);
+    },
+
+    async previewGroupByInviteLink(token, inviteToken) {
+      const response = await unaryCall<PreviewGroupByInviteLinkResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "PreviewGroupByInviteLink",
+        {
+          inviteToken: inviteToken.trim(),
+        },
+        token,
+      );
+
+      return normalizeGroupInvitePreview(response.preview);
     },
 
     async joinGroupByInviteLink(token, inviteToken) {
@@ -2914,6 +2942,18 @@ function normalizeGroupInviteLink(
     updatedAt: input?.updatedAt ?? "",
     disabledAt: normalizeNullableString(input?.disabledAt),
     lastJoinedAt: normalizeNullableString(input?.lastJoinedAt),
+  };
+}
+
+function normalizeGroupInvitePreview(
+  input: GroupInvitePreviewWire | undefined,
+): GroupInvitePreview {
+  return {
+    groupId: input?.groupId ?? "",
+    groupName: input?.groupName ?? "",
+    inviteRole: normalizeGroupMemberRole(input?.inviteRole),
+    memberCount: normalizeCount(input?.memberCount),
+    alreadyJoined: input?.alreadyJoined ?? false,
   };
 }
 
