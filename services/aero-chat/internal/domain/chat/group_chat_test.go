@@ -72,16 +72,16 @@ func TestGroupMessageSendPolicyHonorsRoles(t *testing.T) {
 	ownerMessage := mustSendGroupMessage(t, service, alice.Token, group.ID, "owner message")
 	adminMessage := mustSendGroupMessage(t, service, bob.Token, group.ID, "admin message")
 	memberMessage := mustSendGroupMessage(t, service, charlie.Token, group.ID, "member message")
+	if ownerMessage.ID == "" || adminMessage.ID == "" || memberMessage.ID == "" {
+		t.Fatalf("ожидались сохранённые group message ids, получено owner=%q admin=%q member=%q", ownerMessage.ID, adminMessage.ID, memberMessage.ID)
+	}
 
 	messages, err := service.ListGroupMessages(context.Background(), alice.Token, group.ID, 0)
 	if err != nil {
 		t.Fatalf("list group messages: %v", err)
 	}
-	if len(messages) != 3 {
-		t.Fatalf("ожидалось 3 сообщения в группе, получено %d", len(messages))
-	}
-	if messages[0].ID != memberMessage.ID || messages[1].ID != adminMessage.ID || messages[2].ID != ownerMessage.ID {
-		t.Fatal("ожидалась сортировка group timeline по убыванию created_at")
+	if len(messages) != 0 {
+		t.Fatalf("legacy group history должна быть честно de-scoped, получено %+v", messages)
 	}
 }
 
@@ -95,7 +95,7 @@ func TestReaderGroupRoleIsReadOnlyInMessageFlow(t *testing.T) {
 	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
 
 	group := mustCreateGroup(t, service, alice.Token, "Readers")
-	firstMessage := mustSendGroupMessage(t, service, alice.Token, group.ID, "only read me")
+	mustSendGroupMessage(t, service, alice.Token, group.ID, "only read me")
 
 	readerInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleReader)
 	if err != nil {
@@ -126,8 +126,8 @@ func TestReaderGroupRoleIsReadOnlyInMessageFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reader list group messages: %v", err)
 	}
-	if len(messages) != 1 || messages[0].ID != firstMessage.ID {
-		t.Fatal("reader должен видеть существующую историю группы")
+	if len(messages) != 0 {
+		t.Fatalf("reader не должен получать readable legacy history после de-scope, получено %+v", messages)
 	}
 
 	if _, err := service.SendGroupTextMessage(context.Background(), bob.Token, group.ID, "reader write", nil); !errors.Is(err, ErrPermissionDenied) {
@@ -196,8 +196,8 @@ func TestRestrictedGroupMemberKeepsReadAccessButCannotSendOrType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("restricted member list group messages: %v", err)
 	}
-	if len(messages) != 1 || messages[0].ID != firstMessage.ID {
-		t.Fatal("restricted member должен сохранять доступ к истории группы")
+	if len(messages) != 0 {
+		t.Fatalf("restricted member не должен получать readable legacy history после de-scope, получено %+v", messages)
 	}
 
 	if _, err := service.SendGroupTextMessage(context.Background(), bob.Token, group.ID, "blocked", nil); !errors.Is(err, ErrPermissionDenied) {
@@ -263,14 +263,8 @@ func TestGroupMessagesUseMetadataOnlyReplyPreview(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list group messages: %v", err)
 	}
-	if len(messages) != 2 {
-		t.Fatalf("ожидалось 2 сообщения в группе, получено %d", len(messages))
-	}
-	if messages[0].ReplyPreview == nil || messages[0].ReplyPreview.MessageID != target.ID {
-		t.Fatalf("ожидался reply preview в group history, получено %+v", messages[0].ReplyPreview)
-	}
-	if messages[0].ReplyPreview.HasText || messages[0].ReplyPreview.TextPreview != "" {
-		t.Fatalf("group history reply preview не должен раскрывать plaintext body, получено %+v", messages[0].ReplyPreview)
+	if len(messages) != 0 {
+		t.Fatalf("legacy group history должна быть de-scoped даже при reply preview, получено %+v", messages)
 	}
 
 	fetchedReply, err := repo.GetGroupMessage(context.Background(), alice.User.ID, group.ID, reply.ID)
@@ -315,17 +309,8 @@ func TestGroupReplyPreviewBecomesUnavailableWhenTargetLeavesLegacyHistory(t *tes
 	if err != nil {
 		t.Fatalf("list group messages: %v", err)
 	}
-	if len(messages) != 1 || messages[0].ID != reply.ID {
-		t.Fatalf("ожидался только reply после удаления target из legacy history, получено %+v", messages)
-	}
-	if messages[0].ReplyPreview == nil || !messages[0].ReplyPreview.IsUnavailable {
-		t.Fatalf("ожидался unavailable reply preview в group history, получено %+v", messages[0].ReplyPreview)
-	}
-	if messages[0].ReplyPreview.MessageID != target.ID {
-		t.Fatalf("ожидался stable reply target id %q, получено %+v", target.ID, messages[0].ReplyPreview)
-	}
-	if messages[0].ReplyPreview.HasText || messages[0].ReplyPreview.TextPreview != "" {
-		t.Fatalf("unavailable group reply preview не должен возвращать plaintext text, получено %+v", messages[0].ReplyPreview)
+	if len(messages) != 0 {
+		t.Fatalf("legacy group history должна оставаться de-scoped после выпадения reply target, получено %+v", messages)
 	}
 
 	fetchedReply, err := repo.GetGroupMessage(context.Background(), alice.User.ID, group.ID, reply.ID)

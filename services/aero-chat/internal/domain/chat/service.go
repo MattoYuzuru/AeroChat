@@ -1689,7 +1689,7 @@ func (s *Service) ListGroupMessages(ctx context.Context, token string, groupID s
 		return nil, err
 	}
 
-	group, _, err := s.resolveGroupChat(ctx, authSession.User.ID, groupID)
+	_, _, err = s.resolveGroupChat(ctx, authSession.User.ID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -1698,8 +1698,12 @@ func (s *Service) ListGroupMessages(ctx context.Context, token string, groupID s
 	if err != nil {
 		return nil, err
 	}
+	_ = limit
 
-	return s.repo.ListGroupMessages(ctx, authSession.User.ID, group.ID, limit)
+	// Legacy group plaintext history transport намеренно de-scoped:
+	// активный content path для groups теперь должен читаться через encrypted lane,
+	// а не через readable legacy timeline bootstrap/list path.
+	return []GroupMessage{}, nil
 }
 
 func (s *Service) SearchMessages(ctx context.Context, token string, params SearchMessagesParams) ([]MessageSearchResult, *MessageSearchCursor, bool, error) {

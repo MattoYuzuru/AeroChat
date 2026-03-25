@@ -11,14 +11,11 @@ import {
   type SetStateAction,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import { MessageAttachmentList } from "../attachments/MessageAttachmentList";
 import {
   canSubmitMessageComposer,
-  hasRenderableMessageText,
   normalizeComposerMessageText,
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
-import { downloadAttachment, openAttachmentInNewTab } from "../attachments/open";
 import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
 import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
@@ -116,8 +113,6 @@ export function GroupsPage() {
   const [composerText, setComposerText] = useState("");
   const [encryptedComposerText, setEncryptedComposerText] = useState("");
   const [encryptedComposerError, setEncryptedComposerError] = useState<string | null>(null);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editingMessageText, setEditingMessageText] = useState("");
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
   const [selectedReplyMessage, setSelectedReplyMessage] = useState<GroupMessage | null>(null);
   const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
@@ -133,8 +128,6 @@ export function GroupsPage() {
   const [pendingRestrictionUserId, setPendingRestrictionUserId] = useState<string | null>(null);
   const [pendingRemoveUserId, setPendingRemoveUserId] = useState<string | null>(null);
   const [pendingTransferUserId, setPendingTransferUserId] = useState<string | null>(null);
-  const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
-  const [pendingEditMessageId, setPendingEditMessageId] = useState<string | null>(null);
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
   const [groupCallActionState, setGroupCallActionState] =
     useState<GroupCallActionState>("idle");
@@ -283,9 +276,6 @@ export function GroupsPage() {
   }, [groupCallAwarenessState]);
 
   useEffect(() => {
-    setEditingMessageId(null);
-    setEditingMessageText("");
-    setPendingEditMessageId(null);
     setEditingEncryptedMessageId(null);
     setSelectedReplyMessage(null);
     setSelectedEncryptedReplyMessageId(null);
@@ -478,9 +468,6 @@ export function GroupsPage() {
     if (selectedGroupId === "") {
       setSelectedState(createInitialGroupsSelectedState());
       setComposerText("");
-      setEditingMessageId(null);
-      setEditingMessageText("");
-      setPendingEditMessageId(null);
       setSelectedReplyMessage(null);
       setEditingEncryptedMessageId(null);
       setSelectedEncryptedReplyMessageId(null);
@@ -504,50 +491,30 @@ export function GroupsPage() {
       try {
         const snapshot = await gatewayClient.getGroupChat(token, selectedGroupId);
         const membersPromise = gatewayClient.listGroupMembers(token, selectedGroupId);
-        const messagesPromise = gatewayClient.listGroupMessages(token, selectedGroupId);
         const inviteLinksPromise = snapshot.group.permissions.canManageInviteLinks
           ? gatewayClient.listGroupInviteLinks(token, selectedGroupId)
           : Promise.resolve([]);
-        const [members, messages, inviteLinks] = await Promise.all([
+        const [members, inviteLinks] = await Promise.all([
           membersPromise,
-          messagesPromise,
           inviteLinksPromise,
         ]);
         if (!active) {
           return;
         }
 
-        let readState = snapshot.readState;
         const encryptedReadState = snapshot.encryptedReadState;
-        let group = snapshot.group;
-        const latestMessage = messages[0] ?? null;
-        if (latestMessage) {
-          const readUpdate = await gatewayClient.markGroupChatRead(
-            token,
-            selectedGroupId,
-            latestMessage.id,
-          );
-          if (!active) {
-            return;
-          }
-          readState = readUpdate.readState ?? readState;
-          group = {
-            ...group,
-            unreadCount: readUpdate.unreadCount,
-          };
-        }
 
         setSelectedState({
           status: "ready",
           snapshot: {
             ...snapshot,
-            group,
-            readState,
+            group: snapshot.group,
+            readState: snapshot.readState,
             encryptedReadState,
           },
           members,
           inviteLinks,
-          messages,
+          messages: [],
           errorMessage: null,
         });
         setMemberRoleDrafts(buildMemberRoleDrafts(members));
@@ -1227,6 +1194,7 @@ export function GroupsPage() {
       ? selectedState.members.find((member) => member.user.id === authState.profile.id) ?? null
       : null;
   const requestedJoinToken = extractGroupInviteToken(joinInput || joinTokenFromRoute);
+  const legacyGroupHistoryDescoped = true;
   const threadMessages =
     selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
   const encryptedThreadMessages =
@@ -1944,46 +1912,6 @@ export function GroupsPage() {
     }
   }
 
-  async function handleSaveGroupMessageEdit(messageId: string) {
-    if (selectedState.status !== "ready") {
-      return;
-    }
-
-    const normalizedText = normalizeComposerMessageText(editingMessageText);
-    if (normalizedText === "") {
-      setActionError("Отредактированное сообщение не может быть полностью пустым.");
-      setNotice(null);
-      return;
-    }
-
-    setPendingEditMessageId(messageId);
-    setActionError(null);
-    setNotice(null);
-
-    try {
-      await gatewayClient.editGroupMessage(
-        token,
-        selectedState.snapshot.group.id,
-        messageId,
-        normalizedText,
-      );
-      setEditingMessageId(null);
-      setEditingMessageText("");
-      setNotice("Сообщение обновлено.");
-    } catch (error) {
-      const message = resolveProtectedError(
-        error,
-        "Не удалось сохранить изменения сообщения.",
-        expireSession,
-      );
-      if (message !== null) {
-        setActionError(message);
-      }
-    } finally {
-      setPendingEditMessageId(null);
-    }
-  }
-
   async function handleAttachmentSelection(file: File | null) {
     if (file === null) {
       return;
@@ -2003,40 +1931,6 @@ export function GroupsPage() {
     setActionError(null);
     setNotice(null);
     await encryptedMediaAttachmentDraft.selectFile(file);
-  }
-
-  async function handleOpenAttachment(attachmentId: string) {
-    setPendingOpenAttachmentId(attachmentId);
-    setActionError(null);
-
-    try {
-      await openAttachmentInNewTab(token, attachmentId);
-    } catch (error) {
-      setActionError(
-        error instanceof Error && error.message.trim() !== ""
-          ? error.message
-          : "Не удалось открыть вложение.",
-      );
-    } finally {
-      setPendingOpenAttachmentId(null);
-    }
-  }
-
-  async function handleDownloadAttachment(attachmentId: string, fileName: string) {
-    setPendingOpenAttachmentId(attachmentId);
-    setActionError(null);
-
-    try {
-      await downloadAttachment(token, attachmentId, fileName);
-    } catch (error) {
-      setActionError(
-        error instanceof Error && error.message.trim() !== ""
-          ? error.message
-          : "Не удалось скачать вложение.",
-      );
-    } finally {
-      setPendingOpenAttachmentId(null);
-    }
   }
 
   async function handleUpdateGroupMemberRole(userId: string) {
@@ -2243,13 +2137,11 @@ export function GroupsPage() {
     try {
       const snapshot = await gatewayClient.getGroupChat(token, groupId);
       const membersPromise = gatewayClient.listGroupMembers(token, groupId);
-      const messagesPromise = gatewayClient.listGroupMessages(token, groupId);
       const inviteLinksPromise = snapshot.group.permissions.canManageInviteLinks
         ? gatewayClient.listGroupInviteLinks(token, groupId)
         : Promise.resolve([]);
-      const [members, messages, inviteLinks] = await Promise.all([
+      const [members, inviteLinks] = await Promise.all([
         membersPromise,
-        messagesPromise,
         inviteLinksPromise,
       ]);
       if (!active) {
@@ -2261,7 +2153,7 @@ export function GroupsPage() {
         snapshot,
         members,
         inviteLinks,
-        messages,
+        messages: [],
         errorMessage: null,
       });
       setMemberRoleDrafts(buildMemberRoleDrafts(members));
@@ -2333,9 +2225,9 @@ export function GroupsPage() {
             <p className={styles.cardLabel}>Groups</p>
             <h1 className={styles.title}>Group workspace и call lobby</h1>
             <p className={styles.subtitle}>
-              Текущий web slice добавляет compact group call control/lobby поверх уже существующего
-              group thread и RTC control plane. Media transport для реального multiparty audio/video
-              по-прежнему отложен.
+              Текущий web slice держит encrypted group lane как честный content path, а readable
+              legacy plaintext history/bootstrap для групп теперь de-scoped. Group call surface
+              по-прежнему остаётся compact control/lobby поверх RTC control plane.
             </p>
           </div>
 
@@ -2353,10 +2245,7 @@ export function GroupsPage() {
 
         <div className={styles.metrics}>
           <Metric label="Группы" value={groups.length} />
-          <Metric
-            label="В thread"
-            value={selectedState.status === "ready" ? selectedState.messages.length : 0}
-          />
+          <Metric label="Legacy history" value={0} />
           <Metric label="Активные invite links" value={activeInviteCount} />
         </div>
 
@@ -2552,7 +2441,7 @@ export function GroupsPage() {
           {selectedState.status === "loading" && (
             <InlineState
               title="Открываем группу"
-              message="Загружаем metadata, primary thread, участников и историю сообщений."
+              message="Загружаем metadata группы, primary thread, участников и encrypted lane status без legacy history bootstrap."
             />
           )}
 
@@ -2869,7 +2758,8 @@ export function GroupsPage() {
                   </div>
                   <p className={styles.panelCopy}>
                     Эта секция показывает только client-side projection из opaque encrypted
-                    group envelopes. Legacy plaintext history ниже остаётся отдельным path.
+                    group envelopes. Legacy plaintext history/list bootstrap для groups теперь
+                    честно de-scoped и больше не рендерится как активный timeline path.
                   </p>
                 </div>
 
@@ -2895,10 +2785,11 @@ export function GroupsPage() {
                   </div>
                 )}
 
-                {(encryptedGroupLane.bootstrap !== null || threadMessages.length > 0) && (
+                {(encryptedGroupLane.bootstrap !== null || legacyGroupHistoryDescoped) && (
                   <div className={styles.notice}>
-                    Legacy plaintext timeline и encrypted local projection намеренно показаны
-                    раздельно. Этот slice не притворяется unified merged history.
+                    Encrypted local projection остаётся единственным честным bootstrap/content path
+                    для groups в этом окне. Legacy plaintext history/list transport намеренно
+                    de-scoped и не притворяется fallback timeline.
                   </div>
                 )}
 
@@ -3398,17 +3289,20 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.cardLabel}>Timeline</p>
-                    <h2 className={styles.panelTitle}>Primary group thread</h2>
+                    <p className={styles.cardLabel}>Legacy group history</p>
+                    <h2 className={styles.panelTitle}>Plaintext timeline de-scoped</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Thread показывает текст, polished file cards и inline preview для
-                    image/audio/video attachments, но без media processing pipeline.
+                    Readable legacy `ListGroupMessages` bootstrap больше не используется как
+                    активный product path. Group metadata, membership и encrypted lane остаются
+                    доступными отдельно.
                   </p>
                 </div>
 
                 <div className={styles.timelineMeta}>
-                  <span className={styles.statusPill}>{threadMessages.length} сообщений</span>
+                  <span className={styles.statusPill}>
+                    {legacyGroupHistoryDescoped ? "De-scoped" : `${threadMessages.length} сообщений`}
+                  </span>
                   <span className={styles.statusPill}>
                     updated {formatDateTime(selectedState.snapshot.thread.updatedAt)}
                   </span>
@@ -3416,197 +3310,10 @@ export function GroupsPage() {
                 </div>
 
                 <div className={styles.messagesList}>
-                  {threadMessages.length === 0 ? (
-                    <InlineState
-                      title="Сообщений пока нет"
-                      message="Primary thread уже создан, но ни text-only, ни attachment-only сообщений пока нет."
-                    />
-                    ) : (
-                      threadMessages.map((message) => {
-                        const isOwn = message.senderUserId === authState.profile.id;
-                        const canEdit = isGroupMessageEditable(message, authState.profile.id);
-                        const isEditing = editingMessageId === message.id;
-                        const hasMessageText = hasRenderableMessageText(message.text);
-                        const hasAttachments = message.attachments.length > 0;
-                        const isEditPending = pendingEditMessageId === message.id;
-
-                      return (
-                        <article
-                          className={styles.messageCard}
-                          data-own={isOwn}
-                          data-search-target={highlightedMessageId === message.id}
-                          id={`group-message-${message.id}`}
-                          key={message.id}
-                        >
-                          <div className={styles.messageHeader}>
-                            <div>
-                              <p className={styles.messageAuthor}>
-                                {describeMessageAuthor(
-                                  message.senderUserId,
-                                  authState.profile.id,
-                                  selectedState.members,
-                                )}
-                              </p>
-                              <p className={styles.messageMeta}>
-                                {formatDateTime(message.createdAt)}
-                              </p>
-                            </div>
-                            <div className={styles.badgeColumn}>
-                              <span className={styles.statusPill}>
-                                {describeGroupMessageKind(message)}
-                              </span>
-                              {message.editedAt && (
-                                <span className={styles.statusPill}>Изменено</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {(hasMessageText || hasAttachments) && (
-                            <div className={styles.messageBody}>
-                              {isEditing ? (
-                                <>
-                                  <label className={`${styles.field} ${styles.editField}`}>
-                                    <span>Текст сообщения</span>
-                                    <textarea
-                                      disabled={isEditPending}
-                                      maxLength={4000}
-                                      onChange={(event) => {
-                                        setEditingMessageText(event.target.value);
-                                        setActionError(null);
-                                        setNotice(null);
-                                      }}
-                                      rows={4}
-                                      value={editingMessageText}
-                                    />
-                                  </label>
-
-                                  {hasAttachments && (
-                                    <p className={styles.editHint}>
-                                      Вложения остаются без изменений, редактируется только текст.
-                                    </p>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  {message.replyPreview && (
-                                    <button
-                                      className={styles.replyPreviewCard}
-                                      onClick={() => {
-                                        jumpToMessage(`group-message-${message.replyPreview?.messageId ?? ""}`);
-                                      }}
-                                      type="button"
-                                    >
-                                      <span className={styles.replyPreviewAuthor}>
-                                        {describeGroupReplyPreviewAuthor(
-                                          message.replyPreview,
-                                          authState.profile.id,
-                                        )}
-                                      </span>
-                                      <span className={styles.replyPreviewText}>
-                                        {describeReplyPreviewText(message.replyPreview)}
-                                      </span>
-                                    </button>
-                                  )}
-                                  {hasMessageText && (
-                                    <div className={styles.messageText}>
-                                      <SafeMessageMarkdown text={message.text?.text ?? ""} />
-                                    </div>
-                                  )}
-                                </>
-                              )}
-
-                              {hasAttachments && (
-                                <MessageAttachmentList
-                                  accessToken={token}
-                                  attachments={message.attachments}
-                                  onDownloadAttachment={(attachment) => {
-                                    void handleDownloadAttachment(
-                                      attachment.id,
-                                      attachment.fileName,
-                                    );
-                                  }}
-                                  onOpenAttachment={(attachmentId) => {
-                                    void handleOpenAttachment(attachmentId);
-                                  }}
-                                  pendingAttachmentId={pendingOpenAttachmentId}
-                                  tone={isOwn ? "own" : "other"}
-                                />
-                              )}
-                            </div>
-                          )}
-
-                          <div className={styles.actions}>
-                            {isEditing ? (
-                              <>
-                                <button
-                                  className={styles.primaryButton}
-                                  disabled={isEditPending}
-                                  onClick={() => {
-                                    void handleSaveGroupMessageEdit(message.id);
-                                  }}
-                                  type="button"
-                                >
-                                  {isEditPending ? "Сохраняем..." : "Сохранить"}
-                                </button>
-                                <button
-                                  className={styles.secondaryButton}
-                                  disabled={isEditPending}
-                                  onClick={() => {
-                                    setEditingMessageId(null);
-                                    setEditingMessageText("");
-                                    setActionError(null);
-                                    setNotice(null);
-                                  }}
-                                  type="button"
-                                >
-                                  Отмена
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                {canEdit && (
-                                  <button
-                                    className={styles.secondaryButton}
-                                    onClick={() => {
-                                      setEditingEncryptedMessageId(null);
-                                      setSelectedEncryptedReplyMessageId(null);
-                                      setEditingMessageId(message.id);
-                                      setEditingMessageText(message.text?.text ?? "");
-                                      setActionError(null);
-                                      setNotice(null);
-                                    }}
-                                    type="button"
-                                  >
-                                    Редактировать
-                                  </button>
-                                )}
-
-                                <button
-                                  className={styles.ghostButton}
-                                  onClick={() => {
-                                    setEditingEncryptedMessageId(null);
-                                    setSelectedEncryptedReplyMessageId(null);
-                                    setSelectedReplyMessage(message);
-                                    setActionError(null);
-                                    setNotice(null);
-                                  }}
-                                  type="button"
-                                >
-                                  Ответить
-                                </button>
-                              </>
-                            )}
-                          </div>
-
-                          {message.editedAt && (
-                            <p className={styles.editMeta}>
-                              Последнее редактирование: {formatDateTime(message.editedAt)}
-                            </p>
-                          )}
-                        </article>
-                      );
-                    })
-                  )}
+                  <InlineState
+                    title="Legacy group history недоступна"
+                    message="Readable legacy plaintext list/get/history path для groups в этом slice намеренно de-scoped. Открытый group content теперь нужно читать через encrypted group lane выше. Realtime compatibility payloads и legacy attachment path этим изменением не убираются."
+                  />
                 </div>
               </section>
 
@@ -4368,16 +4075,6 @@ function roleLabel(role: GroupMemberRole): string {
   }
 }
 
-function describeGroupMessageKind(message: { text: { text: string } | null; attachments: { id: string }[] }): string {
-  if (hasRenderableMessageText(message.text) && message.attachments.length > 0) {
-    return "Текст + файл";
-  }
-  if (message.attachments.length > 0) {
-    return "Только файл";
-  }
-  return "Текст";
-}
-
 function describeGroupCallPhaseLabel(phase: ReturnType<typeof deriveGroupCallUiPhase>): string {
   switch (phase) {
     case "starting":
@@ -4440,53 +4137,6 @@ function describeGroupCallParticipantName(
   }
 
   return member.user.nickname || `@${member.user.login}`;
-}
-
-function isGroupMessageEditable(
-  message: GroupMessage,
-  currentUserId: string,
-): boolean {
-  return message.senderUserId === currentUserId && message.text !== null;
-}
-
-function describeGroupReplyPreviewAuthor(
-  preview: GroupMessage["replyPreview"],
-  currentUserId: string,
-): string {
-  if (!preview?.author) {
-    if (preview?.isDeleted) {
-      return "Удалённое сообщение";
-    }
-    if (preview?.isUnavailable) {
-      return "Недоступное сообщение";
-    }
-    return "Ответ";
-  }
-  if (preview.author.id === currentUserId) {
-    return "Вы";
-  }
-  return preview.author.nickname || preview.author.login;
-}
-
-function describeReplyPreviewText(preview: GroupMessage["replyPreview"]): string {
-  if (!preview) {
-    return "";
-  }
-  if (preview.isDeleted) {
-    return "Сообщение удалено.";
-  }
-  if (preview.isUnavailable) {
-    return "Исходное сообщение больше недоступно.";
-  }
-  if (preview.hasText && preview.textPreview.trim() !== "") {
-    return preview.textPreview;
-  }
-  if (preview.attachmentCount > 0) {
-    return preview.attachmentCount === 1
-      ? "Вложение"
-      : `Вложения: ${preview.attachmentCount}`;
-  }
-  return "Текст предпросмотра недоступен.";
 }
 
 function describeGroupComposerReplyTarget(message: GroupMessage): string {
