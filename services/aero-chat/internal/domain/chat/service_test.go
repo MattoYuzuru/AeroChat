@@ -1109,7 +1109,7 @@ func TestGetEncryptedDirectMessageV2ReturnsViewerScopedEnvelope(t *testing.T) {
 	}
 }
 
-func TestDirectCoexistenceKeepsPlaintextHistorySearchAndEncryptedFetchSeparate(t *testing.T) {
+func TestDirectCoexistenceKeepsHistorySeparateAndServerSearchDescoped(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -1177,10 +1177,10 @@ func TestDirectCoexistenceKeepsPlaintextHistorySearchAndEncryptedFetchSeparate(t
 		t.Fatalf("search legacy direct messages: %v", err)
 	}
 	if hasMore || nextCursor != nil {
-		t.Fatalf("не ожидалась пагинация для одного legacy hit, hasMore=%v nextCursor=%+v", hasMore, nextCursor)
+		t.Fatalf("не ожидалась пагинация для de-scoped direct search, hasMore=%v nextCursor=%+v", hasMore, nextCursor)
 	}
-	if len(legacyResults) != 1 || legacyResults[0].MessageID != legacy.ID {
-		t.Fatalf("server-side direct search должна возвращать только legacy plaintext hit, получено %+v", legacyResults)
+	if len(legacyResults) != 0 {
+		t.Fatalf("server-side direct search должна быть честно de-scoped, получено %+v", legacyResults)
 	}
 
 	encryptedResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
@@ -1785,7 +1785,7 @@ func TestListDirectChatsRefreshesSessionTouchWhenLastSeenIsStale(t *testing.T) {
 	}
 }
 
-func TestSearchDirectMessagesSupportsAllAndSpecificScopes(t *testing.T) {
+func TestSearchDirectMessagesAreDescopedForAllAndSpecificScopes(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -1827,20 +1827,8 @@ func TestSearchDirectMessagesSupportsAllAndSpecificScopes(t *testing.T) {
 	if nextCursor != nil {
 		t.Fatalf("не ожидался next cursor, получено %+v", nextCursor)
 	}
-	if len(allResults) != 2 {
-		t.Fatalf("ожидалось 2 direct search hits, получено %d", len(allResults))
-	}
-	if allResults[0].MessageID != other.ID || allResults[1].MessageID != edited.ID {
-		t.Fatalf("ожидался порядок по убыванию created_at: %+v", allResults)
-	}
-	if allResults[0].DirectChatID != secondChat.ID || allResults[1].DirectChatID != firstChat.ID {
-		t.Fatalf("ожидались explicit direct_chat_id в hit'ах, получено %+v", allResults)
-	}
-	if allResults[1].EditedAt == nil {
-		t.Fatal("ожидался edited_at у direct search hit после edit")
-	}
-	if !strings.Contains(strings.ToLower(allResults[1].MatchFragment), "search foundation direct") {
-		t.Fatalf("ожидался fragment с актуальным direct text, получено %q", allResults[1].MatchFragment)
+	if len(allResults) != 0 {
+		t.Fatalf("ожидался честный empty result для all-direct legacy search, получено %+v", allResults)
 	}
 
 	scopedResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
@@ -1856,11 +1844,27 @@ func TestSearchDirectMessagesSupportsAllAndSpecificScopes(t *testing.T) {
 	if hasMore || nextCursor != nil {
 		t.Fatal("не ожидалась пагинация для specific direct scope")
 	}
-	if len(scopedResults) != 1 || scopedResults[0].MessageID != edited.ID {
-		t.Fatalf("ожидался только один visible direct hit без tombstone, получено %+v", scopedResults)
+	if len(scopedResults) != 0 {
+		t.Fatalf("ожидался честный empty result для scoped direct legacy search, получено %+v", scopedResults)
 	}
-	if scopedResults[0].Position.MessageID != edited.ID || !scopedResults[0].Position.MessageCreatedAt.Equal(scopedResults[0].CreatedAt) {
-		t.Fatalf("ожидалась explicit position metadata, получено %+v", scopedResults[0].Position)
+
+	firstHistory, err := service.ListDirectChatMessages(context.Background(), bob.Token, firstChat.ID, 0)
+	if err != nil {
+		t.Fatalf("list first direct chat history: %v", err)
+	}
+	if len(firstHistory) != 2 {
+		t.Fatalf("history первого direct chat не должна терять сообщения, получено %+v", firstHistory)
+	}
+	if firstHistory[1].ID != edited.ID || firstHistory[1].EditedAt == nil {
+		t.Fatalf("history должна оставаться доступной и содержать edited message, получено %+v", firstHistory)
+	}
+
+	secondHistory, err := service.ListDirectChatMessages(context.Background(), alice.Token, secondChat.ID, 0)
+	if err != nil {
+		t.Fatalf("list second direct chat history: %v", err)
+	}
+	if len(secondHistory) != 1 || secondHistory[0].ID != other.ID {
+		t.Fatalf("history второго direct chat не должна меняться из-за de-scoped search, получено %+v", secondHistory)
 	}
 }
 
@@ -1928,23 +1932,30 @@ func TestSearchGroupMessagesHonorsMembershipBoundaries(t *testing.T) {
 	}
 }
 
-func TestSearchMessagesUsesCursorPagination(t *testing.T) {
+func TestSearchGroupMessagesUseCursorPagination(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
 	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
 	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
-	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
 
-	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
-	first := mustSendMessage(t, service, alice.Token, directChat.ID, "cursor foundation one")
-	second := mustSendMessage(t, service, alice.Token, directChat.ID, "cursor foundation two")
-	third := mustSendMessage(t, service, alice.Token, directChat.ID, "cursor foundation three")
+	group := mustCreateGroup(t, service, alice.Token, "Cursor search")
+	invite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create group invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, invite.InviteToken); err != nil {
+		t.Fatalf("join group invite: %v", err)
+	}
+
+	first := mustSendGroupMessage(t, service, alice.Token, group.ID, "cursor foundation one")
+	second := mustSendGroupMessage(t, service, alice.Token, group.ID, "cursor foundation two")
+	third := mustSendGroupMessage(t, service, alice.Token, group.ID, "cursor foundation three")
 
 	pageOne, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
 		Query: "cursor foundation",
-		DirectChat: &SearchDirectMessagesScope{
-			ChatID: &directChat.ID,
+		Group: &SearchGroupMessagesScope{
+			GroupID: &group.ID,
 		},
 		PageSize: 2,
 	})
@@ -1963,8 +1974,8 @@ func TestSearchMessagesUsesCursorPagination(t *testing.T) {
 
 	pageTwo, nextCursorTwo, hasMoreTwo, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
 		Query: "cursor foundation",
-		DirectChat: &SearchDirectMessagesScope{
-			ChatID: &directChat.ID,
+		Group: &SearchGroupMessagesScope{
+			GroupID: &group.ID,
 		},
 		PageSize: 2,
 		Cursor:   nextCursor,
@@ -3870,40 +3881,8 @@ func (r *fakeRepository) SearchDirectMessages(_ context.Context, userID string, 
 		}
 	}
 
-	result := make([]MessageSearchResult, 0)
-	for _, message := range r.messages {
-		if params.ChatID != nil && message.ChatID != *params.ChatID {
-			continue
-		}
-
-		directChat, ok := r.chats[message.ChatID]
-		if !ok || !isParticipant(directChat, userID) {
-			continue
-		}
-		if message.Tombstone != nil {
-			continue
-		}
-		if !searchMessageMatches(message.Text, params.Query) || !searchBeforeCursor(message.CreatedAt, message.ID, params.Cursor) {
-			continue
-		}
-
-		result = append(result, MessageSearchResult{
-			Scope:         ChatKindDirect,
-			DirectChatID:  message.ChatID,
-			MessageID:     message.ID,
-			Author:        searchAuthorForTest(r.users[message.SenderUserID]),
-			CreatedAt:     message.CreatedAt,
-			EditedAt:      message.EditedAt,
-			MatchFragment: searchFragmentForTest(message.Text),
-			Position: MessageSearchPosition{
-				MessageID:        message.ID,
-				MessageCreatedAt: message.CreatedAt,
-			},
-		})
-	}
-
-	sortSearchResultsForTest(result)
-	return result, nil
+	// Legacy direct backend search больше не использует plaintext message body даже в test double.
+	return []MessageSearchResult{}, nil
 }
 
 func (r *fakeRepository) GetDirectReplyPreview(_ context.Context, userID string, chatID string, messageID string) (*ReplyPreview, error) {

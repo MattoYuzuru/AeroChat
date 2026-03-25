@@ -7,6 +7,8 @@ import {
   buildMessageSearchScope,
   buildSearchResultHref,
   describeDirectChatLabel,
+  describeLegacySearchEmptyState,
+  describeLegacySearchPath,
   describeSearchResultAuthor,
   describeSearchResultContainer,
   describeSearchResultScope,
@@ -202,5 +204,25 @@ describe("search result labels", () => {
         "user-1",
       ),
     ).toBe("Вы");
+  });
+});
+
+describe("legacy search boundary copy", () => {
+  it("makes direct server-side de-scope explicit", () => {
+    expect(describeLegacySearchPath("all-direct")).toBe(
+      "Серверный поиск по содержимому legacy direct-сообщений больше не поддерживается.",
+    );
+    expect(describeLegacySearchEmptyState("direct")).toBe(
+      "Legacy direct content search на сервере честно де-скоуплен. Для direct остаётся только локальный encrypted поиск текущей сессии.",
+    );
+  });
+
+  it("keeps group server-side search described as legacy-only", () => {
+    expect(describeLegacySearchPath("group")).toBe(
+      "Серверный поиск остаётся только для legacy group history в выбранной области.",
+    );
+    expect(describeLegacySearchEmptyState("all-groups")).toBe(
+      "В этой области подходящих сообщений нет.",
+    );
   });
 });
