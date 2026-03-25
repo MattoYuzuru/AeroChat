@@ -814,6 +814,40 @@ func TestNewHTTPHandlerPublishesGroupJoinUpdatesToExistingMembersAndJoinedUser(t
 	}
 }
 
+func TestNewHTTPHandlerPreviewsGroupInviteLinkWithoutJoinSideEffects(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	identityDownstream := &testIdentityHandler{}
+	identityDownstream.SetProfileForAuthorization("Bearer v1.user-3", newTestProfile("user-3", "charlie", "Charlie"))
+
+	chatDownstream := newTestChatHandler()
+	gatewayServer := newGatewayTestServer(t, logger, identityDownstream, chatDownstream)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	chatClient := chatv1connect.NewChatServiceClient(gatewayServer.Client(), gatewayServer.URL)
+	request := connect.NewRequest(&chatv1.PreviewGroupByInviteLinkRequest{InviteToken: "ginv-member"})
+	request.Header().Set("Authorization", "Bearer v1.user-3")
+
+	response, err := chatClient.PreviewGroupByInviteLink(ctx, request)
+	if err != nil {
+		t.Fatalf("preview group by invite link через gateway: %v", err)
+	}
+
+	if response.Msg.Preview == nil {
+		t.Fatal("ожидался preview в ответе")
+	}
+	if response.Msg.Preview.GroupId != "group-1" {
+		t.Fatalf("ожидался preview для group-1, получено %q", response.Msg.Preview.GroupId)
+	}
+	if response.Msg.Preview.AlreadyJoined {
+		t.Fatal("preview не должен помечать нового пользователя как already_joined")
+	}
+	if len(chatDownstream.groupMembers) != 2 {
+		t.Fatalf("preview не должен менять membership, получено %d участников", len(chatDownstream.groupMembers))
+	}
+}
+
 func TestNewHTTPHandlerPublishesGroupRoleUpdatesWithViewerRelativeShellState(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	identityDownstream := &testIdentityHandler{}
@@ -1922,6 +1956,28 @@ func (h *testChatHandler) JoinGroupByInviteLink(_ context.Context, req *connect.
 
 	return connect.NewResponse(&chatv1.JoinGroupByInviteLinkResponse{
 		Group: h.groupForUserLocked(actorID),
+	}), nil
+}
+
+func (h *testChatHandler) PreviewGroupByInviteLink(_ context.Context, req *connect.Request[chatv1.PreviewGroupByInviteLinkRequest]) (*connect.Response[chatv1.PreviewGroupByInviteLinkResponse], error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.lastAuthorization = req.Header().Get("Authorization")
+	invite, ok := h.groupInvites[req.Msg.InviteToken]
+	if !ok {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("invite not found"))
+	}
+
+	actorID := userIDFromAuthorization(req.Header().Get("Authorization"))
+	return connect.NewResponse(&chatv1.PreviewGroupByInviteLinkResponse{
+		Preview: &chatv1.GroupInvitePreview{
+			GroupId:       h.group.GetId(),
+			GroupName:     h.group.GetName(),
+			InviteRole:    invite.role,
+			MemberCount:   uint32(len(h.groupMembers)),
+			AlreadyJoined: h.requireGroupMemberLocked(actorID) != nil,
+		},
 	}), nil
 }
 

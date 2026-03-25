@@ -53,10 +53,11 @@ AeroChat должен поддерживать:
 На текущем этапе web-клиент уже поддерживает:
 
 - личные чаты и группы через `aero-gateway`;
-- bootstrap поиска сообщений через отдельную защищённую страницу `/app/search`:
-  - поиск по всем direct chats или по одному direct chat;
-  - поиск по всем группам или по одной группе;
-  - компактные jump-oriented результаты с переходом в нужный direct chat или group;
+- People-first страницу `/app/search`:
+  - точное добавление/поиск контакта по login без публичного каталога;
+  - bounded known-people results с переходом в canonical `person_profile`;
+  - preview группы по invite link до явного join;
+  - вторичный поиск по всем direct chats или группам с compact jump-oriented результатами;
   - временную подсветку target message, если он уже попал в текущую загруженную историю;
 - bounded realtime для chat/group foundation;
 - backend-first foundation для encrypted direct-message v2:

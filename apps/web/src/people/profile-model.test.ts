@@ -3,7 +3,9 @@ import type { Profile } from "../gateway/types";
 import {
   describePersonProfileSummary,
   findExactKnownPeopleEntries,
+  findSimilarKnownPeopleEntries,
   getPersonProfileLaunchTitle,
+  listKnownPeopleEntries,
   resolvePersonProfileEntry,
 } from "./profile-model";
 import type { PeopleSnapshot } from "./state";
@@ -36,6 +38,28 @@ describe("findExactKnownPeopleEntries", () => {
 
     expect(findExactKnownPeopleEntries(snapshot, "ali")).toEqual([]);
     expect(findExactKnownPeopleEntries(snapshot, "release notes")).toEqual([]);
+  });
+});
+
+describe("known people helpers", () => {
+  it("keeps similar results bounded to already known contacts", () => {
+    const snapshot = createPeopleSnapshot();
+
+    expect(findSimilarKnownPeopleEntries(snapshot, "ali")).toEqual([
+      expect.objectContaining({
+        profile: expect.objectContaining({ id: "user-1", login: "alice" }),
+        relationshipKind: "friend",
+      }),
+    ]);
+  });
+
+  it("builds a stable known-people list without public discovery drift", () => {
+    const snapshot = createPeopleSnapshot();
+
+    expect(listKnownPeopleEntries(snapshot, 5).map((entry) => entry.profile.login)).toEqual([
+      "alice",
+      "bob",
+    ]);
   });
 });
 

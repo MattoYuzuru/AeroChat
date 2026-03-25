@@ -893,6 +893,41 @@ func (s *Service) JoinGroupByInviteLink(ctx context.Context, token string, invit
 	return enrichGroupPolicy(group), nil
 }
 
+func (s *Service) PreviewGroupByInviteLink(ctx context.Context, token string, inviteToken string) (*GroupInvitePreview, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedInviteToken, err := normalizeInviteToken(inviteToken)
+	if err != nil {
+		return nil, err
+	}
+
+	target, err := s.repo.GetGroupInviteLinkForJoin(ctx, hashInviteToken(normalizedInviteToken))
+	if err != nil {
+		return nil, err
+	}
+	if target.InviteLink.DisabledAt != nil {
+		return nil, ErrNotFound
+	}
+
+	alreadyJoined := false
+	if _, err := s.repo.GetGroup(ctx, authSession.User.ID, target.Group.ID); err == nil {
+		alreadyJoined = true
+	} else if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
+
+	return &GroupInvitePreview{
+		GroupID:       target.Group.ID,
+		GroupName:     target.Group.Name,
+		InviteRole:    target.InviteLink.Role,
+		MemberCount:   target.Group.MemberCount,
+		AlreadyJoined: alreadyJoined,
+	}, nil
+}
+
 func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupID string, text string, attachmentIDs []string, replyToMessageIDInput ...string) (*GroupMessage, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {

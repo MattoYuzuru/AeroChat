@@ -54,6 +54,7 @@ function createClient(overrides: Partial<GatewayClient>): GatewayClient {
     createGroupInviteLink: vi.fn(),
     listGroupInviteLinks: vi.fn(),
     disableGroupInviteLink: vi.fn(),
+    previewGroupByInviteLink: vi.fn(),
     joinGroupByInviteLink: vi.fn(),
     listGroupMessages: vi.fn(),
     sendGroupTextMessage: vi.fn(),

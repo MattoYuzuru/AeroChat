@@ -241,6 +241,14 @@ type GroupInviteLinkJoinTarget struct {
 	InviteLink GroupInviteLink
 }
 
+type GroupInvitePreview struct {
+	GroupID       string
+	GroupName     string
+	InviteRole    string
+	MemberCount   int32
+	AlreadyJoined bool
+}
+
 type TextMessageContent struct {
 	Text           string
 	MarkdownPolicy string

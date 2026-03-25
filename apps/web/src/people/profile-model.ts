@@ -80,15 +80,37 @@ export function findExactKnownPeopleEntries(
   }
 
   return [...entries.values()].sort((left, right) => {
-    const priorityDelta =
-      relationshipPriority[right.relationshipKind] -
-      relationshipPriority[left.relationshipKind];
-    if (priorityDelta !== 0) {
-      return priorityDelta;
-    }
-
-    return left.profile.login.localeCompare(right.profile.login, "ru-RU");
+    return comparePersonEntries(left, right);
   });
+}
+
+export function findSimilarKnownPeopleEntries(
+  snapshot: PeopleSnapshot,
+  query: string,
+  limit = 5,
+): PersonProfileEntry[] {
+  const normalizedQuery = normalizeExactLoginQuery(query);
+  if (normalizedQuery.length < 2) {
+    return [];
+  }
+
+  return collectKnownPeopleEntries(snapshot)
+    .filter((entry) => {
+      const login = entry.profile.login.trim().toLowerCase();
+      const nickname = entry.profile.nickname.trim().toLowerCase();
+      return (
+        login !== normalizedQuery &&
+        (login.includes(normalizedQuery) || nickname.includes(normalizedQuery))
+      );
+    })
+    .slice(0, limit);
+}
+
+export function listKnownPeopleEntries(
+  snapshot: PeopleSnapshot,
+  limit = 6,
+): PersonProfileEntry[] {
+  return collectKnownPeopleEntries(snapshot).slice(0, limit);
 }
 
 export function getPersonProfileLaunchTitle(profile: Profile): string {
@@ -177,6 +199,52 @@ function upsertPersonProfileEntry(
   }
 
   entries.set(entryKey, entry);
+}
+
+function collectKnownPeopleEntries(snapshot: PeopleSnapshot): PersonProfileEntry[] {
+  const entries = new Map<string, PersonProfileEntry>();
+
+  for (const friend of snapshot.friends) {
+    upsertKnownPersonEntry(entries, mapFriendToPersonProfileEntry(friend));
+  }
+
+  for (const request of snapshot.incoming) {
+    upsertKnownPersonEntry(entries, mapIncomingRequestToPersonProfileEntry(request));
+  }
+
+  for (const request of snapshot.outgoing) {
+    upsertKnownPersonEntry(entries, mapOutgoingRequestToPersonProfileEntry(request));
+  }
+
+  return [...entries.values()].sort((left, right) => comparePersonEntries(left, right));
+}
+
+function upsertKnownPersonEntry(
+  entries: Map<string, PersonProfileEntry>,
+  entry: PersonProfileEntry,
+) {
+  const entryKey = entry.profile.id.trim() || entry.profile.login.trim().toLowerCase();
+  const currentEntry = entries.get(entryKey) ?? null;
+  if (
+    currentEntry !== null &&
+    relationshipPriority[currentEntry.relationshipKind] >=
+      relationshipPriority[entry.relationshipKind]
+  ) {
+    return;
+  }
+
+  entries.set(entryKey, entry);
+}
+
+function comparePersonEntries(left: PersonProfileEntry, right: PersonProfileEntry): number {
+  const priorityDelta =
+    relationshipPriority[right.relationshipKind] -
+    relationshipPriority[left.relationshipKind];
+  if (priorityDelta !== 0) {
+    return priorityDelta;
+  }
+
+  return left.profile.login.localeCompare(right.profile.login, "ru-RU");
 }
 
 function mapFriendToPersonProfileEntry(friend: Friend): PersonProfileEntry {

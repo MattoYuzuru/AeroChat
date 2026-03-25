@@ -493,6 +493,11 @@ SELECT
     l.disabled_at,
     l.last_joined_at,
     g.name AS group_name,
+    (
+        SELECT COUNT(*)
+        FROM group_memberships AS gm
+        WHERE gm.group_id = g.id AND gm.left_at IS NULL
+    )::bigint AS group_member_count,
     g.created_by_user_id AS group_created_by_user_id,
     g.created_at AS group_created_at,
     g.updated_at AS group_updated_at

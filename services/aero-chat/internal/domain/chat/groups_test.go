@@ -133,6 +133,54 @@ func TestDisableGroupInviteLinkPreventsJoin(t *testing.T) {
 	}
 }
 
+func TestPreviewGroupByInviteLinkShowsBoundedGroupInfoBeforeJoin(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	service.randReader = bytes.NewReader(bytes.Repeat([]byte{9}, 32))
+
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	group := mustCreateGroup(t, service, alice.Token, "Preview room")
+	inviteLink, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+
+	preview, err := service.PreviewGroupByInviteLink(context.Background(), bob.Token, inviteLink.InviteToken)
+	if err != nil {
+		t.Fatalf("preview group by invite link: %v", err)
+	}
+	if preview.GroupID != group.ID {
+		t.Fatalf("ожидался preview для группы %q, получено %q", group.ID, preview.GroupID)
+	}
+	if preview.GroupName != "Preview room" {
+		t.Fatalf("ожидалось имя группы Preview room, получено %q", preview.GroupName)
+	}
+	if preview.InviteRole != GroupMemberRoleMember {
+		t.Fatalf("ожидалась роль member, получено %q", preview.InviteRole)
+	}
+	if preview.MemberCount != 1 {
+		t.Fatalf("ожидался member_count=1 до join, получено %d", preview.MemberCount)
+	}
+	if preview.AlreadyJoined {
+		t.Fatal("до join preview не должен считать пользователя участником")
+	}
+
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, inviteLink.InviteToken); err != nil {
+		t.Fatalf("join group by invite link: %v", err)
+	}
+
+	previewAfterJoin, err := service.PreviewGroupByInviteLink(context.Background(), bob.Token, inviteLink.InviteToken)
+	if err != nil {
+		t.Fatalf("preview group by invite link after join: %v", err)
+	}
+	if !previewAfterJoin.AlreadyJoined {
+		t.Fatal("после join preview должен показывать already_joined=true")
+	}
+}
+
 func TestUpdateGroupMemberRoleRequiresOwnerAndKeepsOwnerUnique(t *testing.T) {
 	t.Parallel()
 

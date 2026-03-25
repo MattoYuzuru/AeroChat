@@ -97,7 +97,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/search",
     path: "/app/search",
     shortcutLabel: "Поиск",
-    shortcutMeta: "message search",
+    shortcutMeta: "people first",
   },
   {
     appId: "settings",

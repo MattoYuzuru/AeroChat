@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { buildPersonProfileRoutePath } from "../app/app-routes";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  buildGroupChatRoutePath,
+  buildPersonProfileRoutePath,
+} from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { gatewayClient } from "../gateway/runtime";
@@ -9,14 +12,19 @@ import {
   isGatewayErrorCode,
   type DirectChat,
   type Group,
+  type GroupInvitePreview,
   type MessageSearchCursor,
   type MessageSearchResult,
 } from "../gateway/types";
+import { extractGroupInviteToken } from "../groups/invite-token";
 import {
   describePersonProfileSummary,
   describePersonRelationship,
   findExactKnownPeopleEntries,
+  findSimilarKnownPeopleEntries,
   getPersonProfileLaunchTitle,
+  listKnownPeopleEntries,
+  normalizeExactLoginQuery,
   type PersonProfileEntry,
 } from "../people/profile-model";
 import { usePeople } from "../people/usePeople";
@@ -40,6 +48,7 @@ import { useDesktopShellHost } from "../shell/context";
 import styles from "./SearchPage.module.css";
 
 const SEARCH_PAGE_SIZE = 20;
+const KNOWN_PEOPLE_LIMIT = 4;
 
 interface SubmittedSearch {
   query: string;
@@ -49,12 +58,21 @@ interface SubmittedSearch {
 
 type SearchPathStatus = "idle" | "loading" | "ready" | "error";
 type EncryptedSearchPathStatus = SearchPathStatus | "unavailable";
+type InvitePreviewStatus = "idle" | "loading" | "ready" | "error";
 
 export function SearchPage() {
+  const navigate = useNavigate();
   const { state: authState, expireSession } = useAuth();
   const cryptoRuntime = useCryptoRuntime();
   const desktopShellHost = useDesktopShellHost();
-  const [query, setQuery] = useState("");
+  const [peopleLogin, setPeopleLogin] = useState("");
+  const [peopleFormError, setPeopleFormError] = useState<string | null>(null);
+  const [inviteInput, setInviteInput] = useState("");
+  const [invitePreviewStatus, setInvitePreviewStatus] = useState<InvitePreviewStatus>("idle");
+  const [invitePreviewError, setInvitePreviewError] = useState<string | null>(null);
+  const [invitePreview, setInvitePreview] = useState<GroupInvitePreview | null>(null);
+  const [isJoiningInvite, setIsJoiningInvite] = useState(false);
+  const [messageQuery, setMessageQuery] = useState("");
   const [scopeSelection, setScopeSelection] = useState<SearchScopeSelection>("all-direct");
   const [selectedDirectChatId, setSelectedDirectChatId] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState("");
@@ -63,7 +81,7 @@ export function SearchPage() {
   const [metadataStatus, setMetadataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [isRefreshingMetadata, setIsRefreshingMetadata] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [contentSearchFormError, setContentSearchFormError] = useState<string | null>(null);
   const [legacySearchStatus, setLegacySearchStatus] = useState<SearchPathStatus>("idle");
   const [legacySearchError, setLegacySearchError] = useState<string | null>(null);
   const [legacyResults, setLegacyResults] = useState<MessageSearchResult[]>([]);
@@ -87,8 +105,10 @@ export function SearchPage() {
     token,
     onUnauthenticated: expireSession,
   });
-  const isRunningSearch =
+  const isRunningContentSearch =
     legacySearchStatus === "loading" || encryptedSearchStatus === "loading" || isLoadingMore;
+  const normalizedPeopleLogin = normalizeExactLoginQuery(peopleLogin);
+  const inviteToken = extractGroupInviteToken(inviteInput);
 
   useEffect(() => {
     if (authState.status !== "authenticated") {
@@ -128,7 +148,7 @@ export function SearchPage() {
       } catch (error) {
         const message = resolveProtectedError(
           error,
-          "Не удалось загрузить доступные direct chats и группы для поиска.",
+          "Не удалось загрузить чаты и группы.",
           expireSession,
         );
         if (!active || message === null) {
@@ -146,6 +166,41 @@ export function SearchPage() {
       }
     }
   }, [authState.status, expireSession, token]);
+
+  if (authState.status !== "authenticated") {
+    return null;
+  }
+
+  const exactPeopleMatches =
+    normalizedPeopleLogin === "" || people.state.status !== "ready"
+      ? []
+      : findExactKnownPeopleEntries(people.state.snapshot, peopleLogin);
+  const similarPeopleMatches =
+    normalizedPeopleLogin === "" || people.state.status !== "ready" || exactPeopleMatches.length > 0
+      ? []
+      : findSimilarKnownPeopleEntries(people.state.snapshot, peopleLogin);
+  const knownPeopleEntries =
+    normalizedPeopleLogin !== "" || people.state.status !== "ready"
+      ? []
+      : listKnownPeopleEntries(people.state.snapshot, KNOWN_PEOPLE_LIMIT);
+
+  const selectedDirectChat =
+    selectedDirectChatId.trim() === ""
+      ? null
+      : directChats.find((chat) => chat.id === selectedDirectChatId) ?? null;
+  const selectedGroup =
+    selectedGroupId.trim() === ""
+      ? null
+      : groups.find((group) => group.id === selectedGroupId) ?? null;
+  const searchScopeSummary =
+    submittedSearch === null
+      ? null
+      : describeSubmittedSearch(
+          submittedSearch,
+          directChats,
+          groups,
+          currentUserId,
+        );
 
   async function reloadCollections() {
     if (authState.status !== "authenticated") {
@@ -167,7 +222,7 @@ export function SearchPage() {
     } catch (error) {
       const message = resolveProtectedError(
         error,
-        "Не удалось обновить direct chats и группы для поиска.",
+        "Не удалось обновить чаты и группы.",
         expireSession,
       );
       if (message !== null) {
@@ -181,15 +236,122 @@ export function SearchPage() {
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function openPersonProfile(entry: PersonProfileEntry) {
+    const title = getPersonProfileLaunchTitle(entry.profile);
+    const searchParams = new URLSearchParams({
+      from: "search",
+    });
+
+    if (desktopShellHost !== null) {
+      desktopShellHost.openPersonProfile({
+        userId: entry.profile.id,
+        title,
+        searchParams,
+      });
+    }
+
+    navigate(buildPersonProfileRoutePath(entry.profile.id, searchParams));
+  }
+
+  function openGroupTarget(groupId: string, title: string) {
+    if (desktopShellHost !== null) {
+      desktopShellHost.openGroupChat({
+        groupId,
+        title,
+      });
+    }
+
+    navigate(buildGroupChatRoutePath(groupId));
+  }
+
+  async function handlePeopleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (authState.status !== "authenticated") {
+    const normalizedLogin = normalizeExactLoginQuery(peopleLogin);
+
+    if (normalizedLogin === "") {
+      setPeopleFormError("Введите точный login.");
+      people.clearFeedback();
       return;
     }
 
-    const normalizedQuery = query.trim();
+    setPeopleFormError(null);
+    const success = await people.sendFriendRequest(normalizedLogin);
+    if (success) {
+      setPeopleLogin("");
+    }
+  }
+
+  async function handleInvitePreview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (inviteToken === "") {
+      setInvitePreviewStatus("error");
+      setInvitePreview(null);
+      setInvitePreviewError("Вставьте invite link или raw invite token.");
+      return;
+    }
+
+    setInvitePreviewStatus("loading");
+    setInvitePreviewError(null);
+    setInvitePreview(null);
+
+    try {
+      const preview = await gatewayClient.previewGroupByInviteLink(token, inviteToken);
+      setInvitePreview(preview);
+      setInvitePreviewStatus("ready");
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось показать превью invite link.",
+        expireSession,
+      );
+      if (message === null) {
+        return;
+      }
+
+      setInvitePreviewStatus("error");
+      setInvitePreview(null);
+      setInvitePreviewError(message);
+    }
+  }
+
+  async function handleInviteJoin() {
+    if (invitePreview === null) {
+      return;
+    }
+
+    if (invitePreview.alreadyJoined) {
+      openGroupTarget(invitePreview.groupId, normalizeGroupTitle(invitePreview.groupName));
+      return;
+    }
+
+    setIsJoiningInvite(true);
+    setInvitePreviewError(null);
+
+    try {
+      const group = await gatewayClient.joinGroupByInviteLink(token, inviteToken);
+      await reloadCollections();
+      openGroupTarget(group.id, normalizeGroupTitle(group.name));
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось войти в группу по invite link.",
+        expireSession,
+      );
+      if (message !== null) {
+        setInvitePreviewError(message);
+      }
+    } finally {
+      setIsJoiningInvite(false);
+    }
+  }
+
+  async function handleContentSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedQuery = messageQuery.trim();
     if (normalizedQuery === "") {
-      setFormError("Введите текстовый запрос, прежде чем запускать поиск.");
+      setContentSearchFormError("Введите текстовый запрос.");
       return;
     }
 
@@ -199,15 +361,15 @@ export function SearchPage() {
       selectedGroupId,
     );
     if (scope === null) {
-      setFormError(
+      setContentSearchFormError(
         scopeSelection === "direct"
-          ? "Выберите конкретный личный чат."
-          : "Выберите конкретную группу.",
+          ? "Выберите личный чат."
+          : "Выберите группу.",
       );
       return;
     }
 
-    setFormError(null);
+    setContentSearchFormError(null);
     await runSearch(
       {
         query: normalizedQuery,
@@ -221,7 +383,6 @@ export function SearchPage() {
 
   async function handleLoadMore() {
     if (
-      authState.status !== "authenticated" ||
       !submittedSearch ||
       nextPageCursor === null ||
       isLoadingMore
@@ -237,10 +398,6 @@ export function SearchPage() {
     cursor: MessageSearchCursor | null,
     mode: "replace" | "append",
   ) {
-    if (authState.status !== "authenticated") {
-      return;
-    }
-
     const requestID =
       mode === "replace" ? searchRequestIDRef.current + 1 : searchRequestIDRef.current;
     if (mode === "replace") {
@@ -310,7 +467,7 @@ export function SearchPage() {
       } else {
         const message = resolveProtectedError(
           legacyResult.reason,
-          "Не удалось выполнить поиск legacy plaintext сообщений через gateway.",
+          "Не удалось выполнить поиск по сообщениям.",
           expireSession,
         );
         if (message !== null) {
@@ -334,7 +491,7 @@ export function SearchPage() {
         setEncryptedSearchError(
           describeGatewayError(
             encryptedResult.reason,
-            "Не удалось выполнить local encrypted search в текущем browser profile.",
+            "Не удалось выполнить локальный поиск по encrypted окну.",
           ),
         );
         setEncryptedResults([]);
@@ -347,108 +504,334 @@ export function SearchPage() {
     }
   }
 
-  const selectedDirectChat =
-    selectedDirectChatId.trim() === ""
-      ? null
-      : directChats.find((chat) => chat.id === selectedDirectChatId) ?? null;
-  const selectedGroup =
-    selectedGroupId.trim() === ""
-      ? null
-      : groups.find((group) => group.id === selectedGroupId) ?? null;
-  const searchScopeSummary =
-    submittedSearch === null
-      ? null
-      : describeSubmittedSearch(
-          submittedSearch,
-          directChats,
-          groups,
-          currentUserId,
-        );
-  const exactPeopleMatches =
-    submittedSearch === null || people.state.status !== "ready"
-      ? []
-      : findExactKnownPeopleEntries(people.state.snapshot, submittedSearch.query);
-
-  if (authState.status !== "authenticated") {
-    return null;
-  }
-
-  function openPersonProfile(entry: PersonProfileEntry) {
-    const title = getPersonProfileLaunchTitle(entry.profile);
-
-    if (desktopShellHost !== null) {
-      desktopShellHost.openPersonProfile({
-        userId: entry.profile.id,
-        title,
-        searchParams: new URLSearchParams({
-          from: "search",
-        }),
-      });
-    }
-  }
-
   return (
     <div className={styles.layout}>
-      <section className={styles.heroCard}>
-        <div className={styles.heroHeader}>
+      <section className={styles.primarySection}>
+        <div className={styles.sectionHeader}>
           <div>
-            <p className={styles.cardLabel}>Search</p>
-            <h1 className={styles.title}>Поиск сообщений</h1>
+            <p className={styles.cardLabel}>People</p>
+            <h1 className={styles.title}>Люди и invite links</h1>
             <p className={styles.subtitle}>
-              `/app/search` сохраняет текущий entrypoint, но честно разделяет два path:
-              server-backed legacy plaintext search и local encrypted search по bounded decrypted
-              окну текущего browser/runtime.
+              Сначала точный login, уже знакомые контакты и приглашения в группы. Поиск по
+              сообщениям остаётся ниже как отдельный вторичный блок.
             </p>
           </div>
 
           <button
             className={styles.secondaryButton}
-            disabled={metadataStatus === "loading" || isRefreshingMetadata}
+            disabled={people.state.isRefreshing || isRefreshingMetadata}
             onClick={() => {
+              void people.reload();
               void reloadCollections();
             }}
             type="button"
           >
-            {isRefreshingMetadata ? "Обновляем..." : "Обновить списки"}
+            {people.state.isRefreshing || isRefreshingMetadata ? "Обновляем..." : "Обновить"}
           </button>
         </div>
 
         <div className={styles.metrics}>
-          <Metric label="Direct chats" value={directChats.length} />
+          <Metric label="Друзья" value={people.state.snapshot.friends.length} />
+          <Metric label="Входящие" value={people.state.snapshot.incoming.length} />
+          <Metric label="Исходящие" value={people.state.snapshot.outgoing.length} />
           <Metric label="Группы" value={groups.length} />
-          <Metric label="Legacy hits" value={legacyResults.length} />
-          <Metric label="Encrypted hits" value={encryptedResults.length} />
+        </div>
+
+        <div className={styles.primaryGrid}>
+          <section className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <div>
+                <p className={styles.cardLabel}>Точный login</p>
+                <h2 className={styles.panelTitle}>Найти или добавить человека</h2>
+                <p className={styles.panelDescription}>
+                  Точный login остаётся основным путём. Уже известные контакты показываются
+                  первыми, а похожие known-only подсказки остаются ограниченными.
+                </p>
+              </div>
+            </div>
+
+            {(peopleFormError || people.state.actionErrorMessage || people.state.notice) && (
+              <div className={styles.stack}>
+                {peopleFormError && <div className={styles.error}>{peopleFormError}</div>}
+                {people.state.actionErrorMessage && (
+                  <div className={styles.error}>{people.state.actionErrorMessage}</div>
+                )}
+                {people.state.notice && <div className={styles.notice}>{people.state.notice}</div>}
+              </div>
+            )}
+
+            <form className={styles.form} onSubmit={handlePeopleSubmit}>
+              <label className={styles.field}>
+                <span>Login</span>
+                <input
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  disabled={people.state.isSendingRequest}
+                  onChange={(event) => {
+                    setPeopleLogin(event.target.value);
+                    setPeopleFormError(null);
+                    people.clearFeedback();
+                  }}
+                  placeholder="alice"
+                  spellCheck={false}
+                  value={peopleLogin}
+                />
+              </label>
+
+              <div className={styles.inlineActions}>
+                <button
+                  className={styles.primaryButton}
+                  disabled={people.state.isSendingRequest}
+                  type="submit"
+                >
+                  {people.state.isSendingRequest ? "Отправляем..." : "Отправить заявку"}
+                </button>
+                {normalizedPeopleLogin !== "" && exactPeopleMatches.length > 0 && (
+                  <button
+                    className={styles.secondaryButton}
+                    onClick={() => {
+                      openPersonProfile(exactPeopleMatches[0]!);
+                    }}
+                    type="button"
+                  >
+                    Открыть профиль
+                  </button>
+                )}
+              </div>
+            </form>
+
+            {people.state.status === "loading" && (
+              <InlineState
+                title="Загружаем контакты"
+                message="Получаем друзей и заявки."
+              />
+            )}
+
+            {people.state.status === "error" && (
+              <InlineState
+                title="Контакты временно недоступны"
+                message={people.state.screenErrorMessage ?? "Не удалось загрузить людей."}
+                tone="error"
+              />
+            )}
+
+            {people.state.status === "ready" && (
+              <div className={styles.stack}>
+                {exactPeopleMatches.length > 0 && (
+                  <>
+                    <SectionNote
+                      title="Точное совпадение"
+                      message="Откройте canonical профиль контакта."
+                    />
+                    <div className={styles.cardList}>
+                      {exactPeopleMatches.map((entry) => (
+                        <KnownPersonCard
+                          entry={entry}
+                          key={`${entry.relationshipKind}:${entry.profile.id}`}
+                          onOpenProfile={() => {
+                            openPersonProfile(entry);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {exactPeopleMatches.length === 0 && similarPeopleMatches.length > 0 && (
+                  <>
+                    <SectionNote
+                      title="Похожие известные люди"
+                      message="Это только ваши текущие друзья и заявки."
+                    />
+                    <div className={styles.cardList}>
+                      {similarPeopleMatches.map((entry) => (
+                        <KnownPersonCard
+                          entry={entry}
+                          key={`${entry.relationshipKind}:${entry.profile.id}`}
+                          onOpenProfile={() => {
+                            openPersonProfile(entry);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {normalizedPeopleLogin === "" && knownPeopleEntries.length > 0 && (
+                  <>
+                    <SectionNote
+                      title="Известные люди"
+                      message="Быстрый доступ к текущим контактам и заявкам."
+                    />
+                    <div className={styles.cardList}>
+                      {knownPeopleEntries.map((entry) => (
+                        <KnownPersonCard
+                          entry={entry}
+                          key={`${entry.relationshipKind}:${entry.profile.id}`}
+                          onOpenProfile={() => {
+                            openPersonProfile(entry);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {normalizedPeopleLogin !== "" &&
+                  exactPeopleMatches.length === 0 &&
+                  similarPeopleMatches.length === 0 && (
+                    <InlineState
+                      title="Среди известных людей совпадений нет"
+                      message="Можно отправить новую заявку по точному login."
+                    />
+                  )}
+              </div>
+            )}
+          </section>
+
+          <section className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <div>
+                <p className={styles.cardLabel}>Invite link</p>
+                <h2 className={styles.panelTitle}>Посмотреть группу перед входом</h2>
+                <p className={styles.panelDescription}>
+                  Сначала превью, потом явное действие. Автовхода по вставленной ссылке нет.
+                </p>
+              </div>
+            </div>
+
+            {(invitePreviewError || invitePreviewStatus === "ready") && (
+              <div className={styles.stack}>
+                {invitePreviewError && <div className={styles.error}>{invitePreviewError}</div>}
+              </div>
+            )}
+
+            <form className={styles.form} onSubmit={handleInvitePreview}>
+              <label className={styles.field}>
+                <span>Ссылка или token</span>
+                <input
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  disabled={invitePreviewStatus === "loading" || isJoiningInvite}
+                  onChange={(event) => {
+                    setInviteInput(event.target.value);
+                    setInvitePreview(null);
+                    setInvitePreviewStatus("idle");
+                    setInvitePreviewError(null);
+                  }}
+                  placeholder="https://.../app/groups?join=ginv_..."
+                  spellCheck={false}
+                  value={inviteInput}
+                />
+              </label>
+
+              <div className={styles.inlineActions}>
+                <button
+                  className={styles.primaryButton}
+                  disabled={invitePreviewStatus === "loading" || isJoiningInvite}
+                  type="submit"
+                >
+                  {invitePreviewStatus === "loading" ? "Проверяем..." : "Показать превью"}
+                </button>
+              </div>
+            </form>
+
+            {invitePreviewStatus === "idle" && (
+              <InlineState
+                title="Вставьте invite link"
+                message="Покажем группу и роль по ссылке до вступления."
+              />
+            )}
+
+            {invitePreviewStatus === "ready" && invitePreview !== null && (
+              <article className={styles.previewCard}>
+                <div className={styles.previewHeader}>
+                  <div>
+                    <div className={styles.badgeRow}>
+                      <span className={styles.metaBadge}>Группа</span>
+                      <span className={styles.scopeBadge}>
+                        Роль: {describeInviteRole(invitePreview.inviteRole)}
+                      </span>
+                    </div>
+                    <h3 className={styles.resultTitle}>
+                      {normalizeGroupTitle(invitePreview.groupName)}
+                    </h3>
+                    <p className={styles.resultMeta}>
+                      {describeMemberCount(invitePreview.memberCount)}
+                      {invitePreview.alreadyJoined ? " · вы уже участник" : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div className={styles.inlineActions}>
+                  <button
+                    className={styles.primaryButton}
+                    disabled={isJoiningInvite}
+                    onClick={() => {
+                      void handleInviteJoin();
+                    }}
+                    type="button"
+                  >
+                    {isJoiningInvite
+                      ? "Выполняем..."
+                      : invitePreview.alreadyJoined
+                        ? "Открыть группу"
+                        : "Вступить в группу"}
+                  </button>
+                </div>
+              </article>
+            )}
+          </section>
+        </div>
+      </section>
+
+      <section className={styles.secondarySection}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <p className={styles.cardLabel}>Messages</p>
+            <h2 className={styles.sectionTitle}>Поиск по сообщениям</h2>
+            <p className={styles.sectionDescription}>
+              Дополнительный поиск внутри чатов и групп. Обычные сообщения ищутся через сервер,
+              encrypted сообщения только локально и в пределах текущего окна.
+            </p>
+          </div>
+
+          <span className={styles.metaTag}>
+            {submittedSearch ? `${legacyResults.length} / ${encryptedResults.length}` : "Вторично"}
+          </span>
         </div>
 
         {metadataStatus === "error" && metadataError && (
           <div className={styles.error}>{metadataError}</div>
         )}
-        {formError && <div className={styles.error}>{formError}</div>}
+        {contentSearchFormError && <div className={styles.error}>{contentSearchFormError}</div>}
 
-        <form className={styles.form} onSubmit={handleSubmit}>
+        <form className={styles.form} onSubmit={handleContentSearchSubmit}>
           <label className={styles.field}>
-            <span>Текстовый запрос</span>
+            <span>Запрос</span>
             <input
-              disabled={metadataStatus !== "ready" || isRunningSearch}
+              disabled={metadataStatus !== "ready" || isRunningContentSearch}
               maxLength={200}
               onChange={(event) => {
-                setQuery(event.target.value);
-                setFormError(null);
+                setMessageQuery(event.target.value);
+                setContentSearchFormError(null);
               }}
               placeholder="Например: release notes"
-              value={query}
+              value={messageQuery}
             />
           </label>
 
           <div className={styles.controlsGrid}>
             <label className={styles.field}>
-              <span>Scope</span>
+              <span>Где искать</span>
               <select
-                disabled={metadataStatus !== "ready" || isRunningSearch}
+                disabled={metadataStatus !== "ready" || isRunningContentSearch}
                 onChange={(event) => {
                   const nextValue = event.target.value as SearchScopeSelection;
                   setScopeSelection(nextValue);
-                  setFormError(null);
+                  setContentSearchFormError(null);
                 }}
                 value={scopeSelection}
               >
@@ -463,25 +846,20 @@ export function SearchPage() {
               <label className={styles.field}>
                 <span>Личный чат</span>
                 <select
-                  disabled={metadataStatus !== "ready" || directChats.length === 0 || isRunningSearch}
+                  disabled={metadataStatus !== "ready" || directChats.length === 0 || isRunningContentSearch}
                   onChange={(event) => {
                     setSelectedDirectChatId(event.target.value);
-                    setFormError(null);
+                    setContentSearchFormError(null);
                   }}
                   value={selectedDirectChatId}
                 >
-                  <option value="">Выберите direct chat</option>
+                  <option value="">Выберите чат</option>
                   {directChats.map((chat) => (
                     <option key={chat.id} value={chat.id}>
                       {describeDirectChatLabel(chat, currentUserId)}
                     </option>
                   ))}
                 </select>
-                {directChats.length === 0 && (
-                  <small className={styles.helperText}>
-                    Доступных личных чатов пока нет.
-                  </small>
-                )}
               </label>
             )}
 
@@ -489,344 +867,213 @@ export function SearchPage() {
               <label className={styles.field}>
                 <span>Группа</span>
                 <select
-                  disabled={metadataStatus !== "ready" || groups.length === 0 || isRunningSearch}
+                  disabled={metadataStatus !== "ready" || groups.length === 0 || isRunningContentSearch}
                   onChange={(event) => {
                     setSelectedGroupId(event.target.value);
-                    setFormError(null);
+                    setContentSearchFormError(null);
                   }}
                   value={selectedGroupId}
                 >
                   <option value="">Выберите группу</option>
                   {groups.map((group) => (
                     <option key={group.id} value={group.id}>
-                      {group.name.trim() === "" ? "Группа" : group.name}
+                      {normalizeGroupTitle(group.name)}
                     </option>
                   ))}
                 </select>
-                {groups.length === 0 && (
-                  <small className={styles.helperText}>
-                    Доступных групп пока нет.
-                  </small>
-                )}
               </label>
             )}
           </div>
 
           <div className={styles.formFooter}>
             <p className={styles.scopeHint}>
-              Текущий scope:{" "}
-              <strong>
-                {describeSearchScope(scopeSelection)}
-                {selectedDirectChat
-                  ? ` · ${describeDirectChatLabel(selectedDirectChat, currentUserId)}`
-                  : ""}
-                {selectedGroup ? ` · ${selectedGroup.name || "Группа"}` : ""}
-              </strong>
+              {describeSearchScope(scopeSelection)}
+              {selectedDirectChat
+                ? ` · ${describeDirectChatLabel(selectedDirectChat, currentUserId)}`
+                : ""}
+              {selectedGroup ? ` · ${normalizeGroupTitle(selectedGroup.name)}` : ""}
             </p>
 
-            <button
-              className={styles.primaryButton}
-              disabled={metadataStatus !== "ready" || isRunningSearch}
-              type="submit"
-            >
-              {legacySearchStatus === "loading" || encryptedSearchStatus === "loading"
-                ? "Ищем..."
-                : "Искать"}
-            </button>
+            <div className={styles.inlineActions}>
+              <button
+                className={styles.secondaryButton}
+                disabled={metadataStatus === "loading" || isRefreshingMetadata}
+                onClick={() => {
+                  void reloadCollections();
+                }}
+                type="button"
+              >
+                {isRefreshingMetadata ? "Обновляем..." : "Списки"}
+              </button>
+              <button
+                className={styles.primaryButton}
+                disabled={metadataStatus !== "ready" || isRunningContentSearch}
+                type="submit"
+              >
+                {legacySearchStatus === "loading" || encryptedSearchStatus === "loading"
+                  ? "Ищем..."
+                  : "Искать"}
+              </button>
+            </div>
           </div>
         </form>
-      </section>
 
-      {metadataStatus === "loading" && (
-        <StateCard
-          title="Подготавливаем search bootstrap"
-          message="Загружаем direct chats и группы, чтобы форма могла явно ограничивать scope и честно подписывать legacy/encrypted results."
-        />
-      )}
+        {metadataStatus === "loading" && (
+          <InlineState
+            title="Подготавливаем поиск"
+            message="Загружаем чаты и группы для ограничения области."
+          />
+        )}
 
-      {metadataStatus === "error" && (
-        <StateCard
-          title="Search bootstrap недоступен"
-          message={metadataError ?? "Не удалось загрузить входные данные для поиска."}
-          action={
-            <button
-              className={styles.primaryButton}
-              onClick={() => {
-                void reloadCollections();
-              }}
-              type="button"
-            >
-              Повторить
-            </button>
-          }
-          tone="error"
-        />
-      )}
+        {submittedSearch === null && metadataStatus === "ready" && (
+          <InlineState
+            title="Поиск по сообщениям ещё не запускался"
+            message="Результаты появятся ниже после первого запроса."
+          />
+        )}
 
-      {metadataStatus === "ready" && (
-        <section className={styles.resultsSection}>
-          <div className={styles.resultsHeader}>
-            <div>
-              <p className={styles.cardLabel}>Results</p>
-              <h2 className={styles.sectionTitle}>Найденные сообщения</h2>
-              <p className={styles.sectionDescription}>
-                {searchScopeSummary ??
-                  "Один и тот же query/scope теперь честно идёт по двум путям: legacy plaintext через gateway и encrypted local search по bounded decrypted окну."}
-              </p>
-            </div>
-
-            {submittedSearch && (
-              <span className={styles.metaTag}>
-                {legacyResults.length} legacy / {encryptedResults.length} encrypted
-              </span>
-            )}
-          </div>
-
-          {submittedSearch !== null && (
-            <div className={styles.limitNotice}>
-              Legacy results приходят из `SearchMessages`, а encrypted results строятся только
-              локально. Jump для encrypted target работает только если он уже materialized в
-              текущем bounded local projection.
-            </div>
-          )}
-
-          {submittedSearch !== null && (
+        {submittedSearch !== null && (
+          <div className={styles.pathGrid}>
             <section className={styles.pathSection}>
               <div className={styles.pathHeader}>
                 <div>
-                  <p className={styles.cardLabel}>People Path</p>
-                  <h3 className={styles.pathTitle}>Exact login по известным людям</h3>
+                  <p className={styles.cardLabel}>Обычные сообщения</p>
+                  <h3 className={styles.pathTitle}>Server-backed</h3>
                   <p className={styles.pathDescription}>
-                    Этот path не делает публичный user discovery и не шлёт hidden lookup на
-                    backend. Он показывает только exact-login совпадения по уже известному
-                    social graph snapshot: друзья и активные friend requests.
+                    {searchScopeSummary ?? "Поиск по plaintext истории в выбранной области."}
                   </p>
                 </div>
                 <span className={styles.metaTag}>
-                  {people.state.status === "loading"
-                    ? "Готовим..."
-                    : exactPeopleMatches.length === 0
-                      ? "0 совпадений"
-                      : `${exactPeopleMatches.length} совпадений`}
+                  {legacySearchStatus === "loading"
+                    ? "Ищем..."
+                    : `${legacyResults.length} результатов`}
                 </span>
               </div>
 
-              {people.state.status === "loading" && (
+              {legacySearchStatus === "loading" && (
                 <InlineState
-                  title="Подтягиваем known people snapshot"
-                  message="Для user-result path используем только уже доступные friendships и friend requests."
+                  title="Ищем сообщения"
+                  message="Сервер обрабатывает запрос."
                 />
               )}
 
-              {people.state.status === "error" && (
+              {legacySearchStatus === "error" && (
                 <InlineState
-                  title="People path недоступен"
+                  title="Поиск недоступен"
+                  message={legacySearchError ?? "Не удалось получить результаты."}
+                  tone="error"
+                />
+              )}
+
+              {legacySearchStatus === "ready" && legacyResults.length === 0 && (
+                <InlineState
+                  title="Ничего не найдено"
+                  message="В этой области подходящих сообщений нет."
+                />
+              )}
+
+              {legacyResults.length > 0 && (
+                <>
+                  <div className={styles.cardList}>
+                    {legacyResults.map((result) => (
+                      <SearchResultCard
+                        currentUserId={currentUserId}
+                        directChats={directChats}
+                        groups={groups}
+                        key={`legacy:${result.messageId}:${result.createdAt}`}
+                        pathLabel="Server"
+                        result={result}
+                      />
+                    ))}
+                  </div>
+
+                  {hasMore && (
+                    <div className={styles.loadMoreRow}>
+                      <button
+                        className={styles.secondaryButton}
+                        disabled={isLoadingMore}
+                        onClick={() => {
+                          void handleLoadMore();
+                        }}
+                        type="button"
+                      >
+                        {isLoadingMore ? "Загружаем..." : "Показать ещё"}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section className={styles.pathSection}>
+              <div className={styles.pathHeader}>
+                <div>
+                  <p className={styles.cardLabel}>Encrypted</p>
+                  <h3 className={styles.pathTitle}>Локально в браузере</h3>
+                  <p className={styles.pathDescription}>
+                    Только локально расшифрованное bounded окно текущей сессии.
+                  </p>
+                </div>
+                <span className={styles.metaTag}>
+                  {encryptedSearchStatus === "loading"
+                    ? "Ищем..."
+                    : `${encryptedResults.length} результатов`}
+                </span>
+              </div>
+
+              {encryptedSummary && (
+                <div className={styles.notice}>
+                  {describeEncryptedSummary(encryptedSummary, submittedSearch.scopeSelection)}
+                </div>
+              )}
+
+              {encryptedSearchStatus === "loading" && (
+                <InlineState
+                  title="Готовим локальный индекс"
+                  message="Поиск идёт только по доступному encrypted окну."
+                />
+              )}
+
+              {(encryptedSearchStatus === "unavailable" || encryptedSearchStatus === "error") && (
+                <InlineState
+                  title="Локальный encrypted поиск недоступен"
                   message={
-                    people.state.screenErrorMessage ??
-                    "Не удалось загрузить current people snapshot для exact-login result."
+                    encryptedSearchError ?? "Текущий браузерный профиль не смог подготовить окно."
                   }
                   tone="error"
                 />
               )}
 
-              {people.state.status === "ready" && exactPeopleMatches.length === 0 && (
+              {encryptedSearchStatus === "ready" && encryptedResults.length === 0 && (
                 <InlineState
-                  title="Точных user-result совпадений нет"
-                  message="Search по людям в этом slice ограничен уже известным social graph snapshot и срабатывает только по exact login."
+                  title="Совпадений нет"
+                  message="В локальном encrypted окне ничего не найдено."
                 />
               )}
 
-              {people.state.status === "ready" && exactPeopleMatches.length > 0 && (
-                <div className={styles.resultList}>
-                  {exactPeopleMatches.map((entry) => (
-                    <KnownPersonResultCard
-                      entry={entry}
-                      key={`${entry.relationshipKind}:${entry.profile.id}`}
-                      onOpenProfile={() => {
-                        openPersonProfile(entry);
-                      }}
+              {encryptedResults.length > 0 && (
+                <div className={styles.cardList}>
+                  {encryptedResults.map((result) => (
+                    <SearchResultCard
+                      currentUserId={currentUserId}
+                      directChats={directChats}
+                      groups={groups}
+                      key={`encrypted:${result.messageId}:${result.createdAt}`}
+                      pathLabel="Encrypted local"
+                      result={result}
                     />
                   ))}
                 </div>
               )}
             </section>
-          )}
-
-          {submittedSearch === null && (
-            <InlineState
-              title="Поиск ещё не запускался"
-              message="Legacy path остаётся server-backed для plaintext history. Encrypted path intentionally bounded: без server-side plaintext indexing, без deep history backfill и без claims о full parity."
-            />
-          )}
-
-          {submittedSearch !== null && (
-            <div className={styles.pathGrid}>
-              <section className={styles.pathSection}>
-                <div className={styles.pathHeader}>
-                  <div>
-                    <p className={styles.cardLabel}>Legacy Path</p>
-                    <h3 className={styles.pathTitle}>Server plaintext search</h3>
-                    <p className={styles.pathDescription}>
-                      Текущий `SearchMessages` path для legacy plaintext history остаётся без
-                      архитектурных изменений.
-                    </p>
-                  </div>
-                  <span className={styles.metaTag}>
-                    {legacySearchStatus === "loading"
-                      ? "Ищем..."
-                      : legacyResults.length === 0
-                        ? "0 hit'ов"
-                        : `${legacyResults.length} hit'ов`}
-                  </span>
-                </div>
-
-                {legacySearchStatus === "loading" && (
-                  <InlineState
-                    title="Ищем legacy сообщения"
-                    message="Выполняем server-backed запрос через существующий SearchMessages API."
-                  />
-                )}
-
-                {legacySearchStatus === "error" && (
-                  <InlineState
-                    title="Legacy path недоступен"
-                    message={
-                      legacySearchError ??
-                      "Не удалось выполнить поиск legacy plaintext сообщений."
-                    }
-                    tone="error"
-                  />
-                )}
-
-                {legacySearchStatus === "ready" && legacyResults.length === 0 && (
-                  <InlineState
-                    title="Legacy plaintext совпадений нет"
-                    message="В этом scope серверный plaintext path не вернул подходящих сообщений."
-                  />
-                )}
-
-                {legacyResults.length > 0 && (
-                  <>
-                    <div className={styles.resultList}>
-                      {legacyResults.map((result) => (
-                        <SearchResultCard
-                          currentUserId={currentUserId}
-                          directChats={directChats}
-                          groups={groups}
-                          key={`legacy:${result.messageId}:${result.createdAt}`}
-                          pathLabel="Legacy server"
-                          result={result}
-                        />
-                      ))}
-                    </div>
-
-                    {hasMore && (
-                      <div className={styles.loadMoreRow}>
-                        <button
-                          className={styles.secondaryButton}
-                          disabled={isLoadingMore}
-                          onClick={() => {
-                            void handleLoadMore();
-                          }}
-                          type="button"
-                        >
-                          {isLoadingMore ? "Загружаем..." : "Загрузить ещё"}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </section>
-
-              <section className={styles.pathSection}>
-                <div className={styles.pathHeader}>
-                  <div>
-                    <p className={styles.cardLabel}>Encrypted Path</p>
-                    <h3 className={styles.pathTitle}>Local encrypted search</h3>
-                    <p className={styles.pathDescription}>
-                      Поиск идёт только по локально fetched + decrypted message text. Decrypted
-                      index хранится только в памяти текущей browser session.
-                    </p>
-                  </div>
-                  <span className={styles.metaTag}>
-                    {encryptedSearchStatus === "loading"
-                      ? "Готовим..."
-                      : encryptedResults.length === 0
-                        ? "0 hit'ов"
-                        : `${encryptedResults.length} hit'ов`}
-                  </span>
-                </div>
-
-                {encryptedSummary && (
-                  <div className={styles.limitNotice}>
-                    {describeEncryptedSummary(encryptedSummary, submittedSearch.scopeSelection)}
-                  </div>
-                )}
-
-                {encryptedSearchStatus === "loading" && (
-                  <InlineState
-                    title="Готовим encrypted local search"
-                    message="Подтягиваем opaque envelopes, локально расшифровываем bounded window и строим session-local index без server-side plaintext fallback."
-                  />
-                )}
-
-                {encryptedSearchStatus === "unavailable" && (
-                  <InlineState
-                    title="Encrypted path недоступен"
-                    message={
-                      encryptedSearchError ??
-                      "Текущий browser profile ещё не готов к local encrypted search."
-                    }
-                    tone="error"
-                  />
-                )}
-
-                {encryptedSearchStatus === "error" && (
-                  <InlineState
-                    title="Encrypted local search не выполнен"
-                    message={
-                      encryptedSearchError ??
-                      "Не удалось выполнить local encrypted search в текущем browser profile."
-                    }
-                    tone="error"
-                  />
-                )}
-
-                {encryptedSearchStatus === "ready" && encryptedResults.length === 0 && (
-                  <InlineState
-                    title="Encrypted совпадений нет"
-                    message="В текущем локально indexed окне encrypted conversations подходящих message bodies не найдено."
-                  />
-                )}
-
-                {encryptedSearchStatus === "ready" && encryptedSearchError && (
-                  <div className={styles.error}>{encryptedSearchError}</div>
-                )}
-
-                {encryptedResults.length > 0 && (
-                  <div className={styles.resultList}>
-                    {encryptedResults.map((result) => (
-                      <SearchResultCard
-                        currentUserId={currentUserId}
-                        directChats={directChats}
-                        groups={groups}
-                        key={`encrypted:${result.messageId}:${result.createdAt}`}
-                        pathLabel="Encrypted local"
-                        result={result}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
-          )}
-        </section>
-      )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-function KnownPersonResultCard({
+function KnownPersonCard({
   entry,
   onOpenProfile,
 }: {
@@ -838,38 +1085,21 @@ function KnownPersonResultCard({
       <div className={styles.resultHeaderRow}>
         <div>
           <div className={styles.badgeRow}>
-            <span className={styles.scopeBadge}>user</span>
-            <span className={styles.pathBadge}>Known people</span>
+            <span className={styles.scopeBadge}>Люди</span>
+            <span className={styles.metaBadge}>{describeShortRelationship(entry)}</span>
           </div>
           <h3 className={styles.resultTitle}>{entry.profile.nickname}</h3>
           <p className={styles.resultMeta}>
             @{entry.profile.login} · {describePersonRelationship(entry)}
           </p>
         </div>
+
+        <button className={styles.linkButton} onClick={onOpenProfile} type="button">
+          Профиль
+        </button>
       </div>
 
       <p className={styles.fragment}>{describePersonProfileSummary(entry.profile)}</p>
-
-      <div className={styles.resultFooter}>
-        <Link
-          className={styles.resultLink}
-          onClick={(event) => {
-            if (event.defaultPrevented) {
-              return;
-            }
-
-            onOpenProfile();
-          }}
-          to={buildPersonProfileRoutePath(
-            entry.profile.id,
-            new URLSearchParams({
-              from: "search",
-            }),
-          )}
-        >
-          Открыть профиль
-        </Link>
-      </div>
     </article>
   );
 }
@@ -922,12 +1152,7 @@ function SearchResultCard({
   );
 }
 
-interface MetricProps {
-  label: string;
-  value: number;
-}
-
-function Metric({ label, value }: MetricProps) {
+function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className={styles.metricCard}>
       <span>{label}</span>
@@ -936,40 +1161,24 @@ function Metric({ label, value }: MetricProps) {
   );
 }
 
-interface StateCardProps {
-  title: string;
-  message: string;
-  action?: ReactNode;
-  tone?: "default" | "error";
-}
-
-function StateCard({
-  title,
-  message,
-  action,
-  tone = "default",
-}: StateCardProps) {
+function SectionNote({ title, message }: { title: string; message: string }) {
   return (
-    <section className={styles.stateCard} data-tone={tone}>
-      <p className={styles.cardLabel}>Search state</p>
-      <h2 className={styles.stateTitle}>{title}</h2>
-      <p className={styles.stateMessage}>{message}</p>
-      {action && <div className={styles.stateActions}>{action}</div>}
-    </section>
+    <div className={styles.sectionNote}>
+      <strong>{title}</strong>
+      <span>{message}</span>
+    </div>
   );
-}
-
-interface InlineStateProps {
-  title: string;
-  message: string;
-  tone?: "default" | "error";
 }
 
 function InlineState({
   title,
   message,
   tone = "default",
-}: InlineStateProps) {
+}: {
+  title: string;
+  message: string;
+  tone?: "default" | "error";
+}) {
   return (
     <div className={styles.inlineState} data-tone={tone}>
       <h3 className={styles.inlineStateTitle}>{title}</h3>
@@ -988,7 +1197,7 @@ function describeSubmittedSearch(
     const chatID = search.scope.chatId?.trim() ?? "";
     if (chatID !== "") {
       const chat = directChats.find((entry) => entry.id === chatID) ?? null;
-      return `Запрос: “${search.query}” · ${describeSearchScope(search.scopeSelection)} · ${chat ? describeDirectChatLabel(chat, currentUserId) : "Личный чат"}`;
+      return `${describeSearchScope(search.scopeSelection)} · ${chat ? describeDirectChatLabel(chat, currentUserId) : "Личный чат"}`;
     }
   }
 
@@ -996,11 +1205,11 @@ function describeSubmittedSearch(
     const groupID = search.scope.groupId?.trim() ?? "";
     if (groupID !== "") {
       const group = groups.find((entry) => entry.id === groupID) ?? null;
-      return `Запрос: “${search.query}” · ${describeSearchScope(search.scopeSelection)} · ${group?.name || "Группа"}`;
+      return `${describeSearchScope(search.scopeSelection)} · ${group ? normalizeGroupTitle(group.name) : "Группа"}`;
     }
   }
 
-  return `Запрос: “${search.query}” · ${describeSearchScope(search.scopeSelection)}`;
+  return describeSearchScope(search.scopeSelection);
 }
 
 function describeEncryptedSummary(
@@ -1009,18 +1218,18 @@ function describeEncryptedSummary(
 ): string {
   const base =
     scopeSelection === "direct" || scopeSelection === "group"
-      ? `Локально просмотрено текущее bounded окно encrypted lane: до ${summary.laneMessageLimit} decrypted сообщений.`
-      : `Локально просмотрено ${summary.searchedLaneCount} из ${summary.availableLaneCount} recent encrypted lanes, до ${summary.laneMessageLimit} decrypted сообщений на lane.`;
+      ? `Просмотрено до ${summary.laneMessageLimit} локально расшифрованных сообщений.`
+      : `Просмотрено ${summary.searchedLaneCount} из ${summary.availableLaneCount} recent encrypted lanes, до ${summary.laneMessageLimit} сообщений на lane.`;
 
   const limited = summary.limitedByLaneBudget
-    ? ` All-scope encrypted search ограничен recent lane budget ${summary.laneLimit}.`
+    ? ` Ограничение all-scope: ${summary.laneLimit} lanes.`
     : "";
   const failures =
     summary.failedLaneCount > 0
-      ? ` ${summary.failedLaneCount} lane не удалось локально подготовить в этом запросе.`
+      ? ` Не удалось подготовить ${summary.failedLaneCount} lanes.`
       : "";
 
-  return `${base} Session-local cache ограничен ${summary.cacheLaneLimit} lanes.${limited}${failures}`;
+  return `${base} Локальный кэш ограничен ${summary.cacheLaneLimit} lanes.${limited}${failures}`;
 }
 
 function normalizeMatchFragment(value: string): string {
@@ -1030,6 +1239,54 @@ function normalizeMatchFragment(value: string): string {
   }
 
   return normalized.length > 220 ? `${normalized.slice(0, 217)}...` : normalized;
+}
+
+function normalizeGroupTitle(value: string): string {
+  const normalized = value.trim();
+  return normalized === "" ? "Группа" : normalized;
+}
+
+function describeInviteRole(role: GroupInvitePreview["inviteRole"]): string {
+  switch (role) {
+    case "owner":
+      return "owner";
+    case "admin":
+      return "admin";
+    case "reader":
+      return "reader";
+    case "member":
+    default:
+      return "member";
+  }
+}
+
+function describeMemberCount(count: number): string {
+  if (count % 10 === 1 && count % 100 !== 11) {
+    return `${count} участник`;
+  }
+
+  if (
+    count % 10 >= 2 &&
+    count % 10 <= 4 &&
+    (count % 100 < 10 || count % 100 >= 20)
+  ) {
+    return `${count} участника`;
+  }
+
+  return `${count} участников`;
+}
+
+function describeShortRelationship(entry: PersonProfileEntry): string {
+  switch (entry.relationshipKind) {
+    case "friend":
+      return "Друг";
+    case "incoming_request":
+      return "Входящая";
+    case "outgoing_request":
+      return "Исходящая";
+    default:
+      return "Контакт";
+  }
 }
 
 function formatDateTime(value: string): string {

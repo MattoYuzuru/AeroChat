@@ -12,7 +12,7 @@ const navigationItems = [
   { to: "/app/chats", label: "Чаты", meta: "direct" },
   { to: "/app/groups", label: "Группы", meta: "group chat bootstrap" },
   { to: "/app/explorer", label: "Explorer", meta: "shell organizer" },
-  { to: "/app/search", label: "Поиск", meta: "message search" },
+  { to: "/app/search", label: "Поиск", meta: "people first" },
   { to: "/app/friend-requests", label: "Заявки", meta: "social requests" },
   { to: "/app/people", label: "Люди", meta: "social" },
   { to: "/app/settings", label: "Настройки", meta: "privacy" },

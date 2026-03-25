@@ -2150,6 +2150,11 @@ SELECT
     l.disabled_at,
     l.last_joined_at,
     g.name AS group_name,
+    (
+        SELECT COUNT(*)
+        FROM group_memberships AS gm
+        WHERE gm.group_id = g.id AND gm.left_at IS NULL
+    )::bigint AS group_member_count,
     g.created_by_user_id AS group_created_by_user_id,
     g.created_at AS group_created_at,
     g.updated_at AS group_updated_at
@@ -2169,6 +2174,7 @@ type GetGroupInviteLinkForJoinRow struct {
 	DisabledAt           pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
 	LastJoinedAt         pgtype.Timestamptz `db:"last_joined_at" json:"last_joined_at"`
 	GroupName            string             `db:"group_name" json:"group_name"`
+	GroupMemberCount     int64              `db:"group_member_count" json:"group_member_count"`
 	GroupCreatedByUserID uuid.UUID          `db:"group_created_by_user_id" json:"group_created_by_user_id"`
 	GroupCreatedAt       pgtype.Timestamptz `db:"group_created_at" json:"group_created_at"`
 	GroupUpdatedAt       pgtype.Timestamptz `db:"group_updated_at" json:"group_updated_at"`
@@ -2188,6 +2194,7 @@ func (q *Queries) GetGroupInviteLinkForJoin(ctx context.Context, tokenHash strin
 		&i.DisabledAt,
 		&i.LastJoinedAt,
 		&i.GroupName,
+		&i.GroupMemberCount,
 		&i.GroupCreatedByUserID,
 		&i.GroupCreatedAt,
 		&i.GroupUpdatedAt,

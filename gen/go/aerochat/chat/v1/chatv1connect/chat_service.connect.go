@@ -91,6 +91,9 @@ const (
 	// ChatServiceDisableGroupInviteLinkProcedure is the fully-qualified name of the ChatService's
 	// DisableGroupInviteLink RPC.
 	ChatServiceDisableGroupInviteLinkProcedure = "/aerochat.chat.v1.ChatService/DisableGroupInviteLink"
+	// ChatServicePreviewGroupByInviteLinkProcedure is the fully-qualified name of the ChatService's
+	// PreviewGroupByInviteLink RPC.
+	ChatServicePreviewGroupByInviteLinkProcedure = "/aerochat.chat.v1.ChatService/PreviewGroupByInviteLink"
 	// ChatServiceJoinGroupByInviteLinkProcedure is the fully-qualified name of the ChatService's
 	// JoinGroupByInviteLink RPC.
 	ChatServiceJoinGroupByInviteLinkProcedure = "/aerochat.chat.v1.ChatService/JoinGroupByInviteLink"
@@ -214,6 +217,7 @@ type ChatServiceClient interface {
 	CreateGroupInviteLink(context.Context, *connect.Request[v1.CreateGroupInviteLinkRequest]) (*connect.Response[v1.CreateGroupInviteLinkResponse], error)
 	ListGroupInviteLinks(context.Context, *connect.Request[v1.ListGroupInviteLinksRequest]) (*connect.Response[v1.ListGroupInviteLinksResponse], error)
 	DisableGroupInviteLink(context.Context, *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error)
+	PreviewGroupByInviteLink(context.Context, *connect.Request[v1.PreviewGroupByInviteLinkRequest]) (*connect.Response[v1.PreviewGroupByInviteLinkResponse], error)
 	JoinGroupByInviteLink(context.Context, *connect.Request[v1.JoinGroupByInviteLinkRequest]) (*connect.Response[v1.JoinGroupByInviteLinkResponse], error)
 	SetGroupTyping(context.Context, *connect.Request[v1.SetGroupTypingRequest]) (*connect.Response[v1.SetGroupTypingResponse], error)
 	ClearGroupTyping(context.Context, *connect.Request[v1.ClearGroupTypingRequest]) (*connect.Response[v1.ClearGroupTypingResponse], error)
@@ -384,6 +388,12 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+ChatServiceDisableGroupInviteLinkProcedure,
 			connect.WithSchema(chatServiceMethods.ByName("DisableGroupInviteLink")),
+			connect.WithClientOptions(opts...),
+		),
+		previewGroupByInviteLink: connect.NewClient[v1.PreviewGroupByInviteLinkRequest, v1.PreviewGroupByInviteLinkResponse](
+			httpClient,
+			baseURL+ChatServicePreviewGroupByInviteLinkProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("PreviewGroupByInviteLink")),
 			connect.WithClientOptions(opts...),
 		),
 		joinGroupByInviteLink: connect.NewClient[v1.JoinGroupByInviteLinkRequest, v1.JoinGroupByInviteLinkResponse](
@@ -610,6 +620,7 @@ type chatServiceClient struct {
 	createGroupInviteLink                    *connect.Client[v1.CreateGroupInviteLinkRequest, v1.CreateGroupInviteLinkResponse]
 	listGroupInviteLinks                     *connect.Client[v1.ListGroupInviteLinksRequest, v1.ListGroupInviteLinksResponse]
 	disableGroupInviteLink                   *connect.Client[v1.DisableGroupInviteLinkRequest, v1.DisableGroupInviteLinkResponse]
+	previewGroupByInviteLink                 *connect.Client[v1.PreviewGroupByInviteLinkRequest, v1.PreviewGroupByInviteLinkResponse]
 	joinGroupByInviteLink                    *connect.Client[v1.JoinGroupByInviteLinkRequest, v1.JoinGroupByInviteLinkResponse]
 	setGroupTyping                           *connect.Client[v1.SetGroupTypingRequest, v1.SetGroupTypingResponse]
 	clearGroupTyping                         *connect.Client[v1.ClearGroupTypingRequest, v1.ClearGroupTypingResponse]
@@ -748,6 +759,11 @@ func (c *chatServiceClient) ListGroupInviteLinks(ctx context.Context, req *conne
 // DisableGroupInviteLink calls aerochat.chat.v1.ChatService.DisableGroupInviteLink.
 func (c *chatServiceClient) DisableGroupInviteLink(ctx context.Context, req *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error) {
 	return c.disableGroupInviteLink.CallUnary(ctx, req)
+}
+
+// PreviewGroupByInviteLink calls aerochat.chat.v1.ChatService.PreviewGroupByInviteLink.
+func (c *chatServiceClient) PreviewGroupByInviteLink(ctx context.Context, req *connect.Request[v1.PreviewGroupByInviteLinkRequest]) (*connect.Response[v1.PreviewGroupByInviteLinkResponse], error) {
+	return c.previewGroupByInviteLink.CallUnary(ctx, req)
 }
 
 // JoinGroupByInviteLink calls aerochat.chat.v1.ChatService.JoinGroupByInviteLink.
@@ -939,6 +955,7 @@ type ChatServiceHandler interface {
 	CreateGroupInviteLink(context.Context, *connect.Request[v1.CreateGroupInviteLinkRequest]) (*connect.Response[v1.CreateGroupInviteLinkResponse], error)
 	ListGroupInviteLinks(context.Context, *connect.Request[v1.ListGroupInviteLinksRequest]) (*connect.Response[v1.ListGroupInviteLinksResponse], error)
 	DisableGroupInviteLink(context.Context, *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error)
+	PreviewGroupByInviteLink(context.Context, *connect.Request[v1.PreviewGroupByInviteLinkRequest]) (*connect.Response[v1.PreviewGroupByInviteLinkResponse], error)
 	JoinGroupByInviteLink(context.Context, *connect.Request[v1.JoinGroupByInviteLinkRequest]) (*connect.Response[v1.JoinGroupByInviteLinkResponse], error)
 	SetGroupTyping(context.Context, *connect.Request[v1.SetGroupTypingRequest]) (*connect.Response[v1.SetGroupTypingResponse], error)
 	ClearGroupTyping(context.Context, *connect.Request[v1.ClearGroupTypingRequest]) (*connect.Response[v1.ClearGroupTypingResponse], error)
@@ -1105,6 +1122,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		ChatServiceDisableGroupInviteLinkProcedure,
 		svc.DisableGroupInviteLink,
 		connect.WithSchema(chatServiceMethods.ByName("DisableGroupInviteLink")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServicePreviewGroupByInviteLinkHandler := connect.NewUnaryHandler(
+		ChatServicePreviewGroupByInviteLinkProcedure,
+		svc.PreviewGroupByInviteLink,
+		connect.WithSchema(chatServiceMethods.ByName("PreviewGroupByInviteLink")),
 		connect.WithHandlerOptions(opts...),
 	)
 	chatServiceJoinGroupByInviteLinkHandler := connect.NewUnaryHandler(
@@ -1349,6 +1372,8 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceListGroupInviteLinksHandler.ServeHTTP(w, r)
 		case ChatServiceDisableGroupInviteLinkProcedure:
 			chatServiceDisableGroupInviteLinkHandler.ServeHTTP(w, r)
+		case ChatServicePreviewGroupByInviteLinkProcedure:
+			chatServicePreviewGroupByInviteLinkHandler.ServeHTTP(w, r)
 		case ChatServiceJoinGroupByInviteLinkProcedure:
 			chatServiceJoinGroupByInviteLinkHandler.ServeHTTP(w, r)
 		case ChatServiceSetGroupTypingProcedure:
@@ -1506,6 +1531,10 @@ func (UnimplementedChatServiceHandler) ListGroupInviteLinks(context.Context, *co
 
 func (UnimplementedChatServiceHandler) DisableGroupInviteLink(context.Context, *connect.Request[v1.DisableGroupInviteLinkRequest]) (*connect.Response[v1.DisableGroupInviteLinkResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.DisableGroupInviteLink is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) PreviewGroupByInviteLink(context.Context, *connect.Request[v1.PreviewGroupByInviteLinkRequest]) (*connect.Response[v1.PreviewGroupByInviteLinkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.PreviewGroupByInviteLink is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) JoinGroupByInviteLink(context.Context, *connect.Request[v1.JoinGroupByInviteLinkRequest]) (*connect.Response[v1.JoinGroupByInviteLinkResponse], error) {

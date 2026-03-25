@@ -778,6 +778,7 @@ func (r *Repository) GetGroupInviteLinkForJoin(ctx context.Context, tokenHash st
 			ID:              row.GroupID.String(),
 			Name:            row.GroupName,
 			Kind:            chat.ChatKindGroup,
+			MemberCount:     int32(row.GroupMemberCount),
 			CreatedByUserID: row.GroupCreatedByUserID.String(),
 			CreatedAt:       timestampValue(row.GroupCreatedAt),
 			UpdatedAt:       timestampValue(row.GroupUpdatedAt),

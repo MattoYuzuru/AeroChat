@@ -274,6 +274,14 @@ export interface CreatedGroupInviteLink {
   inviteToken: string;
 }
 
+export interface GroupInvitePreview {
+  groupId: string;
+  groupName: string;
+  inviteRole: GroupMemberRole;
+  memberCount: number;
+  alreadyJoined: boolean;
+}
+
 export interface DirectChat {
   id: string;
   kind: string;
@@ -920,6 +928,7 @@ export interface GatewayClient {
     groupId: string,
     inviteLinkId: string,
   ): Promise<GroupInviteLink>;
+  previewGroupByInviteLink(token: string, inviteToken: string): Promise<GroupInvitePreview>;
   joinGroupByInviteLink(token: string, inviteToken: string): Promise<Group>;
   listGroupMessages(
     token: string,
