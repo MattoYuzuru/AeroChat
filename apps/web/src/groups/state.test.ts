@@ -116,7 +116,7 @@ function createReadyState(): Extract<GroupsSelectedState, { status: "ready" }> {
 }
 
 describe("group realtime state helpers", () => {
-  it("applies message updates idempotently and keeps newest-first history", () => {
+  it("ignores legacy group message realtime for active selected state and group list", () => {
     const state = createReadyState();
     const event: GroupRealtimeEvent = {
       type: "group.message.updated",
@@ -146,17 +146,14 @@ describe("group realtime state helpers", () => {
       },
     };
 
-    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
-    const duplicatedState = applyGroupRealtimeToSelectedState(nextState, event, "user-1");
+    const groups = [state.snapshot.group];
+    const nextState = applyGroupRealtimeToSelectedState(state, event);
+    const nextGroups = applyGroupRealtimeToGroups(groups, event);
 
-    expect(nextState.status).toBe("ready");
-    if (duplicatedState.status !== "ready") {
-      throw new Error("expected ready state");
-    }
-
-    expect(duplicatedState.messages).toHaveLength(2);
-    expect(duplicatedState.messages[0]?.id).toBe("message-2");
-    expect(duplicatedState.messages[1]?.id).toBe("message-1");
+    expect(nextState).toBe(state);
+    expect(nextGroups).toBe(groups);
+    expect(state.messages).toHaveLength(1);
+    expect(state.messages[0]?.id).toBe("message-1");
   });
 
   it("drops selected state and group list when current user loses membership", () => {
@@ -172,8 +169,8 @@ describe("group realtime state helpers", () => {
       selfMember: null,
     };
 
-    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
-    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event, "user-1");
+    const nextState = applyGroupRealtimeToSelectedState(state, event);
+    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event);
 
     expect(shouldClearSelectedGroupOnRealtimeEvent(state, event)).toBe(true);
     expect(nextState).toEqual(createInitialGroupsSelectedState());
@@ -211,7 +208,7 @@ describe("group realtime state helpers", () => {
       previousRole: "owner",
     };
 
-    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
+    const nextState = applyGroupRealtimeToSelectedState(state, event);
 
     expect(nextState.status).toBe("ready");
     if (nextState.status !== "ready") {
@@ -243,8 +240,8 @@ describe("group realtime state helpers", () => {
       },
     };
 
-    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
-    const duplicatedState = applyGroupRealtimeToSelectedState(nextState, event, "user-1");
+    const nextState = applyGroupRealtimeToSelectedState(state, event);
+    const duplicatedState = applyGroupRealtimeToSelectedState(nextState, event);
 
     expect(duplicatedState.status).toBe("ready");
     if (duplicatedState.status !== "ready") {
@@ -255,7 +252,7 @@ describe("group realtime state helpers", () => {
     expect(duplicatedState.snapshot.typingState?.typers[0]?.user.id).toBe("user-2");
   });
 
-  it("does not increment unread count for group message edit realtime", () => {
+  it("keeps group list unread state unchanged for legacy group message edit realtime", () => {
     const state = createReadyState();
     const event: GroupRealtimeEvent = {
       type: "group.message.updated",
@@ -280,8 +277,9 @@ describe("group realtime state helpers", () => {
       },
     };
 
-    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event, "user-1");
+    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event);
     expect(nextGroups[0]?.unreadCount).toBe(0);
+    expect(nextGroups[0]?.updatedAt).toBe("2026-04-10T12:00:00Z");
   });
 
   it("replaces encrypted group read state and unread counters", () => {
@@ -301,8 +299,8 @@ describe("group realtime state helpers", () => {
       encryptedUnreadCount: 1,
     };
 
-    const nextState = applyGroupRealtimeToSelectedState(state, event, "user-1");
-    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event, "user-1");
+    const nextState = applyGroupRealtimeToSelectedState(state, event);
+    const nextGroups = applyGroupRealtimeToGroups([state.snapshot.group], event);
 
     if (nextState.status !== "ready") {
       throw new Error("expected ready state");

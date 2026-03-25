@@ -708,14 +708,8 @@ export function DesktopShell({
       }
 
       if (groupEvent.type === "group.message.updated") {
-        setLiveGroups((currentGroups) => upsertLiveGroup(currentGroups, groupEvent.group));
-        setDesktopRegistryState((currentState) =>
-          upsertGroupChatDesktopEntity(
-            currentState,
-            groupEvent.group.id,
-            groupEvent.group.name,
-          ),
-        );
+        // Legacy group plaintext realtime payload больше не должен влиять
+        // на активные group shell surfaces после de-scope content path.
         return;
       }
 

@@ -175,14 +175,8 @@ export function ExplorerPage() {
       }
 
       if (groupEvent.type === "group.message.updated") {
-        setLocalGroups((currentGroups) => upsertLiveGroup(currentGroups, groupEvent.group));
-        setLocalRegistryState((currentState) =>
-          upsertGroupChatDesktopEntity(
-            currentState,
-            groupEvent.group.id,
-            groupEvent.group.name,
-          ),
-        );
+        // Legacy group plaintext realtime payload больше не должен влиять
+        // на live group surfaces внутри Explorer/runtime.
         return;
       }
 

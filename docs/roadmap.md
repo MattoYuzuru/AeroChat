@@ -130,7 +130,7 @@ session-scoped. Legacy direct reply preview уже деградирован до
 state без server-side plaintext body preview, а server-side search по содержимому legacy direct history
 теперь честно de-scoped вместо зависимости от plaintext body/search_vector. Legacy direct readable
 history/list/get transport тоже уже de-scoped как активный direct content path; pending остаются
-legacy group history и readable legacy realtime payloads.
+readable direct realtime payloads и другие legacy plaintext compatibility surfaces.
 
 ---
 
@@ -175,8 +175,9 @@ Legacy group reply preview уже деградирован до honest metadata-
 plaintext body preview, а server-side search по содержимому legacy group history теперь тоже
 честно de-scoped вместо зависимости от plaintext body/search_vector.
 Readable legacy group history/list/get transport теперь тоже честно de-scoped как активный
-group content path; pending остаются readable legacy realtime payloads, compatibility RPC surfaces
-и legacy plaintext attachment path.
+group content path, а readable legacy group realtime plaintext payload тоже уже de-scoped как
+активный group thread content path; pending остаются readable direct realtime payloads,
+compatibility RPC surfaces и legacy plaintext attachment path.
 
 ---
 
