@@ -127,8 +127,8 @@ desktop shell, mobile launcher adaptation и частичный RTC web slice.
 encrypted direct-message v2 уже существует как отдельная bounded lane, но не заменяет legacy plaintext
 history и не даёт full parity с server-side search/preview. Encrypted search остаётся локальным и
 session-scoped. Legacy direct reply preview уже деградирован до honest metadata-only/deleted/unavailable
-state без server-side plaintext body preview, но server-side search по legacy direct history всё ещё
-остаётся plaintext-dependent.
+state без server-side plaintext body preview, а server-side search по содержимому legacy direct history
+теперь честно de-scoped вместо зависимости от plaintext body/search_vector.
 
 ---
 
