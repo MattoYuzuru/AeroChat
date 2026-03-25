@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createDescopedDirectThreadSnapshot } from "./useChats";
+import {
+  createDescopedDirectThreadSnapshot,
+  shouldBootstrapEncryptedDirectChatActivity,
+} from "./useChats";
 
 describe("createDescopedDirectThreadSnapshot", () => {
   it("returns an honest empty legacy thread snapshot for direct chats", () => {
@@ -41,5 +44,49 @@ describe("createDescopedDirectThreadSnapshot", () => {
     expect(snapshot.chat.id).toBe("chat-1");
     expect(snapshot.chat.pinnedMessageIds).toEqual(["legacy-message-1"]);
     expect(snapshot.chat.encryptedPinnedMessageIds).toEqual(["encrypted-message-1"]);
+  });
+});
+
+describe("shouldBootstrapEncryptedDirectChatActivity", () => {
+  it("requests a list bootstrap for first incoming encrypted direct chat", () => {
+    expect(
+      shouldBootstrapEncryptedDirectChatActivity(
+        [
+          {
+            id: "chat-1",
+            kind: "CHAT_KIND_DIRECT",
+            participants: [],
+            pinnedMessageIds: [],
+            encryptedPinnedMessageIds: [],
+            unreadCount: 0,
+            encryptedUnreadCount: 0,
+            createdAt: "2026-03-25T10:00:00Z",
+            updatedAt: "2026-03-25T10:05:00Z",
+          },
+        ],
+        "chat-2",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps live patch path for already known encrypted direct chat", () => {
+    expect(
+      shouldBootstrapEncryptedDirectChatActivity(
+        [
+          {
+            id: "chat-1",
+            kind: "CHAT_KIND_DIRECT",
+            participants: [],
+            pinnedMessageIds: [],
+            encryptedPinnedMessageIds: [],
+            unreadCount: 0,
+            encryptedUnreadCount: 0,
+            createdAt: "2026-03-25T10:00:00Z",
+            updatedAt: "2026-03-25T10:05:00Z",
+          },
+        ],
+        "chat-1",
+      ),
+    ).toBe(false);
   });
 });

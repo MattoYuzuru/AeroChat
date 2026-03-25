@@ -314,6 +314,50 @@ describe("chatsReducer", () => {
     expect(nextState.thread?.chat.encryptedUnreadCount).toBe(0);
   });
 
+  it("applies encrypted delivery activity to known direct chat without full refresh", () => {
+    const readyState = chatsReducer(createInitialChatsState(), {
+      type: "load_succeeded",
+      chats: [directChat],
+    });
+    const threadState = chatsReducer(readyState, {
+      type: "thread_load_succeeded",
+      snapshot: threadSnapshot,
+    });
+
+    const nextState = chatsReducer(threadState, {
+      type: "encrypted_delivery_observed",
+      event: {
+        type: "encrypted_direct_message_v2.delivery",
+        envelope: {
+          messageId: "encrypted-1",
+          chatId: "chat-1",
+          senderUserId: "user-2",
+          senderCryptoDeviceId: "crypto-user-2",
+          operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
+          targetMessageId: null,
+          revision: 1,
+          createdAt: "2026-04-07T12:04:30Z",
+          storedAt: "2026-04-07T12:05:00Z",
+          viewerDelivery: {
+            recipientCryptoDeviceId: "crypto-user-1",
+            transportHeader: "header",
+            ciphertext: "ciphertext",
+            ciphertextSizeBytes: 10,
+            storedAt: "2026-04-07T12:05:00Z",
+            unreadState: {
+              unreadCount: 3,
+            },
+          },
+        },
+      },
+    });
+
+    expect(nextState.chats[0]?.updatedAt).toBe("2026-04-07T12:05:00Z");
+    expect(nextState.chats[0]?.encryptedUnreadCount).toBe(3);
+    expect(nextState.thread?.chat.updatedAt).toBe("2026-04-07T12:05:00Z");
+    expect(nextState.thread?.chat.encryptedUnreadCount).toBe(3);
+  });
+
   it("replaces active thread typing state from realtime update", () => {
     const readyState = chatsReducer(createInitialChatsState(), {
       type: "load_succeeded",
