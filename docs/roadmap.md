@@ -179,9 +179,9 @@ plaintext body preview, а server-side search по содержимому legacy
 Readable legacy group history/list/get transport теперь тоже честно de-scoped как активный
 group content path, а readable legacy group realtime plaintext payload тоже уже de-scoped как
 активный group thread content path. Active web/runtime usage legacy plaintext group compatibility
-RPC surfaces теперь тоже de-scoped, поэтому для coexistence-модели pending остаются legacy
-plaintext attachment path, bounded internal compatibility reads и отдельные RTC/call follow-up
-slices.
+RPC surfaces и visible legacy plaintext group attachment/file/voice/video runtime path теперь тоже
+de-scoped, поэтому для coexistence-модели pending остаются bounded internal compatibility reads,
+underlying coexistence storage/model и отдельные RTC/call follow-up slices.
 
 ---
 
@@ -210,8 +210,9 @@ slices.
 - [ ] Local media drafts
 
 Примечание:
-encrypted media relay уже работает для encrypted lanes, но legacy plaintext attachment path в
-репозитории всё ещё существует и остаётся частью coexistence-модели.
+encrypted media relay уже работает для encrypted lanes, а visible legacy plaintext group
+attachment/media runtime path уже de-scoped. При этом underlying legacy attachment coexistence
+storage/model и bounded compatibility reads в репозитории всё ещё существуют.
 
 ---
 
