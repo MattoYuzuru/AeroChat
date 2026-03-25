@@ -148,7 +148,7 @@ export function describePersonProfileSummary(profile: Profile): string {
     return profile.country;
   }
 
-  return "Базовый social graph-контакт без публичного discovery.";
+  return "Пока без статуса и описания.";
 }
 
 export function describePersonRelationship(entry: PersonProfileEntry): string {

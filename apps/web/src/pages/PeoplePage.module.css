@@ -8,96 +8,120 @@
 .sectionCard,
 .metricCard,
 .personCard {
-  border: 1px solid var(--color-border-soft);
-  border-radius: 1.55rem;
-  background: var(--surface-panel);
-  box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(16px);
+  border: 1px solid #6c86b2;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(224, 236, 255, 0.92));
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.94),
+    inset -1px -1px 0 rgba(112, 140, 185, 0.28),
+    0 8px 18px rgba(24, 58, 103, 0.12);
 }
 
 .heroCard,
 .stateCard,
 .sectionCard {
-  padding: 1.35rem;
+  padding: 1rem;
 }
 
 .heroHeader,
 .sectionHeader,
 .personHeader,
-.form {
+.form,
+.stateActions,
+.actions {
   display: flex;
+  gap: 0.75rem;
+}
+
+.heroHeader,
+.sectionHeader,
+.personHeader {
   justify-content: space-between;
-  gap: 1rem;
 }
 
 .cardLabel {
   margin: 0;
-  font-size: 0.78rem;
+  color: #23456f;
+  font-size: 0.76rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(3, 50, 82, 0.72);
 }
 
 .title,
 .stateTitle,
 .sectionTitle,
 .personTitle {
-  margin: 0.35rem 0 0;
+  margin: 0.3rem 0 0;
+  color: #10335b;
 }
 
 .title {
-  font-size: clamp(1.8rem, 3vw, 2.2rem);
+  font-size: clamp(1.7rem, 2.8vw, 2.15rem);
 }
 
 .subtitle,
 .stateMessage,
 .sectionDescription,
 .personDescription,
+.personLogin,
 .pendingText,
 .emptyState {
-  margin: 0.8rem 0 0;
-  color: rgba(3, 50, 82, 0.78);
+  margin: 0.55rem 0 0;
+  color: #35557e;
+}
+
+.metrics,
+.grid,
+.list {
+  display: grid;
+  gap: 0.8rem;
 }
 
 .metrics {
-  display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.8rem;
   margin-top: 1rem;
 }
 
 .metricCard {
   display: grid;
-  gap: 0.2rem;
-  padding: 0.9rem 1rem;
-  background: var(--surface-panel-strong);
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  background:
+    linear-gradient(180deg, rgba(246, 250, 255, 0.98), rgba(202, 222, 248, 0.9));
 }
 
 .metricCard span {
-  font-size: 0.82rem;
+  color: #46658f;
+  font-size: 0.8rem;
   text-transform: uppercase;
-  color: rgba(3, 50, 82, 0.7);
 }
 
 .metricCard strong {
-  font-size: 1.8rem;
+  font-size: 1.45rem;
+  color: #163964;
 }
 
 .notice,
 .error {
   margin-top: 1rem;
-  padding: 0.85rem 1rem;
-  border-radius: 1rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #8da9d2;
 }
 
 .notice {
-  background: rgba(16, 130, 203, 0.12);
+  background:
+    linear-gradient(180deg, rgba(239, 248, 255, 0.98), rgba(214, 233, 255, 0.92));
+  color: #245180;
 }
 
 .error {
-  background: var(--color-danger-soft);
-  color: var(--color-danger-ink);
+  background:
+    linear-gradient(180deg, rgba(255, 246, 246, 0.98), rgba(255, 225, 225, 0.94));
+  border-color: rgba(181, 38, 38, 0.32);
+  color: #7f2a2a;
 }
 
 .form {
@@ -112,108 +136,190 @@
 }
 
 .field span {
-  font-size: 0.88rem;
+  color: #12385f;
+  font-size: 0.87rem;
   font-weight: 700;
 }
 
 .field input {
-  min-height: 3rem;
-  padding: 0.75rem 0.95rem;
-  border: 1px solid rgba(3, 50, 82, 0.14);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  min-height: 2.75rem;
+  padding: 0.62rem 0.72rem;
+  border: 1px solid #6f8bb8;
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
+  color: #11345a;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.98),
+    inset -1px -1px 0 rgba(146, 168, 205, 0.35);
 }
 
 .field input:focus-visible {
-  border-color: var(--color-primary-bright);
-  box-shadow:
-    0 0 0 4px rgba(23, 130, 209, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  outline: 2px solid #f3c45d;
+  outline-offset: 1px;
+  border-color: #2d61ab;
 }
 
 .grid {
-  display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
 }
 
 .sectionCard {
   display: grid;
   align-content: start;
-  gap: 1rem;
+  gap: 0.9rem;
 }
 
 .sectionDescription {
-  max-width: 18rem;
+  max-width: 15rem;
   text-align: right;
 }
 
 .list {
-  display: grid;
-  gap: 0.85rem;
+  gap: 0.75rem;
 }
 
 .personCard {
-  padding: 1rem;
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.95rem;
+  background:
+    linear-gradient(180deg, rgba(252, 254, 255, 0.97), rgba(235, 243, 255, 0.93));
+}
+
+.personIdentity {
+  display: flex;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.avatarBadge,
+.avatarImage {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border: 1px solid #6f8bb8;
+  border-radius: 8px;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.96),
+    inset -1px -1px 0 rgba(120, 145, 188, 0.22);
+}
+
+.avatarBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(180deg, #fefefe 0%, #d8e7ff 48%, #c7dbff 49%, #b4cdf7 100%);
+  color: #1d4b81;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.avatarImage {
+  object-fit: cover;
+  background: #d9e8fb;
+}
+
+.personBody {
+  min-width: 0;
+}
+
+.personMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.statusTag,
+.metaTag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid #8fa7cf;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(247, 251, 255, 0.98), rgba(220, 232, 251, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  color: #2a527f;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.statusTag {
+  border-color: #7ca0d8;
+  color: #1f4b82;
 }
 
 .personTitle {
-  font-size: 1.1rem;
+  font-size: 1.08rem;
 }
 
 .personLogin {
-  margin: 0.3rem 0 0;
-  color: rgba(3, 50, 82, 0.68);
+  margin-top: 0.2rem;
 }
 
-.metaTag {
+.personDescription {
+  max-width: 32rem;
+}
+
+.profileAction {
   align-self: start;
-  padding: 0.45rem 0.7rem;
-  border-radius: 999px;
-  background: var(--color-chip);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
-  font-size: 0.8rem;
-  color: rgba(3, 50, 82, 0.72);
 }
 
 .actions,
 .stateActions {
-  display: flex;
   flex-wrap: wrap;
-  gap: 0.7rem;
-  margin-top: 0.95rem;
 }
 
 .primaryButton,
-.secondaryButton {
-  min-height: 2.95rem;
-  padding: 0.75rem 1rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
+.secondaryButton,
+.dangerButton {
+  min-height: 2.5rem;
+  padding: 0.52rem 0.92rem;
+  border-radius: 4px;
+  border: 1px solid #6a82ab;
   cursor: pointer;
-  box-shadow: var(--shadow-button);
+  font: inherit;
+  font-weight: 700;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.98),
+    inset -1px -1px 0 rgba(84, 111, 156, 0.28);
 }
 
 .primaryButton {
+  border-color: #4474ba;
   color: #ffffff;
-  background: var(--surface-button-primary);
+  background:
+    linear-gradient(180deg, #7fb4ff 0%, #4c8de4 48%, #3c78cf 49%, #2f66b7 100%);
+  text-shadow: 0 1px 0 rgba(20, 48, 91, 0.45);
 }
 
 .secondaryButton {
-  background: var(--surface-button);
-  border-color: rgba(3, 50, 82, 0.12);
+  color: #14355c;
+  background:
+    linear-gradient(180deg, #fefefe 0%, #d5e5ff 48%, #c2d9ff 49%, #a8c4f3 100%);
+}
+
+.dangerButton {
+  border-color: #bf6571;
+  color: #ffffff;
+  background:
+    linear-gradient(180deg, #f6b3bb 0%, #de7d88 48%, #cd6571 49%, #b74f5b 100%);
+  text-shadow: 0 1px 0 rgba(105, 26, 36, 0.4);
 }
 
 .primaryButton:disabled,
-.secondaryButton:disabled {
-  cursor: progress;
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  cursor: not-allowed;
   opacity: 0.72;
 }
 
 .pendingText {
   font-size: 0.88rem;
-  color: rgba(12, 93, 153, 0.88);
+  color: #2a5d96;
 }
 
 .stateCard[data-tone="error"] {
@@ -235,9 +341,9 @@
   .heroHeader,
   .sectionHeader,
   .personHeader,
-  .form {
-    display: grid;
-    grid-template-columns: 1fr;
+  .form,
+  .personIdentity {
+    flex-direction: column;
   }
 
   .metrics {

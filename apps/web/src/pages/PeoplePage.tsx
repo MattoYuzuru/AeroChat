@@ -1,9 +1,19 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { buildPersonProfileRoutePath } from "../app/app-routes";
+import { buildFriendRequestsRoutePath } from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
-import type { Profile } from "../gateway/types";
+import {
+  describeGatewayError,
+  isGatewayErrorCode,
+  type Profile,
+} from "../gateway/types";
 import { getPersonProfileLaunchTitle } from "../people/profile-model";
+import {
+  buildDirectChatNavigationIntent,
+  buildPersonProfileNavigationIntent,
+  ensureDirectChatForPeer,
+} from "../people/navigation";
+import { resolvePersonRelationshipActions } from "../people/relationship-actions";
 import { usePeople } from "../people/usePeople";
 import { useDesktopShellHost } from "../shell/context";
 import {
@@ -21,27 +31,78 @@ export function PeoplePage() {
   const { state: authState, expireSession } = useAuth();
   const [login, setLogin] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [openingChatLogin, setOpeningChatLogin] = useState<string | null>(null);
+  const [chatActionError, setChatActionError] = useState<string | null>(null);
   const people = usePeople({
     enabled: authState.status === "authenticated",
     token: authState.status === "authenticated" ? authState.token : "",
     onUnauthenticated: () => expireSession(),
   });
+  const incomingActions = resolvePersonRelationshipActions("incoming_request");
+  const outgoingActions = resolvePersonRelationshipActions("outgoing_request");
+  const friendActions = resolvePersonRelationshipActions("friend");
 
   if (authState.status !== "authenticated") {
     return null;
   }
 
+  const sessionToken = authState.token;
+
   function openPersonProfile(profile: Profile) {
-    const title = getPersonProfileLaunchTitle(profile);
+    const intent = buildPersonProfileNavigationIntent({
+      userId: profile.id,
+      title: getPersonProfileLaunchTitle(profile),
+      source: "people",
+    });
 
     if (desktopShellHost !== null) {
-      desktopShellHost.openPersonProfile({
-        userId: profile.id,
-        title,
-      });
+      desktopShellHost.openPersonProfile(intent.shellOptions);
     }
 
-    navigate(buildPersonProfileRoutePath(profile.id));
+    navigate(intent.routePath);
+  }
+
+  function openFriendRequests() {
+    if (desktopShellHost !== null) {
+      desktopShellHost.launchApp("friend_requests");
+    }
+
+    navigate(buildFriendRequestsRoutePath());
+  }
+
+  async function handleOpenFriendChat(profile: Profile) {
+    if (openingChatLogin !== null) {
+      return;
+    }
+
+    setOpeningChatLogin(profile.login);
+    setChatActionError(null);
+    people.clearFeedback();
+
+    try {
+      const chat = await ensureDirectChatForPeer(sessionToken, profile.id);
+      const intent = buildDirectChatNavigationIntent({
+        chatId: chat.id,
+        title: getPersonProfileLaunchTitle(profile),
+      });
+
+      if (desktopShellHost !== null) {
+        desktopShellHost.openDirectChat(intent.shellOptions);
+      }
+
+      navigate(intent.routePath);
+    } catch (error) {
+      if (isGatewayErrorCode(error, "unauthenticated")) {
+        expireSession();
+        return;
+      }
+
+      setChatActionError(
+        describeGatewayError(error, "Не удалось открыть чат для выбранного контакта."),
+      );
+    } finally {
+      setOpeningChatLogin(null);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -66,24 +127,19 @@ export function PeoplePage() {
       <section className={styles.heroCard}>
         <div className={styles.heroHeader}>
           <div>
-            <p className={styles.cardLabel}>People</p>
-            <h1 className={styles.title}>Друзья по точному login</h1>
+            <p className={styles.cardLabel}>Люди</p>
+            <h1 className={styles.title}>Люди</h1>
             <p className={styles.subtitle}>
-              Frontend social graph bootstrap идёт только через aero-gateway. Публичного каталога
-              и fuzzy search здесь нет, а direct chat создаётся только явным действием из карточки
-              друга.
+              Добавляйте людей по точному login и открывайте профиль или чат без лишних окон.
             </p>
           </div>
 
           <button
             className={styles.secondaryButton}
-            disabled={people.state.status === "loading" || people.state.isRefreshing}
-            onClick={() => {
-              void people.reload();
-            }}
+            onClick={openFriendRequests}
             type="button"
           >
-            {people.state.isRefreshing ? "Обновляем..." : "Обновить"}
+            Заявки
           </button>
         </div>
 
@@ -94,15 +150,15 @@ export function PeoplePage() {
         </div>
 
         {people.state.notice && <div className={styles.notice}>{people.state.notice}</div>}
-        {(formError || people.state.actionErrorMessage) && (
+        {(formError || people.state.actionErrorMessage || chatActionError) && (
           <div className={styles.error}>
-            {formError ?? people.state.actionErrorMessage}
+            {formError ?? people.state.actionErrorMessage ?? chatActionError}
           </div>
         )}
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <label className={styles.field}>
-            <span>Точный неизменяемый login</span>
+            <span>Точный login</span>
             <input
               autoCapitalize="none"
               autoComplete="off"
@@ -131,14 +187,14 @@ export function PeoplePage() {
 
       {people.state.status === "loading" && (
         <StateCard
-          title="Загружаем social graph"
-          message="Получаем входящие, исходящие и текущих друзей через gateway."
+          title="Загружаем людей"
+          message="Собираем друзей и заявки."
         />
       )}
 
       {people.state.status === "error" && (
         <StateCard
-          title="People раздел недоступен"
+          title="Раздел людей недоступен"
           message={people.state.screenErrorMessage ?? "Не удалось загрузить данные."}
           action={
             <button
@@ -159,8 +215,8 @@ export function PeoplePage() {
         <div className={styles.grid}>
           <PeopleSection
             title="Входящие заявки"
-            description="Только точные friend requests без скрытого создания чата."
-            emptyMessage="Сейчас нет входящих заявок."
+            description="Новые заявки на добавление в друзья."
+            emptyMessage="Пока нет новых заявок."
           >
             {people.state.snapshot.incoming.map((request) => {
               const pendingLabel = people.state.pendingLogins[request.profile.login];
@@ -169,22 +225,25 @@ export function PeoplePage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Запрос: ${formatDateTime(request.requestedAt)}`}
+                  statusLabel="Входящая заявка"
                   onOpenProfile={() => {
                     openPersonProfile(request.profile);
                   }}
                   pendingLabel={pendingLabel}
                   profile={request.profile}
                   primaryAction={{
-                    label: "Принять",
+                    label: incomingActions.primary.label,
                     onClick: () => {
                       void people.acceptFriendRequest(request.profile.login);
                     },
+                    tone: incomingActions.primary.tone,
                   }}
                   secondaryAction={{
-                    label: "Отклонить",
+                    label: incomingActions.secondary?.label ?? "Отклонить",
                     onClick: () => {
                       void people.declineFriendRequest(request.profile.login);
                     },
+                    tone: incomingActions.secondary?.tone,
                   }}
                 />
               );
@@ -193,8 +252,8 @@ export function PeoplePage() {
 
           <PeopleSection
             title="Исходящие заявки"
-            description="Можно отменить до принятия второй стороной."
-            emptyMessage="Исходящих заявок пока нет."
+            description="Ожидают ответа второй стороны."
+            emptyMessage="Пока нет исходящих заявок."
           >
             {people.state.snapshot.outgoing.map((request) => {
               const pendingLabel = people.state.pendingLogins[request.profile.login];
@@ -203,16 +262,18 @@ export function PeoplePage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Отправлено: ${formatDateTime(request.requestedAt)}`}
+                  statusLabel="Исходящая заявка"
                   onOpenProfile={() => {
                     openPersonProfile(request.profile);
                   }}
                   pendingLabel={pendingLabel}
                   profile={request.profile}
                   primaryAction={{
-                    label: "Отменить",
+                    label: outgoingActions.primary.label,
                     onClick: () => {
                       void people.cancelOutgoingFriendRequest(request.profile.login);
                     },
+                    tone: outgoingActions.primary.tone,
                   }}
                 />
               );
@@ -221,32 +282,40 @@ export function PeoplePage() {
 
           <PeopleSection
             title="Друзья"
-            description="Direct chat создаётся только явным действием из карточки друга."
-            emptyMessage="Список друзей пока пуст."
+            description="Профиль и чат открываются отдельно."
+            emptyMessage="Пока нет друзей."
           >
             {people.state.snapshot.friends.map((friend) => {
               const pendingLabel = people.state.pendingLogins[friend.profile.login];
+              const isOpeningCurrentChat = openingChatLogin === friend.profile.login;
 
               return (
                 <ProfileCard
                   key={friend.profile.id || friend.profile.login}
                   metaLabel={`Друзья с ${formatDateTime(friend.friendsSince)}`}
+                  statusLabel="Друг"
                   onOpenProfile={() => {
                     openPersonProfile(friend.profile);
                   }}
-                  pendingLabel={pendingLabel}
+                  pendingLabel={
+                    isOpeningCurrentChat ? "Открываем чат..." : pendingLabel
+                  }
                   profile={friend.profile}
                   primaryAction={{
-                    label: "Открыть чат",
+                    label: isOpeningCurrentChat
+                      ? "Открываем чат..."
+                      : friendActions.primary.label,
                     onClick: () => {
-                      navigate(`/app/chats?peer=${encodeURIComponent(friend.profile.id)}`);
+                      void handleOpenFriendChat(friend.profile);
                     },
+                    tone: friendActions.primary.tone,
                   }}
                   secondaryAction={{
-                    label: "Удалить из друзей",
+                    label: friendActions.secondary?.label ?? "Удалить из друзей",
                     onClick: () => {
                       void people.removeFriend(friend.profile.login);
                     },
+                    tone: friendActions.secondary?.tone,
                   }}
                 />
               );

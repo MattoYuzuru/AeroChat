@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
-import { buildPersonProfileRoutePath } from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
 import type { Profile } from "../gateway/types";
 import { getPersonProfileLaunchTitle } from "../people/profile-model";
+import { buildPersonProfileNavigationIntent } from "../people/navigation";
+import { resolvePersonRelationshipActions } from "../people/relationship-actions";
 import { usePeople } from "../people/usePeople";
 import { useDesktopShellHost } from "../shell/context";
 import {
@@ -18,6 +19,8 @@ export function FriendRequestsPage() {
   const navigate = useNavigate();
   const desktopShellHost = useDesktopShellHost();
   const { state: authState, expireSession } = useAuth();
+  const incomingActions = resolvePersonRelationshipActions("incoming_request");
+  const outgoingActions = resolvePersonRelationshipActions("outgoing_request");
   const people = usePeople({
     enabled: authState.status === "authenticated",
     token: authState.status === "authenticated" ? authState.token : "",
@@ -29,20 +32,17 @@ export function FriendRequestsPage() {
   }
 
   function openPersonProfile(profile: Profile) {
-    const title = getPersonProfileLaunchTitle(profile);
-    const searchParams = new URLSearchParams({
-      from: "requests",
+    const intent = buildPersonProfileNavigationIntent({
+      userId: profile.id,
+      title: getPersonProfileLaunchTitle(profile),
+      source: "requests",
     });
 
     if (desktopShellHost !== null) {
-      desktopShellHost.openPersonProfile({
-        userId: profile.id,
-        title,
-        searchParams,
-      });
+      desktopShellHost.openPersonProfile(intent.shellOptions);
     }
 
-    navigate(buildPersonProfileRoutePath(profile.id, searchParams));
+    navigate(intent.routePath);
   }
 
   function openPeopleWorkspace() {
@@ -58,41 +58,27 @@ export function FriendRequestsPage() {
       <section className={styles.heroCard}>
         <div className={styles.heroHeader}>
           <div>
-            <p className={styles.cardLabel}>Friend Requests</p>
+            <p className={styles.cardLabel}>Заявки</p>
             <h1 className={styles.title}>Заявки в друзья</h1>
             <p className={styles.subtitle}>
-              Канонический singleton target для входящих и исходящих заявок. Здесь остаются только
-              bounded request-actions и переход в canonical person-profile окно без скрытого
-              создания чата или public discovery.
+              Все входящие и исходящие заявки в одном месте.
             </p>
           </div>
 
-          <div className={styles.actions}>
-            <button
-              className={styles.secondaryButton}
-              disabled={people.state.status === "loading" || people.state.isRefreshing}
-              onClick={() => {
-                void people.reload();
-              }}
-              type="button"
-            >
-              {people.state.isRefreshing ? "Обновляем..." : "Обновить"}
-            </button>
-            <button
-              className={styles.secondaryButton}
-              onClick={openPeopleWorkspace}
-              type="button"
-            >
-              Люди
-            </button>
-          </div>
+          <button
+            className={styles.secondaryButton}
+            onClick={openPeopleWorkspace}
+            type="button"
+          >
+            Люди
+          </button>
         </div>
 
         <div className={styles.metrics}>
           <Metric label="Входящие" value={people.state.snapshot.incoming.length} />
           <Metric label="Исходящие" value={people.state.snapshot.outgoing.length} />
           <Metric
-            label="Всего активных"
+            label="Активные"
             value={people.state.snapshot.incoming.length + people.state.snapshot.outgoing.length}
           />
         </div>
@@ -106,7 +92,7 @@ export function FriendRequestsPage() {
       {people.state.status === "loading" && (
         <StateCard
           title="Загружаем заявки"
-          message="Получаем входящие и исходящие friend requests через gateway."
+          message="Собираем входящие и исходящие заявки."
         />
       )}
 
@@ -133,8 +119,8 @@ export function FriendRequestsPage() {
         <div className={styles.grid}>
           <PeopleSection
             title="Входящие заявки"
-            description="Принятие и отклонение reuse'ят текущие people hooks и gateway mutations."
-            emptyMessage="Сейчас нет входящих заявок."
+            description="Новые заявки на добавление в друзья."
+            emptyMessage="Пока нет новых заявок."
           >
             {people.state.snapshot.incoming.map((request) => {
               const pendingLabel = people.state.pendingLogins[request.profile.login];
@@ -143,22 +129,25 @@ export function FriendRequestsPage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Запрос: ${formatDateTime(request.requestedAt)}`}
+                  statusLabel="Входящая заявка"
                   onOpenProfile={() => {
                     openPersonProfile(request.profile);
                   }}
                   pendingLabel={pendingLabel}
                   profile={request.profile}
                   primaryAction={{
-                    label: "Принять",
+                    label: incomingActions.primary.label,
                     onClick: () => {
                       void people.acceptFriendRequest(request.profile.login);
                     },
+                    tone: incomingActions.primary.tone,
                   }}
                   secondaryAction={{
-                    label: "Отклонить",
+                    label: incomingActions.secondary?.label ?? "Отклонить",
                     onClick: () => {
                       void people.declineFriendRequest(request.profile.login);
                     },
+                    tone: incomingActions.secondary?.tone,
                   }}
                 />
               );
@@ -167,8 +156,8 @@ export function FriendRequestsPage() {
 
           <PeopleSection
             title="Исходящие заявки"
-            description="До принятия второй стороной заявку можно отменить в том же canonical app."
-            emptyMessage="Исходящих заявок пока нет."
+            description="Ожидают ответа второй стороны."
+            emptyMessage="Пока нет исходящих заявок."
           >
             {people.state.snapshot.outgoing.map((request) => {
               const pendingLabel = people.state.pendingLogins[request.profile.login];
@@ -177,16 +166,18 @@ export function FriendRequestsPage() {
                 <ProfileCard
                   key={request.profile.id || request.profile.login}
                   metaLabel={`Отправлено: ${formatDateTime(request.requestedAt)}`}
+                  statusLabel="Исходящая заявка"
                   onOpenProfile={() => {
                     openPersonProfile(request.profile);
                   }}
                   pendingLabel={pendingLabel}
                   profile={request.profile}
                   primaryAction={{
-                    label: "Отменить",
+                    label: outgoingActions.primary.label,
                     onClick: () => {
                       void people.cancelOutgoingFriendRequest(request.profile.login);
                     },
+                    tone: outgoingActions.primary.tone,
                   }}
                 />
               );
