@@ -188,13 +188,19 @@ export function ChatsPage() {
   ]);
 
   useEffect(() => {
-    setEditingEncryptedMessageId(null);
-    setSelectedReplyMessage(null);
-    setSelectedEncryptedReplyMessageId(null);
-    setSearchJumpNotice(null);
-    setHighlightedMessageId(null);
-    discardVoiceNoteRecording();
-    discardVideoNoteRecording();
+    const timeoutID = window.setTimeout(() => {
+      setEditingEncryptedMessageId(null);
+      setSelectedReplyMessage(null);
+      setSelectedEncryptedReplyMessageId(null);
+      setSearchJumpNotice(null);
+      setHighlightedMessageId(null);
+      discardVoiceNoteRecording();
+      discardVideoNoteRecording();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
   }, [chats.state.selectedChatId]);
 
   useEffect(() => {
@@ -368,6 +374,22 @@ export function ChatsPage() {
       return;
     }
 
+    let timeoutID: number | null = null;
+    const scheduleSearchJumpOutcome = (input: {
+      notice: string | null;
+      highlightedMessageId: string | null;
+      anchorId: string | null;
+    }) => {
+      timeoutID = window.setTimeout(() => {
+        setSearchJumpNotice(input.notice);
+        setHighlightedMessageId(input.highlightedMessageId);
+        if (input.anchorId !== null) {
+          jumpToMessage(input.anchorId);
+        }
+        setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+      }, 0);
+    };
+
     if (requestedChatId !== "" && chats.state.thread.chat.id !== requestedChatId) {
       return;
     }
@@ -378,48 +400,75 @@ export function ChatsPage() {
       }
 
       if (encryptedLane.status !== "ready") {
-        setSearchJumpNotice(
-          encryptedLane.errorMessage ??
+        scheduleSearchJumpOutcome({
+          notice:
+            encryptedLane.errorMessage ??
             "Encrypted search result нельзя открыть в этом browser profile: local crypto runtime или bounded lane недоступны.",
-        );
-        setHighlightedMessageId(null);
-        setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
-        return;
+          highlightedMessageId: null,
+          anchorId: null,
+        });
+        return () => {
+          if (timeoutID !== null) {
+            window.clearTimeout(timeoutID);
+          }
+        };
       }
 
       const encryptedTarget =
         encryptedMessageEntries.find((entry) => entry.messageId === searchJumpIntent.messageId) ??
         null;
       if (encryptedTarget === null) {
-        setSearchJumpNotice(
-          "Найденное encrypted сообщение пока не попало в текущее локально загруженное окно direct lane. Deep history backfill в этом slice не реализован.",
-        );
-        setHighlightedMessageId(null);
-        setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
-        return;
+        scheduleSearchJumpOutcome({
+          notice:
+            "Найденное encrypted сообщение пока не попало в текущее локально загруженное окно direct lane. Deep history backfill в этом slice не реализован.",
+          highlightedMessageId: null,
+          anchorId: null,
+        });
+        return () => {
+          if (timeoutID !== null) {
+            window.clearTimeout(timeoutID);
+          }
+        };
       }
 
-      setSearchJumpNotice(null);
-      setHighlightedMessageId(encryptedTarget.messageId);
-      jumpToMessage(`encrypted-direct-message-${encryptedTarget.messageId}`);
-      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
-      return;
+      scheduleSearchJumpOutcome({
+        notice: null,
+        highlightedMessageId: encryptedTarget.messageId,
+        anchorId: `encrypted-direct-message-${encryptedTarget.messageId}`,
+      });
+      return () => {
+        if (timeoutID !== null) {
+          window.clearTimeout(timeoutID);
+        }
+      };
     }
 
     const targetMessage = findJumpTarget(chats.state.thread.messages, searchJumpIntent.messageId);
     if (targetMessage === null) {
-      setSearchJumpNotice(
-        "Найденное сообщение пока не попало в текущую загруженную историю direct chat. Переход ограничен последним загруженным окном сообщений.",
-      );
-      setHighlightedMessageId(null);
-      setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
-      return;
+      scheduleSearchJumpOutcome({
+        notice:
+          "Найденное сообщение пока не попало в текущую загруженную историю direct chat. Переход ограничен последним загруженным окном сообщений.",
+        highlightedMessageId: null,
+        anchorId: null,
+      });
+      return () => {
+        if (timeoutID !== null) {
+          window.clearTimeout(timeoutID);
+        }
+      };
     }
 
-    setSearchJumpNotice(null);
-    setHighlightedMessageId(targetMessage.id);
-    jumpToMessage(`direct-message-${targetMessage.id}`);
-    setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
+    scheduleSearchJumpOutcome({
+      notice: null,
+      highlightedMessageId: targetMessage.id,
+      anchorId: `direct-message-${targetMessage.id}`,
+    });
+
+    return () => {
+      if (timeoutID !== null) {
+        window.clearTimeout(timeoutID);
+      }
+    };
   }, [
     chats.state.thread,
     chats.state.threadStatus,
@@ -615,7 +664,13 @@ export function ChatsPage() {
   }, [desktopShellHost, selectedPeerTitle, selectedThread]);
 
   useEffect(() => {
-    setMobileWindowContentMode("thread");
+    const timeoutID = window.setTimeout(() => {
+      setMobileWindowContentMode("thread");
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
   }, [requestedChatId, requestedPeerUserId]);
 
   if (authState.status !== "authenticated") {
@@ -785,36 +840,12 @@ export function ChatsPage() {
       return;
     }
 
-    setIsSendingVoiceNote(true);
-    setComposerError(null);
-    chats.clearFeedback();
-
-    const recordedFile = voiceNoteDraft.file;
     voiceNoteRecorder.discardRecording();
-
-    try {
-      const uploadedAttachment = await attachmentComposer.selectFile(recordedFile);
-      if (uploadedAttachment === null) {
-        return;
-      }
-
-      const success = await chats.sendMessage(
-        normalizeComposerMessageText(composerText),
-        [uploadedAttachment.id],
-        selectedReplyMessage?.id ?? null,
-      );
-
-      if (success) {
-        setComposerText("");
-        setSelectedReplyMessage(null);
-        attachmentComposer.markSendSucceeded();
-        return;
-      }
-
-      attachmentComposer.markSendFailed();
-    } finally {
-      setIsSendingVoiceNote(false);
-    }
+    setComposerError(
+      "Legacy direct voice note path в runtime больше не активен. Для direct chats в этом slice остаётся только encrypted DM v2 content path.",
+    );
+    chats.clearFeedback();
+    setIsSendingVoiceNote(false);
   }
 
   async function handleSendVideoNote() {
@@ -830,36 +861,12 @@ export function ChatsPage() {
       return;
     }
 
-    setIsSendingVideoNote(true);
-    setComposerError(null);
-    chats.clearFeedback();
-
-    const recordedFile = videoNoteDraft.file;
     videoNoteRecorder.discardRecording();
-
-    try {
-      const uploadedAttachment = await attachmentComposer.selectFile(recordedFile);
-      if (uploadedAttachment === null) {
-        return;
-      }
-
-      const success = await chats.sendMessage(
-        normalizeComposerMessageText(composerText),
-        [uploadedAttachment.id],
-        selectedReplyMessage?.id ?? null,
-      );
-
-      if (success) {
-        setComposerText("");
-        setSelectedReplyMessage(null);
-        attachmentComposer.markSendSucceeded();
-        return;
-      }
-
-      attachmentComposer.markSendFailed();
-    } finally {
-      setIsSendingVideoNote(false);
-    }
+    setComposerError(
+      "Legacy direct video note path в runtime больше не активен. Для direct chats в этом slice остаётся только encrypted DM v2 content path.",
+    );
+    chats.clearFeedback();
+    setIsSendingVideoNote(false);
   }
 
   async function handleComposerSubmit(event: FormEvent<HTMLFormElement>) {
@@ -903,9 +910,10 @@ export function ChatsPage() {
       return;
     }
 
-    setComposerError(null);
+    setComposerError(
+      "Legacy direct attachment composer больше не подключён к активному runtime path. Используйте encrypted attachment draft.",
+    );
     chats.clearFeedback();
-    await attachmentComposer.selectFile(file);
   }
 
   async function handleEncryptedAttachmentSelection(file: File | null) {
