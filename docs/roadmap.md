@@ -178,8 +178,10 @@ plaintext body preview, а server-side search по содержимому legacy
 честно de-scoped вместо зависимости от plaintext body/search_vector.
 Readable legacy group history/list/get transport теперь тоже честно de-scoped как активный
 group content path, а readable legacy group realtime plaintext payload тоже уже de-scoped как
-активный group thread content path. Для coexistence-модели pending остаются group compatibility RPC
-surfaces, legacy plaintext attachment path и отдельные RTC/call follow-up slices.
+активный group thread content path. Active web/runtime usage legacy plaintext group compatibility
+RPC surfaces теперь тоже de-scoped, поэтому для coexistence-модели pending остаются legacy
+plaintext attachment path, bounded internal compatibility reads и отдельные RTC/call follow-up
+slices.
 
 ---
 
