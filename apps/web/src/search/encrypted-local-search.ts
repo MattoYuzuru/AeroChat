@@ -198,6 +198,8 @@ export async function searchEncryptedLocalMessages(input: {
   token: string;
   cryptoRuntime: CryptoRuntimeContextValue;
 }): Promise<EncryptedLocalSearchResponse> {
+  // Encrypted lanes сознательно не используют backend SearchMessages:
+  // server-side parity остаётся legacy plaintext-only, а encrypted search живёт только локально.
   const activeCryptoDeviceId = resolveActiveRealtimeCryptoDeviceId(input.cryptoRuntime.state);
   if (activeCryptoDeviceId === null) {
     return {

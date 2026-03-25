@@ -647,6 +647,56 @@ func TestSendTextMessageSupportsReplyPreview(t *testing.T) {
 	}
 }
 
+func TestDirectReplyPreviewDegradesAfterTargetTombstone(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	target := mustSendMessage(t, service, bob.Token, directChat.ID, "reply target before tombstone")
+	reply, err := service.SendTextMessage(context.Background(), alice.Token, directChat.ID, "reply", nil, target.ID)
+	if err != nil {
+		t.Fatalf("send reply message: %v", err)
+	}
+
+	if _, err := service.DeleteMessageForEveryone(context.Background(), bob.Token, directChat.ID, target.ID); err != nil {
+		t.Fatalf("delete reply target: %v", err)
+	}
+
+	messages, err := service.ListDirectChatMessages(context.Background(), alice.Token, directChat.ID, 0)
+	if err != nil {
+		t.Fatalf("list direct chat messages: %v", err)
+	}
+
+	var listedReply *DirectChatMessage
+	for i := range messages {
+		if messages[i].ID == reply.ID {
+			listedReply = &messages[i]
+			break
+		}
+	}
+	if listedReply == nil || listedReply.ReplyPreview == nil {
+		t.Fatalf("ожидался reply preview у reply message, получено %+v", listedReply)
+	}
+	if !listedReply.ReplyPreview.IsDeleted {
+		t.Fatalf("ожидалось deleted-state preview после tombstone target, получено %+v", listedReply.ReplyPreview)
+	}
+	if listedReply.ReplyPreview.HasText || listedReply.ReplyPreview.TextPreview != "" || listedReply.ReplyPreview.AttachmentCount != 0 {
+		t.Fatalf("deleted-state reply preview не должен возвращать plaintext body, получено %+v", listedReply.ReplyPreview)
+	}
+
+	fetchedReply, err := repo.GetDirectChatMessage(context.Background(), alice.User.ID, directChat.ID, reply.ID)
+	if err != nil {
+		t.Fatalf("get direct reply from repository: %v", err)
+	}
+	if fetchedReply.ReplyPreview == nil || !fetchedReply.ReplyPreview.IsDeleted {
+		t.Fatalf("ожидался deleted-state preview в direct get flow, получено %+v", fetchedReply.ReplyPreview)
+	}
+}
+
 func TestSendTextMessageRejectsReplyToDeletedTarget(t *testing.T) {
 	t.Parallel()
 
@@ -996,6 +1046,98 @@ func TestGetEncryptedDirectMessageV2ReturnsViewerScopedEnvelope(t *testing.T) {
 	}
 }
 
+func TestDirectCoexistenceKeepsPlaintextHistorySearchAndEncryptedFetchSeparate(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
+	legacy := mustSendMessage(t, service, alice.Token, directChat.ID, "legacy plaintext searchable")
+	if _, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
+		ChatID:               directChat.ID,
+		MessageID:            testUUID(706),
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedDirectMessageV2OperationContent,
+		Revision:             1,
+		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: aliceSender.ID,
+				TransportHeader:         []byte("alice-self-header"),
+				Ciphertext:              []byte("encrypted direct local only"),
+			},
+			{
+				RecipientCryptoDeviceID: bobFirst.ID,
+				TransportHeader:         []byte("bob-header"),
+				Ciphertext:              []byte("encrypted direct local only"),
+			},
+		},
+	}); err != nil {
+		t.Fatalf("send encrypted direct message v2: %v", err)
+	}
+
+	legacyHistory, err := service.ListDirectChatMessages(context.Background(), bob.Token, directChat.ID, 0)
+	if err != nil {
+		t.Fatalf("list direct chat messages: %v", err)
+	}
+	if len(legacyHistory) != 1 || legacyHistory[0].ID != legacy.ID {
+		t.Fatalf("legacy direct history не должна смешиваться с encrypted lane, получено %+v", legacyHistory)
+	}
+
+	encryptedHistory, err := service.ListEncryptedDirectMessageV2(context.Background(), bob.Token, directChat.ID, bobFirst.ID, 0)
+	if err != nil {
+		t.Fatalf("list encrypted direct messages: %v", err)
+	}
+	if len(encryptedHistory) != 1 {
+		t.Fatalf("ожидался один encrypted direct envelope, получено %+v", encryptedHistory)
+	}
+	if encryptedHistory[0].MessageID == legacy.ID {
+		t.Fatalf("encrypted fetch не должен возвращать legacy plaintext message id, получено %+v", encryptedHistory[0])
+	}
+	if string(encryptedHistory[0].ViewerDelivery.Ciphertext) != "encrypted direct local only" {
+		t.Fatalf("ожидался opaque ciphertext без server-side preview fallback, получено %q", string(encryptedHistory[0].ViewerDelivery.Ciphertext))
+	}
+
+	legacyResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "legacy plaintext searchable",
+		DirectChat: &SearchDirectMessagesScope{
+			ChatID: &directChat.ID,
+		},
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("search legacy direct messages: %v", err)
+	}
+	if hasMore || nextCursor != nil {
+		t.Fatalf("не ожидалась пагинация для одного legacy hit, hasMore=%v nextCursor=%+v", hasMore, nextCursor)
+	}
+	if len(legacyResults) != 1 || legacyResults[0].MessageID != legacy.ID {
+		t.Fatalf("server-side direct search должна возвращать только legacy plaintext hit, получено %+v", legacyResults)
+	}
+
+	encryptedResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "encrypted direct local only",
+		DirectChat: &SearchDirectMessagesScope{
+			ChatID: &directChat.ID,
+		},
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("search encrypted direct ciphertext marker: %v", err)
+	}
+	if hasMore || nextCursor != nil {
+		t.Fatalf("не ожидалась пагинация для пустого encrypted-only search result, hasMore=%v nextCursor=%+v", hasMore, nextCursor)
+	}
+	if len(encryptedResults) != 0 {
+		t.Fatalf("server-side direct search не должна притворяться encrypted parity, получено %+v", encryptedResults)
+	}
+}
+
 func TestGetEncryptedGroupBootstrapRequiresReadyReadableRoster(t *testing.T) {
 	t.Parallel()
 
@@ -1184,6 +1326,100 @@ func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *tes
 	}
 	if secondDeviceView.ViewerDelivery.RecipientCryptoDeviceID != bobSecond.ID {
 		t.Fatalf("ожидался bob second delivery %q, получено %q", bobSecond.ID, secondDeviceView.ViewerDelivery.RecipientCryptoDeviceID)
+	}
+}
+
+func TestGroupCoexistenceKeepsPlaintextHistorySearchAndEncryptedFetchSeparate(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	bob := repo.mustIssueAuth(testUUID(2), "bob", "Bob")
+
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	bobFirst := repo.mustAddActiveCryptoDevice(bob.User.ID)
+
+	group := mustCreateGroup(t, service, alice.Token, "Plaintext group coexistence")
+	memberInvite, err := service.CreateGroupInviteLink(context.Background(), alice.Token, group.ID, GroupMemberRoleMember)
+	if err != nil {
+		t.Fatalf("create member invite: %v", err)
+	}
+	if _, err := service.JoinGroupByInviteLink(context.Background(), bob.Token, memberInvite.InviteToken); err != nil {
+		t.Fatalf("join member invite: %v", err)
+	}
+
+	legacy := mustSendGroupMessage(t, service, alice.Token, group.ID, "legacy group searchable")
+	bootstrap, err := service.GetEncryptedGroupBootstrap(context.Background(), alice.Token, group.ID, aliceSender.ID)
+	if err != nil {
+		t.Fatalf("bootstrap encrypted group: %v", err)
+	}
+	if _, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
+		GroupID:              group.ID,
+		MessageID:            testUUID(707),
+		MLSGroupID:           bootstrap.Lane.MLSGroupID,
+		RosterVersion:        bootstrap.Lane.RosterVersion,
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedGroupMessageOperationContent,
+		Revision:             1,
+		Ciphertext:           []byte("encrypted group local only"),
+	}); err != nil {
+		t.Fatalf("send encrypted group message: %v", err)
+	}
+
+	legacyHistory, err := service.ListGroupMessages(context.Background(), bob.Token, group.ID, 0)
+	if err != nil {
+		t.Fatalf("list group messages: %v", err)
+	}
+	if len(legacyHistory) != 1 || legacyHistory[0].ID != legacy.ID {
+		t.Fatalf("legacy group history не должна смешиваться с encrypted lane, получено %+v", legacyHistory)
+	}
+
+	encryptedHistory, err := service.ListEncryptedGroupMessages(context.Background(), bob.Token, group.ID, bobFirst.ID, 0)
+	if err != nil {
+		t.Fatalf("list encrypted group messages: %v", err)
+	}
+	if len(encryptedHistory) != 1 {
+		t.Fatalf("ожидался один encrypted group envelope, получено %+v", encryptedHistory)
+	}
+	if encryptedHistory[0].MessageID == legacy.ID {
+		t.Fatalf("encrypted group fetch не должен возвращать legacy message id, получено %+v", encryptedHistory[0])
+	}
+	if string(encryptedHistory[0].Ciphertext) != "encrypted group local only" {
+		t.Fatalf("ожидался opaque group ciphertext без server-side preview fallback, получено %q", string(encryptedHistory[0].Ciphertext))
+	}
+
+	legacyResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "legacy group searchable",
+		Group: &SearchGroupMessagesScope{
+			GroupID: &group.ID,
+		},
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("search legacy group messages: %v", err)
+	}
+	if hasMore || nextCursor != nil {
+		t.Fatalf("не ожидалась пагинация для одного legacy group hit, hasMore=%v nextCursor=%+v", hasMore, nextCursor)
+	}
+	if len(legacyResults) != 1 || legacyResults[0].MessageID != legacy.ID {
+		t.Fatalf("server-side group search должна возвращать только legacy plaintext hit, получено %+v", legacyResults)
+	}
+
+	encryptedResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
+		Query: "encrypted group local only",
+		Group: &SearchGroupMessagesScope{
+			GroupID: &group.ID,
+		},
+		PageSize: 10,
+	})
+	if err != nil {
+		t.Fatalf("search encrypted group ciphertext marker: %v", err)
+	}
+	if hasMore || nextCursor != nil {
+		t.Fatalf("не ожидалась пагинация для пустого encrypted-only group search result, hasMore=%v nextCursor=%+v", hasMore, nextCursor)
+	}
+	if len(encryptedResults) != 0 {
+		t.Fatalf("server-side group search не должна притворяться encrypted parity, получено %+v", encryptedResults)
 	}
 }
 
@@ -3103,7 +3339,11 @@ func (r *fakeRepository) ListGroupMessages(_ context.Context, userID string, gro
 	result := make([]GroupMessage, 0)
 	for _, message := range r.groupMessages {
 		if message.GroupID == groupID {
-			result = append(result, message)
+			copyMessage := message
+			if copyMessage.ReplyToMessageID != nil {
+				copyMessage.ReplyPreview = r.buildGroupReplyPreviewForTest(*copyMessage.ReplyToMessageID)
+			}
+			result = append(result, copyMessage)
 		}
 	}
 
@@ -3383,9 +3623,19 @@ func (r *fakeRepository) ListDirectChatMessages(_ context.Context, userID string
 	result := make([]DirectChatMessage, 0)
 	for _, message := range r.messages {
 		if message.ChatID == chatID {
-			result = append(result, message)
+			copyMessage := message
+			if copyMessage.ReplyToMessageID != nil {
+				copyMessage.ReplyPreview = r.buildDirectReplyPreviewForTest(*copyMessage.ReplyToMessageID)
+			}
+			result = append(result, copyMessage)
 		}
 	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].CreatedAt.Equal(result[j].CreatedAt) {
+			return result[i].ID > result[j].ID
+		}
+		return result[i].CreatedAt.After(result[j].CreatedAt)
+	})
 	if len(result) > int(limit) {
 		result = result[:limit]
 	}
@@ -3605,6 +3855,9 @@ func (r *fakeRepository) GetDirectChatMessage(_ context.Context, userID string, 
 	}
 
 	copy := message
+	if copy.ReplyToMessageID != nil {
+		copy.ReplyPreview = r.buildDirectReplyPreviewForTest(*copy.ReplyToMessageID)
+	}
 	return &copy, nil
 }
 
@@ -3619,6 +3872,9 @@ func (r *fakeRepository) GetGroupMessage(_ context.Context, userID string, group
 	}
 
 	copy := message
+	if copy.ReplyToMessageID != nil {
+		copy.ReplyPreview = r.buildGroupReplyPreviewForTest(*copy.ReplyToMessageID)
+	}
 	return &copy, nil
 }
 
@@ -3970,6 +4226,63 @@ func groupReadPositionKey(groupID string, userID string) string {
 
 func searchAuthorForTest(user UserSummary) UserSummary {
 	return UserSummary{
+		ID:        user.ID,
+		Login:     user.Login,
+		Nickname:  user.Nickname,
+		AvatarURL: user.AvatarURL,
+	}
+}
+
+func (r *fakeRepository) buildDirectReplyPreviewForTest(messageID string) *ReplyPreview {
+	target, ok := r.messages[messageID]
+	if !ok {
+		return &ReplyPreview{
+			MessageID:     messageID,
+			IsUnavailable: true,
+		}
+	}
+
+	preview := &ReplyPreview{
+		MessageID: messageID,
+		Author:    copyUserSummaryForReplyPreviewForTest(r.users[target.SenderUserID]),
+	}
+	if target.Tombstone != nil {
+		preview.IsDeleted = true
+		return preview
+	}
+	if target.Text != nil {
+		preview.HasText = true
+		preview.TextPreview = buildReplyTextPreview(target.Text.Text)
+	}
+	preview.AttachmentCount = int32(len(target.Attachments))
+
+	return preview
+}
+
+func (r *fakeRepository) buildGroupReplyPreviewForTest(messageID string) *ReplyPreview {
+	target, ok := r.groupMessages[messageID]
+	if !ok {
+		return &ReplyPreview{
+			MessageID:     messageID,
+			IsUnavailable: true,
+		}
+	}
+
+	preview := &ReplyPreview{
+		MessageID:       messageID,
+		Author:          copyUserSummaryForReplyPreviewForTest(r.users[target.SenderUserID]),
+		AttachmentCount: int32(len(target.Attachments)),
+	}
+	if target.Text != nil {
+		preview.HasText = true
+		preview.TextPreview = buildReplyTextPreview(target.Text.Text)
+	}
+
+	return preview
+}
+
+func copyUserSummaryForReplyPreviewForTest(user UserSummary) *UserSummary {
+	return &UserSummary{
 		ID:        user.ID,
 		Login:     user.Login,
 		Nickname:  user.Nickname,

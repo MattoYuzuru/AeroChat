@@ -921,6 +921,8 @@ func (r *Repository) ListGroupMessages(ctx context.Context, userID string, group
 }
 
 func (r *Repository) SearchGroupMessages(ctx context.Context, userID string, params chat.SearchGroupMessagesParams) ([]chat.MessageSearchResult, error) {
+	// Legacy server-side group search остаётся plaintext-only:
+	// backend ищет только по group_messages.text_content/search_vector.
 	rows, err := r.queries.SearchGroupMessages(ctx, chatsqlc.SearchGroupMessagesParams{
 		UserID:          mustParseUUID(userID),
 		GroupID:         nullableUUID(params.GroupID),
@@ -1804,6 +1806,8 @@ func (r *Repository) GetEncryptedGroupStoredMessage(ctx context.Context, groupID
 }
 
 func (r *Repository) SearchDirectMessages(ctx context.Context, userID string, params chat.SearchDirectMessagesParams) ([]chat.MessageSearchResult, error) {
+	// Legacy server-side direct search остаётся plaintext-only:
+	// encrypted DM v2 не индексируется в backend и ищется только локально в web runtime.
 	rows, err := r.queries.SearchDirectMessages(ctx, chatsqlc.SearchDirectMessagesParams{
 		UserID:          mustParseUUID(userID),
 		ChatID:          nullableUUID(params.ChatID),
@@ -2575,6 +2579,8 @@ func messageTextContentFromStorage(text string, markdownPolicy string) *chat.Tex
 }
 
 func (r *Repository) listDirectReplyPreviewsByMessageIDs(ctx context.Context, userID string, chatID string, messageIDs []uuid.UUID) (map[string]*chat.ReplyPreview, error) {
+	// Legacy direct reply preview собирается из server-readable target message.
+	// Если target больше нельзя материализовать из legacy history, preview честно деградирует.
 	result := make(map[string]*chat.ReplyPreview, len(messageIDs))
 	if len(messageIDs) == 0 {
 		return result, nil
@@ -2623,6 +2629,8 @@ func (r *Repository) listDirectReplyPreviewsByMessageIDs(ctx context.Context, us
 }
 
 func (r *Repository) listGroupReplyPreviewsByMessageIDs(ctx context.Context, userID string, groupID string, messageIDs []uuid.UUID) (map[string]*chat.ReplyPreview, error) {
+	// Legacy group reply preview тоже зависит от server-readable target message
+	// и не пытается угадывать fallback вне legacy history.
 	result := make(map[string]*chat.ReplyPreview, len(messageIDs))
 	if len(messageIDs) == 0 {
 		return result, nil

@@ -152,6 +152,19 @@ describe("buildSearchResultHref", () => {
       ),
     ).toBe("/app/chats?message=message-1&from=search&lane=encrypted&chat=chat-1");
   });
+
+  it("keeps encrypted lane marker for group results to avoid plaintext jump fallback", () => {
+    expect(
+      buildSearchResultHref(
+        createResult({
+          scope: "group",
+          lane: "encrypted",
+          directChatId: null,
+          groupId: "group-1",
+        }),
+      ),
+    ).toBe("/app/groups?message=message-1&from=search&lane=encrypted&group=group-1");
+  });
 });
 
 describe("search result labels", () => {
