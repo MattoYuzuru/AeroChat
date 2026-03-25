@@ -228,11 +228,18 @@ func TestSendAttachmentOnlyMessageInDirectChat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list messages: %v", err)
 	}
-	if len(messages) != 1 {
-		t.Fatalf("ожидалось одно сообщение в direct thread, получено %d", len(messages))
+	if len(messages) != 0 {
+		t.Fatalf("legacy direct history должна быть de-scoped для attachment-only direct message, получено %+v", messages)
 	}
-	if messages[0].Text != nil {
-		t.Fatalf("attachment-only message из истории не должен содержать text payload, получено %+v", messages[0].Text)
+	fetchedMessage, err := repo.GetDirectChatMessage(context.Background(), bob.User.ID, directChat.ID, message.ID)
+	if err != nil {
+		t.Fatalf("get attachment-only direct message from repository: %v", err)
+	}
+	if fetchedMessage.Text != nil {
+		t.Fatalf("attachment-only direct message не должен содержать text payload, получено %+v", fetchedMessage.Text)
+	}
+	if len(fetchedMessage.Attachments) != 1 {
+		t.Fatalf("ожидалось одно вложение во internal direct message fetch, получено %d", len(fetchedMessage.Attachments))
 	}
 }
 
@@ -815,11 +822,15 @@ func TestDeleteDirectMessageTransitionsAttachmentToDetached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list messages after delete: %v", err)
 	}
-	if len(messages) != 1 {
-		t.Fatalf("ожидалось одно сообщение после удаления, получено %d", len(messages))
+	if len(messages) != 0 {
+		t.Fatalf("legacy direct history должна оставаться de-scoped после direct delete, получено %+v", messages)
 	}
-	if len(messages[0].Attachments) != 0 {
-		t.Fatalf("tombstoned message из истории не должен возвращать active attachments, получено %d", len(messages[0].Attachments))
+	fetchedMessage, err := repo.GetDirectChatMessage(context.Background(), bob.User.ID, directChat.ID, message.ID)
+	if err != nil {
+		t.Fatalf("get deleted direct message from repository: %v", err)
+	}
+	if len(fetchedMessage.Attachments) != 0 {
+		t.Fatalf("tombstoned message не должен возвращать active attachments во internal fetch, получено %d", len(fetchedMessage.Attachments))
 	}
 }
 

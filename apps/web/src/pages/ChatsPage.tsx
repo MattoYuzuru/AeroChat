@@ -8,14 +8,10 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { MessageAttachmentList } from "../attachments/MessageAttachmentList";
 import {
-  canSubmitMessageComposer,
-  hasRenderableMessageText,
   normalizeComposerMessageText,
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
-import { downloadAttachment, openAttachmentInNewTab } from "../attachments/open";
 import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
 import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
 import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
@@ -73,10 +69,7 @@ export function ChatsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [composerText, setComposerText] = useState("");
   const [composerError, setComposerError] = useState<string | null>(null);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editingMessageText, setEditingMessageText] = useState("");
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
-  const [pendingOpenAttachmentId, setPendingOpenAttachmentId] = useState<string | null>(null);
   const [isSendingVoiceNote, setIsSendingVoiceNote] = useState(false);
   const [isSendingVideoNote, setIsSendingVideoNote] = useState(false);
   const [selectedReplyMessage, setSelectedReplyMessage] = useState<DirectChatMessage | null>(null);
@@ -195,8 +188,6 @@ export function ChatsPage() {
   ]);
 
   useEffect(() => {
-    setEditingMessageId(null);
-    setEditingMessageText("");
     setEditingEncryptedMessageId(null);
     setSelectedReplyMessage(null);
     setSelectedEncryptedReplyMessageId(null);
@@ -527,10 +518,6 @@ export function ChatsPage() {
     selectedPeer?.nickname?.trim() ||
     selectedPeer?.login?.trim() ||
     "Личный чат";
-  const latestOwnMessageId =
-    selectedThread !== null
-      ? getLatestOwnMessageId(selectedThread.messages, currentUserId)
-      : null;
   const pinnedMessages =
     selectedThread === null
       ? []
@@ -578,11 +565,6 @@ export function ChatsPage() {
     videoNoteStatus === "processing" ||
     videoNoteStatus === "recorded";
   const isSendingRecordedNote = isSendingVoiceNote || isSendingVideoNote;
-  const canSubmitComposer = canSubmitMessageComposer({
-    text: composerText,
-    uploadedAttachmentId,
-    isUploading: attachmentComposer.isUploading,
-  });
   const canPickAttachment =
     !chats.state.isSendingMessage &&
     !isSendingRecordedNote &&
@@ -599,22 +581,6 @@ export function ChatsPage() {
     uploadedAttachmentId === null &&
     !hasPendingVoiceNote &&
     !hasPendingVideoNote;
-  const canRecordVoiceNote =
-    !chats.state.isSendingMessage &&
-    !isSendingRecordedNote &&
-    !attachmentComposer.isUploading &&
-    !encryptedMediaAttachmentDraft.isUploading &&
-    attachmentDraft === null &&
-    encryptedAttachmentDraft === null &&
-    !hasPendingVideoNote;
-  const canRecordVideoNote =
-    !chats.state.isSendingMessage &&
-    !isSendingRecordedNote &&
-    !attachmentComposer.isUploading &&
-    !encryptedMediaAttachmentDraft.isUploading &&
-    attachmentDraft === null &&
-    encryptedAttachmentDraft === null &&
-    !hasPendingVoiceNote;
   const canSendEncryptedDirectMessageV2 =
     selectedThread !== null &&
     !chats.state.isSendingMessage &&
@@ -638,6 +604,7 @@ export function ChatsPage() {
     isEditingEncryptedMessage: editingEncryptedEntry !== null,
     cryptoRuntimeState: cryptoRuntime.state,
   });
+  const legacyDirectHistoryDescoped = true;
 
   useEffect(() => {
     if (desktopShellHost === null || selectedThread === null) {
@@ -653,53 +620,6 @@ export function ChatsPage() {
 
   if (authState.status !== "authenticated") {
     return null;
-  }
-
-  async function submitComposer() {
-    if (selectedEncryptedReplyEntry !== null || editingEncryptedEntry !== null) {
-      setComposerError(
-        "Текущий composer находится в encrypted режиме. Для plaintext send сначала снимите encrypted reply/edit.",
-      );
-      chats.clearFeedback();
-      return;
-    }
-
-    if (encryptedAttachmentDraft !== null || uploadedEncryptedAttachmentDraft !== null) {
-      setComposerError(
-        "Текущий encrypted media draft отправляется только через кнопку Encrypted DM v2.",
-      );
-      chats.clearFeedback();
-      return;
-    }
-
-    if (!canSubmitComposer) {
-      setComposerError(
-        attachmentComposer.isUploading
-          ? "Дождитесь завершения загрузки файла, прежде чем отправлять сообщение."
-          : "Добавьте текст сообщения или готовое вложение.",
-      );
-      chats.clearFeedback();
-      return;
-    }
-
-    setComposerError(null);
-    const success = await chats.sendMessage(
-      normalizeComposerMessageText(composerText),
-      uploadedAttachmentId === null ? [] : [uploadedAttachmentId],
-      selectedReplyMessage?.id ?? null,
-    );
-    if (success) {
-      setComposerText("");
-      setSelectedReplyMessage(null);
-      if (uploadedAttachmentId !== null) {
-        attachmentComposer.markSendSucceeded();
-      }
-      return;
-    }
-
-    if (uploadedAttachmentId !== null) {
-      attachmentComposer.markSendFailed();
-    }
   }
 
   async function handleEncryptedDirectMessageV2Send() {
@@ -944,7 +864,7 @@ export function ChatsPage() {
 
   async function handleComposerSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await submitComposer();
+    await handleEncryptedDirectMessageV2Send();
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -953,7 +873,7 @@ export function ChatsPage() {
     }
 
     event.preventDefault();
-    void submitComposer();
+    void handleEncryptedDirectMessageV2Send();
   }
 
   function handleBackToChatsList() {
@@ -998,58 +918,6 @@ export function ChatsPage() {
     await encryptedMediaAttachmentDraft.selectFile(file);
   }
 
-  async function handleSaveMessageEdit(messageId: string) {
-    const normalizedText = normalizeComposerMessageText(editingMessageText);
-    if (normalizedText === "") {
-      setComposerError("Отредактированное сообщение не может быть полностью пустым.");
-      chats.clearFeedback();
-      return;
-    }
-
-    setComposerError(null);
-    const success = await chats.editMessage(messageId, normalizedText);
-    if (!success) {
-      return;
-    }
-
-    setEditingMessageId(null);
-    setEditingMessageText("");
-  }
-
-  async function handleOpenAttachment(attachmentId: string) {
-    setPendingOpenAttachmentId(attachmentId);
-    setComposerError(null);
-
-    try {
-      await openAttachmentInNewTab(sessionToken, attachmentId);
-    } catch (error) {
-      setComposerError(
-        error instanceof Error && error.message.trim() !== ""
-          ? error.message
-          : "Не удалось открыть вложение.",
-      );
-    } finally {
-      setPendingOpenAttachmentId(null);
-    }
-  }
-
-  async function handleDownloadAttachment(attachmentId: string, fileName: string) {
-    setPendingOpenAttachmentId(attachmentId);
-    setComposerError(null);
-
-    try {
-      await downloadAttachment(sessionToken, attachmentId, fileName);
-    } catch (error) {
-      setComposerError(
-        error instanceof Error && error.message.trim() !== ""
-          ? error.message
-          : "Не удалось скачать вложение.",
-      );
-    } finally {
-      setPendingOpenAttachmentId(null);
-    }
-  }
-
   return (
     <div
       className={`${styles.layout} ${isDesktopTargetWindow ? styles.desktopWindowLayout : ""}`}
@@ -1061,10 +929,10 @@ export function ChatsPage() {
             <p className={styles.cardLabel}>Chats</p>
             <h1 className={styles.title}>Личные чаты AeroChat</h1>
             <p className={styles.subtitle}>
-              Лёгкий direct chat shell остаётся gateway-only, уже поднимает bounded realtime
-              transport foundation и single-file attachment flow с text-only, text + file и
-              attachment-only сообщениями, включая lazy inline preview для image/audio/video
-              attachments.
+              Direct chat shell остаётся gateway-only, но readable legacy plaintext history для
+              1:1 чатов в этом slice честно de-scoped. Активный content path для direct chats
+              теперь показывается через encrypted DM v2 local projection без скрытого fallback на
+              legacy timeline bootstrap.
             </p>
           </div>
 
@@ -1086,7 +954,7 @@ export function ChatsPage() {
 
         <div className={styles.metrics}>
           <Metric label="Чаты" value={chats.state.chats.length} />
-          <Metric label="В thread" value={selectedThread?.messages.length ?? 0} />
+          <Metric label="Legacy history" value={selectedThread?.messages.length ?? 0} />
           <Metric label="Encrypted unread" value={selectedThread?.chat.encryptedUnreadCount ?? 0} />
           <Metric label="Закреплено" value={pinnedMessages.length} />
         </div>
@@ -1728,38 +1596,6 @@ export function ChatsPage() {
                   />
                 </section>
 
-                {pinnedMessages.length > 0 && (
-                  <section className={styles.pinnedStrip}>
-                    <div className={styles.blockHeader}>
-                      <div>
-                        <p className={styles.cardLabel}>Pinned</p>
-                        <h3 className={styles.blockTitle}>Закреплённые сообщения</h3>
-                      </div>
-                      <span className={styles.metaTag}>{pinnedMessages.length}</span>
-                    </div>
-
-                    <div className={styles.pinnedList}>
-                      {pinnedMessages.map((message) => {
-                        const isOwn = message.senderUserId === authState.profile.id;
-
-                        return (
-                          <article key={message.id} className={styles.pinnedCard}>
-                            <div className={styles.pinnedHeader}>
-                              <strong>{isOwn ? "Вы" : selectedPeer?.nickname ?? "Собеседник"}</strong>
-                              <span className={styles.pinnedMeta}>
-                                {formatDateTime(message.createdAt)}
-                              </span>
-                            </div>
-                            <p className={styles.pinnedText}>
-                              {describeMessagePreview(message)}
-                            </p>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  </section>
-                )}
-
                 {selectedThread.chat.encryptedPinnedMessageIds.length > 0 && (
                   <section className={styles.pinnedStrip}>
                     <div className={styles.blockHeader}>
@@ -1937,278 +1773,30 @@ export function ChatsPage() {
                 <section className={styles.messagesPanel}>
                   <div className={styles.blockHeader}>
                     <div>
-                      <p className={styles.cardLabel}>Timeline</p>
-                      <h3 className={styles.blockTitle}>Сообщения</h3>
+                      <p className={styles.cardLabel}>Legacy direct history</p>
+                      <h3 className={styles.blockTitle}>Plaintext timeline de-scoped</h3>
                     </div>
                     <span className={styles.metaTag}>
-                      {selectedThread.messages.length === 0
-                        ? "Пусто"
-                        : `${selectedThread.messages.length} шт.`}
+                      {legacyDirectHistoryDescoped ? "De-scoped" : `${selectedThread.messages.length} шт.`}
                     </span>
                   </div>
 
                   <div className={styles.messagesList}>
-                    {selectedThread.messages.length === 0 ? (
-                      <StateCard
-                        title="Сообщений пока нет"
-                        message="Отправьте первое сообщение: текст, текст с файлом или attachment-only. Для image/audio/video attachments inline preview уже доступен, а media processing pipeline остаётся отдельным slice."
-                      />
-                    ) : (
-                      selectedThread.messages.map((message) => {
-                        const isOwn = message.senderUserId === authState.profile.id;
-                        const canEdit = isDirectMessageEditable(message, authState.profile.id);
-                        const isEditing = editingMessageId === message.id;
-                        const hasMessageText = hasRenderableMessageText(message.text);
-                        const hasAttachments = message.attachments.length > 0;
-                        const pendingLabel = chats.state.pendingMessageActions[message.id] ?? null;
-                        const readLabel =
-                          message.id === latestOwnMessageId
-                            ? describeOwnMessageReadLabel(message, selectedThread.readState)
-                            : null;
-
-                        return (
-                          <article
-                            key={message.id}
-                            className={styles.messageRow}
-                            id={`direct-message-${message.id}`}
-                            data-own={isOwn}
-                            data-search-target={highlightedMessageId === message.id}
-                          >
-                            <div className={styles.messageBubble} data-own={isOwn}>
-                              <div className={styles.messageHeader}>
-                                <div>
-                                  <p className={styles.messageAuthor}>
-                                    {isOwn ? "Вы" : selectedPeer?.nickname ?? "Собеседник"}
-                                  </p>
-                                  <p className={styles.messageMeta}>
-                                    {formatDateTime(message.createdAt)}
-                                  </p>
-                                </div>
-
-                                <div className={styles.messageBadges}>
-                                  {message.pinned && (
-                                    <span className={styles.statusBadge} data-tone="accent">
-                                      Закреплено
-                                    </span>
-                                  )}
-                                  {message.editedAt && (
-                                    <span className={styles.statusBadge}>Изменено</span>
-                                  )}
-                                  {readLabel && (
-                                    <span className={styles.statusBadge}>{readLabel}</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className={styles.messageBody}>
-                                {message.tombstone ? (
-                                  <p className={styles.tombstoneText}>Сообщение удалено для всех.</p>
-                                ) : isEditing ? (
-                                  <>
-                                    <label className={`${styles.field} ${styles.editField}`}>
-                                      <span>Текст сообщения</span>
-                                      <textarea
-                                        disabled={pendingLabel !== null}
-                                        maxLength={4000}
-                                        onChange={(event) => {
-                                          setEditingMessageText(event.target.value);
-                                          setComposerError(null);
-                                          chats.clearFeedback();
-                                        }}
-                                        rows={4}
-                                        value={editingMessageText}
-                                      />
-                                    </label>
-
-                                    {hasAttachments && (
-                                      <p className={styles.editHint}>
-                                        Вложения остаются без изменений, редактируется только текст.
-                                      </p>
-                                    )}
-
-                                    {hasAttachments && (
-                                      <MessageAttachmentList
-                                        accessToken={sessionToken}
-                                        attachments={message.attachments}
-                                        onDownloadAttachment={(attachment) => {
-                                          void handleDownloadAttachment(
-                                            attachment.id,
-                                            attachment.fileName,
-                                          );
-                                        }}
-                                        onOpenAttachment={(attachmentId) => {
-                                          void handleOpenAttachment(attachmentId);
-                                        }}
-                                        pendingAttachmentId={pendingOpenAttachmentId}
-                                        tone={isOwn ? "own" : "other"}
-                                      />
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    {message.replyPreview && (
-                                      <button
-                                        className={styles.replyPreviewCard}
-                                        onClick={() => {
-                                          jumpToMessage(`direct-message-${message.replyPreview?.messageId ?? ""}`);
-                                        }}
-                                        type="button"
-                                      >
-                                        <span className={styles.replyPreviewAuthor}>
-                                          {describeReplyPreviewAuthor(
-                                            message.replyPreview,
-                                            authState.profile.id,
-                                            selectedPeer?.nickname ?? "Собеседник",
-                                          )}
-                                        </span>
-                                        <span className={styles.replyPreviewText}>
-                                          {describeReplyPreviewText(message.replyPreview)}
-                                        </span>
-                                      </button>
-                                    )}
-                                    {hasMessageText && (
-                                      <div className={styles.messageText}>
-                                        <SafeMessageMarkdown text={message.text?.text ?? ""} />
-                                      </div>
-                                    )}
-
-                                    {hasAttachments && (
-                                      <MessageAttachmentList
-                                        accessToken={sessionToken}
-                                        attachments={message.attachments}
-                                        onDownloadAttachment={(attachment) => {
-                                          void handleDownloadAttachment(
-                                            attachment.id,
-                                            attachment.fileName,
-                                          );
-                                        }}
-                                        onOpenAttachment={(attachmentId) => {
-                                          void handleOpenAttachment(attachmentId);
-                                        }}
-                                        pendingAttachmentId={pendingOpenAttachmentId}
-                                        tone={isOwn ? "own" : "other"}
-                                      />
-                                    )}
-                                  </>
-                                )}
-                              </div>
-
-                              {!message.tombstone && (
-                                <div className={styles.actions}>
-                                  {isEditing ? (
-                                    <>
-                                      <button
-                                        className={styles.primaryButton}
-                                        disabled={pendingLabel !== null}
-                                        onClick={() => {
-                                          void handleSaveMessageEdit(message.id);
-                                        }}
-                                        type="button"
-                                      >
-                                        Сохранить
-                                      </button>
-                                      <button
-                                        className={styles.ghostButton}
-                                        disabled={pendingLabel !== null}
-                                        onClick={() => {
-                                          setEditingMessageId(null);
-                                          setEditingMessageText("");
-                                          setComposerError(null);
-                                          chats.clearFeedback();
-                                        }}
-                                        type="button"
-                                      >
-                                        Отмена
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <button
-                                        className={styles.ghostButton}
-                                        disabled={pendingLabel !== null}
-                                        onClick={() => {
-                                          void (message.pinned
-                                            ? chats.unpinMessage(message.id)
-                                            : chats.pinMessage(message.id));
-                                        }}
-                                        type="button"
-                                      >
-                                        {message.pinned ? "Снять pin" : "Закрепить"}
-                                      </button>
-
-                                      <button
-                                        className={styles.ghostButton}
-                                        disabled={pendingLabel !== null}
-                                        onClick={() => {
-                                          setSelectedEncryptedReplyMessageId(null);
-                                          setEditingEncryptedMessageId(null);
-                                          setSelectedReplyMessage(message);
-                                          setComposerError(null);
-                                          chats.clearFeedback();
-                                        }}
-                                        type="button"
-                                      >
-                                        Ответить
-                                      </button>
-
-                                      {canEdit && (
-                                        <button
-                                          className={styles.ghostButton}
-                                          disabled={pendingLabel !== null}
-                                          onClick={() => {
-                                            setSelectedEncryptedReplyMessageId(null);
-                                            setEditingEncryptedMessageId(null);
-                                            setEditingMessageId(message.id);
-                                            setEditingMessageText(message.text?.text ?? "");
-                                            setComposerError(null);
-                                            chats.clearFeedback();
-                                          }}
-                                          type="button"
-                                        >
-                                          Редактировать
-                                        </button>
-                                      )}
-
-                                      {isOwn && (
-                                        <button
-                                          className={styles.ghostButton}
-                                          disabled={pendingLabel !== null}
-                                          onClick={() => {
-                                            void chats.deleteMessageForEveryone(message.id);
-                                          }}
-                                          type="button"
-                                        >
-                                          Удалить для всех
-                                        </button>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              )}
-
-                              {!message.tombstone && message.editedAt && (
-                                <p className={styles.editMeta}>
-                                  Последнее редактирование: {formatDateTime(message.editedAt)}
-                                </p>
-                              )}
-
-                              {pendingLabel && <p className={styles.pendingText}>{pendingLabel}</p>}
-                            </div>
-                          </article>
-                        );
-                      })
-                    )}
+                    <StateCard
+                      title="Legacy direct history недоступна"
+                      message="Readable legacy plaintext list/get/history path для direct chats в этом slice намеренно de-scoped. Открытый контент для direct chat теперь нужно смотреть через encrypted DM v2 local projection выше. Group history этим изменением не затрагивается."
+                    />
                   </div>
                 </section>
 
                 <section className={styles.composerCard}>
                   <div className={styles.blockHeader}>
                     <div>
-                      <p className={styles.cardLabel}>Composer</p>
-                      <h3 className={styles.blockTitle}>Новое сообщение</h3>
+                      <p className={styles.cardLabel}>Encrypted composer</p>
+                      <h3 className={styles.blockTitle}>Encrypted DM v2</h3>
                     </div>
                     <span className={styles.composerHint}>
-                      Enter отправляет, Shift+Enter переносит строку
+                      Enter отправляет encrypted message, Shift+Enter переносит строку
                     </span>
                   </div>
 
@@ -2314,13 +1902,13 @@ export function ChatsPage() {
                       />
                       <button
                         className={styles.secondaryButton}
-                        disabled={!canPickAttachment}
+                        disabled={legacyDirectHistoryDescoped || !canPickAttachment}
                         onClick={() => {
                           attachmentInputRef.current?.click();
                         }}
                         type="button"
                       >
-                        {attachmentDraft === null ? "Выбрать файл" : "Заменить файл"}
+                        Legacy файл de-scoped
                       </button>
                       <button
                         className={styles.secondaryButton}
@@ -2335,13 +1923,14 @@ export function ChatsPage() {
                           : "Заменить encrypted файл"}
                       </button>
                       <span className={styles.attachmentHint}>
-                        Single-file composer: можно выбрать файл, записать голосовую или видео
-                        заметку, отправить текст + attachment или только attachment.
+                        Legacy plaintext composer, legacy attachment path и voice/video notes для
+                        direct chats в этом slice честно de-scoped. Активным остаётся только
+                        encrypted DM v2 path с отдельным encrypted attachment draft.
                       </span>
                     </div>
 
                     <VoiceNoteRecorderPanel
-                      discardDisabled={chats.state.isSendingMessage || isSendingRecordedNote}
+                      discardDisabled
                       isSending={isSendingVoiceNote}
                       onDiscard={() => {
                         voiceNoteRecorder.discardRecording();
@@ -2355,19 +1944,14 @@ export function ChatsPage() {
                       onStop={() => {
                         voiceNoteRecorder.stopRecording();
                       }}
-                      sendDisabled={
-                        chats.state.isSendingMessage ||
-                        isSendingRecordedNote ||
-                        attachmentComposer.isUploading ||
-                        encryptedMediaAttachmentDraft.isUploading
-                      }
-                      startDisabled={!canRecordVoiceNote}
+                      sendDisabled
+                      startDisabled
                       state={voiceNoteRecorder.state}
-                      stopDisabled={isSendingRecordedNote}
+                      stopDisabled
                     />
 
                     <VideoNoteRecorderPanel
-                      discardDisabled={chats.state.isSendingMessage || isSendingRecordedNote}
+                      discardDisabled
                       isSending={isSendingVideoNote}
                       onDiscard={() => {
                         videoNoteRecorder.discardRecording();
@@ -2381,15 +1965,10 @@ export function ChatsPage() {
                       onStop={() => {
                         videoNoteRecorder.stopRecording();
                       }}
-                      sendDisabled={
-                        chats.state.isSendingMessage ||
-                        isSendingRecordedNote ||
-                        attachmentComposer.isUploading ||
-                        encryptedMediaAttachmentDraft.isUploading
-                      }
-                      startDisabled={!canRecordVideoNote}
+                      sendDisabled
+                      startDisabled
                       state={videoNoteRecorder.state}
-                      stopDisabled={isSendingRecordedNote}
+                      stopDisabled
                     />
 
                     {attachmentDraft && (
@@ -2540,19 +2119,6 @@ export function ChatsPage() {
                       </span>
 
                       <div className={styles.actions}>
-                        <button
-                          className={styles.primaryButton}
-                          disabled={
-                            chats.state.isSendingMessage ||
-                            isSendingVoiceNote ||
-                            isSendingVideoNote ||
-                            encryptedAttachmentDraft !== null ||
-                            !canSubmitComposer
-                          }
-                          type="submit"
-                        >
-                          {chats.state.isSendingMessage ? "Отправляем..." : "Отправить"}
-                        </button>
                         <button
                           className={styles.secondaryButton}
                           disabled={!canSendEncryptedDirectMessageV2}
@@ -2853,14 +2419,6 @@ function getParticipantInitials(peer: ChatUser | null): string {
     .join("") || peer.login.slice(0, 2).toUpperCase();
 }
 
-function getLatestOwnMessageId(messages: DirectChatMessage[], currentUserId: string): string | null {
-  const latestOwnMessage = [...messages]
-    .reverse()
-    .find((message) => message.senderUserId === currentUserId && message.tombstone === null);
-
-  return latestOwnMessage?.id ?? null;
-}
-
 function describeChatPreview(chat: DirectChat, peer: ChatUser | null): string {
   if (chat.pinnedMessageIds.length > 0) {
     return `Есть закреплённые сообщения и готовый direct thread с ${peer ? `@${peer.login}` : "собеседником"}.`;
@@ -2871,25 +2429,6 @@ function describeChatPreview(chat: DirectChat, peer: ChatUser | null): string {
   }
 
   return "Личный thread готов к открытию.";
-}
-
-function describeMessagePreview(message: DirectChatMessage): string {
-  if (message.tombstone) {
-    return "Удалённое сообщение";
-  }
-
-  const text = createMarkdownPreview(message.text?.text ?? "");
-  if (text === "") {
-    if (message.attachments.length === 1) {
-      return "Вложение без текста";
-    }
-    if (message.attachments.length > 1) {
-      return `Вложения без текста: ${message.attachments.length}`;
-    }
-    return "Текст недоступен";
-  }
-
-  return text.length > 92 ? `${text.slice(0, 89)}...` : text;
 }
 
 function describeReadStatus(readState: DirectChatReadState | null): string {
@@ -2906,17 +2445,6 @@ function describeTypingStatus(typingState: DirectChatTypingState | null): string
   }
 
   return "Печатает...";
-}
-
-function isDirectMessageEditable(
-  message: DirectChatMessage,
-  currentUserId: string,
-): boolean {
-  return (
-    message.senderUserId === currentUserId &&
-    message.tombstone === null &&
-    message.text !== null
-  );
 }
 
 function describePresenceStatus(presenceState: DirectChatPresenceState | null): string {
@@ -2956,69 +2484,6 @@ function describeDirectProfileLocation(profile: Profile | null): string {
   }
 
   return "Не указана";
-}
-
-function describeOwnMessageReadLabel(
-  message: DirectChatMessage,
-  readState: DirectChatReadState | null,
-): string | null {
-  const peerPosition = readState?.peerPosition;
-  if (!peerPosition) {
-    return null;
-  }
-
-  const messageDate = new Date(message.createdAt);
-  const readDate = new Date(peerPosition.messageCreatedAt);
-  if (Number.isNaN(messageDate.getTime()) || Number.isNaN(readDate.getTime())) {
-    return "Прочитано";
-  }
-
-  if (messageDate.getTime() <= readDate.getTime()) {
-    return "Прочитано";
-  }
-
-  return null;
-}
-
-function describeReplyPreviewAuthor(
-  preview: DirectChatMessage["replyPreview"],
-  currentUserId: string,
-  fallbackPeerName: string,
-): string {
-  if (!preview?.author) {
-    if (preview?.isDeleted) {
-      return "Удалённое сообщение";
-    }
-    if (preview?.isUnavailable) {
-      return "Недоступное сообщение";
-    }
-    return "Ответ";
-  }
-  if (preview.author.id === currentUserId) {
-    return "Вы";
-  }
-  return preview.author.nickname || fallbackPeerName;
-}
-
-function describeReplyPreviewText(preview: DirectChatMessage["replyPreview"]): string {
-  if (!preview) {
-    return "";
-  }
-  if (preview.isDeleted) {
-    return "Сообщение удалено для всех.";
-  }
-  if (preview.isUnavailable) {
-    return "Исходное сообщение больше недоступно.";
-  }
-  if (preview.hasText && preview.textPreview.trim() !== "") {
-    return preview.textPreview;
-  }
-  if (preview.attachmentCount > 0) {
-    return preview.attachmentCount === 1
-      ? "Вложение"
-      : `Вложения: ${preview.attachmentCount}`;
-  }
-  return "Текст предпросмотра недоступен.";
 }
 
 function describeDirectComposerReplyTarget(

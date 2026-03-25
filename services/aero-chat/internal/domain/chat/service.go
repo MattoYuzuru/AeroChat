@@ -1673,12 +1673,14 @@ func (s *Service) ListDirectChatMessages(ctx context.Context, token string, chat
 		return nil, err
 	}
 
-	limit, err := normalizePageSize(pageSize)
-	if err != nil {
+	if _, err := normalizePageSize(pageSize); err != nil {
 		return nil, err
 	}
 
-	return s.repo.ListDirectChatMessages(ctx, authSession.User.ID, normalizedChatID, limit)
+	// Legacy direct plaintext history transport намеренно de-scoped:
+	// активный content path для direct chats теперь должен идти через encrypted lane,
+	// а не через readable legacy timeline bootstrap.
+	return []DirectChatMessage{}, nil
 }
 
 func (s *Service) ListGroupMessages(ctx context.Context, token string, groupID string, pageSize uint32) ([]GroupMessage, error) {
