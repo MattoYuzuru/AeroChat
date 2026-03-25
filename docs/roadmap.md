@@ -174,6 +174,9 @@ MLS client.
 Legacy group reply preview уже деградирован до honest metadata-only/unavailable state без server-side
 plaintext body preview, а server-side search по содержимому legacy group history теперь тоже
 честно de-scoped вместо зависимости от plaintext body/search_vector.
+Readable legacy group history/list/get transport теперь тоже честно de-scoped как активный
+group content path; pending остаются readable legacy realtime payloads, compatibility RPC surfaces
+и legacy plaintext attachment path.
 
 ---
 
