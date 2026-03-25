@@ -287,6 +287,16 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("does not expose legacy group plaintext content rpc helpers in web runtime", () => {
+    const client = createGatewayClient(vi.fn(), "/api");
+
+    expect("listGroupMessages" in client).toBe(false);
+    expect("sendGroupTextMessage" in client).toBe(false);
+    expect("editGroupMessage" in client).toBe(false);
+    expect("getGroupChat" in client).toBe(true);
+    expect("sendEncryptedGroupMessage" in client).toBe(true);
+  });
+
   it("loads devices with nested sessions through gateway identity endpoint", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

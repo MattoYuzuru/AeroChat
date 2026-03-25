@@ -930,24 +930,6 @@ export interface GatewayClient {
   ): Promise<GroupInviteLink>;
   previewGroupByInviteLink(token: string, inviteToken: string): Promise<GroupInvitePreview>;
   joinGroupByInviteLink(token: string, inviteToken: string): Promise<Group>;
-  listGroupMessages(
-    token: string,
-    groupId: string,
-    pageSize?: number,
-  ): Promise<GroupMessage[]>;
-  sendGroupTextMessage(
-    token: string,
-    groupId: string,
-    text: string,
-    attachmentIds?: string[],
-    replyToMessageId?: string | null,
-  ): Promise<GroupMessage>;
-  editGroupMessage(
-    token: string,
-    groupId: string,
-    messageId: string,
-    text: string,
-  ): Promise<GroupMessage>;
   createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
   listDirectChats(token: string): Promise<DirectChat[]>;
   getDirectChat(token: string, chatId: string): Promise<DirectChatSnapshot>;

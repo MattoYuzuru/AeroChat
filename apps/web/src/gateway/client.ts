@@ -44,7 +44,6 @@ import type {
   GroupChatThread,
   GroupInviteLink,
   GroupInvitePreview,
-  GroupMessage,
   GroupMember,
   GroupMemberRole,
   EncryptedUnreadState,
@@ -402,19 +401,6 @@ interface DirectChatMessageWire extends TimestampedWire {
   text?: TextMessageContentWire;
   tombstone?: MessageTombstoneWire;
   pinned?: boolean;
-  replyToMessageId?: string;
-  replyPreview?: ReplyPreviewWire;
-  attachments?: AttachmentWire[];
-  editedAt?: string;
-}
-
-interface GroupMessageWire extends TimestampedWire {
-  id?: string;
-  groupId?: string;
-  threadId?: string;
-  senderUserId?: string;
-  kind?: string;
-  text?: TextMessageContentWire;
   replyToMessageId?: string;
   replyPreview?: ReplyPreviewWire;
   attachments?: AttachmentWire[];
@@ -818,18 +804,6 @@ interface PreviewGroupByInviteLinkResponseWire {
 
 interface JoinGroupByInviteLinkResponseWire {
   group?: GroupWire;
-}
-
-interface ListGroupMessagesResponseWire {
-  messages?: GroupMessageWire[];
-}
-
-interface SendGroupTextMessageResponseWire {
-  message?: GroupMessageWire;
-}
-
-interface EditGroupMessageResponseWire {
-  message?: GroupMessageWire;
 }
 
 interface MarkDirectChatReadResponseWire {
@@ -1553,63 +1527,6 @@ export function createGatewayClient(
       );
 
       return normalizeGroup(response.group);
-    },
-
-    async listGroupMessages(token, groupId, pageSize) {
-      const response = await unaryCall<ListGroupMessagesResponseWire>(
-        fetchImpl,
-        baseUrl,
-        chatServicePath,
-        "ListGroupMessages",
-        {
-          groupId: groupId.trim(),
-          pageSize,
-        },
-        token,
-      );
-
-      return (response.messages ?? []).map(normalizeGroupMessage);
-    },
-
-    async sendGroupTextMessage(
-      token,
-      groupId,
-      text,
-      attachmentIds = [],
-      replyToMessageId = null,
-    ) {
-      const response = await unaryCall<SendGroupTextMessageResponseWire>(
-        fetchImpl,
-        baseUrl,
-        chatServicePath,
-        "SendGroupTextMessage",
-        {
-          groupId: groupId.trim(),
-          text,
-          attachmentIds: normalizeIDs(attachmentIds),
-          replyToMessageId: normalizeOptionalString(replyToMessageId ?? ""),
-        },
-        token,
-      );
-
-      return normalizeGroupMessage(response.message);
-    },
-
-    async editGroupMessage(token, groupId, messageId, text) {
-      const response = await unaryCall<EditGroupMessageResponseWire>(
-        fetchImpl,
-        baseUrl,
-        chatServicePath,
-        "EditGroupMessage",
-        {
-          groupId: groupId.trim(),
-          messageId: messageId.trim(),
-          text,
-        },
-        token,
-      );
-
-      return normalizeGroupMessage(response.message);
     },
 
     async createDirectChat(token, peerUserId) {
@@ -2994,23 +2911,6 @@ function normalizeAttachmentUploadSession(
     expiresAt: input?.expiresAt ?? "",
     completedAt: normalizeNullableString(input?.completedAt),
     failedAt: normalizeNullableString(input?.failedAt),
-  };
-}
-
-function normalizeGroupMessage(input: GroupMessageWire | undefined): GroupMessage {
-  return {
-    id: input?.id ?? "",
-    groupId: input?.groupId ?? "",
-    threadId: input?.threadId ?? "",
-    senderUserId: input?.senderUserId ?? "",
-    kind: input?.kind ?? "",
-    text: input?.text ? normalizeTextMessageContent(input.text) : null,
-    replyToMessageId: normalizeNullableString(input?.replyToMessageId),
-    replyPreview: normalizeReplyPreview(input?.replyPreview),
-    attachments: (input?.attachments ?? []).map(normalizeAttachment),
-    createdAt: input?.createdAt ?? "",
-    updatedAt: input?.updatedAt ?? "",
-    editedAt: normalizeNullableString(input?.editedAt),
   };
 }
 
