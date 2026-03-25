@@ -718,6 +718,7 @@ type SyncEncryptedGroupControlPlaneParams struct {
 type SendEncryptedDirectMessageV2Params struct {
 	ChatID               string
 	MessageID            string
+	MessageCreatedAt     time.Time
 	SenderCryptoDeviceID string
 	OperationKind        string
 	TargetMessageID      *string
@@ -747,6 +748,7 @@ type CreateEncryptedGroupMessageParams struct {
 type SendEncryptedGroupMessageParams struct {
 	GroupID              string
 	MessageID            string
+	MessageCreatedAt     time.Time
 	MLSGroupID           string
 	RosterVersion        uint64
 	SenderCryptoDeviceID string

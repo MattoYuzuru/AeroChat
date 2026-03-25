@@ -1817,6 +1817,7 @@ export function createGatewayClient(
         {
           chatId: input.chatId.trim(),
           messageId: input.messageId.trim(),
+          messageCreatedAt: input.messageCreatedAt,
           senderCryptoDeviceId: input.senderCryptoDeviceId.trim(),
           operationKind: normalizeEncryptedDirectMessageV2OperationKindForWire(
             input.operationKind,
@@ -1940,6 +1941,7 @@ export function createGatewayClient(
         {
           groupId: input.groupId.trim(),
           messageId: input.messageId.trim(),
+          messageCreatedAt: input.messageCreatedAt,
           mlsGroupId: input.mlsGroupId.trim(),
           rosterVersion: input.rosterVersion,
           senderCryptoDeviceId: input.senderCryptoDeviceId.trim(),

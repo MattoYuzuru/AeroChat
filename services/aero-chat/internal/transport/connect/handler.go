@@ -633,6 +633,7 @@ func (h *Handler) SendEncryptedDirectMessageV2(ctx context.Context, req *connect
 	envelope, err := h.service.SendEncryptedDirectMessageV2(ctx, token, chat.SendEncryptedDirectMessageV2Params{
 		ChatID:               req.Msg.ChatId,
 		MessageID:            req.Msg.MessageId,
+		MessageCreatedAt:     req.Msg.GetMessageCreatedAt().AsTime(),
 		SenderCryptoDeviceID: req.Msg.SenderCryptoDeviceId,
 		OperationKind:        fromProtoEncryptedDirectMessageV2OperationKind(req.Msg.OperationKind),
 		TargetMessageID:      req.Msg.TargetMessageId,
@@ -715,6 +716,7 @@ func (h *Handler) SendEncryptedGroupMessage(ctx context.Context, req *connect.Re
 	envelope, err := h.service.SendEncryptedGroupMessage(ctx, token, chat.SendEncryptedGroupMessageParams{
 		GroupID:              req.Msg.GroupId,
 		MessageID:            req.Msg.MessageId,
+		MessageCreatedAt:     req.Msg.GetMessageCreatedAt().AsTime(),
 		MLSGroupID:           req.Msg.MlsGroupId,
 		RosterVersion:        req.Msg.RosterVersion,
 		SenderCryptoDeviceID: req.Msg.SenderCryptoDeviceId,

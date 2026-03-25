@@ -256,6 +256,7 @@ describe("createGatewayClient", () => {
     const result = await client.sendEncryptedGroupMessage("token-1", {
       groupId: "group-1",
       messageId: "message-1",
+      messageCreatedAt: "2026-03-22T12:11:00Z",
       mlsGroupId: "mls-1",
       rosterVersion: 7,
       senderCryptoDeviceId: "crypto-1",
@@ -275,6 +276,7 @@ describe("createGatewayClient", () => {
         body: JSON.stringify({
           groupId: "group-1",
           messageId: "message-1",
+          messageCreatedAt: "2026-03-22T12:11:00Z",
           mlsGroupId: "mls-1",
           rosterVersion: 7,
           senderCryptoDeviceId: "crypto-1",
@@ -1672,6 +1674,7 @@ describe("createGatewayClient", () => {
     const envelope = await client.sendEncryptedDirectMessageV2("token-1", {
       chatId: "chat-1",
       messageId: "message-1",
+      messageCreatedAt: "2026-03-22T12:00:00Z",
       senderCryptoDeviceId: "crypto-1",
       operationKind: "content",
       revision: 1,
@@ -1706,6 +1709,7 @@ describe("createGatewayClient", () => {
         body: JSON.stringify({
           chatId: "chat-1",
           messageId: "message-1",
+          messageCreatedAt: "2026-03-22T12:00:00Z",
           senderCryptoDeviceId: "crypto-1",
           operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
           targetMessageId: undefined,

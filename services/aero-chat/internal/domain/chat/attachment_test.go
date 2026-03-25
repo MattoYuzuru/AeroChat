@@ -326,6 +326,7 @@ func TestEncryptedDirectMessageTombstoneDetachesEncryptedRelayBlobAndReleasesQuo
 	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
 		ChatID:               directChat.ID,
 		MessageID:            testUUID(706),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 14, 0, 0, time.UTC),
 		SenderCryptoDeviceID: aliceSender.ID,
 		OperationKind:        EncryptedDirectMessageV2OperationContent,
 		Revision:             1,
@@ -372,6 +373,7 @@ func TestEncryptedDirectMessageTombstoneDetachesEncryptedRelayBlobAndReleasesQuo
 	if _, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
 		ChatID:               directChat.ID,
 		MessageID:            testUUID(707),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 15, 0, 0, time.UTC),
 		SenderCryptoDeviceID: aliceSender.ID,
 		OperationKind:        EncryptedDirectMessageV2OperationTombstone,
 		TargetMessageID:      &targetMessageID,
@@ -479,6 +481,7 @@ func TestSendEncryptedGroupMessageAttachesEncryptedRelayBlobForGroupParticipants
 	receipt, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
 		GroupID:              group.ID,
 		MessageID:            testUUID(706),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 16, 0, 0, time.UTC),
 		MLSGroupID:           bootstrap.Lane.MLSGroupID,
 		RosterVersion:        bootstrap.Lane.RosterVersion,
 		SenderCryptoDeviceID: aliceSender.ID,
@@ -567,6 +570,7 @@ func TestEncryptedGroupMessageTombstoneDetachesEncryptedRelayBlobAndReleasesQuot
 	receipt, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
 		GroupID:              group.ID,
 		MessageID:            testUUID(708),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 17, 0, 0, time.UTC),
 		MLSGroupID:           bootstrap.Lane.MLSGroupID,
 		RosterVersion:        bootstrap.Lane.RosterVersion,
 		SenderCryptoDeviceID: aliceSender.ID,
@@ -604,6 +608,7 @@ func TestEncryptedGroupMessageTombstoneDetachesEncryptedRelayBlobAndReleasesQuot
 	if _, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
 		GroupID:              group.ID,
 		MessageID:            testUUID(709),
+		MessageCreatedAt:     time.Date(2026, time.March, 25, 18, 18, 0, 0, time.UTC),
 		MLSGroupID:           bootstrap.Lane.MLSGroupID,
 		RosterVersion:        bootstrap.Lane.RosterVersion,
 		SenderCryptoDeviceID: aliceSender.ID,

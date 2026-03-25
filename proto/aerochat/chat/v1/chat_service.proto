@@ -852,6 +852,9 @@ message SendEncryptedDirectMessageV2Request {
   string chat_id = 1;
   // message_id назначается клиентом до fanout и остаётся стабильным logical identifier.
   string message_id = 2;
+  // message_created_at входит в client-side authenticated envelope metadata,
+  // поэтому сервер обязан сохранить sender-assigned значение без пересборки.
+  google.protobuf.Timestamp message_created_at = 9;
   string sender_crypto_device_id = 3;
   EncryptedDirectMessageV2OperationKind operation_kind = 4;
   optional string target_message_id = 5;
@@ -908,6 +911,9 @@ message SendEncryptedGroupMessageRequest {
   string group_id = 1;
   // message_id назначается клиентом до send и остаётся стабильным logical identifier.
   string message_id = 2;
+  // message_created_at входит в authenticated group envelope metadata,
+  // поэтому сервер хранит sender-assigned timestamp как logical message created_at.
+  google.protobuf.Timestamp message_created_at = 11;
   string mls_group_id = 3;
   uint64 roster_version = 4;
   string sender_crypto_device_id = 5;

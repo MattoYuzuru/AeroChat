@@ -1008,6 +1008,7 @@ export interface GatewayClient {
     input: {
       chatId: string;
       messageId: string;
+      messageCreatedAt: string;
       senderCryptoDeviceId: string;
       operationKind: "content" | "edit" | "tombstone";
       targetMessageId?: string | null;
@@ -1054,6 +1055,7 @@ export interface GatewayClient {
     input: {
       groupId: string;
       messageId: string;
+      messageCreatedAt: string;
       mlsGroupId: string;
       rosterVersion: number;
       senderCryptoDeviceId: string;
