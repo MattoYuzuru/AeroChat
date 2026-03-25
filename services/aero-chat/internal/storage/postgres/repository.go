@@ -1806,43 +1806,14 @@ func (r *Repository) GetEncryptedGroupStoredMessage(ctx context.Context, groupID
 }
 
 func (r *Repository) SearchDirectMessages(ctx context.Context, userID string, params chat.SearchDirectMessagesParams) ([]chat.MessageSearchResult, error) {
-	// Legacy server-side direct search остаётся plaintext-only:
-	// encrypted DM v2 не индексируется в backend и ищется только локально в web runtime.
-	rows, err := r.queries.SearchDirectMessages(ctx, chatsqlc.SearchDirectMessagesParams{
-		UserID:          mustParseUUID(userID),
-		ChatID:          nullableUUID(params.ChatID),
-		CursorCreatedAt: nullableTimestamptz(searchCursorCreatedAt(params.Cursor)),
-		CursorMessageID: nullableUUID(searchCursorMessageID(params.Cursor)),
-		LimitCount:      params.PageSize + 1,
-		QueryText:       params.Query,
-	})
-	if err != nil {
-		return nil, convertError(err)
-	}
+	_ = ctx
+	_ = userID
+	_ = params
 
-	result := make([]chat.MessageSearchResult, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, chat.MessageSearchResult{
-			Scope:        chat.ChatKindDirect,
-			DirectChatID: row.ChatID.String(),
-			MessageID:    row.MessageID.String(),
-			Author: chat.UserSummary{
-				ID:        row.SenderUserID.String(),
-				Login:     row.Login,
-				Nickname:  row.Nickname,
-				AvatarURL: textPointer(row.AvatarUrl),
-			},
-			CreatedAt:     timestampValue(row.CreatedAt),
-			EditedAt:      timestamptzPointer(row.EditedAt),
-			MatchFragment: stringValue(row.MatchFragment),
-			Position: chat.MessageSearchPosition{
-				MessageID:        row.MessageID.String(),
-				MessageCreatedAt: timestampValue(row.CreatedAt),
-			},
-		})
-	}
-
-	return result, nil
+	// Backend direct content search сознательно де-скоуплен:
+	// legacy SearchMessages больше не использует plaintext text_content/search_vector,
+	// а encrypted direct search остаётся только локальным в browser runtime.
+	return []chat.MessageSearchResult{}, nil
 }
 
 func (r *Repository) GetDirectReplyPreview(ctx context.Context, userID string, chatID string, messageID string) (*chat.ReplyPreview, error) {

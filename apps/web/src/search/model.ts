@@ -84,6 +84,28 @@ export function describeSearchScope(selection: SearchScopeSelection): string {
   }
 }
 
+export function describeLegacySearchPath(selection: SearchScopeSelection): string {
+  switch (selection) {
+    case "all-direct":
+    case "direct":
+      return "Серверный поиск по содержимому legacy direct-сообщений больше не поддерживается.";
+    case "all-groups":
+    case "group":
+      return "Серверный поиск остаётся только для legacy group history в выбранной области.";
+  }
+}
+
+export function describeLegacySearchEmptyState(selection: SearchScopeSelection): string {
+  switch (selection) {
+    case "all-direct":
+    case "direct":
+      return "Legacy direct content search на сервере честно де-скоуплен. Для direct остаётся только локальный encrypted поиск текущей сессии.";
+    case "all-groups":
+    case "group":
+      return "В этой области подходящих сообщений нет.";
+  }
+}
+
 export function describeSearchResultScope(result: SearchResultLike): string {
   return result.scope === "group" ? "Группа" : "Direct";
 }

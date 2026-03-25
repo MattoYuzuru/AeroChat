@@ -37,6 +37,8 @@ import {
 } from "../search/encrypted-local-search";
 import {
   buildMessageSearchScope,
+  describeLegacySearchEmptyState,
+  describeLegacySearchPath,
   buildSearchResultHref,
   describeDirectChatLabel,
   describeSearchResultAuthor,
@@ -907,8 +909,9 @@ export function SearchPage() {
             <p className={styles.cardLabel}>Messages</p>
             <h2 className={styles.sectionTitle}>Поиск по сообщениям</h2>
             <p className={styles.sectionDescription}>
-              Дополнительный поиск внутри чатов и групп. Обычные сообщения ищутся через сервер,
-              encrypted сообщения только локально и в пределах текущего окна.
+              Legacy group history всё ещё ищется через сервер, а server-side поиск по содержимому
+              legacy direct-сообщений честно де-скоуплен. Encrypted сообщения ищутся только
+              локально и в пределах текущего окна.
             </p>
           </div>
 
@@ -1054,7 +1057,9 @@ export function SearchPage() {
                   <p className={styles.cardLabel}>Обычные сообщения</p>
                   <h3 className={styles.pathTitle}>Серверный поиск</h3>
                   <p className={styles.pathDescription}>
-                    {searchScopeSummary ?? "Поиск по обычной истории в выбранной области."}
+                    {submittedSearch
+                      ? `${searchScopeSummary ?? describeSearchScope(submittedSearch.scopeSelection)} · ${describeLegacySearchPath(submittedSearch.scopeSelection)}`
+                      : "Поиск по обычной истории в выбранной области."}
                   </p>
                 </div>
                 <span className={styles.metaTag}>
@@ -1082,7 +1087,7 @@ export function SearchPage() {
               {legacySearchStatus === "ready" && legacyResults.length === 0 && (
                 <InlineState
                   title="Ничего не найдено"
-                  message="В этой области подходящих сообщений нет."
+                  message={describeLegacySearchEmptyState(submittedSearch.scopeSelection)}
                 />
               )}
 
