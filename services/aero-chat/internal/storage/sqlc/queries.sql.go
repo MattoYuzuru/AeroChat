@@ -3451,7 +3451,6 @@ SELECT
     u.login,
     u.nickname,
     u.avatar_url,
-    m.text_content,
     t.deleted_by_user_id,
     t.deleted_at,
     COALESCE((
@@ -3480,7 +3479,6 @@ type ListDirectReplyPreviewRowsRow struct {
 	Login           string             `db:"login" json:"login"`
 	Nickname        string             `db:"nickname" json:"nickname"`
 	AvatarUrl       pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	TextContent     string             `db:"text_content" json:"text_content"`
 	DeletedByUserID pgtype.UUID        `db:"deleted_by_user_id" json:"deleted_by_user_id"`
 	DeletedAt       pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 	AttachmentCount int32              `db:"attachment_count" json:"attachment_count"`
@@ -3501,7 +3499,6 @@ func (q *Queries) ListDirectReplyPreviewRows(ctx context.Context, arg ListDirect
 			&i.Login,
 			&i.Nickname,
 			&i.AvatarUrl,
-			&i.TextContent,
 			&i.DeletedByUserID,
 			&i.DeletedAt,
 			&i.AttachmentCount,

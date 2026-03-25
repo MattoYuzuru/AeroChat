@@ -85,6 +85,7 @@ type Repository interface {
 	ListGroupMessages(context.Context, string, string, int32) ([]GroupMessage, error)
 	SearchDirectMessages(context.Context, string, SearchDirectMessagesParams) ([]MessageSearchResult, error)
 	SearchGroupMessages(context.Context, string, SearchGroupMessagesParams) ([]MessageSearchResult, error)
+	GetDirectReplyPreview(context.Context, string, string, string) (*ReplyPreview, error)
 	GetDirectChatMessage(context.Context, string, string, string) (*DirectChatMessage, error)
 	GetGroupMessage(context.Context, string, string, string) (*GroupMessage, error)
 	DeleteDirectChatMessageForEveryone(context.Context, string, string, string, time.Time) (bool, error)
@@ -1530,14 +1531,13 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 
 	var replyPreview *ReplyPreview
 	if replyToMessageID != nil {
-		replyTarget, err := s.repo.GetDirectChatMessage(ctx, authSession.User.ID, normalizedChatID, *replyToMessageID)
+		replyPreview, err = s.repo.GetDirectReplyPreview(ctx, authSession.User.ID, normalizedChatID, *replyToMessageID)
 		if err != nil {
 			return nil, err
 		}
-		if replyTarget.Tombstone != nil {
+		if replyPreview.IsDeleted {
 			return nil, fmt.Errorf("%w: reply target is deleted", ErrConflict)
 		}
-		replyPreview = buildDirectReplyPreview(*replyTarget, directChat.Participants)
 	}
 
 	now := s.now()
@@ -3023,17 +3023,6 @@ func valueOrEmpty(value *string) string {
 	return *value
 }
 
-func buildDirectReplyPreview(message DirectChatMessage, participants []UserSummary) *ReplyPreview {
-	return buildReplyPreview(
-		message.ID,
-		findUserSummaryByID(participants, message.SenderUserID),
-		message.Text,
-		len(message.Attachments),
-		message.Tombstone != nil,
-		false,
-	)
-}
-
 func buildGroupReplyPreview(message GroupMessage, members []GroupMember) *ReplyPreview {
 	return buildReplyPreview(
 		message.ID,
@@ -3088,19 +3077,6 @@ func buildReplyTextPreview(value string) string {
 	}
 
 	return string(runes[:maxPreviewRunes]) + "..."
-}
-
-func findUserSummaryByID(users []UserSummary, userID string) *UserSummary {
-	for _, user := range users {
-		if user.ID != userID {
-			continue
-		}
-
-		userCopy := user
-		return &userCopy
-	}
-
-	return nil
 }
 
 func findGroupMemberUserByID(members []GroupMember, userID string) *UserSummary {

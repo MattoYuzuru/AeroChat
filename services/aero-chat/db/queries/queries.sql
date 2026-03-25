@@ -727,7 +727,6 @@ SELECT
     u.login,
     u.nickname,
     u.avatar_url,
-    m.text_content,
     t.deleted_by_user_id,
     t.deleted_at,
     COALESCE((

@@ -3018,7 +3018,7 @@ function describeReplyPreviewText(preview: DirectChatMessage["replyPreview"]): s
       ? "Вложение"
       : `Вложения: ${preview.attachmentCount}`;
   }
-  return "Пустой preview";
+  return "Текст предпросмотра недоступен.";
 }
 
 function describeDirectComposerReplyTarget(

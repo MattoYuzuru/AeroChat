@@ -1845,6 +1845,20 @@ func (r *Repository) SearchDirectMessages(ctx context.Context, userID string, pa
 	return result, nil
 }
 
+func (r *Repository) GetDirectReplyPreview(ctx context.Context, userID string, chatID string, messageID string) (*chat.ReplyPreview, error) {
+	replyPreviewByMessageID, err := r.listDirectReplyPreviewsByMessageIDs(ctx, userID, chatID, []uuid.UUID{mustParseUUID(messageID)})
+	if err != nil {
+		return nil, err
+	}
+
+	replyPreview := cloneReplyPreview(replyPreviewByMessageID[messageID])
+	if replyPreview == nil || replyPreview.IsUnavailable {
+		return nil, chat.ErrNotFound
+	}
+
+	return replyPreview, nil
+}
+
 func (r *Repository) GetDirectChatMessage(ctx context.Context, userID string, chatID string, messageID string) (*chat.DirectChatMessage, error) {
 	row, err := r.queries.GetDirectChatMessageByID(ctx, chatsqlc.GetDirectChatMessageByIDParams{
 		UserID: mustParseUUID(userID),
@@ -2579,8 +2593,8 @@ func messageTextContentFromStorage(text string, markdownPolicy string) *chat.Tex
 }
 
 func (r *Repository) listDirectReplyPreviewsByMessageIDs(ctx context.Context, userID string, chatID string, messageIDs []uuid.UUID) (map[string]*chat.ReplyPreview, error) {
-	// Legacy direct reply preview собирается из server-readable target message.
-	// Если target больше нельзя материализовать из legacy history, preview честно деградирует.
+	// Legacy direct reply preview больше не читает plaintext body target message.
+	// Direct path сохраняет только metadata-only linkage либо explicit unavailable/deleted state.
 	result := make(map[string]*chat.ReplyPreview, len(messageIDs))
 	if len(messageIDs) == 0 {
 		return result, nil
@@ -2604,15 +2618,11 @@ func (r *Repository) listDirectReplyPreviewsByMessageIDs(ctx context.Context, us
 				Nickname:  row.Nickname,
 				AvatarURL: textPointer(row.AvatarUrl),
 			},
-			HasText:         row.TextContent != "",
-			TextPreview:     buildReplyPreviewText(row.TextContent),
 			AttachmentCount: row.AttachmentCount,
 			IsDeleted:       row.DeletedByUserID.Valid && row.DeletedAt.Valid,
 			IsUnavailable:   false,
 		}
 		if result[row.ID.String()].IsDeleted {
-			result[row.ID.String()].HasText = false
-			result[row.ID.String()].TextPreview = ""
 			result[row.ID.String()].AttachmentCount = 0
 		}
 	}
