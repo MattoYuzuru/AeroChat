@@ -5,11 +5,12 @@
 Проект уже вышел за пределы чистой foundation phase.
 
 Сейчас в репозитории есть рабочий базовый продуктовый slice:
-identity, social graph, direct chats, groups, media, realtime и bounded encrypted lanes.
+identity, social graph, legacy direct/group chats, media relay, realtime, bounded encrypted lanes,
+desktop shell, mobile launcher adaptation и частичный RTC web slice.
 
 Главная задача ближайших этапов:
-доводить encrypted coexistence, platform polish и RTC polish без ложных claims о завершённости PWA, calls
-или full E2EE parity.
+доводить encrypted coexistence, убирать plaintext из product-critical paths, завершать platform polish
+и не делать ложных claims о завершённости PWA, calls или full E2EE parity.
 
 Последний завершённый platform slice:
 
@@ -122,6 +123,11 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Direct chat realtime bootstrap через `aero-gateway`
 - [x] Direct chat typing/presence realtime fan-out через `aero-gateway`
 
+Примечание:
+encrypted direct-message v2 уже существует как отдельная bounded lane, но не заменяет legacy plaintext
+history и не даёт full parity с server-side search/preview. Encrypted search остаётся локальным и
+session-scoped.
+
 ---
 
 ## Этап 4. Groups
@@ -157,6 +163,11 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Encrypted search recovery foundation
 - [x] Encrypted media relay integration for MLS group lane
 
+Примечание:
+encrypted group lane остаётся forward-only coexistence slice поверх legacy plaintext group history.
+Это foundation под MLS-ориентированный поток, а не claim о full encrypted group parity или завершённом
+MLS client.
+
 ---
 
 ## Этап 5. Media foundation
@@ -183,6 +194,10 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] TTL cleanup
 - [ ] Local media drafts
 
+Примечание:
+encrypted media relay уже работает для encrypted lanes, но legacy plaintext attachment path в
+репозитории всё ещё существует и остаётся частью coexistence-модели.
+
 ---
 
 ## Этап 6. RTC foundation
@@ -195,12 +210,17 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Signaling model
 - [x] Active call and participant control-plane foundation через `aero-rtc-control`
 - [x] Web audio-only 1:1 direct-call bootstrap
-- [x] 1:1 call polish, continuity и richer call UX
+- [ ] 1:1 call polish, continuity и richer call UX
 - [x] One-active-call-per-user policy
-- [x] Group call control
+- [x] Group call control-plane и web lobby bootstrap
 - [ ] Device controls
 - [ ] Quality presets
 - [ ] Future screen-share hooks
+
+Примечание:
+текущий direct-call web slice остаётся bounded audio-only bootstrap без repo-level STUN/TURN
+orchestration и без device controls. Group call flow сейчас покрывает control-plane и lobby UI,
+но не multiparty browser media transport.
 
 ---
 
@@ -217,7 +237,7 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [ ] PWA
 - [x] Desktop shell XP runtime scaffold
 - [x] Boot/login application model внутри нового shell
-- [x] Canonical self chat shell target
+- [x] Canonical self chat shell target без backend self-direct thread
 - [x] Canonical direct/group shell windows
 - [x] Canonical person profile shell target для people/search/request flows
 - [x] Canonical friend requests shell target
@@ -232,6 +252,10 @@ identity, social graph, direct chats, groups, media, realtime и bounded encrypt
 - [x] Mobile practical shell adaptation
 - [x] Settings and privacy bootstrap через `aero-gateway`
 - [ ] Trash model
+
+Примечание:
+`Self Chat` сейчас является честным shell/account target и не симулирует backend conversation.
+Mobile adaptation уже реальна, но не означает завершённый PWA/mobile product slice.
 
 ---
 
