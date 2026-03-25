@@ -71,6 +71,7 @@ export function useChats({
   const typingLastSentAtRef = useRef(0);
   const typingRefreshTimerRef = useRef<number | null>(null);
   const typingIdleTimerRef = useRef<number | null>(null);
+  const pendingEncryptedChatBootstrapRef = useRef<Set<string>>(new Set());
   const isPageVisible = usePageVisibility();
 
   useEffect(() => {
@@ -165,14 +166,24 @@ export function useChats({
         return;
       }
 
+      if (shouldBootstrapEncryptedDirectChatActivity(stateRef.current.chats, event.envelope.chatId)) {
+        void bootstrapEncryptedDirectChatActivity(
+          token,
+          event.envelope.chatId,
+          pendingEncryptedChatBootstrapRef,
+          mountedRef,
+          dispatch,
+          onUnauthenticatedRef,
+        );
+        return;
+      }
+
       dispatch({
         type: "encrypted_delivery_observed",
-        chatId: event.envelope.chatId,
-        updatedAt: event.envelope.storedAt,
-        unreadCount: event.envelope.viewerDelivery.unreadState?.unreadCount ?? null,
+        event,
       });
     });
-  }, [enabled]);
+  }, [enabled, token]);
 
   const activePresenceChatId = resolveDirectChatPresenceHeartbeatChatId({
     enabled,
@@ -960,6 +971,47 @@ function findDirectChatByPeerUserId(
       chat.participants.some((participant) => participant.id === peerUserId),
     ) ?? null
   );
+}
+
+export function shouldBootstrapEncryptedDirectChatActivity(
+  chats: DirectChat[],
+  chatId: string,
+): boolean {
+  return !chats.some((chat) => chat.id === chatId);
+}
+
+async function bootstrapEncryptedDirectChatActivity(
+  token: string,
+  chatId: string,
+  pendingRef: { current: Set<string> },
+  mountedRef: { current: boolean },
+  dispatch: ChatsDispatch,
+  onUnauthenticatedRef: { current: () => void },
+) {
+  const normalizedChatID = chatId.trim();
+  if (normalizedChatID === "" || pendingRef.current.has(normalizedChatID)) {
+    return;
+  }
+
+  pendingRef.current.add(normalizedChatID);
+  try {
+    const chats = await gatewayClient.listDirectChats(token);
+    if (!mountedRef.current) {
+      return;
+    }
+
+    dispatch({
+      type: "list_refresh_succeeded",
+      chats,
+      notice: null,
+    });
+  } catch (error) {
+    if (isGatewayErrorCode(error, "unauthenticated")) {
+      onUnauthenticatedRef.current();
+    }
+  } finally {
+    pendingRef.current.delete(normalizedChatID);
+  }
 }
 
 function resolveProtectedError(

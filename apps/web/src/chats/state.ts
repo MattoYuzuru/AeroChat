@@ -7,6 +7,8 @@ import type {
   DirectChatTypingState,
   EncryptedDirectChatReadState,
 } from "../gateway/types";
+import type { EncryptedDirectMessageV2RealtimeEvent } from "./encrypted-v2-realtime";
+import { patchLiveEncryptedDirectChatActivity } from "./live-direct-activity";
 
 export interface ChatThreadSnapshot {
   chat: DirectChat;
@@ -66,9 +68,7 @@ type ChatsAction =
     }
   | {
       type: "encrypted_delivery_observed";
-      chatId: string;
-      updatedAt: string;
-      unreadCount?: number | null;
+      event: EncryptedDirectMessageV2RealtimeEvent;
     }
   | {
       type: "typing_state_replaced";
@@ -399,14 +399,12 @@ function applyEncryptedDeliveryObserved(
   state: ChatsState,
   action: Extract<ChatsAction, { type: "encrypted_delivery_observed" }>,
 ): ChatsState {
-  const nextChats = patchEncryptedChatActivity(
-    state.chats,
-    action.chatId,
-    action.updatedAt,
-    action.unreadCount,
-  );
+  const nextChats = patchLiveEncryptedDirectChatActivity(state.chats, action.event);
+  const chatId = action.event.envelope.chatId;
+  const updatedAt = action.event.envelope.storedAt;
+  const unreadCount = action.event.envelope.viewerDelivery.unreadState?.unreadCount ?? null;
 
-  if (state.thread?.chat.id !== action.chatId) {
+  if (state.thread?.chat.id !== chatId) {
     return {
       ...state,
       chats: nextChats,
@@ -420,8 +418,8 @@ function applyEncryptedDeliveryObserved(
       ...state.thread,
       chat: patchSingleEncryptedChatActivity(
         state.thread.chat,
-        action.updatedAt,
-        action.unreadCount,
+        updatedAt,
+        unreadCount,
       ),
     },
   };
@@ -583,20 +581,6 @@ function replaceChatEncryptedUnreadCount(
           encryptedUnreadCount: unreadCount,
         },
   );
-}
-
-function patchEncryptedChatActivity(
-  chats: DirectChat[],
-  chatId: string,
-  updatedAt: string,
-  unreadCount: number | null | undefined,
-): DirectChat[] {
-  const currentChat = findChatByID(chats, chatId);
-  if (!currentChat) {
-    return chats;
-  }
-
-  return upsertChatInList(chats, patchSingleEncryptedChatActivity(currentChat, updatedAt, unreadCount));
 }
 
 function patchSingleEncryptedChatActivity(

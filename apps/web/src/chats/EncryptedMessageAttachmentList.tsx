@@ -112,10 +112,18 @@ function EncryptedInlineAttachmentPreview({
 }) {
   const cryptoRuntime = useCryptoRuntime();
   const triggerRef = useRef<HTMLDivElement | null>(null);
+  const revokePreviewRef = useRef<(() => void) | null>(null);
   const startsVisible = typeof IntersectionObserver === "undefined";
   const [isVisible, setIsVisible] = useState(startsVisible);
   const [status, setStatus] = useState<PreviewStatus>(startsVisible ? "loading" : "idle");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      revokePreviewRef.current?.();
+      revokePreviewRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     const node = triggerRef.current;
@@ -151,7 +159,6 @@ function EncryptedInlineAttachmentPreview({
     }
 
     let active = true;
-    let revokePreview: (() => void) | null = null;
 
     void resolveEncryptedAttachmentObjectUrl(cryptoRuntime, accessToken, attachment)
       .then((resolved) => {
@@ -160,7 +167,8 @@ function EncryptedInlineAttachmentPreview({
           return;
         }
 
-        revokePreview = resolved.revoke;
+        revokePreviewRef.current?.();
+        revokePreviewRef.current = resolved.revoke;
         setPreviewUrl(resolved.url);
         setStatus("ready");
       })
@@ -175,11 +183,12 @@ function EncryptedInlineAttachmentPreview({
 
     return () => {
       active = false;
-      revokePreview?.();
     };
   }, [accessToken, attachment, cryptoRuntime, isVisible, status]);
 
   function handleMediaError() {
+    revokePreviewRef.current?.();
+    revokePreviewRef.current = null;
     setPreviewUrl(null);
     setStatus("error");
   }
