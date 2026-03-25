@@ -12,6 +12,10 @@ import {
   normalizeComposerMessageText,
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
+import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
+import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
+import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
+import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import {
   describeEncryptedDirectMessageV2Failure,
@@ -91,8 +95,14 @@ export function ChatsPage() {
         : {
             kind: "direct",
             id: chats.state.thread.chat.id,
-          },
+    },
     onUnauthenticated: () => expireSession(),
+  });
+  const voiceNoteRecorder = useVoiceNoteRecorder({
+    enabled: authState.status === "authenticated",
+  });
+  const videoNoteRecorder = useVideoNoteRecorder({
+    enabled: authState.status === "authenticated",
   });
   const applyEncryptedReadState = useEffectEvent(
     (
@@ -103,6 +113,10 @@ export function ChatsPage() {
       chats.replaceEncryptedReadState(chatId, readState, unreadCount);
     },
   );
+  const discardEncryptedMediaNoteDrafts = useEffectEvent(() => {
+    voiceNoteRecorder.discardRecording();
+    videoNoteRecorder.discardRecording();
+  });
 
   const requestedChatId = searchParams.get("chat")?.trim() ?? "";
   const requestedPeerUserId = searchParams.get("peer")?.trim() ?? "";
@@ -158,6 +172,7 @@ export function ChatsPage() {
       setSelectedEncryptedReplyMessageId(null);
       setSearchJumpNotice(null);
       setHighlightedMessageId(null);
+      discardEncryptedMediaNoteDrafts();
     }, 0);
 
     return () => {
@@ -558,10 +573,46 @@ export function ChatsPage() {
         }));
   const encryptedAttachmentDraft = encryptedMediaAttachmentDraft.draft;
   const uploadedEncryptedAttachmentDraft = encryptedMediaAttachmentDraft.uploadedDraft;
+  const activeReadStatusLabel =
+    selectedThread === null
+      ? "Без видимого read state"
+      : describeActiveDirectReadStatus(
+          selectedThread.readState,
+          selectedThread.encryptedReadState,
+          encryptedLane.status === "ready" ? latestEncryptedMessage : null,
+        );
+  const activeReadStatusTone =
+    selectedThread === null
+      ? "neutral"
+      : encryptedLane.status === "ready" && latestEncryptedMessage !== null
+        ? selectedThread.encryptedReadState?.peerPosition
+          ? "accent"
+          : "neutral"
+        : selectedThread.readState?.peerPosition
+          ? "accent"
+          : "neutral";
   const canPickEncryptedAttachment =
     !chats.state.isSendingMessage &&
     !encryptedMediaAttachmentDraft.isUploading &&
     editingEncryptedEntry === null;
+  const canUseEncryptedMediaNoteEntry =
+    selectedThread !== null &&
+    !chats.state.isSendingMessage &&
+    !cryptoRuntime.state.isActionPending &&
+    !encryptedMediaAttachmentDraft.isUploading &&
+    editingEncryptedEntry === null;
+  const voiceNoteStartDisabled =
+    !canUseEncryptedMediaNoteEntry ||
+    videoNoteRecorder.state.status === "requesting_permission" ||
+    videoNoteRecorder.state.status === "recording" ||
+    videoNoteRecorder.state.status === "processing" ||
+    videoNoteRecorder.state.status === "recorded";
+  const videoNoteStartDisabled =
+    !canUseEncryptedMediaNoteEntry ||
+    voiceNoteRecorder.state.status === "requesting_permission" ||
+    voiceNoteRecorder.state.status === "recording" ||
+    voiceNoteRecorder.state.status === "processing" ||
+    voiceNoteRecorder.state.status === "recorded";
   const canSendEncryptedDirectMessageV2 =
     selectedThread !== null &&
     !chats.state.isSendingMessage &&
@@ -771,6 +822,47 @@ export function ChatsPage() {
     setComposerError(null);
     chats.clearFeedback();
     await encryptedMediaAttachmentDraft.selectFile(file);
+  }
+
+  async function handleEncryptedMediaNoteSend(
+    file: File | null,
+    clearRecorderDraft: () => void,
+  ) {
+    if (selectedThread === null || file === null) {
+      return;
+    }
+
+    setComposerError(null);
+    chats.clearFeedback();
+
+    try {
+      const uploadedDraft = await encryptedMediaAttachmentDraft.selectFile(file);
+      if (uploadedDraft === null) {
+        return;
+      }
+
+      const result = await cryptoRuntime.sendEncryptedDirectMessageV2Content(
+        selectedThread.chat.id,
+        "",
+        selectedEncryptedReplyEntry?.messageId ?? null,
+        [uploadedDraft],
+      );
+      if (result === null) {
+        return;
+      }
+
+      publishLocalEncryptedDirectMessageV2Projection(result.localProjection);
+      setSelectedEncryptedReplyMessageId(null);
+      encryptedMediaAttachmentDraft.markSendSucceeded();
+      clearRecorderDraft();
+    } catch (error) {
+      encryptedMediaAttachmentDraft.markSendFailed();
+      setComposerError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось отправить media note.",
+      );
+    }
   }
 
   return (
@@ -1145,8 +1237,8 @@ export function ChatsPage() {
                         tone={selectedThread.presenceState?.peerPresence ? "success" : "neutral"}
                       />
                       <StatusPill
-                        label={describeReadStatus(selectedThread.readState)}
-                        tone={selectedThread.readState?.peerPosition ? "accent" : "neutral"}
+                        label={activeReadStatusLabel}
+                        tone={activeReadStatusTone}
                       />
                       {selectedThread.typingState?.peerTyping && (
                         <StatusPill
@@ -1306,8 +1398,8 @@ export function ChatsPage() {
                       tone={selectedThread.presenceState?.peerPresence ? "success" : "neutral"}
                     />
                     <StatusPill
-                      label={describeReadStatus(selectedThread.readState)}
-                      tone={selectedThread.readState?.peerPosition ? "accent" : "neutral"}
+                      label={activeReadStatusLabel}
+                      tone={activeReadStatusTone}
                     />
                     {selectedThread.typingState?.peerTyping && (
                       <StatusPill
@@ -1726,10 +1818,74 @@ export function ChatsPage() {
                           : "Заменить файл"}
                       </button>
                       <span className={styles.attachmentHint}>
-                        Прикрепите файл к следующему сообщению. Дополнительных режимов отправки в
-                        этом окне нет.
+                        Прикрепите файл вручную или используйте voice/video note ниже. Всё уходит
+                        через тот же encrypted attachment flow.
                       </span>
                     </div>
+
+                    <VoiceNoteRecorderPanel
+                      state={voiceNoteRecorder.state}
+                      startDisabled={voiceNoteStartDisabled}
+                      stopDisabled={voiceNoteRecorder.state.status !== "recording"}
+                      discardDisabled={!canUseEncryptedMediaNoteEntry}
+                      sendDisabled={
+                        !canUseEncryptedMediaNoteEntry ||
+                        voiceNoteRecorder.state.draft === null
+                      }
+                      isSending={
+                        encryptedMediaAttachmentDraft.isUploading ||
+                        cryptoRuntime.state.isActionPending
+                      }
+                      onStart={() => {
+                        void voiceNoteRecorder.startRecording();
+                      }}
+                      onStop={() => {
+                        voiceNoteRecorder.stopRecording();
+                      }}
+                      onDiscard={() => {
+                        voiceNoteRecorder.discardRecording();
+                      }}
+                      onSend={() => {
+                        void handleEncryptedMediaNoteSend(
+                          voiceNoteRecorder.state.draft?.file ?? null,
+                          () => {
+                            voiceNoteRecorder.discardRecording();
+                          },
+                        );
+                      }}
+                    />
+
+                    <VideoNoteRecorderPanel
+                      state={videoNoteRecorder.state}
+                      startDisabled={videoNoteStartDisabled}
+                      stopDisabled={videoNoteRecorder.state.status !== "recording"}
+                      discardDisabled={!canUseEncryptedMediaNoteEntry}
+                      sendDisabled={
+                        !canUseEncryptedMediaNoteEntry ||
+                        videoNoteRecorder.state.draft === null
+                      }
+                      isSending={
+                        encryptedMediaAttachmentDraft.isUploading ||
+                        cryptoRuntime.state.isActionPending
+                      }
+                      onStart={() => {
+                        void videoNoteRecorder.startRecording();
+                      }}
+                      onStop={() => {
+                        videoNoteRecorder.stopRecording();
+                      }}
+                      onDiscard={() => {
+                        videoNoteRecorder.discardRecording();
+                      }}
+                      onSend={() => {
+                        void handleEncryptedMediaNoteSend(
+                          videoNoteRecorder.state.draft?.file ?? null,
+                          () => {
+                            videoNoteRecorder.discardRecording();
+                          },
+                        );
+                      }}
+                    />
 
                     {encryptedAttachmentDraft && (
                       <div className={styles.attachmentDraftCard}>
@@ -2131,6 +2287,26 @@ function describeChatPreview(chat: DirectChat, peer: ChatUser | null): string {
   }
 
   return "Личный thread готов к открытию.";
+}
+
+function describeActiveDirectReadStatus(
+  legacyReadState: DirectChatReadState | null,
+  encryptedReadState: EncryptedDirectChatReadState | null,
+  latestEncryptedMessage: EncryptedDirectMessageV2ProjectedMessageEntry | null,
+): string {
+  if (latestEncryptedMessage === null) {
+    return describeReadStatus(legacyReadState);
+  }
+
+  const peerPosition = encryptedReadState?.peerPosition;
+  if (peerPosition === null || peerPosition === undefined) {
+    return "Encrypted read state не виден";
+  }
+  if (peerPosition.messageId === latestEncryptedMessage.messageId) {
+    return `Прочитано · ${formatDateTime(peerPosition.updatedAt)}`;
+  }
+
+  return `Прочитано до ${formatDateTime(peerPosition.updatedAt)}`;
 }
 
 function describeReadStatus(readState: DirectChatReadState | null): string {
