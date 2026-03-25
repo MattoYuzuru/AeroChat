@@ -1363,7 +1363,7 @@ func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *tes
 	}
 }
 
-func TestGroupCoexistenceKeepsPlaintextHistoryWhileSearchIsDescopedAndEncryptedFetchSeparate(t *testing.T) {
+func TestGroupCoexistenceDescopesLegacyHistoryWhileEncryptedFetchRemainsSeparate(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -1404,8 +1404,8 @@ func TestGroupCoexistenceKeepsPlaintextHistoryWhileSearchIsDescopedAndEncryptedF
 	if err != nil {
 		t.Fatalf("list group messages: %v", err)
 	}
-	if len(legacyHistory) != 1 || legacyHistory[0].ID != legacy.ID {
-		t.Fatalf("legacy group history не должна смешиваться с encrypted lane, получено %+v", legacyHistory)
+	if len(legacyHistory) != 0 {
+		t.Fatalf("legacy group history должна быть честно de-scoped рядом с encrypted lane, получено %+v", legacyHistory)
 	}
 
 	encryptedHistory, err := service.ListEncryptedGroupMessages(context.Background(), bob.Token, group.ID, bobFirst.ID, 0)
@@ -1863,7 +1863,7 @@ func TestSearchGroupMessagesAreDescopedForAllAndSpecificScopes(t *testing.T) {
 		t.Fatalf("join group two: %v", err)
 	}
 
-	firstMessage := mustSendGroupMessage(t, service, alice.Token, groupOne.ID, "group search alpha")
+	mustSendGroupMessage(t, service, alice.Token, groupOne.ID, "group search alpha")
 	secondMessage := mustSendGroupMessage(t, service, alice.Token, groupTwo.ID, "group search beta")
 	if _, err := service.EditGroupMessage(context.Background(), alice.Token, groupTwo.ID, secondMessage.ID, "group search beta edited"); err != nil {
 		t.Fatalf("edit group search message: %v", err)
@@ -1890,8 +1890,8 @@ func TestSearchGroupMessagesAreDescopedForAllAndSpecificScopes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list accessible group history: %v", err)
 	}
-	if len(groupHistory) != 1 || groupHistory[0].ID != firstMessage.ID {
-		t.Fatalf("group history не должна меняться из-за de-scoped search, получено %+v", groupHistory)
+	if len(groupHistory) != 0 {
+		t.Fatalf("group history тоже должна оставаться de-scoped после group search removal, получено %+v", groupHistory)
 	}
 
 	scopedResults, scopedNextCursor, scopedHasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
@@ -1938,9 +1938,9 @@ func TestSearchGroupMessagesKeepEmptyPaginationWhenDescoped(t *testing.T) {
 		t.Fatalf("join group invite: %v", err)
 	}
 
-	first := mustSendGroupMessage(t, service, alice.Token, group.ID, "cursor foundation one")
-	second := mustSendGroupMessage(t, service, alice.Token, group.ID, "cursor foundation two")
-	third := mustSendGroupMessage(t, service, alice.Token, group.ID, "cursor foundation three")
+	mustSendGroupMessage(t, service, alice.Token, group.ID, "cursor foundation one")
+	mustSendGroupMessage(t, service, alice.Token, group.ID, "cursor foundation two")
+	mustSendGroupMessage(t, service, alice.Token, group.ID, "cursor foundation three")
 
 	pageOne, nextCursor, hasMore, err := service.SearchMessages(context.Background(), bob.Token, SearchMessagesParams{
 		Query: "cursor foundation",
@@ -1966,8 +1966,8 @@ func TestSearchGroupMessagesKeepEmptyPaginationWhenDescoped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list group history after de-scoped search: %v", err)
 	}
-	if len(groupHistory) != 3 || groupHistory[0].ID != third.ID || groupHistory[1].ID != second.ID || groupHistory[2].ID != first.ID {
-		t.Fatalf("history группы должна оставаться доступной и упорядоченной, получено %+v", groupHistory)
+	if len(groupHistory) != 0 {
+		t.Fatalf("history группы должна оставаться de-scoped и после проверки cursor semantics, получено %+v", groupHistory)
 	}
 }
 

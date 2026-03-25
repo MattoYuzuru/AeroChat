@@ -154,6 +154,10 @@
   - legacy direct readable history/list/get transport больше не должен считаться активным product path:
     `ListDirectChatMessages` теперь честно de-scoped для content-bearing timeline поведения, а web direct bootstrap не рендерит legacy plaintext timeline как активную direct surface;
   - encrypted direct fetch/projection остаётся отдельным активным path для direct content.
+- Group history/bootstrap:
+  - legacy group readable history/list/get transport теперь тоже больше не должен считаться активным product path:
+    `ListGroupMessages` честно de-scoped для content-bearing timeline поведения, а web group bootstrap не рендерит legacy plaintext timeline как активную group surface;
+  - encrypted group fetch/projection остаётся отдельным активным path для group content.
 - Media:
   - attachment relay поддерживает `relay_schema = 'legacy_plaintext'`;
   - legacy attachment metadata остаётся server-visible: `file_name`, `mime_type`, `size_bytes`, `object_key`.
@@ -191,7 +195,9 @@
   - direct legacy readable history/list/bootstrap path теперь честно de-scoped на product surface:
     `ListDirectChatMessages` больше не должен обслуживать active readable direct timeline, а web direct thread не притворяется fallback на этот plaintext path;
   - `GetDirectChatMessage` остаётся только internal compatibility path и не должен трактоваться как активный product fetch для readable direct content;
-  - `ListGroupMessages` / `GetGroupMessage` пока остаются legacy plaintext history APIs для groups;
+  - legacy group readable history/list/bootstrap path теперь тоже честно de-scoped на product surface:
+    `ListGroupMessages` больше не должен обслуживать active readable group timeline, а web group thread не притворяется fallback на этот plaintext path;
+  - `GetGroupMessage` остаётся internal compatibility path для bounded domain flows вроде read/edit/reply target resolution и не должен трактоваться как активный product fetch для readable group content;
   - encrypted direct/group history читается только через отдельные opaque list/get/bootstrap методы и не merge'ится server-side в те же message payloads.
 - Search UX boundary:
   - `/app/search` сохраняет coexistence-модель: legacy direct/group content search на сервере честно de-scoped, а encrypted results строятся только из local/session-local decrypted index в браузере;
@@ -203,8 +209,9 @@
   - direct legacy server-side search plaintext dependency теперь тоже удалена через честный de-scope backend path;
   - direct legacy readable history/list/get transport теперь тоже удалён как активный product path для direct content;
   - legacy group server-side search plaintext dependency теперь тоже удалена через честный de-scope backend path;
-  - group legacy history и legacy readable realtime payloads всё ещё остаются pending;
-  - этот slice не убирает legacy plaintext attachment path, RTC issues и не меняет bounded local encrypted search model.
+  - legacy group readable history/list/get transport теперь тоже удалён как активный product path для group content;
+  - readable direct/group realtime compatibility payloads, legacy plaintext compatibility RPC surfaces и legacy plaintext attachment path всё ещё остаются pending;
+  - этот slice не убирает RTC issues и не меняет bounded local encrypted search model.
 
 ### Areas that need manual runtime verification
 

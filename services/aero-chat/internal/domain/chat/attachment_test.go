@@ -280,11 +280,8 @@ func TestSendAttachmentOnlyMessageInGroupChat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list group messages: %v", err)
 	}
-	if len(messages) != 1 {
-		t.Fatalf("ожидалось одно сообщение в group thread, получено %d", len(messages))
-	}
-	if messages[0].Text != nil {
-		t.Fatalf("group attachment-only message из истории не должен содержать text payload, получено %+v", messages[0].Text)
+	if len(messages) != 0 {
+		t.Fatalf("legacy group history должна быть de-scoped даже для attachment-only messages, получено %+v", messages)
 	}
 }
 
