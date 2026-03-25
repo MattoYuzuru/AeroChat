@@ -577,8 +577,15 @@ func TestSendAndListMessagesUseMarkdownPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list messages: %v", err)
 	}
-	if len(messages) != 1 || messages[0].ID != message.ID {
-		t.Fatal("ожидалось одно сообщение в истории чата")
+	if len(messages) != 0 {
+		t.Fatalf("legacy direct history должна быть честно de-scoped, получено %+v", messages)
+	}
+	fetchedMessage, err := repo.GetDirectChatMessage(context.Background(), bob.User.ID, directChat.ID, message.ID)
+	if err != nil {
+		t.Fatalf("get direct message from repository: %v", err)
+	}
+	if fetchedMessage.Text == nil || fetchedMessage.Text.Text != "hello **bob**" {
+		t.Fatalf("ожидался сохранённый message payload для internal flow, получено %+v", fetchedMessage.Text)
 	}
 }
 
@@ -635,21 +642,8 @@ func TestSendTextMessageUsesMetadataOnlyDirectReplyPreview(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list direct chat messages: %v", err)
 	}
-	if len(messages) != 2 {
-		t.Fatalf("ожидалось 2 сообщения в direct chat, получено %d", len(messages))
-	}
-	var listedReply *DirectChatMessage
-	for i := range messages {
-		if messages[i].ID == reply.ID {
-			listedReply = &messages[i]
-			break
-		}
-	}
-	if listedReply == nil || listedReply.ReplyPreview == nil || listedReply.ReplyPreview.MessageID != target.ID {
-		t.Fatalf("ожидался reply preview в истории, получено %+v", listedReply)
-	}
-	if listedReply.ReplyPreview.HasText || listedReply.ReplyPreview.TextPreview != "" {
-		t.Fatalf("history direct reply preview не должен раскрывать plaintext body, получено %+v", listedReply.ReplyPreview)
+	if len(messages) != 0 {
+		t.Fatalf("legacy direct history должна быть de-scoped даже при наличии reply, получено %+v", messages)
 	}
 
 	fetchedReply, err := repo.GetDirectChatMessage(context.Background(), bob.User.ID, directChat.ID, reply.ID)
@@ -687,22 +681,8 @@ func TestDirectReplyPreviewDegradesAfterTargetTombstone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list direct chat messages: %v", err)
 	}
-
-	var listedReply *DirectChatMessage
-	for i := range messages {
-		if messages[i].ID == reply.ID {
-			listedReply = &messages[i]
-			break
-		}
-	}
-	if listedReply == nil || listedReply.ReplyPreview == nil {
-		t.Fatalf("ожидался reply preview у reply message, получено %+v", listedReply)
-	}
-	if !listedReply.ReplyPreview.IsDeleted {
-		t.Fatalf("ожидалось deleted-state preview после tombstone target, получено %+v", listedReply.ReplyPreview)
-	}
-	if listedReply.ReplyPreview.HasText || listedReply.ReplyPreview.TextPreview != "" || listedReply.ReplyPreview.AttachmentCount != 0 {
-		t.Fatalf("deleted-state reply preview не должен возвращать plaintext body, получено %+v", listedReply.ReplyPreview)
+	if len(messages) != 0 {
+		t.Fatalf("legacy direct history должна оставаться de-scoped после tombstone target, получено %+v", messages)
 	}
 
 	fetchedReply, err := repo.GetDirectChatMessage(context.Background(), alice.User.ID, directChat.ID, reply.ID)
@@ -735,17 +715,8 @@ func TestDirectReplyPreviewBecomesUnavailableWhenTargetLeavesLegacyHistory(t *te
 	if err != nil {
 		t.Fatalf("list direct chat messages: %v", err)
 	}
-	if len(messages) != 1 || messages[0].ID != reply.ID {
-		t.Fatalf("ожидался только reply после выпадения target из legacy history, получено %+v", messages)
-	}
-	if messages[0].ReplyPreview == nil || !messages[0].ReplyPreview.IsUnavailable {
-		t.Fatalf("ожидался unavailable reply preview в direct history, получено %+v", messages[0].ReplyPreview)
-	}
-	if messages[0].ReplyPreview.MessageID != target.ID {
-		t.Fatalf("ожидался stable reply target id %q, получено %+v", target.ID, messages[0].ReplyPreview)
-	}
-	if messages[0].ReplyPreview.HasText || messages[0].ReplyPreview.TextPreview != "" || messages[0].ReplyPreview.AttachmentCount != 0 {
-		t.Fatalf("unavailable direct reply preview не должен возвращать plaintext body, получено %+v", messages[0].ReplyPreview)
+	if len(messages) != 0 {
+		t.Fatalf("legacy direct history должна быть de-scoped и после выпадения target, получено %+v", messages)
 	}
 
 	fetchedReply, err := repo.GetDirectChatMessage(context.Background(), alice.User.ID, directChat.ID, reply.ID)
@@ -786,7 +757,7 @@ func TestSendTextMessageRequiresActiveFriendship(t *testing.T) {
 	repo.friendships[pairKey(alice.User.ID, bob.User.ID)] = true
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
-	firstMessage := mustSendMessage(t, service, alice.Token, directChat.ID, "before removal")
+	mustSendMessage(t, service, alice.Token, directChat.ID, "before removal")
 
 	delete(repo.friendships, pairKey(alice.User.ID, bob.User.ID))
 
@@ -798,8 +769,8 @@ func TestSendTextMessageRequiresActiveFriendship(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list messages after friendship removal: %v", err)
 	}
-	if len(messages) != 1 || messages[0].ID != firstMessage.ID {
-		t.Fatal("история чата должна оставаться доступной после удаления friendship")
+	if len(messages) != 0 {
+		t.Fatalf("legacy direct history должна оставаться de-scoped после удаления friendship, получено %+v", messages)
 	}
 }
 
@@ -1148,8 +1119,8 @@ func TestDirectCoexistenceKeepsHistorySeparateAndServerSearchDescoped(t *testing
 	if err != nil {
 		t.Fatalf("list direct chat messages: %v", err)
 	}
-	if len(legacyHistory) != 1 || legacyHistory[0].ID != legacy.ID {
-		t.Fatalf("legacy direct history не должна смешиваться с encrypted lane, получено %+v", legacyHistory)
+	if len(legacyHistory) != 0 {
+		t.Fatalf("legacy direct history должна быть de-scoped рядом с encrypted lane, получено %+v", legacyHistory)
 	}
 
 	encryptedHistory, err := service.ListEncryptedDirectMessageV2(context.Background(), bob.Token, directChat.ID, bobFirst.ID, 0)
@@ -1809,7 +1780,7 @@ func TestSearchDirectMessagesAreDescopedForAllAndSpecificScopes(t *testing.T) {
 		t.Fatalf("delete direct search candidate: %v", err)
 	}
 
-	other := mustSendMessage(t, service, charlie.Token, secondChat.ID, "search foundation second chat")
+	mustSendMessage(t, service, charlie.Token, secondChat.ID, "search foundation second chat")
 
 	allResults, nextCursor, hasMore, err := service.SearchMessages(context.Background(), alice.Token, SearchMessagesParams{
 		Query: "search foundation",
@@ -1852,19 +1823,16 @@ func TestSearchDirectMessagesAreDescopedForAllAndSpecificScopes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list first direct chat history: %v", err)
 	}
-	if len(firstHistory) != 2 {
-		t.Fatalf("history первого direct chat не должна терять сообщения, получено %+v", firstHistory)
-	}
-	if firstHistory[1].ID != edited.ID || firstHistory[1].EditedAt == nil {
-		t.Fatalf("history должна оставаться доступной и содержать edited message, получено %+v", firstHistory)
+	if len(firstHistory) != 0 {
+		t.Fatalf("history первого direct chat должна быть de-scoped, получено %+v", firstHistory)
 	}
 
 	secondHistory, err := service.ListDirectChatMessages(context.Background(), alice.Token, secondChat.ID, 0)
 	if err != nil {
 		t.Fatalf("list second direct chat history: %v", err)
 	}
-	if len(secondHistory) != 1 || secondHistory[0].ID != other.ID {
-		t.Fatalf("history второго direct chat не должна меняться из-за de-scoped search, получено %+v", secondHistory)
+	if len(secondHistory) != 0 {
+		t.Fatalf("history второго direct chat тоже должна быть de-scoped, получено %+v", secondHistory)
 	}
 }
 

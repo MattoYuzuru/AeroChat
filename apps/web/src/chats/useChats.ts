@@ -5,6 +5,7 @@ import {
   isGatewayErrorCode,
   type DirectChat,
   type DirectChatMessage,
+  type DirectChatSnapshot,
   type EncryptedDirectChatReadState,
 } from "../gateway/types";
 import { subscribeRealtimeEnvelopes } from "../realtime/events";
@@ -109,12 +110,8 @@ export function useChats({
       }
 
       if (event.type === "direct_chat.message.updated") {
-        dispatch({
-          type: "message_updated",
-          currentUserId,
-          message: event.message,
-          reason: event.reason,
-        });
+        // Legacy direct plaintext realtime payload больше не должен становиться
+        // active thread content path после de-scope history/bootstrap surface.
         return;
       }
 
@@ -920,28 +917,29 @@ async function fetchThreadSnapshot(
   token: string,
   chatId: string,
 ): Promise<ChatThreadSnapshot> {
-  const [snapshot, rawMessages] = await Promise.all([
-    gatewayClient.getDirectChat(token, chatId),
-    gatewayClient.listDirectChatMessages(token, chatId, 50),
-  ]);
-  const messages = [...rawMessages].reverse();
+  const snapshot = await gatewayClient.getDirectChat(token, chatId);
+  const threadSnapshot = createDescopedDirectThreadSnapshot(snapshot);
 
-  let readState = snapshot.readState;
-  let unreadCount = snapshot.chat.unreadCount;
-  const latestMessage = messages.at(-1);
-  if (latestMessage) {
-    const readUpdate = await gatewayClient.markDirectChatRead(token, chatId, latestMessage.id);
-    readState = readUpdate.readState ?? readState;
-    unreadCount = readUpdate.unreadCount;
-  }
+  const readState = snapshot.readState;
+  const unreadCount = snapshot.chat.unreadCount;
 
   return {
+    ...threadSnapshot,
     chat: {
-      ...snapshot.chat,
+      ...threadSnapshot.chat,
       unreadCount,
     },
-    messages,
     readState,
+  };
+}
+
+export function createDescopedDirectThreadSnapshot(
+  snapshot: DirectChatSnapshot,
+): ChatThreadSnapshot {
+  return {
+    chat: snapshot.chat,
+    messages: [],
+    readState: snapshot.readState,
     encryptedReadState: snapshot.encryptedReadState,
     typingState: snapshot.typingState,
     presenceState: snapshot.presenceState,
