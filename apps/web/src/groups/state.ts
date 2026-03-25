@@ -56,21 +56,12 @@ export function createInitialGroupsSelectedState(): GroupsSelectedState {
 export function applyGroupRealtimeToGroups(
   groups: Group[],
   event: GroupRealtimeEvent,
-  currentUserId: string,
 ): Group[] {
   switch (event.type) {
     case "group.message.updated":
-      return sortGroups(
-        upsertGroup(
-          groups,
-          patchGroupFromMessage(
-            findGroupByID(groups, event.group.id),
-            event.message,
-            event.reason,
-            currentUserId,
-          ),
-        ),
-      );
+      // Readable legacy group realtime content path намеренно de-scoped:
+      // active group thread и live group surfaces больше не сходятся по plaintext payload.
+      return groups;
     case "group.membership.updated":
       if (event.group === null || event.selfMember === null) {
         return groups.filter((group) => group.id !== event.groupId);
@@ -102,7 +93,6 @@ export function applyGroupRealtimeToGroups(
 export function applyGroupRealtimeToSelectedState(
   state: GroupsSelectedState,
   event: GroupRealtimeEvent,
-  currentUserId: string,
 ): GroupsSelectedState {
   if (state.status !== "ready") {
     return state;
@@ -112,29 +102,8 @@ export function applyGroupRealtimeToSelectedState(
   const selectedThreadId = state.snapshot.thread.id;
 
   if (event.type === "group.message.updated") {
-    if (event.group.id !== selectedGroupId) {
-      return state;
-    }
-
-    return {
-      status: "ready",
-      snapshot: {
-        group: patchGroupFromMessage(
-          state.snapshot.group,
-          event.message,
-          event.reason,
-          currentUserId,
-        ),
-        thread: state.snapshot.thread,
-        readState: state.snapshot.readState,
-        encryptedReadState: state.snapshot.encryptedReadState,
-        typingState: state.snapshot.typingState,
-      },
-      members: state.members,
-      inviteLinks: filterInviteLinks(state.inviteLinks, event.group.selfRole),
-      messages: sortMessages(upsertMessage(state.messages, event.message)),
-      errorMessage: null,
-    };
+    void selectedGroupId;
+    return state;
   }
 
   if (event.type === "group.typing.updated") {
@@ -314,12 +283,6 @@ function upsertGroup(groups: Group[], nextGroup: Group): Group[] {
   return nextGroups;
 }
 
-function upsertMessage(messages: GroupMessage[], nextMessage: GroupMessage): GroupMessage[] {
-  const nextMessages = messages.filter((message) => message.id !== nextMessage.id);
-  nextMessages.push(nextMessage);
-  return nextMessages;
-}
-
 function upsertMember(members: GroupMember[], nextMember: GroupMember): GroupMember[] {
   const nextMembers = members.filter((member) => member.user.id !== nextMember.user.id);
   nextMembers.push(nextMember);
@@ -346,55 +309,6 @@ function filterInviteLinks(
   selfRole: GroupMemberRole,
 ): GroupInviteLink[] {
   return canManageInviteLinks(selfRole) ? inviteLinks : [];
-}
-
-function patchGroupFromMessage(
-  group: Group | null,
-  message: GroupMessage,
-  reason: string,
-  currentUserId: string,
-): Group {
-  if (group === null) {
-    return {
-      id: message.groupId,
-      name: "",
-      kind: "CHAT_KIND_GROUP",
-      selfRole: "member",
-      memberCount: 0,
-      encryptedPinnedMessageIds: [],
-      unreadCount:
-        reason === "message_created" && message.senderUserId !== currentUserId ? 1 : 0,
-      encryptedUnreadCount: 0,
-      permissions: {
-        canManageInviteLinks: false,
-        creatableInviteRoles: [],
-        canManageMemberRoles: false,
-        roleManagementTargetRoles: [],
-        assignableRoles: [],
-        canTransferOwnership: false,
-        removableMemberRoles: [],
-        restrictableMemberRoles: [],
-        canLeaveGroup: true,
-      },
-      createdAt: "",
-      updatedAt: message.updatedAt || message.createdAt,
-    };
-  }
-
-  const candidateUpdatedAt = message.updatedAt || message.createdAt;
-  const shouldIncrementUnread =
-    message.senderUserId !== currentUserId &&
-    candidateUpdatedAt !== "" &&
-    group.updatedAt < candidateUpdatedAt;
-
-  return {
-    ...group,
-    unreadCount:
-      reason === "message_created" && shouldIncrementUnread
-        ? group.unreadCount + 1
-        : group.unreadCount,
-    updatedAt: candidateUpdatedAt === "" ? group.updatedAt : candidateUpdatedAt,
-  };
 }
 
 function mergeGroupPreservingUnread(current: Group | null, next: Group): Group {
@@ -432,17 +346,6 @@ function sortGroups(groups: Group[]): Group[] {
     const byUpdatedAt = compareTimestampDesc(left.updatedAt, right.updatedAt);
     if (byUpdatedAt !== 0) {
       return byUpdatedAt;
-    }
-
-    return right.id.localeCompare(left.id);
-  });
-}
-
-function sortMessages(messages: GroupMessage[]): GroupMessage[] {
-  return [...messages].sort((left, right) => {
-    const byCreatedAt = compareTimestampDesc(left.createdAt, right.createdAt);
-    if (byCreatedAt !== 0) {
-      return byCreatedAt;
     }
 
     return right.id.localeCompare(left.id);

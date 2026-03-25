@@ -545,16 +545,8 @@ export function GroupsPage() {
     };
   }, [authState.status, expireSession, selectedGroupId, token]);
 
-  const authenticatedUserId =
-    authState.status === "authenticated" ? authState.profile.id : null;
-
   useEffect(() => {
     if (authState.status !== "authenticated") {
-      return;
-    }
-
-    const currentUserId = authenticatedUserId;
-    if (currentUserId === null) {
       return;
     }
 
@@ -564,7 +556,13 @@ export function GroupsPage() {
         return;
       }
 
-      setGroups((current) => applyGroupRealtimeToGroups(current, event, currentUserId));
+      if (event.type === "group.message.updated") {
+        // Readable legacy group realtime payload больше не должен оживлять
+        // active group thread или live group list после de-scope plaintext path.
+        return;
+      }
+
+      setGroups((current) => applyGroupRealtimeToGroups(current, event));
 
       const shouldClearSelection = shouldClearSelectedGroupOnRealtimeEvent(
         selectedStateRef.current,
@@ -579,14 +577,9 @@ export function GroupsPage() {
       const nextSelectedState = applyGroupRealtimeToSelectedState(
         selectedStateRef.current,
         event,
-        currentUserId,
       );
       selectedStateRef.current = nextSelectedState;
       setSelectedState(nextSelectedState);
-
-      if (event.type === "group.message.updated") {
-        return;
-      }
 
       if (nextSelectedState?.status === "ready") {
         setMemberRoleDrafts(buildMemberRoleDrafts(nextSelectedState.members));
@@ -595,7 +588,7 @@ export function GroupsPage() {
 
       setMemberRoleDrafts({});
     });
-  }, [authState.status, authenticatedUserId, setSearchParams]);
+  }, [authState.status, setSearchParams]);
 
   useEffect(() => {
     if (authState.status !== "authenticated") {
@@ -3295,7 +3288,8 @@ export function GroupsPage() {
                   <p className={styles.panelCopy}>
                     Readable legacy `ListGroupMessages` bootstrap больше не используется как
                     активный product path. Group metadata, membership и encrypted lane остаются
-                    доступными отдельно.
+                    доступными отдельно, а readable legacy realtime payload тоже больше не
+                    обновляет visible group thread.
                   </p>
                 </div>
 
@@ -3312,7 +3306,7 @@ export function GroupsPage() {
                 <div className={styles.messagesList}>
                   <InlineState
                     title="Legacy group history недоступна"
-                    message="Readable legacy plaintext list/get/history path для groups в этом slice намеренно de-scoped. Открытый group content теперь нужно читать через encrypted group lane выше. Realtime compatibility payloads и legacy attachment path этим изменением не убираются."
+                    message="Readable legacy plaintext list/get/history path для groups в этом slice намеренно de-scoped. Legacy group realtime plaintext payload тоже больше не обновляет активный thread content. Открытый group content теперь нужно читать через encrypted group lane выше. Pending остаются readable direct realtime compatibility payload, compatibility RPC surfaces и legacy plaintext attachment path."
                   />
                 </div>
               </section>
