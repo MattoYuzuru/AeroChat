@@ -132,7 +132,7 @@ export function useEncryptedMediaAttachmentDraft({
         errorMessage:
           error instanceof Error && error.message.trim() !== ""
             ? error.message
-            : "Не удалось подготовить encrypted media relay upload.",
+            : "Не удалось подготовить файл.",
       });
       return null;
     }
@@ -152,8 +152,7 @@ export function useEncryptedMediaAttachmentDraft({
               mimeType: current.mimeType,
               plaintextSizeBytes: current.plaintextSizeBytes,
               ciphertextSizeBytes: current.ciphertextSizeBytes,
-              errorMessage:
-                "Повторный upload encrypted media недоступен после сброса локального draft.",
+              errorMessage: "Нельзя повторить загрузку после сброса черновика.",
             },
       );
       return null;
@@ -276,7 +275,7 @@ export function useEncryptedMediaAttachmentDraft({
         mimeType: metadata.mimeType,
         plaintextSizeBytes: metadata.plaintextSizeBytes,
         ciphertextSizeBytes: prepared.attachment.ciphertextSizeBytes,
-        errorMessage: describeGatewayError(error, "Не удалось загрузить encrypted ciphertext blob."),
+        errorMessage: describeGatewayError(error, "Не удалось загрузить файл."),
       });
       return null;
     } finally {

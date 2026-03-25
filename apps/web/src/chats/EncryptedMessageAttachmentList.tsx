@@ -199,21 +199,21 @@ function EncryptedInlineAttachmentPreview({
           <div className={styles.previewPlaceholder} data-kind={previewKind}>
             <span className={styles.previewPlaceholderLabel}>
               {previewKind === "audio"
-                ? "Encrypted audio"
+                ? "Аудио"
                 : previewKind === "video"
-                  ? "Encrypted video"
-                  : "Encrypted preview"}
+                  ? "Видео"
+                  : "Предпросмотр"}
             </span>
             <span className={styles.previewPlaceholderText}>
               {status === "loading"
                 ? previewKind === "audio"
-                  ? "Локально расшифровываем аудио..."
+                  ? "Готовим аудио..."
                   : previewKind === "video"
-                    ? "Локально расшифровываем видео..."
-                    : "Локально расшифровываем изображение..."
+                    ? "Готовим видео..."
+                    : "Готовим изображение..."
                 : status === "error"
-                  ? "Preview недоступен."
-                  : "Preview готовится по viewport demand."}
+                  ? "Предпросмотр недоступен."
+                  : "Предпросмотр появится при прокрутке."}
             </span>
           </div>
         )}
@@ -345,12 +345,12 @@ async function resolveEncryptedAttachmentObjectUrl(
 }> {
   const access = await gatewayClient.getAttachment(accessToken, attachment.attachmentId);
   if (!access.downloadUrl) {
-    throw new Error("Ciphertext relay blob пока недоступен для скачивания.");
+    throw new Error("Файл пока недоступен для скачивания.");
   }
 
   const response = await fetch(access.downloadUrl);
   if (!response.ok) {
-    throw new Error("Не удалось скачать ciphertext relay blob.");
+    throw new Error("Не удалось скачать файл.");
   }
 
   const decrypted = await cryptoRuntime.decryptEncryptedMediaAttachment({
@@ -358,7 +358,7 @@ async function resolveEncryptedAttachmentObjectUrl(
     ciphertextBytes: await response.arrayBuffer(),
   });
   if (decrypted === null) {
-    throw new Error("Не удалось локально расшифровать ciphertext relay blob.");
+    throw new Error("Не удалось подготовить файл к открытию.");
   }
 
   const objectUrl = URL.createObjectURL(

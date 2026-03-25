@@ -1093,9 +1093,6 @@ export function GroupsPage() {
       ? selectedState.members.find((member) => member.user.id === authState.profile.id) ?? null
       : null;
   const requestedJoinToken = extractGroupInviteToken(joinInput || joinTokenFromRoute);
-  const legacyGroupHistoryDescoped = true;
-  const threadMessages =
-    selectedState.status === "ready" ? [...selectedState.messages].reverse() : [];
   const encryptedThreadMessages =
     selectedState.status === "ready" ? [...encryptedGroupLane.items].reverse() : [];
   const encryptedMessageIndex = new Map(
@@ -1462,7 +1459,7 @@ export function GroupsPage() {
     if (encryptedGroupLane.status !== "ready" || encryptedGroupLane.bootstrap === null) {
       setEncryptedComposerError(
         encryptedGroupLane.errorMessage ??
-          "Encrypted group lane ещё не готов для outbound bootstrap send.",
+          "Сообщения группы пока не готовы к отправке.",
       );
       setNotice(null);
       return;
@@ -1470,8 +1467,8 @@ export function GroupsPage() {
     if (!selectedState.snapshot.thread.canSendMessages) {
       setEncryptedComposerError(
         selectedSelfMember?.isWriteRestricted
-          ? "Backend-ограничение на отправку сообщений запрещает encrypted group send для текущего участника."
-          : "Роль `reader` не может отправлять encrypted group messages.",
+          ? "Для этого участника отправка сообщений сейчас отключена."
+          : "Текущая роль не может отправлять сообщения.",
       );
       setNotice(null);
       return;
@@ -1482,14 +1479,14 @@ export function GroupsPage() {
       (encryptedAttachmentDraft !== null || uploadedEncryptedAttachmentDraft !== null)
     ) {
       setEncryptedComposerError(
-        "Encrypted group edit в этом slice не добавляет новые вложения. Уберите encrypted draft и повторите text-only edit.",
+        "Нельзя добавить новый файл во время редактирования. Сначала уберите вложение.",
       );
       setNotice(null);
       return;
     }
     if (normalizedText === "" && uploadedEncryptedAttachmentDraft === null) {
       setEncryptedComposerError(
-        "Добавьте текст или готовый encrypted attachment для encrypted group send.",
+        "Добавьте текст или подготовьте файл для отправки.",
       );
       setNotice(null);
       return;
@@ -1528,17 +1525,17 @@ export function GroupsPage() {
       encryptedMediaAttachmentDraft.markSendSucceeded();
       setNotice(
         editingEncryptedEntry !== null
-          ? "Encrypted group edit опубликован через local crypto runtime."
+          ? "Изменения сохранены."
           : attachmentDrafts.length > 0
-            ? "Encrypted group media message отправлено через local crypto runtime."
-            : "Encrypted group message отправлено через local crypto runtime.",
+            ? "Сообщение с файлом отправлено."
+            : "Сообщение отправлено.",
       );
     } catch (error) {
       encryptedMediaAttachmentDraft.markSendFailed();
       setEncryptedComposerError(
         error instanceof Error && error.message.trim() !== ""
           ? error.message
-          : "Не удалось отправить encrypted group message через crypto runtime.",
+          : "Не удалось отправить сообщение.",
       );
     }
   }
@@ -1572,12 +1569,12 @@ export function GroupsPage() {
       if (selectedEncryptedReplyMessageId === message.messageId) {
         setSelectedEncryptedReplyMessageId(null);
       }
-      setNotice("Encrypted tombstone опубликован.");
+      setNotice("Сообщение удалено для всех.");
     } catch (error) {
       setEncryptedComposerError(
         error instanceof Error && error.message.trim() !== ""
           ? error.message
-          : "Не удалось опубликовать encrypted tombstone.",
+          : "Не удалось удалить сообщение для всех.",
       );
     }
   }
@@ -1611,8 +1608,8 @@ export function GroupsPage() {
       const message = resolveProtectedError(
         error,
         pinned
-          ? "Не удалось снять encrypted pin."
-          : "Не удалось закрепить encrypted group message.",
+          ? "Не удалось снять закрепление."
+          : "Не удалось закрепить сообщение.",
         expireSession,
       );
       if (message !== null) {
@@ -1920,11 +1917,10 @@ export function GroupsPage() {
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Groups</p>
-            <h1 className={styles.title}>Group workspace и call lobby</h1>
+            <h1 className={styles.title}>Группы AeroChat</h1>
             <p className={styles.subtitle}>
-              Текущий web slice держит encrypted group lane как честный content path, а readable
-              legacy plaintext history/bootstrap для групп теперь de-scoped. Group call surface
-              по-прежнему остаётся compact control/lobby поверх RTC control plane.
+              Окно группы показывает обычную переписку, вложения и действия участников. Звонки
+              по-прежнему остаются отдельной компактной lobby-поверхностью.
             </p>
           </div>
 
@@ -1942,7 +1938,7 @@ export function GroupsPage() {
 
         <div className={styles.metrics}>
           <Metric label="Группы" value={groups.length} />
-          <Metric label="Legacy history" value={0} />
+          <Metric label="Новых" value={selectedState.status === "ready" ? selectedState.snapshot.group.encryptedUnreadCount : 0} />
           <Metric label="Активные invite links" value={activeInviteCount} />
         </div>
 
@@ -2098,7 +2094,7 @@ export function GroupsPage() {
                             )}
                             {group.encryptedUnreadCount > 0 && (
                               <span className={styles.unreadPill}>
-                                Encrypted unread: {group.encryptedUnreadCount}
+                                Новых: {group.encryptedUnreadCount}
                               </span>
                             )}
                             {activeGroupCallEntry && (
@@ -2138,7 +2134,7 @@ export function GroupsPage() {
           {selectedState.status === "loading" && (
             <InlineState
               title="Открываем группу"
-              message="Загружаем metadata группы, primary thread, участников и encrypted lane status без legacy history bootstrap."
+              message="Загружаем группу, участников и текущую переписку."
             />
           )}
 
@@ -2240,7 +2236,7 @@ export function GroupsPage() {
                 <div className={styles.panelHeader}>
                   <div>
                     <p className={styles.cardLabel}>Group call</p>
-                    <h2 className={styles.panelTitle}>Control / lobby bootstrap</h2>
+                    <h2 className={styles.panelTitle}>Лобби звонка</h2>
                   </div>
                   <div className={styles.badgeColumn}>
                     <span className={styles.statusPill}>
@@ -2450,69 +2446,46 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.cardLabel}>Encrypted lane</p>
-                    <h2 className={styles.panelTitle}>Local decrypted projection</h2>
+                    <p className={styles.cardLabel}>Сообщения</p>
+                    <h2 className={styles.panelTitle}>Переписка группы</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Эта секция показывает только client-side projection из opaque encrypted
-                    group envelopes. Legacy plaintext history/list bootstrap для groups теперь
-                    честно de-scoped и больше не рендерится как активный timeline path.
+                    Сообщения и вложения открываются как обычная переписка. Если часть истории
+                    недоступна, это показывается отдельным состоянием ниже.
                   </p>
                 </div>
 
                 {selectedState.snapshot.group.encryptedUnreadCount > 0 && (
                   <div className={styles.timelineMeta}>
                     <span className={styles.statusPill}>
-                      Encrypted unread {selectedState.snapshot.group.encryptedUnreadCount}
+                      Новых сообщений {selectedState.snapshot.group.encryptedUnreadCount}
                     </span>
-                  </div>
-                )}
-
-                {encryptedGroupLane.bootstrap !== null && (
-                  <div className={styles.timelineMeta}>
-                    <span className={styles.statusPill}>
-                      mls group {encryptedGroupLane.bootstrap.lane.mlsGroupId}
-                    </span>
-                    <span className={styles.statusPill}>
-                      roster v{encryptedGroupLane.bootstrap.lane.rosterVersion}
-                    </span>
-                    <span className={styles.statusPill}>
-                      devices {encryptedGroupLane.bootstrap.rosterDevices.length}
-                    </span>
-                  </div>
-                )}
-
-                {(encryptedGroupLane.bootstrap !== null || legacyGroupHistoryDescoped) && (
-                  <div className={styles.notice}>
-                    Encrypted local projection остаётся единственным честным bootstrap/content path
-                    для groups в этом окне. Legacy plaintext history/list transport намеренно
-                    de-scoped и не притворяется fallback timeline.
                   </div>
                 )}
 
                 {encryptedGroupLane.status === "loading" && (
                   <InlineState
-                    title="Проверяем encrypted group lane"
-                    message="Читаем bootstrap/list path для active local crypto-device и пропускаем opaque envelopes через crypto runtime worker."
+                    title="Загружаем сообщения"
+                    message="Подготавливаем переписку группы для чтения."
                   />
                 )}
 
                 {encryptedGroupLane.status === "unavailable" && (
                   <InlineState
-                    title="Encrypted lane пока недоступен"
+                    title="Сообщения недоступны"
                     message={
                       encryptedGroupLane.errorMessage ??
-                      "Encrypted group lane пока недоступен для текущего local crypto-device."
+                      "Для этой группы не удалось подготовить переписку."
                     }
                   />
                 )}
 
                 {encryptedGroupLane.status === "error" && (
                   <InlineState
-                    title="Encrypted lane не загрузился"
+                    title="Не удалось загрузить сообщения"
                     message={
                       encryptedGroupLane.errorMessage ??
-                      "Не удалось загрузить encrypted group local projection."
+                      "Не удалось подготовить переписку группы."
                     }
                     tone="error"
                   />
@@ -2520,17 +2493,11 @@ export function GroupsPage() {
 
                 {encryptedGroupLane.status === "ready" && (
                   <>
-                    <div className={styles.notice}>
-                      Encrypted lane в этом slice уже восстанавливает replies, edits, tombstones и
-                      pins без server-side plaintext preview. Search, unread parity, backup и RTC
-                      по-прежнему остаются отдельными slices.
-                    </div>
-
                     {!selectedState.snapshot.thread.canSendMessages && (
                       <div className={styles.readOnlyNotice}>
                         {selectedSelfMember?.isWriteRestricted
-                          ? "Текущий участник остаётся читателем encrypted lane, но backend запретил outbound send и typing."
-                          : "Роль `reader` может читать encrypted lane, но не может отправлять новые encrypted сообщения."}
+                          ? "Сейчас для этого участника отправка сообщений отключена."
+                          : "Текущая роль позволяет только читать переписку."}
                       </div>
                     )}
 
@@ -2542,7 +2509,7 @@ export function GroupsPage() {
                               <div>
                                 <p className={styles.messageAuthor}>
                                   {entry === null
-                                    ? "Encrypted message"
+                                    ? "Сообщение"
                                     : describeEncryptedGroupAuthor(
                                         entry,
                                         authState.profile.id,
@@ -2556,7 +2523,7 @@ export function GroupsPage() {
                                 </p>
                               </div>
                               <div className={styles.badgeColumn}>
-                                <span className={styles.statusPill}>encrypted pin</span>
+                                <span className={styles.statusPill}>Закреплено</span>
                               </div>
                             </div>
                             <div className={styles.messageBody}>
@@ -2577,7 +2544,7 @@ export function GroupsPage() {
                         <div className={styles.replyComposerCard}>
                           <div>
                             <p className={styles.replyPreviewAuthor}>
-                              Encrypted reply на{" "}
+                              Ответ на{" "}
                               {describeEncryptedGroupAuthor(
                                 selectedEncryptedReplyEntry,
                                 authState.profile.id,
@@ -2597,7 +2564,7 @@ export function GroupsPage() {
                             }}
                             type="button"
                           >
-                            Отменить encrypted reply
+                            Отменить ответ
                           </button>
                         </div>
                       )}
@@ -2606,7 +2573,7 @@ export function GroupsPage() {
                         <div className={styles.replyComposerCard}>
                           <div>
                             <p className={styles.replyPreviewAuthor}>
-                              Encrypted edit revision {editingEncryptedEntry.revision + 1}
+                              Редактирование · версия {editingEncryptedEntry.revision + 1}
                             </p>
                             <p className={styles.replyPreviewText}>
                               {describeEncryptedGroupComposerReplyTarget(editingEncryptedEntry)}
@@ -2621,7 +2588,7 @@ export function GroupsPage() {
                             }}
                             type="button"
                           >
-                            Отменить encrypted edit
+                            Отменить редактирование
                           </button>
                         </div>
                       )}
@@ -2647,12 +2614,11 @@ export function GroupsPage() {
                           type="button"
                         >
                           {encryptedAttachmentDraft === null
-                            ? "Выбрать encrypted файл"
-                            : "Заменить encrypted файл"}
+                            ? "Добавить файл"
+                            : "Заменить файл"}
                         </button>
                         <span className={styles.attachmentHint}>
-                          Этот path reuse'ит ciphertext-only relay из ADR-065: файл шифруется до
-                          upload, descriptor уходит только внутри encrypted group payload.
+                          Прикрепите файл к следующему сообщению.
                         </span>
                       </div>
 
@@ -2665,28 +2631,27 @@ export function GroupsPage() {
                             <p className={styles.attachmentDraftMeta}>
                               {formatAttachmentSize(
                                 encryptedAttachmentDraft.plaintextSizeBytes,
-                              )}{" "}
-                              plaintext •{" "}
+                              )}
                               {encryptedAttachmentDraft.ciphertextSizeBytes > 0 &&
-                                `${formatAttachmentSize(
+                                ` • ${formatAttachmentSize(
                                   encryptedAttachmentDraft.ciphertextSizeBytes,
-                                )} ciphertext • `}
+                                )} после подготовки`}
+                              {" • "}
                               {describeAttachmentMimeType(encryptedAttachmentDraft.mimeType)}
                             </p>
                             {encryptedAttachmentDraft.status === "preparing" && (
                               <p className={styles.attachmentDraftStatus}>
-                                Шифруем файл внутри crypto runtime перед ciphertext upload...
+                                Подготавливаем файл...
                               </p>
                             )}
                             {encryptedAttachmentDraft.status === "uploading" && (
                               <p className={styles.attachmentDraftStatus}>
-                                Загружаем ciphertext blob: {encryptedAttachmentDraft.progress}%
+                                Загружаем файл: {encryptedAttachmentDraft.progress}%
                               </p>
                             )}
                             {encryptedAttachmentDraft.status === "uploaded" && (
                               <p className={styles.attachmentDraftStatus}>
-                                Ciphertext blob загружен. Descriptor будет отправлен только через
-                                encrypted group content message.
+                                Файл готов к отправке.
                               </p>
                             )}
                             {encryptedAttachmentDraft.status === "error" && (
@@ -2722,7 +2687,7 @@ export function GroupsPage() {
                       )}
 
                       <label className={styles.field}>
-                        <span>Encrypted text</span>
+                        <span>Сообщение</span>
                         <textarea
                           disabled={
                             cryptoRuntime.state.isActionPending ||
@@ -2736,8 +2701,8 @@ export function GroupsPage() {
                           }}
                           placeholder={
                             selectedState.snapshot.thread.canSendMessages
-                              ? "Отправить encrypted group message через local crypto runtime"
-                              : "Текущая роль не может отправлять encrypted group messages"
+                              ? "Напишите сообщение"
+                              : "Текущая роль не может отправлять сообщения"
                           }
                           rows={4}
                           value={encryptedComposerText}
@@ -2762,8 +2727,8 @@ export function GroupsPage() {
                           {cryptoRuntime.state.isActionPending
                             ? "Собираем..."
                             : editingEncryptedEntry !== null
-                              ? "Сохранить encrypted edit"
-                              : "Отправить encrypted text"}
+                              ? "Сохранить правки"
+                              : "Отправить"}
                         </button>
                       </div>
                     </form>
@@ -2771,8 +2736,8 @@ export function GroupsPage() {
                     <div className={styles.messagesList}>
                       {encryptedThreadMessages.length === 0 ? (
                         <InlineState
-                          title="Encrypted group messages пока не materialized"
-                          message="Control-plane уже может быть подготовлен, но для текущего bounded окна ещё нет decrypt-ready encrypted envelopes."
+                          title="Сообщений пока нет"
+                          message="В этом окне ещё нет доступных сообщений."
                         />
                       ) : (
                         encryptedThreadMessages.map((entry) => (
@@ -2802,7 +2767,6 @@ export function GroupsPage() {
                                 </p>
                               </div>
                               <div className={styles.badgeColumn}>
-                                <span className={styles.statusPill}>encrypted</span>
                                 {entry.kind === "message" &&
                                   selectedState.snapshot.group.encryptedPinnedMessageIds.includes(
                                     entry.messageId,
@@ -2823,7 +2787,7 @@ export function GroupsPage() {
                               {entry.kind === "message" ? (
                                 entry.isTombstone ? (
                                   <p className={styles.helperText}>
-                                    Сообщение скрыто локальным tombstone из encrypted lane.
+                                    Сообщение скрыто после удаления для всех.
                                   </p>
                                 ) : (
                                   <>
@@ -2882,7 +2846,7 @@ export function GroupsPage() {
                                       </div>
                                     ) : entry.attachments.length === 0 ? (
                                       <p className={styles.helperText}>
-                                        Bootstrap payload не содержит renderable text body.
+                                        В сообщении нет доступного текста.
                                       </p>
                                     ) : null}
                                     <EncryptedMessageAttachmentList
@@ -2949,7 +2913,7 @@ export function GroupsPage() {
                                   {selectedState.snapshot.group.encryptedPinnedMessageIds.includes(
                                     entry.messageId,
                                   )
-                                    ? "Снять encrypted pin"
+                                    ? "Снять закрепление"
                                     : "Закрепить"}
                                 </button>
                                 {entry.senderUserId === authState.profile.id && (
@@ -2967,12 +2931,12 @@ export function GroupsPage() {
                             )}
 
                             <p className={styles.editMeta}>
-                              stored {formatDateTime(entry.storedAt)}
+                              сохранено {formatDateTime(entry.storedAt)}
                               {entry.kind === "message" && entry.editedAt
-                                ? ` • edited ${formatDateTime(entry.editedAt)}`
+                                ? ` • изменено ${formatDateTime(entry.editedAt)}`
                                 : ""}
                               {entry.kind === "message" && entry.deletedAt
-                                ? ` • tombstone ${formatDateTime(entry.deletedAt)}`
+                                ? ` • удалено ${formatDateTime(entry.deletedAt)}`
                                 : ""}
                             </p>
                           </article>
@@ -2986,52 +2950,27 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.cardLabel}>Legacy group history</p>
-                    <h2 className={styles.panelTitle}>Plaintext timeline de-scoped</h2>
+                    <p className={styles.cardLabel}>История</p>
+                    <h2 className={styles.panelTitle}>Ранние сообщения недоступны</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Readable legacy `ListGroupMessages` bootstrap больше не используется как
-                    активный product path. Group metadata, membership и encrypted lane остаются
-                    доступными отдельно, а readable legacy realtime payload тоже больше не
-                    обновляет visible group thread.
+                    В этом окне доступны текущие сообщения. Более ранняя история здесь сейчас не
+                    открывается.
                   </p>
                 </div>
 
                 <div className={styles.timelineMeta}>
+                  <span className={styles.statusPill}>Недоступно</span>
                   <span className={styles.statusPill}>
-                    {legacyGroupHistoryDescoped ? "De-scoped" : `${threadMessages.length} сообщений`}
-                  </span>
-                  <span className={styles.statusPill}>
-                    updated {formatDateTime(selectedState.snapshot.thread.updatedAt)}
+                    Обновлено {formatDateTime(selectedState.snapshot.thread.updatedAt)}
                   </span>
                   {typingLabel && <span className={styles.statusPill}>{typingLabel}</span>}
                 </div>
 
                 <div className={styles.messagesList}>
                   <InlineState
-                    title="Legacy group history недоступна"
-                    message="Readable legacy plaintext list/get/history path для groups в этом slice намеренно de-scoped. Legacy group realtime plaintext payload тоже больше не обновляет активный thread content, а plaintext-compatible group RPC content operations больше не остаются активным runtime path. Открытый group content теперь нужно читать через encrypted group lane выше. Pending остаются legacy plaintext attachment path, bounded internal compatibility reads и отдельные RTC/call follow-up."
-                  />
-                </div>
-              </section>
-
-              <section className={styles.panelCard}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <p className={styles.cardLabel}>Legacy compatibility composer</p>
-                    <h2 className={styles.panelTitle}>Plaintext runtime de-scoped</h2>
-                  </div>
-                  <p className={styles.panelCopy}>
-                    Active group content operations больше не идут через plaintext-compatible
-                    `SendGroupTextMessage` и связанные legacy composer flows. Для visible group
-                    thread активным runtime path остаётся только encrypted lane выше.
-                  </p>
-                </div>
-
-                <div className={styles.messagesList}>
-                  <InlineState
-                    title="Legacy group compatibility RPC выключены"
-                    message="Plaintext-compatible group composer, reply и attachment/voice/video send больше не остаются активным web/runtime path. Если encrypted parity для действия ещё не готова, интерфейс честно не предлагает fallback в legacy plaintext RPC."
+                    title="История недоступна"
+                    message="Текущая группа работает через обычное окно переписки без отдельного fallback-режима для старого пути."
                   />
                 </div>
               </section>
@@ -3376,7 +3315,7 @@ function describeEncryptedGroupAuthor(
 
   const member = members.find((candidate) => candidate.user.id === entry.senderUserId);
   if (!member) {
-    return "Участник encrypted roster";
+    return "Участник группы";
   }
 
   return member.user.nickname || `@${member.user.login}`;
@@ -3636,16 +3575,16 @@ function resolveEncryptedGroupReplyTarget(
   if (target === undefined) {
     return {
       messageId: null,
-      authorLabel: "Недоступное encrypted сообщение",
-      previewText: "Reply target пока не разрешён в текущем локальном bounded окне.",
+      authorLabel: "Недоступное сообщение",
+      previewText: "Исходное сообщение пока недоступно в этом окне.",
     };
   }
 
   if (target.isTombstone) {
     return {
       messageId: target.messageId,
-      authorLabel: "Удалённое encrypted сообщение",
-      previewText: "Сообщение удалено для всех локальным tombstone.",
+      authorLabel: "Удалённое сообщение",
+      previewText: "Сообщение удалено для всех.",
     };
   }
 
@@ -3667,21 +3606,21 @@ function describeEncryptedGroupComposerReplyTarget(
   }
   if (entry.attachments.length > 0) {
     return entry.attachments.length === 1
-      ? "Encrypted вложение"
-      : `Encrypted вложения: ${entry.attachments.length}`;
+      ? "Вложение"
+      : `Вложения: ${entry.attachments.length}`;
   }
 
-  return "Encrypted сообщение без renderable content.";
+  return "Сообщение без доступного содержимого.";
 }
 
 function describeEncryptedGroupPinnedPreview(
   entry: EncryptedGroupProjectedMessageEntry | null,
 ): string {
   if (entry === null) {
-    return "Серверный pin уже сохранён, но содержимое сообщения ещё не разрешено локальной encrypted projection.";
+    return "Сообщение закреплено, но его содержимое пока недоступно в этом окне.";
   }
   if (entry.isTombstone) {
-    return "Сообщение закреплено по logical id, но его текущее состояние tombstone.";
+    return "Сообщение закреплено, но уже удалено для всех.";
   }
 
   return describeEncryptedGroupComposerReplyTarget(entry);
@@ -3698,10 +3637,10 @@ function describeEncryptedGroupBootstrapSendHint(input: {
   cryptoRuntimeState: CryptoContextState;
 }): string {
   if (!input.groupSelected) {
-    return "Encrypted group media bootstrap доступен только внутри открытой группы.";
+    return "Откройте группу, чтобы отправить сообщение.";
   }
   if (input.cryptoRuntimeState.status !== "ready") {
-    return "Crypto runtime ещё не готов. Encrypted group send ждёт worker bootstrap.";
+    return "Подготавливаем защищённый режим отправки.";
   }
   const snapshot = input.cryptoRuntimeState.snapshot;
   if (
@@ -3712,35 +3651,35 @@ function describeEncryptedGroupBootstrapSendHint(input: {
   ) {
     return (
       snapshot?.errorMessage ??
-      "Для encrypted group media bootstrap нужен active local crypto-device."
+      "Для отправки сообщений нужно активное локальное устройство."
     );
   }
   if (input.encryptedAttachmentDraft?.status === "preparing") {
-    return "Файл шифруется внутри crypto runtime перед presigned ciphertext upload.";
+    return "Подготавливаем файл перед загрузкой.";
   }
   if (input.encryptedAttachmentDraft?.status === "uploading") {
-    return "Загружаем ciphertext blob через общий relay path. Descriptor уйдёт позже внутри encrypted group payload.";
+    return "Загружаем файл и готовим его к отправке.";
   }
   if (input.encryptedAttachmentDraft?.status === "error") {
-    return "Encrypted media draft не готов: исправьте ошибку upload и повторите.";
+    return "Не удалось подготовить файл. Исправьте ошибку и повторите.";
   }
   if (input.isEditingEncryptedMessage) {
-    return "Encrypted group edit в этом slice остаётся text-only. Новые вложения добавляются только в новый content message.";
+    return "Следующее действие сохранит изменения сообщения.";
   }
   if (input.hasEncryptedReplyTarget) {
-    return "Reply reference и media descriptor уходят только внутри ciphertext payload. Сервер не строит plaintext quote preview.";
+    return "Следующее сообщение будет отправлено как ответ.";
   }
   if (
     normalizeComposerMessageText(input.composerText) === "" &&
     input.encryptedAttachmentDraft?.status !== "uploaded"
   ) {
-    return "Введите текст или подготовьте encrypted attachment, чтобы отправить bounded encrypted group message.";
+    return "Введите текст или подготовьте файл для отправки.";
   }
   if (input.encryptedAttachmentDraft?.status === "uploaded") {
-    return "Ciphertext blob уже загружен. Кнопка отправит descriptor внутри encrypted group content message без второго group-only media path.";
+    return "Файл готов. Можно отправлять сообщение.";
   }
 
-  return "Этот composer reuse'ит ADR-065 как есть: ciphertext-only relay, local decrypt/use и без plaintext shadow write в legacy group history.";
+  return "Сообщение будет отправлено обычным действием из этого окна.";
 }
 
 function jumpToMessage(elementId: string) {

@@ -210,19 +210,19 @@ describe("search result labels", () => {
 describe("legacy search boundary copy", () => {
   it("makes direct server-side de-scope explicit", () => {
     expect(describeLegacySearchPath("all-direct")).toBe(
-      "Серверный поиск по содержимому legacy direct-сообщений больше не поддерживается.",
+      "Серверный поиск по содержимому личных чатов сейчас недоступен.",
     );
     expect(describeLegacySearchEmptyState("direct")).toBe(
-      "Legacy direct content search на сервере честно де-скоуплен. Для direct остаётся только локальный encrypted поиск текущей сессии.",
+      "В этой области доступны только результаты из текущей локальной сессии.",
     );
   });
 
   it("makes group server-side de-scope explicit", () => {
     expect(describeLegacySearchPath("group")).toBe(
-      "Серверный поиск по содержимому legacy group-сообщений больше не поддерживается.",
+      "Серверный поиск по содержимому групп сейчас недоступен.",
     );
     expect(describeLegacySearchEmptyState("all-groups")).toBe(
-      "Legacy group content search на сервере честно де-скоуплен. Для групп остаётся только локальный encrypted поиск текущей сессии.",
+      "В этой области доступны только результаты из текущей локальной сессии.",
     );
   });
 });

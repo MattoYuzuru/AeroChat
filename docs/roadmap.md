@@ -16,6 +16,7 @@ desktop shell, mobile launcher adaptation и частичный RTC web slice.
 
 - [x] Контекстное меню фона рабочего стола с bounded-действиями создания папки и открытия Explorer
 - [x] Финальный desktop usability pass для shell: восстановленный hit-testing desktop entrypoints, viewport-safe Start и bounded resize окон
+- [x] Консолидация visible direct/group chat UX вокруг default-safe path без routine plaintext/encrypted duality в `apps/web`
 
 ---
 

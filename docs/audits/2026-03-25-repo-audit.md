@@ -225,6 +225,10 @@
 - Search UX boundary:
   - `/app/search` сохраняет coexistence-модель: legacy direct/group content search на сервере честно de-scoped, а encrypted results строятся только из local/session-local decrypted index в браузере;
   - удаление plaintext без replacement search/reply/history strategy сломает текущий product surface, а не просто storage detail.
+- Visible UX consolidation:
+  - visible direct/group chat windows и file/media entrypoints в `apps/web` уже сведены к обычному default-safe UX без отдельных plaintext-vs-encrypted пользовательских контролов;
+  - encryption-first path теперь показывается как стандартный путь переписки, а de-scoped history/search ограничения формулируются короткими product-facing состояниями без migration-heavy wording;
+  - этот UI slice не убирает bounded internal compatibility reads, coexistence storage/model или metadata-level debt из репозитория.
 - Следующий минимальный slice после этого guardrail PR:
   - отдельно убрать одну legacy plaintext dependency за раз;
   - direct legacy reply preview degradation/removal slice уже выполнен;

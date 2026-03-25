@@ -285,7 +285,7 @@ function resolveStableScope(
 }
 
 export const LEGACY_GROUP_ATTACHMENT_COMPOSER_DESCOPED_MESSAGE =
-  "Legacy plaintext group attachment path больше не является активным runtime UX. Для groups используйте encrypted media composer.";
+  "Обычный старый путь вложений для групп больше недоступен. Используйте текущее окно отправки сообщения.";
 
 export function isLegacyPlaintextGroupAttachmentComposerDescoped(
   scope: AttachmentComposerScope | null,
