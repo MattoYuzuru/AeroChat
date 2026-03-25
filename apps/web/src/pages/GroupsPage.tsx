@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useEffectEvent,
   useReducer,
   useRef,
   useState,
@@ -11,16 +10,8 @@ import {
   type SetStateAction,
 } from "react";
 import { useSearchParams } from "react-router-dom";
-import {
-  canSubmitMessageComposer,
-  normalizeComposerMessageText,
-} from "../attachments/message-content";
+import { normalizeComposerMessageText } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
-import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
-import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
-import { useAttachmentComposer } from "../attachments/useAttachmentComposer";
-import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
-import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import { EncryptedMessageAttachmentList } from "../chats/EncryptedMessageAttachmentList";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
@@ -36,7 +27,6 @@ import {
   type Group,
   type GroupMember,
   type GroupMemberRole,
-  type GroupMessage,
   type GroupTypingState,
   type RtcCallParticipant,
 } from "../gateway/types";
@@ -110,18 +100,15 @@ export function GroupsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
   const [joinInput, setJoinInput] = useState("");
-  const [composerText, setComposerText] = useState("");
   const [encryptedComposerText, setEncryptedComposerText] = useState("");
   const [encryptedComposerError, setEncryptedComposerError] = useState<string | null>(null);
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
-  const [selectedReplyMessage, setSelectedReplyMessage] = useState<GroupMessage | null>(null);
   const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
     useState<string | null>(null);
   const [inviteRole, setInviteRole] = useState<GroupMemberRole>("member");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isCreatingInviteLink, setIsCreatingInviteLink] = useState(false);
   const [pendingDisableInviteId, setPendingDisableInviteId] = useState<string | null>(null);
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null);
@@ -147,7 +134,6 @@ export function GroupsPage() {
   );
   const groupCallAwarenessStateRef = useRef(groupCallAwarenessState);
   const previousSelectedGroupCallIdRef = useRef<string | null>(null);
-  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const activeTypingTargetRef = useRef<GroupTypingSessionTarget | null>(null);
   const typingLastSentAtRef = useRef(0);
@@ -172,19 +158,7 @@ export function GroupsPage() {
     threadId: selectedState.status === "ready" ? selectedState.snapshot.thread.id : null,
     canSendMessages:
       selectedState.status === "ready" ? selectedState.snapshot.thread.canSendMessages : false,
-    composerText,
-  });
-  const attachmentComposer = useAttachmentComposer({
-    enabled: authState.status === "authenticated",
-    token,
-    scope:
-      selectedState.status === "ready"
-        ? {
-            kind: "group",
-            id: selectedState.snapshot.group.id,
-          }
-        : null,
-    onUnauthenticated: expireSession,
+    composerText: "",
   });
   const encryptedMediaAttachmentDraft = useEncryptedMediaAttachmentDraft({
     enabled: authState.status === "authenticated",
@@ -198,70 +172,8 @@ export function GroupsPage() {
         : null,
     onUnauthenticated: expireSession,
   });
-  const voiceNoteRecorder = useVoiceNoteRecorder({
-    enabled: authState.status === "authenticated",
-  });
-  const videoNoteRecorder = useVideoNoteRecorder({
-    enabled: authState.status === "authenticated",
-  });
-  const discardVoiceNoteRecording = useEffectEvent(() => {
-    voiceNoteRecorder.discardRecording();
-  });
-  const discardVideoNoteRecording = useEffectEvent(() => {
-    videoNoteRecorder.discardRecording();
-  });
-  const voiceNoteStatus = voiceNoteRecorder.state.status;
-  const hasPendingVoiceNote =
-    voiceNoteStatus === "requesting_permission" ||
-    voiceNoteStatus === "recording" ||
-    voiceNoteStatus === "processing" ||
-    voiceNoteStatus === "recorded";
-  const videoNoteStatus = videoNoteRecorder.state.status;
-  const hasPendingVideoNote =
-    videoNoteStatus === "requesting_permission" ||
-    videoNoteStatus === "recording" ||
-    videoNoteStatus === "processing" ||
-    videoNoteStatus === "recorded";
-  const uploadedAttachmentId = attachmentComposer.uploadedAttachmentId;
-  const attachmentDraft = attachmentComposer.state.draft;
   const encryptedAttachmentDraft = encryptedMediaAttachmentDraft.draft;
   const uploadedEncryptedAttachmentDraft = encryptedMediaAttachmentDraft.uploadedDraft;
-  const canSubmitGroupComposer =
-    selectedState.status === "ready" &&
-    canSubmitMessageComposer({
-      text: composerText,
-      uploadedAttachmentId,
-      isUploading: attachmentComposer.isUploading,
-      canSendMessages: selectedState.snapshot.thread.canSendMessages,
-    });
-  const canPickAttachment =
-    selectedState.status === "ready" &&
-    !isSendingMessage &&
-    !attachmentComposer.isUploading &&
-    !encryptedMediaAttachmentDraft.isUploading &&
-    encryptedAttachmentDraft === null &&
-    uploadedEncryptedAttachmentDraft === null &&
-    !hasPendingVoiceNote &&
-    !hasPendingVideoNote &&
-    selectedState.snapshot.thread.canSendMessages;
-  const canRecordVoiceNote =
-    selectedState.status === "ready" &&
-    !isSendingMessage &&
-    !attachmentComposer.isUploading &&
-    !encryptedMediaAttachmentDraft.isUploading &&
-    attachmentDraft === null &&
-    encryptedAttachmentDraft === null &&
-    !hasPendingVideoNote &&
-    selectedState.snapshot.thread.canSendMessages;
-  const canRecordVideoNote =
-    selectedState.status === "ready" &&
-    !isSendingMessage &&
-    !attachmentComposer.isUploading &&
-    !encryptedMediaAttachmentDraft.isUploading &&
-    attachmentDraft === null &&
-    encryptedAttachmentDraft === null &&
-    !hasPendingVoiceNote &&
-    selectedState.snapshot.thread.canSendMessages;
 
   useEffect(() => {
     selectedStateRef.current = selectedState;
@@ -277,7 +189,6 @@ export function GroupsPage() {
 
   useEffect(() => {
     setEditingEncryptedMessageId(null);
-    setSelectedReplyMessage(null);
     setSelectedEncryptedReplyMessageId(null);
     setEncryptedComposerText("");
     setEncryptedComposerError(null);
@@ -287,8 +198,6 @@ export function GroupsPage() {
     previousSelectedGroupCallIdRef.current = null;
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
-    discardVoiceNoteRecording();
-    discardVideoNoteRecording();
   }, [selectedGroupId]);
 
   useEffect(() => {
@@ -467,8 +376,6 @@ export function GroupsPage() {
     }
     if (selectedGroupId === "") {
       setSelectedState(createInitialGroupsSelectedState());
-      setComposerText("");
-      setSelectedReplyMessage(null);
       setEditingEncryptedMessageId(null);
       setSelectedEncryptedReplyMessageId(null);
       setEncryptedComposerText("");
@@ -570,7 +477,6 @@ export function GroupsPage() {
       );
       if (shouldClearSelection) {
         setSearchParams(new URLSearchParams(), { replace: true });
-        setComposerText("");
         setNotice("Live state: доступ к группе больше не активен.");
       }
 
@@ -1215,28 +1121,16 @@ export function GroupsPage() {
     encryptedGroupLane.status === "ready" &&
     encryptedGroupLane.bootstrap !== null &&
     selectedState.snapshot.thread.canSendMessages &&
-    !isSendingMessage &&
     !cryptoRuntime.state.isActionPending &&
-    !attachmentComposer.isUploading &&
     !encryptedMediaAttachmentDraft.isUploading &&
-    attachmentDraft === null &&
-    uploadedAttachmentId === null &&
-    !hasPendingVoiceNote &&
-    !hasPendingVideoNote &&
     editingEncryptedEntry === null;
   const canSendEncryptedGroupText =
     selectedState.status === "ready" &&
     encryptedGroupLane.status === "ready" &&
     encryptedGroupLane.bootstrap !== null &&
     selectedState.snapshot.thread.canSendMessages &&
-    !isSendingMessage &&
     !cryptoRuntime.state.isActionPending &&
-    !attachmentComposer.isUploading &&
     !encryptedMediaAttachmentDraft.isUploading &&
-    attachmentDraft === null &&
-    uploadedAttachmentId === null &&
-    !hasPendingVoiceNote &&
-    !hasPendingVideoNote &&
     (editingEncryptedEntry !== null
       ? normalizeComposerMessageText(encryptedComposerText) !== "" &&
         uploadedEncryptedAttachmentDraft === null
@@ -1245,10 +1139,7 @@ export function GroupsPage() {
   const encryptedSendHint = describeEncryptedGroupBootstrapSendHint({
     groupSelected: selectedState.status === "ready",
     composerText: encryptedComposerText,
-    legacyAttachmentDraftPresent: attachmentDraft !== null || uploadedAttachmentId !== null,
     encryptedAttachmentDraft,
-    hasPendingVoiceNote,
-    hasPendingVideoNote,
     isEditingEncryptedMessage: editingEncryptedEntry !== null,
     hasEncryptedReplyTarget: selectedEncryptedReplyEntry !== null,
     cryptoRuntimeState: cryptoRuntime.state,
@@ -1446,7 +1337,6 @@ export function GroupsPage() {
     try {
       const group = await gatewayClient.createGroup(token, normalizedName);
       setGroupName("");
-      setComposerText("");
       setLastCreatedInvite(null);
       setNotice("Группа создана.");
       await reloadGroups();
@@ -1480,7 +1370,6 @@ export function GroupsPage() {
     try {
       const group = await gatewayClient.joinGroupByInviteLink(token, requestedJoinToken);
       setJoinInput(requestedJoinToken);
-      setComposerText("");
       setLastCreatedInvite(null);
       setNotice("Вход в группу выполнен.");
       openGroup(group.id);
@@ -1564,60 +1453,6 @@ export function GroupsPage() {
     }
   }
 
-  async function handleSendGroupMessage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (selectedState.status !== "ready") {
-      return;
-    }
-
-    const normalizedText = normalizeComposerMessageText(composerText);
-    if (!canSubmitGroupComposer) {
-      setActionError(
-        attachmentComposer.isUploading
-          ? "Дождитесь завершения загрузки файла, прежде чем отправлять сообщение."
-          : "Добавьте текст сообщения или готовое вложение.",
-      );
-      setNotice(null);
-      return;
-    }
-
-    setIsSendingMessage(true);
-    setActionError(null);
-    setNotice(null);
-
-    try {
-      await gatewayClient.sendGroupTextMessage(
-        token,
-        selectedState.snapshot.group.id,
-        normalizedText,
-        attachmentComposer.uploadedAttachmentId === null
-          ? []
-          : [attachmentComposer.uploadedAttachmentId],
-        selectedReplyMessage?.id ?? null,
-      );
-      setComposerText("");
-      setSelectedReplyMessage(null);
-      if (attachmentComposer.uploadedAttachmentId !== null) {
-        attachmentComposer.markSendSucceeded();
-      }
-      setNotice("Сообщение отправлено.");
-    } catch (error) {
-      if (attachmentComposer.uploadedAttachmentId !== null) {
-        attachmentComposer.markSendFailed();
-      }
-      const message = resolveProtectedError(
-        error,
-        "Не удалось отправить сообщение в группу.",
-        expireSession,
-      );
-      if (message !== null) {
-        setActionError(message);
-      }
-    } finally {
-      setIsSendingMessage(false);
-    }
-  }
-
   async function handleSendEncryptedGroupMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (selectedState.status !== "ready") {
@@ -1641,21 +1476,6 @@ export function GroupsPage() {
       setNotice(null);
       return;
     }
-    if (attachmentDraft !== null || uploadedAttachmentId !== null) {
-      setEncryptedComposerError(
-        "Legacy group attachment composer не подключён к encrypted group send. Используйте отдельный encrypted media draft.",
-      );
-      setNotice(null);
-      return;
-    }
-    if (hasPendingVoiceNote || hasPendingVideoNote) {
-      setEncryptedComposerError(
-        "Voice/video note path остаётся legacy group attachment flow и не входит в encrypted group media bootstrap.",
-      );
-      setNotice(null);
-      return;
-    }
-
     const normalizedText = normalizeComposerMessageText(encryptedComposerText);
     if (
       editingEncryptedEntry !== null &&
@@ -1799,120 +1619,6 @@ export function GroupsPage() {
         setActionError(message);
       }
     }
-  }
-
-  async function handleSendGroupVoiceNote() {
-    if (selectedState.status !== "ready" || voiceNoteRecorder.state.draft === null) {
-      return;
-    }
-
-    if (isSendingMessage || attachmentComposer.isUploading) {
-      return;
-    }
-
-    setIsSendingMessage(true);
-    setActionError(null);
-    setNotice(null);
-
-    const recordedFile = voiceNoteRecorder.state.draft.file;
-    let uploadedAttachmentId: string | null = null;
-    voiceNoteRecorder.discardRecording();
-
-    try {
-      const uploadedAttachment = await attachmentComposer.selectFile(recordedFile);
-      if (uploadedAttachment === null) {
-        return;
-      }
-      uploadedAttachmentId = uploadedAttachment.id;
-
-      await gatewayClient.sendGroupTextMessage(
-        token,
-        selectedState.snapshot.group.id,
-        normalizeComposerMessageText(composerText),
-        [uploadedAttachmentId],
-        selectedReplyMessage?.id ?? null,
-      );
-      setComposerText("");
-      setSelectedReplyMessage(null);
-      attachmentComposer.markSendSucceeded();
-      setNotice("Голосовая заметка отправлена.");
-    } catch (error) {
-      if (uploadedAttachmentId !== null) {
-        attachmentComposer.markSendFailed();
-      }
-      const message = resolveProtectedError(
-        error,
-        "Не удалось отправить голосовую заметку в группу.",
-        expireSession,
-      );
-      if (message !== null) {
-        setActionError(message);
-      }
-    } finally {
-      setIsSendingMessage(false);
-    }
-  }
-
-  async function handleSendGroupVideoNote() {
-    if (selectedState.status !== "ready" || videoNoteRecorder.state.draft === null) {
-      return;
-    }
-
-    if (isSendingMessage || attachmentComposer.isUploading) {
-      return;
-    }
-
-    setIsSendingMessage(true);
-    setActionError(null);
-    setNotice(null);
-
-    const recordedFile = videoNoteRecorder.state.draft.file;
-    let uploadedAttachmentId: string | null = null;
-    videoNoteRecorder.discardRecording();
-
-    try {
-      const uploadedAttachment = await attachmentComposer.selectFile(recordedFile);
-      if (uploadedAttachment === null) {
-        return;
-      }
-      uploadedAttachmentId = uploadedAttachment.id;
-
-      await gatewayClient.sendGroupTextMessage(
-        token,
-        selectedState.snapshot.group.id,
-        normalizeComposerMessageText(composerText),
-        [uploadedAttachmentId],
-        selectedReplyMessage?.id ?? null,
-      );
-      setComposerText("");
-      setSelectedReplyMessage(null);
-      attachmentComposer.markSendSucceeded();
-      setNotice("Видео заметка отправлена.");
-    } catch (error) {
-      if (uploadedAttachmentId !== null) {
-        attachmentComposer.markSendFailed();
-      }
-      const message = resolveProtectedError(
-        error,
-        "Не удалось отправить видео заметку в группу.",
-        expireSession,
-      );
-      if (message !== null) {
-        setActionError(message);
-      }
-    } finally {
-      setIsSendingMessage(false);
-    }
-  }
-
-  async function handleAttachmentSelection(file: File | null) {
-    if (file === null) {
-      return;
-    }
-
-    setActionError(null);
-    setNotice(null);
-    await attachmentComposer.selectFile(file);
   }
 
   async function handleEncryptedAttachmentSelection(file: File | null) {
@@ -2190,12 +1896,10 @@ export function GroupsPage() {
   function clearGroupSelection() {
     if (desktopShellHost !== null) {
       desktopShellHost.launchApp("groups");
-      setComposerText("");
       return;
     }
 
     setSearchParams(new URLSearchParams(), { replace: true });
-    setComposerText("");
   }
 
   function setGroupInfoMode(nextMode: "thread" | "info") {
@@ -3306,7 +3010,7 @@ export function GroupsPage() {
                 <div className={styles.messagesList}>
                   <InlineState
                     title="Legacy group history недоступна"
-                    message="Readable legacy plaintext list/get/history path для groups в этом slice намеренно de-scoped. Legacy group realtime plaintext payload тоже больше не обновляет активный thread content. Открытый group content теперь нужно читать через encrypted group lane выше. Pending остаются readable direct realtime compatibility payload, compatibility RPC surfaces и legacy plaintext attachment path."
+                    message="Readable legacy plaintext list/get/history path для groups в этом slice намеренно de-scoped. Legacy group realtime plaintext payload тоже больше не обновляет активный thread content, а plaintext-compatible group RPC content operations больше не остаются активным runtime path. Открытый group content теперь нужно читать через encrypted group lane выше. Pending остаются legacy plaintext attachment path, bounded internal compatibility reads и отдельные RTC/call follow-up."
                   />
                 </div>
               </section>
@@ -3314,227 +3018,22 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.cardLabel}>Composer</p>
-                    <h2 className={styles.panelTitle}>Новое сообщение</h2>
+                    <p className={styles.cardLabel}>Legacy compatibility composer</p>
+                    <h2 className={styles.panelTitle}>Plaintext runtime de-scoped</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Raw HTML запрещён. Файл или записанная голосовая заметка загружаются отдельно,
-                    а single-file composer допускает text-only, text + attachment и attachment-only
-                    сообщения.
+                    Active group content operations больше не идут через plaintext-compatible
+                    `SendGroupTextMessage` и связанные legacy composer flows. Для visible group
+                    thread активным runtime path остаётся только encrypted lane выше.
                   </p>
                 </div>
 
-                {!selectedState.snapshot.thread.canSendMessages && (
-                  <div className={styles.readOnlyNotice}>
-                    {selectedSelfMember?.isWriteRestricted
-                      ? "Для текущего участника включено backend-ограничение на отправку сообщений и typing."
-                      : "Роль `reader` видит историю группы, но не может отправлять сообщения."}
-                  </div>
-                )}
-
-                <form className={styles.composer} onSubmit={handleSendGroupMessage}>
-                  {selectedReplyMessage && (
-                    <div className={styles.replyComposerCard}>
-                      <div>
-                        <p className={styles.replyPreviewAuthor}>
-                          Ответ на{" "}
-                          {describeMessageAuthor(
-                            selectedReplyMessage.senderUserId,
-                            authState.profile.id,
-                            selectedState.members,
-                          )}
-                        </p>
-                        <p className={styles.replyPreviewText}>
-                          {describeGroupComposerReplyTarget(selectedReplyMessage)}
-                        </p>
-                      </div>
-                      <button
-                        className={styles.ghostButton}
-                        onClick={() => {
-                          setSelectedReplyMessage(null);
-                        }}
-                        type="button"
-                      >
-                        Отменить reply
-                      </button>
-                    </div>
-                  )}
-
-                  <div className={styles.attachmentActions}>
-                    <input
-                      accept="*/*"
-                      className={styles.attachmentInput}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0] ?? null;
-                        void handleAttachmentSelection(file);
-                        event.target.value = "";
-                      }}
-                      ref={attachmentInputRef}
-                      type="file"
-                    />
-                    <button
-                      className={styles.secondaryButton}
-                      disabled={!canPickAttachment}
-                      onClick={() => {
-                        attachmentInputRef.current?.click();
-                      }}
-                      type="button"
-                    >
-                      {attachmentDraft === null ? "Выбрать файл" : "Заменить файл"}
-                    </button>
-                    <span className={styles.attachmentHint}>
-                      Single-file composer: legacy file, voice note или video note идут через
-                      plaintext path. Encrypted media для MLS lane отправляется только отдельным
-                      encrypted composer выше.
-                    </span>
-                  </div>
-
-                  <VoiceNoteRecorderPanel
-                    discardDisabled={isSendingMessage}
-                    isSending={isSendingMessage}
-                    onDiscard={() => {
-                      voiceNoteRecorder.discardRecording();
-                    }}
-                    onSend={() => {
-                      void handleSendGroupVoiceNote();
-                    }}
-                    onStart={() => {
-                      void voiceNoteRecorder.startRecording();
-                    }}
-                    onStop={() => {
-                      voiceNoteRecorder.stopRecording();
-                    }}
-                    sendDisabled={
-                      isSendingMessage ||
-                      attachmentComposer.isUploading ||
-                      encryptedMediaAttachmentDraft.isUploading ||
-                      !selectedState.snapshot.thread.canSendMessages
-                    }
-                    startDisabled={!canRecordVoiceNote}
-                    state={voiceNoteRecorder.state}
-                    stopDisabled={isSendingMessage}
+                <div className={styles.messagesList}>
+                  <InlineState
+                    title="Legacy group compatibility RPC выключены"
+                    message="Plaintext-compatible group composer, reply и attachment/voice/video send больше не остаются активным web/runtime path. Если encrypted parity для действия ещё не готова, интерфейс честно не предлагает fallback в legacy plaintext RPC."
                   />
-
-                  <VideoNoteRecorderPanel
-                    discardDisabled={isSendingMessage}
-                    isSending={isSendingMessage}
-                    onDiscard={() => {
-                      videoNoteRecorder.discardRecording();
-                    }}
-                    onSend={() => {
-                      void handleSendGroupVideoNote();
-                    }}
-                    onStart={() => {
-                      void videoNoteRecorder.startRecording();
-                    }}
-                    onStop={() => {
-                      videoNoteRecorder.stopRecording();
-                    }}
-                    sendDisabled={
-                      isSendingMessage ||
-                      attachmentComposer.isUploading ||
-                      encryptedMediaAttachmentDraft.isUploading ||
-                      !selectedState.snapshot.thread.canSendMessages
-                    }
-                    startDisabled={!canRecordVideoNote}
-                    state={videoNoteRecorder.state}
-                    stopDisabled={isSendingMessage}
-                  />
-
-                  {attachmentDraft && (
-                    <div className={styles.attachmentDraftCard}>
-                      <div>
-                        <p className={styles.attachmentDraftTitle}>
-                          {attachmentDraft.fileName}
-                        </p>
-                        <p className={styles.attachmentDraftMeta}>
-                          {formatAttachmentSize(attachmentDraft.sizeBytes)} •{" "}
-                          {describeAttachmentMimeType(attachmentDraft.mimeType)}
-                        </p>
-                        {attachmentDraft.status === "preparing" && (
-                          <p className={styles.attachmentDraftStatus}>
-                            Подготавливаем upload intent...
-                          </p>
-                        )}
-                        {attachmentDraft.status === "uploading" && (
-                          <p className={styles.attachmentDraftStatus}>
-                            Загружаем: {attachmentDraft.progress}%
-                          </p>
-                        )}
-                        {attachmentDraft.status === "uploaded" && (
-                          <p className={styles.attachmentDraftStatus}>
-                            Файл загружен и будет прикреплён к следующему сообщению.
-                          </p>
-                        )}
-                        {attachmentDraft.status === "error" && (
-                          <p className={styles.attachmentDraftError}>
-                            {attachmentDraft.errorMessage ?? "Не удалось загрузить файл."}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className={styles.attachmentDraftActions}>
-                        {attachmentDraft.status === "error" && (
-                          <button
-                            className={styles.ghostButton}
-                            onClick={() => {
-                              void attachmentComposer.retryUpload();
-                            }}
-                            type="button"
-                          >
-                            Повторить upload
-                          </button>
-                        )}
-                        <button
-                          className={styles.ghostButton}
-                          onClick={() => {
-                            attachmentComposer.removeDraft();
-                          }}
-                          type="button"
-                        >
-                          Убрать
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <label className={styles.field}>
-                    <span>Текст сообщения</span>
-                    <textarea
-                      disabled={
-                        isSendingMessage ||
-                        attachmentComposer.isUploading ||
-                        !selectedState.snapshot.thread.canSendMessages
-                      }
-                      maxLength={4000}
-                      onChange={(event) => {
-                        setComposerText(event.target.value);
-                        setActionError(null);
-                      }}
-                      placeholder={
-                        selectedState.snapshot.thread.canSendMessages
-                          ? "Напишите текстовое сообщение в primary thread"
-                          : "Эта роль читает историю без отправки"
-                      }
-                      rows={5}
-                      value={composerText}
-                    />
-                  </label>
-
-                  <div className={styles.composerFooter}>
-                    <span className={styles.characterCount}>{composerText.trim().length}/4000</span>
-                    <button
-                      className={styles.primaryButton}
-                      disabled={
-                        isSendingMessage ||
-                        !canSubmitGroupComposer
-                      }
-                      type="submit"
-                    >
-                      {isSendingMessage ? "Отправляем..." : "Отправить"}
-                    </button>
-                  </div>
-                </form>
+                </div>
               </section>
                 </>
               )}
@@ -3864,22 +3363,6 @@ export function GroupsPage() {
     </div>
   );
 
-  function describeMessageAuthor(
-    senderUserId: string,
-    currentUserId: string,
-    members: GroupMember[],
-  ): string {
-    if (senderUserId === currentUserId) {
-      return "Вы";
-    }
-
-    const member = members.find((candidate) => candidate.user.id === senderUserId);
-    if (!member) {
-      return "Участник группы";
-    }
-
-    return member.user.nickname || `@${member.user.login}`;
-  }
 }
 
 function describeEncryptedGroupAuthor(
@@ -4133,19 +3616,6 @@ function describeGroupCallParticipantName(
   return member.user.nickname || `@${member.user.login}`;
 }
 
-function describeGroupComposerReplyTarget(message: GroupMessage): string {
-  const normalizedText = normalizeComposerMessageText(message.text?.text ?? "");
-  if (normalizedText !== "") {
-    return normalizedText.length > 140 ? `${normalizedText.slice(0, 137)}...` : normalizedText;
-  }
-  if (message.attachments.length > 0) {
-    return message.attachments.length === 1
-      ? "Вложение"
-      : `Вложения: ${message.attachments.length}`;
-  }
-  return "Сообщение без текста";
-}
-
 interface EncryptedGroupReplyTargetDescriptor {
   messageId: string | null;
   authorLabel: string;
@@ -4220,12 +3690,9 @@ function describeEncryptedGroupPinnedPreview(
 function describeEncryptedGroupBootstrapSendHint(input: {
   groupSelected: boolean;
   composerText: string;
-  legacyAttachmentDraftPresent: boolean;
   encryptedAttachmentDraft: ReturnType<
     typeof useEncryptedMediaAttachmentDraft
   >["draft"];
-  hasPendingVoiceNote: boolean;
-  hasPendingVideoNote: boolean;
   isEditingEncryptedMessage: boolean;
   hasEncryptedReplyTarget: boolean;
   cryptoRuntimeState: CryptoContextState;
@@ -4248,9 +3715,6 @@ function describeEncryptedGroupBootstrapSendHint(input: {
       "Для encrypted group media bootstrap нужен active local crypto-device."
     );
   }
-  if (input.legacyAttachmentDraftPresent) {
-    return "Legacy group attachment draft отправляется только через plaintext thread. Для encrypted media используйте отдельный encrypted draft.";
-  }
   if (input.encryptedAttachmentDraft?.status === "preparing") {
     return "Файл шифруется внутри crypto runtime перед presigned ciphertext upload.";
   }
@@ -4259,9 +3723,6 @@ function describeEncryptedGroupBootstrapSendHint(input: {
   }
   if (input.encryptedAttachmentDraft?.status === "error") {
     return "Encrypted media draft не готов: исправьте ошибку upload и повторите.";
-  }
-  if (input.hasPendingVoiceNote || input.hasPendingVideoNote) {
-    return "Voice/video notes пока остаются только в legacy group attachment flow и не входят в encrypted media bootstrap.";
   }
   if (input.isEditingEncryptedMessage) {
     return "Encrypted group edit в этом slice остаётся text-only. Новые вложения добавляются только в новый content message.";
