@@ -36,6 +36,9 @@
   - publish-процесс для `aerochat-web` сохраняет conservative STUN fallback для direct calls;
   - canonical TURN/STUN policy теперь задаётся через `AERO_RTC_STUN_URLS`, `AERO_RTC_TURN_URLS`,
     `AERO_RTC_TURN_USERNAME_TTL` и server secret `AERO_RTC_TURN_AUTH_SECRET`, которые читает `aero-rtc-control`;
+  - repo-managed `turn` runtime теперь поднимается тем же `docker-compose.server.yml` в `host` network mode;
+  - для direct calls server env отдельно различает internal shared-edge host IP и public TURN relay IP через
+    `AERO_RTC_TURN_EXTERNAL_IP` и опциональный `AERO_RTC_TURN_RELAY_IP`;
   - compose публикует `web`, `aero-gateway` и `minio` API на одном host IP, достижимом из pod'ов `Traefik`;
   - shared `Traefik` остаётся единственным публичным edge на `80/443`;
   - TLS обслуживается через cluster `cert-manager`, а не через host-level certificate path.
@@ -48,7 +51,8 @@
    - `web` как контейнер со статически собранным frontend;
    - `aero-gateway` как единственная backend edge-точка;
    - `aero-identity` и `aero-chat` как внутренние сервисы;
-   - `postgres`, `redis`, `minio` как внутренние зависимости.
+   - `postgres`, `redis`, `minio` как внутренние зависимости;
+   - `turn` как отдельный host-network service для browser media relay.
 
 2. Cluster edge
    - shared `Traefik` как единственный публичный HTTP/TLS ingress;
@@ -79,6 +83,13 @@
 
 При этом `MinIO Console` и public bucket discovery наружу не публикуются.
 
+Для RTC отдельно публикуется не-HTTP runtime:
+
+- TURN listener на `3478` по умолчанию;
+- relay range `49160-49200` по умолчанию.
+
+Эти ports не проходят через `Traefik` и должны быть разрешены отдельно на host/firewall уровне.
+
 ## Server env-модель
 
 Для одного VPS фиксируется двухфайловая модель:
@@ -96,7 +107,8 @@
   - реальная рабочая копия non-secret runtime config;
   - оператор обычно меняет здесь `AERO_IMAGE_TAG`;
   - здесь же фиксируются `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT`, `AERO_MEDIA_HOST_PORT`,
-    `AERO_MEDIA_EDGE_DOMAIN`, `MEDIA_S3_PUBLIC_ENDPOINT` и `MEDIA_S3_CORS_ALLOWED_ORIGINS`.
+    `AERO_MEDIA_EDGE_DOMAIN`, `MEDIA_S3_PUBLIC_ENDPOINT`, `MEDIA_S3_CORS_ALLOWED_ORIGINS`,
+    `AERO_RTC_TURN_EXTERNAL_IP`, `AERO_RTC_TURN_RELAY_IP` и relay port range для coturn.
   - `AERO_MEDIA_EDGE_DOMAIN` должен быть отдельным zone-level sibling-host, а не nested host под `AERO_EDGE_DOMAIN`.
 
 - `.env.server.secrets` на VPS
@@ -126,6 +138,7 @@
 - `.env.server.secrets`;
 - реальные volumes Docker Compose;
 - host firewall rules и иные network restrictions для high ports.
+- прямой TURN listener и relay port range на самом VPS.
 
 Только в кластере существуют:
 
@@ -162,6 +175,7 @@
 - `aero-gateway` остаётся единственной backend edge-точкой;
 - explicit host upstream contract через `AERO_SHARED_EDGE_HOST_IP` и high ports;
 - отдельный media edge для browser-visible object storage traffic;
+- repo-managed TURN runtime для direct-call relay path;
 - автоматический bootstrap bucket privacy и CORS через `mc`;
 - минимальные Kubernetes resources для shared `Traefik`;
 - TLS path через existing `cert-manager`;
@@ -191,6 +205,7 @@
 - домен `aero.keykomi.com`, указывающий на текущий edge;
 - отдельный media host внутри той же зоны, например `media.keykomi.com`, указывающий на тот же edge;
 - host IP VPS, достижимый из pod'ов `Traefik`;
+- публичный IP VPS, который соответствует host из `AERO_RTC_TURN_URLS`;
 - возможность ограничить high ports так, чтобы они не стали вторым публичным edge.
 
 Для current launch-target за Cloudflare это важно отдельно:
@@ -225,6 +240,11 @@ cp .env.server.secrets.example .env.server.secrets
 - `AERO_MEDIA_HOST_PORT`
 - `MEDIA_S3_PUBLIC_ENDPOINT`
 - `MEDIA_S3_CORS_ALLOWED_ORIGINS`
+- `AERO_RTC_TURN_EXTERNAL_IP`
+- `AERO_RTC_TURN_RELAY_IP`
+- `AERO_RTC_TURN_LISTEN_PORT`
+- `AERO_RTC_TURN_MIN_RELAY_PORT`
+- `AERO_RTC_TURN_MAX_RELAY_PORT`
 
 Ожидаемая семантика:
 
@@ -238,6 +258,10 @@ cp .env.server.secrets.example .env.server.secrets
 - `AERO_MEDIA_HOST_PORT` обслуживает MinIO API upstream для `https://${AERO_MEDIA_EDGE_DOMAIN}`;
 - `MEDIA_S3_PUBLIC_ENDPOINT` должен совпадать с browser-visible media origin, а не с `minio:9000`;
 - `MEDIA_S3_CORS_ALLOWED_ORIGINS` должен перечислять только доверенные application origins;
+- `AERO_RTC_TURN_EXTERNAL_IP` должен соответствовать browser-visible TURN host из `AERO_RTC_TURN_URLS`;
+- `AERO_RTC_TURN_RELAY_IP` должен указывать на локальный bind IP хоста, если public TURN IP не принадлежит интерфейсу VPS;
+- при NAT-сценарии coturn будет рекламировать mapping `AERO_RTC_TURN_EXTERNAL_IP/AERO_RTC_TURN_RELAY_IP`;
+- `AERO_RTC_TURN_LISTEN_PORT` и relay range должны совпадать с реально открытыми host/firewall ports.
 - high ports не должны оставаться бесконтрольно доступными извне.
 
 4. Проверь итоговую compose-конфигурацию:
@@ -287,6 +311,21 @@ curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}/"
 curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz"
 curl -fsS "http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}/minio/health/live"
 ```
+
+Для direct calls отдельно проверь TURN runtime:
+
+```bash
+docker compose \
+  --env-file .env.server \
+  --env-file .env.server.secrets \
+  -f infra/compose/docker-compose.server.yml \
+  logs --tail=100 turn
+
+ss -lntup | rg ':3478|:49160|:49200'
+```
+
+Если в логах `turn` видны `Cannot assign requested address` или `no available ports`,
+значит `AERO_RTC_TURN_EXTERNAL_IP` / `AERO_RTC_TURN_RELAY_IP` не совпадают с реальным NAT/network contract VPS.
 
 Для `minio-bootstrap` статус `Exited (0)` после успешного первого запуска является нормой:
 это одноразовый helper, а не long-running сервис.

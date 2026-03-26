@@ -154,6 +154,48 @@ services:
       retries: 5
       start_period: 5s
 
+  turn:
+    image: coturn/coturn:4.7.0
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      AERO_RTC_TURN_AUTH_SECRET: ${AERO_RTC_TURN_AUTH_SECRET}
+      AERO_RTC_TURN_REALM: ${AERO_EDGE_DOMAIN}
+      AERO_RTC_TURN_LISTEN_PORT: ${AERO_RTC_TURN_LISTEN_PORT:-3478}
+      AERO_RTC_TURN_MIN_RELAY_PORT: ${AERO_RTC_TURN_MIN_RELAY_PORT:-49160}
+      AERO_RTC_TURN_MAX_RELAY_PORT: ${AERO_RTC_TURN_MAX_RELAY_PORT:-49200}
+      AERO_RTC_TURN_EXTERNAL_IP: ${AERO_RTC_TURN_EXTERNAL_IP:-}
+      AERO_RTC_TURN_RELAY_IP: ${AERO_RTC_TURN_RELAY_IP:-}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        set -eu
+        args="
+          -n
+          --log-file=stdout
+          --use-auth-secret
+          --static-auth-secret $${AERO_RTC_TURN_AUTH_SECRET}
+          --realm $${AERO_RTC_TURN_REALM}
+          --fingerprint
+          --listening-ip 0.0.0.0
+          --listening-port $${AERO_RTC_TURN_LISTEN_PORT}
+          --min-port $${AERO_RTC_TURN_MIN_RELAY_PORT}
+          --max-port $${AERO_RTC_TURN_MAX_RELAY_PORT}
+          --no-cli
+          --no-tls
+          --no-dtls
+        "
+        if [ -n "$${AERO_RTC_TURN_EXTERNAL_IP:-}" ] && [ -n "$${AERO_RTC_TURN_RELAY_IP:-}" ] && [ "$${AERO_RTC_TURN_EXTERNAL_IP}" != "$${AERO_RTC_TURN_RELAY_IP}" ]; then
+          args="$$args --external-ip $${AERO_RTC_TURN_EXTERNAL_IP}/$${AERO_RTC_TURN_RELAY_IP}"
+        elif [ -n "$${AERO_RTC_TURN_EXTERNAL_IP:-}" ]; then
+          args="$$args --external-ip $${AERO_RTC_TURN_EXTERNAL_IP}"
+        fi
+        if [ -n "$${AERO_RTC_TURN_RELAY_IP:-}" ]; then
+          args="$$args --relay-ip $${AERO_RTC_TURN_RELAY_IP}"
+        fi
+        exec turnserver $$args
+
   aero-gateway:
     image: ${AERO_IMAGE_NAMESPACE:-ghcr.io/mattoyuzuru}/aerochat-aero-gateway:${AERO_IMAGE_TAG:-edge}
     restart: unless-stopped

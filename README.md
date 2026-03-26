@@ -183,7 +183,9 @@ AeroChat должен поддерживать:
   - web 1:1 звонок существует как bounded audio-only bootstrap;
   - browser direct-call runtime теперь читает ICE servers из `aero-rtc-control` и держит repo-default STUN fallback,
     поэтому operator может задавать TURN/STUN policy без нового frontend build;
-  - production-grade connectivity по-прежнему не гарантируется без operator-managed TURN/STUN policy;
+  - server/prod-like compose теперь включает repo-managed `turn` runtime с явным public relay IP contract,
+    чтобы direct-call connectivity не зависела от вне-репозитарного ad-hoc coturn setup;
+  - production-grade connectivity по-прежнему не гарантируется без корректно заданной operator-managed TURN/STUN policy;
   - group call UI сейчас остаётся lobby/control surface без multiparty browser media transport.
 
 <p align="right">(<a href="#readme-top">наверх</a>)</p>
