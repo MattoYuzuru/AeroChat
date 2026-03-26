@@ -1156,7 +1156,7 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 		return nil, err
 	}
 
-	now := s.now()
+	storedAt := normalizeStoredMessageTimestamp(s.now(), normalizedMessageCreatedAt)
 	return s.repo.CreateEncryptedDirectMessageV2(ctx, CreateEncryptedDirectMessageV2Params{
 		MessageID:            normalizedMessageID,
 		ChatID:               normalizedChatID,
@@ -1168,7 +1168,7 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 		AttachmentIDs:        normalizedAttachmentIDs,
 		Deliveries:           targetDeliveries,
 		CreatedAt:            normalizedMessageCreatedAt,
-		StoredAt:             now,
+		StoredAt:             storedAt,
 	})
 }
 
@@ -1390,7 +1390,7 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 		return nil, err
 	}
 
-	now := s.now()
+	storedAt := normalizeStoredMessageTimestamp(s.now(), normalizedMessageCreatedAt)
 	return s.repo.CreateEncryptedGroupMessage(ctx, CreateEncryptedGroupMessageParams{
 		MessageID:            normalizedMessageID,
 		GroupID:              group.ID,
@@ -1406,7 +1406,7 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 		Ciphertext:           normalizedCiphertext,
 		Deliveries:           deliveries,
 		CreatedAt:            normalizedMessageCreatedAt,
-		StoredAt:             now,
+		StoredAt:             storedAt,
 	})
 }
 
@@ -3268,6 +3268,15 @@ func normalizeRequiredTimestamp(value time.Time, field string) (time.Time, error
 	}
 
 	return value.UTC(), nil
+}
+
+func normalizeStoredMessageTimestamp(serverNow time.Time, messageCreatedAt time.Time) time.Time {
+	serverNow = serverNow.UTC()
+	if serverNow.Before(messageCreatedAt) {
+		return messageCreatedAt
+	}
+
+	return serverNow
 }
 
 func normalizeOptionalScopeID(value *string, field string) (*string, error) {

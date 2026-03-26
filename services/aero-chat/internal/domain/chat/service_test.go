@@ -954,6 +954,9 @@ func TestSendEncryptedDirectMessageV2CreatesDeviceScopedDeliveries(t *testing.T)
 	if !receipt.CreatedAt.Equal(messageCreatedAt) {
 		t.Fatalf("ожидался client-assigned created_at %v, получено %v", messageCreatedAt, receipt.CreatedAt)
 	}
+	if !receipt.StoredAt.Equal(messageCreatedAt) {
+		t.Fatalf("ожидался clamped stored_at %v при clock skew, получено %v", messageCreatedAt, receipt.StoredAt)
+	}
 
 	aliceSenderView, err := service.ListEncryptedDirectMessageV2(context.Background(), alice.Token, directChat.ID, aliceSender.ID, 0)
 	if err != nil {
@@ -1430,6 +1433,9 @@ func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *tes
 	}
 	if !receipt.CreatedAt.Equal(time.Date(2026, time.March, 25, 18, 6, 7, 0, time.UTC)) {
 		t.Fatalf("ожидался sender-assigned group created_at, получено %v", receipt.CreatedAt)
+	}
+	if !receipt.StoredAt.Equal(time.Date(2026, time.March, 25, 18, 6, 7, 0, time.UTC)) {
+		t.Fatalf("ожидался clamped group stored_at на sender-assigned created_at, получено %v", receipt.StoredAt)
 	}
 
 	bobView, err := service.ListEncryptedGroupMessages(context.Background(), bob.Token, group.ID, bobFirst.ID, 0)
