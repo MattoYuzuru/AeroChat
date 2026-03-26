@@ -37,11 +37,12 @@ export function MobileLauncherHome() {
   return (
     <div className={styles.home}>
       <section className={styles.hero}>
-        <p className={styles.eyebrow}>Launcher home</p>
+        <p className={styles.eyebrow}>Главный экран</p>
         <h1 className={styles.title}>Быстрый вход в AeroChat</h1>
-        <p className={styles.subtitle}>
-          @{auth.state.profile.login} · {auth.state.profile.nickname}
-        </p>
+        <div className={styles.profileStrip}>
+          <strong>{auth.state.profile.nickname}</strong>
+          <span>@{auth.state.profile.login}</span>
+        </div>
 
         <div className={styles.quickActions}>
           {viewModel.primaryApps
@@ -119,7 +120,7 @@ export function MobileLauncherHome() {
           </div>
         ) : (
           <p className={styles.emptyState}>
-            Здесь появятся recent chats, groups и launcher apps после реальных переходов.
+            Здесь появятся недавние чаты, группы и приложения после первых переходов.
           </p>
         )}
       </section>
@@ -142,13 +143,13 @@ export function MobileLauncherHome() {
                 type="button"
               >
                 <span className={styles.listBadge}>П</span>
-                <span className={styles.listContent}>
+                  <span className={styles.listContent}>
                   <span className={styles.listTitle}>{folder.title}</span>
                   <small>
                     {folder.memberCount === 0
                       ? "Папка пуста"
                       : `Объектов: ${folder.memberCount}${
-                          folder.unreadCount > 0 ? ` · unread: ${folder.unreadCount}` : ""
+                          folder.unreadCount > 0 ? ` · новых: ${folder.unreadCount}` : ""
                         }`}
                   </small>
                 </span>
@@ -157,7 +158,7 @@ export function MobileLauncherHome() {
           </div>
         ) : (
           <p className={styles.emptyState}>
-            Custom folders остаются shell-local и открываются через Explorer.
+            Папки остаются локальными для оболочки и открываются через Проводник.
           </p>
         )}
 

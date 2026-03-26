@@ -20,19 +20,26 @@ const navigationItems = [
 ];
 
 const statusItems = [
-  "gateway edge",
-  "launcher home",
-  "self chat",
-  "group creator",
-  "profile",
-  "people",
-  "direct chats",
-  "groups",
-  "explorer",
-  "search",
-  "friend requests",
-  "settings",
+  "связь",
+  "главный экран",
+  "личный чат",
+  "группы",
+  "профиль",
+  "люди",
+  "чаты",
+  "поиск",
+  "заявки",
+  "настройки",
 ];
+
+const mobileNavigationItems = navigationItems.filter(
+  (item) =>
+    item.to === "/app" ||
+    item.to === "/app/chats" ||
+    item.to === "/app/groups" ||
+    item.to === "/app/search" ||
+    item.to === "/app/settings",
+);
 
 export function LegacyAppShell({ children }: PropsWithChildren) {
   const location = useLocation();
@@ -82,6 +89,17 @@ export function LegacyAppShell({ children }: PropsWithChildren) {
       (participant) =>
         participant.userId === state.profile.id && participant.state === "active",
     ) ?? false;
+  const isHome = location.pathname === "/app";
+  const activeNavigationItem =
+    navigationItems.find((item) =>
+      item.exact === true
+        ? location.pathname === item.to
+        : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`),
+    ) ?? null;
+  const currentTitle = isHome ? "AeroChat" : activeNavigationItem?.label ?? "Раздел";
+  const currentSubtitle = isHome
+    ? `@${state.profile.login} · ${state.profile.nickname}`
+    : activeNavigationItem?.meta ?? "Мобильный раздел";
 
   function openDirectCallThread(withJoinIntent: boolean) {
     if (visibleDirectCallSurface === null) {
@@ -102,58 +120,78 @@ export function LegacyAppShell({ children }: PropsWithChildren) {
       <div className={styles.backdrop} aria-hidden="true" />
 
       <header className={styles.topBar}>
-        <div>
-          <p className={styles.eyebrow}>AeroChat</p>
-          <h1 className={styles.title}>Лёгкий glossy workspace</h1>
-          <p className={styles.subtitle}>
-            Текущий пользователь: <strong>{state.profile.nickname}</strong> · @{state.profile.login}
-          </p>
+        <div className={styles.headerBar}>
+          <button
+            className={styles.headerButton}
+            onClick={() => {
+              if (isHome) {
+                navigate("/app/search");
+                return;
+              }
+
+              if (window.history.length > 1) {
+                navigate(-1);
+                return;
+              }
+
+              navigate("/app");
+            }}
+            type="button"
+          >
+            {isHome ? "Поиск" : "Назад"}
+          </button>
+
+          <div className={styles.headerCopy}>
+            <p className={styles.eyebrow}>{isHome ? "Мобильный режим" : "AeroChat"}</p>
+            <h1 className={styles.title}>{currentTitle}</h1>
+            <p className={styles.subtitle}>{currentSubtitle}</p>
+          </div>
+
+          <button
+            className={styles.headerButton}
+            disabled={isLoggingOut}
+            onClick={() => {
+              if (isHome) {
+                void handleLogout();
+                return;
+              }
+
+              navigate("/app");
+            }}
+            type="button"
+          >
+            {isHome ? (isLoggingOut ? "Выход..." : "Выйти") : "Домой"}
+          </button>
         </div>
 
-        <div className={styles.topBarAside}>
+        {isHome && (
           <div className={styles.statusCluster}>
-            {statusItems.map((item) => (
+            {statusItems.slice(0, 4).map((item) => (
               <span key={item} className={styles.statusChip}>
                 {item}
               </span>
             ))}
           </div>
-          <button
-            className={styles.logoutButton}
-            disabled={isLoggingOut}
-            onClick={handleLogout}
-            type="button"
-          >
-            {isLoggingOut ? "Выход..." : "Выйти"}
-          </button>
-          {logoutError && <p className={styles.logoutError}>{logoutError}</p>}
-        </div>
+        )}
+
+        {logoutError && <p className={styles.logoutError}>{logoutError}</p>}
       </header>
 
       {visibleDirectCallSurface && (
         <section className={styles.callSurface}>
           <div>
-            <p className={styles.callSurfaceLabel}>Активный direct call</p>
+            <p className={styles.callSurfaceLabel}>Активный звонок</p>
             <h2 className={styles.callSurfaceTitle}>
-              {visibleDirectCallPeer?.nickname ?? "Direct chat"}
+              {visibleDirectCallPeer?.nickname ?? "Личный чат"}
             </h2>
             <p className={styles.callSurfaceText}>
               {canReturnToCall
-                ? "Звонок ещё активен на сервере. Можно быстро вернуться в direct thread и заново поднять локальную audio session."
-                : "В одном из direct chats идёт активный аудиозвонок. Можно открыть thread или явно присоединиться."}
+                ? "Звонок ещё активен. Можно быстро вернуться в чат и снова подключиться."
+                : "В одном из личных чатов идёт активный звонок. Можно сразу присоединиться."}
             </p>
           </div>
 
           <div className={styles.callSurfaceActions}>
-            <button
-              className={styles.surfaceGhostButton}
-              onClick={() => {
-                openDirectCallThread(false);
-              }}
-              type="button"
-            >
-              Открыть чат
-            </button>
             <button
               className={styles.surfacePrimaryButton}
               onClick={() => {
@@ -179,61 +217,28 @@ export function LegacyAppShell({ children }: PropsWithChildren) {
         </section>
       )}
 
-      <main className={styles.workspace}>
-        <aside className={styles.sidebar}>
-          <section className={styles.sidebarCard}>
-            <p className={styles.panelLabel}>Навигация</p>
-            <nav className={styles.navList} aria-label="Основные разделы">
-              {navigationItems.map((item) => (
-                <NavLink
-                  end={item.exact === true}
-                  key={item.to}
-                  className={({ isActive }) =>
-                    isActive ? styles.navItemActive : styles.navItem
-                  }
-                  to={item.to}
-                >
-                  <span>{item.label}</span>
-                  <small>{item.meta}</small>
-                </NavLink>
-              ))}
-            </nav>
-          </section>
-
-          <section className={styles.sidebarCard}>
-            <p className={styles.panelLabel}>Контур</p>
-            <dl className={styles.metaGrid}>
-              <div>
-                <dt>Edge</dt>
-                <dd>`/api` + `/api/realtime` → `aero-gateway`</dd>
-              </div>
-              <div>
-                <dt>Auth</dt>
-                <dd>sessionStorage bootstrap</dd>
-              </div>
-              <div>
-                <dt>Scope</dt>
-                <dd>login, register, group creator, profile, people, chats, groups, search, settings</dd>
-              </div>
-            </dl>
-          </section>
-        </aside>
-
-        <section className={styles.contentArea}>
-          <div className={styles.contentWindow}>
-            <div className={styles.windowHeader}>
-              <span className={styles.windowDot} />
-              <span className={styles.windowDot} />
-              <span className={styles.windowDot} />
-              <span className={styles.windowTitle}>apps/web</span>
-            </div>
-
-            <div className={styles.windowBody}>
-              {children}
-            </div>
-          </div>
-        </section>
+      <main className={styles.contentArea}>
+        <div className={styles.contentWindow}>
+          <div className={styles.windowBody}>{children}</div>
+        </div>
       </main>
+
+      <nav className={styles.navList} aria-label="Основные разделы">
+        {mobileNavigationItems.map((item) => (
+          <NavLink
+            end={item.exact === true}
+            key={item.to}
+            className={({ isActive }) =>
+              isActive ? styles.navItemActive : styles.navItem
+            }
+            to={item.to}
+          >
+            <span>{item.label}</span>
+            <small>{item.meta}</small>
+          </NavLink>
+        ))}
+      </nav>
+      <div className={styles.safeArea} aria-hidden="true" />
     </div>
   );
 }
