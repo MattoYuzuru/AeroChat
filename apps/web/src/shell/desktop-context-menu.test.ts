@@ -145,7 +145,7 @@ describe("desktop context menu", () => {
     });
   });
 
-  it("shows only open for mandatory system apps", () => {
+  it("shows only open for non-hideable system apps", () => {
     const state = createInitialDesktopRegistryState();
     const selfChatEntry = state.entries.find(
       (entry): entry is DesktopEntity =>
@@ -157,6 +157,29 @@ describe("desktop context menu", () => {
         kind: "command",
         id: "open",
         label: "Открыть",
+        tone: "default",
+      },
+    ]);
+  });
+
+  it("shows hide action for the default group creator app", () => {
+    const state = createInitialDesktopRegistryState();
+    const groupCreatorEntry = state.entries.find(
+      (entry): entry is DesktopEntity =>
+        entry.kind === "system_app" && entry.appId === "group_creator",
+    )!;
+
+    expect(listDesktopContextMenuItems(groupCreatorEntry, state)).toEqual([
+      {
+        kind: "command",
+        id: "open",
+        label: "Открыть",
+        tone: "default",
+      },
+      {
+        kind: "command",
+        id: "hide",
+        label: "Скрыть с рабочего стола",
         tone: "default",
       },
     ]);

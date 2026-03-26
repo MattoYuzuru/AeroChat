@@ -19,6 +19,7 @@ describe("buildMobileLauncherViewModel", () => {
     expect(viewModel.primaryApps.map((entry) => entry.appId)).toEqual(
       mobileLauncherPrimaryApps.map((entry) => entry.appId),
     );
+    expect(viewModel.primaryApps.some((entry) => entry.appId === "group_creator")).toBe(true);
     expect(viewModel.primaryApps.some((entry) => entry.appId === "settings")).toBe(true);
   });
 

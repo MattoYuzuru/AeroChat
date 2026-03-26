@@ -107,6 +107,27 @@ describe("start menu recent items", () => {
     ]);
   });
 
+  it("tracks group creator as a recent singleton app", () => {
+    const items = trackStartMenuRecentWindow([], {
+      appId: "group_creator",
+      title: "Создать группу",
+      routePath: "/app/group-creator",
+      target: {
+        key: "group_creator",
+      },
+    });
+
+    expect(items).toEqual([
+      {
+        id: "app:group_creator",
+        kind: "app",
+        appId: "group_creator",
+        title: "Создать группу",
+        routePath: "/app/group-creator",
+      },
+    ]);
+  });
+
   it("persists bounded recent items in browser-local storage", () => {
     const storage = new MemoryStorage();
     let items = [] as ReturnType<typeof readStartMenuRecentItems>;

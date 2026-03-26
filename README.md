@@ -169,6 +169,10 @@ AeroChat должен поддерживать:
 - desktop shell и mobile launcher adaptation:
   - на viewport от `1180px` web-клиент переходит в XP-style desktop shell с route-backed singleton и singleton-per-target окнами;
   - на mobile используется launcher home и route-backed app pages без desktop window runtime;
+  - отдельное shell-приложение `Создать группу` теперь является дефолтным desktop entrypoint для group bootstrap:
+    - оно открывается как отдельный singleton app, а не прячется внутри общего group page flow;
+    - entrypoint доступен на рабочем столе, в Start menu и Explorer;
+    - shortcut можно скрыть с рабочего стола и вернуть через Explorer без потери самого app target;
   - `Self Chat` уже существует как shell/account target, но backend self-direct thread пока не поддерживается.
 - RTC/calls остаются частичными:
   - `aero-rtc-control` уже даёт signaling и server-backed call control-plane;

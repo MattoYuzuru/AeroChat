@@ -71,7 +71,7 @@ export interface ExplorerFolderMemberRecord {
 }
 
 export interface ExplorerAppLinkRecord {
-  appId: Extract<ShellAppId, "friend_requests" | "search" | "settings">;
+  appId: Extract<ShellAppId, "friend_requests" | "group_creator" | "search" | "settings">;
   title: string;
   description: string;
 }
@@ -259,9 +259,15 @@ export function buildExplorerSectionViewModel(
           ),
         folders: [],
         buckets: [],
-        appLinks: [],
+        appLinks: [
+          {
+            appId: "group_creator",
+            title: "Создать группу",
+            description: "Открыть мастер создания новой группы.",
+          },
+        ],
         emptyTitle: "Групп пока нет",
-        emptyDescription: "Группы появятся здесь автоматически.",
+        emptyDescription: "Группы появятся здесь автоматически или через отдельный мастер создания.",
       };
     case "hidden":
       return {
@@ -482,6 +488,10 @@ function describeExplorerEntityType(entry: DesktopEntity): string {
     return "Explorer";
   }
 
+  if (entry.appId === "group_creator") {
+    return "Создание групп";
+  }
+
   if (entry.appId === "friend_requests") {
     return "Заявки";
   }
@@ -519,6 +529,10 @@ function describeExplorerEntityAccent(entry: DesktopEntity): string {
 
   if (entry.kind === "direct_chat" || entry.kind === "group_chat") {
     return entry.title.slice(0, 1).toUpperCase();
+  }
+
+  if (entry.appId === "group_creator") {
+    return "Г+";
   }
 
   if (entry.appId === "friend_requests") {

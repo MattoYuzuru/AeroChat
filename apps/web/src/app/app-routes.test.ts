@@ -85,6 +85,18 @@ describe("resolveShellRouteEntry", () => {
     });
   });
 
+  it("maps group creator route to the canonical singleton target", () => {
+    const resolved = resolveShellRouteEntry("/app/group-creator", "?from=start");
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.app.appId).toBe("group_creator");
+    expect(resolved?.target).toEqual({
+      key: "group_creator",
+      title: "Создать группу",
+      routePath: "/app/group-creator?from=start",
+    });
+  });
+
   it("maps explorer route to the canonical singleton target while preserving section deep-link", () => {
     const resolved = resolveShellRouteEntry("/app/explorer", "?section=overflow");
 

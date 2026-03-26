@@ -87,6 +87,7 @@ export interface DesktopOverflowSummary {
 
 export type DesktopSystemAppId =
   | "self_chat"
+  | "group_creator"
   | "search"
   | "explorer"
   | "friend_requests"
@@ -99,33 +100,45 @@ interface DesktopSourceEntry {
   title: string;
 }
 
-const desktopSystemAppTitles: Record<DesktopSystemAppId, string> = {
-  self_chat: "Я",
-  search: "Поиск",
-  explorer: "Explorer",
-  friend_requests: "Заявки",
-  settings: "Настройки",
-};
-
-const mandatorySystemEntries: readonly {
+interface DesktopSystemAppConfig {
   appId: DesktopSystemAppId;
-  title: string;
+  hideable: boolean;
   order: number;
-}[] = [
-  { appId: "self_chat", title: desktopSystemAppTitles.self_chat, order: 1 },
-  { appId: "search", title: desktopSystemAppTitles.search, order: 2 },
-  { appId: "explorer", title: desktopSystemAppTitles.explorer, order: 3 },
-  { appId: "friend_requests", title: desktopSystemAppTitles.friend_requests, order: 4 },
-  { appId: "settings", title: desktopSystemAppTitles.settings, order: 5 },
+  title: string;
+}
+
+const desktopSystemAppConfigs: readonly DesktopSystemAppConfig[] = [
+  { appId: "self_chat", title: "Я", order: 1, hideable: false },
+  { appId: "group_creator", title: "Создать группу", order: 2, hideable: true },
+  { appId: "search", title: "Поиск", order: 3, hideable: false },
+  { appId: "explorer", title: "Explorer", order: 4, hideable: false },
+  { appId: "friend_requests", title: "Заявки", order: 5, hideable: false },
+  { appId: "settings", title: "Настройки", order: 6, hideable: false },
 ];
+
+const desktopSystemAppTitles: Record<DesktopSystemAppId, string> =
+  desktopSystemAppConfigs.reduce(
+    (titles, entry) => {
+      titles[entry.appId] = entry.title;
+      return titles;
+    },
+    {} as Record<DesktopSystemAppId, string>,
+  );
+
+const desktopSystemAppConfigById = new Map(
+  desktopSystemAppConfigs.map((entry) => [entry.appId, entry]),
+);
 
 export function createInitialDesktopRegistryState(): DesktopRegistryState {
   return normalizeDesktopRegistryState({
-    entries: mandatorySystemEntries.map((entry) =>
-      createSystemEntity(entry.appId, entry.title, entry.order),
+    entries: desktopSystemAppConfigs.map((entry) =>
+      createSystemEntity(entry.appId, {
+        order: entry.order,
+        title: entry.title,
+      }),
     ),
     folderMembers: [],
-    nextOrder: mandatorySystemEntries.length + 1,
+    nextOrder: desktopSystemAppConfigs.length + 1,
     nextFolderSequence: 1,
     nextFolderMemberSequence: 1,
   });
@@ -166,7 +179,7 @@ export function readDesktopRegistryState(
     return normalizeDesktopRegistryState({
       entries,
       folderMembers,
-      nextOrder: readPositiveNumber(parsed.nextOrder, mandatorySystemEntries.length + 1),
+      nextOrder: readPositiveNumber(parsed.nextOrder, desktopSystemAppConfigs.length + 1),
       nextFolderSequence: readPositiveNumber(parsed.nextFolderSequence, 1),
       nextFolderMemberSequence: readPositiveNumber(parsed.nextFolderMemberSequence, 1),
     });
@@ -365,7 +378,7 @@ export function hideDesktopEntity(
   entryId: string,
 ): DesktopRegistryState {
   const nextEntries = state.entries.map((entry) =>
-    entry.id !== entryId || entry.kind === "system_app"
+    entry.id !== entryId || !isDesktopEntityHideable(entry)
       ? entry
       : {
           ...entry,
@@ -385,12 +398,12 @@ export function showDesktopEntityOnDesktop(
   targetIndex?: number,
 ): DesktopRegistryState {
   const targetEntry = state.entries.find((entry) => entry.id === entryId) ?? null;
-  if (targetEntry === null || targetEntry.kind === "system_app") {
+  if (targetEntry === null || !isDesktopEntityHideable(targetEntry)) {
     return state;
   }
 
   const nextEntries = state.entries.map((entry) =>
-    entry.id !== entryId || entry.kind === "system_app"
+    entry.id !== entryId || !isDesktopEntityHideable(entry)
       ? entry
       : {
           ...entry,
@@ -638,7 +651,7 @@ export function hasDesktopTargetUnread(
 }
 
 export function isDesktopEntityHideable(entry: DesktopEntity): boolean {
-  return entry.kind !== "system_app";
+  return entry.kind !== "system_app" || isDesktopSystemAppHideable(entry.appId);
 }
 
 export function describeDirectChatDesktopTitle(
@@ -723,21 +736,35 @@ function normalizeDesktopRegistryState(
     byId.set(entry.id, entry);
   }
 
-  for (const systemEntry of mandatorySystemEntries) {
+  for (const systemEntry of desktopSystemAppConfigs) {
+    const systemEntryId = buildDesktopEntityId("system_app", systemEntry.appId);
+    if (byId.has(systemEntryId)) {
+      continue;
+    }
+
     byId.set(
-      buildDesktopEntityId("system_app", systemEntry.appId),
-      createSystemEntity(systemEntry.appId, systemEntry.title, systemEntry.order),
+      systemEntryId,
+      createSystemEntity(systemEntry.appId, {
+        order: systemEntry.order,
+        title: systemEntry.title,
+      }),
     );
   }
 
-  const systemEntries: DesktopSystemAppEntity[] = mandatorySystemEntries.map((entry) => {
+  const systemEntries: DesktopSystemAppEntity[] = desktopSystemAppConfigs.map((entry) => {
     const currentEntry =
       byId.get(buildDesktopEntityId("system_app", entry.appId)) ??
-      createSystemEntity(entry.appId, entry.title, entry.order);
-    return {
-      ...createSystemEntity(entry.appId, currentEntry.title, entry.order),
+      createSystemEntity(entry.appId, {
+        order: entry.order,
+        title: entry.title,
+      });
+    const hideable = isDesktopSystemAppHideable(entry.appId);
+    return createSystemEntity(entry.appId, {
       order: readPositiveNumber(currentEntry.order, entry.order),
-    };
+      title: currentEntry.title,
+      visibility:
+        hideable && currentEntry.visibility === "hidden" ? "hidden" : "visible",
+    });
   });
 
   const dynamicEntries = [...byId.values()]
@@ -798,8 +825,8 @@ function normalizeDesktopRegistryState(
 
   const folderMembers = [...referenceByIdentity.values()].sort(compareFolderMemberReferences);
   const nextOrder = Math.max(
-    readPositiveNumber(input.nextOrder, mandatorySystemEntries.length + 1),
-    mandatorySystemEntries.length + 1,
+    readPositiveNumber(input.nextOrder, desktopSystemAppConfigs.length + 1),
+    desktopSystemAppConfigs.length + 1,
     ...systemEntries.map((entry) => entry.order + 1),
     ...normalizedDynamicEntries.map((entry) => entry.order + 1),
   );
@@ -959,13 +986,14 @@ function normalizeDesktopEntity(
       return null;
     }
 
+    const hideable = isDesktopSystemAppHideable(appId);
     return {
       id: id === "" ? buildDesktopEntityId("system_app", appId) : id,
       kind,
       appId,
       targetKey: appId,
       title: normalizeDesktopEntityTitle(title, desktopSystemAppTitles[appId]),
-      visibility: "visible",
+      visibility: hideable && visibility === "hidden" ? "hidden" : "visible",
       placement: "desktop",
       overflowBucket: null,
       order,
@@ -1073,19 +1101,25 @@ function normalizeFolderReferenceTarget(
 
 function createSystemEntity(
   appId: DesktopSystemAppId,
-  title: string,
-  order: number,
+  options?: {
+    order?: number;
+    title?: string;
+    visibility?: DesktopEntityVisibility;
+  },
 ): DesktopSystemAppEntity {
+  const config = desktopSystemAppConfigById.get(appId);
+  const normalizedVisibility =
+    config?.hideable === true && options?.visibility === "hidden" ? "hidden" : "visible";
   return {
     id: buildDesktopEntityId("system_app", appId),
     kind: "system_app",
     appId,
     targetKey: appId,
-    title: normalizeDesktopEntityTitle(title, desktopSystemAppTitles[appId]),
-    visibility: "visible",
+    title: normalizeDesktopEntityTitle(options?.title ?? "", desktopSystemAppTitles[appId]),
+    visibility: normalizedVisibility,
     placement: "desktop",
     overflowBucket: null,
-    order,
+    order: readPositiveNumber(options?.order, config?.order ?? 0),
   };
 }
 
@@ -1116,12 +1150,17 @@ function readDesktopEntityKind(value: unknown): DesktopEntityKind | null {
 
 function readSystemAppId(value: unknown): DesktopSystemAppId | null {
   return value === "self_chat" ||
+    value === "group_creator" ||
     value === "search" ||
     value === "explorer" ||
     value === "friend_requests" ||
     value === "settings"
     ? value
     : null;
+}
+
+function isDesktopSystemAppHideable(appId: DesktopSystemAppId): boolean {
+  return desktopSystemAppConfigById.get(appId)?.hideable === true;
 }
 
 function readDesktopOverflowBucket(value: unknown): DesktopOverflowBucket {

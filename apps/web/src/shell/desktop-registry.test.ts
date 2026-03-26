@@ -44,7 +44,32 @@ describe("desktop registry", () => {
     const state = readDesktopRegistryState(storage);
     const visibleTitles = listDesktopEntitiesForSurface(state).map((entry) => entry.title);
 
-    expect(visibleTitles).toEqual(["Я", "Поиск", "Explorer", "Заявки", "Настройки"]);
+    expect(visibleTitles).toEqual([
+      "Я",
+      "Создать группу",
+      "Поиск",
+      "Explorer",
+      "Заявки",
+      "Настройки",
+    ]);
+  });
+
+  it("persists hidden state for the hideable default group creator app", () => {
+    const storage = new MemoryStorage();
+    let state = createInitialDesktopRegistryState();
+
+    state = hideDesktopEntity(state, "system_app:group_creator");
+    writeDesktopRegistryState(storage, state);
+    const restoredState = readDesktopRegistryState(storage);
+
+    expect(
+      restoredState.entries.find((entry) => entry.id === "system_app:group_creator")?.visibility,
+    ).toBe("hidden");
+    expect(
+      listDesktopEntitiesForSurface(restoredState).some(
+        (entry) => entry.id === "system_app:group_creator",
+      ),
+    ).toBe(false);
   });
 
   it("persists hidden direct chat state across reload", () => {
@@ -109,7 +134,7 @@ describe("desktop registry", () => {
 
     expect(visibleEntries).toHaveLength(10);
     expect(overflow).toEqual([
-      { bucket: "contacts", title: "Контакты", count: 7 },
+      { bucket: "contacts", title: "Контакты", count: 8 },
       { bucket: "groups", title: "Группы", count: 1 },
     ]);
   });
@@ -126,8 +151,8 @@ describe("desktop registry", () => {
     expect(listDesktopEntitiesForSurface(state).map((entry) => entry.id).slice(0, 4)).toEqual([
       "system_app:self_chat",
       "direct_chat:chat-3",
+      "system_app:group_creator",
       "system_app:search",
-      "system_app:explorer",
     ]);
   });
 

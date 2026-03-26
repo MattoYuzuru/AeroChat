@@ -8,6 +8,7 @@ import styles from "./AppShell.module.css";
 const navigationItems = [
   { to: "/app", label: "Домой", meta: "launcher", exact: true },
   { to: "/app/self", label: "Я", meta: "self workspace" },
+  { to: "/app/group-creator", label: "Создать группу", meta: "group bootstrap" },
   { to: "/app/profile", label: "Профиль", meta: "identity" },
   { to: "/app/chats", label: "Чаты", meta: "direct" },
   { to: "/app/groups", label: "Группы", meta: "group chat bootstrap" },
@@ -22,6 +23,7 @@ const statusItems = [
   "gateway edge",
   "launcher home",
   "self chat",
+  "group creator",
   "profile",
   "people",
   "direct chats",
@@ -211,7 +213,7 @@ export function LegacyAppShell({ children }: PropsWithChildren) {
               </div>
               <div>
                 <dt>Scope</dt>
-                <dd>login, register, profile, people, chats, groups, search, settings</dd>
+                <dd>login, register, group creator, profile, people, chats, groups, search, settings</dd>
               </div>
             </dl>
           </section>

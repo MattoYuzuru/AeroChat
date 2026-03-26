@@ -14,6 +14,7 @@ export const START_MENU_VIEWPORT_EDGE_GAP = 12;
 
 export type StartMenuLauncherAppId =
   | "self_chat"
+  | "group_creator"
   | "explorer"
   | "search"
   | "friend_requests"
@@ -69,6 +70,12 @@ export type StartMenuRecentItem =
 
 export const startMenuLauncherApps: readonly StartMenuLauncherAppEntry[] = [
   {
+    appId: "group_creator",
+    badge: "Г+",
+    title: "Создать группу",
+    description: "Отдельный wizard для owner bootstrap новой группы и мгновенного открытия target window.",
+  },
+  {
     appId: "self_chat",
     badge: "Я",
     title: "Я",
@@ -108,6 +115,7 @@ export const startMenuLauncherApps: readonly StartMenuLauncherAppEntry[] = [
 
 const recentEligibleAppIds = new Set<StartMenuRecentAppId>([
   "self_chat",
+  "group_creator",
   "explorer",
   "search",
   "friend_requests",
@@ -246,6 +254,10 @@ export function describeStartMenuRecentItemBadge(item: StartMenuRecentItem): str
 
   if (item.appId === "self_chat") {
     return "Я";
+  }
+
+  if (item.appId === "group_creator") {
+    return "Г+";
   }
 
   if (item.appId === "explorer") {

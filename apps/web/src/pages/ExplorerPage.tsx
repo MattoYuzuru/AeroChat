@@ -31,6 +31,7 @@ import {
   createDesktopUnreadTargetMap,
   deleteCustomFolderDesktopEntity,
   hideDesktopEntity,
+  isDesktopEntityHideable,
   listCustomFolderDesktopEntities,
   readDesktopRegistryState,
   removeCustomFolderMemberReference,
@@ -289,7 +290,9 @@ export function ExplorerPage() {
     navigate(buildExplorerFolderRoutePath(folderId));
   }
 
-  function openSystemApp(appId: "self_chat" | "friend_requests" | "search" | "settings") {
+  function openSystemApp(
+    appId: "self_chat" | "group_creator" | "friend_requests" | "search" | "settings",
+  ) {
     if (desktopShellHost !== null) {
       desktopShellHost.launchApp(appId);
       return;
@@ -302,6 +305,11 @@ export function ExplorerPage() {
 
     if (appId === "friend_requests") {
       navigate("/app/friend-requests");
+      return;
+    }
+
+    if (appId === "group_creator") {
+      navigate("/app/group-creator");
       return;
     }
 
@@ -1068,18 +1076,11 @@ function ExplorerActionButton({
 }
 
 function canShowDesktopEntry(entry: DesktopEntity): boolean {
-  return (
-    entry.kind !== "system_app" &&
-    (entry.visibility === "hidden" || entry.placement === "overflow")
-  );
+  return isDesktopEntityHideable(entry) && entry.visibility === "hidden";
 }
 
 function canHideDesktopEntry(entry: DesktopEntity): boolean {
-  return (
-    entry.kind !== "system_app" &&
-    entry.visibility === "visible" &&
-    entry.placement === "desktop"
-  );
+  return isDesktopEntityHideable(entry) && entry.visibility === "visible" && entry.placement === "desktop";
 }
 
 function canAddEntryToFolder(
