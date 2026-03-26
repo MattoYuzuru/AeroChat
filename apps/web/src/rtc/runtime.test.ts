@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   flushPendingRemoteICECandidates,
+  hasMatchingRemoteSessionDescription,
   queueOrApplyRemoteICECandidate,
   stopMediaStreamTracks,
   teardownDirectCallPeerRuntime,
@@ -104,5 +105,37 @@ describe("rtc runtime cleanup helpers", () => {
 
     expect(nextQueue).toEqual([]);
     expect(peerConnection.addIceCandidate).toHaveBeenCalledTimes(2);
+  });
+
+  it("detects a duplicated remote offer across pending/current descriptions", () => {
+    const description = {
+      type: "offer" as const,
+      sdp: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\n",
+    };
+    const peerConnection = {
+      remoteDescription: null,
+      currentRemoteDescription: description,
+      pendingRemoteDescription: null,
+    };
+
+    expect(hasMatchingRemoteSessionDescription(peerConnection, description)).toBe(true);
+  });
+
+  it("does not mark a different SDP as a duplicated remote description", () => {
+    const peerConnection = {
+      remoteDescription: {
+        type: "offer" as const,
+        sdp: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\n",
+      },
+      currentRemoteDescription: null,
+      pendingRemoteDescription: null,
+    };
+
+    expect(
+      hasMatchingRemoteSessionDescription(peerConnection, {
+        type: "offer",
+        sdp: "v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\n",
+      }),
+    ).toBe(false);
   });
 });

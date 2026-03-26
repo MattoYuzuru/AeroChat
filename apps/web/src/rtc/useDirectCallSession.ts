@@ -27,6 +27,7 @@ import {
 } from "./state";
 import {
   flushPendingRemoteICECandidates,
+  hasMatchingRemoteSessionDescription,
   queueOrApplyRemoteICECandidate,
   teardownDirectCallPeerRuntime,
   teardownDirectCallRuntime,
@@ -367,10 +368,17 @@ export function useDirectCallSession(
             throw new Error("invalid offer payload");
           }
 
+          if (hasMatchingRemoteSessionDescription(peerConnection, offer)) {
+            return;
+          }
+
           if (peerConnection.signalingState !== "stable") {
             resetPeerRuntime();
             const refreshedPeerConnection = ensurePeerConnection();
             if (refreshedPeerConnection === null) {
+              return;
+            }
+            if (hasMatchingRemoteSessionDescription(refreshedPeerConnection, offer)) {
               return;
             }
             await refreshedPeerConnection.setRemoteDescription(offer);
@@ -412,6 +420,10 @@ export function useDirectCallSession(
           const answer = decodeRTCSessionDescriptionPayload(signal.payload, "answer");
           if (answer === null) {
             throw new Error("invalid answer payload");
+          }
+
+          if (hasMatchingRemoteSessionDescription(peerConnection, answer)) {
+            return;
           }
 
           await peerConnection.setRemoteDescription(answer);

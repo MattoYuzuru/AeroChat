@@ -15,6 +15,12 @@ interface ICECapablePeerConnectionLike {
   addIceCandidate(candidate: RTCIceCandidateInit): Promise<void>;
 }
 
+interface SessionDescriptionCapablePeerConnectionLike {
+  remoteDescription: RTCSessionDescriptionInit | null;
+  currentRemoteDescription?: RTCSessionDescriptionInit | null;
+  pendingRemoteDescription?: RTCSessionDescriptionInit | null;
+}
+
 interface DirectCallPeerRuntimeInput {
   peerConnection: PeerConnectionLike | null;
   remoteStream: MediaStreamLike | null;
@@ -66,4 +72,17 @@ export async function queueOrApplyRemoteICECandidate(
 
   await peerConnection.addIceCandidate(candidate);
   return pendingCandidates;
+}
+
+export function hasMatchingRemoteSessionDescription(
+  peerConnection: SessionDescriptionCapablePeerConnectionLike,
+  description: RTCSessionDescriptionInit,
+): boolean {
+  return [
+    peerConnection.pendingRemoteDescription,
+    peerConnection.currentRemoteDescription,
+    peerConnection.remoteDescription,
+  ].some((currentDescription) =>
+    currentDescription?.type === description.type && currentDescription.sdp === description.sdp
+  );
 }
