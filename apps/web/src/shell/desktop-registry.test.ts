@@ -107,6 +107,38 @@ describe("desktop registry", () => {
     expect(chatEntries[0]?.title).toBe("Alice Cooper");
   });
 
+  it("does not create a duplicate desktop chat entry for canonical self chat", () => {
+    let state = createInitialDesktopRegistryState();
+
+    state = syncDirectChatDesktopEntities(
+      state,
+      [
+        {
+          id: "chat-self",
+          kind: "CHAT_KIND_DIRECT",
+          participants: [
+            {
+              id: "user-self",
+              login: "alice",
+              nickname: "Alice",
+              avatarUrl: null,
+            },
+          ],
+          pinnedMessageIds: [],
+          encryptedPinnedMessageIds: [],
+          unreadCount: 0,
+          encryptedUnreadCount: 0,
+          createdAt: "2026-03-26T09:00:00Z",
+          updatedAt: "2026-03-26T09:00:00Z",
+        },
+      ],
+      "user-self",
+    );
+
+    expect(state.entries.filter((entry) => entry.kind === "direct_chat")).toHaveLength(0);
+    expect(state.entries.some((entry) => entry.id === "system_app:self_chat")).toBe(true);
+  });
+
   it("restores hidden entry back into desktop-visible organizer state without duplicates", () => {
     let state = createInitialDesktopRegistryState();
 

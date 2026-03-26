@@ -25,6 +25,7 @@ import {
   type ChatThreadSnapshot,
 } from "./state";
 import { parseEncryptedDirectMessageV2RealtimeEvent } from "./encrypted-v2-realtime";
+import { findSelfDirectChat } from "./self-chat";
 
 interface UseChatsOptions {
   enabled: boolean;
@@ -636,6 +637,67 @@ export function useChats({
     }
   }
 
+  async function ensureSelfChat(): Promise<string | null> {
+    dispatch({ type: "clear_feedback" });
+    dispatch({ type: "create_started" });
+
+    try {
+      let chats = stateRef.current.chats;
+      let targetChat = findSelfDirectChat(chats, currentUserId);
+      let notice: string | null = null;
+
+      if (!targetChat) {
+        try {
+          targetChat = await gatewayClient.createDirectChat(token, currentUserId);
+          notice = "Self chat создан.";
+        } catch (error) {
+          if (!isGatewayErrorCode(error, "already_exists")) {
+            throw error;
+          }
+        }
+
+        chats = await gatewayClient.listDirectChats(token);
+        if (!mountedRef.current) {
+          return null;
+        }
+
+        dispatch({
+          type: "list_refresh_succeeded",
+          chats,
+          notice,
+        });
+        targetChat = findSelfDirectChat(chats, currentUserId) ?? targetChat;
+      }
+
+      if (!targetChat) {
+        throw new Error("Gateway не вернул доступный self chat для текущего пользователя.");
+      }
+
+      const isOpened = await openChat(targetChat.id);
+      if (!isOpened) {
+        return null;
+      }
+
+      return targetChat.id;
+    } catch (error) {
+      const message = resolveProtectedError(
+        error,
+        "Не удалось открыть self chat через gateway.",
+        onUnauthenticatedRef,
+      );
+      if (!mountedRef.current || message === null) {
+        return null;
+      }
+
+      dispatch({ type: "list_refresh_failed", message });
+      return null;
+    } finally {
+      if (mountedRef.current) {
+        dispatch({ type: "create_finished" });
+      }
+    }
+  }
+
   async function sendMessage(
     text: string,
     attachmentIds: string[] = [],
@@ -764,6 +826,7 @@ export function useChats({
     reloadChats,
     openChat,
     ensureDirectChat,
+    ensureSelfChat,
     sendMessage,
     editMessage,
     deleteMessageForEveryone,

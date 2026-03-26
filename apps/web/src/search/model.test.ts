@@ -179,6 +179,24 @@ describe("search result labels", () => {
     ).toBe("Bob · @bob");
   });
 
+  it("renders self chat as canonical Я label", () => {
+    const selfChat = createDirectChat({
+      participants: [
+        {
+          id: "user-1",
+          login: "alice",
+          nickname: "Alice",
+          avatarUrl: null,
+        },
+      ],
+    });
+
+    expect(describeDirectChatLabel(selfChat, "user-1")).toBe("Я");
+    expect(
+      describeSearchResultContainer(createResult(), [selfChat], [], "user-1"),
+    ).toBe("Я");
+  });
+
   it("describes group container from loaded group list", () => {
     const result = createResult({
       scope: "group",

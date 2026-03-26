@@ -31,7 +31,13 @@ export interface DesktopShellHost {
   desktopGridCapacity: number;
   desktopRegistryState: DesktopRegistryState;
   desktopUnreadTargetMap: DesktopUnreadTargetMap;
-  launchApp(appId: ShellAppId): void;
+  launchApp(
+    appId: ShellAppId,
+    options?: {
+      routePath?: string | null;
+      title?: string;
+    },
+  ): void;
   openDirectChat(options: OpenDirectChatWindowOptions): void;
   openGroupChat(options: OpenGroupChatWindowOptions): void;
   openCustomFolder(folderId: string): void;
