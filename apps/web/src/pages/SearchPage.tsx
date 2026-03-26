@@ -906,7 +906,7 @@ export function SearchPage() {
       <section className={styles.secondarySection}>
         <div className={styles.sectionHeader}>
           <div>
-            <p className={styles.cardLabel}>Messages</p>
+            <p className={styles.cardLabel}>Сообщения</p>
             <h2 className={styles.sectionTitle}>Поиск по сообщениям</h2>
             <p className={styles.sectionDescription}>
               Результаты из текущей сессии ищутся локально. Если серверный поиск недоступен, это
@@ -1385,14 +1385,14 @@ function normalizeGroupTitle(value: string): string {
 function describeInviteRole(role: GroupInvitePreview["inviteRole"]): string {
   switch (role) {
     case "owner":
-      return "owner";
+      return "владелец";
     case "admin":
-      return "admin";
+      return "администратор";
     case "reader":
-      return "reader";
+      return "читатель";
     case "member":
     default:
-      return "member";
+      return "участник";
   }
 }
 

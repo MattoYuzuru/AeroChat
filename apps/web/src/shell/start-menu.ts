@@ -16,6 +16,7 @@ export type StartMenuLauncherAppId =
   | "self_chat"
   | "group_creator"
   | "explorer"
+  | "people"
   | "search"
   | "friend_requests"
   | "chats"
@@ -73,43 +74,49 @@ export const startMenuLauncherApps: readonly StartMenuLauncherAppEntry[] = [
     appId: "group_creator",
     badge: "Г+",
     title: "Создать группу",
-    description: "Отдельный wizard для owner bootstrap новой группы и мгновенного открытия target window.",
+    description: "Быстрое создание новой группы и переход к её окну.",
   },
   {
     appId: "self_chat",
     badge: "Я",
     title: "Я",
-    description: "Канонический self-facing workspace для текущего пользователя.",
+    description: "Личные заметки, файлы и быстрый доступ к себе.",
   },
   {
     appId: "explorer",
-    badge: "Ex",
-    title: "Explorer",
-    description: "Organizer surface для desktop entrypoints, hidden state и custom folders.",
+    badge: "Пр",
+    title: "Проводник",
+    description: "Навигация по ярлыкам, папкам и скрытым приложениям.",
+  },
+  {
+    appId: "people",
+    badge: "Л",
+    title: "Люди",
+    description: "Контакты, друзья и быстрый переход к профилям.",
   },
   {
     appId: "search",
     badge: "По",
     title: "Поиск",
-    description: "People-first поиск: контакты, invite links и вторичный поиск по сообщениям.",
+    description: "Контакты, приглашения и поиск по сообщениям.",
   },
   {
     appId: "friend_requests",
     badge: "З",
     title: "Заявки",
-    description: "Friend requests без дублирования singleton window.",
+    description: "Входящие и исходящие заявки в друзья.",
   },
   {
     appId: "chats",
     badge: "Ч",
     title: "Чаты",
-    description: "Launcher/list surface для всех direct chats, если нужен быстрый обзор.",
+    description: "Список всех личных переписок.",
   },
   {
     appId: "groups",
     badge: "Г",
     title: "Группы",
-    description: "Launcher/list surface для групп и открытия canonical group targets.",
+    description: "Список групп и быстрый переход к ним.",
   },
 ];
 
@@ -117,6 +124,7 @@ const recentEligibleAppIds = new Set<StartMenuRecentAppId>([
   "self_chat",
   "group_creator",
   "explorer",
+  "people",
   "search",
   "friend_requests",
   "settings",
@@ -258,6 +266,10 @@ export function describeStartMenuRecentItemBadge(item: StartMenuRecentItem): str
 
   if (item.appId === "group_creator") {
     return "Г+";
+  }
+
+  if (item.appId === "people") {
+    return "Л";
   }
 
   if (item.appId === "explorer") {

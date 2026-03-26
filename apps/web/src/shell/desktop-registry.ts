@@ -91,6 +91,7 @@ export type DesktopSystemAppId =
   | "group_creator"
   | "search"
   | "explorer"
+  | "people"
   | "friend_requests"
   | "settings";
 
@@ -112,9 +113,10 @@ const desktopSystemAppConfigs: readonly DesktopSystemAppConfig[] = [
   { appId: "self_chat", title: "Я", order: 1, hideable: false },
   { appId: "group_creator", title: "Создать группу", order: 2, hideable: true },
   { appId: "search", title: "Поиск", order: 3, hideable: false },
-  { appId: "explorer", title: "Explorer", order: 4, hideable: false },
-  { appId: "friend_requests", title: "Заявки", order: 5, hideable: false },
-  { appId: "settings", title: "Настройки", order: 6, hideable: false },
+  { appId: "explorer", title: "Проводник", order: 4, hideable: false },
+  { appId: "people", title: "Люди", order: 5, hideable: true },
+  { appId: "friend_requests", title: "Заявки", order: 6, hideable: false },
+  { appId: "settings", title: "Настройки", order: 7, hideable: false },
 ];
 
 const desktopSystemAppTitles: Record<DesktopSystemAppId, string> =

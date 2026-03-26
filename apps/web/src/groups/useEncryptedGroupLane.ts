@@ -29,6 +29,7 @@ interface UseEncryptedGroupLaneOptions {
   enabled: boolean;
   token: string;
   groupId: string | null;
+  pageSize?: number;
 }
 
 export interface EncryptedGroupLaneState {
@@ -50,6 +51,7 @@ export function useEncryptedGroupLane({
   enabled,
   token,
   groupId,
+  pageSize = encryptedGroupProjectionLimit,
 }: UseEncryptedGroupLaneOptions): EncryptedGroupLaneState {
   const cryptoRuntime = useCryptoRuntime();
   const activeCryptoDeviceId = resolveActiveRealtimeCryptoDeviceId(cryptoRuntime.state);
@@ -67,6 +69,7 @@ export function useEncryptedGroupLane({
     activeGroupId,
     activeCryptoDeviceId,
     cryptoRuntimeState: cryptoRuntime.state,
+    pageSize,
     token,
   });
   const activeLoadRequestKey =
@@ -97,6 +100,7 @@ export function useEncryptedGroupLane({
       groupId: activeLoadGroupId,
       activeCryptoDeviceId: activeLoadCryptoDeviceId,
       cryptoRuntime,
+      pageSize,
     })
       .then((result) => {
         if (requestVersionRef.current !== requestVersion) {
@@ -132,6 +136,7 @@ export function useEncryptedGroupLane({
     activeLoadRequestKey,
     activeLoadToken,
     loadedState.requestKey,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -233,6 +238,7 @@ export function useEncryptedGroupLane({
         groupId: activeLoadGroupId,
         activeCryptoDeviceId: activeLoadCryptoDeviceId,
         cryptoRuntime,
+        pageSize,
       })
         .then((result) => {
           if (requestVersionRef.current !== requestVersion) {
@@ -271,6 +277,7 @@ export function useEncryptedGroupLane({
     activeLoadGroupId,
     activeLoadRequestKey,
     activeLoadToken,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -342,6 +349,7 @@ async function loadEncryptedGroupLane(input: {
   groupId: string;
   activeCryptoDeviceId: string;
   cryptoRuntime: ReturnType<typeof useCryptoRuntime>;
+  pageSize: number;
 }): Promise<{
   bootstrap: EncryptedGroupBootstrap;
   items: EncryptedGroupProjectionEntry[];
@@ -355,7 +363,7 @@ async function loadEncryptedGroupLane(input: {
     input.token,
     input.groupId,
     input.activeCryptoDeviceId,
-    encryptedGroupProjectionLimit,
+    input.pageSize,
   );
   const buffered = listBufferedEncryptedGroupRealtimeEvents()
     .map((event) => event.envelope)
@@ -382,7 +390,7 @@ async function loadEncryptedGroupLane(input: {
 
   return {
     bootstrap,
-    items: mergeEncryptedGroupProjection([], [...updates, ...localOutbound]),
+    items: mergeEncryptedGroupProjection([], [...updates, ...localOutbound], input.pageSize),
   };
 }
 
@@ -407,6 +415,7 @@ export function resolveEncryptedGroupLoadDescriptor(input: {
   activeGroupId: string;
   activeCryptoDeviceId: string | null;
   cryptoRuntimeState: ReturnType<typeof useCryptoRuntime>["state"];
+  pageSize?: number;
   token: string;
 }):
   | { kind: "idle" }
@@ -448,6 +457,7 @@ export function resolveEncryptedGroupLoadDescriptor(input: {
       input.token,
       input.activeGroupId,
       input.activeCryptoDeviceId,
+      Math.max(1, Math.trunc(input.pageSize ?? encryptedGroupProjectionLimit)),
     ].join(":"),
     token: input.token,
     groupId: input.activeGroupId,

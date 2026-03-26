@@ -27,6 +27,7 @@ interface UseEncryptedDirectMessageV2LaneOptions {
   enabled: boolean;
   token: string;
   chatId: string | null;
+  pageSize?: number;
 }
 
 export interface EncryptedDirectMessageV2LaneState {
@@ -46,6 +47,7 @@ export function useEncryptedDirectMessageV2Lane({
   enabled,
   token,
   chatId,
+  pageSize = encryptedDirectMessageV2ProjectionLimit,
 }: UseEncryptedDirectMessageV2LaneOptions): EncryptedDirectMessageV2LaneState {
   const cryptoRuntime = useCryptoRuntime();
   const activeCryptoDeviceId = resolveActiveRealtimeCryptoDeviceId(cryptoRuntime.state);
@@ -62,6 +64,7 @@ export function useEncryptedDirectMessageV2Lane({
     activeChatId,
     activeCryptoDeviceId,
     cryptoRuntimeState: cryptoRuntime.state,
+    pageSize,
     token,
   });
   const activeLoadRequestKey =
@@ -92,6 +95,7 @@ export function useEncryptedDirectMessageV2Lane({
       chatId: activeLoadChatId,
       activeCryptoDeviceId: activeLoadCryptoDeviceId,
       cryptoRuntime,
+      pageSize,
     })
       .then((items) => {
         if (requestVersionRef.current !== requestVersion) {
@@ -127,6 +131,7 @@ export function useEncryptedDirectMessageV2Lane({
     activeLoadRequestKey,
     activeLoadToken,
     loadedState.requestKey,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -227,6 +232,7 @@ export function useEncryptedDirectMessageV2Lane({
         chatId: activeLoadChatId,
         activeCryptoDeviceId: activeLoadCryptoDeviceId,
         cryptoRuntime,
+        pageSize,
       })
         .then((items) => {
           if (requestVersionRef.current !== requestVersion) {
@@ -262,6 +268,7 @@ export function useEncryptedDirectMessageV2Lane({
     activeLoadCryptoDeviceId,
     activeLoadRequestKey,
     activeLoadToken,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -337,12 +344,13 @@ async function loadEncryptedLane(input: {
   chatId: string;
   activeCryptoDeviceId: string;
   cryptoRuntime: ReturnType<typeof useCryptoRuntime>;
+  pageSize: number;
 }): Promise<EncryptedDirectMessageV2ProjectionEntry[]> {
   const envelopes = await gatewayClient.listEncryptedDirectMessageV2(
     input.token,
     input.chatId,
     input.activeCryptoDeviceId,
-    encryptedDirectMessageV2ProjectionLimit,
+    input.pageSize,
   );
   const buffered = listBufferedEncryptedDirectMessageV2RealtimeEvents()
     .map((event) => event.envelope)
@@ -372,7 +380,7 @@ async function loadEncryptedLane(input: {
   return mergeEncryptedDirectMessageV2Projection([], [
     ...decrypted,
     ...localOutbound,
-  ]);
+  ], input.pageSize);
 }
 
 function deduplicateEncryptedDirectMessageV2Envelopes(
@@ -423,6 +431,7 @@ function resolveEncryptedLaneLoadDescriptor(input: {
   activeChatId: string;
   activeCryptoDeviceId: string | null;
   cryptoRuntimeState: ReturnType<typeof useCryptoRuntime>["state"];
+  pageSize?: number;
   token: string;
 }):
   | { kind: "idle" }
@@ -473,6 +482,7 @@ function resolveEncryptedLaneLoadDescriptor(input: {
       input.token,
       input.activeChatId,
       input.activeCryptoDeviceId,
+      Math.max(1, Math.trunc(input.pageSize ?? encryptedDirectMessageV2ProjectionLimit)),
     ].join(":"),
     token: input.token,
     chatId: input.activeChatId,

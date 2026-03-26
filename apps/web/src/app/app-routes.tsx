@@ -35,7 +35,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/self",
     path: "/app/self",
     shortcutLabel: "Я",
-    shortcutMeta: "self workspace",
+    shortcutMeta: "Личное пространство",
   },
   {
     appId: "group_creator",
@@ -44,7 +44,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/group-creator",
     path: "/app/group-creator",
     shortcutLabel: "Создать группу",
-    shortcutMeta: "group bootstrap",
+    shortcutMeta: "Новая группа",
   },
   {
     appId: "profile",
@@ -53,7 +53,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/profile",
     path: "/app/profile",
     shortcutLabel: "Профиль",
-    shortcutMeta: "identity",
+    shortcutMeta: "Учётная запись",
   },
   {
     appId: "friend_requests",
@@ -62,7 +62,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/friend-requests",
     path: "/app/friend-requests",
     shortcutLabel: "Заявки",
-    shortcutMeta: "social requests",
+    shortcutMeta: "Запросы",
   },
   {
     appId: "people",
@@ -71,7 +71,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/people",
     path: "/app/people",
     shortcutLabel: "Люди",
-    shortcutMeta: "social",
+    shortcutMeta: "Контакты",
   },
   {
     appId: "chats",
@@ -80,7 +80,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/chats",
     path: "/app/chats",
     shortcutLabel: "Чаты",
-    shortcutMeta: "chat opener",
+    shortcutMeta: "Личные переписки",
   },
   {
     appId: "groups",
@@ -89,16 +89,16 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/groups",
     path: "/app/groups",
     shortcutLabel: "Группы",
-    shortcutMeta: "group chat",
+    shortcutMeta: "Групповые переписки",
   },
   {
     appId: "explorer",
-    title: "Explorer",
+    title: "Проводник",
     launchPolicy: "singleton",
     routePath: "/app/explorer",
     path: "/app/explorer",
-    shortcutLabel: "Explorer",
-    shortcutMeta: "shell organizer",
+    shortcutLabel: "Проводник",
+    shortcutMeta: "навигация",
   },
   {
     appId: "search",
@@ -107,7 +107,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/search",
     path: "/app/search",
     shortcutLabel: "Поиск",
-    shortcutMeta: "people first",
+    shortcutMeta: "Сообщения и люди",
   },
   {
     appId: "settings",
@@ -116,7 +116,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     routePath: "/app/settings",
     path: "/app/settings",
     shortcutLabel: "Настройки",
-    shortcutMeta: "privacy",
+    shortcutMeta: "Параметры",
   },
 ];
 

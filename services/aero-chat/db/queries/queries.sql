@@ -496,7 +496,7 @@ SELECT
     (
         SELECT COUNT(*)
         FROM group_memberships AS gm
-        WHERE gm.group_id = g.id AND gm.left_at IS NULL
+        WHERE gm.group_id = g.id
     )::bigint AS group_member_count,
     g.created_by_user_id AS group_created_by_user_id,
     g.created_at AS group_created_at,

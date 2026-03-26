@@ -7,13 +7,11 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   normalizeComposerMessageText,
 } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
-import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
-import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
 import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
 import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
@@ -26,12 +24,14 @@ import { EncryptedMessageAttachmentList } from "../chats/EncryptedMessageAttachm
 import { publishLocalEncryptedDirectMessageV2Projection } from "../chats/encrypted-v2-local-outbound";
 import { resolveChatsRouteSyncAction } from "../chats/route-sync";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
+import { ChatGlyph } from "../chats/ChatGlyph";
 import { getDirectChatPeerOrSelf, isSelfDirectChat } from "../chats/self-chat";
 import { useEncryptedMediaAttachmentDraft } from "../chats/useEncryptedMediaAttachmentDraft";
 import {
   describeEncryptedDirectMessageV2LaneEmptyState,
   useEncryptedDirectMessageV2Lane,
 } from "../chats/useEncryptedDirectMessageV2Lane";
+import { encryptedDirectMessageV2ProjectionLimit } from "../chats/encrypted-v2-projection";
 import type { CryptoContextState } from "../crypto/runtime-context";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { useChats } from "../chats/useChats";
@@ -63,7 +63,12 @@ interface ChatsPageProps {
   routeMode?: "direct" | "self";
 }
 
+const encryptedDirectInitialPageSize = encryptedDirectMessageV2ProjectionLimit;
+const encryptedDirectPageStep = 50;
+const encryptedDirectMaxPageSize = 200;
+
 export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
+  const navigate = useNavigate();
   const { state: authState, expireSession } = useAuth();
   const desktopShellHost = useDesktopShellHost();
   const directCallAwareness = useDirectCallAwareness();
@@ -76,9 +81,18 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     useState<string | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [encryptedPageSize, setEncryptedPageSize] = useState(encryptedDirectInitialPageSize);
+  const [activePinnedIndex, setActivePinnedIndex] = useState(0);
   const pendingPeerRef = useRef<string | null>(null);
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const directCallAudioRef = useRef<HTMLAudioElement | null>(null);
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const keepScrollPinnedToBottomRef = useRef(true);
+  const olderHistoryAnchorRef = useRef<{
+    previousScrollHeight: number;
+    previousScrollTop: number;
+  } | null>(null);
+  const previousSelectedThreadIDRef = useRef<string | null>(null);
   const isPageVisible = usePageVisibility();
   const sessionToken =
     authState.status === "authenticated" ? authState.token : "";
@@ -283,6 +297,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     enabled: authState.status === "authenticated",
     token: sessionToken,
     chatId: selectedThread?.chat.id ?? null,
+    pageSize: encryptedPageSize,
   });
   const encryptedMessageEntries = encryptedLane.items.filter(
     (
@@ -646,6 +661,15 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
           messageId,
           entry: encryptedMessageIndex.get(messageId) ?? null,
         }));
+  const activePinnedMessage =
+    encryptedPinnedMessages.length === 0
+      ? null
+      : encryptedPinnedMessages[Math.min(activePinnedIndex, encryptedPinnedMessages.length - 1)] ??
+        null;
+  const canLoadOlderEncryptedMessages =
+    encryptedLane.status === "ready" &&
+    encryptedMessageCount >= encryptedPageSize &&
+    encryptedPageSize < encryptedDirectMaxPageSize;
   const encryptedAttachmentDraft = encryptedMediaAttachmentDraft.draft;
   const uploadedEncryptedAttachmentDraft = encryptedMediaAttachmentDraft.uploadedDraft;
   const activeReadStatusLabel =
@@ -724,6 +748,73 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
       window.clearTimeout(timeoutID);
     };
   }, [requestedChatId, requestedPeerUserId]);
+
+  useEffect(() => {
+    const timeoutID = window.setTimeout(() => {
+      setEncryptedPageSize(encryptedDirectInitialPageSize);
+      setActivePinnedIndex(0);
+    }, 0);
+    keepScrollPinnedToBottomRef.current = true;
+    olderHistoryAnchorRef.current = null;
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
+  }, [selectedThread?.chat.id]);
+
+  useEffect(() => {
+    if (encryptedPinnedMessages.length === 0) {
+      if (activePinnedIndex !== 0) {
+        const timeoutID = window.setTimeout(() => {
+          setActivePinnedIndex(0);
+        }, 0);
+
+        return () => {
+          window.clearTimeout(timeoutID);
+        };
+      }
+      return;
+    }
+
+    if (activePinnedIndex > encryptedPinnedMessages.length - 1) {
+      const timeoutID = window.setTimeout(() => {
+        setActivePinnedIndex(encryptedPinnedMessages.length - 1);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timeoutID);
+      };
+    }
+  }, [activePinnedIndex, encryptedPinnedMessages.length]);
+
+  useEffect(() => {
+    const viewport = messagesViewportRef.current;
+    if (viewport === null) {
+      return;
+    }
+
+    const selectedThreadID = selectedThread?.chat.id ?? null;
+    const selectedThreadChanged = previousSelectedThreadIDRef.current !== selectedThreadID;
+    const olderHistoryAnchor = olderHistoryAnchorRef.current;
+
+    if (olderHistoryAnchor !== null) {
+      const nextScrollTop =
+        viewport.scrollHeight - olderHistoryAnchor.previousScrollHeight +
+        olderHistoryAnchor.previousScrollTop;
+      viewport.scrollTop = Math.max(0, nextScrollTop);
+      olderHistoryAnchorRef.current = null;
+    } else if (selectedThreadChanged || keepScrollPinnedToBottomRef.current) {
+      const behavior = selectedThreadChanged ? "auto" : "smooth";
+      window.requestAnimationFrame(() => {
+        viewport.scrollTo({
+          top: viewport.scrollHeight,
+          behavior,
+        });
+      });
+    }
+
+    previousSelectedThreadIDRef.current = selectedThreadID;
+  }, [encryptedLane.items, selectedThread?.chat.id]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -940,6 +1031,63 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
           ? error.message
           : "Не удалось отправить media note.",
       );
+    }
+  }
+
+  function handleThreadHeaderClick() {
+    if (isSelectedSelfChat) {
+      if (desktopShellHost !== null) {
+        desktopShellHost.launchApp("profile");
+      }
+
+      navigate("/app/profile");
+      return;
+    }
+
+    setDirectInfoMode("info");
+  }
+
+  function handleMessagesViewportScroll() {
+    const viewport = messagesViewportRef.current;
+    if (viewport === null) {
+      return;
+    }
+
+    const distanceFromBottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    keepScrollPinnedToBottomRef.current = distanceFromBottom < 64;
+  }
+
+  function handleLoadOlderEncryptedMessages() {
+    const viewport = messagesViewportRef.current;
+    if (viewport !== null) {
+      olderHistoryAnchorRef.current = {
+        previousScrollHeight: viewport.scrollHeight,
+        previousScrollTop: viewport.scrollTop,
+      };
+    }
+
+    setEncryptedPageSize((current: number) =>
+      Math.min(encryptedDirectMaxPageSize, current + encryptedDirectPageStep),
+    );
+  }
+
+  function jumpToPinnedMessage(messageId: string | null) {
+    if (messageId === null) {
+      return;
+    }
+
+    jumpToMessage(`encrypted-direct-message-${messageId}`);
+  }
+
+  function handlePrimaryDirectCallAction() {
+    if (directCall.canJoin) {
+      void directCall.joinCall();
+      return;
+    }
+
+    if (directCall.canStart) {
+      void directCall.startCall();
     }
   }
 
@@ -1454,9 +1602,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                 <section className={styles.threadHero}>
                   <button
                     className={styles.threadIdentityButton}
-                    onClick={() => {
-                      setDirectInfoMode("info");
-                    }}
+                    onClick={handleThreadHeaderClick}
                     type="button"
                   >
                     <div className={styles.threadIdentity}>
@@ -1465,204 +1611,93 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       </span>
 
                       <div>
-                        <p className={styles.threadEyebrow}>Direct thread</p>
-                        <h3 className={styles.threadTitle}>
-                          {selectedPeer?.nickname ?? "Собеседник"}
-                        </h3>
-                        <p className={styles.threadDescription}>
-                          {selectedPeer ? `@${selectedPeer.login}` : "Участник недоступен"}
+                        <div className={styles.chatItemHeader}>
+                          <h3 className={styles.threadTitle}>{selectedPeerTitle}</h3>
+                          {!isSelectedSelfChat && selectedPeer ? (
+                            <span className={styles.threadDescription}>@{selectedPeer.login}</span>
+                          ) : null}
+                        </div>
+                        <p className={styles.threadEyebrow}>
+                          {describeDirectThreadStatus(
+                            isSelectedSelfChat,
+                            selectedThread.presenceState,
+                            selectedThread.typingState,
+                          )}
                         </p>
                         <p className={styles.identityActionHint}>
-                          Открыть профиль и информацию в этом же окне
+                          {isSelectedSelfChat
+                            ? "Открыть профиль и настройки аккаунта"
+                            : "Открыть профиль контакта в этом же окне"}
                         </p>
                       </div>
                     </div>
                   </button>
 
                   <div className={styles.threadStatusRow}>
-                    <StatusPill
-                      label={describePresenceStatus(selectedThread.presenceState)}
-                      tone={selectedThread.presenceState?.peerPresence ? "success" : "neutral"}
-                    />
-                    <StatusPill
-                      label={activeReadStatusLabel}
-                      tone={activeReadStatusTone}
-                    />
-                    {selectedThread.typingState?.peerTyping && (
-                      <StatusPill
-                        label={describeTypingStatus(selectedThread.typingState)}
-                        tone="accent"
-                      />
+                    {!isSelectedSelfChat && (
+                      <button
+                        aria-label="Позвонить"
+                        className={styles.iconButton}
+                        disabled={!directCall.canJoin && !directCall.canStart}
+                        onClick={handlePrimaryDirectCallAction}
+                        type="button"
+                      >
+                        <ChatGlyph kind="phone" />
+                      </button>
                     )}
                   </div>
                 </section>
 
-                {!isSelectedSelfChat && (
-                  <section className={styles.callCard}>
-                    <div className={styles.blockHeader}>
-                      <div>
-                        <p className={styles.cardLabel}>Audio call</p>
-                        <h3 className={styles.blockTitle}>Прямой аудиозвонок</h3>
-                      </div>
-                      <span className={styles.metaTag}>
-                        {describeDirectCallPhaseLabel(directCall.phase)}
-                      </span>
-                    </div>
-
-                    <div className={styles.callMeta}>
-                      <StatusPill
-                        label={describeDirectCallPeerStatus(
-                          directCall.remoteParticipant !== null,
-                          selectedPeer?.nickname ?? "Собеседник",
-                        )}
-                        tone={directCall.remoteParticipant ? "success" : "neutral"}
-                      />
-                      {directCall.state.call && (
-                        <StatusPill
-                          label={`Control-plane: ${describeDirectCallServerState(directCall.state.call.status)}`}
-                          tone={directCall.state.call.status === "active" ? "accent" : "neutral"}
-                        />
-                      )}
-                      {directCall.isLocallyJoined && (
-                        <StatusPill
-                          label="Вы подключены"
-                          tone="accent"
-                        />
-                      )}
-                    </div>
-
-                    <p className={styles.callDescription}>
-                      Узкий browser bootstrap поверх текущего RTC control plane: active call
-                      остаётся server-backed, а local audio session можно явно вернуть после
-                      ухода из thread. Только direct chat, только audio, без video/device scope.
-                    </p>
-
-                    <div className={styles.callActions}>
-                      {directCall.canStart && (
-                        <button
-                          className={styles.primaryButton}
-                          onClick={() => {
-                            void directCall.startCall();
-                          }}
-                          type="button"
-                        >
-                          Позвонить
-                        </button>
-                      )}
-
-                      {directCall.canJoin && (
-                        <button
-                          className={styles.primaryButton}
-                          onClick={() => {
-                            void directCall.joinCall();
-                          }}
-                          type="button"
-                        >
-                          {directCall.selfParticipant ? "Вернуться в звонок" : "Присоединиться"}
-                        </button>
-                      )}
-
-                      {directCall.canLeave && !directCall.canEnd && (
-                        <button
-                          className={styles.secondaryButton}
-                          onClick={() => {
-                            void directCall.leaveCall();
-                          }}
-                          type="button"
-                        >
-                          Покинуть звонок
-                        </button>
-                      )}
-
-                      {directCall.canEnd && (
-                        <button
-                          className={styles.secondaryButton}
-                          onClick={() => {
-                            void directCall.endCall();
-                          }}
-                          type="button"
-                        >
-                          Завершить звонок
-                        </button>
-                      )}
-                    </div>
-
-                    {directCall.state.errorMessage && (
-                      <div className={styles.callFeedback} data-tone="error">
-                        <p>{directCall.state.errorMessage}</p>
-                        <button
-                          className={styles.ghostButton}
-                          onClick={() => {
-                            directCall.dismissError();
-                          }}
-                          type="button"
-                        >
-                          Скрыть
-                        </button>
-                      </div>
-                    )}
-
-                    {directCall.state.remoteAudioState === "blocked" && (
-                      <div className={styles.callFeedback}>
-                        <p>
-                          Браузер заблокировал autoplay удалённого аудио. Подтвердите воспроизведение
-                          вручную.
-                        </p>
-                        <button
-                          className={styles.ghostButton}
-                          onClick={() => {
-                            void directCall.retryRemoteAudioPlayback(directCallAudioRef.current);
-                          }}
-                          type="button"
-                        >
-                          Включить звук
-                        </button>
-                      </div>
-                    )}
-
-                    <audio
-                      autoPlay
-                      playsInline
-                      ref={directCallAudioRef}
-                      className={styles.hiddenAudio}
-                    />
-                  </section>
-                )}
-
-                {selectedThread.chat.encryptedPinnedMessageIds.length > 0 && (
+                {activePinnedMessage !== null && (
                   <section className={styles.pinnedStrip}>
                     <div className={styles.blockHeader}>
-                      <div>
-                        <p className={styles.cardLabel}>Закреплённые</p>
-                        <h3 className={styles.blockTitle}>Закреплённые сообщения</h3>
-                      </div>
-                      <span className={styles.metaTag}>
-                        {selectedThread.chat.encryptedPinnedMessageIds.length}
-                      </span>
-                    </div>
+                      <button
+                        aria-label="Предыдущее закреплённое сообщение"
+                        className={styles.iconButton}
+                        disabled={activePinnedIndex === 0}
+                        onClick={() => {
+                          setActivePinnedIndex((current) => Math.max(0, current - 1));
+                        }}
+                        type="button"
+                      >
+                        <ChatGlyph kind="chevron_left" />
+                      </button>
 
-                    <div className={styles.pinnedList}>
-                      {encryptedPinnedMessages.map(({ messageId, entry }) => (
-                        <article key={messageId} className={styles.pinnedCard}>
-                          <div className={styles.pinnedHeader}>
-                            <strong>
-                              {entry === null
-                                ? "Сообщение"
-                                : entry.senderUserId === authState.profile.id
-                                  ? "Вы"
-                                  : selectedPeer?.nickname ?? "Собеседник"}
-                            </strong>
-                            <span className={styles.pinnedMeta}>
-                              {entry === null
-                                ? "Локально не разрешено"
-                                : formatDateTime(entry.createdAt)}
-                            </span>
-                          </div>
-                          <p className={styles.pinnedText}>
-                            {describeEncryptedPinnedPreview(entry)}
-                          </p>
-                        </article>
-                      ))}
+                      <button
+                        className={styles.pinnedCard}
+                        onClick={() => {
+                          jumpToPinnedMessage(activePinnedMessage.messageId);
+                        }}
+                        type="button"
+                      >
+                        <div className={styles.pinnedHeader}>
+                          <strong>
+                            Сообщение {activePinnedIndex + 1}/{encryptedPinnedMessages.length}
+                          </strong>
+                          <span className={styles.pinnedMeta}>
+                            {activePinnedMessage.entry === null
+                              ? "Недоступно локально"
+                              : formatDateTime(activePinnedMessage.entry.createdAt)}
+                          </span>
+                        </div>
+                        <p className={styles.pinnedText}>
+                          {describeEncryptedPinnedPreview(activePinnedMessage.entry)}
+                        </p>
+                      </button>
+
+                      <button
+                        aria-label="Следующее закреплённое сообщение"
+                        className={styles.iconButton}
+                        disabled={activePinnedIndex >= encryptedPinnedMessages.length - 1}
+                        onClick={() => {
+                          setActivePinnedIndex((current) =>
+                            Math.min(encryptedPinnedMessages.length - 1, current + 1),
+                          );
+                        }}
+                        type="button"
+                      >
+                        <ChatGlyph kind="chevron_right" />
+                      </button>
                     </div>
                   </section>
                 )}
@@ -1670,8 +1705,8 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                 <section className={styles.messagesPanel}>
                   <div className={styles.blockHeader}>
                     <div>
-                      <p className={styles.cardLabel}>Сообщения</p>
-                      <h3 className={styles.blockTitle}>Переписка</h3>
+                      <p className={styles.cardLabel}>Переписка</p>
+                      <h3 className={styles.blockTitle}>{selectedPeerTitle}</h3>
                     </div>
                     <div className={styles.headerActions}>
                       {selectedThread.chat.encryptedUnreadCount > 0 && (
@@ -1688,13 +1723,146 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       </span>
                     </div>
                   </div>
+                </section>
 
-                  <p className={styles.encryptedLaneDescription}>
-                    Текущая переписка открывается в обычном чате. Если часть истории недоступна,
-                    это показывается отдельным честным состоянием ниже.
-                  </p>
+                <section className={styles.messagesPanel}>
+                  <div
+                    className={styles.messagesViewport}
+                    onScroll={handleMessagesViewportScroll}
+                    ref={messagesViewportRef}
+                  >
+                    <div className={styles.messagesList}>
+                      {canLoadOlderEncryptedMessages && (
+                        <div className={styles.loadMoreRow}>
+                          <button
+                            className={styles.secondaryButton}
+                            onClick={handleLoadOlderEncryptedMessages}
+                            type="button"
+                          >
+                            Показать более ранние сообщения
+                          </button>
+                        </div>
+                      )}
 
-                  <div className={styles.messagesList}>
+                      {searchJumpNotice && <div className={styles.notice}>{searchJumpNotice}</div>}
+
+                      {!isSelectedSelfChat &&
+                        (directCall.state.call !== null ||
+                          directCall.phase !== "idle" ||
+                          directCall.state.errorMessage !== null ||
+                          directCall.state.remoteAudioState === "blocked") && (
+                          <article className={styles.messageRow} data-system="true">
+                            <div className={styles.callCard}>
+                              <div className={styles.messageHeader}>
+                                <div>
+                                  <p className={styles.messageAuthor}>Звонок</p>
+                                  <p className={styles.messageMeta}>
+                                    {describeDirectCallPhaseLabel(directCall.phase)}
+                                  </p>
+                                </div>
+                                <div className={styles.messageBadges}>
+                                  {directCall.state.call && (
+                                    <span className={styles.statusBadge}>
+                                      {describeDirectCallServerState(directCall.state.call.status)}
+                                    </span>
+                                  )}
+                                  {directCall.isLocallyJoined && (
+                                    <span className={styles.statusBadge} data-tone="accent">
+                                      Вы подключены
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <p className={styles.callDescription}>
+                                {describeDirectCallPeerStatus(
+                                  directCall.remoteParticipant !== null,
+                                  selectedPeer?.nickname ?? "Собеседник",
+                                )}
+                              </p>
+
+                              <div className={styles.callActions}>
+                                {directCall.canJoin && (
+                                  <button
+                                    className={styles.primaryButton}
+                                    onClick={() => {
+                                      void directCall.joinCall();
+                                    }}
+                                    type="button"
+                                  >
+                                    {directCall.selfParticipant ? "Вернуться" : "Присоединиться"}
+                                  </button>
+                                )}
+                                {directCall.canStart && (
+                                  <button
+                                    className={styles.primaryButton}
+                                    onClick={() => {
+                                      void directCall.startCall();
+                                    }}
+                                    type="button"
+                                  >
+                                    Позвонить
+                                  </button>
+                                )}
+                                {directCall.canLeave && !directCall.canEnd && (
+                                  <button
+                                    className={styles.secondaryButton}
+                                    onClick={() => {
+                                      void directCall.leaveCall();
+                                    }}
+                                    type="button"
+                                  >
+                                    Выйти
+                                  </button>
+                                )}
+                                {directCall.canEnd && (
+                                  <button
+                                    className={styles.secondaryButton}
+                                    onClick={() => {
+                                      void directCall.endCall();
+                                    }}
+                                    type="button"
+                                  >
+                                    Завершить
+                                  </button>
+                                )}
+                              </div>
+
+                              {directCall.state.errorMessage && (
+                                <div className={styles.callFeedback} data-tone="error">
+                                  <p>{directCall.state.errorMessage}</p>
+                                  <button
+                                    className={styles.ghostButton}
+                                    onClick={() => {
+                                      directCall.dismissError();
+                                    }}
+                                    type="button"
+                                  >
+                                    Скрыть
+                                  </button>
+                                </div>
+                              )}
+
+                              {directCall.state.remoteAudioState === "blocked" && (
+                                <div className={styles.callFeedback}>
+                                  <p>Браузер заблокировал удалённый звук.</p>
+                                  <button
+                                    className={styles.ghostButton}
+                                    onClick={() => {
+                                      void directCall.retryRemoteAudioPlayback(
+                                        directCallAudioRef.current,
+                                      );
+                                    }}
+                                    type="button"
+                                  >
+                                    Включить звук
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </article>
+                        )}
+
                     {encryptedLane.status === "loading" && (
                       <StateCard
                         title="Загружаем сообщения"
@@ -1738,6 +1906,12 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                           accessToken: sessionToken,
                           currentUserId: authState.profile.id,
                           peerNickname: selectedPeer?.nickname ?? "Собеседник",
+                          isSearchTarget:
+                            item.kind === "message" && item.messageId === highlightedMessageId,
+                          peerReadPosition:
+                            item.kind === "message"
+                              ? selectedThread.encryptedReadState?.peerPosition ?? null
+                              : null,
                           replyTarget:
                             item.kind === "message"
                               ? resolveEncryptedDirectReplyTarget(
@@ -1797,25 +1971,12 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                                 },
                         }),
                       )}
-                  </div>
-                </section>
-
-                <section className={styles.messagesPanel}>
-                  <div className={styles.blockHeader}>
-                    <div>
-                      <p className={styles.cardLabel}>История</p>
-                      <h3 className={styles.blockTitle}>Ранние сообщения недоступны</h3>
+                      <div className={styles.historyNotice}>
+                        {canLoadOlderEncryptedMessages
+                          ? "Показан только текущий фрагмент истории. Более ранние сообщения можно догрузить кнопкой выше."
+                          : "Показан текущий доступный фрагмент истории."}
+                      </div>
                     </div>
-                    <span className={styles.metaTag}>
-                      Недоступно
-                    </span>
-                  </div>
-
-                  <div className={styles.messagesList}>
-                    <StateCard
-                      title="История недоступна"
-                      message="В этом окне доступны текущие сообщения. Более ранняя история здесь сейчас не открывается."
-                    />
                   </div>
                 </section>
 
@@ -1835,7 +1996,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       <div className={styles.replyComposerCard}>
                         <div>
                           <p className={styles.replyPreviewAuthor}>
-                            Encrypted reply на{" "}
+                            Ответ на{" "}
                             {selectedEncryptedReplyEntry.senderUserId === authState.profile.id
                               ? "ваше сообщение"
                               : selectedPeer?.nickname ?? "сообщение собеседника"}
@@ -1862,7 +2023,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       <div className={styles.replyComposerCard}>
                         <div>
                           <p className={styles.replyPreviewAuthor}>
-                            Encrypted edit revision {editingEncryptedEntry.revision + 1}
+                            Редактирование · версия {editingEncryptedEntry.revision + 1}
                           </p>
                           <p className={styles.replyPreviewText}>
                             {describeEncryptedDirectComposerReplyTarget(editingEncryptedEntry)}
@@ -1882,98 +2043,16 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       </div>
                     )}
 
-                    <div className={styles.attachmentActions}>
-                      <input
-                        accept="*/*"
-                        className={styles.attachmentInput}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0] ?? null;
-                          void handleEncryptedAttachmentSelection(file);
-                          event.target.value = "";
-                        }}
-                        ref={encryptedAttachmentInputRef}
-                        type="file"
-                      />
-                      <button
-                        className={styles.secondaryButton}
-                        disabled={!canPickEncryptedAttachment}
-                        onClick={() => {
-                          encryptedAttachmentInputRef.current?.click();
-                        }}
-                        type="button"
-                      >
-                        {encryptedAttachmentDraft === null
-                          ? "Добавить файл"
-                          : "Заменить файл"}
-                      </button>
-                      <span className={styles.attachmentHint}>
-                        Прикрепите файл вручную или используйте voice/video note ниже. Всё уходит
-                        через тот же encrypted attachment flow.
-                      </span>
-                    </div>
-
-                    <VoiceNoteRecorderPanel
-                      state={voiceNoteRecorder.state}
-                      startDisabled={voiceNoteStartDisabled}
-                      stopDisabled={voiceNoteRecorder.state.status !== "recording"}
-                      discardDisabled={!canUseEncryptedMediaNoteEntry}
-                      sendDisabled={
-                        !canUseEncryptedMediaNoteEntry ||
-                        voiceNoteRecorder.state.draft === null
-                      }
-                      isSending={
-                        encryptedMediaAttachmentDraft.isUploading ||
-                        cryptoRuntime.state.isActionPending
-                      }
-                      onStart={() => {
-                        void voiceNoteRecorder.startRecording();
+                    <input
+                      accept="*/*"
+                      className={styles.attachmentInput}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        void handleEncryptedAttachmentSelection(file);
+                        event.target.value = "";
                       }}
-                      onStop={() => {
-                        voiceNoteRecorder.stopRecording();
-                      }}
-                      onDiscard={() => {
-                        voiceNoteRecorder.discardRecording();
-                      }}
-                      onSend={() => {
-                        void handleEncryptedMediaNoteSend(
-                          voiceNoteRecorder.state.draft?.file ?? null,
-                          () => {
-                            voiceNoteRecorder.discardRecording();
-                          },
-                        );
-                      }}
-                    />
-
-                    <VideoNoteRecorderPanel
-                      state={videoNoteRecorder.state}
-                      startDisabled={videoNoteStartDisabled}
-                      stopDisabled={videoNoteRecorder.state.status !== "recording"}
-                      discardDisabled={!canUseEncryptedMediaNoteEntry}
-                      sendDisabled={
-                        !canUseEncryptedMediaNoteEntry ||
-                        videoNoteRecorder.state.draft === null
-                      }
-                      isSending={
-                        encryptedMediaAttachmentDraft.isUploading ||
-                        cryptoRuntime.state.isActionPending
-                      }
-                      onStart={() => {
-                        void videoNoteRecorder.startRecording();
-                      }}
-                      onStop={() => {
-                        videoNoteRecorder.stopRecording();
-                      }}
-                      onDiscard={() => {
-                        videoNoteRecorder.discardRecording();
-                      }}
-                      onSend={() => {
-                        void handleEncryptedMediaNoteSend(
-                          videoNoteRecorder.state.draft?.file ?? null,
-                          () => {
-                            videoNoteRecorder.discardRecording();
-                          },
-                        );
-                      }}
+                      ref={encryptedAttachmentInputRef}
+                      type="file"
                     />
 
                     {encryptedAttachmentDraft && (
@@ -2024,7 +2103,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                               }}
                               type="button"
                             >
-                              Повторить upload
+                              Повторить
                             </button>
                           )}
                           <button
@@ -2040,25 +2119,195 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       </div>
                     )}
 
-                    <label className={styles.field}>
-                      <span>Текст сообщения</span>
-                      <textarea
-                        disabled={
-                          chats.state.isSendingMessage ||
-                          encryptedMediaAttachmentDraft.isUploading
-                        }
-                        maxLength={4000}
-                        onChange={(event) => {
-                          setComposerText(event.target.value);
-                          setComposerError(null);
-                          chats.clearFeedback();
+                    {voiceNoteRecorder.state.errorMessage && (
+                      <div className={styles.error}>{voiceNoteRecorder.state.errorMessage}</div>
+                    )}
+
+                    {videoNoteRecorder.state.errorMessage && (
+                      <div className={styles.error}>{videoNoteRecorder.state.errorMessage}</div>
+                    )}
+
+                    {voiceNoteRecorder.state.status === "recorded" &&
+                      voiceNoteRecorder.state.draft !== null && (
+                        <div className={styles.attachmentDraftCard}>
+                          <div>
+                            <p className={styles.attachmentDraftTitle}>
+                              {voiceNoteRecorder.state.draft.fileName}
+                            </p>
+                            <p className={styles.attachmentDraftMeta}>
+                              Голосовое сообщение
+                            </p>
+                          </div>
+                          <audio
+                            className={styles.hiddenAudio}
+                            controls
+                            preload="metadata"
+                            src={voiceNoteRecorder.state.draft.previewUrl}
+                          />
+                          <div className={styles.attachmentDraftActions}>
+                            <button
+                              className={styles.ghostButton}
+                              onClick={() => {
+                                voiceNoteRecorder.discardRecording();
+                              }}
+                              type="button"
+                            >
+                              Убрать
+                            </button>
+                            <button
+                              className={styles.secondaryButton}
+                              onClick={() => {
+                                void handleEncryptedMediaNoteSend(
+                                  voiceNoteRecorder.state.draft?.file ?? null,
+                                  () => {
+                                    voiceNoteRecorder.discardRecording();
+                                  },
+                                );
+                              }}
+                              type="button"
+                            >
+                              Отправить запись
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                    {videoNoteRecorder.state.status === "recorded" &&
+                      videoNoteRecorder.state.draft !== null && (
+                        <div className={styles.attachmentDraftCard}>
+                          <div>
+                            <p className={styles.attachmentDraftTitle}>
+                              {videoNoteRecorder.state.draft.fileName}
+                            </p>
+                            <p className={styles.attachmentDraftMeta}>
+                              Видео сообщение
+                            </p>
+                          </div>
+                          <video
+                            className={styles.mediaPreview}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            src={videoNoteRecorder.state.draft.previewUrl}
+                          />
+                          <div className={styles.attachmentDraftActions}>
+                            <button
+                              className={styles.ghostButton}
+                              onClick={() => {
+                                videoNoteRecorder.discardRecording();
+                              }}
+                              type="button"
+                            >
+                              Убрать
+                            </button>
+                            <button
+                              className={styles.secondaryButton}
+                              onClick={() => {
+                                void handleEncryptedMediaNoteSend(
+                                  videoNoteRecorder.state.draft?.file ?? null,
+                                  () => {
+                                    videoNoteRecorder.discardRecording();
+                                  },
+                                );
+                              }}
+                              type="button"
+                            >
+                              Отправить видео
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                    <div className={styles.composerRow}>
+                      <button
+                        aria-label="Прикрепить файл"
+                        className={styles.iconButton}
+                        disabled={!canPickEncryptedAttachment}
+                        onClick={() => {
+                          encryptedAttachmentInputRef.current?.click();
                         }}
-                        onKeyDown={handleComposerKeyDown}
-                        placeholder="Напишите спокойное текстовое сообщение"
-                        rows={5}
-                        value={composerText}
-                      />
-                    </label>
+                        type="button"
+                      >
+                        <ChatGlyph kind="attach" />
+                      </button>
+
+                      <label className={styles.field}>
+                        <textarea
+                          disabled={
+                            chats.state.isSendingMessage ||
+                            encryptedMediaAttachmentDraft.isUploading
+                          }
+                          maxLength={4000}
+                          onChange={(event) => {
+                            setComposerText(event.target.value);
+                            setComposerError(null);
+                            chats.clearFeedback();
+                          }}
+                          onKeyDown={handleComposerKeyDown}
+                          placeholder="Напишите сообщение"
+                          rows={2}
+                          value={composerText}
+                        />
+                      </label>
+
+                      <button
+                        aria-label="Записать голосовое сообщение"
+                        className={styles.iconButton}
+                        disabled={voiceNoteStartDisabled}
+                        onClick={() => {
+                          if (voiceNoteRecorder.state.status === "recording") {
+                            voiceNoteRecorder.stopRecording();
+                            return;
+                          }
+
+                          void voiceNoteRecorder.startRecording();
+                        }}
+                        type="button"
+                      >
+                        <ChatGlyph
+                          kind={
+                            voiceNoteRecorder.state.status === "recording"
+                              ? "microphone_active"
+                              : "microphone"
+                          }
+                        />
+                      </button>
+
+                      <button
+                        aria-label="Записать видео сообщение"
+                        className={styles.iconButton}
+                        disabled={videoNoteStartDisabled}
+                        onClick={() => {
+                          if (videoNoteRecorder.state.status === "recording") {
+                            videoNoteRecorder.stopRecording();
+                            return;
+                          }
+
+                          void videoNoteRecorder.startRecording();
+                        }}
+                        type="button"
+                      >
+                        <ChatGlyph
+                          kind={
+                            videoNoteRecorder.state.status === "recording"
+                              ? "camera_active"
+                              : "camera"
+                          }
+                        />
+                      </button>
+
+                      <button
+                        aria-label="Отправить сообщение"
+                        className={styles.primaryIconButton}
+                        disabled={!canSendEncryptedDirectMessageV2}
+                        onClick={() => {
+                          void handleEncryptedDirectMessageV2Send();
+                        }}
+                        type="button"
+                      >
+                        <ChatGlyph kind="send" />
+                      </button>
+                    </div>
 
                     <div className={styles.composerFooter}>
                       <span className={styles.characterCount}>
@@ -2085,6 +2334,13 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                     <p className={styles.attachmentHint}>{encryptedSendHint}</p>
                   </form>
                 </section>
+
+                <audio
+                  autoPlay
+                  playsInline
+                  ref={directCallAudioRef}
+                  className={styles.hiddenAudio}
+                />
               </div>
               )
             )}
@@ -2150,6 +2406,8 @@ interface RenderEncryptedDirectMessageV2EntryInput {
   accessToken: string;
   currentUserId: string;
   peerNickname: string;
+  isSearchTarget: boolean;
+  peerReadPosition: EncryptedDirectConversationReadPositionLike | null;
   replyTarget: EncryptedReplyTargetDescriptor | null;
   isPinned: boolean;
   onJumpToReplyTarget(messageId: string): void;
@@ -2177,7 +2435,7 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
               <p className={styles.messageMeta}>{formatDateTime(input.item.createdAt)}</p>
             </div>
             <div className={styles.messageBadges}>
-              <span className={styles.statusBadge}>Decrypt failed</span>
+              <span className={styles.statusBadge}>Не удалось открыть</span>
             </div>
           </div>
           <p className={styles.encryptedFailureText}>
@@ -2193,6 +2451,7 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
       key={input.item.key}
       className={styles.messageRow}
       data-own={isOwn}
+      data-search-target={input.isSearchTarget || undefined}
       id={`encrypted-direct-message-${input.item.messageId}`}
     >
       <div className={styles.messageBubble} data-own={isOwn}>
@@ -2202,12 +2461,14 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
             <p className={styles.messageMeta}>{formatDateTime(input.item.createdAt)}</p>
           </div>
           <div className={styles.messageBadges}>
-            <span className={styles.statusBadge} data-tone="accent">
-              Encrypted v2
-            </span>
-            {input.isPinned && <span className={styles.statusBadge}>Pin</span>}
+            {input.isPinned && <span className={styles.statusBadge}>Закреплено</span>}
             {input.item.editedAt && <span className={styles.statusBadge}>Изменено</span>}
             {input.item.isTombstone && <span className={styles.statusBadge}>Удалено</span>}
+            {isOwn && isEncryptedMessageReadByPeer(input.item, input.peerReadPosition) && (
+              <span className={styles.statusBadge} data-tone="success">
+                Прочитано
+              </span>
+            )}
           </div>
         </div>
         <div className={styles.messageBody}>
@@ -2256,40 +2517,52 @@ function renderEncryptedDirectMessageV2Entry(input: RenderEncryptedDirectMessage
           )}
         </div>
         {!input.item.isTombstone && (
-          <div className={styles.actions}>
+          <div className={styles.messageActions}>
             {input.onTogglePin && (
               <button
-                className={styles.ghostButton}
+                aria-label={input.isPinned ? "Снять закрепление" : "Закрепить"}
+                className={styles.messageActionButton}
                 onClick={input.onTogglePin}
                 type="button"
               >
-                {input.isPinned ? "Снять закрепление" : "Закрепить"}
+                <ChatGlyph kind={input.isPinned ? "unpin" : "pin"} />
               </button>
             )}
             {input.onReply && (
-              <button className={styles.ghostButton} onClick={input.onReply} type="button">
-                Ответить
+              <button
+                aria-label="Ответить"
+                className={styles.messageActionButton}
+                onClick={input.onReply}
+                type="button"
+              >
+                <ChatGlyph kind="reply" />
               </button>
             )}
             {input.onEdit && (
-              <button className={styles.ghostButton} onClick={input.onEdit} type="button">
-                Редактировать
+              <button
+                aria-label="Редактировать"
+                className={styles.messageActionButton}
+                onClick={input.onEdit}
+                type="button"
+              >
+                <ChatGlyph kind="edit" />
               </button>
             )}
             {input.onDeleteForEveryone && (
               <button
-                className={styles.ghostButton}
+                aria-label="Удалить для всех"
+                className={styles.messageActionButton}
                 onClick={input.onDeleteForEveryone}
                 type="button"
               >
-                Удалить для всех
+                <ChatGlyph kind="delete" />
               </button>
             )}
           </div>
         )}
         <p className={styles.editMeta}>
-          stored {formatDateTime(input.item.storedAt)}
-          {input.item.editedAt ? ` • edited ${formatDateTime(input.item.editedAt)}` : ""}
+          сохранено {formatDateTime(input.item.storedAt)}
+          {input.item.editedAt ? ` • изменено ${formatDateTime(input.item.editedAt)}` : ""}
           {input.item.deletedAt
             ? ` • удалено ${formatDateTime(input.item.deletedAt)}`
             : ""}
@@ -2303,6 +2576,26 @@ interface EncryptedReplyTargetDescriptor {
   messageId: string | null;
   authorLabel: string;
   previewText: string;
+}
+
+interface EncryptedDirectConversationReadPositionLike {
+  messageCreatedAt: string;
+  messageId: string;
+}
+
+function isEncryptedMessageReadByPeer(
+  entry: EncryptedDirectMessageV2ProjectedMessageEntry,
+  peerReadPosition: EncryptedDirectConversationReadPositionLike | null,
+): boolean {
+  if (peerReadPosition === null) {
+    return false;
+  }
+
+  if (entry.createdAt !== peerReadPosition.messageCreatedAt) {
+    return entry.createdAt < peerReadPosition.messageCreatedAt;
+  }
+
+  return entry.messageId <= peerReadPosition.messageId;
 }
 
 function describeDirectCallPhaseLabel(
@@ -2446,6 +2739,26 @@ function describePresenceStatus(presenceState: DirectChatPresenceState | null): 
   }
 
   return `В сети · ${formatDateTime(presenceState.peerPresence.heartbeatAt)}`;
+}
+
+function describeDirectThreadStatus(
+  isSelfChat: boolean,
+  presenceState: DirectChatPresenceState | null,
+  typingState: DirectChatTypingState | null,
+): string {
+  if (isSelfChat) {
+    return "Личные заметки, файлы и перенос между устройствами";
+  }
+
+  if (typingState?.peerTyping) {
+    return "Печатает...";
+  }
+
+  if (presenceState?.peerPresence) {
+    return "В сети";
+  }
+
+  return "Не в сети";
 }
 
 function describeDirectProfileSummary(profile: Profile | null): string {

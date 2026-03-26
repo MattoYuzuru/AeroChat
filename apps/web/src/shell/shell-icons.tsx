@@ -13,6 +13,7 @@ export type ShellIconKey =
   | "folder_empty"
   | "folder_full"
   | "friend_requests"
+  | "people"
   | "settings"
   | "groups"
   | "chats"
@@ -68,6 +69,8 @@ export function resolveShellAppIconKey(appId: ShellAppId): ShellIconKey {
       return "explorer";
     case "friend_requests":
       return "friend_requests";
+    case "people":
+      return "people";
     case "settings":
       return "settings";
     case "chats":
@@ -214,6 +217,15 @@ function renderShellIcon(iconKey: ShellIconKey) {
           />
         </>
       );
+    case "people":
+      return (
+        <>
+          <circle cx="11" cy="12" r="4.1" fill="#f0c693" stroke="#8e5c30" />
+          <circle cx="21" cy="13.5" r="3.3" fill="#f6d6ac" stroke="#a06b3f" />
+          <path d="M5.5 24c0-3.5 2.7-6.1 5.9-6.1S17.3 20.5 17.3 24" fill="#83b6e4" stroke="#1e6197" />
+          <path d="M16 24c0-2.7 2.1-4.8 4.8-4.8s4.8 2.1 4.8 4.8" fill="#c6def6" stroke="#4c84b7" />
+        </>
+      );
     case "settings":
       return (
         <>
@@ -244,14 +256,13 @@ function renderShellIcon(iconKey: ShellIconKey) {
     case "network":
       return (
         <>
-          <rect x="5.5" y="8" width="21" height="14" rx="2.5" fill="#dff3ff" stroke="#24699f" />
-          <path d="M10 25h12" stroke="#24699f" strokeLinecap="round" strokeWidth="2" />
+          <circle cx="16" cy="23.4" r="1.7" fill="#3d9c38" stroke="#24699f" strokeWidth="0.6" />
           <path
-            d="M10 18c1.7-2.2 3.7-3.3 6-3.3 2.3 0 4.3 1.1 6 3.3M12.6 15.2c1.1-1.2 2.2-1.8 3.4-1.8s2.3.6 3.4 1.8M15 12.7c.4-.3.8-.4 1-.4.2 0 .6.1 1 .4"
+            d="M7.2 20.8c2.7-3 5.7-4.5 8.8-4.5 3.1 0 6.1 1.5 8.8 4.5M10.2 17.5c1.8-1.9 3.7-2.9 5.8-2.9 2.1 0 4 1 5.8 2.9M13.1 14.2c.9-.9 1.9-1.4 2.9-1.4s2 .5 2.9 1.4"
             fill="none"
             stroke="#3d9c38"
             strokeLinecap="round"
-            strokeWidth="1.6"
+            strokeWidth="1.8"
           />
         </>
       );

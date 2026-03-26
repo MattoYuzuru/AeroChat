@@ -157,11 +157,10 @@ export function CreateGroupPage() {
       <section className={styles.heroCard}>
         <div className={styles.heroContent}>
           <div>
-            <p className={styles.eyebrow}>Group wizard</p>
+            <p className={styles.eyebrow}>Новая группа</p>
             <h1 className={styles.title}>Создать новую группу</h1>
             <p className={styles.subtitle}>
-              Отдельное shell-приложение для быстрого owner bootstrap без перехода в общий список
-              групп и без потери XP-first chrome.
+              Отдельное окно для быстрого создания группы без перехода в общий список.
             </p>
           </div>
 
@@ -170,8 +169,8 @@ export function CreateGroupPage() {
               label="Группы"
               value={groupsLoadState.status === "ready" ? groupsLoadState.groups.length : "…"}
             />
-            <Metric label="Роль" value="owner" />
-            <Metric label="Thread" value="primary" />
+            <Metric label="Роль" value="владелец" />
+            <Metric label="Окно" value="основное" />
           </div>
         </div>
       </section>
@@ -187,22 +186,21 @@ export function CreateGroupPage() {
         <section className={styles.windowCard}>
           <div className={styles.windowTitleBar}>
             <span className={styles.windowTitle}>Мастер создания группы</span>
-            <span className={styles.windowMeta}>XP.css inspired</span>
+            <span className={styles.windowMeta}>AeroChat</span>
           </div>
 
           <div className={styles.windowBody}>
             <form className={styles.formPanel} onSubmit={handleCreateGroup}>
               <div className={styles.panelHeader}>
                 <div>
-                  <p className={styles.panelLabel}>Create</p>
+                  <p className={styles.panelLabel}>Создание</p>
                   <h2 className={styles.panelTitle}>Новый workspace для участников</h2>
                 </div>
-                <span className={styles.roleBadge}>owner</span>
+                <span className={styles.roleBadge}>владелец</span>
               </div>
 
               <p className={styles.description}>
-                После создания backend сразу добавит вас в membership, поднимет primary thread и
-                вернёт канонический group target для shell.
+                После создания вы сразу станете участником группы и откроете её переписку.
               </p>
 
               <label className={styles.field}>
@@ -213,7 +211,7 @@ export function CreateGroupPage() {
                   onChange={(event) => {
                     setGroupName(event.target.value);
                   }}
-                  placeholder="Design Council"
+                  placeholder="Совет проекта"
                   value={groupName}
                 />
               </label>
@@ -243,10 +241,10 @@ export function CreateGroupPage() {
               <section className={styles.infoPanel}>
                 <p className={styles.panelLabel}>Что произойдёт</p>
                 <ul className={styles.infoList}>
-                  <li>owner membership создаётся сразу</li>
-                  <li>канонический group chat открывается без лишних шагов</li>
-                  <li>desktop entry самой группы появится автоматически</li>
-                  <li>приложение можно скрыть с рабочего стола и вернуть через Explorer</li>
+                  <li>владелец создаётся сразу</li>
+                  <li>переписка группы откроется без лишних шагов</li>
+                  <li>ярлык самой группы появится автоматически</li>
+                  <li>ярлык можно вернуть через проводник</li>
                 </ul>
               </section>
 

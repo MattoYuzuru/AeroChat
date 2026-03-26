@@ -71,7 +71,10 @@ export interface ExplorerFolderMemberRecord {
 }
 
 export interface ExplorerAppLinkRecord {
-  appId: Extract<ShellAppId, "friend_requests" | "group_creator" | "search" | "settings">;
+  appId: Extract<
+    ShellAppId,
+    "friend_requests" | "group_creator" | "people" | "search" | "settings"
+  >;
   title: string;
   description: string;
 }
@@ -321,6 +324,11 @@ export function buildExplorerSectionViewModel(
         buckets: [],
         appLinks: [
           {
+            appId: "people",
+            title: "Люди",
+            description: "Открыть контакты и друзей.",
+          },
+          {
             appId: "friend_requests",
             title: "Заявки",
             description: "Открыть заявки в друзья.",
@@ -485,11 +493,15 @@ function describeExplorerEntityType(entry: DesktopEntity): string {
   }
 
   if (entry.appId === "explorer") {
-    return "Explorer";
+    return "Проводник";
   }
 
   if (entry.appId === "group_creator") {
     return "Создание групп";
+  }
+
+  if (entry.appId === "people") {
+    return "Люди";
   }
 
   if (entry.appId === "friend_requests") {

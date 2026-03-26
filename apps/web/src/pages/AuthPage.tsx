@@ -51,27 +51,21 @@ export function AuthPage({ mode }: AuthPageProps) {
 
   return (
     <main className={styles.viewport}>
-      <section className={styles.heroPanel}>
-        <p className={styles.eyebrow}>AeroChat</p>
-        <h1 className={styles.title}>Login application</h1>
-        <p className={styles.copy}>
-          Текущий auth flow уже входит в новую shell-направленность: вход и регистрация живут в
-          том же визуальном языке, что и desktop runtime, но по-прежнему идут только через
-          `aero-gateway`.
-        </p>
-        <ul className={styles.highlights}>
-          <li>boot и chooser уже отделены от ежедневного fast-entry</li>
-          <li>логин и регистрация остаются bounded app surfaces, а не marketing landing</li>
-          <li>после валидного входа desktop shell становится primary desktop entrypoint</li>
-        </ul>
-      </section>
+      <div className={styles.shellBar} aria-hidden="true" />
 
       <section className={styles.formPanel}>
         <div className={styles.formCard}>
-          <p className={styles.eyebrow}>{isRegister ? "Регистрация" : "Вход"}</p>
-          <h2 className={styles.formTitle}>
-            {isRegister ? "Создать аккаунт" : "Войти в AeroChat"}
-          </h2>
+          <div className={styles.userTile}>
+            <div className={styles.avatarFrame}>
+              <div className={styles.avatarBadge}>{isRegister ? "A+" : "A"}</div>
+            </div>
+            <div className={styles.userMeta}>
+              <p className={styles.modeLabel}>{isRegister ? "Регистрация" : "Вход"}</p>
+              <h1 className={styles.formTitle}>
+                {isRegister ? "Создать учётную запись" : "Войти в AeroChat"}
+              </h1>
+            </div>
+          </div>
 
           {state.notice && <div className={styles.notice}>{state.notice}</div>}
           {errorMessage && <div className={styles.error}>{errorMessage}</div>}
@@ -165,6 +159,8 @@ export function AuthPage({ mode }: AuthPageProps) {
             </Link>
           </p>
         </div>
+
+        <p className={styles.footerBrand}>AeroChat</p>
       </section>
     </main>
   );
