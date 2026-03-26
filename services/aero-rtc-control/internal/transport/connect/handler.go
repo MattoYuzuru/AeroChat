@@ -37,6 +37,27 @@ func (h *Handler) Ping(context.Context, *connect.Request[rtcv1.PingRequest]) (*c
 	}), nil
 }
 
+func (h *Handler) GetIceServers(ctx context.Context, req *connect.Request[rtcv1.GetIceServersRequest]) (*connect.Response[rtcv1.GetIceServersResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	servers, err := h.service.GetICEServers(ctx, token)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	response := &rtcv1.GetIceServersResponse{
+		IceServers: make([]*rtcv1.IceServer, 0, len(servers)),
+	}
+	for _, server := range servers {
+		response.IceServers = append(response.IceServers, toProtoIceServer(server))
+	}
+
+	return connect.NewResponse(response), nil
+}
+
 func (h *Handler) GetActiveCall(ctx context.Context, req *connect.Request[rtcv1.GetActiveCallRequest]) (*connect.Response[rtcv1.GetActiveCallResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -315,6 +336,19 @@ func toProtoSignal(signal *rtc.SignalEnvelope) *rtcv1.SignalEnvelope {
 		Payload:      append([]byte(nil), signal.Payload...),
 		CreatedAt:    timestamppb.New(signal.CreatedAt),
 	}
+}
+
+func toProtoIceServer(server rtc.ICEServer) *rtcv1.IceServer {
+	protoServer := &rtcv1.IceServer{
+		Urls:       append([]string(nil), server.URLs...),
+		Username:   server.Username,
+		Credential: server.Credential,
+	}
+	if server.ExpiresAt != nil {
+		protoServer.ExpiresAt = timestamppb.New(*server.ExpiresAt)
+	}
+
+	return protoServer
 }
 
 func toProtoScopeType(scopeType string) rtcv1.ConversationScopeType {

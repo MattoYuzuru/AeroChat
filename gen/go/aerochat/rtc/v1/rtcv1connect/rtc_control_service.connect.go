@@ -35,6 +35,9 @@ const (
 const (
 	// RtcControlServicePingProcedure is the fully-qualified name of the RtcControlService's Ping RPC.
 	RtcControlServicePingProcedure = "/aerochat.rtc.v1.RtcControlService/Ping"
+	// RtcControlServiceGetIceServersProcedure is the fully-qualified name of the RtcControlService's
+	// GetIceServers RPC.
+	RtcControlServiceGetIceServersProcedure = "/aerochat.rtc.v1.RtcControlService/GetIceServers"
 	// RtcControlServiceGetActiveCallProcedure is the fully-qualified name of the RtcControlService's
 	// GetActiveCall RPC.
 	RtcControlServiceGetActiveCallProcedure = "/aerochat.rtc.v1.RtcControlService/GetActiveCall"
@@ -64,6 +67,7 @@ const (
 // RtcControlServiceClient is a client for the aerochat.rtc.v1.RtcControlService service.
 type RtcControlServiceClient interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
+	GetIceServers(context.Context, *connect.Request[v1.GetIceServersRequest]) (*connect.Response[v1.GetIceServersResponse], error)
 	GetActiveCall(context.Context, *connect.Request[v1.GetActiveCallRequest]) (*connect.Response[v1.GetActiveCallResponse], error)
 	GetCall(context.Context, *connect.Request[v1.GetCallRequest]) (*connect.Response[v1.GetCallResponse], error)
 	StartCall(context.Context, *connect.Request[v1.StartCallRequest]) (*connect.Response[v1.StartCallResponse], error)
@@ -89,6 +93,12 @@ func NewRtcControlServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			httpClient,
 			baseURL+RtcControlServicePingProcedure,
 			connect.WithSchema(rtcControlServiceMethods.ByName("Ping")),
+			connect.WithClientOptions(opts...),
+		),
+		getIceServers: connect.NewClient[v1.GetIceServersRequest, v1.GetIceServersResponse](
+			httpClient,
+			baseURL+RtcControlServiceGetIceServersProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("GetIceServers")),
 			connect.WithClientOptions(opts...),
 		),
 		getActiveCall: connect.NewClient[v1.GetActiveCallRequest, v1.GetActiveCallResponse](
@@ -145,6 +155,7 @@ func NewRtcControlServiceClient(httpClient connect.HTTPClient, baseURL string, o
 // rtcControlServiceClient implements RtcControlServiceClient.
 type rtcControlServiceClient struct {
 	ping                 *connect.Client[v1.PingRequest, v1.PingResponse]
+	getIceServers        *connect.Client[v1.GetIceServersRequest, v1.GetIceServersResponse]
 	getActiveCall        *connect.Client[v1.GetActiveCallRequest, v1.GetActiveCallResponse]
 	getCall              *connect.Client[v1.GetCallRequest, v1.GetCallResponse]
 	startCall            *connect.Client[v1.StartCallRequest, v1.StartCallResponse]
@@ -158,6 +169,11 @@ type rtcControlServiceClient struct {
 // Ping calls aerochat.rtc.v1.RtcControlService.Ping.
 func (c *rtcControlServiceClient) Ping(ctx context.Context, req *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
 	return c.ping.CallUnary(ctx, req)
+}
+
+// GetIceServers calls aerochat.rtc.v1.RtcControlService.GetIceServers.
+func (c *rtcControlServiceClient) GetIceServers(ctx context.Context, req *connect.Request[v1.GetIceServersRequest]) (*connect.Response[v1.GetIceServersResponse], error) {
+	return c.getIceServers.CallUnary(ctx, req)
 }
 
 // GetActiveCall calls aerochat.rtc.v1.RtcControlService.GetActiveCall.
@@ -203,6 +219,7 @@ func (c *rtcControlServiceClient) SendSignal(ctx context.Context, req *connect.R
 // RtcControlServiceHandler is an implementation of the aerochat.rtc.v1.RtcControlService service.
 type RtcControlServiceHandler interface {
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
+	GetIceServers(context.Context, *connect.Request[v1.GetIceServersRequest]) (*connect.Response[v1.GetIceServersResponse], error)
 	GetActiveCall(context.Context, *connect.Request[v1.GetActiveCallRequest]) (*connect.Response[v1.GetActiveCallResponse], error)
 	GetCall(context.Context, *connect.Request[v1.GetCallRequest]) (*connect.Response[v1.GetCallResponse], error)
 	StartCall(context.Context, *connect.Request[v1.StartCallRequest]) (*connect.Response[v1.StartCallResponse], error)
@@ -224,6 +241,12 @@ func NewRtcControlServiceHandler(svc RtcControlServiceHandler, opts ...connect.H
 		RtcControlServicePingProcedure,
 		svc.Ping,
 		connect.WithSchema(rtcControlServiceMethods.ByName("Ping")),
+		connect.WithHandlerOptions(opts...),
+	)
+	rtcControlServiceGetIceServersHandler := connect.NewUnaryHandler(
+		RtcControlServiceGetIceServersProcedure,
+		svc.GetIceServers,
+		connect.WithSchema(rtcControlServiceMethods.ByName("GetIceServers")),
 		connect.WithHandlerOptions(opts...),
 	)
 	rtcControlServiceGetActiveCallHandler := connect.NewUnaryHandler(
@@ -278,6 +301,8 @@ func NewRtcControlServiceHandler(svc RtcControlServiceHandler, opts ...connect.H
 		switch r.URL.Path {
 		case RtcControlServicePingProcedure:
 			rtcControlServicePingHandler.ServeHTTP(w, r)
+		case RtcControlServiceGetIceServersProcedure:
+			rtcControlServiceGetIceServersHandler.ServeHTTP(w, r)
 		case RtcControlServiceGetActiveCallProcedure:
 			rtcControlServiceGetActiveCallHandler.ServeHTTP(w, r)
 		case RtcControlServiceGetCallProcedure:
@@ -305,6 +330,10 @@ type UnimplementedRtcControlServiceHandler struct{}
 
 func (UnimplementedRtcControlServiceHandler) Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.Ping is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) GetIceServers(context.Context, *connect.Request[v1.GetIceServersRequest]) (*connect.Response[v1.GetIceServersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.GetIceServers is not implemented"))
 }
 
 func (UnimplementedRtcControlServiceHandler) GetActiveCall(context.Context, *connect.Request[v1.GetActiveCallRequest]) (*connect.Response[v1.GetActiveCallResponse], error) {

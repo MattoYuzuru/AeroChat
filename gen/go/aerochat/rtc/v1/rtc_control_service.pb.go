@@ -719,6 +719,154 @@ func (x *SignalEnvelope) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type IceServer struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Urls          []string               `protobuf:"bytes,1,rep,name=urls,proto3" json:"urls,omitempty"`
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	Credential    string                 `protobuf:"bytes,3,opt,name=credential,proto3" json:"credential,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IceServer) Reset() {
+	*x = IceServer{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IceServer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IceServer) ProtoMessage() {}
+
+func (x *IceServer) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IceServer.ProtoReflect.Descriptor instead.
+func (*IceServer) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *IceServer) GetUrls() []string {
+	if x != nil {
+		return x.Urls
+	}
+	return nil
+}
+
+func (x *IceServer) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *IceServer) GetCredential() string {
+	if x != nil {
+		return x.Credential
+	}
+	return ""
+}
+
+func (x *IceServer) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+type GetIceServersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIceServersRequest) Reset() {
+	*x = GetIceServersRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIceServersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIceServersRequest) ProtoMessage() {}
+
+func (x *GetIceServersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIceServersRequest.ProtoReflect.Descriptor instead.
+func (*GetIceServersRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{7}
+}
+
+type GetIceServersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IceServers    []*IceServer           `protobuf:"bytes,1,rep,name=ice_servers,json=iceServers,proto3" json:"ice_servers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetIceServersResponse) Reset() {
+	*x = GetIceServersResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetIceServersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetIceServersResponse) ProtoMessage() {}
+
+func (x *GetIceServersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetIceServersResponse.ProtoReflect.Descriptor instead.
+func (*GetIceServersResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetIceServersResponse) GetIceServers() []*IceServer {
+	if x != nil {
+		return x.IceServers
+	}
+	return nil
+}
+
 type GetActiveCallRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scope         *ConversationScope     `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
@@ -728,7 +876,7 @@ type GetActiveCallRequest struct {
 
 func (x *GetActiveCallRequest) Reset() {
 	*x = GetActiveCallRequest{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[6]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -740,7 +888,7 @@ func (x *GetActiveCallRequest) String() string {
 func (*GetActiveCallRequest) ProtoMessage() {}
 
 func (x *GetActiveCallRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[6]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -753,7 +901,7 @@ func (x *GetActiveCallRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetActiveCallRequest.ProtoReflect.Descriptor instead.
 func (*GetActiveCallRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{6}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetActiveCallRequest) GetScope() *ConversationScope {
@@ -772,7 +920,7 @@ type GetActiveCallResponse struct {
 
 func (x *GetActiveCallResponse) Reset() {
 	*x = GetActiveCallResponse{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[7]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -784,7 +932,7 @@ func (x *GetActiveCallResponse) String() string {
 func (*GetActiveCallResponse) ProtoMessage() {}
 
 func (x *GetActiveCallResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[7]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -797,7 +945,7 @@ func (x *GetActiveCallResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetActiveCallResponse.ProtoReflect.Descriptor instead.
 func (*GetActiveCallResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{7}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetActiveCallResponse) GetCall() *Call {
@@ -816,7 +964,7 @@ type GetCallRequest struct {
 
 func (x *GetCallRequest) Reset() {
 	*x = GetCallRequest{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[8]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -828,7 +976,7 @@ func (x *GetCallRequest) String() string {
 func (*GetCallRequest) ProtoMessage() {}
 
 func (x *GetCallRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[8]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -841,7 +989,7 @@ func (x *GetCallRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCallRequest.ProtoReflect.Descriptor instead.
 func (*GetCallRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{8}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetCallRequest) GetCallId() string {
@@ -860,7 +1008,7 @@ type GetCallResponse struct {
 
 func (x *GetCallResponse) Reset() {
 	*x = GetCallResponse{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[9]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -872,7 +1020,7 @@ func (x *GetCallResponse) String() string {
 func (*GetCallResponse) ProtoMessage() {}
 
 func (x *GetCallResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[9]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -885,7 +1033,7 @@ func (x *GetCallResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCallResponse.ProtoReflect.Descriptor instead.
 func (*GetCallResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{9}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetCallResponse) GetCall() *Call {
@@ -904,7 +1052,7 @@ type StartCallRequest struct {
 
 func (x *StartCallRequest) Reset() {
 	*x = StartCallRequest{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[10]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -916,7 +1064,7 @@ func (x *StartCallRequest) String() string {
 func (*StartCallRequest) ProtoMessage() {}
 
 func (x *StartCallRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[10]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -929,7 +1077,7 @@ func (x *StartCallRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartCallRequest.ProtoReflect.Descriptor instead.
 func (*StartCallRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{10}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StartCallRequest) GetScope() *ConversationScope {
@@ -949,7 +1097,7 @@ type StartCallResponse struct {
 
 func (x *StartCallResponse) Reset() {
 	*x = StartCallResponse{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[11]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -961,7 +1109,7 @@ func (x *StartCallResponse) String() string {
 func (*StartCallResponse) ProtoMessage() {}
 
 func (x *StartCallResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[11]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -974,7 +1122,7 @@ func (x *StartCallResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartCallResponse.ProtoReflect.Descriptor instead.
 func (*StartCallResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{11}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *StartCallResponse) GetCall() *Call {
@@ -1000,7 +1148,7 @@ type JoinCallRequest struct {
 
 func (x *JoinCallRequest) Reset() {
 	*x = JoinCallRequest{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[12]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1012,7 +1160,7 @@ func (x *JoinCallRequest) String() string {
 func (*JoinCallRequest) ProtoMessage() {}
 
 func (x *JoinCallRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[12]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1025,7 +1173,7 @@ func (x *JoinCallRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinCallRequest.ProtoReflect.Descriptor instead.
 func (*JoinCallRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{12}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *JoinCallRequest) GetCallId() string {
@@ -1045,7 +1193,7 @@ type JoinCallResponse struct {
 
 func (x *JoinCallResponse) Reset() {
 	*x = JoinCallResponse{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[13]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1057,7 +1205,7 @@ func (x *JoinCallResponse) String() string {
 func (*JoinCallResponse) ProtoMessage() {}
 
 func (x *JoinCallResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[13]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1070,7 +1218,7 @@ func (x *JoinCallResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinCallResponse.ProtoReflect.Descriptor instead.
 func (*JoinCallResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{13}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *JoinCallResponse) GetCall() *Call {
@@ -1096,7 +1244,7 @@ type LeaveCallRequest struct {
 
 func (x *LeaveCallRequest) Reset() {
 	*x = LeaveCallRequest{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[14]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1108,7 +1256,7 @@ func (x *LeaveCallRequest) String() string {
 func (*LeaveCallRequest) ProtoMessage() {}
 
 func (x *LeaveCallRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[14]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1121,7 +1269,7 @@ func (x *LeaveCallRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveCallRequest.ProtoReflect.Descriptor instead.
 func (*LeaveCallRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{14}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *LeaveCallRequest) GetCallId() string {
@@ -1141,7 +1289,7 @@ type LeaveCallResponse struct {
 
 func (x *LeaveCallResponse) Reset() {
 	*x = LeaveCallResponse{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[15]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1153,7 +1301,7 @@ func (x *LeaveCallResponse) String() string {
 func (*LeaveCallResponse) ProtoMessage() {}
 
 func (x *LeaveCallResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[15]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1166,7 +1314,7 @@ func (x *LeaveCallResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaveCallResponse.ProtoReflect.Descriptor instead.
 func (*LeaveCallResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{15}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *LeaveCallResponse) GetCall() *Call {
@@ -1192,7 +1340,7 @@ type EndCallRequest struct {
 
 func (x *EndCallRequest) Reset() {
 	*x = EndCallRequest{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[16]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1204,7 +1352,7 @@ func (x *EndCallRequest) String() string {
 func (*EndCallRequest) ProtoMessage() {}
 
 func (x *EndCallRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[16]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1217,7 +1365,7 @@ func (x *EndCallRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EndCallRequest.ProtoReflect.Descriptor instead.
 func (*EndCallRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{16}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *EndCallRequest) GetCallId() string {
@@ -1237,7 +1385,7 @@ type EndCallResponse struct {
 
 func (x *EndCallResponse) Reset() {
 	*x = EndCallResponse{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[17]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1249,7 +1397,7 @@ func (x *EndCallResponse) String() string {
 func (*EndCallResponse) ProtoMessage() {}
 
 func (x *EndCallResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[17]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1262,7 +1410,7 @@ func (x *EndCallResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EndCallResponse.ProtoReflect.Descriptor instead.
 func (*EndCallResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{17}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *EndCallResponse) GetCall() *Call {
@@ -1288,7 +1436,7 @@ type ListCallParticipantsRequest struct {
 
 func (x *ListCallParticipantsRequest) Reset() {
 	*x = ListCallParticipantsRequest{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[18]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1300,7 +1448,7 @@ func (x *ListCallParticipantsRequest) String() string {
 func (*ListCallParticipantsRequest) ProtoMessage() {}
 
 func (x *ListCallParticipantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[18]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1313,7 +1461,7 @@ func (x *ListCallParticipantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCallParticipantsRequest.ProtoReflect.Descriptor instead.
 func (*ListCallParticipantsRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{18}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListCallParticipantsRequest) GetCallId() string {
@@ -1332,7 +1480,7 @@ type ListCallParticipantsResponse struct {
 
 func (x *ListCallParticipantsResponse) Reset() {
 	*x = ListCallParticipantsResponse{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[19]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1344,7 +1492,7 @@ func (x *ListCallParticipantsResponse) String() string {
 func (*ListCallParticipantsResponse) ProtoMessage() {}
 
 func (x *ListCallParticipantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[19]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1357,7 +1505,7 @@ func (x *ListCallParticipantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCallParticipantsResponse.ProtoReflect.Descriptor instead.
 func (*ListCallParticipantsResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{19}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ListCallParticipantsResponse) GetParticipants() []*CallParticipant {
@@ -1379,7 +1527,7 @@ type SendSignalRequest struct {
 
 func (x *SendSignalRequest) Reset() {
 	*x = SendSignalRequest{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[20]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1391,7 +1539,7 @@ func (x *SendSignalRequest) String() string {
 func (*SendSignalRequest) ProtoMessage() {}
 
 func (x *SendSignalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[20]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1404,7 +1552,7 @@ func (x *SendSignalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendSignalRequest.ProtoReflect.Descriptor instead.
 func (*SendSignalRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{20}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SendSignalRequest) GetCallId() string {
@@ -1444,7 +1592,7 @@ type SendSignalResponse struct {
 
 func (x *SendSignalResponse) Reset() {
 	*x = SendSignalResponse{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[21]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1456,7 +1604,7 @@ func (x *SendSignalResponse) String() string {
 func (*SendSignalResponse) ProtoMessage() {}
 
 func (x *SendSignalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[21]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1469,7 +1617,7 @@ func (x *SendSignalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendSignalResponse.ProtoReflect.Descriptor instead.
 func (*SendSignalResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{21}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *SendSignalResponse) GetSignal() *SignalEnvelope {
@@ -1526,7 +1674,19 @@ const file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc = "" +
 	"\x04type\x18\x04 \x01(\x0e2#.aerochat.rtc.v1.SignalEnvelopeTypeR\x04type\x12\x18\n" +
 	"\apayload\x18\x05 \x01(\fR\apayload\x129\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"P\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x96\x01\n" +
+	"\tIceServer\x12\x12\n" +
+	"\x04urls\x18\x01 \x03(\tR\x04urls\x12\x1a\n" +
+	"\busername\x18\x02 \x01(\tR\busername\x12\x1e\n" +
+	"\n" +
+	"credential\x18\x03 \x01(\tR\n" +
+	"credential\x129\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x16\n" +
+	"\x14GetIceServersRequest\"T\n" +
+	"\x15GetIceServersResponse\x12;\n" +
+	"\vice_servers\x18\x01 \x03(\v2\x1a.aerochat.rtc.v1.IceServerR\n" +
+	"iceServers\"P\n" +
 	"\x14GetActiveCallRequest\x128\n" +
 	"\x05scope\x18\x01 \x01(\v2\".aerochat.rtc.v1.ConversationScopeR\x05scope\"B\n" +
 	"\x15GetActiveCallResponse\x12)\n" +
@@ -1587,9 +1747,10 @@ const file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc = "" +
 	" SIGNAL_ENVELOPE_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aSIGNAL_ENVELOPE_TYPE_OFFER\x10\x01\x12\x1f\n" +
 	"\x1bSIGNAL_ENVELOPE_TYPE_ANSWER\x10\x02\x12&\n" +
-	"\"SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE\x10\x032\x99\x06\n" +
+	"\"SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE\x10\x032\xf9\x06\n" +
 	"\x11RtcControlService\x12C\n" +
 	"\x04Ping\x12\x1c.aerochat.rtc.v1.PingRequest\x1a\x1d.aerochat.rtc.v1.PingResponse\x12^\n" +
+	"\rGetIceServers\x12%.aerochat.rtc.v1.GetIceServersRequest\x1a&.aerochat.rtc.v1.GetIceServersResponse\x12^\n" +
 	"\rGetActiveCall\x12%.aerochat.rtc.v1.GetActiveCallRequest\x1a&.aerochat.rtc.v1.GetActiveCallResponse\x12L\n" +
 	"\aGetCall\x12\x1f.aerochat.rtc.v1.GetCallRequest\x1a .aerochat.rtc.v1.GetCallResponse\x12R\n" +
 	"\tStartCall\x12!.aerochat.rtc.v1.StartCallRequest\x1a\".aerochat.rtc.v1.StartCallResponse\x12O\n" +
@@ -1613,7 +1774,7 @@ func file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP() []byte {
 }
 
 var file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_aerochat_rtc_v1_rtc_control_service_proto_goTypes = []any{
 	(ConversationScopeType)(0),           // 0: aerochat.rtc.v1.ConversationScopeType
 	(CallStatus)(0),                      // 1: aerochat.rtc.v1.CallStatus
@@ -1626,80 +1787,87 @@ var file_aerochat_rtc_v1_rtc_control_service_proto_goTypes = []any{
 	(*Call)(nil),                         // 8: aerochat.rtc.v1.Call
 	(*CallParticipant)(nil),              // 9: aerochat.rtc.v1.CallParticipant
 	(*SignalEnvelope)(nil),               // 10: aerochat.rtc.v1.SignalEnvelope
-	(*GetActiveCallRequest)(nil),         // 11: aerochat.rtc.v1.GetActiveCallRequest
-	(*GetActiveCallResponse)(nil),        // 12: aerochat.rtc.v1.GetActiveCallResponse
-	(*GetCallRequest)(nil),               // 13: aerochat.rtc.v1.GetCallRequest
-	(*GetCallResponse)(nil),              // 14: aerochat.rtc.v1.GetCallResponse
-	(*StartCallRequest)(nil),             // 15: aerochat.rtc.v1.StartCallRequest
-	(*StartCallResponse)(nil),            // 16: aerochat.rtc.v1.StartCallResponse
-	(*JoinCallRequest)(nil),              // 17: aerochat.rtc.v1.JoinCallRequest
-	(*JoinCallResponse)(nil),             // 18: aerochat.rtc.v1.JoinCallResponse
-	(*LeaveCallRequest)(nil),             // 19: aerochat.rtc.v1.LeaveCallRequest
-	(*LeaveCallResponse)(nil),            // 20: aerochat.rtc.v1.LeaveCallResponse
-	(*EndCallRequest)(nil),               // 21: aerochat.rtc.v1.EndCallRequest
-	(*EndCallResponse)(nil),              // 22: aerochat.rtc.v1.EndCallResponse
-	(*ListCallParticipantsRequest)(nil),  // 23: aerochat.rtc.v1.ListCallParticipantsRequest
-	(*ListCallParticipantsResponse)(nil), // 24: aerochat.rtc.v1.ListCallParticipantsResponse
-	(*SendSignalRequest)(nil),            // 25: aerochat.rtc.v1.SendSignalRequest
-	(*SendSignalResponse)(nil),           // 26: aerochat.rtc.v1.SendSignalResponse
-	(*v1.ServiceMeta)(nil),               // 27: aerochat.common.v1.ServiceMeta
-	(*timestamppb.Timestamp)(nil),        // 28: google.protobuf.Timestamp
+	(*IceServer)(nil),                    // 11: aerochat.rtc.v1.IceServer
+	(*GetIceServersRequest)(nil),         // 12: aerochat.rtc.v1.GetIceServersRequest
+	(*GetIceServersResponse)(nil),        // 13: aerochat.rtc.v1.GetIceServersResponse
+	(*GetActiveCallRequest)(nil),         // 14: aerochat.rtc.v1.GetActiveCallRequest
+	(*GetActiveCallResponse)(nil),        // 15: aerochat.rtc.v1.GetActiveCallResponse
+	(*GetCallRequest)(nil),               // 16: aerochat.rtc.v1.GetCallRequest
+	(*GetCallResponse)(nil),              // 17: aerochat.rtc.v1.GetCallResponse
+	(*StartCallRequest)(nil),             // 18: aerochat.rtc.v1.StartCallRequest
+	(*StartCallResponse)(nil),            // 19: aerochat.rtc.v1.StartCallResponse
+	(*JoinCallRequest)(nil),              // 20: aerochat.rtc.v1.JoinCallRequest
+	(*JoinCallResponse)(nil),             // 21: aerochat.rtc.v1.JoinCallResponse
+	(*LeaveCallRequest)(nil),             // 22: aerochat.rtc.v1.LeaveCallRequest
+	(*LeaveCallResponse)(nil),            // 23: aerochat.rtc.v1.LeaveCallResponse
+	(*EndCallRequest)(nil),               // 24: aerochat.rtc.v1.EndCallRequest
+	(*EndCallResponse)(nil),              // 25: aerochat.rtc.v1.EndCallResponse
+	(*ListCallParticipantsRequest)(nil),  // 26: aerochat.rtc.v1.ListCallParticipantsRequest
+	(*ListCallParticipantsResponse)(nil), // 27: aerochat.rtc.v1.ListCallParticipantsResponse
+	(*SendSignalRequest)(nil),            // 28: aerochat.rtc.v1.SendSignalRequest
+	(*SendSignalResponse)(nil),           // 29: aerochat.rtc.v1.SendSignalResponse
+	(*v1.ServiceMeta)(nil),               // 30: aerochat.common.v1.ServiceMeta
+	(*timestamppb.Timestamp)(nil),        // 31: google.protobuf.Timestamp
 }
 var file_aerochat_rtc_v1_rtc_control_service_proto_depIdxs = []int32{
-	27, // 0: aerochat.rtc.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
+	30, // 0: aerochat.rtc.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
 	0,  // 1: aerochat.rtc.v1.ConversationScope.type:type_name -> aerochat.rtc.v1.ConversationScopeType
 	7,  // 2: aerochat.rtc.v1.Call.scope:type_name -> aerochat.rtc.v1.ConversationScope
 	1,  // 3: aerochat.rtc.v1.Call.status:type_name -> aerochat.rtc.v1.CallStatus
-	28, // 4: aerochat.rtc.v1.Call.created_at:type_name -> google.protobuf.Timestamp
-	28, // 5: aerochat.rtc.v1.Call.updated_at:type_name -> google.protobuf.Timestamp
-	28, // 6: aerochat.rtc.v1.Call.started_at:type_name -> google.protobuf.Timestamp
-	28, // 7: aerochat.rtc.v1.Call.ended_at:type_name -> google.protobuf.Timestamp
+	31, // 4: aerochat.rtc.v1.Call.created_at:type_name -> google.protobuf.Timestamp
+	31, // 5: aerochat.rtc.v1.Call.updated_at:type_name -> google.protobuf.Timestamp
+	31, // 6: aerochat.rtc.v1.Call.started_at:type_name -> google.protobuf.Timestamp
+	31, // 7: aerochat.rtc.v1.Call.ended_at:type_name -> google.protobuf.Timestamp
 	2,  // 8: aerochat.rtc.v1.Call.end_reason:type_name -> aerochat.rtc.v1.CallEndReason
 	3,  // 9: aerochat.rtc.v1.CallParticipant.state:type_name -> aerochat.rtc.v1.ParticipantState
-	28, // 10: aerochat.rtc.v1.CallParticipant.joined_at:type_name -> google.protobuf.Timestamp
-	28, // 11: aerochat.rtc.v1.CallParticipant.left_at:type_name -> google.protobuf.Timestamp
-	28, // 12: aerochat.rtc.v1.CallParticipant.updated_at:type_name -> google.protobuf.Timestamp
-	28, // 13: aerochat.rtc.v1.CallParticipant.last_signal_at:type_name -> google.protobuf.Timestamp
+	31, // 10: aerochat.rtc.v1.CallParticipant.joined_at:type_name -> google.protobuf.Timestamp
+	31, // 11: aerochat.rtc.v1.CallParticipant.left_at:type_name -> google.protobuf.Timestamp
+	31, // 12: aerochat.rtc.v1.CallParticipant.updated_at:type_name -> google.protobuf.Timestamp
+	31, // 13: aerochat.rtc.v1.CallParticipant.last_signal_at:type_name -> google.protobuf.Timestamp
 	4,  // 14: aerochat.rtc.v1.SignalEnvelope.type:type_name -> aerochat.rtc.v1.SignalEnvelopeType
-	28, // 15: aerochat.rtc.v1.SignalEnvelope.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 16: aerochat.rtc.v1.GetActiveCallRequest.scope:type_name -> aerochat.rtc.v1.ConversationScope
-	8,  // 17: aerochat.rtc.v1.GetActiveCallResponse.call:type_name -> aerochat.rtc.v1.Call
-	8,  // 18: aerochat.rtc.v1.GetCallResponse.call:type_name -> aerochat.rtc.v1.Call
-	7,  // 19: aerochat.rtc.v1.StartCallRequest.scope:type_name -> aerochat.rtc.v1.ConversationScope
-	8,  // 20: aerochat.rtc.v1.StartCallResponse.call:type_name -> aerochat.rtc.v1.Call
-	9,  // 21: aerochat.rtc.v1.StartCallResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
-	8,  // 22: aerochat.rtc.v1.JoinCallResponse.call:type_name -> aerochat.rtc.v1.Call
-	9,  // 23: aerochat.rtc.v1.JoinCallResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
-	8,  // 24: aerochat.rtc.v1.LeaveCallResponse.call:type_name -> aerochat.rtc.v1.Call
-	9,  // 25: aerochat.rtc.v1.LeaveCallResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
-	8,  // 26: aerochat.rtc.v1.EndCallResponse.call:type_name -> aerochat.rtc.v1.Call
-	9,  // 27: aerochat.rtc.v1.EndCallResponse.affected_participants:type_name -> aerochat.rtc.v1.CallParticipant
-	9,  // 28: aerochat.rtc.v1.ListCallParticipantsResponse.participants:type_name -> aerochat.rtc.v1.CallParticipant
-	4,  // 29: aerochat.rtc.v1.SendSignalRequest.type:type_name -> aerochat.rtc.v1.SignalEnvelopeType
-	10, // 30: aerochat.rtc.v1.SendSignalResponse.signal:type_name -> aerochat.rtc.v1.SignalEnvelope
-	5,  // 31: aerochat.rtc.v1.RtcControlService.Ping:input_type -> aerochat.rtc.v1.PingRequest
-	11, // 32: aerochat.rtc.v1.RtcControlService.GetActiveCall:input_type -> aerochat.rtc.v1.GetActiveCallRequest
-	13, // 33: aerochat.rtc.v1.RtcControlService.GetCall:input_type -> aerochat.rtc.v1.GetCallRequest
-	15, // 34: aerochat.rtc.v1.RtcControlService.StartCall:input_type -> aerochat.rtc.v1.StartCallRequest
-	17, // 35: aerochat.rtc.v1.RtcControlService.JoinCall:input_type -> aerochat.rtc.v1.JoinCallRequest
-	19, // 36: aerochat.rtc.v1.RtcControlService.LeaveCall:input_type -> aerochat.rtc.v1.LeaveCallRequest
-	21, // 37: aerochat.rtc.v1.RtcControlService.EndCall:input_type -> aerochat.rtc.v1.EndCallRequest
-	23, // 38: aerochat.rtc.v1.RtcControlService.ListCallParticipants:input_type -> aerochat.rtc.v1.ListCallParticipantsRequest
-	25, // 39: aerochat.rtc.v1.RtcControlService.SendSignal:input_type -> aerochat.rtc.v1.SendSignalRequest
-	6,  // 40: aerochat.rtc.v1.RtcControlService.Ping:output_type -> aerochat.rtc.v1.PingResponse
-	12, // 41: aerochat.rtc.v1.RtcControlService.GetActiveCall:output_type -> aerochat.rtc.v1.GetActiveCallResponse
-	14, // 42: aerochat.rtc.v1.RtcControlService.GetCall:output_type -> aerochat.rtc.v1.GetCallResponse
-	16, // 43: aerochat.rtc.v1.RtcControlService.StartCall:output_type -> aerochat.rtc.v1.StartCallResponse
-	18, // 44: aerochat.rtc.v1.RtcControlService.JoinCall:output_type -> aerochat.rtc.v1.JoinCallResponse
-	20, // 45: aerochat.rtc.v1.RtcControlService.LeaveCall:output_type -> aerochat.rtc.v1.LeaveCallResponse
-	22, // 46: aerochat.rtc.v1.RtcControlService.EndCall:output_type -> aerochat.rtc.v1.EndCallResponse
-	24, // 47: aerochat.rtc.v1.RtcControlService.ListCallParticipants:output_type -> aerochat.rtc.v1.ListCallParticipantsResponse
-	26, // 48: aerochat.rtc.v1.RtcControlService.SendSignal:output_type -> aerochat.rtc.v1.SendSignalResponse
-	40, // [40:49] is the sub-list for method output_type
-	31, // [31:40] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	31, // 15: aerochat.rtc.v1.SignalEnvelope.created_at:type_name -> google.protobuf.Timestamp
+	31, // 16: aerochat.rtc.v1.IceServer.expires_at:type_name -> google.protobuf.Timestamp
+	11, // 17: aerochat.rtc.v1.GetIceServersResponse.ice_servers:type_name -> aerochat.rtc.v1.IceServer
+	7,  // 18: aerochat.rtc.v1.GetActiveCallRequest.scope:type_name -> aerochat.rtc.v1.ConversationScope
+	8,  // 19: aerochat.rtc.v1.GetActiveCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	8,  // 20: aerochat.rtc.v1.GetCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	7,  // 21: aerochat.rtc.v1.StartCallRequest.scope:type_name -> aerochat.rtc.v1.ConversationScope
+	8,  // 22: aerochat.rtc.v1.StartCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	9,  // 23: aerochat.rtc.v1.StartCallResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
+	8,  // 24: aerochat.rtc.v1.JoinCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	9,  // 25: aerochat.rtc.v1.JoinCallResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
+	8,  // 26: aerochat.rtc.v1.LeaveCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	9,  // 27: aerochat.rtc.v1.LeaveCallResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
+	8,  // 28: aerochat.rtc.v1.EndCallResponse.call:type_name -> aerochat.rtc.v1.Call
+	9,  // 29: aerochat.rtc.v1.EndCallResponse.affected_participants:type_name -> aerochat.rtc.v1.CallParticipant
+	9,  // 30: aerochat.rtc.v1.ListCallParticipantsResponse.participants:type_name -> aerochat.rtc.v1.CallParticipant
+	4,  // 31: aerochat.rtc.v1.SendSignalRequest.type:type_name -> aerochat.rtc.v1.SignalEnvelopeType
+	10, // 32: aerochat.rtc.v1.SendSignalResponse.signal:type_name -> aerochat.rtc.v1.SignalEnvelope
+	5,  // 33: aerochat.rtc.v1.RtcControlService.Ping:input_type -> aerochat.rtc.v1.PingRequest
+	12, // 34: aerochat.rtc.v1.RtcControlService.GetIceServers:input_type -> aerochat.rtc.v1.GetIceServersRequest
+	14, // 35: aerochat.rtc.v1.RtcControlService.GetActiveCall:input_type -> aerochat.rtc.v1.GetActiveCallRequest
+	16, // 36: aerochat.rtc.v1.RtcControlService.GetCall:input_type -> aerochat.rtc.v1.GetCallRequest
+	18, // 37: aerochat.rtc.v1.RtcControlService.StartCall:input_type -> aerochat.rtc.v1.StartCallRequest
+	20, // 38: aerochat.rtc.v1.RtcControlService.JoinCall:input_type -> aerochat.rtc.v1.JoinCallRequest
+	22, // 39: aerochat.rtc.v1.RtcControlService.LeaveCall:input_type -> aerochat.rtc.v1.LeaveCallRequest
+	24, // 40: aerochat.rtc.v1.RtcControlService.EndCall:input_type -> aerochat.rtc.v1.EndCallRequest
+	26, // 41: aerochat.rtc.v1.RtcControlService.ListCallParticipants:input_type -> aerochat.rtc.v1.ListCallParticipantsRequest
+	28, // 42: aerochat.rtc.v1.RtcControlService.SendSignal:input_type -> aerochat.rtc.v1.SendSignalRequest
+	6,  // 43: aerochat.rtc.v1.RtcControlService.Ping:output_type -> aerochat.rtc.v1.PingResponse
+	13, // 44: aerochat.rtc.v1.RtcControlService.GetIceServers:output_type -> aerochat.rtc.v1.GetIceServersResponse
+	15, // 45: aerochat.rtc.v1.RtcControlService.GetActiveCall:output_type -> aerochat.rtc.v1.GetActiveCallResponse
+	17, // 46: aerochat.rtc.v1.RtcControlService.GetCall:output_type -> aerochat.rtc.v1.GetCallResponse
+	19, // 47: aerochat.rtc.v1.RtcControlService.StartCall:output_type -> aerochat.rtc.v1.StartCallResponse
+	21, // 48: aerochat.rtc.v1.RtcControlService.JoinCall:output_type -> aerochat.rtc.v1.JoinCallResponse
+	23, // 49: aerochat.rtc.v1.RtcControlService.LeaveCall:output_type -> aerochat.rtc.v1.LeaveCallResponse
+	25, // 50: aerochat.rtc.v1.RtcControlService.EndCall:output_type -> aerochat.rtc.v1.EndCallResponse
+	27, // 51: aerochat.rtc.v1.RtcControlService.ListCallParticipants:output_type -> aerochat.rtc.v1.ListCallParticipantsResponse
+	29, // 52: aerochat.rtc.v1.RtcControlService.SendSignal:output_type -> aerochat.rtc.v1.SendSignalResponse
+	43, // [43:53] is the sub-list for method output_type
+	33, // [33:43] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_aerochat_rtc_v1_rtc_control_service_proto_init() }
@@ -1713,7 +1881,7 @@ func file_aerochat_rtc_v1_rtc_control_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc), len(file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   22,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

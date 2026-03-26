@@ -1059,6 +1059,7 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     createDirectChat: vi.fn(),
     listDirectChats: vi.fn(),
     getDirectChat: vi.fn(),
+    getRtcIceServers: vi.fn(async () => []),
     getActiveCall: vi.fn(),
     startCall: vi.fn(),
     joinCall: vi.fn(),

@@ -3,6 +3,7 @@ import {
   flushPendingRemoteICECandidates,
   hasMatchingRemoteSessionDescription,
   queueOrApplyRemoteICECandidate,
+  shouldBlockPeerRuntimeAfterFailure,
   stopMediaStreamTracks,
   teardownDirectCallPeerRuntime,
   teardownDirectCallRuntime,
@@ -136,6 +137,42 @@ describe("rtc runtime cleanup helpers", () => {
         type: "offer",
         sdp: "v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\n",
       }),
+    ).toBe(false);
+  });
+
+  it("blocks peer runtime restart for the same failed call and remote user", () => {
+    expect(
+      shouldBlockPeerRuntimeAfterFailure(
+        {
+          callId: "call-1",
+          remoteUserId: "user-2",
+        },
+        "call-1",
+        "user-2",
+      ),
+    ).toBe(true);
+  });
+
+  it("allows peer runtime restart when call or remote user changes", () => {
+    expect(
+      shouldBlockPeerRuntimeAfterFailure(
+        {
+          callId: "call-1",
+          remoteUserId: "user-2",
+        },
+        "call-2",
+        "user-2",
+      ),
+    ).toBe(false);
+    expect(
+      shouldBlockPeerRuntimeAfterFailure(
+        {
+          callId: "call-1",
+          remoteUserId: "user-2",
+        },
+        "call-1",
+        "user-3",
+      ),
     ).toBe(false);
   });
 });

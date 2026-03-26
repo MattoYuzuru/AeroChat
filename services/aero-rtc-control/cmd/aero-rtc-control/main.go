@@ -81,6 +81,13 @@ func run() error {
 		downstream.NewIdentityAuthenticator(clients.Identity),
 		downstream.NewChatScopeAuthorizer(clients.Chat),
 		cfg.MaxSignalPayloadSizeBytes,
+	).WithICEServerProvider(
+		rtc.NewConfigurableICEServerProvider(
+			cfg.STUNServerURLs,
+			cfg.TURNServerURLs,
+			cfg.TURNAuthSecret,
+			cfg.TURNUsernameTTL,
+		),
 	)
 	handler := connecthandler.NewHandler(serviceName, version, service)
 

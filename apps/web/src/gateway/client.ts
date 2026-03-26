@@ -64,6 +64,7 @@ import type {
   RtcCallParticipant,
   RtcConversationScope,
   RtcConversationScopeInput,
+  RtcIceServer,
   RtcSignalEnvelope,
   RtcSignalType,
   RevokeSessionOrDeviceTarget,
@@ -656,6 +657,13 @@ interface RtcSignalEnvelopeWire {
   createdAt?: string;
 }
 
+interface RtcIceServerWire {
+  urls?: string[];
+  username?: string;
+  credential?: string;
+  expiresAt?: string;
+}
+
 interface CreateDirectChatResponseWire {
   chat?: DirectChatWire;
 }
@@ -674,6 +682,10 @@ interface GetDirectChatResponseWire {
 
 interface GetActiveCallResponseWire {
   call?: RtcCallWire;
+}
+
+interface GetIceServersResponseWire {
+  iceServers?: RtcIceServerWire[];
 }
 
 interface StartCallResponseWire {
@@ -1570,6 +1582,19 @@ export function createGatewayClient(
       );
 
       return normalizeDirectChatSnapshot(response);
+    },
+
+    async getRtcIceServers(token) {
+      const response = await unaryCall<GetIceServersResponseWire>(
+        fetchImpl,
+        baseUrl,
+        rtcServicePath,
+        "GetIceServers",
+        {},
+        token,
+      );
+
+      return (response.iceServers ?? []).map(normalizeRtcIceServer);
     },
 
     async getActiveCall(token, scope) {
@@ -3097,6 +3122,17 @@ function normalizeRtcSignalEnvelope(
     type: normalizeRtcSignalType(input?.type),
     payload: decodeBase64ToBytes(input?.payload ?? ""),
     createdAt: input?.createdAt ?? "",
+  };
+}
+
+function normalizeRtcIceServer(input: RtcIceServerWire | undefined): RtcIceServer {
+  return {
+    urls: (input?.urls ?? []).filter(
+      (value): value is string => typeof value === "string" && value.trim() !== "",
+    ),
+    username: normalizeNullableString(input?.username),
+    credential: normalizeNullableString(input?.credential),
+    expiresAt: normalizeNullableString(input?.expiresAt),
   };
 }
 

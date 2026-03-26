@@ -49,9 +49,11 @@ checkout на VPS и при необходимости повторно прим
 
 Для direct 1:1 calls это важно отдельно:
 
-- текущий published `aerochat-web` image уже содержит default STUN bootstrap;
-- текущий rollout этого slice не передаёт TURN credentials в runtime статического `web` image,
-  поэтому operator-managed TURN остаётся отдельным будущим web/runtime hardening шагом.
+- текущий published `aerochat-web` image уже содержит default STUN fallback;
+- canonical TURN/STUN policy теперь задаётся не через `VITE_*`, а через server env `AERO_RTC_STUN_URLS`,
+  `AERO_RTC_TURN_URLS`, `AERO_RTC_TURN_USERNAME_TTL` и secret `AERO_RTC_TURN_AUTH_SECRET`;
+- после изменения этих env оператору достаточно обновить compose runtime `aero-rtc-control` и `aero-gateway`,
+  новый frontend build для смены ICE policy больше не требуется.
 
 ## GitHub Environment `production`
 

@@ -1332,6 +1332,10 @@ func (h *testRTCHandler) Ping(context.Context, *connect.Request[rtcv1.PingReques
 	return connect.NewResponse(&rtcv1.PingResponse{}), nil
 }
 
+func (h *testRTCHandler) GetIceServers(context.Context, *connect.Request[rtcv1.GetIceServersRequest]) (*connect.Response[rtcv1.GetIceServersResponse], error) {
+	return connect.NewResponse(&rtcv1.GetIceServersResponse{}), nil
+}
+
 func (h *testIdentityHandler) Ping(context.Context, *connect.Request[identityv1.PingRequest]) (*connect.Response[identityv1.PingResponse], error) {
 	return connect.NewResponse(&identityv1.PingResponse{}), nil
 }

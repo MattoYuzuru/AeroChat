@@ -21,6 +21,11 @@ interface SessionDescriptionCapablePeerConnectionLike {
   pendingRemoteDescription?: RTCSessionDescriptionInit | null;
 }
 
+export interface DirectCallPeerFailureMarker {
+  callId: string;
+  remoteUserId: string;
+}
+
 interface DirectCallPeerRuntimeInput {
   peerConnection: PeerConnectionLike | null;
   remoteStream: MediaStreamLike | null;
@@ -85,4 +90,16 @@ export function hasMatchingRemoteSessionDescription(
   ].some((currentDescription) =>
     currentDescription?.type === description.type && currentDescription.sdp === description.sdp
   );
+}
+
+export function shouldBlockPeerRuntimeAfterFailure(
+  marker: DirectCallPeerFailureMarker | null,
+  callId: string,
+  remoteUserId: string,
+): boolean {
+  if (marker === null) {
+    return false;
+  }
+
+  return marker.callId === callId && marker.remoteUserId === remoteUserId;
 }

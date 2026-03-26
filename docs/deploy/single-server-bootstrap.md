@@ -33,9 +33,9 @@
   - `.env.server.example` содержит только versioned non-secret runtime config;
   - `.env.server.secrets.example` содержит только перечень обязательных secret keys с плейсхолдерами;
   - `infra/compose/docker-compose.server.yml` тянет предсобранные application images из registry;
-  - publish-процесс для `aerochat-web` уже включает conservative STUN fallback для direct calls;
-  - текущий server compose contract не передаёт TURN credentials в статически собранный `web` image,
-    поэтому operator-managed TURN остаётся отдельным будущим runtime slice;
+  - publish-процесс для `aerochat-web` сохраняет conservative STUN fallback для direct calls;
+  - canonical TURN/STUN policy теперь задаётся через `AERO_RTC_STUN_URLS`, `AERO_RTC_TURN_URLS`,
+    `AERO_RTC_TURN_USERNAME_TTL` и server secret `AERO_RTC_TURN_AUTH_SECRET`, которые читает `aero-rtc-control`;
   - compose публикует `web`, `aero-gateway` и `minio` API на одном host IP, достижимом из pod'ов `Traefik`;
   - shared `Traefik` остаётся единственным публичным edge на `80/443`;
   - TLS обслуживается через cluster `cert-manager`, а не через host-level certificate path.
@@ -108,6 +108,7 @@
 
 - `POSTGRES_PASSWORD`
 - `MINIO_ROOT_PASSWORD`
+- `AERO_RTC_TURN_AUTH_SECRET`
 
 ## Что версионируется и что создаётся только в runtime
 

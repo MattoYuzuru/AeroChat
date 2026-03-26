@@ -29,10 +29,14 @@ import {
   flushPendingRemoteICECandidates,
   hasMatchingRemoteSessionDescription,
   queueOrApplyRemoteICECandidate,
+  shouldBlockPeerRuntimeAfterFailure,
   teardownDirectCallPeerRuntime,
   teardownDirectCallRuntime,
 } from "./runtime";
-import { directCallRTCConfiguration } from "./config";
+import {
+  buildDirectCallRTCConfiguration,
+  directCallRTCConfiguration,
+} from "./config";
 
 const directCallRefreshIntervalMs = 5000;
 
@@ -91,8 +95,14 @@ export function useDirectCallSession(
   const stateRef = useRef(state);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const localJoinedCallIdRef = useRef<string | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const pendingRemoteICECandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const rtcConfigurationRef = useRef<RTCConfiguration>(directCallRTCConfiguration);
+  const peerFailureMarkerRef = useRef<{
+    callId: string;
+    remoteUserId: string;
+  } | null>(null);
   const refreshDirectChatCallRef = useRef(refreshDirectChatCall);
 
   useEffect(() => {
@@ -118,6 +128,19 @@ export function useDirectCallSession(
   const phase = deriveDirectCallUiPhase(state, currentUserId);
   const isLocallyJoined =
     state.call !== null && state.localJoinedCallId === state.call.id;
+
+  const clearPeerFailureMarker = useCallback(() => {
+    peerFailureMarkerRef.current = null;
+  }, []);
+
+  const refreshRTCConfiguration = useCallback(async () => {
+    try {
+      const iceServers = await gatewayClient.getRtcIceServers(token);
+      rtcConfigurationRef.current = buildDirectCallRTCConfiguration(iceServers);
+    } catch {
+      rtcConfigurationRef.current = directCallRTCConfiguration;
+    }
+  }, [token]);
 
   const resetPeerRuntime = useCallback(() => {
     if (
@@ -145,18 +168,20 @@ export function useDirectCallSession(
   }, []);
 
   const disposeLocalRuntime = useCallback(() => {
+    clearPeerFailureMarker();
     teardownDirectCallRuntime({
       localStream: localStreamRef.current,
       peerConnection: peerConnectionRef.current,
       remoteStream: remoteStreamRef.current,
     });
     localStreamRef.current = null;
+    localJoinedCallIdRef.current = null;
     peerConnectionRef.current = null;
     remoteStreamRef.current = null;
     pendingRemoteICECandidatesRef.current = [];
     setRemoteAudioStream(null);
     dispatch({ type: "local_left" });
-  }, []);
+  }, [clearPeerFailureMarker]);
 
   const describeError = useCallback((error: unknown, fallbackMessage: string): string => {
     if (isGatewayErrorCode(error, "unauthenticated")) {
@@ -249,7 +274,7 @@ export function useDirectCallSession(
       },
     ) => {
       const call = stateRef.current.call;
-      if (call === null || stateRef.current.localJoinedCallId !== call.id) {
+      if (call === null || localJoinedCallIdRef.current !== call.id) {
         return;
       }
 
@@ -273,7 +298,7 @@ export function useDirectCallSession(
       return null;
     }
 
-    const peerConnection = new RTCPeerConnection(directCallRTCConfiguration);
+    const peerConnection = new RTCPeerConnection(rtcConfigurationRef.current);
     for (const track of localStream.getTracks()) {
       peerConnection.addTrack(track, localStream);
     }
@@ -324,6 +349,19 @@ export function useDirectCallSession(
           });
           return;
         case "failed":
+          {
+            const failedCall = stateRef.current.call;
+            const failedRemoteParticipant =
+              failedCall === null
+                ? null
+                : selectDirectCallRemoteParticipant(stateRef.current, currentUserId);
+            if (failedCall !== null && failedRemoteParticipant !== null) {
+              peerFailureMarkerRef.current = {
+                callId: failedCall.id,
+                remoteUserId: failedRemoteParticipant.userId,
+              };
+            }
+          }
           dispatch({
             type: "peer_state_replaced",
             peerConnectionState: "failed",
@@ -350,7 +388,17 @@ export function useDirectCallSession(
     if (
       currentCall === null ||
       currentCall.id !== signal.callId ||
-      stateRef.current.localJoinedCallId !== signal.callId
+      localJoinedCallIdRef.current !== signal.callId
+    ) {
+      return;
+    }
+
+    if (
+      shouldBlockPeerRuntimeAfterFailure(
+        peerFailureMarkerRef.current,
+        signal.callId,
+        signal.fromUserId,
+      )
     ) {
       return;
     }
@@ -465,7 +513,17 @@ export function useDirectCallSession(
     if (
       currentCall === null ||
       currentCall.createdByUserId !== currentUserId ||
-      stateRef.current.localJoinedCallId !== currentCall.id
+      localJoinedCallIdRef.current !== currentCall.id
+    ) {
+      return;
+    }
+
+    if (
+      shouldBlockPeerRuntimeAfterFailure(
+        peerFailureMarkerRef.current,
+        currentCall.id,
+        participant.userId,
+      )
     ) {
       return;
     }
@@ -508,6 +566,8 @@ export function useDirectCallSession(
     call: RtcCall,
     selfParticipant: RtcCallParticipant | null,
   ) => {
+    clearPeerFailureMarker();
+    localJoinedCallIdRef.current = call.id;
     dispatch({
       type: "local_call_bootstrapped",
       call,
@@ -515,7 +575,7 @@ export function useDirectCallSession(
     });
     ensurePeerConnection();
     await runRefreshDirectChatCall(false);
-  }, [ensurePeerConnection, runRefreshDirectChatCall]);
+  }, [clearPeerFailureMarker, ensurePeerConnection, runRefreshDirectChatCall]);
 
   async function startCall() {
     if (!enabled || chat === null || !isDirectChatSupported) {
@@ -527,6 +587,7 @@ export function useDirectCallSession(
     let localStream: MediaStream | null = null;
     try {
       localStream = await ensureLocalAudioStream();
+      await refreshRTCConfiguration();
       const response = await gatewayClient.startCall(token, {
         kind: "direct",
         directChatId: chat.id,
@@ -542,6 +603,7 @@ export function useDirectCallSession(
           remoteStream: remoteStreamRef.current,
         });
         localStreamRef.current = null;
+        localJoinedCallIdRef.current = null;
         peerConnectionRef.current = null;
         remoteStreamRef.current = null;
         setRemoteAudioStream(null);
@@ -589,6 +651,7 @@ export function useDirectCallSession(
     let localStream: MediaStream | null = null;
     try {
       localStream = await ensureLocalAudioStream();
+      await refreshRTCConfiguration();
       const response = await gatewayClient.joinCall(token, currentCall.id);
       dispatch({ type: "action_finished" });
       localStreamRef.current = localStream;
@@ -601,6 +664,7 @@ export function useDirectCallSession(
           remoteStream: remoteStreamRef.current,
         });
         localStreamRef.current = null;
+        localJoinedCallIdRef.current = null;
         peerConnectionRef.current = null;
         remoteStreamRef.current = null;
         setRemoteAudioStream(null);
@@ -811,6 +875,10 @@ export function useDirectCallSession(
   useEffect(() => {
     const joinedCall = state.call;
     if (joinedCall === null || state.localJoinedCallId !== joinedCall.id) {
+      if (state.localJoinedCallId === null) {
+        clearPeerFailureMarker();
+        localJoinedCallIdRef.current = null;
+      }
       resetPeerRuntime();
       return;
     }
@@ -824,6 +892,7 @@ export function useDirectCallSession(
     }
 
     if (nextRemoteParticipant === null) {
+      clearPeerFailureMarker();
       resetPeerRuntime();
       if (state.peerConnectionState !== "waiting_for_peer") {
         dispatch({
@@ -831,6 +900,22 @@ export function useDirectCallSession(
           peerConnectionState: "waiting_for_peer",
         });
       }
+      return;
+    }
+
+    if (
+      peerFailureMarkerRef.current?.callId === joinedCall.id &&
+      peerFailureMarkerRef.current.remoteUserId !== nextRemoteParticipant.userId
+    ) {
+      clearPeerFailureMarker();
+    }
+    if (
+      shouldBlockPeerRuntimeAfterFailure(
+        peerFailureMarkerRef.current,
+        joinedCall.id,
+        nextRemoteParticipant.userId,
+      )
+    ) {
       return;
     }
 
@@ -848,6 +933,7 @@ export function useDirectCallSession(
     }
   }, [
     createOfferForRemoteParticipant,
+    clearPeerFailureMarker,
     disposeLocalRuntime,
     ensurePeerConnection,
     currentUserId,

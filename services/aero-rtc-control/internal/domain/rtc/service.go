@@ -37,6 +37,7 @@ type Service struct {
 	repo                 Repository
 	authenticator        Authenticator
 	scopeAuthorizer      ScopeAuthorizer
+	iceServerProvider    ICEServerProvider
 	maxSignalPayloadSize int
 	now                  func() time.Time
 	newID                func() string
@@ -59,6 +60,24 @@ func NewService(repo Repository, authenticator Authenticator, scopeAuthorizer Sc
 			return uuid.NewString()
 		},
 	}
+}
+
+func (s *Service) WithICEServerProvider(provider ICEServerProvider) *Service {
+	s.iceServerProvider = provider
+	return s
+}
+
+func (s *Service) GetICEServers(ctx context.Context, token string) ([]ICEServer, error) {
+	user, err := s.authenticator.Authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.iceServerProvider == nil {
+		return nil, nil
+	}
+
+	return s.iceServerProvider.BuildForUser(user.ID, s.now()), nil
 }
 
 func (s *Service) GetActiveCall(ctx context.Context, token string, scope ConversationScope) (*Call, error) {

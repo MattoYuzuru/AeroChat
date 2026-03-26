@@ -9,6 +9,7 @@ import "google/protobuf/timestamp.proto";
 
 service RtcControlService {
   rpc Ping(PingRequest) returns (PingResponse);
+  rpc GetIceServers(GetIceServersRequest) returns (GetIceServersResponse);
   rpc GetActiveCall(GetActiveCallRequest) returns (GetActiveCallResponse);
   rpc GetCall(GetCallRequest) returns (GetCallResponse);
   rpc StartCall(StartCallRequest) returns (StartCallResponse);
@@ -94,6 +95,19 @@ message SignalEnvelope {
   SignalEnvelopeType type = 4;
   bytes payload = 5;
   google.protobuf.Timestamp created_at = 6;
+}
+
+message IceServer {
+  repeated string urls = 1;
+  string username = 2;
+  string credential = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message GetIceServersRequest {}
+
+message GetIceServersResponse {
+  repeated IceServer ice_servers = 1;
 }
 
 message GetActiveCallRequest {

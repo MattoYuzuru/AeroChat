@@ -347,6 +347,13 @@ export interface RtcSignalEnvelope {
   createdAt: string;
 }
 
+export interface RtcIceServer {
+  urls: string[];
+  username: string | null;
+  credential: string | null;
+  expiresAt: string | null;
+}
+
 export type RtcConversationScopeInput =
   | {
       kind: "direct";
@@ -933,6 +940,7 @@ export interface GatewayClient {
   createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
   listDirectChats(token: string): Promise<DirectChat[]>;
   getDirectChat(token: string, chatId: string): Promise<DirectChatSnapshot>;
+  getRtcIceServers(token: string): Promise<RtcIceServer[]>;
   getActiveCall(token: string, scope: RtcConversationScopeInput): Promise<RtcCall | null>;
   startCall(
     token: string,

@@ -19,6 +19,10 @@ type Config struct {
 	DownstreamTimeout         time.Duration
 	IdentityBaseURL           string
 	ChatBaseURL               string
+	STUNServerURLs            []string
+	TURNServerURLs            []string
+	TURNAuthSecret            string
+	TURNUsernameTTL           time.Duration
 	MaxSignalPayloadSizeBytes int
 }
 
@@ -33,6 +37,10 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		return Config{}, err
 	}
 	downstreamTimeout, err := lookupDuration("AERO_DOWNSTREAM_TIMEOUT", 5*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	turnUsernameTTL, err := lookupDuration("AERO_RTC_TURN_USERNAME_TTL", 10*time.Minute)
 	if err != nil {
 		return Config{}, err
 	}
@@ -61,6 +69,10 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		DownstreamTimeout:         downstreamTimeout,
 		IdentityBaseURL:           identityBaseURL,
 		ChatBaseURL:               chatBaseURL,
+		STUNServerURLs:            lookupStringList("AERO_RTC_STUN_URLS", []string{"stun:stun.cloudflare.com:3478"}),
+		TURNServerURLs:            lookupStringList("AERO_RTC_TURN_URLS", nil),
+		TURNAuthSecret:            lookupString("AERO_RTC_TURN_AUTH_SECRET", ""),
+		TURNUsernameTTL:           turnUsernameTTL,
 		MaxSignalPayloadSizeBytes: maxSignalPayloadSizeBytes,
 	}, nil
 }
@@ -114,4 +126,29 @@ func lookupInt(key string, fallback int) (int, error) {
 	}
 
 	return parsed, nil
+}
+
+func lookupStringList(key string, fallback []string) []string {
+	value := os.Getenv(key)
+	if value == "" {
+		return append([]string(nil), fallback...)
+	}
+
+	parts := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == '\n'
+	})
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		normalized := strings.TrimSpace(part)
+		if normalized == "" {
+			continue
+		}
+
+		result = append(result, normalized)
+	}
+	if len(result) == 0 {
+		return append([]string(nil), fallback...)
+	}
+
+	return result
 }

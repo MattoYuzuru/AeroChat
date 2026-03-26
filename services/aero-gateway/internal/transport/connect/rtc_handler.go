@@ -50,6 +50,10 @@ func (h *RTCHandler) Ping(context.Context, *connect.Request[rtcv1.PingRequest]) 
 	}), nil
 }
 
+func (h *RTCHandler) GetIceServers(ctx context.Context, req *connect.Request[rtcv1.GetIceServersRequest]) (*connect.Response[rtcv1.GetIceServersResponse], error) {
+	return forwardUnary(ctx, req, h.client.GetIceServers)
+}
+
 func (h *RTCHandler) GetActiveCall(ctx context.Context, req *connect.Request[rtcv1.GetActiveCallRequest]) (*connect.Response[rtcv1.GetActiveCallResponse], error) {
 	return forwardUnary(ctx, req, h.client.GetActiveCall)
 }

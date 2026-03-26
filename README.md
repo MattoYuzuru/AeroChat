@@ -181,8 +181,8 @@ AeroChat должен поддерживать:
 - RTC/calls остаются частичными:
   - `aero-rtc-control` уже даёт signaling и server-backed call control-plane;
   - web 1:1 звонок существует как bounded audio-only bootstrap;
-  - browser direct-call runtime теперь использует configurable ICE bootstrap c repo-default STUN fallback,
-    поэтому за пределами одной LAN звонок больше не зависит только от host-only ICE candidates;
+  - browser direct-call runtime теперь читает ICE servers из `aero-rtc-control` и держит repo-default STUN fallback,
+    поэтому operator может задавать TURN/STUN policy без нового frontend build;
   - production-grade connectivity по-прежнему не гарантируется без operator-managed TURN/STUN policy;
   - group call UI сейчас остаётся lobby/control surface без multiparty browser media transport.
 
