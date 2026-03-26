@@ -71,6 +71,8 @@ AeroChat должен поддерживать:
     - target roster собирается по active crypto devices собеседника и всех active devices отправителя, включая originating sender device;
     - per-device opaque envelopes собираются внутри crypto worker/runtime boundary;
     - originating sender device теперь получает server-backed self-delivery через тот же opaque storage/realtime path, а bounded local optimistic projection остаётся только временным reconciliation layer без plaintext fallback;
+    - newly linked device начинает получать только новые encrypted direct messages после своей активации;
+    - backfill старой encrypted direct history на freshly linked device в текущем slice пока не реализован;
   - encrypted media relay v1 для direct encrypted lane:
     - presigned direct-to-object-storage flow сохраняется, но encrypted media upload/download идёт только как ciphertext blob;
     - relay metadata отделена от encrypted attachment descriptor;
