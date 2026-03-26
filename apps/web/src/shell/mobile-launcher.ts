@@ -20,6 +20,12 @@ export const mobileLauncherPrimaryApps = [
     description: "Self workspace",
   },
   {
+    appId: "group_creator",
+    badge: "Г+",
+    title: "Создать группу",
+    description: "Owner bootstrap",
+  },
+  {
     appId: "chats",
     badge: "Ч",
     title: "Чаты",

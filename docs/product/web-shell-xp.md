@@ -222,7 +222,8 @@ Desktop обязан быть функциональным рабочим про
 - desktop entity переживает reload и не считается одноразовой декоративной иконкой;
 - remove from desktop означает только hide from desktop;
 - скрытый объект остаётся доступен через Explorer, Search и системные folders;
-- обязательные системные entrypoints shell включают `Я`, Search, Explorer, Friend Requests и Settings.
+- обязательные системные entrypoints shell включают `Я`, `Создать группу`, Search, Explorer, Friend Requests и Settings;
+- `Создать группу` остаётся отдельным singleton app и может быть скрыто с рабочего стола без удаления самого entrypoint'а.
 
 ### 13. Переполнение desktop должно быть bounded
 
@@ -281,7 +282,7 @@ Explorer в MVP нужен как messenger organizer / manager surface:
 
 Пользователь после входа:
 
-1. видит рабочий стол с системными entrypoints `Я`, Search, Explorer, Friend Requests и Settings;
+1. видит рабочий стол с системными entrypoints `Я`, `Создать группу`, Search, Explorer, Friend Requests и Settings;
 2. получает на desktop новые friend/direct targets и новые groups автоматически;
 3. открывает direct chat, группу, search или settings как окно;
 4. может держать несколько контекстов параллельно в пределах bounded window cap;

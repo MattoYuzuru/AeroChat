@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { CreateGroupPage } from "../pages/CreateGroupPage";
 import { ChatsPage } from "../pages/ChatsPage";
 import { ExplorerPage } from "../pages/ExplorerPage";
 import { FriendRequestsPage } from "../pages/FriendRequestsPage";
@@ -35,6 +36,15 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
     path: "/app/self",
     shortcutLabel: "Я",
     shortcutMeta: "self workspace",
+  },
+  {
+    appId: "group_creator",
+    title: "Создать группу",
+    launchPolicy: "singleton",
+    routePath: "/app/group-creator",
+    path: "/app/group-creator",
+    shortcutLabel: "Создать группу",
+    shortcutMeta: "group bootstrap",
   },
   {
     appId: "profile",
@@ -112,6 +122,7 @@ export const routeBackedShellApps: RouteBackedShellApp[] = [
 
 export const shellAppRegistry: Record<ShellAppId, ShellAppDefinition> = {
   self_chat: routeBackedShellApps.find((app) => app.appId === "self_chat")!,
+  group_creator: routeBackedShellApps.find((app) => app.appId === "group_creator")!,
   friend_requests: routeBackedShellApps.find((app) => app.appId === "friend_requests")!,
   explorer: routeBackedShellApps.find((app) => app.appId === "explorer")!,
   profile: routeBackedShellApps.find((app) => app.appId === "profile")!,
@@ -313,6 +324,8 @@ export function renderShellAppContent(appId: ShellAppId): ReactNode {
   switch (appId) {
     case "self_chat":
       return <SelfChatPage />;
+    case "group_creator":
+      return <CreateGroupPage />;
     case "profile":
       return <ProfilePage />;
     case "friend_requests":

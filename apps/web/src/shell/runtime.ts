@@ -2,6 +2,7 @@ export const MAX_OPEN_SHELL_WINDOWS = 10;
 
 export type ShellAppId =
   | "self_chat"
+  | "group_creator"
   | "friend_requests"
   | "explorer"
   | "profile"

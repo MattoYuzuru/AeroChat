@@ -135,7 +135,12 @@ export function listDesktopContextMenuItems(
   registryState: DesktopRegistryState,
 ): DesktopContextMenuItem[] {
   if (entry.kind === "system_app") {
-    return [createCommandItem("open", "Открыть")];
+    return [
+      createCommandItem("open", "Открыть"),
+      ...(isDesktopEntityHideable(entry)
+        ? [createCommandItem("hide", "Скрыть с рабочего стола")]
+        : []),
+    ];
   }
 
   if (entry.kind === "custom_folder") {

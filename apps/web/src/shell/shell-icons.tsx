@@ -5,6 +5,7 @@ import type { ShellAppId } from "./runtime";
 
 export type ShellIconKey =
   | "self_chat"
+  | "group_creator"
   | "direct_chat"
   | "group_chat"
   | "search"
@@ -54,6 +55,8 @@ export function resolveShellAppIconKey(appId: ShellAppId): ShellIconKey {
   switch (appId) {
     case "self_chat":
       return "self_chat";
+    case "group_creator":
+      return "group_creator";
     case "direct_chat":
       return "direct_chat";
     case "group_chat":
@@ -113,6 +116,21 @@ function renderShellIcon(iconKey: ShellIconKey) {
             stroke="#1f5f97"
           />
           <path d="M9 8.5h5.5" stroke="#92cf4b" strokeLinecap="round" strokeWidth="2" />
+        </>
+      );
+    case "group_creator":
+      return (
+        <>
+          <circle cx="11.5" cy="12.5" r="4" fill="#f1c48f" stroke="#905a2d" />
+          <circle cx="20.5" cy="13.5" r="3.4" fill="#f7d4a9" stroke="#a36e40" />
+          <path d="M5.2 24c0-3.3 2.8-6 6.3-6s6.3 2.7 6.3 6" fill="#74addf" stroke="#1f5f97" />
+          <path d="M15.4 24c0-2.6 2.2-4.8 4.9-4.8s4.9 2.2 4.9 4.8" fill="#b2d7f5" stroke="#3b7cb4" />
+          <path
+            d="M23.2 7.3v4.3M21.1 9.45h4.3"
+            stroke="#43a238"
+            strokeLinecap="round"
+            strokeWidth="2.2"
+          />
         </>
       );
     case "direct_chat":

@@ -155,6 +155,19 @@ describe("buildExplorerSectionViewModel", () => {
 
     expect(promotedEntry?.stateLabel).toBe("На рабочем столе");
   });
+
+  it("offers group creator app link inside groups section", () => {
+    const viewModel = buildExplorerSectionViewModel(
+      createInitialDesktopRegistryState(),
+      "groups",
+    );
+
+    expect(viewModel.appLinks).toContainEqual({
+      appId: "group_creator",
+      title: "Создать группу",
+      description: "Открыть мастер создания новой группы.",
+    });
+  });
 });
 
 describe("buildExplorerFolderViewModel", () => {
