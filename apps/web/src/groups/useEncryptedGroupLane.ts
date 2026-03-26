@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { describeGatewayError, isGatewayErrorCode } from "../gateway/types";
 import type { EncryptedGroupBootstrap } from "../gateway/types";
 import { gatewayClient } from "../gateway/runtime";
 import {
+  parseBoundRealtimeCryptoDeviceId,
   resolveActiveRealtimeCryptoDeviceId,
 } from "../crypto/realtime-bridge-helpers";
 import type { EncryptedGroupEnvelope } from "../gateway/types";
@@ -22,6 +23,7 @@ import {
   listBufferedLocalEncryptedGroupProjection,
   subscribeLocalEncryptedGroupProjection,
 } from "./encrypted-group-local-outbound";
+import { subscribeRealtimeEnvelopes } from "../realtime/events";
 
 interface UseEncryptedGroupLaneOptions {
   enabled: boolean;
@@ -60,23 +62,30 @@ export function useEncryptedGroupLane({
     errorMessage: null,
   });
   const requestVersionRef = useRef(0);
-  const loadDescriptor = useMemo(
-    () =>
-      resolveEncryptedGroupLoadDescriptor({
-        enabled,
-        activeGroupId,
-        activeCryptoDeviceId,
-        cryptoRuntimeState: cryptoRuntime.state,
-        token,
-      }),
-    [activeCryptoDeviceId, activeGroupId, cryptoRuntime.state, enabled, token],
-  );
+  const loadDescriptor = resolveEncryptedGroupLoadDescriptor({
+    enabled,
+    activeGroupId,
+    activeCryptoDeviceId,
+    cryptoRuntimeState: cryptoRuntime.state,
+    token,
+  });
+  const activeLoadRequestKey =
+    loadDescriptor.kind === "load" ? loadDescriptor.requestKey : null;
+  const activeLoadToken = loadDescriptor.kind === "load" ? loadDescriptor.token : null;
+  const activeLoadGroupId = loadDescriptor.kind === "load" ? loadDescriptor.groupId : null;
+  const activeLoadCryptoDeviceId =
+    loadDescriptor.kind === "load" ? loadDescriptor.activeCryptoDeviceId : null;
 
   useEffect(() => {
-    if (loadDescriptor.kind !== "load") {
+    if (
+      activeLoadRequestKey === null ||
+      activeLoadToken === null ||
+      activeLoadGroupId === null ||
+      activeLoadCryptoDeviceId === null
+    ) {
       return;
     }
-    if (loadedState.requestKey === loadDescriptor.requestKey) {
+    if (loadedState.requestKey === activeLoadRequestKey) {
       return;
     }
 
@@ -84,9 +93,9 @@ export function useEncryptedGroupLane({
     requestVersionRef.current = requestVersion;
 
     void loadEncryptedGroupLane({
-      token: loadDescriptor.token,
-      groupId: loadDescriptor.groupId,
-      activeCryptoDeviceId: loadDescriptor.activeCryptoDeviceId,
+      token: activeLoadToken,
+      groupId: activeLoadGroupId,
+      activeCryptoDeviceId: activeLoadCryptoDeviceId,
       cryptoRuntime,
     })
       .then((result) => {
@@ -95,7 +104,7 @@ export function useEncryptedGroupLane({
         }
 
         setLoadedState({
-          requestKey: loadDescriptor.requestKey,
+          requestKey: activeLoadRequestKey,
           status: "ready",
           bootstrap: result.bootstrap,
           items: result.items,
@@ -109,17 +118,28 @@ export function useEncryptedGroupLane({
 
         const resolved = resolveEncryptedGroupLoadError(error);
         setLoadedState({
-          requestKey: loadDescriptor.requestKey,
+          requestKey: activeLoadRequestKey,
           status: resolved.kind,
           bootstrap: null,
           items: [],
           errorMessage: resolved.message,
         });
       });
-  }, [cryptoRuntime, loadDescriptor, loadedState.requestKey]);
+  }, [
+    cryptoRuntime,
+    activeLoadCryptoDeviceId,
+    activeLoadGroupId,
+    activeLoadRequestKey,
+    activeLoadToken,
+    loadedState.requestKey,
+  ]);
 
   useEffect(() => {
-    if (loadDescriptor.kind !== "load") {
+    if (
+      activeLoadRequestKey === null ||
+      activeLoadGroupId === null ||
+      activeLoadCryptoDeviceId === null
+    ) {
       return;
     }
 
@@ -128,9 +148,9 @@ export function useEncryptedGroupLane({
     const unsubscribe = subscribeEncryptedGroupRealtimeEvents((event) => {
       if (
         cancelled ||
-        event.envelope.groupId !== loadDescriptor.groupId ||
+        event.envelope.groupId !== activeLoadGroupId ||
         event.envelope.viewerDelivery.recipientCryptoDeviceId !==
-          loadDescriptor.activeCryptoDeviceId
+          activeLoadCryptoDeviceId
       ) {
         return;
       }
@@ -151,7 +171,7 @@ export function useEncryptedGroupLane({
           }
 
           setLoadedState((current) => ({
-            requestKey: loadDescriptor.requestKey,
+            requestKey: activeLoadRequestKey,
             status: "ready",
             bootstrap: current.bootstrap,
             items: mergeEncryptedGroupProjection(current.items, updates),
@@ -165,7 +185,7 @@ export function useEncryptedGroupLane({
 
           setLoadedState((current) => ({
             ...current,
-            requestKey: loadDescriptor.requestKey,
+            requestKey: activeLoadRequestKey,
             status: "error",
             errorMessage:
               error instanceof Error && error.message.trim() !== ""
@@ -179,27 +199,99 @@ export function useEncryptedGroupLane({
       cancelled = true;
       unsubscribe();
     };
-  }, [cryptoRuntime, loadDescriptor]);
+  }, [
+    cryptoRuntime,
+    activeLoadCryptoDeviceId,
+    activeLoadGroupId,
+    activeLoadRequestKey,
+  ]);
 
   useEffect(() => {
-    if (loadDescriptor.kind !== "load") {
+    if (
+      activeLoadRequestKey === null ||
+      activeLoadToken === null ||
+      activeLoadGroupId === null ||
+      activeLoadCryptoDeviceId === null
+    ) {
+      return;
+    }
+
+    return subscribeRealtimeEnvelopes((envelope) => {
+      const boundCryptoDeviceId = parseBoundRealtimeCryptoDeviceId(envelope);
+      if (
+        boundCryptoDeviceId === null ||
+        boundCryptoDeviceId !== activeLoadCryptoDeviceId
+      ) {
+        return;
+      }
+
+      const requestVersion = requestVersionRef.current + 1;
+      requestVersionRef.current = requestVersion;
+
+      void loadEncryptedGroupLane({
+        token: activeLoadToken,
+        groupId: activeLoadGroupId,
+        activeCryptoDeviceId: activeLoadCryptoDeviceId,
+        cryptoRuntime,
+      })
+        .then((result) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return;
+          }
+
+          setLoadedState({
+            requestKey: activeLoadRequestKey,
+            status: "ready",
+            bootstrap: result.bootstrap,
+            items: result.items,
+            errorMessage: null,
+          });
+        })
+        .catch((error) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return;
+          }
+
+          setLoadedState((current) => ({
+            requestKey: activeLoadRequestKey,
+            status: "error",
+            bootstrap:
+              current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
+            items: current.requestKey === activeLoadRequestKey ? current.items : [],
+            errorMessage:
+              error instanceof Error && error.message.trim() !== ""
+                ? error.message
+                : "Не удалось перечитать encrypted group local projection после reconnect.",
+          }));
+        });
+    });
+  }, [
+    cryptoRuntime,
+    activeLoadCryptoDeviceId,
+    activeLoadGroupId,
+    activeLoadRequestKey,
+    activeLoadToken,
+  ]);
+
+  useEffect(() => {
+    if (activeLoadRequestKey === null || activeLoadGroupId === null) {
       return;
     }
 
     return subscribeLocalEncryptedGroupProjection((event) => {
-      if (event.projection.groupId !== loadDescriptor.groupId) {
+      if (event.projection.groupId !== activeLoadGroupId) {
         return;
       }
 
       setLoadedState((current) => ({
-        requestKey: loadDescriptor.requestKey,
+        requestKey: activeLoadRequestKey,
         status: "ready",
         bootstrap: current.bootstrap,
         items: mergeEncryptedGroupProjection(current.items, [event.projection]),
         errorMessage: current.errorMessage,
       }));
     });
-  }, [loadDescriptor]);
+  }, [activeLoadGroupId, activeLoadRequestKey]);
 
   if (loadDescriptor.kind === "idle") {
     return {
@@ -310,7 +402,7 @@ function deduplicateEncryptedGroupEnvelopes(
   );
 }
 
-function resolveEncryptedGroupLoadDescriptor(input: {
+export function resolveEncryptedGroupLoadDescriptor(input: {
   enabled: boolean;
   activeGroupId: string;
   activeCryptoDeviceId: string | null;
@@ -321,9 +413,9 @@ function resolveEncryptedGroupLoadDescriptor(input: {
   | { kind: "loading" }
   | { kind: "unavailable"; errorMessage: string }
   | {
-      kind: "load";
-      requestKey: string;
-      token: string;
+    kind: "load";
+    requestKey: string;
+    token: string;
       groupId: string;
       activeCryptoDeviceId: string;
     } {
@@ -352,7 +444,11 @@ function resolveEncryptedGroupLoadDescriptor(input: {
 
   return {
     kind: "load",
-    requestKey: `${input.activeGroupId}:${input.activeCryptoDeviceId}`,
+    requestKey: [
+      input.token,
+      input.activeGroupId,
+      input.activeCryptoDeviceId,
+    ].join(":"),
     token: input.token,
     groupId: input.activeGroupId,
     activeCryptoDeviceId: input.activeCryptoDeviceId,

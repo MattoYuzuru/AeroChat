@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useReducer,
   useRef,
   useState,
@@ -12,6 +13,10 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { normalizeComposerMessageText } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
+import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
+import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
+import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
+import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import { EncryptedMessageAttachmentList } from "../chats/EncryptedMessageAttachmentList";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
@@ -172,8 +177,18 @@ export function GroupsPage() {
         : null,
     onUnauthenticated: expireSession,
   });
+  const voiceNoteRecorder = useVoiceNoteRecorder({
+    enabled: authState.status === "authenticated",
+  });
+  const videoNoteRecorder = useVideoNoteRecorder({
+    enabled: authState.status === "authenticated",
+  });
   const encryptedAttachmentDraft = encryptedMediaAttachmentDraft.draft;
   const uploadedEncryptedAttachmentDraft = encryptedMediaAttachmentDraft.uploadedDraft;
+  const discardEncryptedMediaNoteDrafts = useEffectEvent(() => {
+    voiceNoteRecorder.discardRecording();
+    videoNoteRecorder.discardRecording();
+  });
 
   useEffect(() => {
     selectedStateRef.current = selectedState;
@@ -198,6 +213,7 @@ export function GroupsPage() {
     previousSelectedGroupCallIdRef.current = null;
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
+    discardEncryptedMediaNoteDrafts();
   }, [selectedGroupId]);
 
   useEffect(() => {
@@ -1121,6 +1137,26 @@ export function GroupsPage() {
     !cryptoRuntime.state.isActionPending &&
     !encryptedMediaAttachmentDraft.isUploading &&
     editingEncryptedEntry === null;
+  const canUseEncryptedMediaNoteEntry =
+    selectedState.status === "ready" &&
+    encryptedGroupLane.status === "ready" &&
+    encryptedGroupLane.bootstrap !== null &&
+    selectedState.snapshot.thread.canSendMessages &&
+    !cryptoRuntime.state.isActionPending &&
+    !encryptedMediaAttachmentDraft.isUploading &&
+    editingEncryptedEntry === null;
+  const voiceNoteStartDisabled =
+    !canUseEncryptedMediaNoteEntry ||
+    videoNoteRecorder.state.status === "requesting_permission" ||
+    videoNoteRecorder.state.status === "recording" ||
+    videoNoteRecorder.state.status === "processing" ||
+    videoNoteRecorder.state.status === "recorded";
+  const videoNoteStartDisabled =
+    !canUseEncryptedMediaNoteEntry ||
+    voiceNoteRecorder.state.status === "requesting_permission" ||
+    voiceNoteRecorder.state.status === "recording" ||
+    voiceNoteRecorder.state.status === "processing" ||
+    voiceNoteRecorder.state.status === "recorded";
   const canSendEncryptedGroupText =
     selectedState.status === "ready" &&
     encryptedGroupLane.status === "ready" &&
@@ -1627,6 +1663,49 @@ export function GroupsPage() {
     setActionError(null);
     setNotice(null);
     await encryptedMediaAttachmentDraft.selectFile(file);
+  }
+
+  async function handleEncryptedGroupMediaNoteSend(
+    file: File | null,
+    clearRecorderDraft: () => void,
+  ) {
+    if (selectedState.status !== "ready" || file === null) {
+      return;
+    }
+
+    setEncryptedComposerError(null);
+    setActionError(null);
+    setNotice(null);
+
+    try {
+      const uploadedDraft = await encryptedMediaAttachmentDraft.selectFile(file);
+      if (uploadedDraft === null) {
+        return;
+      }
+
+      const result = await cryptoRuntime.sendEncryptedGroupContent(
+        selectedState.snapshot.group.id,
+        "",
+        selectedEncryptedReplyEntry?.messageId ?? null,
+        [uploadedDraft],
+      );
+      if (result === null) {
+        return;
+      }
+
+      publishLocalEncryptedGroupProjection(result.localProjection);
+      setSelectedEncryptedReplyMessageId(null);
+      encryptedMediaAttachmentDraft.markSendSucceeded();
+      clearRecorderDraft();
+      setNotice("Media note отправлена.");
+    } catch (error) {
+      encryptedMediaAttachmentDraft.markSendFailed();
+      setEncryptedComposerError(
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "Не удалось отправить media note.",
+      );
+    }
   }
 
   async function handleUpdateGroupMemberRole(userId: string) {
@@ -2618,9 +2697,74 @@ export function GroupsPage() {
                             : "Заменить файл"}
                         </button>
                         <span className={styles.attachmentHint}>
-                          Прикрепите файл к следующему сообщению.
+                          Прикрепите файл вручную или используйте voice/video note ниже. Всё
+                          уходит через тот же encrypted attachment flow.
                         </span>
                       </div>
+
+                      <VoiceNoteRecorderPanel
+                        state={voiceNoteRecorder.state}
+                        startDisabled={voiceNoteStartDisabled}
+                        stopDisabled={voiceNoteRecorder.state.status !== "recording"}
+                        discardDisabled={!canUseEncryptedMediaNoteEntry}
+                        sendDisabled={
+                          !canUseEncryptedMediaNoteEntry ||
+                          voiceNoteRecorder.state.draft === null
+                        }
+                        isSending={
+                          encryptedMediaAttachmentDraft.isUploading ||
+                          cryptoRuntime.state.isActionPending
+                        }
+                        onStart={() => {
+                          void voiceNoteRecorder.startRecording();
+                        }}
+                        onStop={() => {
+                          voiceNoteRecorder.stopRecording();
+                        }}
+                        onDiscard={() => {
+                          voiceNoteRecorder.discardRecording();
+                        }}
+                        onSend={() => {
+                          void handleEncryptedGroupMediaNoteSend(
+                            voiceNoteRecorder.state.draft?.file ?? null,
+                            () => {
+                              voiceNoteRecorder.discardRecording();
+                            },
+                          );
+                        }}
+                      />
+
+                      <VideoNoteRecorderPanel
+                        state={videoNoteRecorder.state}
+                        startDisabled={videoNoteStartDisabled}
+                        stopDisabled={videoNoteRecorder.state.status !== "recording"}
+                        discardDisabled={!canUseEncryptedMediaNoteEntry}
+                        sendDisabled={
+                          !canUseEncryptedMediaNoteEntry ||
+                          videoNoteRecorder.state.draft === null
+                        }
+                        isSending={
+                          encryptedMediaAttachmentDraft.isUploading ||
+                          cryptoRuntime.state.isActionPending
+                        }
+                        onStart={() => {
+                          void videoNoteRecorder.startRecording();
+                        }}
+                        onStop={() => {
+                          videoNoteRecorder.stopRecording();
+                        }}
+                        onDiscard={() => {
+                          videoNoteRecorder.discardRecording();
+                        }}
+                        onSend={() => {
+                          void handleEncryptedGroupMediaNoteSend(
+                            videoNoteRecorder.state.draft?.file ?? null,
+                            () => {
+                              videoNoteRecorder.discardRecording();
+                            },
+                          );
+                        }}
+                      />
 
                       {encryptedAttachmentDraft && (
                         <div className={styles.attachmentDraftCard}>
