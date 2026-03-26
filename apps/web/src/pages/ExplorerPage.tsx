@@ -260,15 +260,15 @@ export function ExplorerPage() {
     }
 
     if (navigationTarget.kind === "folder") {
-      const folderTitle = folderViewModel?.folder.folder.title ?? "Explorer";
-      desktopShellHost.syncCurrentRouteTitle(`Explorer · ${folderTitle}`);
+      const folderTitle = folderViewModel?.folder.folder.title ?? "Проводник";
+      desktopShellHost.syncCurrentRouteTitle(`Проводник · ${folderTitle}`);
       return;
     }
 
     const currentSection =
       sectionViewModel?.section.label === "Рабочий стол"
-        ? "Explorer"
-        : `Explorer · ${sectionViewModel?.section.label ?? "Explorer"}`;
+        ? "Проводник"
+        : `Проводник · ${sectionViewModel?.section.label ?? "Проводник"}`;
     desktopShellHost.syncCurrentRouteTitle(currentSection);
   }, [desktopShellHost, folderViewModel, navigationTarget, sectionViewModel]);
 
@@ -291,7 +291,7 @@ export function ExplorerPage() {
   }
 
   function openSystemApp(
-    appId: "self_chat" | "group_creator" | "friend_requests" | "search" | "settings",
+    appId: "self_chat" | "group_creator" | "friend_requests" | "people" | "search" | "settings",
   ) {
     if (desktopShellHost !== null) {
       desktopShellHost.launchApp(appId);
@@ -315,6 +315,11 @@ export function ExplorerPage() {
 
     if (appId === "search") {
       navigate("/app/search");
+      return;
+    }
+
+    if (appId === "people") {
+      navigate("/app/people");
       return;
     }
 
@@ -487,9 +492,9 @@ export function ExplorerPage() {
 
   return (
     <div className={styles.surface}>
-      <aside className={styles.sidebar} aria-label="Explorer navigation">
+      <aside className={styles.sidebar} aria-label="Навигация проводника">
         <div className={styles.sidebarHeader}>
-          <p className={styles.sidebarEyebrow}>Explorer</p>
+          <p className={styles.sidebarEyebrow}>Проводник</p>
           <h1 className={styles.sidebarTitle}>Проводник AeroChat</h1>
         </div>
 

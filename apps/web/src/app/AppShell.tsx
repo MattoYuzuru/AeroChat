@@ -6,17 +6,17 @@ import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import styles from "./AppShell.module.css";
 
 const navigationItems = [
-  { to: "/app", label: "Домой", meta: "launcher", exact: true },
-  { to: "/app/self", label: "Я", meta: "self workspace" },
-  { to: "/app/group-creator", label: "Создать группу", meta: "group bootstrap" },
-  { to: "/app/profile", label: "Профиль", meta: "identity" },
-  { to: "/app/chats", label: "Чаты", meta: "direct" },
-  { to: "/app/groups", label: "Группы", meta: "group chat bootstrap" },
-  { to: "/app/explorer", label: "Explorer", meta: "shell organizer" },
-  { to: "/app/search", label: "Поиск", meta: "people first" },
-  { to: "/app/friend-requests", label: "Заявки", meta: "social requests" },
-  { to: "/app/people", label: "Люди", meta: "social" },
-  { to: "/app/settings", label: "Настройки", meta: "privacy" },
+  { to: "/app", label: "Домой", meta: "Пуск", exact: true },
+  { to: "/app/self", label: "Я", meta: "Личное" },
+  { to: "/app/group-creator", label: "Создать группу", meta: "Новая группа" },
+  { to: "/app/profile", label: "Профиль", meta: "Учётная запись" },
+  { to: "/app/chats", label: "Чаты", meta: "Личные переписки" },
+  { to: "/app/groups", label: "Группы", meta: "Групповые переписки" },
+  { to: "/app/explorer", label: "Проводник", meta: "Ярлыки и папки" },
+  { to: "/app/search", label: "Поиск", meta: "Сообщения и люди" },
+  { to: "/app/friend-requests", label: "Заявки", meta: "Запросы" },
+  { to: "/app/people", label: "Люди", meta: "Контакты" },
+  { to: "/app/settings", label: "Настройки", meta: "Параметры" },
 ];
 
 const statusItems = [

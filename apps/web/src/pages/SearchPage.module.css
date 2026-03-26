@@ -12,14 +12,14 @@
 .inlineState,
 .sectionNote {
   border: 1px solid var(--xp-panel-border);
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--xp-panel-surface);
   box-shadow: var(--xp-panel-shadow);
 }
 
 .primarySection,
 .secondarySection {
-  padding: 1rem;
+  padding: 0.85rem;
 }
 
 .sectionHeader,
@@ -78,7 +78,7 @@
 
 .metrics {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: 1rem;
+  margin-top: 0.75rem;
 }
 
 .primaryGrid,
@@ -90,7 +90,7 @@
 .metricCard {
   display: grid;
   gap: 0.15rem;
-  padding: 0.75rem 0.9rem;
+  padding: 0.55rem 0.7rem;
   background: var(--xp-panel-surface-soft);
 }
 
@@ -108,13 +108,13 @@
 .panel,
 .pathSection {
   display: grid;
-  gap: 0.9rem;
-  padding: 0.9rem;
+  gap: 0.75rem;
+  padding: 0.75rem;
 }
 
 .pathSection {
   border: 1px solid var(--xp-panel-border-soft);
-  border-radius: 7px;
+  border-radius: 0;
   background: var(--xp-panel-surface-strong);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
@@ -124,7 +124,7 @@
 .stack,
 .cardList {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.55rem;
 }
 
 .controlsGrid {
@@ -139,8 +139,8 @@
 
 .field input,
 .field select {
-  min-height: 2.75rem;
-  padding: 0.62rem 0.72rem;
+  min-height: 2.3rem;
+  padding: 0.48rem 0.62rem;
   border: 1px solid var(--xp-field-border);
   border-radius: 3px;
   background: var(--xp-field-surface);
@@ -179,11 +179,14 @@
 .loadMoreRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  gap: 0.4rem;
+  align-items: center;
 }
 
 .formFooter {
   align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.2rem;
 }
 
 .scopeHint {
@@ -194,8 +197,8 @@
 .primaryButton,
 .secondaryButton,
 .linkButton {
-  min-height: 2.5rem;
-  padding: 0.52rem 0.92rem;
+  min-height: 2.1rem;
+  padding: 0.34rem 0.7rem;
   border-radius: 3px;
   border: 1px solid var(--xp-panel-border-strong);
   cursor: pointer;
@@ -229,8 +232,8 @@
 .notice,
 .error,
 .sectionNote {
-  padding: 0.72rem 0.82rem;
-  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0;
 }
 
 .notice,
@@ -251,7 +254,7 @@
 }
 
 .inlineState {
-  padding: 0.8rem;
+  padding: 0.65rem;
 }
 
 .inlineState[data-tone="error"] {
@@ -262,7 +265,7 @@
 
 .resultCard,
 .previewCard {
-  padding: 0.85rem;
+  padding: 0.7rem;
 }
 
 .resultTitle {
@@ -279,12 +282,12 @@
 .metaBadge,
 .pathBadge {
   align-self: start;
-  padding: 0.24rem 0.55rem;
-  border-radius: 999px;
+  padding: 0.18rem 0.4rem;
+  border-radius: 0;
   border: 1px solid var(--xp-badge-border);
   background: var(--xp-badge-surface);
   color: #23496f;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .scopeBadge {
@@ -338,5 +341,11 @@
   .primarySection,
   .secondarySection {
     padding: 0.85rem;
+  }
+
+  .primaryButton,
+  .secondaryButton,
+  .linkButton {
+    width: 100%;
   }
 }

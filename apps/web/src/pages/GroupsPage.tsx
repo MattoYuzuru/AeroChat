@@ -2206,7 +2206,7 @@ export function GroupsPage() {
           {selectedState.status === "idle" && (
             <InlineState
               title="Группа не выбрана"
-              message="Откройте группу из списка слева или используйте explicit join по invite link."
+              message="Откройте группу из списка слева или используйте ссылку-приглашение."
             />
           )}
 
@@ -2246,19 +2246,18 @@ export function GroupsPage() {
                       }}
                       type="button"
                     >
-                      <p className={styles.cardLabel}>Group shell</p>
+                      <p className={styles.cardLabel}>Группа</p>
                       <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
                       <p className={styles.description}>
-                        Текущая роль: {roleLabel(selectedState.snapshot.group.selfRole)}. Thread
-                        key: `{selectedState.snapshot.thread.threadKey}`.
+                        Текущая роль: {roleLabel(selectedState.snapshot.group.selfRole)}.
                       </p>
                       <p className={styles.infoActionHint}>
-                        Открыть участников, роли, invite links и действия группы в этом же окне
+                        Открыть участников, роли, приглашения и действия группы в этом же окне
                       </p>
                     </button>
                   ) : (
                     <div>
-                      <p className={styles.cardLabel}>Group info</p>
+                      <p className={styles.cardLabel}>Сведения</p>
                       <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
                       <p className={styles.description}>
                         Управление группой остаётся в том же canonical window без нового target.
@@ -2281,10 +2280,10 @@ export function GroupsPage() {
                     )}
                     <span className={styles.statusPill}>
                       {selectedState.snapshot.thread.canSendMessages
-                        ? "write allowed"
+                        ? "Можно писать"
                         : selectedSelfMember?.isWriteRestricted
-                          ? "write restricted"
-                          : "read only"}
+                          ? "Отправка ограничена"
+                          : "Только чтение"}
                     </span>
                     {selectedState.snapshot.group.permissions.canLeaveGroup && (
                       <button
@@ -2314,7 +2313,7 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.cardLabel}>Group call</p>
+                    <p className={styles.cardLabel}>Звонок</p>
                     <h2 className={styles.panelTitle}>Лобби звонка</h2>
                   </div>
                   <div className={styles.badgeColumn}>
@@ -2323,30 +2322,29 @@ export function GroupsPage() {
                     </span>
                     {selectedGroupCallEntry && (
                       <span className={styles.statusPill}>
-                        Active participants: {selectedGroupCallParticipants.length}
+                        Участников: {selectedGroupCallParticipants.length}
                       </span>
                     )}
                   </div>
                 </div>
 
                 <p className={styles.description}>
-                  Surface честно остаётся group call lobby: можно увидеть активный server-backed
-                  call, стартовать, войти, выйти и завершить его по текущей policy. Multi-party
-                  browser audio/video transport пока не реализован.
+                  Можно увидеть активный звонок, присоединиться, выйти или завершить его по текущим
+                  правам. Многопользовательский аудио- и видеорежим ещё не добавлен.
                 </p>
 
                 {selectedGroupCallEntry && (
                   <div className={styles.timelineMeta}>
                     <span className={styles.statusPill}>
-                      Control-plane:{" "}
-                      {selectedGroupCallEntry.call.status === "active" ? "active" : "ended"}
+                      Состояние:{" "}
+                      {selectedGroupCallEntry.call.status === "active" ? "активен" : "завершён"}
                     </span>
                     <span className={styles.statusPill}>
                       {selectedGroupCallSelfParticipant !== null
-                        ? "Вы в lobby"
+                        ? "Вы в звонке"
                         : selectedGroupCallActions?.isReadOnly
                           ? "Наблюдение"
-                          : "Наблюдение без join"}
+                          : "Ожидание входа"}
                     </span>
                     <span className={styles.statusPill}>
                       Создатель:{" "}
@@ -2385,8 +2383,8 @@ export function GroupsPage() {
 
                     {selectedGroupCallActions?.isReadOnly ? (
                       <div className={styles.readOnlyNotice}>
-                        Роль `reader` может видеть будущий active group call и roster участников,
-                        но не может запускать, join'ить или завершать звонок.
+                        Роль «читатель» может видеть звонок и список участников, но не может
+                        запускать его, входить или завершать.
                       </div>
                     ) : (
                       <div className={styles.actions}>
@@ -2411,8 +2409,8 @@ export function GroupsPage() {
                   <>
                     {selectedGroupCallActions?.isReadOnly && (
                       <div className={styles.readOnlyNotice}>
-                        `reader` остаётся observe-only участником: active call и roster видны, но
-                        join/start/end заблокированы текущей серверной policy.
+                        Роль «читатель» видит звонок и список участников, но вход, запуск и
+                        завершение недоступны.
                       </div>
                     )}
 
@@ -2443,7 +2441,7 @@ export function GroupsPage() {
                         >
                           {groupCallActionState === "leaving"
                             ? "Выходим..."
-                            : "Покинуть lobby"}
+                            : "Покинуть звонок"}
                         </button>
                       )}
 
@@ -2466,8 +2464,8 @@ export function GroupsPage() {
                     <div className={styles.rosterCard}>
                       <div className={styles.blockHeader}>
                         <div>
-                          <p className={styles.cardLabel}>Participants</p>
-                          <h3 className={styles.blockTitle}>Активные участники lobby</h3>
+                          <p className={styles.cardLabel}>Участники</p>
+                          <h3 className={styles.blockTitle}>Активные участники</h3>
                         </div>
                         <span className={styles.metaTag}>
                           {selectedGroupCallParticipants.length}
@@ -2476,8 +2474,8 @@ export function GroupsPage() {
 
                       {selectedGroupCallParticipants.length === 0 ? (
                         <p className={styles.emptyState}>
-                          Серверный call активен, но roster ещё пустой. Следующий refresh уточнит
-                          active participants.
+                          Звонок уже активен, но список участников пока пуст. Следующее обновление
+                          уточнит состав.
                         </p>
                       ) : (
                         <div className={styles.rosterList}>
@@ -2501,7 +2499,7 @@ export function GroupsPage() {
                                     )}
                                   </p>
                                   <p className={styles.rosterMeta}>
-                                    joined {formatDateTime(participant.joinedAt)}
+                                    Подключился {formatDateTime(participant.joinedAt)}
                                   </p>
                                 </div>
                                 <div className={styles.badgeColumn}>
@@ -2510,7 +2508,7 @@ export function GroupsPage() {
                                       {roleLabel(participantMember.role)}
                                     </span>
                                   )}
-                                  <span className={styles.statusPill}>active</span>
+                                  <span className={styles.statusPill}>в звонке</span>
                                 </div>
                               </article>
                             );
@@ -2914,15 +2912,15 @@ export function GroupsPage() {
                                 {entry.kind === "message" &&
                                   selectedState.snapshot.group.encryptedPinnedMessageIds.includes(
                                     entry.messageId,
-                                  ) && <span className={styles.statusPill}>pin</span>}
+                                  ) && <span className={styles.statusPill}>закреплено</span>}
                                 <span className={styles.statusPill}>
                                   {entry.kind === "message"
                                     ? entry.isTombstone
-                                      ? "tombstone"
+                                      ? "удалено"
                                       : entry.editedAt
-                                        ? "edited"
-                                        : "content"
-                                    : "decrypt failed"}
+                                        ? "изменено"
+                                        : "сообщение"
+                                    : "ошибка расшифровки"}
                                 </span>
                               </div>
                             </div>
@@ -3126,7 +3124,7 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.cardLabel}>Members</p>
+                    <p className={styles.cardLabel}>Участники</p>
                     <h2 className={styles.panelTitle}>Участники группы</h2>
                   </div>
                   <p className={styles.panelCopy}>
@@ -3319,18 +3317,18 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.cardLabel}>Invite links</p>
-                    <h2 className={styles.panelTitle}>Role-scoped invite links</h2>
+                    <p className={styles.cardLabel}>Приглашения</p>
+                    <h2 className={styles.panelTitle}>Ссылки-приглашения</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Invite links по-прежнему управляются только `owner`/`admin`.
+                    Ссылками-приглашениями по-прежнему управляют только владелец и администратор.
                   </p>
                 </div>
 
                 {!selectedState.snapshot.group.permissions.canManageInviteLinks && (
                   <p className={styles.emptyState}>
-                    Текущая роль не управляет invite links. Для этого требуется `owner` или
-                    `admin`.
+                    Текущая роль не управляет ссылками-приглашениями. Для этого нужен владелец или
+                    администратор.
                   </p>
                 )}
 
@@ -3338,7 +3336,7 @@ export function GroupsPage() {
                   <>
                     <form className={styles.form} onSubmit={handleCreateInviteLink}>
                       <label className={styles.field}>
-                        <span>Роль по invite link</span>
+                        <span>Роль по ссылке</span>
                         <select
                           onChange={(event) =>
                             setInviteRole(event.target.value as GroupMemberRole)
@@ -3360,7 +3358,7 @@ export function GroupsPage() {
                         disabled={isCreatingInviteLink}
                         type="submit"
                       >
-                        {isCreatingInviteLink ? "Создаём..." : "Создать invite link"}
+                        {isCreatingInviteLink ? "Создаём..." : "Создать ссылку"}
                       </button>
                     </form>
 
@@ -3368,7 +3366,7 @@ export function GroupsPage() {
                       <article className={styles.inviteCard}>
                         <div className={styles.inviteHeader}>
                           <div>
-                            <strong>Последний созданный invite link</strong>
+                            <strong>Последняя созданная ссылка</strong>
                             <p className={styles.groupMeta}>
                               Роль: {roleLabel(lastCreatedInvite.inviteLink.role)}
                             </p>
@@ -3384,7 +3382,7 @@ export function GroupsPage() {
 
                     {selectedState.inviteLinks.length === 0 ? (
                       <p className={styles.emptyState}>
-                        Для этой группы ещё нет созданных invite links.
+                        Для этой группы ещё нет созданных ссылок-приглашений.
                       </p>
                     ) : (
                       <div className={styles.inviteList}>
@@ -3605,7 +3603,7 @@ function InlineState({
 }: InlineStateProps) {
   return (
     <section className={styles.stateCard} data-tone={tone}>
-      <p className={styles.cardLabel}>Groups state</p>
+      <p className={styles.cardLabel}>Состояние</p>
       <h3 className={styles.stateTitle}>{title}</h3>
       <p className={styles.stateMessage}>{message}</p>
       {action && <div className={styles.actions}>{action}</div>}
@@ -3623,13 +3621,13 @@ function buildMemberRoleDrafts(members: GroupMember[]): Record<string, GroupMemb
 function roleLabel(role: GroupMemberRole): string {
   switch (role) {
     case "owner":
-      return "owner";
+      return "владелец";
     case "admin":
-      return "admin";
+      return "администратор";
     case "member":
-      return "member";
+      return "участник";
     case "reader":
-      return "reader";
+      return "читатель";
     default:
       return role;
   }
@@ -3638,22 +3636,22 @@ function roleLabel(role: GroupMemberRole): string {
 function describeGroupCallPhaseLabel(phase: ReturnType<typeof deriveGroupCallUiPhase>): string {
   switch (phase) {
     case "starting":
-      return "starting";
+      return "запуск";
     case "joined":
-      return "joined";
+      return "в звонке";
     case "observing":
-      return "observing";
+      return "наблюдение";
     case "ending":
-      return "ending";
+      return "завершение";
     case "ended":
-      return "ended";
+      return "завершён";
     case "failed":
-      return "failed";
+      return "сбой";
     case "active":
-      return "active";
+      return "активен";
     case "no_active_call":
     default:
-      return "no active call";
+      return "нет звонка";
   }
 }
 

@@ -1032,7 +1032,7 @@ export function DesktopShell({
 
     launchShellAppWindow(shellAppRegistry.explorer, {
       key: "explorer",
-      title: folder === null ? "Explorer" : `Explorer · ${folder.title}`,
+      title: folder === null ? "Проводник" : `Проводник · ${folder.title}`,
       routePath,
     });
     closeDesktopContextMenu();
@@ -1990,10 +1990,10 @@ export function DesktopShell({
               }}
               role="dialog"
             >
-              <p className={styles.placeholderLabel}>Desktop folder</p>
+              <p className={styles.placeholderLabel}>Папка рабочего стола</p>
               <h2 className={styles.placeholderTitle}>Переименовать папку</h2>
               <p className={styles.placeholderText}>
-                Изменится только shell-local label. Ссылки на chats и groups сохранятся.
+                Изменится только название этой папки. Ссылки на чаты и группы сохранятся.
               </p>
               <label className={styles.dialogField}>
                 <span>Название папки</span>
@@ -2049,11 +2049,11 @@ export function DesktopShell({
               className={styles.dialogCard}
               role="dialog"
             >
-              <p className={styles.placeholderLabel}>Desktop folder</p>
+              <p className={styles.placeholderLabel}>Папка рабочего стола</p>
               <h2 className={styles.placeholderTitle}>Удалить папку «{folderDeleteDialogState.title}»?</h2>
               <p className={styles.placeholderText}>
-                Будет удалён только shell-local folder object и его shortcut-ссылки. Сами chats и
-                groups останутся без изменений.
+                Будет удалена только эта папка и её ярлыки. Сами чаты и группы останутся без
+                изменений.
               </p>
               <div className={styles.actions}>
                 <button
@@ -2112,7 +2112,7 @@ export function DesktopShell({
                       <strong>{state.profile.nickname}</strong>
                       <span>@{state.profile.login}</span>
                     </div>
-                    <small>Launcher-first surface</small>
+                    <small>Быстрый запуск</small>
                   </div>
 
                   <div className={styles.startMenuBody}>
@@ -2233,7 +2233,7 @@ export function DesktopShell({
                         <button
                           className={styles.startMenuSectionLink}
                           onClick={() => {
-                            openExplorerSection("folders", "Explorer · Папки");
+                            openExplorerSection("folders", "Проводник · Папки");
                           }}
                           type="button"
                         >
@@ -2306,9 +2306,6 @@ export function DesktopShell({
           </div>
 
           <div className={styles.tray}>
-            <span className={styles.trayBadge} aria-label="UI sounds placeholder">
-              UI
-            </span>
             <span className={styles.trayBadge} aria-label="Сетевой статус">
               <ShellIcon className={styles.trayIcon} iconKey="network" title="Сеть" />
             </span>
@@ -2339,11 +2336,11 @@ function ShellWindowBody({
   if (window.windowId !== activeWindowId) {
     return (
       <div className={styles.placeholderCard}>
-        <p className={styles.placeholderLabel}>Route-backed window</p>
+        <p className={styles.placeholderLabel}>Фоновое окно</p>
         <h2 className={styles.placeholderTitle}>{window.title}</h2>
         <p className={styles.placeholderText}>
-          Для desktop shell route остаётся source of truth только для foreground target. При
-          фокусе это окно восстановит свой chat/group screen без дублирования window instance.
+          Когда окно не в фокусе, его содержимое удерживается shell-слоем. После возврата фокуса
+          переписка или страница восстановится без открытия второго окна.
         </p>
       </div>
     );
@@ -2475,7 +2472,7 @@ function DesktopContextMenuPanel({
                     ))
                   ) : (
                     <p className={styles.contextMenuEmptyState}>
-                      Создайте папку в Explorer, чтобы добавить сюда этот target.
+                      Создайте папку в проводнике, чтобы добавить сюда этот ярлык.
                     </p>
                   )}
                 </div>

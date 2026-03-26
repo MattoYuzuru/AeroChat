@@ -1,17 +1,17 @@
 .surface {
   display: grid;
   grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
-  gap: 0.75rem;
+  gap: 0.6rem;
   min-height: 100%;
-  padding: 0.7rem;
+  padding: 0.55rem;
   background: linear-gradient(180deg, #f1f5fb, #dbe7f6);
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
-  padding: 0.85rem;
+  gap: 0.55rem;
+  padding: 0.65rem;
   border: 1px solid #6d8eaf;
   background: linear-gradient(180deg, #f8fbff, #dfeaf6);
   box-shadow:
@@ -65,8 +65,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.25rem;
-  padding: 0.65rem 0.8rem;
+  gap: 0.2rem;
+  padding: 0.45rem 0.6rem;
   border: 1px solid #88a1bf;
   background: linear-gradient(180deg, #ffffff, #e6eef8);
   color: rgba(27, 44, 81, 0.9);
@@ -137,8 +137,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.18rem;
-  padding: 0.6rem 0.75rem;
+  gap: 0.15rem;
+  padding: 0.45rem 0.6rem;
   border: 1px solid #88a1bf;
   background: linear-gradient(180deg, #ffffff, #e6eef8);
   color: rgba(27, 44, 81, 0.92);
@@ -163,7 +163,7 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.7rem;
   min-width: 0;
 }
 
@@ -171,7 +171,7 @@
 .emptyState,
 .toolbarCard,
 .bucketCard {
-  padding: 0.85rem 0.95rem;
+  padding: 0.65rem 0.75rem;
   border: 1px solid #6d8eaf;
   background: linear-gradient(180deg, #fbfdff, #e3edf8);
   box-shadow:
@@ -217,7 +217,7 @@
 .cardList,
 .bucketGrid {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.65rem;
 }
 
 .entityCard,
@@ -225,8 +225,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.85rem;
-  padding: 0.75rem 0.8rem;
+  gap: 0.65rem;
+  padding: 0.55rem 0.65rem;
   border: 1px solid #89a3c1;
   background: linear-gradient(180deg, #ffffff, #edf3fa);
   box-shadow:
@@ -245,8 +245,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 1.8rem;
+  height: 1.8rem;
   border: 1px solid #6d8ba9;
   background: linear-gradient(180deg, #8fc0f4, #4d85c0);
   color: white;
@@ -277,11 +277,11 @@
 
 .primaryAction,
 .secondaryAction {
-  min-height: 2.25rem;
+  min-height: 1.95rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.45rem 0.72rem;
+  gap: 0.35rem;
+  padding: 0.32rem 0.5rem;
   font: inherit;
   cursor: pointer;
 }
@@ -312,13 +312,13 @@
 .inlineForm {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.45rem;
 }
 
 .textInput,
 .selectInput {
-  min-height: 2.35rem;
-  padding: 0.55rem 0.8rem;
+  min-height: 2rem;
+  padding: 0.38rem 0.55rem;
   border: 1px solid #7f9abb;
   background: #ffffff;
   color: rgba(23, 43, 82, 0.96);
@@ -339,8 +339,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2rem;
-  padding: 0.3rem 0.65rem;
+  min-height: 1.55rem;
+  padding: 0.16rem 0.45rem;
   border: 1px solid #f3e2e2;
   color: #ffffff;
   background: linear-gradient(180deg, rgba(239, 109, 109, 0.96), rgba(183, 36, 36, 0.94));
@@ -387,8 +387,22 @@
 .actionGlyph[data-action="show"]::before,
 .actionGlyph[data-action="create"]::before,
 .actionGlyph[data-action="save"]::before {
-  inset: 0.12rem;
+  top: 0.2rem;
+  left: 0.12rem;
+  width: 0.56rem;
+  height: 0.46rem;
   border: 1px solid currentColor;
+}
+
+.actionGlyph[data-action="open"]::after,
+.actionGlyph[data-action="show"]::after {
+  top: 0.1rem;
+  right: 0.06rem;
+  width: 0.34rem;
+  height: 0.34rem;
+  border-top: 1px solid currentColor;
+  border-right: 1px solid currentColor;
+  transform: rotate(45deg);
 }
 
 .actionGlyph[data-action="create"]::after,

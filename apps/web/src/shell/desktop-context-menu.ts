@@ -178,7 +178,7 @@ export function listDesktopContextMenuItems(
 export function listDesktopBackgroundContextMenuItems(): DesktopContextMenuCommandItem[] {
   return [
     createCommandItem("create_folder", "Создать папку"),
-    createCommandItem("open_explorer", "Открыть Explorer"),
+    createCommandItem("open_explorer", "Открыть проводник"),
   ];
 }
 
