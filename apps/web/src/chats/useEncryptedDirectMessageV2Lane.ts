@@ -421,7 +421,7 @@ export function describeEncryptedDirectMessageV2LaneEmptyState(
     return "";
   }
 
-  return "Для текущего direct chat и текущего local crypto-device opaque encrypted envelopes пока не найдены. Legacy plaintext история остаётся ниже без скрытого merge.";
+  return "Для текущего direct chat и текущего local crypto-device opaque encrypted envelopes пока не найдены. Если это freshly linked устройство, здесь появятся только новые encrypted сообщения после его активации: backfill старой encrypted history в текущем slice пока не реализован. Legacy plaintext история остаётся ниже без скрытого merge.";
 }
 
 export { describeEncryptedDirectMessageV2Failure };

@@ -1218,6 +1218,7 @@ async function synchronizeSession(
 
     if (localMaterial !== null) {
       const localCryptoDeviceID = localMaterial.record.cryptoDeviceId;
+      const localWasPendingLink = localMaterial.record.status === "pending_link";
       const remoteDevice = devices.find(
         (device) => device.id === localCryptoDeviceID,
       );
@@ -1314,6 +1315,11 @@ async function synchronizeSession(
       linkIntents = await dependencies.gatewayClient.listCryptoDeviceLinkIntents(
         session.token,
       );
+      if (localWasPendingLink && remoteDevice.status === "active") {
+        nextNotice =
+          nextNotice ??
+          "Локальный linked crypto-device активирован. В текущем slice он увидит только новые encrypted сообщения, отправленные после активации; backfill старой encrypted history пока не выполняется.";
+      }
     }
 
     const phase =

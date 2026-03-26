@@ -235,6 +235,53 @@ describe("createCryptoRuntimeCore", () => {
     );
   });
 
+  it("surfaces linked-device history limitation when pending device becomes active", async () => {
+    const keyStore = createMemoryKeyStore();
+    await keyStore.save(
+      createLocalMaterial({
+        cryptoDeviceId: "crypto-linked",
+        status: "pending_link",
+        bundleDigestBase64: "digest-1",
+        lastBundleVersion: 1,
+        linkIntentId: "intent-1",
+        linkIntentExpiresAt: "2026-03-22T13:00:00Z",
+      }),
+    );
+    const activeLinkedDevice = createCryptoDevice({
+      id: "crypto-linked",
+      status: "active",
+      lastBundleVersion: 1,
+      lastBundlePublishedAt: "2026-03-22T12:00:00Z",
+    });
+    const bundle = createCryptoDeviceBundle({
+      cryptoDeviceId: "crypto-linked",
+      bundleVersion: 1,
+      bundleDigestBase64: "digest-1",
+      publishedAt: "2026-03-22T12:00:00Z",
+    });
+    const gatewayClient = createGatewayClient({
+      listCryptoDevices: vi.fn(async () => [activeLinkedDevice]),
+      listCryptoDeviceLinkIntents: vi.fn(async () => []),
+      getCryptoDevice: vi.fn(async () => ({
+        device: activeLinkedDevice,
+        currentBundle: bundle,
+      })),
+    });
+    const runtime = createCryptoRuntimeCore({
+      gatewayClient,
+      keyStore,
+      materialFactory: createFakeMaterialFactory(),
+      resolveDeviceLabel: () => "Web Test",
+    });
+
+    const snapshot = await runtime.bootstrapSession(baseSession);
+
+    expect(snapshot.phase).toBe("ready");
+    expect(snapshot.localDevice?.status).toBe("active");
+    expect(snapshot.notice).toContain("активирован");
+    expect(snapshot.notice).toContain("backfill");
+  });
+
   it("approves pending link intent from existing active local device", async () => {
     const keyStore = createMemoryKeyStore();
     await keyStore.save(
