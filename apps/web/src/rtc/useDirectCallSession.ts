@@ -5,6 +5,7 @@ import {
   isGatewayErrorCode,
   isRTCActiveCallConflict,
   type DirectChat,
+  type RtcCall,
   type RtcCallParticipant,
   type RtcSignalEnvelope,
 } from "../gateway/types";
@@ -490,8 +491,15 @@ export function useDirectCallSession(
     }
   }, [currentUserId, describeError, ensurePeerConnection, sendRTCSignal]);
 
-  const bootstrapJoinedCall = useCallback(async (callId: string) => {
-    dispatch({ type: "local_joined", callId });
+  const bootstrapJoinedCall = useCallback(async (
+    call: RtcCall,
+    selfParticipant: RtcCallParticipant | null,
+  ) => {
+    dispatch({
+      type: "local_call_bootstrapped",
+      call,
+      selfParticipant,
+    });
     ensurePeerConnection();
     await runRefreshDirectChatCall(false);
   }, [ensurePeerConnection, runRefreshDirectChatCall]);
@@ -512,7 +520,7 @@ export function useDirectCallSession(
       });
       dispatch({ type: "action_finished" });
       localStreamRef.current = localStream;
-      await bootstrapJoinedCall(response.call.id);
+      await bootstrapJoinedCall(response.call, response.selfParticipant);
     } catch (error) {
       if (localStream !== null) {
         teardownDirectCallRuntime({
@@ -571,7 +579,7 @@ export function useDirectCallSession(
       const response = await gatewayClient.joinCall(token, currentCall.id);
       dispatch({ type: "action_finished" });
       localStreamRef.current = localStream;
-      await bootstrapJoinedCall(response.call.id);
+      await bootstrapJoinedCall(response.call, response.selfParticipant);
     } catch (error) {
       if (localStream !== null) {
         teardownDirectCallRuntime({

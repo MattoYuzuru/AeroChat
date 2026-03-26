@@ -55,10 +55,14 @@ export type DirectCallAction =
       call: RtcCall | null;
       participants: RtcCallParticipant[];
     }
+  | {
+      type: "local_call_bootstrapped";
+      call: RtcCall;
+      selfParticipant: RtcCallParticipant | null;
+    }
   | { type: "sync_failed"; message: string }
   | { type: "action_started"; actionState: Exclude<DirectCallActionState, "idle"> }
   | { type: "action_finished" }
-  | { type: "local_joined"; callId: string }
   | { type: "local_left" }
   | { type: "media_request_started" }
   | { type: "media_ready" }
@@ -135,6 +139,22 @@ export function directCallReducer(
         terminalState: "failed",
         errorMessage: action.message,
       };
+    case "local_call_bootstrapped": {
+      const participants = upsertSelfParticipant(
+        state.call?.id === action.call.id ? state.participants : [],
+        action.selfParticipant,
+      );
+
+      return {
+        ...state,
+        syncStatus: "ready",
+        call: action.call,
+        participants,
+        localJoinedCallId: action.call.id,
+        terminalState: "idle",
+        errorMessage: null,
+      };
+    }
     case "action_started":
       return {
         ...state,
@@ -146,13 +166,6 @@ export function directCallReducer(
       return {
         ...state,
         actionState: "idle",
-      };
-    case "local_joined":
-      return {
-        ...state,
-        localJoinedCallId: action.callId,
-        terminalState: "idle",
-        errorMessage: null,
       };
     case "local_left":
       return {
@@ -281,4 +294,19 @@ export function deriveDirectCallUiPhase(
   }
 
   return "ringing";
+}
+
+function upsertSelfParticipant(
+  participants: RtcCallParticipant[],
+  selfParticipant: RtcCallParticipant | null,
+): RtcCallParticipant[] {
+  if (selfParticipant === null) {
+    return participants;
+  }
+
+  const filteredParticipants = participants.filter(
+    (participant) => participant.userId !== selfParticipant.userId,
+  );
+
+  return [...filteredParticipants, selfParticipant];
 }
