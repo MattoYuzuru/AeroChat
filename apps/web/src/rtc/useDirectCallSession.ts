@@ -31,6 +31,7 @@ import {
   teardownDirectCallPeerRuntime,
   teardownDirectCallRuntime,
 } from "./runtime";
+import { directCallRTCConfiguration } from "./config";
 
 const directCallRefreshIntervalMs = 5000;
 
@@ -271,7 +272,7 @@ export function useDirectCallSession(
       return null;
     }
 
-    const peerConnection = new RTCPeerConnection();
+    const peerConnection = new RTCPeerConnection(directCallRTCConfiguration);
     for (const track of localStream.getTracks()) {
       peerConnection.addTrack(track, localStream);
     }

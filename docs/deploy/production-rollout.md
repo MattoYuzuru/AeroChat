@@ -47,6 +47,12 @@ checkout на VPS и при необходимости повторно прим
 Для этого рекомендуется рендерить manifest через `infra/scripts/render-shared-edge-manifest.sh .env.server`,
 а не править versioned example вручную.
 
+Для direct 1:1 calls это важно отдельно:
+
+- текущий published `aerochat-web` image уже содержит default STUN bootstrap;
+- текущий rollout этого slice не передаёт TURN credentials в runtime статического `web` image,
+  поэтому operator-managed TURN остаётся отдельным будущим web/runtime hardening шагом.
+
 ## GitHub Environment `production`
 
 Workflow использует только GitHub Environment `production`.

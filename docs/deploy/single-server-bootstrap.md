@@ -33,6 +33,9 @@
   - `.env.server.example` содержит только versioned non-secret runtime config;
   - `.env.server.secrets.example` содержит только перечень обязательных secret keys с плейсхолдерами;
   - `infra/compose/docker-compose.server.yml` тянет предсобранные application images из registry;
+  - publish-процесс для `aerochat-web` уже включает conservative STUN fallback для direct calls;
+  - текущий server compose contract не передаёт TURN credentials в статически собранный `web` image,
+    поэтому operator-managed TURN остаётся отдельным будущим runtime slice;
   - compose публикует `web`, `aero-gateway` и `minio` API на одном host IP, достижимом из pod'ов `Traefik`;
   - shared `Traefik` остаётся единственным публичным edge на `80/443`;
   - TLS обслуживается через cluster `cert-manager`, а не через host-level certificate path.
