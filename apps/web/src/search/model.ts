@@ -5,6 +5,7 @@ import type {
   MessageSearchScopeInput,
   MessageSearchScopeKind,
 } from "../gateway/types";
+import { getDirectChatPeerOrSelf, isSelfDirectChat } from "../chats/self-chat";
 
 export type SearchScopeSelection =
   | "all-direct"
@@ -114,7 +115,11 @@ export function describeDirectChatLabel(
   chat: DirectChat,
   currentUserId: string,
 ): string {
-  const peer = chat.participants.find((participant) => participant.id !== currentUserId) ?? null;
+  if (isSelfDirectChat(chat, currentUserId)) {
+    return "Я";
+  }
+
+  const peer = getDirectChatPeerOrSelf(chat, currentUserId);
   if (!peer) {
     return "Личный чат";
   }

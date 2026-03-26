@@ -26,6 +26,7 @@ import { EncryptedMessageAttachmentList } from "../chats/EncryptedMessageAttachm
 import { publishLocalEncryptedDirectMessageV2Projection } from "../chats/encrypted-v2-local-outbound";
 import { resolveChatsRouteSyncAction } from "../chats/route-sync";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
+import { getDirectChatPeerOrSelf, isSelfDirectChat } from "../chats/self-chat";
 import { useEncryptedMediaAttachmentDraft } from "../chats/useEncryptedMediaAttachmentDraft";
 import {
   describeEncryptedDirectMessageV2LaneEmptyState,
@@ -58,7 +59,11 @@ import { useDirectCallSession } from "../rtc/useDirectCallSession";
 import { useDesktopShellHost } from "../shell/context";
 import styles from "./ChatsPage.module.css";
 
-export function ChatsPage() {
+interface ChatsPageProps {
+  routeMode?: "direct" | "self";
+}
+
+export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const { state: authState, expireSession } = useAuth();
   const desktopShellHost = useDesktopShellHost();
   const directCallAwareness = useDirectCallAwareness();
@@ -119,10 +124,15 @@ export function ChatsPage() {
   });
 
   const requestedChatId = searchParams.get("chat")?.trim() ?? "";
-  const requestedPeerUserId = searchParams.get("peer")?.trim() ?? "";
-  const isThreadRouteActive = requestedChatId !== "" || requestedPeerUserId !== "";
+  const requestedPeerUserId =
+    routeMode === "self" ? "" : searchParams.get("peer")?.trim() ?? "";
+  const isThreadRouteActive =
+    routeMode === "self"
+      ? requestedChatId !== ""
+      : requestedChatId !== "" || requestedPeerUserId !== "";
   const requestedCallAction = searchParams.get("call")?.trim() ?? "";
   const searchJumpIntent = readSearchJumpIntent(searchParams);
+  const searchParamsKey = searchParams.toString();
   const syncRouteSelection = useEffectEvent(async () => {
     const action = resolveChatsRouteSyncAction({
       requestedChatId,
@@ -152,8 +162,66 @@ export function ChatsPage() {
     setSearchParams({ chat: chatId }, { replace: true });
   });
 
+  const currentThreadIsSelfChat =
+    authState.status === "authenticated" &&
+    chats.state.thread !== null &&
+    isSelfDirectChat(chats.state.thread.chat, authState.profile.id);
+  const ensureSelfRouteChat = useEffectEvent(async () => {
+    const chatId = await chats.ensureSelfChat();
+    if (chatId === null || requestedChatId === chatId) {
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParamsKey);
+    nextSearchParams.set("chat", chatId);
+    nextSearchParams.delete("peer");
+    setSearchParams(nextSearchParams, { replace: true });
+  });
+
   useEffect(() => {
-    if (authState.status !== "authenticated" || chats.state.status !== "ready") {
+    if (
+      routeMode !== "self" ||
+      authState.status !== "authenticated" ||
+      chats.state.status !== "ready"
+    ) {
+      return;
+    }
+    if (
+      requestedChatId !== "" &&
+      currentThreadIsSelfChat &&
+      chats.state.thread?.chat.id === requestedChatId
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      await ensureSelfRouteChat();
+      if (cancelled) {
+        return;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authState.status,
+    chats.state.status,
+    chats.state.thread,
+    currentThreadIsSelfChat,
+    requestedChatId,
+    routeMode,
+    searchParamsKey,
+    setSearchParams,
+  ]);
+
+  useEffect(() => {
+    if (
+      routeMode === "self" ||
+      authState.status !== "authenticated" ||
+      chats.state.status !== "ready"
+    ) {
       return;
     }
 
@@ -164,6 +232,7 @@ export function ChatsPage() {
     chats.state.status,
     requestedChatId,
     requestedPeerUserId,
+    routeMode,
   ]);
 
   useEffect(() => {
@@ -205,8 +274,10 @@ export function ChatsPage() {
             chats.state.thread.chat.id === chats.state.selectedChatId
           ? chats.state.thread
           : null;
+  const isSelectedSelfChat =
+    selectedThread !== null && isSelfDirectChat(selectedThread.chat, currentUserId);
   const selectedDirectCallAwarenessEntry = directCallAwareness.getEntry(
-    selectedThread?.chat.id ?? null,
+    isSelectedSelfChat ? null : selectedThread?.chat.id ?? null,
   );
   const encryptedLane = useEncryptedDirectMessageV2Lane({
     enabled: authState.status === "authenticated",
@@ -224,7 +295,8 @@ export function ChatsPage() {
     enabled:
       authState.status === "authenticated" &&
       isThreadRouteActive &&
-      selectedThread !== null,
+      selectedThread !== null &&
+      !isSelectedSelfChat,
     token: sessionToken,
     chat: selectedThread?.chat ?? null,
     awarenessEntry: selectedDirectCallAwarenessEntry,
@@ -524,12 +596,13 @@ export function ChatsPage() {
     enabled:
       authState.status === "authenticated" &&
       directWindowContentMode === "info" &&
-      selectedPeer !== null,
+      selectedPeer !== null &&
+      !isSelectedSelfChat,
     token: sessionToken,
     onUnauthenticated: expireSession,
   });
   const selectedFriend =
-    selectedPeer !== null && people.state.status === "ready"
+    selectedPeer !== null && !isSelectedSelfChat && people.state.status === "ready"
       ? people.state.snapshot.friends.find(
           (friend) =>
             friend.profile.id === selectedPeer.id || friend.profile.login === selectedPeer.login,
@@ -541,9 +614,11 @@ export function ChatsPage() {
       ? null
       : people.state.pendingLogins[selectedDirectProfile.login] ?? null;
   const selectedPeerTitle =
-    selectedPeer?.nickname?.trim() ||
-    selectedPeer?.login?.trim() ||
-    "Личный чат";
+    isSelectedSelfChat
+      ? "Я"
+      : selectedPeer?.nickname?.trim() ||
+        selectedPeer?.login?.trim() ||
+        "Личный чат";
   const pinnedMessages =
     selectedThread === null
       ? []
@@ -582,7 +657,7 @@ export function ChatsPage() {
           encryptedLane.status === "ready" ? latestEncryptedMessage : null,
           encryptedMessageIndex,
           currentUserId,
-          selectedPeer?.nickname ?? "Собеседник",
+          isSelectedSelfChat ? "Я" : selectedPeer?.nickname ?? "Собеседник",
         );
   const activeReadStatusTone =
     selectedThread === null
@@ -986,6 +1061,7 @@ export function ChatsPage() {
               <div className={styles.chatList}>
                 {chats.state.chats.map((chat) => {
                   const peer = getPeerParticipant(chat, authState.profile.id);
+                  const isSelfChat = isSelfDirectChat(chat, authState.profile.id);
                   const isActive = chat.id === requestedChatId;
 
                   return (
@@ -995,9 +1071,17 @@ export function ChatsPage() {
                       data-active={isActive}
                       onClick={() => {
                         if (desktopShellHost !== null) {
+                          if (isSelfChat) {
+                            desktopShellHost.launchApp("self_chat", {
+                              routePath: buildSelfChatRoutePathFromChatID(chat.id),
+                            });
+                            return;
+                          }
                           desktopShellHost.openDirectChat({
                             chatId: chat.id,
-                            title: peer?.nickname ?? peer?.login ?? "Личный чат",
+                            title: isSelfChat
+                              ? "Я"
+                              : peer?.nickname ?? peer?.login ?? "Личный чат",
                           });
                           return;
                         }
@@ -1014,10 +1098,10 @@ export function ChatsPage() {
                         <div className={styles.chatItemHeader}>
                           <div>
                             <h3 className={styles.chatItemTitle}>
-                              {peer?.nickname ?? "Direct chat"}
+                              {isSelfChat ? "Я" : peer?.nickname ?? "Direct chat"}
                             </h3>
                             <p className={styles.chatItemLogin}>
-                              {peer ? `@${peer.login}` : "Участник недоступен"}
+                              {isSelfChat ? "Ваш приватный чат" : peer ? `@${peer.login}` : "Участник недоступен"}
                             </p>
                           </div>
                           <span className={styles.metaTag}>
@@ -1026,7 +1110,7 @@ export function ChatsPage() {
                         </div>
 
                         <p className={styles.chatItemDescription}>
-                          {describeChatPreview(chat, peer)}
+                          {describeChatPreview(chat, peer, authState.profile.id)}
                         </p>
 
                         <div className={styles.chatItemFooter}>
@@ -1413,135 +1497,137 @@ export function ChatsPage() {
                   </div>
                 </section>
 
-                <section className={styles.callCard}>
-                  <div className={styles.blockHeader}>
-                    <div>
-                      <p className={styles.cardLabel}>Audio call</p>
-                      <h3 className={styles.blockTitle}>Прямой аудиозвонок</h3>
+                {!isSelectedSelfChat && (
+                  <section className={styles.callCard}>
+                    <div className={styles.blockHeader}>
+                      <div>
+                        <p className={styles.cardLabel}>Audio call</p>
+                        <h3 className={styles.blockTitle}>Прямой аудиозвонок</h3>
+                      </div>
+                      <span className={styles.metaTag}>
+                        {describeDirectCallPhaseLabel(directCall.phase)}
+                      </span>
                     </div>
-                    <span className={styles.metaTag}>
-                      {describeDirectCallPhaseLabel(directCall.phase)}
-                    </span>
-                  </div>
 
-                  <div className={styles.callMeta}>
-                    <StatusPill
-                      label={describeDirectCallPeerStatus(
-                        directCall.remoteParticipant !== null,
-                        selectedPeer?.nickname ?? "Собеседник",
+                    <div className={styles.callMeta}>
+                      <StatusPill
+                        label={describeDirectCallPeerStatus(
+                          directCall.remoteParticipant !== null,
+                          selectedPeer?.nickname ?? "Собеседник",
+                        )}
+                        tone={directCall.remoteParticipant ? "success" : "neutral"}
+                      />
+                      {directCall.state.call && (
+                        <StatusPill
+                          label={`Control-plane: ${describeDirectCallServerState(directCall.state.call.status)}`}
+                          tone={directCall.state.call.status === "active" ? "accent" : "neutral"}
+                        />
                       )}
-                      tone={directCall.remoteParticipant ? "success" : "neutral"}
+                      {directCall.isLocallyJoined && (
+                        <StatusPill
+                          label="Вы подключены"
+                          tone="accent"
+                        />
+                      )}
+                    </div>
+
+                    <p className={styles.callDescription}>
+                      Узкий browser bootstrap поверх текущего RTC control plane: active call
+                      остаётся server-backed, а local audio session можно явно вернуть после
+                      ухода из thread. Только direct chat, только audio, без video/device scope.
+                    </p>
+
+                    <div className={styles.callActions}>
+                      {directCall.canStart && (
+                        <button
+                          className={styles.primaryButton}
+                          onClick={() => {
+                            void directCall.startCall();
+                          }}
+                          type="button"
+                        >
+                          Позвонить
+                        </button>
+                      )}
+
+                      {directCall.canJoin && (
+                        <button
+                          className={styles.primaryButton}
+                          onClick={() => {
+                            void directCall.joinCall();
+                          }}
+                          type="button"
+                        >
+                          {directCall.selfParticipant ? "Вернуться в звонок" : "Присоединиться"}
+                        </button>
+                      )}
+
+                      {directCall.canLeave && !directCall.canEnd && (
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={() => {
+                            void directCall.leaveCall();
+                          }}
+                          type="button"
+                        >
+                          Покинуть звонок
+                        </button>
+                      )}
+
+                      {directCall.canEnd && (
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={() => {
+                            void directCall.endCall();
+                          }}
+                          type="button"
+                        >
+                          Завершить звонок
+                        </button>
+                      )}
+                    </div>
+
+                    {directCall.state.errorMessage && (
+                      <div className={styles.callFeedback} data-tone="error">
+                        <p>{directCall.state.errorMessage}</p>
+                        <button
+                          className={styles.ghostButton}
+                          onClick={() => {
+                            directCall.dismissError();
+                          }}
+                          type="button"
+                        >
+                          Скрыть
+                        </button>
+                      </div>
+                    )}
+
+                    {directCall.state.remoteAudioState === "blocked" && (
+                      <div className={styles.callFeedback}>
+                        <p>
+                          Браузер заблокировал autoplay удалённого аудио. Подтвердите воспроизведение
+                          вручную.
+                        </p>
+                        <button
+                          className={styles.ghostButton}
+                          onClick={() => {
+                            void directCall.retryRemoteAudioPlayback(directCallAudioRef.current);
+                          }}
+                          type="button"
+                        >
+                          Включить звук
+                        </button>
+                      </div>
+                    )}
+
+                    <audio
+                      autoPlay
+                      playsInline
+                      ref={directCallAudioRef}
+                      className={styles.hiddenAudio}
                     />
-                    {directCall.state.call && (
-                      <StatusPill
-                        label={`Control-plane: ${describeDirectCallServerState(directCall.state.call.status)}`}
-                        tone={directCall.state.call.status === "active" ? "accent" : "neutral"}
-                      />
-                    )}
-                    {directCall.isLocallyJoined && (
-                      <StatusPill
-                        label="Вы подключены"
-                        tone="accent"
-                      />
-                    )}
-                  </div>
-
-                  <p className={styles.callDescription}>
-                    Узкий browser bootstrap поверх текущего RTC control plane: active call
-                    остаётся server-backed, а local audio session можно явно вернуть после
-                    ухода из thread. Только direct chat, только audio, без video/device scope.
-                  </p>
-
-                  <div className={styles.callActions}>
-                    {directCall.canStart && (
-                      <button
-                        className={styles.primaryButton}
-                        onClick={() => {
-                          void directCall.startCall();
-                        }}
-                        type="button"
-                      >
-                        Позвонить
-                      </button>
-                    )}
-
-                    {directCall.canJoin && (
-                      <button
-                        className={styles.primaryButton}
-                        onClick={() => {
-                          void directCall.joinCall();
-                        }}
-                        type="button"
-                      >
-                        {directCall.selfParticipant ? "Вернуться в звонок" : "Присоединиться"}
-                      </button>
-                    )}
-
-                    {directCall.canLeave && !directCall.canEnd && (
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={() => {
-                          void directCall.leaveCall();
-                        }}
-                        type="button"
-                      >
-                        Покинуть звонок
-                      </button>
-                    )}
-
-                    {directCall.canEnd && (
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={() => {
-                          void directCall.endCall();
-                        }}
-                        type="button"
-                      >
-                        Завершить звонок
-                      </button>
-                    )}
-                  </div>
-
-                  {directCall.state.errorMessage && (
-                    <div className={styles.callFeedback} data-tone="error">
-                      <p>{directCall.state.errorMessage}</p>
-                      <button
-                        className={styles.ghostButton}
-                        onClick={() => {
-                          directCall.dismissError();
-                        }}
-                        type="button"
-                      >
-                        Скрыть
-                      </button>
-                    </div>
-                  )}
-
-                  {directCall.state.remoteAudioState === "blocked" && (
-                    <div className={styles.callFeedback}>
-                      <p>
-                        Браузер заблокировал autoplay удалённого аудио. Подтвердите воспроизведение
-                        вручную.
-                      </p>
-                      <button
-                        className={styles.ghostButton}
-                        onClick={() => {
-                          void directCall.retryRemoteAudioPlayback(directCallAudioRef.current);
-                        }}
-                        type="button"
-                      >
-                        Включить звук
-                      </button>
-                    </div>
-                  )}
-
-                  <audio
-                    autoPlay
-                    playsInline
-                    ref={directCallAudioRef}
-                    className={styles.hiddenAudio}
-                  />
-                </section>
+                  </section>
+                )}
 
                 {selectedThread.chat.encryptedPinnedMessageIds.length > 0 && (
                   <section className={styles.pinnedStrip}>
@@ -2263,8 +2349,17 @@ function describeDirectCallServerState(state: "active" | "ended"): string {
   return state === "active" ? "активен" : "завершён";
 }
 
+function buildSelfChatRoutePathFromChatID(chatID: string): string {
+  const normalizedChatID = chatID.trim();
+  if (normalizedChatID === "") {
+    return "/app/self";
+  }
+
+  return `/app/self?chat=${encodeURIComponent(normalizedChatID)}`;
+}
+
 function getPeerParticipant(chat: DirectChat, currentUserId: string): ChatUser | null {
-  return chat.participants.find((participant) => participant.id !== currentUserId) ?? null;
+  return getDirectChatPeerOrSelf(chat, currentUserId);
 }
 
 function getParticipantInitials(peer: ChatUser | null): string {
@@ -2280,7 +2375,19 @@ function getParticipantInitials(peer: ChatUser | null): string {
     .join("") || peer.login.slice(0, 2).toUpperCase();
 }
 
-function describeChatPreview(chat: DirectChat, peer: ChatUser | null): string {
+function describeChatPreview(
+  chat: DirectChat,
+  peer: ChatUser | null,
+  currentUserId: string,
+): string {
+  if (isSelfDirectChat(chat, currentUserId)) {
+    if (chat.pinnedMessageIds.length > 0) {
+      return "Ваш self chat уже содержит закреплённые сообщения и готов к быстрому переносу между устройствами.";
+    }
+
+    return "Ваш приватный chat с собой готов для заметок, быстрых файлов и multi-device handoff.";
+  }
+
   if (chat.pinnedMessageIds.length > 0) {
     return `Есть закреплённые сообщения и готовый direct thread с ${peer ? `@${peer.login}` : "собеседником"}.`;
   }

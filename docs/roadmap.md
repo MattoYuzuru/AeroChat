@@ -254,7 +254,8 @@ orchestration и без device controls. Group call flow сейчас покры
 - [ ] PWA
 - [x] Desktop shell XP runtime scaffold
 - [x] Boot/login application model внутри нового shell
-- [x] Canonical self chat shell target без backend self-direct thread
+- [x] Canonical self chat shell target
+- [x] Backend self-direct thread и multi-device self-delivery reuse поверх direct chat lane
 - [x] Canonical direct/group shell windows
 - [x] Canonical person profile shell target для people/search/request flows
 - [x] Canonical friend requests shell target
@@ -271,7 +272,7 @@ orchestration и без device controls. Group call flow сейчас покры
 - [ ] Trash model
 
 Примечание:
-`Self Chat` сейчас является честным shell/account target и не симулирует backend conversation.
+`Self Chat` теперь является реальным backend-supported direct chat текущего пользователя, но не получает отдельную unread/device-relative модель или self-call semantics.
 Mobile adaptation уже реальна, но не означает завершённый PWA/mobile product slice.
 
 ---

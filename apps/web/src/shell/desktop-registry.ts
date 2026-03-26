@@ -1,4 +1,5 @@
 import type { DirectChat, Group } from "../gateway/types";
+import { getDirectChatPeerOrSelf, isSelfDirectChat } from "../chats/self-chat";
 import type { ShellPreferencesStorageLike } from "./preferences";
 
 const desktopRegistryStorageKey = "aerochat.shell.desktop-registry.v1";
@@ -430,10 +431,12 @@ export function syncDirectChatDesktopEntities(
 ): DesktopRegistryState {
   return syncSourceEntities(
     state,
-    chats.map((chat) => ({
-      id: chat.id,
-      title: describeDirectChatDesktopTitle(chat, currentUserId),
-    })),
+    chats
+      .filter((chat) => !isSelfDirectChat(chat, currentUserId))
+      .map((chat) => ({
+        id: chat.id,
+        title: describeDirectChatDesktopTitle(chat, currentUserId),
+      })),
     "direct_chat",
   );
 }
@@ -658,8 +661,11 @@ export function describeDirectChatDesktopTitle(
   chat: DirectChat,
   currentUserId: string,
 ): string {
-  const peer =
-    chat.participants.find((participant) => participant.id !== currentUserId) ?? null;
+  if (isSelfDirectChat(chat, currentUserId)) {
+    return "Я";
+  }
+
+  const peer = getDirectChatPeerOrSelf(chat, currentUserId);
   return normalizeDesktopEntityTitle(peer?.nickname ?? peer?.login ?? "", "Личный чат");
 }
 

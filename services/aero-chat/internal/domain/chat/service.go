@@ -230,16 +230,14 @@ func (s *Service) CreateDirectChat(ctx context.Context, token string, peerUserID
 	if err != nil {
 		return nil, err
 	}
-	if targetUserID == authSession.User.ID {
-		return nil, fmt.Errorf("%w: self-chat creation is not allowed", ErrConflict)
-	}
-
-	relationshipState, err := s.friendships.GetDirectChatRelationshipState(ctx, authSession.User.ID, targetUserID)
-	if err != nil {
-		return nil, err
-	}
-	if !relationshipState.AreFriends {
-		return nil, fmt.Errorf("%w: direct chat can only be created between friends", ErrConflict)
+	if targetUserID != authSession.User.ID {
+		relationshipState, err := s.friendships.GetDirectChatRelationshipState(ctx, authSession.User.ID, targetUserID)
+		if err != nil {
+			return nil, err
+		}
+		if !relationshipState.AreFriends {
+			return nil, fmt.Errorf("%w: direct chat can only be created between friends", ErrConflict)
+		}
 	}
 
 	now := s.now()
@@ -1623,6 +1621,10 @@ func (s *Service) EditDirectChatMessage(ctx context.Context, token string, chatI
 }
 
 func (s *Service) ensureDirectChatWriteAllowed(ctx context.Context, userID string, directChat DirectChat) error {
+	if isSelfDirectChatForUser(directChat, userID) {
+		return nil
+	}
+
 	peerUserID, err := directChatPeerUserID(directChat, userID)
 	if err != nil {
 		return err
@@ -1643,6 +1645,10 @@ func (s *Service) ensureDirectChatWriteAllowed(ctx context.Context, userID strin
 }
 
 func directChatPeerUserID(directChat DirectChat, userID string) (string, error) {
+	if isSelfDirectChatForUser(directChat, userID) {
+		return userID, nil
+	}
+
 	if len(directChat.Participants) != 2 {
 		return "", fmt.Errorf("%w: direct chat write requires exactly two participants", ErrPermissionDenied)
 	}
@@ -1665,6 +1671,10 @@ func directChatPeerUserID(directChat DirectChat, userID string) (string, error) 
 	}
 
 	return peerUserID, nil
+}
+
+func isSelfDirectChatForUser(directChat DirectChat, userID string) bool {
+	return len(directChat.Participants) == 1 && directChat.Participants[0].ID == userID
 }
 
 func (s *Service) ListDirectChatMessages(ctx context.Context, token string, chatID string, pageSize uint32) ([]DirectChatMessage, error) {
@@ -2906,6 +2916,7 @@ func resolveEncryptedDirectMessageV2Deliveries(
 	activeDevices []CryptoDevice,
 	requestedDeliveries []EncryptedDirectMessageV2DeliveryDraft,
 ) ([]EncryptedDirectMessageV2Delivery, error) {
+	isSelfChat := senderUserID == recipientUserID
 	expectedTargets := make(map[string]string)
 	senderDeviceIsActive := false
 	recipientActiveDeviceCount := 0
@@ -2913,13 +2924,14 @@ func resolveEncryptedDirectMessageV2Deliveries(
 		if device.Status != CryptoDeviceStatusActive {
 			continue
 		}
-		switch device.UserID {
-		case senderUserID:
+		if device.UserID == senderUserID {
 			if device.ID == senderCryptoDeviceID {
 				senderDeviceIsActive = true
 			}
 			expectedTargets[device.ID] = senderUserID
-		case recipientUserID:
+			continue
+		}
+		if device.UserID == recipientUserID {
 			recipientActiveDeviceCount++
 			expectedTargets[device.ID] = recipientUserID
 		}
@@ -2928,7 +2940,7 @@ func resolveEncryptedDirectMessageV2Deliveries(
 	if !senderDeviceIsActive {
 		return nil, fmt.Errorf("%w: sender crypto device must be active", ErrConflict)
 	}
-	if recipientActiveDeviceCount == 0 {
+	if !isSelfChat && recipientActiveDeviceCount == 0 {
 		return nil, fmt.Errorf("%w: recipient must have at least one active crypto device", ErrConflict)
 	}
 	if len(expectedTargets) == 0 {
@@ -2968,6 +2980,26 @@ func resolveEncryptedDirectMessageV2SendTargetDevices(
 	senderCryptoDeviceID string,
 	activeDevices []CryptoDevice,
 ) ([]CryptoDevice, []CryptoDevice, error) {
+	if senderUserID == recipientUserID {
+		senderDeviceIsActive := false
+		senderOtherDevices := make([]CryptoDevice, 0)
+		for _, device := range activeDevices {
+			if device.Status != CryptoDeviceStatusActive || device.UserID != senderUserID {
+				continue
+			}
+			if device.ID == senderCryptoDeviceID {
+				senderDeviceIsActive = true
+				continue
+			}
+			senderOtherDevices = append(senderOtherDevices, device)
+		}
+		if !senderDeviceIsActive {
+			return nil, nil, fmt.Errorf("%w: sender crypto device must be active", ErrConflict)
+		}
+
+		return nil, senderOtherDevices, nil
+	}
+
 	senderDeviceIsActive := false
 	recipientDevices := make([]CryptoDevice, 0)
 	senderOtherDevices := make([]CryptoDevice, 0)
