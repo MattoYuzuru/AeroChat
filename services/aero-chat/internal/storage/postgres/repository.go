@@ -138,12 +138,14 @@ func (r *Repository) CreateDirectChat(ctx context.Context, params chat.CreateDir
 	}); err != nil {
 		return nil, convertError(err)
 	}
-	if err := q.AddDirectChatParticipant(ctx, chatsqlc.AddDirectChatParticipantParams{
-		ChatID:   chatID,
-		UserID:   mustParseUUID(params.SecondUserID),
-		JoinedAt: timestamptzValue(params.CreatedAt),
-	}); err != nil {
-		return nil, convertError(err)
+	if params.SecondUserID != params.FirstUserID {
+		if err := q.AddDirectChatParticipant(ctx, chatsqlc.AddDirectChatParticipantParams{
+			ChatID:   chatID,
+			UserID:   mustParseUUID(params.SecondUserID),
+			JoinedAt: timestamptzValue(params.CreatedAt),
+		}); err != nil {
+			return nil, convertError(err)
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -12,7 +12,7 @@ import (
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
 )
 
-func TestCreateDirectChatRequiresFriendshipAndPreventsDuplicates(t *testing.T) {
+func TestCreateDirectChatAllowsSelfChatAndStillRequiresFriendshipForPeers(t *testing.T) {
 	t.Parallel()
 
 	service, repo := newTestService()
@@ -26,8 +26,19 @@ func TestCreateDirectChatRequiresFriendshipAndPreventsDuplicates(t *testing.T) {
 	alice = repo.mustIssueAuth(testUUID(1), "alice", "Alice")
 	bob = repo.mustIssueAuth(testUUID(2), "bob", "Bob")
 
+	selfChat, err := service.CreateDirectChat(context.Background(), alice.Token, alice.User.ID)
+	if err != nil {
+		t.Fatalf("create self chat: %v", err)
+	}
+	if len(selfChat.Participants) != 1 {
+		t.Fatalf("ожидался один участник self chat, получено %d", len(selfChat.Participants))
+	}
+	if selfChat.Participants[0].ID != alice.User.ID {
+		t.Fatalf("ожидался self participant %q, получен %q", alice.User.ID, selfChat.Participants[0].ID)
+	}
+
 	if _, err := service.CreateDirectChat(context.Background(), alice.Token, alice.User.ID); !errors.Is(err, ErrConflict) {
-		t.Fatalf("ожидалась ошибка self-chat creation, получено %v", err)
+		t.Fatalf("ожидалась ошибка duplicate self chat, получено %v", err)
 	}
 
 	if _, err := service.CreateDirectChat(context.Background(), alice.Token, bob.User.ID); !errors.Is(err, ErrConflict) {
@@ -46,6 +57,84 @@ func TestCreateDirectChatRequiresFriendshipAndPreventsDuplicates(t *testing.T) {
 
 	if _, err := service.CreateDirectChat(context.Background(), bob.Token, alice.User.ID); !errors.Is(err, ErrConflict) {
 		t.Fatalf("ожидалась ошибка duplicate direct chat, получено %v", err)
+	}
+}
+
+func TestSelfChatEncryptedSendBootstrapAndDeliveriesReuseOwnActiveDevices(t *testing.T) {
+	t.Parallel()
+
+	service, repo := newTestService()
+	alice := repo.mustIssueAuth(testUUID(1), "alice", "Alice")
+	aliceSender := repo.mustAddActiveCryptoDevice(alice.User.ID)
+	aliceOther := repo.mustAddActiveCryptoDevice(alice.User.ID)
+
+	selfChat := mustCreateDirectChat(t, service, alice.Token, alice.User.ID)
+	bootstrap, err := service.GetEncryptedDirectMessageV2SendBootstrap(
+		context.Background(),
+		alice.Token,
+		selfChat.ID,
+		aliceSender.ID,
+	)
+	if err != nil {
+		t.Fatalf("get encrypted direct message v2 send bootstrap for self chat: %v", err)
+	}
+
+	if bootstrap.ChatID != selfChat.ID {
+		t.Fatalf("ожидался chat id %q, получен %q", selfChat.ID, bootstrap.ChatID)
+	}
+	if bootstrap.RecipientUserID != alice.User.ID {
+		t.Fatalf("ожидался recipient user id %q, получен %q", alice.User.ID, bootstrap.RecipientUserID)
+	}
+	if len(bootstrap.RecipientDevices) != 0 {
+		t.Fatalf("ожидалось 0 recipient devices для self chat bootstrap, получено %d", len(bootstrap.RecipientDevices))
+	}
+	if len(bootstrap.SenderOtherDevices) != 1 {
+		t.Fatalf("ожидался 1 sender secondary device, получено %d", len(bootstrap.SenderOtherDevices))
+	}
+	if bootstrap.SenderOtherDevices[0].DeviceID != aliceOther.ID {
+		t.Fatalf("ожидался sender secondary device %q, получен %q", aliceOther.ID, bootstrap.SenderOtherDevices[0].DeviceID)
+	}
+
+	messageCreatedAt := time.Date(2026, time.March, 26, 9, 30, 0, 0, time.UTC)
+	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
+		ChatID:               selfChat.ID,
+		MessageID:            testUUID(880),
+		MessageCreatedAt:     messageCreatedAt,
+		SenderCryptoDeviceID: aliceSender.ID,
+		OperationKind:        EncryptedDirectMessageV2OperationContent,
+		Revision:             1,
+		Deliveries: []EncryptedDirectMessageV2DeliveryDraft{
+			{
+				RecipientCryptoDeviceID: aliceSender.ID,
+				TransportHeader:         []byte("self-origin-header"),
+				Ciphertext:              []byte("self-origin-ciphertext"),
+			},
+			{
+				RecipientCryptoDeviceID: aliceOther.ID,
+				TransportHeader:         []byte("self-other-header"),
+				Ciphertext:              []byte("self-other-ciphertext"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("send encrypted direct message v2 for self chat: %v", err)
+	}
+	if receipt.StoredDeliveryCount != 2 {
+		t.Fatalf("ожидалось 2 delivery records, получено %d", receipt.StoredDeliveryCount)
+	}
+
+	otherView, err := service.ListEncryptedDirectMessageV2(context.Background(), alice.Token, selfChat.ID, aliceOther.ID, 0)
+	if err != nil {
+		t.Fatalf("list encrypted direct message v2 for self secondary device: %v", err)
+	}
+	if len(otherView) != 1 {
+		t.Fatalf("ожидался один envelope для self secondary device, получено %d", len(otherView))
+	}
+	if otherView[0].ViewerDelivery.RecipientUserID != alice.User.ID {
+		t.Fatalf("ожидался self delivery owner %q, получен %q", alice.User.ID, otherView[0].ViewerDelivery.RecipientUserID)
+	}
+	if otherView[0].ViewerDelivery.RecipientCryptoDeviceID != aliceOther.ID {
+		t.Fatalf("ожидался delivery target %q, получено %q", aliceOther.ID, otherView[0].ViewerDelivery.RecipientCryptoDeviceID)
 	}
 }
 
@@ -2619,21 +2708,22 @@ func (r *fakeRepository) UpsertEncryptedGroupReadState(_ context.Context, params
 func (r *fakeRepository) CreateDirectChat(_ context.Context, params CreateDirectChatParams) (*DirectChat, error) {
 	key := pairKey(params.FirstUserID, params.SecondUserID)
 	for _, directChat := range r.chats {
-		if pairKey(directChat.Participants[0].ID, directChat.Participants[1].ID) == key {
+		if directChatPairKey(directChat) == key {
 			return nil, ErrConflict
 		}
 	}
 
+	participants := []UserSummary{r.users[params.FirstUserID]}
+	if params.SecondUserID != params.FirstUserID {
+		participants = append(participants, r.users[params.SecondUserID])
+	}
 	directChat := DirectChat{
-		ID:   params.ChatID,
-		Kind: ChatKindDirect,
-		Participants: []UserSummary{
-			r.users[params.FirstUserID],
-			r.users[params.SecondUserID],
-		},
-		UnreadCount: 0,
-		CreatedAt:   params.CreatedAt,
-		UpdatedAt:   params.CreatedAt,
+		ID:           params.ChatID,
+		Kind:         ChatKindDirect,
+		Participants: participants,
+		UnreadCount:  0,
+		CreatedAt:    params.CreatedAt,
+		UpdatedAt:    params.CreatedAt,
 	}
 	r.chats[directChat.ID] = directChat
 	copy := directChat
@@ -4236,6 +4326,17 @@ func encryptedGroupLaneChanged(record fakeEncryptedGroupLaneRecord, params SyncE
 func pairKey(firstUserID string, secondUserID string) string {
 	userLowID, userHighID := CanonicalUserPair(firstUserID, secondUserID)
 	return userLowID + ":" + userHighID
+}
+
+func directChatPairKey(directChat DirectChat) string {
+	switch len(directChat.Participants) {
+	case 0:
+		return ""
+	case 1:
+		return pairKey(directChat.Participants[0].ID, directChat.Participants[0].ID)
+	default:
+		return pairKey(directChat.Participants[0].ID, directChat.Participants[1].ID)
+	}
 }
 
 func readPositionKey(chatID string, userID string) string {
