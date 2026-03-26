@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBindCryptoDeviceRealtimeEnvelope,
+  parseBoundRealtimeCryptoDeviceId,
   resolveActiveRealtimeCryptoDeviceId,
 } from "./realtime-bridge-helpers";
 
@@ -84,6 +85,32 @@ describe("crypto realtime bridge helpers", () => {
         },
         isActionPending: false,
         pendingLabel: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("parses bound crypto-device ack from realtime envelope", () => {
+    expect(
+      parseBoundRealtimeCryptoDeviceId({
+        id: "evt-1",
+        type: "connection.crypto_device.bound",
+        issuedAt: "2026-03-26T10:00:00Z",
+        payload: {
+          connectionId: "conn-1",
+          userId: "user-1",
+          cryptoDeviceId: "crypto-1",
+        },
+      }),
+    ).toBe("crypto-1");
+
+    expect(
+      parseBoundRealtimeCryptoDeviceId({
+        id: "evt-2",
+        type: "connection.ready",
+        issuedAt: "2026-03-26T10:00:01Z",
+        payload: {
+          cryptoDeviceId: "crypto-1",
+        },
       }),
     ).toBeNull();
   });
