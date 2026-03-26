@@ -17,7 +17,10 @@ import {
   listBufferedLocalEncryptedDirectMessageV2Projection,
   subscribeLocalEncryptedDirectMessageV2Projection,
 } from "./encrypted-v2-local-outbound";
-import { resolveActiveRealtimeCryptoDeviceId } from "../crypto/realtime-bridge-helpers";
+import {
+  parseBoundRealtimeCryptoDeviceId,
+  resolveActiveRealtimeCryptoDeviceId,
+} from "../crypto/realtime-bridge-helpers";
 import { subscribeRealtimeEnvelopes } from "../realtime/events";
 
 interface UseEncryptedDirectMessageV2LaneOptions {
@@ -173,6 +176,59 @@ export function useEncryptedDirectMessageV2Lane({
       cancelled = true;
       unsubscribe();
     };
+  }, [cryptoRuntime, loadDescriptor]);
+
+  useEffect(() => {
+    if (loadDescriptor.kind !== "load") {
+      return;
+    }
+
+    return subscribeRealtimeEnvelopes((envelope) => {
+      const boundCryptoDeviceId = parseBoundRealtimeCryptoDeviceId(envelope);
+      if (
+        boundCryptoDeviceId === null ||
+        boundCryptoDeviceId !== loadDescriptor.activeCryptoDeviceId
+      ) {
+        return;
+      }
+
+      const requestVersion = requestVersionRef.current + 1;
+      requestVersionRef.current = requestVersion;
+
+      void loadEncryptedLane({
+        token: loadDescriptor.token,
+        chatId: loadDescriptor.chatId,
+        activeCryptoDeviceId: loadDescriptor.activeCryptoDeviceId,
+        cryptoRuntime,
+      })
+        .then((items) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return;
+          }
+
+          setLoadedState({
+            requestKey: loadDescriptor.requestKey,
+            status: "ready",
+            items,
+            errorMessage: null,
+          });
+        })
+        .catch((error) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return;
+          }
+
+          setLoadedState((current) => ({
+            requestKey: loadDescriptor.requestKey,
+            status: "error",
+            items: current.requestKey === loadDescriptor.requestKey ? current.items : [],
+            errorMessage:
+              error instanceof Error && error.message.trim() !== ""
+                ? error.message
+                : "Не удалось перечитать encrypted DM v2 local projection после reconnect.",
+          }));
+        });
+    });
   }, [cryptoRuntime, loadDescriptor]);
 
   useEffect(() => {
