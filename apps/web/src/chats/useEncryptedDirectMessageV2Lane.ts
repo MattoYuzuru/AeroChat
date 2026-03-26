@@ -9,8 +9,8 @@ import {
 import { gatewayClient } from "../gateway/runtime";
 import { type EncryptedDirectMessageV2Envelope } from "../gateway/types";
 import {
-  parseEncryptedDirectMessageV2RealtimeEvent,
   listBufferedEncryptedDirectMessageV2RealtimeEvents,
+  subscribeEncryptedDirectMessageV2RealtimeEvents,
 } from "./encrypted-v2-realtime";
 import {
   discardBufferedLocalEncryptedDirectMessageV2Projection,
@@ -64,12 +64,23 @@ export function useEncryptedDirectMessageV2Lane({
     cryptoRuntimeState: cryptoRuntime.state,
     token,
   });
+  const activeLoadRequestKey =
+    loadDescriptor.kind === "load" ? loadDescriptor.requestKey : null;
+  const activeLoadToken = loadDescriptor.kind === "load" ? loadDescriptor.token : null;
+  const activeLoadChatId = loadDescriptor.kind === "load" ? loadDescriptor.chatId : null;
+  const activeLoadCryptoDeviceId =
+    loadDescriptor.kind === "load" ? loadDescriptor.activeCryptoDeviceId : null;
 
   useEffect(() => {
-    if (loadDescriptor.kind !== "load") {
+    if (
+      activeLoadRequestKey === null ||
+      activeLoadToken === null ||
+      activeLoadChatId === null ||
+      activeLoadCryptoDeviceId === null
+    ) {
       return;
     }
-    if (loadedState.requestKey === loadDescriptor.requestKey) {
+    if (loadedState.requestKey === activeLoadRequestKey) {
       return;
     }
 
@@ -77,9 +88,9 @@ export function useEncryptedDirectMessageV2Lane({
     requestVersionRef.current = requestVersion;
 
     void loadEncryptedLane({
-      token: loadDescriptor.token,
-      chatId: loadDescriptor.chatId,
-      activeCryptoDeviceId: loadDescriptor.activeCryptoDeviceId,
+      token: activeLoadToken,
+      chatId: activeLoadChatId,
+      activeCryptoDeviceId: activeLoadCryptoDeviceId,
       cryptoRuntime,
     })
       .then((items) => {
@@ -88,7 +99,7 @@ export function useEncryptedDirectMessageV2Lane({
         }
 
         setLoadedState({
-          requestKey: loadDescriptor.requestKey,
+          requestKey: activeLoadRequestKey,
           status: "ready",
           items,
           errorMessage: null,
@@ -100,7 +111,7 @@ export function useEncryptedDirectMessageV2Lane({
         }
 
         setLoadedState({
-          requestKey: loadDescriptor.requestKey,
+          requestKey: activeLoadRequestKey,
           status: "error",
           items: [],
           errorMessage:
@@ -111,24 +122,30 @@ export function useEncryptedDirectMessageV2Lane({
       });
   }, [
     cryptoRuntime,
-    loadDescriptor,
+    activeLoadChatId,
+    activeLoadCryptoDeviceId,
+    activeLoadRequestKey,
+    activeLoadToken,
     loadedState.requestKey,
   ]);
 
   useEffect(() => {
-    if (loadDescriptor.kind !== "load") {
+    if (
+      activeLoadRequestKey === null ||
+      activeLoadChatId === null ||
+      activeLoadCryptoDeviceId === null
+    ) {
       return;
     }
 
     let cancelled = false;
-    const unsubscribe = subscribeRealtimeEnvelopes((envelope) => {
-      const event = parseEncryptedDirectMessageV2RealtimeEvent(envelope);
+    const unsubscribe = subscribeEncryptedDirectMessageV2RealtimeEvents((event) => {
       if (
         event === null ||
         cancelled ||
-        event.envelope.chatId !== loadDescriptor.chatId ||
+        event.envelope.chatId !== activeLoadChatId ||
         event.envelope.viewerDelivery.recipientCryptoDeviceId !==
-          loadDescriptor.activeCryptoDeviceId
+          activeLoadCryptoDeviceId
       ) {
         return;
       }
@@ -149,7 +166,7 @@ export function useEncryptedDirectMessageV2Lane({
           }
 
           setLoadedState((current) => ({
-            requestKey: loadDescriptor.requestKey,
+            requestKey: activeLoadRequestKey,
             status: "ready",
             items: mergeEncryptedDirectMessageV2Projection(current.items, updates),
             errorMessage: current.errorMessage,
@@ -162,7 +179,7 @@ export function useEncryptedDirectMessageV2Lane({
 
           setLoadedState((current) => ({
             ...current,
-            requestKey: loadDescriptor.requestKey,
+            requestKey: activeLoadRequestKey,
             status: "error",
             errorMessage:
               error instanceof Error && error.message.trim() !== ""
@@ -176,10 +193,20 @@ export function useEncryptedDirectMessageV2Lane({
       cancelled = true;
       unsubscribe();
     };
-  }, [cryptoRuntime, loadDescriptor]);
+  }, [
+    cryptoRuntime,
+    activeLoadChatId,
+    activeLoadCryptoDeviceId,
+    activeLoadRequestKey,
+  ]);
 
   useEffect(() => {
-    if (loadDescriptor.kind !== "load") {
+    if (
+      activeLoadRequestKey === null ||
+      activeLoadToken === null ||
+      activeLoadChatId === null ||
+      activeLoadCryptoDeviceId === null
+    ) {
       return;
     }
 
@@ -187,7 +214,7 @@ export function useEncryptedDirectMessageV2Lane({
       const boundCryptoDeviceId = parseBoundRealtimeCryptoDeviceId(envelope);
       if (
         boundCryptoDeviceId === null ||
-        boundCryptoDeviceId !== loadDescriptor.activeCryptoDeviceId
+        boundCryptoDeviceId !== activeLoadCryptoDeviceId
       ) {
         return;
       }
@@ -196,9 +223,9 @@ export function useEncryptedDirectMessageV2Lane({
       requestVersionRef.current = requestVersion;
 
       void loadEncryptedLane({
-        token: loadDescriptor.token,
-        chatId: loadDescriptor.chatId,
-        activeCryptoDeviceId: loadDescriptor.activeCryptoDeviceId,
+        token: activeLoadToken,
+        chatId: activeLoadChatId,
+        activeCryptoDeviceId: activeLoadCryptoDeviceId,
         cryptoRuntime,
       })
         .then((items) => {
@@ -207,7 +234,7 @@ export function useEncryptedDirectMessageV2Lane({
           }
 
           setLoadedState({
-            requestKey: loadDescriptor.requestKey,
+            requestKey: activeLoadRequestKey,
             status: "ready",
             items,
             errorMessage: null,
@@ -219,9 +246,9 @@ export function useEncryptedDirectMessageV2Lane({
           }
 
           setLoadedState((current) => ({
-            requestKey: loadDescriptor.requestKey,
+            requestKey: activeLoadRequestKey,
             status: "error",
-            items: current.requestKey === loadDescriptor.requestKey ? current.items : [],
+            items: current.requestKey === activeLoadRequestKey ? current.items : [],
             errorMessage:
               error instanceof Error && error.message.trim() !== ""
                 ? error.message
@@ -229,20 +256,26 @@ export function useEncryptedDirectMessageV2Lane({
           }));
         });
     });
-  }, [cryptoRuntime, loadDescriptor]);
+  }, [
+    cryptoRuntime,
+    activeLoadChatId,
+    activeLoadCryptoDeviceId,
+    activeLoadRequestKey,
+    activeLoadToken,
+  ]);
 
   useEffect(() => {
-    if (loadDescriptor.kind !== "load") {
+    if (activeLoadRequestKey === null || activeLoadChatId === null) {
       return;
     }
 
     return subscribeLocalEncryptedDirectMessageV2Projection((event) => {
-      if (event.projection.chatId !== loadDescriptor.chatId) {
+      if (event.projection.chatId !== activeLoadChatId) {
         return;
       }
 
       setLoadedState((current) => ({
-        requestKey: loadDescriptor.requestKey,
+        requestKey: activeLoadRequestKey,
         status: "ready",
         items: mergeEncryptedDirectMessageV2Projection(current.items, [
           event.projection,
@@ -250,7 +283,7 @@ export function useEncryptedDirectMessageV2Lane({
         errorMessage: current.errorMessage,
       }));
     });
-  }, [loadDescriptor]);
+  }, [activeLoadChatId, activeLoadRequestKey]);
 
   if (loadDescriptor.kind === "idle") {
     return {
