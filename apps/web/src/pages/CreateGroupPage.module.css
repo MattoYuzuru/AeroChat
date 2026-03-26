@@ -1,43 +1,25 @@
 .layout {
   display: grid;
-  gap: 1rem;
+  gap: 0.9rem;
 }
 
 .heroCard,
 .windowCard,
 .notice,
 .error {
-  border: 1px solid rgba(39, 77, 125, 0.9);
-  border-radius: 16px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.88),
-    0 16px 34px rgba(33, 69, 117, 0.2);
+  border: 1px solid var(--xp-panel-border);
+  border-radius: 0;
+  background: var(--xp-panel-surface);
+  box-shadow: var(--xp-panel-shadow);
 }
 
 .heroCard {
-  position: relative;
-  overflow: hidden;
-  padding: 1.25rem 1.35rem;
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.86), transparent 34%),
-    linear-gradient(180deg, rgba(232, 244, 255, 0.98), rgba(177, 211, 244, 0.92));
-}
-
-.heroCard::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 40%),
-    radial-gradient(circle at bottom left, rgba(74, 143, 219, 0.2), transparent 34%);
-  pointer-events: none;
+  padding: 0.85rem;
 }
 
 .heroContent {
-  position: relative;
-  z-index: 1;
   display: grid;
-  gap: 1rem;
+  gap: 0.85rem;
   align-items: start;
 }
 
@@ -77,38 +59,44 @@
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8.2rem, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
 }
 
 .metric {
-  padding: 0.85rem 0.95rem;
-  border: 1px solid rgba(44, 86, 137, 0.8);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(208, 228, 247, 0.92));
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--xp-panel-border-soft);
+  border-radius: 0;
+  background: var(--xp-panel-surface-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
 }
 
 .metric strong {
   display: block;
-  margin-top: 0.25rem;
+  margin-top: 0.18rem;
   color: #16375d;
-  font-size: 1.2rem;
+  font-size: 1.35rem;
 }
 
 .feedbackStack {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.65rem;
 }
 
 .notice,
 .error {
-  padding: 0.85rem 1rem;
-  background: linear-gradient(180deg, rgba(249, 255, 219, 0.98), rgba(227, 243, 176, 0.94));
+  padding: 0.65rem 0.75rem;
+}
+
+.notice {
+  border-color: var(--xp-note-border);
+  background: var(--xp-note-surface);
   color: #4d5b10;
 }
 
 .error {
-  background: linear-gradient(180deg, rgba(255, 239, 230, 0.99), rgba(255, 207, 182, 0.96));
+  border-color: rgba(181, 38, 38, 0.3);
+  background: rgba(255, 233, 233, 0.96);
   color: #8a3418;
 }
 
@@ -118,7 +106,6 @@
 
 .windowCard {
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(240, 247, 255, 0.98), rgba(223, 236, 249, 0.98));
 }
 
 .windowTitleBar {
@@ -126,11 +113,9 @@
   justify-content: space-between;
   gap: 1rem;
   align-items: center;
-  padding: 0.7rem 1rem;
-  border-bottom: 1px solid rgba(22, 68, 120, 0.9);
-  background:
-    linear-gradient(180deg, rgba(110, 170, 232, 0.98), rgba(28, 89, 161, 0.98)),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.22), transparent);
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid #0f3e79;
+  background: linear-gradient(180deg, #3a7bd5 0%, #2459b7 48%, #1e4ca0 100%);
   color: #fff;
 }
 
@@ -142,19 +127,19 @@
 .windowBody {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
-  gap: 1rem;
-  padding: 1rem;
+  gap: 0.75rem;
+  padding: 0.75rem;
 }
 
 .formPanel,
 .infoPanel {
   display: grid;
-  gap: 1rem;
-  padding: 1rem;
-  border: 1px solid rgba(101, 141, 185, 0.82);
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(228, 239, 251, 0.95));
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--xp-panel-border);
+  border-radius: 0;
+  background: var(--xp-panel-surface-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94);
 }
 
 .panelHeader {
@@ -169,10 +154,10 @@
   align-items: center;
   justify-content: center;
   min-width: 4rem;
-  padding: 0.3rem 0.65rem;
-  border: 1px solid rgba(74, 121, 177, 0.9);
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(188, 216, 243, 0.92));
+  padding: 0.18rem 0.45rem;
+  border: 1px solid var(--xp-badge-border);
+  border-radius: 0;
+  background: var(--xp-badge-surface);
   color: #214d80;
   font-size: 0.74rem;
   font-weight: 700;
@@ -190,19 +175,21 @@
 }
 
 .field input {
-  min-height: 2.75rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid rgba(81, 123, 173, 0.88);
-  border-radius: 10px;
-  background: #fff;
+  min-height: 2.1rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--xp-field-border);
+  border-radius: 0;
+  background: var(--xp-field-surface);
   color: #183b61;
   font: inherit;
-  box-shadow: inset 0 1px 2px rgba(19, 59, 101, 0.12);
+  box-shadow: var(--xp-field-shadow);
 }
 
 .field input:focus-visible {
-  outline: 2px solid rgba(88, 155, 236, 0.95);
-  outline-offset: 1px;
+  border-color: var(--xp-field-border-strong);
+  box-shadow:
+    var(--xp-focus-ring),
+    var(--xp-field-shadow);
 }
 
 .buttonRow {
@@ -214,29 +201,31 @@
 .primaryButton,
 .secondaryButton,
 .groupLink {
-  border: 1px solid rgba(31, 83, 140, 0.92);
-  border-radius: 10px;
+  border: 1px solid var(--xp-panel-border-strong);
+  border-radius: 0;
   color: #173a63;
   cursor: pointer;
   font: inherit;
+  box-shadow: var(--xp-button-shadow);
 }
 
 .primaryButton,
 .secondaryButton {
-  min-height: 2.8rem;
-  padding: 0.65rem 1rem;
+  min-height: 2rem;
+  padding: 0.32rem 0.7rem;
   font-weight: 700;
 }
 
 .primaryButton {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(204, 227, 248, 0.95)),
-    linear-gradient(180deg, rgba(114, 172, 234, 0.94), rgba(49, 109, 180, 0.94));
+  border-color: #4474ba;
+  color: #ffffff;
+  background: var(--xp-button-surface-primary);
+  text-shadow: 0 1px 0 rgba(20, 48, 91, 0.45);
 }
 
 .secondaryButton,
 .groupLink {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(224, 237, 249, 0.95));
+  background: var(--xp-button-surface);
 }
 
 .primaryButton:disabled,
@@ -247,7 +236,7 @@
 
 .sidePanel {
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem;
   align-content: start;
 }
 
@@ -259,14 +248,14 @@
 
 .groupList {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.55rem;
 }
 
 .groupLink {
   display: grid;
   gap: 0.25rem;
   justify-items: start;
-  padding: 0.8rem 0.9rem;
+  padding: 0.55rem 0.65rem;
   text-align: left;
 }
 
@@ -276,6 +265,10 @@
 }
 
 @media (max-width: 980px) {
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
   .windowBody {
     grid-template-columns: 1fr;
   }

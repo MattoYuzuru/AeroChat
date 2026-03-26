@@ -160,7 +160,7 @@ export function CreateGroupPage() {
             <p className={styles.eyebrow}>Новая группа</p>
             <h1 className={styles.title}>Создать новую группу</h1>
             <p className={styles.subtitle}>
-              Отдельное окно для быстрого создания группы без перехода в общий список.
+              Быстрое создание группы в отдельном окне без лишних шагов.
             </p>
           </div>
 
@@ -194,7 +194,7 @@ export function CreateGroupPage() {
               <div className={styles.panelHeader}>
                 <div>
                   <p className={styles.panelLabel}>Создание</p>
-                  <h2 className={styles.panelTitle}>Новый workspace для участников</h2>
+                  <h2 className={styles.panelTitle}>Новая переписка группы</h2>
                 </div>
                 <span className={styles.roleBadge}>владелец</span>
               </div>
@@ -249,16 +249,16 @@ export function CreateGroupPage() {
               </section>
 
               <section className={styles.infoPanel}>
-                <p className={styles.panelLabel}>Недавние группы</p>
+                  <p className={styles.panelLabel}>Недавние группы</p>
                 {groupsLoadState.status === "loading" && (
-                  <p className={styles.stateText}>Подтягиваем актуальный список групп...</p>
+                  <p className={styles.stateText}>Обновляем список групп...</p>
                 )}
                 {groupsLoadState.status === "error" && (
                   <p className={styles.stateText}>{groupsLoadState.message}</p>
                 )}
                 {groupsLoadState.status === "ready" && recentGroups.length === 0 && (
                   <p className={styles.stateText}>
-                    Пока нет ни одной группы. Созданная здесь группа станет первым target.
+                    Пока нет ни одной группы. Созданная здесь группа появится здесь первой.
                   </p>
                 )}
                 {groupsLoadState.status === "ready" && recentGroups.length > 0 && (
@@ -274,7 +274,7 @@ export function CreateGroupPage() {
                       >
                         <span className={styles.groupLinkTitle}>{group.name}</span>
                         <small>
-                          unread {group.unreadCount + group.encryptedUnreadCount} · обновлено{" "}
+                          новых {group.unreadCount + group.encryptedUnreadCount} · обновлено{" "}
                           {formatRelativeIsoDate(group.updatedAt)}
                         </small>
                       </button>

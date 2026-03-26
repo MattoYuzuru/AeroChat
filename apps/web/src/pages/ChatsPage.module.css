@@ -788,12 +788,9 @@
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 0;
-  border: 1px solid var(--xp-panel-border);
-  background:
-    linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(232, 240, 251, 0.96));
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.98),
-    inset -1px -1px 0 rgba(125, 149, 182, 0.9);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .threadHero,
@@ -826,7 +823,7 @@
   border-left: 0;
   border-right: 0;
   border-top: 0;
-  padding: 0.7rem 0.9rem;
+  padding: 0.65rem 0.8rem;
 }
 
 .messagesPanel {
@@ -859,7 +856,11 @@
 }
 
 .messageRow[data-system="true"] {
-  justify-content: stretch;
+  justify-content: flex-start;
+}
+
+.messageRow[data-system="true"][data-own="true"] {
+  justify-content: flex-end;
 }
 
 .messageBubble,
@@ -887,7 +888,9 @@
 }
 
 .threadIdentity {
+  display: flex;
   align-items: stretch;
+  gap: 0.75rem;
 }
 
 .avatarBadge {
@@ -924,8 +927,11 @@
 }
 
 .threadStatusRow {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
+  gap: 0.35rem;
 }
 
 .threadTitle {
@@ -953,7 +959,9 @@
   color: #1f5d9a;
 }
 
-.pinnedStrip .blockHeader {
+.pinnedRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.45rem;
 }
@@ -977,7 +985,6 @@
 }
 
 .messageHeader,
-.blockHeader,
 .chatItemHeader,
 .composerFooter {
   align-items: center;
@@ -1007,9 +1014,9 @@
 .messageActionButton,
 .iconButton,
 .primaryIconButton {
-  width: 2rem;
-  height: 2rem;
-  min-height: 2rem;
+  width: 2.15rem;
+  height: 2.15rem;
+  min-height: 2.15rem;
   padding: 0;
   border: 1px solid #6f89ae;
   background: var(--xp-button-surface);
@@ -1052,19 +1059,19 @@
 }
 
 .composerCard {
-  padding: 0.65rem 0.9rem 0.8rem;
+  padding: 0.45rem 0.8rem 0.65rem;
   border-bottom: 0;
 }
 
 .composer {
-  gap: 0.55rem;
+  gap: 0.45rem;
 }
 
 .composerRow {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
-  gap: 0.35rem;
-  align-items: end;
+  grid-template-columns: 2.15rem minmax(0, 1fr) 2.15rem 2.15rem 2.15rem;
+  gap: 0.3rem;
+  align-items: stretch;
 }
 
 .field {
@@ -1072,13 +1079,17 @@
 }
 
 .field textarea {
-  min-height: 2.2rem;
-  max-height: 8rem;
-  padding: 0.55rem 0.65rem;
+  min-height: 2.15rem;
+  max-height: 6rem;
+  padding: 0.42rem 0.55rem;
   border-radius: 0;
   resize: vertical;
   background: var(--xp-field-surface);
   box-shadow: var(--xp-field-shadow);
+}
+
+.replyPreviewCard {
+  border-radius: 0;
 }
 
 .replyComposerCard,
@@ -1148,6 +1159,24 @@
   padding: 0.1rem 0;
 }
 
+.desktopWindowLayout .desktopThreadSection {
+  display: grid;
+  min-height: 0;
+}
+
+.desktopWindowLayout .threadHero {
+  border: 0;
+  border-bottom: 1px solid var(--xp-panel-border);
+  background: transparent;
+  box-shadow: none;
+}
+
+.desktopWindowLayout .pinnedStrip,
+.desktopWindowLayout .composerCard {
+  border-left: 0;
+  border-right: 0;
+}
+
 .mediaPreview {
   display: block;
   width: min(100%, 15rem);
@@ -1183,7 +1212,7 @@
   }
 
   .composerRow {
-    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    grid-template-columns: 2.15rem minmax(0, 1fr) 2.15rem 2.15rem 2.15rem;
   }
 
   .messageBubble,
@@ -1192,8 +1221,11 @@
   }
 
   .messageHeader,
-  .blockHeader,
   .chatItemHeader {
     grid-template-columns: 1fr;
+  }
+
+  .pinnedRow {
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 }

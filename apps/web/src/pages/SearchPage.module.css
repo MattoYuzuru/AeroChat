@@ -22,6 +22,13 @@
   padding: 0.85rem;
 }
 
+.primarySection {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .sectionHeader,
 .panelHeader,
 .formFooter,
@@ -109,7 +116,7 @@
 .pathSection {
   display: grid;
   gap: 0.75rem;
-  padding: 0.75rem;
+  padding: 0.65rem 0.7rem;
 }
 
 .pathSection {
@@ -127,6 +134,11 @@
   gap: 0.55rem;
 }
 
+.compactForm {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
 .controlsGrid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -139,10 +151,10 @@
 
 .field input,
 .field select {
-  min-height: 2.3rem;
-  padding: 0.48rem 0.62rem;
+  min-height: 2rem;
+  padding: 0.4rem 0.55rem;
   border: 1px solid var(--xp-field-border);
-  border-radius: 3px;
+  border-radius: 0;
   background: var(--xp-field-surface);
   color: #11345a;
   box-shadow: var(--xp-field-shadow);
@@ -185,7 +197,7 @@
 
 .formFooter {
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.9rem;
   padding-top: 0.2rem;
 }
 
@@ -197,9 +209,9 @@
 .primaryButton,
 .secondaryButton,
 .linkButton {
-  min-height: 2.1rem;
-  padding: 0.34rem 0.7rem;
-  border-radius: 3px;
+  min-height: 1.95rem;
+  padding: 0.25rem 0.62rem;
+  border-radius: 0;
   border: 1px solid var(--xp-panel-border-strong);
   cursor: pointer;
   color: #14355c;
@@ -265,7 +277,7 @@
 
 .resultCard,
 .previewCard {
-  padding: 0.7rem;
+  padding: 0.6rem 0.65rem;
 }
 
 .resultTitle {
@@ -341,6 +353,14 @@
   .primarySection,
   .secondarySection {
     padding: 0.85rem;
+  }
+
+  .primarySection {
+    padding: 0;
+  }
+
+  .compactForm {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .primaryButton,

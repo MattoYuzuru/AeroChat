@@ -13,11 +13,10 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { normalizeComposerMessageText } from "../attachments/message-content";
 import { describeAttachmentMimeType, formatAttachmentSize } from "../attachments/metadata";
-import { VideoNoteRecorderPanel } from "../attachments/VideoNoteRecorderPanel";
-import { VoiceNoteRecorderPanel } from "../attachments/VoiceNoteRecorderPanel";
 import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
 import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
+import { ChatGlyph } from "../chats/ChatGlyph";
 import { EncryptedMessageAttachmentList } from "../chats/EncryptedMessageAttachmentList";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
 import { useEncryptedMediaAttachmentDraft } from "../chats/useEncryptedMediaAttachmentDraft";
@@ -89,6 +88,7 @@ import styles from "./GroupsPage.module.css";
 export function GroupsPage() {
   const refreshActiveGroupCallsIntervalMs = 5000;
   const { state: authState, expireSession } = useAuth();
+  const currentUserId = authState.status === "authenticated" ? authState.profile.id : "";
   const desktopShellHost = useDesktopShellHost();
   const cryptoRuntime = useCryptoRuntime();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,6 +139,7 @@ export function GroupsPage() {
   );
   const groupCallAwarenessStateRef = useRef(groupCallAwarenessState);
   const previousSelectedGroupCallIdRef = useRef<string | null>(null);
+  const threadEndRef = useRef<HTMLDivElement | null>(null);
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const activeTypingTargetRef = useRef<GroupTypingSessionTarget | null>(null);
   const typingLastSentAtRef = useRef(0);
@@ -1019,7 +1020,7 @@ export function GroupsPage() {
   const selectedGroupCallParticipants = sortGroupCallParticipants(
     selectedGroupCallEntry?.participants ?? [],
     selectedState.status === "ready" ? selectedState.members : [],
-    authState.status === "authenticated" ? authState.profile.id : "",
+    currentUserId,
   );
   const selectedGroupCallSelfParticipant =
     authState.status !== "authenticated"
@@ -1096,17 +1097,13 @@ export function GroupsPage() {
     setMobileWindowContentMode("thread");
   }, [selectedGroupId]);
 
-  if (authState.status !== "authenticated") {
-    return null;
-  }
-
   const activeInviteCount =
     selectedState.status === "ready"
       ? selectedState.inviteLinks.filter((inviteLink) => inviteLink.disabledAt === null).length
       : 0;
   const selectedSelfMember =
     selectedState.status === "ready"
-      ? selectedState.members.find((member) => member.user.id === authState.profile.id) ?? null
+      ? selectedState.members.find((member) => member.user.id === currentUserId) ?? null
       : null;
   const requestedJoinToken = extractGroupInviteToken(joinInput || joinTokenFromRoute);
   const encryptedThreadMessages =
@@ -1179,8 +1176,52 @@ export function GroupsPage() {
   });
   const typingLabel =
     selectedState.status === "ready"
-      ? describeGroupTypingLabel(selectedState.snapshot.typingState, authState.profile.id)
+      ? describeGroupTypingLabel(selectedState.snapshot.typingState, currentUserId)
       : null;
+
+  useEffect(() => {
+    if (
+      groupWindowContentMode !== "thread" ||
+      selectedState.status !== "ready" ||
+      encryptedGroupLane.status !== "ready" ||
+      searchJumpIntent !== null
+    ) {
+      return;
+    }
+
+    const target = threadEndRef.current;
+    if (target === null) {
+      return;
+    }
+
+    const scrollToEnd = () => {
+      target.scrollIntoView({
+        block: "end",
+      });
+    };
+
+    const firstFrame = requestAnimationFrame(() => {
+      scrollToEnd();
+      requestAnimationFrame(scrollToEnd);
+    });
+    const timeoutId = window.setTimeout(scrollToEnd, 80);
+
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    encryptedGroupLane.status,
+    encryptedThreadMessages.length,
+    groupWindowContentMode,
+    searchJumpIntent,
+    selectedGroupCallEntry?.call.id,
+    selectedState,
+  ]);
+
+  if (authState.status !== "authenticated") {
+    return null;
+  }
 
   async function reloadGroups() {
     if (groupsStatus === "loading") {
@@ -1760,7 +1801,7 @@ export function GroupsPage() {
     }
     if (
       !window.confirm(
-        `Передать ownership участнику ${member.user.nickname || `@${member.user.login}`}? После этого ваша роль станет admin.`,
+        `Передать владение участнику ${member.user.nickname || `@${member.user.login}`}? После этого ваша роль станет администратором.`,
       )
     ) {
       return;
@@ -1776,11 +1817,11 @@ export function GroupsPage() {
         selectedState.snapshot.group.id,
         userId,
       );
-      setNotice("Ownership передан. Текущая роль обновлена.");
+      setNotice("Владение передано. Текущая роль обновлена.");
     } catch (error) {
       const message = resolveProtectedError(
         error,
-        "Не удалось передать ownership.",
+        "Не удалось передать владение.",
         expireSession,
       );
       if (message !== null) {
@@ -1995,11 +2036,10 @@ export function GroupsPage() {
         <section className={styles.heroCard}>
         <div className={styles.heroHeader}>
           <div>
-            <p className={styles.cardLabel}>Groups</p>
+            <p className={styles.cardLabel}>Группы</p>
             <h1 className={styles.title}>Группы AeroChat</h1>
             <p className={styles.subtitle}>
-              Окно группы показывает обычную переписку, вложения и действия участников. Звонки
-              по-прежнему остаются отдельной компактной lobby-поверхностью.
+              Здесь собраны переписка группы, участники, ссылки-приглашения и звонок в одном окне.
             </p>
           </div>
 
@@ -2018,7 +2058,7 @@ export function GroupsPage() {
         <div className={styles.metrics}>
           <Metric label="Группы" value={groups.length} />
           <Metric label="Новых" value={selectedState.status === "ready" ? selectedState.snapshot.group.encryptedUnreadCount : 0} />
-          <Metric label="Активные invite links" value={activeInviteCount} />
+          <Metric label="Активные ссылки" value={activeInviteCount} />
         </div>
 
       {notice && <div className={styles.notice}>{notice}</div>}
@@ -2029,14 +2069,14 @@ export function GroupsPage() {
           <form className={styles.panelCard} onSubmit={handleCreateGroup}>
             <div className={styles.joinHeader}>
               <div>
-                <p className={styles.cardLabel}>Create</p>
+                <p className={styles.cardLabel}>Создание</p>
                 <h2 className={styles.panelTitle}>Создать новую группу</h2>
               </div>
-              <span className={styles.rolePill}>owner</span>
+              <span className={styles.rolePill}>владелец</span>
             </div>
 
             <p className={styles.description}>
-              Создание группы сразу bootstrap'ит owner membership и primary message thread.
+              После создания группа сразу откроется в обычном окне переписки.
             </p>
 
             <div className={styles.form}>
@@ -2045,7 +2085,7 @@ export function GroupsPage() {
                 <input
                   maxLength={80}
                   onChange={(event) => setGroupName(event.target.value)}
-                  placeholder="Ops Room"
+                  placeholder="Совет проекта"
                   value={groupName}
                 />
               </label>
@@ -2063,19 +2103,19 @@ export function GroupsPage() {
           <form className={styles.joinCard} onSubmit={handleJoinByInviteLink}>
             <div className={styles.joinHeader}>
               <div>
-                <p className={styles.cardLabel}>Join</p>
-                <h2 className={styles.panelTitle}>Войти по invite link</h2>
+                <p className={styles.cardLabel}>Вход</p>
+                <h2 className={styles.panelTitle}>Войти по ссылке-приглашению</h2>
               </div>
               {joinTokenFromRoute !== "" && <span className={styles.rolePill}>из URL</span>}
             </div>
 
             <p className={styles.description}>
-              Вставьте полную ссылку или raw token. Публичного discovery по-прежнему нет.
+              Вставьте полную ссылку или token. Публичного списка групп здесь нет.
             </p>
 
             <div className={styles.form}>
               <label className={styles.field}>
-                <span>Invite link или token</span>
+                <span>Ссылка или token</span>
                 <textarea
                   onChange={(event) => setJoinInput(event.target.value)}
                   placeholder="https://aerochat.local/app/groups?join=ginv_..."
@@ -2252,7 +2292,7 @@ export function GroupsPage() {
                         Текущая роль: {roleLabel(selectedState.snapshot.group.selfRole)}.
                       </p>
                       <p className={styles.infoActionHint}>
-                        Открыть участников, роли, приглашения и действия группы в этом же окне
+                        Открыть участников, роли и ссылки-приглашения в этом же окне
                       </p>
                     </button>
                   ) : (
@@ -2260,13 +2300,41 @@ export function GroupsPage() {
                       <p className={styles.cardLabel}>Сведения</p>
                       <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
                       <p className={styles.description}>
-                        Управление группой остаётся в том же canonical window без нового target.
-                        Текущая роль: {roleLabel(selectedState.snapshot.group.selfRole)}.
+                        Управление группой остаётся в этом же окне. Текущая роль:{" "}
+                        {roleLabel(selectedState.snapshot.group.selfRole)}.
                       </p>
                     </div>
                   )}
 
                   <div className={styles.badgeColumn}>
+                    {groupWindowContentMode === "thread" && (
+                      <button
+                        aria-label="Управление звонком"
+                        className={styles.iconButton}
+                        disabled={
+                          (selectedGroupCallActions?.canJoin !== true &&
+                            selectedGroupCallActions?.canStart !== true &&
+                            selectedGroupCallEntry === null) ||
+                          groupCallActionState !== "idle"
+                        }
+                        onClick={() => {
+                          if (selectedGroupCallActions?.canJoin) {
+                            void handleJoinGroupCall();
+                            return;
+                          }
+
+                          if (selectedGroupCallActions?.canStart) {
+                            void handleStartGroupCall();
+                            return;
+                          }
+
+                          jumpToMessage("group-call-card");
+                        }}
+                        type="button"
+                      >
+                        <ChatGlyph kind="phone" />
+                      </button>
+                    )}
                     {groupWindowContentMode === "info" && (
                       <button
                         className={styles.secondaryButton}
@@ -2313,222 +2381,11 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.cardLabel}>Звонок</p>
-                    <h2 className={styles.panelTitle}>Лобби звонка</h2>
-                  </div>
-                  <div className={styles.badgeColumn}>
-                    <span className={styles.statusPill}>
-                      {describeGroupCallPhaseLabel(selectedGroupCallPhase)}
-                    </span>
-                    {selectedGroupCallEntry && (
-                      <span className={styles.statusPill}>
-                        Участников: {selectedGroupCallParticipants.length}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <p className={styles.description}>
-                  Можно увидеть активный звонок, присоединиться, выйти или завершить его по текущим
-                  правам. Многопользовательский аудио- и видеорежим ещё не добавлен.
-                </p>
-
-                {selectedGroupCallEntry && (
-                  <div className={styles.timelineMeta}>
-                    <span className={styles.statusPill}>
-                      Состояние:{" "}
-                      {selectedGroupCallEntry.call.status === "active" ? "активен" : "завершён"}
-                    </span>
-                    <span className={styles.statusPill}>
-                      {selectedGroupCallSelfParticipant !== null
-                        ? "Вы в звонке"
-                        : selectedGroupCallActions?.isReadOnly
-                          ? "Наблюдение"
-                          : "Ожидание входа"}
-                    </span>
-                    <span className={styles.statusPill}>
-                      Создатель:{" "}
-                      {selectedGroupCallEntry.call.createdByUserId === authState.profile.id
-                        ? "вы"
-                        : "другой участник"}
-                    </span>
-                  </div>
-                )}
-
-                {groupCallError && (
-                  <div className={styles.error}>
-                    <div className={styles.inlineActionRow}>
-                      <span>{groupCallError}</span>
-                      <button
-                        className={styles.ghostButton}
-                        onClick={() => {
-                          setGroupCallError(null);
-                          setGroupCallTerminalState("idle");
-                        }}
-                        type="button"
-                      >
-                        Скрыть
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {selectedGroupCallEntry === null && (
-                  <>
-                    <div className={styles.notice}>
-                      В этой группе сейчас нет активного звонка. Новый call создаётся через
-                      существующий `StartCall`, а UI дальше сходится только от server-backed
-                      refresh.
-                    </div>
-
-                    {selectedGroupCallActions?.isReadOnly ? (
-                      <div className={styles.readOnlyNotice}>
-                        Роль «читатель» может видеть звонок и список участников, но не может
-                        запускать его, входить или завершать.
-                      </div>
-                    ) : (
-                      <div className={styles.actions}>
-                        <button
-                          className={styles.primaryButton}
-                          disabled={selectedGroupCallActions?.canStart !== true}
-                          onClick={() => {
-                            void handleStartGroupCall();
-                          }}
-                          type="button"
-                        >
-                          {groupCallActionState === "starting"
-                            ? "Запускаем..."
-                            : "Начать звонок"}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {selectedGroupCallEntry !== null && (
-                  <>
-                    {selectedGroupCallActions?.isReadOnly && (
-                      <div className={styles.readOnlyNotice}>
-                        Роль «читатель» видит звонок и список участников, но вход, запуск и
-                        завершение недоступны.
-                      </div>
-                    )}
-
-                    <div className={styles.actions}>
-                      {selectedGroupCallActions?.canJoin && (
-                        <button
-                          className={styles.primaryButton}
-                          disabled={groupCallActionState !== "idle"}
-                          onClick={() => {
-                            void handleJoinGroupCall();
-                          }}
-                          type="button"
-                        >
-                          {groupCallActionState === "joining"
-                            ? "Входим..."
-                            : "Присоединиться"}
-                        </button>
-                      )}
-
-                      {selectedGroupCallActions?.canLeave && (
-                        <button
-                          className={styles.secondaryButton}
-                          disabled={groupCallActionState !== "idle"}
-                          onClick={() => {
-                            void handleLeaveGroupCall();
-                          }}
-                          type="button"
-                        >
-                          {groupCallActionState === "leaving"
-                            ? "Выходим..."
-                            : "Покинуть звонок"}
-                        </button>
-                      )}
-
-                      {selectedGroupCallActions?.canEnd && (
-                        <button
-                          className={styles.dangerButton}
-                          disabled={groupCallActionState !== "idle"}
-                          onClick={() => {
-                            void handleEndGroupCall();
-                          }}
-                          type="button"
-                        >
-                          {groupCallActionState === "ending"
-                            ? "Завершаем..."
-                            : "Завершить звонок"}
-                        </button>
-                      )}
-                    </div>
-
-                    <div className={styles.rosterCard}>
-                      <div className={styles.blockHeader}>
-                        <div>
-                          <p className={styles.cardLabel}>Участники</p>
-                          <h3 className={styles.blockTitle}>Активные участники</h3>
-                        </div>
-                        <span className={styles.metaTag}>
-                          {selectedGroupCallParticipants.length}
-                        </span>
-                      </div>
-
-                      {selectedGroupCallParticipants.length === 0 ? (
-                        <p className={styles.emptyState}>
-                          Звонок уже активен, но список участников пока пуст. Следующее обновление
-                          уточнит состав.
-                        </p>
-                      ) : (
-                        <div className={styles.rosterList}>
-                          {selectedGroupCallParticipants.map((participant) => {
-                            const participantMember =
-                              selectedState.members.find(
-                                (member) => member.user.id === participant.userId,
-                              ) ?? null;
-
-                            return (
-                              <article
-                                className={styles.rosterItem}
-                                key={participant.id}
-                              >
-                                <div>
-                                  <p className={styles.rosterName}>
-                                    {describeGroupCallParticipantName(
-                                      participant,
-                                      participantMember,
-                                      authState.profile.id,
-                                    )}
-                                  </p>
-                                  <p className={styles.rosterMeta}>
-                                    Подключился {formatDateTime(participant.joinedAt)}
-                                  </p>
-                                </div>
-                                <div className={styles.badgeColumn}>
-                                  {participantMember && (
-                                    <span className={styles.rolePill}>
-                                      {roleLabel(participantMember.role)}
-                                    </span>
-                                  )}
-                                  <span className={styles.statusPill}>в звонке</span>
-                                </div>
-                              </article>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </section>
-
-              <section className={styles.panelCard}>
-                <div className={styles.panelHeader}>
-                  <div>
                     <p className={styles.cardLabel}>Сообщения</p>
                     <h2 className={styles.panelTitle}>Переписка группы</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Сообщения и вложения открываются как обычная переписка. Если часть истории
-                    недоступна, это показывается отдельным состоянием ниже.
+                    Сообщения, вложения и карточка звонка показываются в одной ленте переписки.
                   </p>
                 </div>
 
@@ -2670,98 +2527,16 @@ export function GroupsPage() {
                         </div>
                       )}
 
-                      <div className={styles.attachmentActions}>
-                        <input
-                          accept="*/*"
-                          className={styles.attachmentInput}
-                          onChange={(event) => {
-                            const file = event.target.files?.[0] ?? null;
-                            void handleEncryptedAttachmentSelection(file);
-                            event.target.value = "";
-                          }}
-                          ref={encryptedAttachmentInputRef}
-                          type="file"
-                        />
-                        <button
-                          className={styles.secondaryButton}
-                          disabled={!canPickEncryptedAttachment}
-                          onClick={() => {
-                            encryptedAttachmentInputRef.current?.click();
-                          }}
-                          type="button"
-                        >
-                          {encryptedAttachmentDraft === null
-                            ? "Добавить файл"
-                            : "Заменить файл"}
-                        </button>
-                        <span className={styles.attachmentHint}>
-                          Прикрепите файл вручную или используйте voice/video note ниже. Всё
-                          уходит через тот же encrypted attachment flow.
-                        </span>
-                      </div>
-
-                      <VoiceNoteRecorderPanel
-                        state={voiceNoteRecorder.state}
-                        startDisabled={voiceNoteStartDisabled}
-                        stopDisabled={voiceNoteRecorder.state.status !== "recording"}
-                        discardDisabled={!canUseEncryptedMediaNoteEntry}
-                        sendDisabled={
-                          !canUseEncryptedMediaNoteEntry ||
-                          voiceNoteRecorder.state.draft === null
-                        }
-                        isSending={
-                          encryptedMediaAttachmentDraft.isUploading ||
-                          cryptoRuntime.state.isActionPending
-                        }
-                        onStart={() => {
-                          void voiceNoteRecorder.startRecording();
+                      <input
+                        accept="*/*"
+                        className={styles.attachmentInput}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          void handleEncryptedAttachmentSelection(file);
+                          event.target.value = "";
                         }}
-                        onStop={() => {
-                          voiceNoteRecorder.stopRecording();
-                        }}
-                        onDiscard={() => {
-                          voiceNoteRecorder.discardRecording();
-                        }}
-                        onSend={() => {
-                          void handleEncryptedGroupMediaNoteSend(
-                            voiceNoteRecorder.state.draft?.file ?? null,
-                            () => {
-                              voiceNoteRecorder.discardRecording();
-                            },
-                          );
-                        }}
-                      />
-
-                      <VideoNoteRecorderPanel
-                        state={videoNoteRecorder.state}
-                        startDisabled={videoNoteStartDisabled}
-                        stopDisabled={videoNoteRecorder.state.status !== "recording"}
-                        discardDisabled={!canUseEncryptedMediaNoteEntry}
-                        sendDisabled={
-                          !canUseEncryptedMediaNoteEntry ||
-                          videoNoteRecorder.state.draft === null
-                        }
-                        isSending={
-                          encryptedMediaAttachmentDraft.isUploading ||
-                          cryptoRuntime.state.isActionPending
-                        }
-                        onStart={() => {
-                          void videoNoteRecorder.startRecording();
-                        }}
-                        onStop={() => {
-                          videoNoteRecorder.stopRecording();
-                        }}
-                        onDiscard={() => {
-                          videoNoteRecorder.discardRecording();
-                        }}
-                        onSend={() => {
-                          void handleEncryptedGroupMediaNoteSend(
-                            videoNoteRecorder.state.draft?.file ?? null,
-                            () => {
-                              videoNoteRecorder.discardRecording();
-                            },
-                          );
-                        }}
+                        ref={encryptedAttachmentInputRef}
+                        type="file"
                       />
 
                       {encryptedAttachmentDraft && (
@@ -2812,7 +2587,7 @@ export function GroupsPage() {
                                 }}
                                 type="button"
                               >
-                                Повторить upload
+                                Повторить
                               </button>
                             )}
                             <button
@@ -2828,28 +2603,191 @@ export function GroupsPage() {
                         </div>
                       )}
 
-                      <label className={styles.field}>
-                        <span>Сообщение</span>
-                        <textarea
-                          disabled={
-                            cryptoRuntime.state.isActionPending ||
-                            encryptedMediaAttachmentDraft.isUploading ||
-                            !selectedState.snapshot.thread.canSendMessages
-                          }
-                          maxLength={4000}
-                          onChange={(event) => {
-                            setEncryptedComposerText(event.target.value);
-                            setEncryptedComposerError(null);
+                      {voiceNoteRecorder.state.errorMessage && (
+                        <div className={styles.error}>{voiceNoteRecorder.state.errorMessage}</div>
+                      )}
+
+                      {videoNoteRecorder.state.errorMessage && (
+                        <div className={styles.error}>{videoNoteRecorder.state.errorMessage}</div>
+                      )}
+
+                      {voiceNoteRecorder.state.status === "recorded" &&
+                        voiceNoteRecorder.state.draft !== null && (
+                          <div className={styles.attachmentDraftCard}>
+                            <div>
+                              <p className={styles.attachmentDraftTitle}>
+                                {voiceNoteRecorder.state.draft.fileName}
+                              </p>
+                              <p className={styles.attachmentDraftMeta}>Голосовое сообщение</p>
+                            </div>
+                            <audio
+                              className={styles.hiddenAudio}
+                              controls
+                              preload="metadata"
+                              src={voiceNoteRecorder.state.draft.previewUrl}
+                            />
+                            <div className={styles.attachmentDraftActions}>
+                              <button
+                                className={styles.ghostButton}
+                                onClick={() => {
+                                  voiceNoteRecorder.discardRecording();
+                                }}
+                                type="button"
+                              >
+                                Убрать
+                              </button>
+                              <button
+                                className={styles.primaryButton}
+                                onClick={() => {
+                                  void handleEncryptedGroupMediaNoteSend(
+                                    voiceNoteRecorder.state.draft?.file ?? null,
+                                    () => {
+                                      voiceNoteRecorder.discardRecording();
+                                    },
+                                  );
+                                }}
+                                type="button"
+                              >
+                                Отправить запись
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                      {videoNoteRecorder.state.status === "recorded" &&
+                        videoNoteRecorder.state.draft !== null && (
+                          <div className={styles.attachmentDraftCard}>
+                            <div>
+                              <p className={styles.attachmentDraftTitle}>
+                                {videoNoteRecorder.state.draft.fileName}
+                              </p>
+                              <p className={styles.attachmentDraftMeta}>Видео сообщение</p>
+                            </div>
+                            <video
+                              className={styles.mediaPreview}
+                              controls
+                              playsInline
+                              preload="metadata"
+                              src={videoNoteRecorder.state.draft.previewUrl}
+                            />
+                            <div className={styles.attachmentDraftActions}>
+                              <button
+                                className={styles.ghostButton}
+                                onClick={() => {
+                                  videoNoteRecorder.discardRecording();
+                                }}
+                                type="button"
+                              >
+                                Убрать
+                              </button>
+                              <button
+                                className={styles.primaryButton}
+                                onClick={() => {
+                                  void handleEncryptedGroupMediaNoteSend(
+                                    videoNoteRecorder.state.draft?.file ?? null,
+                                    () => {
+                                      videoNoteRecorder.discardRecording();
+                                    },
+                                  );
+                                }}
+                                type="button"
+                              >
+                                Отправить видео
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                      <div className={styles.composerRow}>
+                        <button
+                          aria-label="Прикрепить файл"
+                          className={styles.iconButton}
+                          disabled={!canPickEncryptedAttachment}
+                          onClick={() => {
+                            encryptedAttachmentInputRef.current?.click();
                           }}
-                          placeholder={
-                            selectedState.snapshot.thread.canSendMessages
-                              ? "Напишите сообщение"
-                              : "Текущая роль не может отправлять сообщения"
-                          }
-                          rows={4}
-                          value={encryptedComposerText}
-                        />
-                      </label>
+                          type="button"
+                        >
+                          <ChatGlyph kind="attach" />
+                        </button>
+
+                        <label className={styles.field}>
+                          <textarea
+                            disabled={
+                              cryptoRuntime.state.isActionPending ||
+                              encryptedMediaAttachmentDraft.isUploading ||
+                              !selectedState.snapshot.thread.canSendMessages
+                            }
+                            maxLength={4000}
+                            onChange={(event) => {
+                              setEncryptedComposerText(event.target.value);
+                              setEncryptedComposerError(null);
+                            }}
+                            placeholder={
+                              selectedState.snapshot.thread.canSendMessages
+                                ? "Напишите сообщение"
+                                : "Текущая роль не может отправлять сообщения"
+                            }
+                            rows={2}
+                            value={encryptedComposerText}
+                          />
+                        </label>
+
+                        <button
+                          aria-label="Записать голосовое сообщение"
+                          className={styles.iconButton}
+                          disabled={voiceNoteStartDisabled}
+                          onClick={() => {
+                            if (voiceNoteRecorder.state.status === "recording") {
+                              voiceNoteRecorder.stopRecording();
+                              return;
+                            }
+
+                            void voiceNoteRecorder.startRecording();
+                          }}
+                          type="button"
+                        >
+                          <ChatGlyph
+                            kind={
+                              voiceNoteRecorder.state.status === "recording"
+                                ? "microphone_active"
+                                : "microphone"
+                            }
+                          />
+                        </button>
+
+                        <button
+                          aria-label="Записать видео сообщение"
+                          className={styles.iconButton}
+                          disabled={videoNoteStartDisabled}
+                          onClick={() => {
+                            if (videoNoteRecorder.state.status === "recording") {
+                              videoNoteRecorder.stopRecording();
+                              return;
+                            }
+
+                            void videoNoteRecorder.startRecording();
+                          }}
+                          type="button"
+                        >
+                          <ChatGlyph
+                            kind={
+                              videoNoteRecorder.state.status === "recording"
+                                ? "camera_active"
+                                : "camera"
+                            }
+                          />
+                        </button>
+
+                        <button
+                          aria-label="Отправить сообщение"
+                          className={styles.primaryIconButton}
+                          disabled={!canSendEncryptedGroupText}
+                          type="submit"
+                        >
+                          <ChatGlyph kind="send" />
+                        </button>
+                      </div>
 
                       {encryptedComposerError && (
                         <div className={styles.error}>{encryptedComposerError}</div>
@@ -2861,17 +2799,6 @@ export function GroupsPage() {
                         <span className={styles.characterCount}>
                           {normalizeComposerMessageText(encryptedComposerText).length}/4000
                         </span>
-                        <button
-                          className={styles.primaryButton}
-                          disabled={!canSendEncryptedGroupText}
-                          type="submit"
-                        >
-                          {cryptoRuntime.state.isActionPending
-                            ? "Собираем..."
-                            : editingEncryptedEntry !== null
-                              ? "Сохранить правки"
-                              : "Отправить"}
-                        </button>
                       </div>
                     </form>
 
@@ -3084,37 +3011,201 @@ export function GroupsPage() {
                           </article>
                         ))
                       )}
+
+                      {(selectedGroupCallEntry !== null ||
+                        groupCallTerminalState !== "idle" ||
+                        groupCallError !== null) && (
+                        <article
+                          className={styles.messageCard}
+                          data-own={
+                            selectedGroupCallEntry?.call.createdByUserId === authState.profile.id
+                              ? "true"
+                              : undefined
+                          }
+                          id="group-call-card"
+                        >
+                          <div className={styles.messageHeader}>
+                            <div>
+                              <p className={styles.messageAuthor}>Звонок</p>
+                              <p className={styles.messageMeta}>
+                                {describeGroupCallPhaseLabel(selectedGroupCallPhase)}
+                              </p>
+                            </div>
+                            <div className={styles.badgeColumn}>
+                              {selectedGroupCallEntry && (
+                                <span className={styles.statusPill}>
+                                  {selectedGroupCallEntry.call.status === "active"
+                                    ? "активен"
+                                    : "завершён"}
+                                </span>
+                              )}
+                              {selectedGroupCallSelfParticipant !== null && (
+                                <span className={styles.statusPill}>Вы в звонке</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className={styles.messageBody}>
+                            <p className={styles.helperText}>
+                              {selectedGroupCallEntry === null
+                                ? "Активный звонок завершён."
+                                : selectedGroupCallSelfParticipant !== null
+                                  ? "Вы уже подключены. Можно вернуться, выйти или завершить звонок."
+                                  : selectedGroupCallActions?.isReadOnly
+                                    ? "Текущая роль может только видеть состояние звонка."
+                                    : "Можно присоединиться к звонку или завершить его по текущим правам."}
+                            </p>
+
+                            {selectedGroupCallEntry && (
+                              <div className={styles.timelineMeta}>
+                                <span className={styles.statusPill}>
+                                  Участников: {selectedGroupCallParticipants.length}
+                                </span>
+                                <span className={styles.statusPill}>
+                                  Создатель:{" "}
+                                  {selectedGroupCallEntry.call.createdByUserId === authState.profile.id
+                                    ? "вы"
+                                    : "другой участник"}
+                                </span>
+                              </div>
+                            )}
+
+                            {groupCallError && (
+                              <div className={styles.error}>
+                                <div className={styles.inlineActionRow}>
+                                  <span>{groupCallError}</span>
+                                  <button
+                                    className={styles.ghostButton}
+                                    onClick={() => {
+                                      setGroupCallError(null);
+                                      setGroupCallTerminalState("idle");
+                                    }}
+                                    type="button"
+                                  >
+                                    Скрыть
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {selectedGroupCallActions?.isReadOnly && selectedGroupCallEntry && (
+                              <div className={styles.readOnlyNotice}>
+                                Роль «читатель» может только видеть звонок и список участников.
+                              </div>
+                            )}
+
+                            <div className={styles.actions}>
+                              {selectedGroupCallActions?.canJoin && (
+                                <button
+                                  className={styles.primaryButton}
+                                  disabled={groupCallActionState !== "idle"}
+                                  onClick={() => {
+                                    void handleJoinGroupCall();
+                                  }}
+                                  type="button"
+                                >
+                                  {groupCallActionState === "joining"
+                                    ? "Входим..."
+                                    : selectedGroupCallSelfParticipant !== null
+                                      ? "Вернуться"
+                                      : "Присоединиться"}
+                                </button>
+                              )}
+
+                              {selectedGroupCallActions?.canStart && (
+                                <button
+                                  className={styles.primaryButton}
+                                  disabled={groupCallActionState !== "idle"}
+                                  onClick={() => {
+                                    void handleStartGroupCall();
+                                  }}
+                                  type="button"
+                                >
+                                  {groupCallActionState === "starting"
+                                    ? "Запускаем..."
+                                    : "Начать звонок"}
+                                </button>
+                              )}
+
+                              {selectedGroupCallActions?.canLeave && (
+                                <button
+                                  className={styles.secondaryButton}
+                                  disabled={groupCallActionState !== "idle"}
+                                  onClick={() => {
+                                    void handleLeaveGroupCall();
+                                  }}
+                                  type="button"
+                                >
+                                  {groupCallActionState === "leaving"
+                                    ? "Выходим..."
+                                    : "Выйти"}
+                                </button>
+                              )}
+
+                              {selectedGroupCallActions?.canEnd && (
+                                <button
+                                  className={styles.dangerButton}
+                                  disabled={groupCallActionState !== "idle"}
+                                  onClick={() => {
+                                    void handleEndGroupCall();
+                                  }}
+                                  type="button"
+                                >
+                                  {groupCallActionState === "ending"
+                                    ? "Завершаем..."
+                                    : "Завершить"}
+                                </button>
+                              )}
+                            </div>
+
+                            {selectedGroupCallParticipants.length > 0 && (
+                              <div className={styles.rosterList}>
+                                {selectedGroupCallParticipants.map((participant) => {
+                                  const participantMember =
+                                    selectedState.members.find(
+                                      (member) => member.user.id === participant.userId,
+                                    ) ?? null;
+
+                                  return (
+                                    <article className={styles.rosterItem} key={participant.id}>
+                                      <div>
+                                        <p className={styles.rosterName}>
+                                          {describeGroupCallParticipantName(
+                                            participant,
+                                            participantMember,
+                                            authState.profile.id,
+                                          )}
+                                        </p>
+                                        <p className={styles.rosterMeta}>
+                                          Подключился {formatDateTime(participant.joinedAt)}
+                                        </p>
+                                      </div>
+                                      <div className={styles.badgeColumn}>
+                                        {participantMember && (
+                                          <span className={styles.rolePill}>
+                                            {roleLabel(participantMember.role)}
+                                          </span>
+                                        )}
+                                        <span className={styles.statusPill}>в звонке</span>
+                                      </div>
+                                    </article>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      )}
+
+                      <div className={styles.historyNotice}>
+                        Показан текущий доступный фрагмент истории. Более ранние сообщения здесь
+                        пока не открываются.
+                        {typingLabel ? ` ${typingLabel}` : ""}
+                      </div>
+                      <div ref={threadEndRef} />
                     </div>
                   </>
                 )}
-              </section>
-
-              <section className={styles.panelCard}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <p className={styles.cardLabel}>История</p>
-                    <h2 className={styles.panelTitle}>Ранние сообщения недоступны</h2>
-                  </div>
-                  <p className={styles.panelCopy}>
-                    В этом окне доступны текущие сообщения. Более ранняя история здесь сейчас не
-                    открывается.
-                  </p>
-                </div>
-
-                <div className={styles.timelineMeta}>
-                  <span className={styles.statusPill}>Недоступно</span>
-                  <span className={styles.statusPill}>
-                    Обновлено {formatDateTime(selectedState.snapshot.thread.updatedAt)}
-                  </span>
-                  {typingLabel && <span className={styles.statusPill}>{typingLabel}</span>}
-                </div>
-
-                <div className={styles.messagesList}>
-                  <InlineState
-                    title="История недоступна"
-                    message="Текущая группа работает через обычное окно переписки без отдельного fallback-режима для старого пути."
-                  />
-                </div>
               </section>
                 </>
               )}
@@ -3128,26 +3219,23 @@ export function GroupsPage() {
                     <h2 className={styles.panelTitle}>Участники группы</h2>
                   </div>
                   <p className={styles.panelCopy}>
-                    Список участников доступен всем membership roles, включая `reader`. В этом
-                    slice owner управляет ролями, а admin получает bounded remove/restrict powers
-                    без обхода owner-only invariants.
+                    Здесь видны участники группы, их роли и доступные действия по текущим правам.
                   </p>
                 </div>
 
                 {selectedState.snapshot.group.selfRole === "owner" ? (
                   <div className={styles.notice}>
-                    Ownership нельзя потерять неявно. Чтобы owner вышел из группы, сначала нужен
-                    явный `TransferGroupOwnership`, затем обычный `LeaveGroup`.
+                    Владелец не может покинуть группу без явной передачи владения другому
+                    участнику.
                   </div>
                 ) : (
                   <p className={styles.helperText}>
-                    Текущая роль может только просматривать roster и при необходимости выполнить
-                    self-leave.
+                    Текущая роль может просматривать состав группы и доступные действия.
                   </p>
                 )}
 
                 {selectedState.members.length === 0 ? (
-                  <p className={styles.emptyState}>Backend пока не вернул участников группы.</p>
+                  <p className={styles.emptyState}>Список участников пока пуст.</p>
                 ) : (
                   <div className={styles.memberList}>
                     {selectedState.members.map((member) => {
@@ -3217,7 +3305,7 @@ export function GroupsPage() {
                                   >
                                     {permissions.assignableRoles.map((role) => (
                                       <option key={role} value={role}>
-                                        {role}
+                                        {roleLabel(role)}
                                       </option>
                                     ))}
                                   </select>
@@ -3253,7 +3341,7 @@ export function GroupsPage() {
                                   >
                                     {pendingTransferUserId === member.user.id
                                       ? "Передаём..."
-                                      : "Передать ownership"}
+                                      : "Передать владение"}
                                   </button>
                                 )}
 
@@ -3272,8 +3360,8 @@ export function GroupsPage() {
                                     {pendingRestrictionUserId === member.user.id
                                       ? "Сохраняем..."
                                       : member.isWriteRestricted
-                                        ? "Снять restriction"
-                                        : "Ограничить write"}
+                                        ? "Снять ограничение"
+                                        : "Запретить отправку"}
                                   </button>
                                 )}
 
@@ -3303,8 +3391,8 @@ export function GroupsPage() {
                             isCurrentUser && (
                               <p className={styles.helperText}>
                                 {selectedState.snapshot.group.selfRole === "owner"
-                                  ? "Owner не может покинуть группу без явной передачи ownership."
-                                  : "Для self-leave используйте кнопку в верхней панели группы."}
+                                  ? "Владелец не может выйти без передачи владения."
+                                  : "Для выхода используйте кнопку в верхней панели группы."}
                               </p>
                             )}
                         </article>
@@ -3346,7 +3434,7 @@ export function GroupsPage() {
                           {selectedState.snapshot.group.permissions.creatableInviteRoles.map(
                             (role) => (
                               <option key={role} value={role}>
-                                {role}
+                                {roleLabel(role)}
                               </option>
                             ),
                           )}
@@ -3371,7 +3459,7 @@ export function GroupsPage() {
                               Роль: {roleLabel(lastCreatedInvite.inviteLink.role)}
                             </p>
                           </div>
-                          <span className={styles.statusPill}>new</span>
+                          <span className={styles.statusPill}>новая</span>
                         </div>
 
                         <p className={styles.inviteValue}>
@@ -3392,7 +3480,7 @@ export function GroupsPage() {
                               <div>
                                 <strong>{roleLabel(inviteLink.role)}</strong>
                                 <p className={styles.groupMeta}>
-                                  join count: {inviteLink.joinCount} • создано{" "}
+                                  вступлений: {inviteLink.joinCount} • создано{" "}
                                   {formatDateTime(inviteLink.createdAt)}
                                 </p>
                               </div>
@@ -3401,7 +3489,7 @@ export function GroupsPage() {
                                 className={styles.statusPill}
                                 data-tone={inviteLink.disabledAt ? "danger" : "default"}
                               >
-                                {inviteLink.disabledAt ? "disabled" : "active"}
+                                {inviteLink.disabledAt ? "отключена" : "активна"}
                               </span>
                             </div>
 
@@ -3409,7 +3497,7 @@ export function GroupsPage() {
                               <p className={styles.helperText}>
                                 {inviteLink.disabledAt
                                   ? `Отключён ${formatDateTime(inviteLink.disabledAt)}`
-                                  : "Ссылка активна и готова к explicit join."}
+                                  : "Ссылка активна и готова для входа."}
                               </p>
 
                               <button

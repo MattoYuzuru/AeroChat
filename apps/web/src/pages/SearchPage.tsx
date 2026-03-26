@@ -93,7 +93,6 @@ export function SearchPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [metadataStatus, setMetadataStatus] = useState<"loading" | "ready" | "error">("loading");
   const [metadataError, setMetadataError] = useState<string | null>(null);
-  const [isRefreshingMetadata, setIsRefreshingMetadata] = useState(false);
   const [contentSearchFormError, setContentSearchFormError] = useState<string | null>(null);
   const [legacySearchStatus, setLegacySearchStatus] = useState<SearchPathStatus>("idle");
   const [legacySearchError, setLegacySearchError] = useState<string | null>(null);
@@ -139,8 +138,6 @@ export function SearchPage() {
     async function loadCollections(mode: "initial" | "refresh") {
       if (mode === "initial") {
         setMetadataStatus("loading");
-      } else {
-        setIsRefreshingMetadata(true);
       }
 
       setMetadataError(null);
@@ -172,10 +169,6 @@ export function SearchPage() {
         setGroups([]);
         setMetadataStatus("error");
         setMetadataError(message);
-      } finally {
-        if (active) {
-          setIsRefreshingMetadata(false);
-        }
       }
     }
   }, [authState.status, expireSession, token]);
@@ -220,7 +213,6 @@ export function SearchPage() {
       return;
     }
 
-    setIsRefreshingMetadata(true);
     setMetadataError(null);
 
     try {
@@ -244,8 +236,6 @@ export function SearchPage() {
         setMetadataStatus("error");
         setMetadataError(message);
       }
-    } finally {
-      setIsRefreshingMetadata(false);
     }
   }
 
@@ -344,7 +334,7 @@ export function SearchPage() {
     if (inviteToken === "") {
       setInvitePreviewStatus("error");
       setInvitePreview(null);
-      setInvitePreviewError("Вставьте invite link или raw invite token.");
+      setInvitePreviewError("Вставьте ссылку-приглашение или token.");
       return;
     }
 
@@ -359,7 +349,7 @@ export function SearchPage() {
     } catch (error) {
       const message = resolveProtectedError(
         error,
-        "Не удалось показать превью invite link.",
+        "Не удалось показать превью ссылки-приглашения.",
         expireSession,
       );
       if (message === null) {
@@ -392,7 +382,7 @@ export function SearchPage() {
     } catch (error) {
       const message = resolveProtectedError(
         error,
-        "Не удалось войти в группу по invite link.",
+        "Не удалось войти в группу по ссылке-приглашению.",
         expireSession,
       );
       if (message !== null) {
@@ -574,17 +564,6 @@ export function SearchPage() {
             </p>
           </div>
 
-          <button
-            className={styles.secondaryButton}
-            disabled={people.state.isRefreshing || isRefreshingMetadata}
-            onClick={() => {
-              void people.reload();
-              void reloadCollections();
-            }}
-            type="button"
-          >
-            {people.state.isRefreshing || isRefreshingMetadata ? "Обновляем..." : "Обновить"}
-          </button>
         </div>
 
         <div className={styles.metrics}>
@@ -621,7 +600,7 @@ export function SearchPage() {
               </div>
             )}
 
-            <form className={styles.form} onSubmit={handlePeopleSubmit}>
+            <form className={`${styles.form} ${styles.compactForm}`} onSubmit={handlePeopleSubmit}>
               <label className={styles.field}>
                 <span>Login</span>
                 <input
@@ -823,7 +802,7 @@ export function SearchPage() {
               </div>
             )}
 
-            <form className={styles.form} onSubmit={handleInvitePreview}>
+            <form className={`${styles.form} ${styles.compactForm}`} onSubmit={handleInvitePreview}>
               <label className={styles.field}>
                 <span>Ссылка или token</span>
                 <input
@@ -856,8 +835,8 @@ export function SearchPage() {
 
             {invitePreviewStatus === "idle" && (
               <InlineState
-                title="Вставьте invite link"
-                message="Покажем группу и роль по ссылке до вступления."
+                title="Вставьте ссылку-приглашение"
+                message="Сначала покажем группу и роль, затем можно будет вступить."
               />
             )}
 
@@ -1001,37 +980,27 @@ export function SearchPage() {
             )}
           </div>
 
-          <div className={styles.formFooter}>
-            <p className={styles.scopeHint}>
-              {describeSearchScope(scopeSelection)}
+            <div className={styles.formFooter}>
+              <p className={styles.scopeHint}>
+                {describeSearchScope(scopeSelection)}
               {selectedDirectChat
                 ? ` · ${describeDirectChatLabel(selectedDirectChat, currentUserId)}`
                 : ""}
               {selectedGroup ? ` · ${normalizeGroupTitle(selectedGroup.name)}` : ""}
-            </p>
+              </p>
 
-            <div className={styles.inlineActions}>
-              <button
-                className={styles.secondaryButton}
-                disabled={metadataStatus === "loading" || isRefreshingMetadata}
-                onClick={() => {
-                  void reloadCollections();
-                }}
-                type="button"
-              >
-                {isRefreshingMetadata ? "Обновляем..." : "Списки"}
-              </button>
-              <button
-                className={styles.primaryButton}
-                disabled={metadataStatus !== "ready" || isRunningContentSearch}
-                type="submit"
-              >
-                {legacySearchStatus === "loading" || encryptedSearchStatus === "loading"
-                  ? "Ищем..."
-                  : "Искать"}
-              </button>
+              <div className={styles.inlineActions}>
+                <button
+                  className={styles.primaryButton}
+                  disabled={metadataStatus !== "ready" || isRunningContentSearch}
+                  type="submit"
+                >
+                  {legacySearchStatus === "loading" || encryptedSearchStatus === "loading"
+                    ? "Ищем..."
+                    : "Искать"}
+                </button>
+              </div>
             </div>
-          </div>
         </form>
 
         {metadataStatus === "loading" && (

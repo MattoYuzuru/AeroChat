@@ -656,14 +656,14 @@ export function SettingsPage() {
 
                   <div className={styles.chipGroup}>
                     <span className={styles.metaChip}>
-                      поддержка: {cryptoRuntime.state.snapshot.support}
+                      поддержка устройства: {cryptoRuntime.state.snapshot.support}
                     </span>
                     <span className={styles.metaChip}>
-                      режим: {cryptoRuntime.state.snapshot.phase}
+                      состояние: {cryptoRuntime.state.snapshot.phase}
                     </span>
                     {cryptoRuntime.state.snapshot.localDevice && (
                       <span className={styles.metaChip}>
-                        bundle v{cryptoRuntime.state.snapshot.localDevice.lastBundleVersion}
+                        пакет ключей v{cryptoRuntime.state.snapshot.localDevice.lastBundleVersion}
                       </span>
                     )}
                   </div>
@@ -671,7 +671,7 @@ export function SettingsPage() {
                   {cryptoRuntime.state.snapshot.localDevice && (
                     <div className={styles.metaGrid}>
                       <div>
-                        <dt>Crypto device ID</dt>
+                        <dt>ID криптоустройства</dt>
                         <dd>
                           {formatShortId(
                             cryptoRuntime.state.snapshot.localDevice.cryptoDeviceId,
@@ -690,7 +690,7 @@ export function SettingsPage() {
                         </dd>
                       </div>
                       <div>
-                        <dt>Link intent</dt>
+                        <dt>Запрос привязки</dt>
                         <dd>
                           {cryptoRuntime.state.snapshot.localDevice.linkIntentId
                             ? formatShortId(
@@ -744,7 +744,7 @@ export function SettingsPage() {
                     >
                       {cryptoRuntime.state.pendingLabel ===
                       "Синхронизируем crypto runtime..."
-                        ? cryptoRuntime.state.pendingLabel
+                        ? "Синхронизируем..."
                         : "Обновить состояние"}
                     </button>
                     <button
@@ -776,7 +776,7 @@ export function SettingsPage() {
                     >
                       {cryptoRuntime.state.pendingLabel ===
                       "Публикуем текущий bundle..."
-                        ? cryptoRuntime.state.pendingLabel
+                        ? "Публикуем..."
                         : "Опубликовать пакет"}
                     </button>
                   </div>
