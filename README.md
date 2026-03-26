@@ -1,6 +1,7 @@
 <a id="readme-top"></a>
 
 <div align="center">
+  <img src="./favicon_io/android-chrome-192x192.png" alt="AeroChat icon" width="96" height="96" />
   <h1>AeroChat</h1>
   <p>
     Самостоятельно разворачиваемый приватный чат с веб-клиентом, группами, realtime и bounded foundation под encrypted lanes.
