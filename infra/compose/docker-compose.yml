@@ -196,6 +196,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_GATEWAY_BASE_URL: ${VITE_GATEWAY_BASE_URL:-/api}
+        VITE_RTC_ICE_SERVER_URLS: ${VITE_RTC_ICE_SERVER_URLS:-}
     depends_on:
       aero-gateway:
         condition: service_healthy

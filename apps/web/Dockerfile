@@ -6,6 +6,8 @@ RUN npm install -g pnpm@10.19.0
 
 ARG VITE_GATEWAY_BASE_URL=/api
 ENV VITE_GATEWAY_BASE_URL=${VITE_GATEWAY_BASE_URL}
+ARG VITE_RTC_ICE_SERVER_URLS
+ENV VITE_RTC_ICE_SERVER_URLS=${VITE_RTC_ICE_SERVER_URLS}
 
 COPY package.json pnpm-workspace.yaml ./
 COPY pnpm-lock.yaml ./pnpm-lock.yaml
