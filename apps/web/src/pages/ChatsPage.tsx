@@ -1,6 +1,7 @@
 import {
   useEffect,
   useEffectEvent,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -56,7 +57,7 @@ import {
 import { primeEncryptedDirectLocalSearchIndex } from "../search/encrypted-local-search";
 import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import { useDirectCallSession } from "../rtc/useDirectCallSession";
-import { useDesktopShellHost } from "../shell/context";
+import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
 import styles from "./ChatsPage.module.css";
 
 interface ChatsPageProps {
@@ -71,9 +72,14 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const navigate = useNavigate();
   const { state: authState, expireSession } = useAuth();
   const desktopShellHost = useDesktopShellHost();
+  const windowLocation = useDesktopShellWindowLocation();
   const directCallAwareness = useDirectCallAwareness();
   const cryptoRuntime = useCryptoRuntime();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
+  const searchParams = useMemo(
+    () => new URLSearchParams(windowLocation.search),
+    [windowLocation.search],
+  );
   const [composerText, setComposerText] = useState("");
   const [composerError, setComposerError] = useState<string | null>(null);
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
@@ -605,7 +611,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     "thread",
   );
   const directWindowContentMode =
-    desktopShellHost?.activeWindowContentMode ?? mobileWindowContentMode;
+    desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
   const isDesktopTargetWindow = desktopShellHost !== null && isThreadRouteActive;
   const people = usePeople({
     enabled:
@@ -1118,7 +1124,10 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
       className={`${styles.layout} ${isDesktopTargetWindow ? styles.desktopWindowLayout : ""}`}
     >
       {!isDesktopTargetWindow && (
-        <section className={styles.heroCard}>
+        <section
+          className={styles.heroCard}
+          data-mobile-hidden={isThreadRouteActive || undefined}
+        >
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Chats</p>
@@ -1163,6 +1172,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
 
       <div
         className={`${styles.workspace} ${isDesktopTargetWindow ? styles.desktopWindowWorkspace : ""}`}
+        data-mobile-thread-active={isThreadRouteActive || undefined}
       >
         {!isDesktopTargetWindow && (
           <section

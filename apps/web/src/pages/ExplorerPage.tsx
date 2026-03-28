@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import {
   buildDirectChatRoutePath,
@@ -24,7 +24,7 @@ import {
   type ExplorerFolderRecord,
   type ExplorerSectionId,
 } from "../shell/explorer-model";
-import { useDesktopShellHost } from "../shell/context";
+import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
 import {
   addCustomFolderMemberReference,
   createCustomFolderDesktopEntity,
@@ -50,10 +50,10 @@ import { getBrowserShellPreferencesStorage } from "../shell/preferences";
 import styles from "./ExplorerPage.module.css";
 
 export function ExplorerPage() {
-  const location = useLocation();
   const navigate = useNavigate();
   const auth = useAuth();
   const desktopShellHost = useDesktopShellHost();
+  const windowLocation = useDesktopShellWindowLocation();
   const [storage] = useState(() => getBrowserShellPreferencesStorage());
   const [localRegistryState, setLocalRegistryState] = useState<DesktopRegistryState>(() =>
     readDesktopRegistryState(storage),
@@ -67,7 +67,10 @@ export function ExplorerPage() {
     Record<string, string>
   >({});
 
-  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const searchParams = useMemo(
+    () => new URLSearchParams(windowLocation.search),
+    [windowLocation.search],
+  );
   const navigationTarget = resolveExplorerNavigationTarget({
     section: searchParams.get("section"),
     folder: searchParams.get("folder"),

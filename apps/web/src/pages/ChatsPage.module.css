@@ -791,6 +791,7 @@
   border: 0;
   background: transparent;
   box-shadow: none;
+  height: 100%;
 }
 
 .threadHero,
@@ -823,7 +824,7 @@
   border-left: 0;
   border-right: 0;
   border-top: 0;
-  padding: 0.65rem 0.8rem;
+  padding: 0.45rem 0.65rem;
 }
 
 .messagesPanel {
@@ -838,7 +839,7 @@
 .messagesViewport {
   min-height: 0;
   overflow-y: auto;
-  padding: 0.8rem 0.9rem;
+  padding: 0.65rem 0.75rem;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 247, 251, 0.98));
 }
@@ -865,8 +866,8 @@
 
 .messageBubble,
 .callCard {
-  width: min(100%, 34rem);
-  padding: 0.55rem 0.7rem;
+  width: min(100%, 30rem);
+  padding: 0.42rem 0.55rem;
 }
 
 .messageBubble[data-own="true"] {
@@ -890,12 +891,12 @@
 .threadIdentity {
   display: flex;
   align-items: stretch;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 .avatarBadge {
-  width: 2.85rem;
-  height: 2.85rem;
+  width: 2.55rem;
+  height: 2.55rem;
   border-radius: 0;
   border: 1px solid #6c86b2;
   background:
@@ -907,8 +908,8 @@
 }
 
 .avatarBadgeLarge {
-  width: 3.2rem;
-  height: 3.2rem;
+  width: 2.85rem;
+  height: 2.85rem;
   border-radius: 0;
 }
 
@@ -936,14 +937,14 @@
 
 .threadTitle {
   margin: 0;
-  font-size: 1.12rem;
+  font-size: 1rem;
   color: #123863;
 }
 
 .threadEyebrow {
   margin: 0.18rem 0 0;
   color: #32567e;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
 }
 
 .threadDescription,
@@ -952,7 +953,7 @@
 .historyNotice {
   margin: 0.18rem 0 0;
   color: #45617f;
-  font-size: 0.84rem;
+  font-size: 0.78rem;
 }
 
 .identityActionHint {
@@ -997,18 +998,20 @@
 .attachmentDraftError {
   margin: 0.2rem 0 0;
   color: #536d8d;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
 }
 
 .messageText {
   color: #173451;
+  font-size: 0.92rem;
+  line-height: 1.38;
 }
 
 .messageActions {
   display: flex;
   justify-content: flex-end;
   gap: 0.25rem;
-  margin-top: 0.35rem;
+  margin-top: 0.25rem;
 }
 
 .messageActionButton,
@@ -1059,12 +1062,12 @@
 }
 
 .composerCard {
-  padding: 0.45rem 0.8rem 0.65rem;
+  padding: 0.35rem 0.55rem 0.5rem;
   border-bottom: 0;
 }
 
 .composer {
-  gap: 0.45rem;
+  gap: 0.35rem;
 }
 
 .composerRow {
@@ -1079,9 +1082,9 @@
 }
 
 .field textarea {
-  min-height: 2.15rem;
-  max-height: 6rem;
-  padding: 0.42rem 0.55rem;
+  min-height: 1.95rem;
+  max-height: 5rem;
+  padding: 0.32rem 0.45rem;
   border-radius: 0;
   resize: vertical;
   background: var(--xp-field-surface);
@@ -1162,6 +1165,8 @@
 .desktopWindowLayout .desktopThreadSection {
   display: grid;
   min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .desktopWindowLayout .threadHero {
@@ -1189,6 +1194,25 @@
 }
 
 @media (max-width: 920px) {
+  .heroCard[data-mobile-hidden="true"] {
+    display: none;
+  }
+
+  .workspace[data-mobile-thread-active="true"] {
+    min-height: calc(100dvh - 12.5rem);
+  }
+
+  .threadPane[data-mobile-hidden="false"] {
+    min-height: inherit;
+  }
+
+  .threadPane[data-mobile-hidden="false"] > .sectionCard {
+    display: grid;
+    min-height: inherit;
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
   .threadLayout {
     grid-template-rows: auto auto minmax(0, 1fr) auto;
   }

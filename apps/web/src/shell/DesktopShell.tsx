@@ -1180,6 +1180,40 @@ export function DesktopShell({
     }
   }
 
+  function syncWindowRouteTitle(window: ShellWindow | null, title: string) {
+    if (window === null || window.target === null) {
+      return;
+    }
+
+    const targetKey = window.target.key;
+    const normalizedTitle = title.trim();
+    if (normalizedTitle === "" || window.title === normalizedTitle) {
+      return;
+    }
+
+    dispatch({
+      type: "sync_target",
+      app: shellAppRegistry[window.appId],
+      target: {
+        ...window.target,
+        title: normalizedTitle,
+        routePath: window.routePath ?? window.target.routePath,
+      },
+    });
+
+    if (window.appId === "direct_chat") {
+      setDesktopRegistryState((currentState) =>
+        upsertDirectChatDesktopEntity(currentState, targetKey, normalizedTitle),
+      );
+    }
+
+    if (window.appId === "group_chat") {
+      setDesktopRegistryState((currentState) =>
+        upsertGroupChatDesktopEntity(currentState, targetKey, normalizedTitle),
+      );
+    }
+  }
+
   function setActiveWindowContentMode(contentMode: ShellWindowContentMode) {
     if (activeWindow === null || activeWindow.contentMode === null) {
       return;
@@ -1188,6 +1222,21 @@ export function DesktopShell({
     dispatch({
       type: "set_content_mode",
       windowId: activeWindow.windowId,
+      contentMode,
+    });
+  }
+
+  function setWindowContentMode(
+    window: ShellWindow | null,
+    contentMode: ShellWindowContentMode,
+  ) {
+    if (window === null || window.contentMode === null) {
+      return;
+    }
+
+    dispatch({
+      type: "set_content_mode",
+      windowId: window.windowId,
       contentMode,
     });
   }
@@ -1561,30 +1610,43 @@ export function DesktopShell({
     }
   }
 
+  const activeWindowRouteLocation =
+    activeWindow?.routePath === null || activeWindow?.routePath === undefined
+      ? null
+      : readRoutePathLocation(activeWindow.routePath);
+  const baseDesktopShellHost = {
+    isDesktopShell: true as const,
+    activeWindowId: activeWindow?.windowId ?? null,
+    activeWindowContentMode: activeWindow?.contentMode ?? null,
+    currentWindowId: activeWindow?.windowId ?? null,
+    currentWindowContentMode: activeWindow?.contentMode ?? null,
+    currentWindowRoutePath: activeWindow?.routePath ?? null,
+    currentWindowPathname: activeWindowRouteLocation?.pathname ?? null,
+    currentWindowSearch: activeWindowRouteLocation?.search ?? "",
+    currentWindowTargetKey: activeWindow?.target?.key ?? null,
+    isCurrentWindowActive: activeWindow !== null,
+    desktopGridCapacity: desktopGridMetrics.capacity,
+    desktopRegistryState,
+    desktopUnreadTargetMap,
+    launchApp,
+    openDirectChat,
+    openGroupChat,
+    openCustomFolder,
+    openPersonProfile,
+    createCustomFolder,
+    renameCustomFolder,
+    deleteCustomFolder,
+    addFolderMember,
+    removeFolderMember,
+    hideDesktopEntry,
+    showDesktopEntry,
+    setActiveWindowContentMode,
+    syncCurrentRouteTitle,
+  };
+
   return (
     <DesktopShellHostContext.Provider
-      value={{
-        isDesktopShell: true,
-        activeWindowId: activeWindow?.windowId ?? null,
-        activeWindowContentMode: activeWindow?.contentMode ?? null,
-        desktopGridCapacity: desktopGridMetrics.capacity,
-        desktopRegistryState,
-        desktopUnreadTargetMap,
-        launchApp,
-        openDirectChat,
-        openGroupChat,
-        openCustomFolder,
-        openPersonProfile,
-        createCustomFolder,
-        renameCustomFolder,
-        deleteCustomFolder,
-        addFolderMember,
-        removeFolderMember,
-        hideDesktopEntry,
-        showDesktopEntry,
-        setActiveWindowContentMode,
-        syncCurrentRouteTitle,
-      }}
+      value={baseDesktopShellHost}
     >
       <div className={styles.shell}>
         <div className={styles.wallpaper} aria-hidden="true" />
@@ -1844,6 +1906,8 @@ export function DesktopShell({
                 window.bounds,
                 windowLayerViewport,
               );
+              const windowRouteLocation =
+                window.routePath === null ? null : readRoutePathLocation(window.routePath);
 
               return (
                 <div
@@ -1944,10 +2008,26 @@ export function DesktopShell({
                     </div>
                   </div>
                   <div className={styles.windowBody}>
-                    <ShellWindowBody
-                      activeWindowId={runtimeState.activeWindowId}
-                      window={window}
-                    />
+                    <DesktopShellHostContext.Provider
+                      value={{
+                        ...baseDesktopShellHost,
+                        currentWindowId: window.windowId,
+                        currentWindowContentMode: window.contentMode,
+                        currentWindowRoutePath: window.routePath,
+                        currentWindowPathname: windowRouteLocation?.pathname ?? null,
+                        currentWindowSearch: windowRouteLocation?.search ?? "",
+                        currentWindowTargetKey: window.target?.key ?? null,
+                        isCurrentWindowActive: runtimeState.activeWindowId === window.windowId,
+                        setActiveWindowContentMode: (contentMode) => {
+                          setWindowContentMode(window, contentMode);
+                        },
+                        syncCurrentRouteTitle: (title) => {
+                          syncWindowRouteTitle(window, title);
+                        },
+                      }}
+                    >
+                      <ShellWindowBody window={window} />
+                    </DesktopShellHostContext.Provider>
                   </div>
                   {window.state !== "maximized" &&
                     windowResizeHandles.map((handle) => (
@@ -2320,30 +2400,25 @@ export function DesktopShell({
   );
 }
 
-function ShellWindowBody({
-  activeWindowId,
-  window,
-}: {
-  activeWindowId: string | null;
-  window: ShellWindow;
-}) {
+function readRoutePathLocation(routePath: string): {
+  pathname: string;
+  search: string;
+} {
+  const [pathnamePart, ...searchParts] = routePath.split("?");
+  const pathname = pathnamePart?.trim() ?? "";
+  const searchValue = searchParts.join("?");
+
+  return {
+    pathname,
+    search: searchValue === "" ? "" : `?${searchValue}`,
+  };
+}
+
+function ShellWindowBody({ window }: { window: ShellWindow }) {
   const { appId } = window;
 
   if (!isRouteBackedShellAppId(appId)) {
     return <div className={styles.routeHost}>{renderShellAppContent(appId)}</div>;
-  }
-
-  if (window.windowId !== activeWindowId) {
-    return (
-      <div className={styles.placeholderCard}>
-        <p className={styles.placeholderLabel}>Фоновое окно</p>
-        <h2 className={styles.placeholderTitle}>{window.title}</h2>
-        <p className={styles.placeholderText}>
-          Когда окно не в фокусе, его содержимое удерживается shell-слоем. После возврата фокуса
-          переписка или страница восстановится без открытия второго окна.
-        </p>
-      </div>
-    );
   }
 
   return (
