@@ -67,6 +67,18 @@ func (h *IdentityHandler) UpdateCurrentProfile(ctx context.Context, req *connect
 	return forwardUnary(ctx, req, h.client.UpdateCurrentProfile)
 }
 
+func (h *IdentityHandler) GetWebPushPublicKey(ctx context.Context, req *connect.Request[identityv1.GetWebPushPublicKeyRequest]) (*connect.Response[identityv1.GetWebPushPublicKeyResponse], error) {
+	return forwardUnary(ctx, req, h.client.GetWebPushPublicKey)
+}
+
+func (h *IdentityHandler) UpsertWebPushSubscription(ctx context.Context, req *connect.Request[identityv1.UpsertWebPushSubscriptionRequest]) (*connect.Response[identityv1.UpsertWebPushSubscriptionResponse], error) {
+	return forwardUnary(ctx, req, h.client.UpsertWebPushSubscription)
+}
+
+func (h *IdentityHandler) DeleteWebPushSubscription(ctx context.Context, req *connect.Request[identityv1.DeleteWebPushSubscriptionRequest]) (*connect.Response[identityv1.DeleteWebPushSubscriptionResponse], error) {
+	return forwardUnary(ctx, req, h.client.DeleteWebPushSubscription)
+}
+
 func (h *IdentityHandler) ListDevices(ctx context.Context, req *connect.Request[identityv1.ListDevicesRequest]) (*connect.Response[identityv1.ListDevicesResponse], error) {
 	return forwardUnary(ctx, req, h.client.ListDevices)
 }

@@ -35,6 +35,7 @@ type Querier interface {
 	DeleteEncryptedGroupRosterDevicesByGroupID(ctx context.Context, groupID uuid.UUID) error
 	DeleteEncryptedGroupRosterMembersByGroupID(ctx context.Context, groupID uuid.UUID) error
 	DeleteGroupMembership(ctx context.Context, arg DeleteGroupMembershipParams) (int64, error)
+	DeleteWebPushSubscriptionsByIDs(ctx context.Context, dollar_1 []uuid.UUID) (int64, error)
 	DetachDirectMessageAttachments(ctx context.Context, arg DetachDirectMessageAttachmentsParams) (int64, error)
 	DetachEncryptedDirectMessageV2Attachments(ctx context.Context, arg DetachEncryptedDirectMessageV2AttachmentsParams) (int64, error)
 	DetachEncryptedGroupMessageV1Attachments(ctx context.Context, arg DetachEncryptedGroupMessageV1AttachmentsParams) (int64, error)
@@ -70,6 +71,7 @@ type Querier interface {
 	InsertEncryptedGroupRosterMember(ctx context.Context, arg InsertEncryptedGroupRosterMemberParams) error
 	JoinGroupMembership(ctx context.Context, arg JoinGroupMembershipParams) (int64, error)
 	ListActiveCryptoDevicesByUserIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListActiveCryptoDevicesByUserIDsRow, error)
+	ListActiveWebPushSubscriptionsByUserIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]WebPushSubscription, error)
 	ListAttachmentObjectDeletionCandidates(ctx context.Context, arg ListAttachmentObjectDeletionCandidatesParams) ([]ListAttachmentObjectDeletionCandidatesRow, error)
 	ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListAttachmentRowsByIDsRow, error)
 	ListCurrentCryptoDeviceBundlesByDeviceIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListCurrentCryptoDeviceBundlesByDeviceIDsRow, error)
@@ -105,6 +107,8 @@ type Querier interface {
 	PinEncryptedGroupMessage(ctx context.Context, arg PinEncryptedGroupMessageParams) (int64, error)
 	SearchDirectMessages(ctx context.Context, arg SearchDirectMessagesParams) ([]SearchDirectMessagesRow, error)
 	SearchGroupMessages(ctx context.Context, arg SearchGroupMessagesParams) ([]SearchGroupMessagesRow, error)
+	SetAllDirectChatNotificationPreferencesByUserID(ctx context.Context, arg SetAllDirectChatNotificationPreferencesByUserIDParams) error
+	SetAllGroupNotificationPreferencesByUserID(ctx context.Context, arg SetAllGroupNotificationPreferencesByUserIDParams) error
 	SetGroupMembershipWriteRestriction(ctx context.Context, arg SetGroupMembershipWriteRestrictionParams) (int64, error)
 	TouchDirectChatMessageUpdatedAt(ctx context.Context, arg TouchDirectChatMessageUpdatedAtParams) error
 	TouchDirectChatUpdatedAt(ctx context.Context, arg TouchDirectChatUpdatedAtParams) error
@@ -118,10 +122,12 @@ type Querier interface {
 	UnpinEncryptedGroupMessage(ctx context.Context, arg UnpinEncryptedGroupMessageParams) (int64, error)
 	UpdateEncryptedGroupLane(ctx context.Context, arg UpdateEncryptedGroupLaneParams) (int64, error)
 	UpdateGroupMembershipRole(ctx context.Context, arg UpdateGroupMembershipRoleParams) (int64, error)
+	UpsertDirectChatNotificationPreference(ctx context.Context, arg UpsertDirectChatNotificationPreferenceParams) error
 	UpsertDirectChatReadReceipt(ctx context.Context, arg UpsertDirectChatReadReceiptParams) (int64, error)
 	UpsertEncryptedDirectChatReadState(ctx context.Context, arg UpsertEncryptedDirectChatReadStateParams) (int64, error)
 	UpsertEncryptedGroupReadState(ctx context.Context, arg UpsertEncryptedGroupReadStateParams) (int64, error)
 	UpsertGroupChatReadState(ctx context.Context, arg UpsertGroupChatReadStateParams) (int64, error)
+	UpsertGroupNotificationPreference(ctx context.Context, arg UpsertGroupNotificationPreferenceParams) error
 }
 
 var _ Querier = (*Queries)(nil)

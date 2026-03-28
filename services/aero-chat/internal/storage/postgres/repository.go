@@ -50,6 +50,7 @@ func (r *Repository) GetSessionAuthByID(ctx context.Context, sessionID string) (
 			ReadReceiptsEnabled:     row.ReadReceiptsEnabled,
 			PresenceEnabled:         row.PresenceEnabled,
 			TypingVisibilityEnabled: row.TypingVisibilityEnabled,
+			PushNotificationsEnabled: row.PushNotificationsEnabled,
 		},
 		Device: chat.Device{
 			ID:         row.DeviceID.String(),
@@ -187,6 +188,34 @@ func (r *Repository) GetDirectChat(ctx context.Context, userID string, chatID st
 	return &chats[0], nil
 }
 
+func (r *Repository) UpsertDirectChatNotificationPreference(
+	ctx context.Context,
+	chatID string,
+	userID string,
+	enabled bool,
+	updatedAt time.Time,
+) error {
+	return convertError(r.queries.UpsertDirectChatNotificationPreference(ctx, chatsqlc.UpsertDirectChatNotificationPreferenceParams{
+		ChatID:                mustParseUUID(chatID),
+		UserID:                mustParseUUID(userID),
+		NotificationsEnabled:  enabled,
+		UpdatedAt:             timestamptzValue(updatedAt),
+	}))
+}
+
+func (r *Repository) SetAllDirectChatNotificationPreferences(
+	ctx context.Context,
+	userID string,
+	enabled bool,
+	updatedAt time.Time,
+) error {
+	return convertError(r.queries.SetAllDirectChatNotificationPreferencesByUserID(ctx, chatsqlc.SetAllDirectChatNotificationPreferencesByUserIDParams{
+		UserID:               mustParseUUID(userID),
+		NotificationsEnabled: enabled,
+		UpdatedAt:            timestamptzValue(updatedAt),
+	}))
+}
+
 func (r *Repository) CreateGroup(ctx context.Context, params chat.CreateGroupParams) (*chat.Group, error) {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -269,6 +298,7 @@ func (r *Repository) ListGroups(ctx context.Context, userID string) ([]chat.Grou
 			EncryptedPinnedMessageIDs: uuidSliceToStrings(encryptedPinnedIDs),
 			UnreadCount:               row.UnreadCount,
 			EncryptedUnreadCount:      row.EncryptedUnreadCount,
+			NotificationsEnabled:      row.NotificationsEnabled,
 			CreatedAt:                 timestampValue(row.CreatedAt),
 			UpdatedAt:                 timestampValue(row.UpdatedAt),
 		})
@@ -301,6 +331,7 @@ func (r *Repository) GetGroup(ctx context.Context, userID string, groupID string
 		EncryptedPinnedMessageIDs: uuidSliceToStrings(encryptedPinnedIDs),
 		UnreadCount:               row.UnreadCount,
 		EncryptedUnreadCount:      row.EncryptedUnreadCount,
+		NotificationsEnabled:      row.NotificationsEnabled,
 		CreatedAt:                 timestampValue(row.CreatedAt),
 		UpdatedAt:                 timestampValue(row.UpdatedAt),
 	}
@@ -323,6 +354,84 @@ func (r *Repository) GetGroupChatThread(ctx context.Context, userID string, grou
 		CreatedAt: timestampValue(row.CreatedAt),
 		UpdatedAt: timestampValue(row.UpdatedAt),
 	}, nil
+}
+
+func (r *Repository) UpsertGroupNotificationPreference(
+	ctx context.Context,
+	groupID string,
+	userID string,
+	enabled bool,
+	updatedAt time.Time,
+) error {
+	return convertError(r.queries.UpsertGroupNotificationPreference(ctx, chatsqlc.UpsertGroupNotificationPreferenceParams{
+		GroupID:               mustParseUUID(groupID),
+		UserID:                mustParseUUID(userID),
+		NotificationsEnabled:  enabled,
+		UpdatedAt:             timestamptzValue(updatedAt),
+	}))
+}
+
+func (r *Repository) SetAllGroupNotificationPreferences(
+	ctx context.Context,
+	userID string,
+	enabled bool,
+	updatedAt time.Time,
+) error {
+	return convertError(r.queries.SetAllGroupNotificationPreferencesByUserID(ctx, chatsqlc.SetAllGroupNotificationPreferencesByUserIDParams{
+		UserID:               mustParseUUID(userID),
+		NotificationsEnabled: enabled,
+		UpdatedAt:            timestamptzValue(updatedAt),
+	}))
+}
+
+func (r *Repository) ListActiveWebPushSubscriptionsByUserIDs(
+	ctx context.Context,
+	userIDs []string,
+) ([]chat.WebPushSubscription, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
+	}
+
+	parsedIDs := make([]uuid.UUID, 0, len(userIDs))
+	for _, userID := range userIDs {
+		parsedIDs = append(parsedIDs, mustParseUUID(userID))
+	}
+
+	rows, err := r.queries.ListActiveWebPushSubscriptionsByUserIDs(ctx, parsedIDs)
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	subscriptions := make([]chat.WebPushSubscription, 0, len(rows))
+	for _, row := range rows {
+		subscriptions = append(subscriptions, chat.WebPushSubscription{
+			ID:         row.ID.String(),
+			UserID:     row.UserID.String(),
+			Endpoint:   row.Endpoint,
+			P256DHKey:  row.P256dhKey,
+			AuthSecret: row.AuthSecret,
+		})
+	}
+
+	return subscriptions, nil
+}
+
+func (r *Repository) DeleteWebPushSubscriptionsByIDs(ctx context.Context, ids []string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	parsedIDs := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		parsedIDs = append(parsedIDs, mustParseUUID(id))
+	}
+
+	affected, err := r.queries.DeleteWebPushSubscriptionsByIDs(ctx, parsedIDs)
+	if err != nil {
+		return 0, convertError(err)
+	}
+
+	return affected, nil
 }
 
 func (r *Repository) GetGroupReadStateEntry(ctx context.Context, userID string, groupID string) (*chat.GroupReadStateEntry, error) {
@@ -391,6 +500,7 @@ func (r *Repository) ListGroupMembers(ctx context.Context, userID string, groupI
 				Login:     row.Login,
 				Nickname:  row.Nickname,
 				AvatarURL: textPointer(row.AvatarUrl),
+				PushNotificationsEnabled: row.PushNotificationsEnabled,
 			},
 			Role:              row.Role,
 			JoinedAt:          timestampValue(row.JoinedAt),
@@ -471,6 +581,7 @@ func (r *Repository) GetGroupMember(ctx context.Context, groupID string, userID 
 			Login:     row.Login,
 			Nickname:  row.Nickname,
 			AvatarURL: textPointer(row.AvatarUrl),
+			PushNotificationsEnabled: row.PushNotificationsEnabled,
 		},
 		Role:              row.Role,
 		JoinedAt:          timestampValue(row.JoinedAt),
@@ -2292,10 +2403,12 @@ type listChatRow struct {
 	ChatUpdatedAt        pgtype.Timestamptz
 	UnreadCount          int32
 	EncryptedUnreadCount int32
+	NotificationsEnabled bool
 	ParticipantUserID    uuid.UUID
 	ParticipantLogin     string
 	ParticipantNickname  string
 	ParticipantAvatarURL pgtype.Text
+	ParticipantPushNotificationsEnabled bool
 }
 
 func rowsToListChatRows(rows []chatsqlc.ListDirectChatRowsByUserIDRow) []listChatRow {
@@ -2307,10 +2420,12 @@ func rowsToListChatRows(rows []chatsqlc.ListDirectChatRowsByUserIDRow) []listCha
 			ChatUpdatedAt:        row.ChatUpdatedAt,
 			UnreadCount:          row.UnreadCount,
 			EncryptedUnreadCount: row.EncryptedUnreadCount,
+			NotificationsEnabled: row.NotificationsEnabled,
 			ParticipantUserID:    row.ParticipantUserID,
 			ParticipantLogin:     row.ParticipantLogin,
 			ParticipantNickname:  row.ParticipantNickname,
 			ParticipantAvatarURL: row.ParticipantAvatarUrl,
+			ParticipantPushNotificationsEnabled: row.ParticipantPushNotificationsEnabled,
 		})
 	}
 	return items
@@ -2325,10 +2440,12 @@ func rowsToGetChatRows(rows []chatsqlc.GetDirectChatRowsByIDAndUserIDRow) []list
 			ChatUpdatedAt:        row.ChatUpdatedAt,
 			UnreadCount:          row.UnreadCount,
 			EncryptedUnreadCount: row.EncryptedUnreadCount,
+			NotificationsEnabled: row.NotificationsEnabled,
 			ParticipantUserID:    row.ParticipantUserID,
 			ParticipantLogin:     row.ParticipantLogin,
 			ParticipantNickname:  row.ParticipantNickname,
 			ParticipantAvatarURL: row.ParticipantAvatarUrl,
+			ParticipantPushNotificationsEnabled: row.ParticipantPushNotificationsEnabled,
 		})
 	}
 	return items
@@ -2357,6 +2474,7 @@ func (r *Repository) collectChats(ctx context.Context, rows []listChatRow) ([]ch
 				EncryptedPinnedMessageIDs: nil,
 				UnreadCount:               row.UnreadCount,
 				EncryptedUnreadCount:      row.EncryptedUnreadCount,
+				NotificationsEnabled:      row.NotificationsEnabled,
 				CreatedAt:                 timestampValue(row.ChatCreatedAt),
 				UpdatedAt:                 timestampValue(row.ChatUpdatedAt),
 			})
@@ -2374,6 +2492,7 @@ func (r *Repository) collectChats(ctx context.Context, rows []listChatRow) ([]ch
 			Login:     row.ParticipantLogin,
 			Nickname:  row.ParticipantNickname,
 			AvatarURL: textPointer(row.ParticipantAvatarURL),
+			PushNotificationsEnabled: row.ParticipantPushNotificationsEnabled,
 		})
 	}
 

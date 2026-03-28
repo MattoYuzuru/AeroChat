@@ -240,6 +240,8 @@ cp .env.server.secrets.example .env.server.secrets
 - `AERO_MEDIA_HOST_PORT`
 - `MEDIA_S3_PUBLIC_ENDPOINT`
 - `MEDIA_S3_CORS_ALLOWED_ORIGINS`
+- `AERO_WEB_PUSH_SUBSCRIBER`
+- `AERO_WEB_PUSH_VAPID_PUBLIC_KEY`
 - `AERO_RTC_TURN_EXTERNAL_IP`
 - `AERO_RTC_TURN_RELAY_IP`
 - `AERO_RTC_TURN_LISTEN_PORT`
@@ -258,11 +260,17 @@ cp .env.server.secrets.example .env.server.secrets
 - `AERO_MEDIA_HOST_PORT` обслуживает MinIO API upstream для `https://${AERO_MEDIA_EDGE_DOMAIN}`;
 - `MEDIA_S3_PUBLIC_ENDPOINT` должен совпадать с browser-visible media origin, а не с `minio:9000`;
 - `MEDIA_S3_CORS_ALLOWED_ORIGINS` должен перечислять только доверенные application origins;
+- `AERO_WEB_PUSH_SUBSCRIBER` должен содержать корректный VAPID subject, обычно `mailto:` URL;
+- `AERO_WEB_PUSH_VAPID_PUBLIC_KEY` должен совпадать с private key из `.env.server.secrets`;
 - `AERO_RTC_TURN_EXTERNAL_IP` должен соответствовать browser-visible TURN host из `AERO_RTC_TURN_URLS`;
 - `AERO_RTC_TURN_RELAY_IP` должен указывать на локальный bind IP хоста, если public TURN IP не принадлежит интерфейсу VPS;
 - при NAT-сценарии coturn будет рекламировать mapping `AERO_RTC_TURN_EXTERNAL_IP/AERO_RTC_TURN_RELAY_IP`;
 - `AERO_RTC_TURN_LISTEN_PORT` и relay range должны совпадать с реально открытыми host/firewall ports.
 - high ports не должны оставаться бесконтрольно доступными извне.
+
+Минимально важные secret-переменные в `.env.server.secrets` дополнительно включают:
+
+- `AERO_WEB_PUSH_VAPID_PRIVATE_KEY`
 
 4. Проверь итоговую compose-конфигурацию:
 

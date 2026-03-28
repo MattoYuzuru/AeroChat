@@ -15,6 +15,7 @@ INSERT INTO users (
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at
 ) VALUES (
@@ -34,7 +35,8 @@ INSERT INTO users (
     $14,
     $15,
     $16,
-    $17
+    $17,
+    $18
 )
 RETURNING
     id,
@@ -52,6 +54,7 @@ RETURNING
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at;
 
@@ -103,6 +106,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at,
     c.password_hash,
@@ -129,6 +133,7 @@ SELECT
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at
 FROM users
@@ -151,6 +156,7 @@ SELECT
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at
 FROM users
@@ -172,7 +178,8 @@ SET
     presence_enabled = $12,
     typing_visibility_enabled = $13,
     key_backup_status = $14,
-    updated_at = $15
+    push_notifications_enabled = $15,
+    updated_at = $16
 WHERE id = $1
 RETURNING
     id,
@@ -190,6 +197,7 @@ RETURNING
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at;
 
@@ -223,6 +231,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
 FROM user_sessions AS s
@@ -312,6 +321,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at
 FROM user_blocks AS b
@@ -394,6 +404,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at
 FROM user_friend_requests AS fr
@@ -419,6 +430,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at
 FROM user_friend_requests AS fr
@@ -444,6 +456,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at
 FROM user_friendships AS f
@@ -454,3 +467,57 @@ JOIN users AS u
     END
 WHERE f.user_low_id = $1 OR f.user_high_id = $1
 ORDER BY f.created_at DESC;
+
+-- name: UpsertWebPushSubscription :exec
+INSERT INTO web_push_subscriptions (
+    id,
+    user_id,
+    endpoint,
+    p256dh_key,
+    auth_secret,
+    expiration_time,
+    user_agent,
+    created_at,
+    updated_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9
+)
+ON CONFLICT (endpoint) DO UPDATE
+SET
+    user_id = EXCLUDED.user_id,
+    p256dh_key = EXCLUDED.p256dh_key,
+    auth_secret = EXCLUDED.auth_secret,
+    expiration_time = EXCLUDED.expiration_time,
+    user_agent = EXCLUDED.user_agent,
+    updated_at = EXCLUDED.updated_at;
+
+-- name: DeleteWebPushSubscriptionByUserIDAndEndpoint :execrows
+DELETE FROM web_push_subscriptions
+WHERE user_id = $1 AND endpoint = $2;
+
+-- name: ListWebPushSubscriptionsByUserID :many
+SELECT
+    id,
+    user_id,
+    endpoint,
+    p256dh_key,
+    auth_secret,
+    expiration_time,
+    user_agent,
+    created_at,
+    updated_at
+FROM web_push_subscriptions
+WHERE user_id = $1
+ORDER BY created_at DESC;
+
+-- name: DeleteWebPushSubscriptionsByIDs :execrows
+DELETE FROM web_push_subscriptions
+WHERE id = ANY($1::uuid[]);

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +13,7 @@ import (
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
 	"github.com/MattoYuzuru/AeroChat/libs/go/dbbootstrap"
+	libnotifications "github.com/MattoYuzuru/AeroChat/libs/go/notifications"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	chatschema "github.com/MattoYuzuru/AeroChat/services/aero-chat/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/app"
@@ -109,6 +111,14 @@ func run() error {
 		typingStore,
 		presenceStore,
 		objectStorage,
+		app.NewMessageNotificationDispatcher(
+			libnotifications.NewWebPushClient(
+				&http.Client{},
+				cfg.WebPushSubscriber,
+				cfg.WebPushVAPIDPublicKey,
+				cfg.WebPushVAPIDPrivateKey,
+			),
+		),
 		libauth.NewSessionTokenManager(),
 		cfg.DirectChatTypingTTL,
 		cfg.DirectChatPresenceTTL,

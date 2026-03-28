@@ -20,7 +20,7 @@ type Querier interface {
 	CreateFriendRequest(ctx context.Context, arg CreateFriendRequestParams) error
 	CreateFriendship(ctx context.Context, arg CreateFriendshipParams) error
 	CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error)
-	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	CreateUserBlock(ctx context.Context, arg CreateUserBlockParams) error
 	CreateUserPasswordCredential(ctx context.Context, arg CreateUserPasswordCredentialParams) error
 	DeleteCryptoDeviceBundlePublishChallengeByDeviceID(ctx context.Context, cryptoDeviceID uuid.UUID) (int64, error)
@@ -28,6 +28,8 @@ type Querier interface {
 	DeleteFriendRequestsByPair(ctx context.Context, arg DeleteFriendRequestsByPairParams) error
 	DeleteFriendshipByPair(ctx context.Context, arg DeleteFriendshipByPairParams) (int64, error)
 	DeleteUserBlock(ctx context.Context, arg DeleteUserBlockParams) (int64, error)
+	DeleteWebPushSubscriptionByUserIDAndEndpoint(ctx context.Context, arg DeleteWebPushSubscriptionByUserIDAndEndpointParams) (int64, error)
+	DeleteWebPushSubscriptionsByIDs(ctx context.Context, dollar_1 []uuid.UUID) (int64, error)
 	ExpireCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg ExpireCryptoDeviceLinkIntentByIDAndUserIDParams) (ExpireCryptoDeviceLinkIntentByIDAndUserIDRow, error)
 	ExpirePendingCryptoDeviceLinkIntentsByDeviceID(ctx context.Context, arg ExpirePendingCryptoDeviceLinkIntentsByDeviceIDParams) (int64, error)
 	ExpireStaleCryptoDeviceLinkIntentsByUserID(ctx context.Context, arg ExpireStaleCryptoDeviceLinkIntentsByUserIDParams) (int64, error)
@@ -41,8 +43,8 @@ type Querier interface {
 	GetPendingCryptoDeviceLinkIntentByDeviceID(ctx context.Context, pendingCryptoDeviceID uuid.UUID) (GetPendingCryptoDeviceLinkIntentByDeviceIDRow, error)
 	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
 	GetSocialGraphState(ctx context.Context, arg GetSocialGraphStateParams) (GetSocialGraphStateRow, error)
-	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
-	GetUserByLogin(ctx context.Context, login string) (User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error)
+	GetUserByLogin(ctx context.Context, login string) (GetUserByLoginRow, error)
 	ListBlockedUsersByUserID(ctx context.Context, blockerUserID uuid.UUID) ([]ListBlockedUsersByUserIDRow, error)
 	ListCryptoDeviceLinkIntentsByUserID(ctx context.Context, userID uuid.UUID) ([]ListCryptoDeviceLinkIntentsByUserIDRow, error)
 	ListCryptoDevicesByUserID(ctx context.Context, userID uuid.UUID) ([]CryptoDevice, error)
@@ -51,6 +53,7 @@ type Querier interface {
 	ListIncomingFriendRequestsByUserID(ctx context.Context, addresseeUserID uuid.UUID) ([]ListIncomingFriendRequestsByUserIDRow, error)
 	ListOutgoingFriendRequestsByUserID(ctx context.Context, requesterUserID uuid.UUID) ([]ListOutgoingFriendRequestsByUserIDRow, error)
 	ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
+	ListWebPushSubscriptionsByUserID(ctx context.Context, userID uuid.UUID) ([]WebPushSubscription, error)
 	RevokeCryptoDeviceWithMetadata(ctx context.Context, arg RevokeCryptoDeviceWithMetadataParams) (CryptoDevice, error)
 	RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (int64, error)
 	RevokeDeviceSessions(ctx context.Context, arg RevokeDeviceSessionsParams) error
@@ -58,8 +61,9 @@ type Querier interface {
 	SupersedeCurrentCryptoDeviceBundle(ctx context.Context, arg SupersedeCurrentCryptoDeviceBundleParams) (int64, error)
 	TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error
 	UpdateCryptoDeviceBundleTracking(ctx context.Context, arg UpdateCryptoDeviceBundleTrackingParams) (CryptoDevice, error)
-	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UpdateUserProfileRow, error)
 	UpsertCryptoDeviceBundlePublishChallenge(ctx context.Context, arg UpsertCryptoDeviceBundlePublishChallengeParams) (CryptoDeviceBundlePublishChallenge, error)
+	UpsertWebPushSubscription(ctx context.Context, arg UpsertWebPushSubscriptionParams) error
 }
 
 var _ Querier = (*Queries)(nil)

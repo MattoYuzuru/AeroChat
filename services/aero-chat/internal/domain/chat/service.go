@@ -28,6 +28,12 @@ type Repository interface {
 	CreateDirectChat(context.Context, CreateDirectChatParams) (*DirectChat, error)
 	ListDirectChats(context.Context, string) ([]DirectChat, error)
 	GetDirectChat(context.Context, string, string) (*DirectChat, error)
+	UpsertDirectChatNotificationPreference(context.Context, string, string, bool, time.Time) error
+	UpsertGroupNotificationPreference(context.Context, string, string, bool, time.Time) error
+	SetAllDirectChatNotificationPreferences(context.Context, string, bool, time.Time) error
+	SetAllGroupNotificationPreferences(context.Context, string, bool, time.Time) error
+	ListActiveWebPushSubscriptionsByUserIDs(context.Context, []string) ([]WebPushSubscription, error)
+	DeleteWebPushSubscriptionsByIDs(context.Context, []string) (int64, error)
 	CreateAttachmentUploadIntent(context.Context, CreateAttachmentUploadIntentParams) (*AttachmentUploadIntent, error)
 	GetAttachment(context.Context, string) (*Attachment, *AttachmentUploadSession, error)
 	ListAttachments(context.Context, []string) ([]Attachment, error)
@@ -97,6 +103,27 @@ type Repository interface {
 	UnpinEncryptedGroupMessage(context.Context, string, string) (bool, error)
 }
 
+type NotificationDispatcher interface {
+	DispatchDirectMessage(
+		context.Context,
+		UserSummary,
+		UserSummary,
+		DirectChat,
+		[]WebPushSubscription,
+		string,
+		time.Time,
+	) []string
+	DispatchGroupMessage(
+		context.Context,
+		UserSummary,
+		Group,
+		UserSummary,
+		[]WebPushSubscription,
+		string,
+		time.Time,
+	) []string
+}
+
 type FriendshipChecker interface {
 	GetDirectChatRelationshipState(context.Context, string, string) (*DirectChatRelationshipState, error)
 }
@@ -147,6 +174,7 @@ type Service struct {
 	typingStore                      TypingStateStore
 	presenceStore                    PresenceStateStore
 	objectStorage                    ObjectStorage
+	notificationDispatcher           NotificationDispatcher
 	sessionToken                     *libauth.SessionTokenManager
 	sessionTouchInterval             time.Duration
 	typingTTL                        time.Duration
@@ -167,6 +195,7 @@ func NewService(
 	typingStore TypingStateStore,
 	presenceStore PresenceStateStore,
 	objectStorage ObjectStorage,
+	notificationDispatcher NotificationDispatcher,
 	sessionToken *libauth.SessionTokenManager,
 	typingTTL time.Duration,
 	presenceTTL time.Duration,
@@ -201,6 +230,7 @@ func NewService(
 		typingStore:                      typingStore,
 		presenceStore:                    presenceStore,
 		objectStorage:                    objectStorage,
+		notificationDispatcher:           notificationDispatcher,
 		sessionToken:                     sessionToken,
 		sessionTouchInterval:             defaultSessionTouchInterval,
 		typingTTL:                        typingTTL,
@@ -298,6 +328,38 @@ func (s *Service) GetDirectChat(ctx context.Context, token string, chatID string
 	return directChat, readState, encryptedReadState, typingState, presenceState, nil
 }
 
+func (s *Service) SetDirectChatNotifications(
+	ctx context.Context,
+	token string,
+	chatID string,
+	enabled bool,
+) (*DirectChat, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedChatID, err := normalizeID(chatID, "chat_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.UpsertDirectChatNotificationPreference(
+		ctx,
+		normalizedChatID,
+		authSession.User.ID,
+		enabled,
+		s.now(),
+	); err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetDirectChat(ctx, authSession.User.ID, normalizedChatID)
+}
+
 func (s *Service) CreateGroup(ctx context.Context, token string, name string) (*Group, error) {
 	authSession, err := s.authenticate(ctx, token)
 	if err != nil {
@@ -360,6 +422,60 @@ func (s *Service) GetGroup(ctx context.Context, token string, groupID string) (*
 	}
 
 	return enrichGroupPolicy(group), nil
+}
+
+func (s *Service) SetGroupNotifications(
+	ctx context.Context,
+	token string,
+	groupID string,
+	enabled bool,
+) (*Group, error) {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedGroupID, err := normalizeID(groupID, "group_id")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.UpsertGroupNotificationPreference(
+		ctx,
+		normalizedGroupID,
+		authSession.User.ID,
+		enabled,
+		s.now(),
+	); err != nil {
+		return nil, err
+	}
+
+	group, err := s.repo.GetGroup(ctx, authSession.User.ID, normalizedGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	return enrichGroupPolicy(group), nil
+}
+
+func (s *Service) SetAllNotifications(ctx context.Context, token string, enabled bool) error {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	now := s.now()
+	if err := s.repo.SetAllDirectChatNotificationPreferences(ctx, authSession.User.ID, enabled, now); err != nil {
+		return err
+	}
+	if err := s.repo.SetAllGroupNotificationPreferences(ctx, authSession.User.ID, enabled, now); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Service) GetGroupChat(ctx context.Context, token string, groupID string) (*Group, *GroupChatThread, *GroupReadState, *EncryptedGroupReadState, *GroupTypingState, error) {
@@ -978,7 +1094,7 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 	}
 
 	now := s.now()
-	return s.repo.CreateGroupMessage(ctx, CreateGroupMessageParams{
+	message, err := s.repo.CreateGroupMessage(ctx, CreateGroupMessageParams{
 		MessageID:        s.newID(),
 		GroupID:          group.ID,
 		ThreadID:         thread.ID,
@@ -989,6 +1105,13 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 		ReplyPreview:     replyPreview,
 		CreatedAt:        now,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+s.dispatchGroupMessageNotification(ctx, authSession.User, *group, false, normalizedText, now)
+
+	return message, nil
 }
 
 func (s *Service) GetEncryptedDirectMessageV2SendBootstrap(ctx context.Context, token string, chatID string, senderCryptoDeviceID string) (*EncryptedDirectMessageV2SendBootstrap, error) {
@@ -1157,7 +1280,7 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 	}
 
 	storedAt := normalizeStoredMessageTimestamp(s.now(), normalizedMessageCreatedAt)
-	return s.repo.CreateEncryptedDirectMessageV2(ctx, CreateEncryptedDirectMessageV2Params{
+	storedEnvelope, err := s.repo.CreateEncryptedDirectMessageV2(ctx, CreateEncryptedDirectMessageV2Params{
 		MessageID:            normalizedMessageID,
 		ChatID:               normalizedChatID,
 		SenderUserID:         authSession.User.ID,
@@ -1170,6 +1293,20 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 		CreatedAt:            normalizedMessageCreatedAt,
 		StoredAt:             storedAt,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.dispatchDirectMessageNotification(
+		ctx,
+		authSession.User,
+		*directChat,
+		true,
+		"",
+		normalizedMessageCreatedAt,
+	)
+
+	return storedEnvelope, nil
 }
 
 func (s *Service) ListEncryptedDirectMessageV2(ctx context.Context, token string, chatID string, viewerCryptoDeviceID string, pageSize uint32) ([]EncryptedDirectMessageV2Envelope, error) {
@@ -1391,7 +1528,7 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 	}
 
 	storedAt := normalizeStoredMessageTimestamp(s.now(), normalizedMessageCreatedAt)
-	return s.repo.CreateEncryptedGroupMessage(ctx, CreateEncryptedGroupMessageParams{
+	storedEnvelope, err := s.repo.CreateEncryptedGroupMessage(ctx, CreateEncryptedGroupMessageParams{
 		MessageID:            normalizedMessageID,
 		GroupID:              group.ID,
 		ThreadID:             thread.ID,
@@ -1408,6 +1545,20 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 		CreatedAt:            normalizedMessageCreatedAt,
 		StoredAt:             storedAt,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.dispatchGroupMessageNotification(
+		ctx,
+		authSession.User,
+		*group,
+		true,
+		"",
+		normalizedMessageCreatedAt,
+	)
+
+	return storedEnvelope, nil
 }
 
 func validateEncryptedMessageAttachmentLinkage(operationKind string, attachmentIDs []string) error {
@@ -1547,7 +1698,7 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 	}
 
 	now := s.now()
-	return s.repo.CreateDirectChatMessage(ctx, CreateDirectChatMessageParams{
+	message, err := s.repo.CreateDirectChatMessage(ctx, CreateDirectChatMessageParams{
 		MessageID:        s.newID(),
 		ChatID:           normalizedChatID,
 		SenderUserID:     authSession.User.ID,
@@ -1557,6 +1708,13 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 		ReplyPreview:     replyPreview,
 		CreatedAt:        now,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+s.dispatchDirectMessageNotification(ctx, authSession.User, *directChat, false, normalizedText, now)
+
+	return message, nil
 }
 
 func (s *Service) EditDirectChatMessage(ctx context.Context, token string, chatID string, messageID string, text string) (*DirectChatMessage, error) {

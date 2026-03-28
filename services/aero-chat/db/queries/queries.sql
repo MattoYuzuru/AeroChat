@@ -20,6 +20,7 @@ SELECT
     u.read_receipts_enabled,
     u.presence_enabled,
     u.typing_visibility_enabled,
+    u.push_notifications_enabled,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
 FROM user_sessions AS s
@@ -121,12 +122,16 @@ SELECT
               )
           )
     ), 0)::INT AS encrypted_unread_count,
+    COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
-    u.avatar_url AS participant_avatar_url
+    u.avatar_url AS participant_avatar_url,
+    u.push_notifications_enabled AS participant_push_notifications_enabled
 FROM direct_chat_participants AS self
 JOIN direct_chats AS c ON c.id = self.chat_id
+LEFT JOIN direct_chat_notification_preferences AS self_pref
+    ON self_pref.chat_id = c.id AND self_pref.user_id = self.user_id
 JOIN direct_chat_participants AS p ON p.chat_id = c.id
 JOIN users AS u ON u.id = p.user_id
 WHERE self.user_id = $1
@@ -175,16 +180,51 @@ SELECT
               )
           )
     ), 0)::INT AS encrypted_unread_count,
+    COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
-    u.avatar_url AS participant_avatar_url
+    u.avatar_url AS participant_avatar_url,
+    u.push_notifications_enabled AS participant_push_notifications_enabled
 FROM direct_chat_participants AS self
 JOIN direct_chats AS c ON c.id = self.chat_id
+LEFT JOIN direct_chat_notification_preferences AS self_pref
+    ON self_pref.chat_id = c.id AND self_pref.user_id = self.user_id
 JOIN direct_chat_participants AS p ON p.chat_id = c.id
 JOIN users AS u ON u.id = p.user_id
 WHERE self.user_id = $1 AND c.id = $2
 ORDER BY p.joined_at ASC, p.user_id ASC;
+
+-- name: UpsertDirectChatNotificationPreference :exec
+INSERT INTO direct_chat_notification_preferences (
+    chat_id,
+    user_id,
+    notifications_enabled,
+    updated_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (chat_id, user_id) DO UPDATE
+SET
+    notifications_enabled = EXCLUDED.notifications_enabled,
+    updated_at = EXCLUDED.updated_at;
+
+-- name: SetAllDirectChatNotificationPreferencesByUserID :exec
+INSERT INTO direct_chat_notification_preferences (
+    chat_id,
+    user_id,
+    notifications_enabled,
+    updated_at
+)
+SELECT
+    self.chat_id,
+    self.user_id,
+    $2,
+    $3
+FROM direct_chat_participants AS self
+WHERE self.user_id = $1
+ON CONFLICT (chat_id, user_id) DO UPDATE
+SET
+    notifications_enabled = EXCLUDED.notifications_enabled,
+    updated_at = EXCLUDED.updated_at;
 
 -- name: CreateGroup :one
 INSERT INTO groups (
@@ -288,9 +328,12 @@ SELECT
         SELECT COUNT(*)::INT
         FROM group_memberships AS members
         WHERE members.group_id = g.id
-    ), 0)::INT AS member_count
+    ), 0)::INT AS member_count,
+    COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
+LEFT JOIN group_notification_preferences AS self_pref
+    ON self_pref.group_id = g.id AND self_pref.user_id = self.user_id
 WHERE self.user_id = $1
 ORDER BY g.updated_at DESC, g.id DESC;
 
@@ -342,10 +385,44 @@ SELECT
         SELECT COUNT(*)::INT
         FROM group_memberships AS members
         WHERE members.group_id = g.id
-    ), 0)::INT AS member_count
+    ), 0)::INT AS member_count,
+    COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
+LEFT JOIN group_notification_preferences AS self_pref
+    ON self_pref.group_id = g.id AND self_pref.user_id = self.user_id
 WHERE self.user_id = $1 AND g.id = $2;
+
+-- name: UpsertGroupNotificationPreference :exec
+INSERT INTO group_notification_preferences (
+    group_id,
+    user_id,
+    notifications_enabled,
+    updated_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+    notifications_enabled = EXCLUDED.notifications_enabled,
+    updated_at = EXCLUDED.updated_at;
+
+-- name: SetAllGroupNotificationPreferencesByUserID :exec
+INSERT INTO group_notification_preferences (
+    group_id,
+    user_id,
+    notifications_enabled,
+    updated_at
+)
+SELECT
+    self.group_id,
+    self.user_id,
+    $2,
+    $3
+FROM group_memberships AS self
+WHERE self.user_id = $1
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+    notifications_enabled = EXCLUDED.notifications_enabled,
+    updated_at = EXCLUDED.updated_at;
 
 -- name: GetGroupChatThreadRowByGroupIDAndUserID :one
 SELECT
@@ -360,6 +437,27 @@ WHERE self.user_id = $1
   AND self.group_id = $2
   AND t.thread_key = 'primary';
 
+-- name: ListActiveWebPushSubscriptionsByUserIDs :many
+SELECT
+    s.id,
+    s.user_id,
+    s.endpoint,
+    s.p256dh_key,
+    s.auth_secret,
+    s.expiration_time,
+    s.user_agent,
+    s.created_at,
+    s.updated_at
+FROM web_push_subscriptions AS s
+JOIN users AS u ON u.id = s.user_id
+WHERE s.user_id = ANY($1::uuid[])
+  AND u.push_notifications_enabled = TRUE
+ORDER BY s.created_at DESC, s.id DESC;
+
+-- name: DeleteWebPushSubscriptionsByIDs :execrows
+DELETE FROM web_push_subscriptions
+WHERE id = ANY($1::uuid[]);
+
 -- name: ListGroupMemberRowsByGroupIDAndUserID :many
 SELECT
     m.group_id,
@@ -370,7 +468,8 @@ SELECT
     m.joined_at,
     u.login,
     u.nickname,
-    u.avatar_url
+    u.avatar_url,
+    u.push_notifications_enabled
 FROM group_memberships AS self
 JOIN group_memberships AS m ON m.group_id = self.group_id
 JOIN users AS u ON u.id = m.user_id
@@ -396,7 +495,8 @@ SELECT
     m.joined_at,
     u.login,
     u.nickname,
-    u.avatar_url
+    u.avatar_url,
+    u.push_notifications_enabled
 FROM group_memberships AS m
 JOIN users AS u ON u.id = m.user_id
 WHERE m.group_id = $1 AND m.user_id = $2;

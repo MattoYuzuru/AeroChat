@@ -41,6 +41,7 @@ import {
   describeEncryptedGroupLaneIssue,
 } from "../groups/useEncryptedGroupLane";
 import { subscribeEncryptedGroupRealtimeEvents } from "../groups/encrypted-group-realtime";
+import { useWebNotifications } from "../notifications/context";
 import type {
   EncryptedGroupProjectionEntry,
   EncryptedGroupProjectedMessageEntry,
@@ -88,11 +89,17 @@ import styles from "./GroupsPage.module.css";
 
 export function GroupsPage() {
   const refreshActiveGroupCallsIntervalMs = 5000;
-  const { state: authState, expireSession } = useAuth();
+  const {
+    state: authState,
+    expireSession,
+    updateProfile,
+    clearNotice,
+  } = useAuth();
   const currentUserId = authState.status === "authenticated" ? authState.profile.id : "";
   const desktopShellHost = useDesktopShellHost();
   const windowLocation = useDesktopShellWindowLocation();
   const cryptoRuntime = useCryptoRuntime();
+  const webNotifications = useWebNotifications();
   const [, setSearchParams] = useSearchParams();
   const searchParams = useMemo(
     () => new URLSearchParams(windowLocation.search),
@@ -109,6 +116,8 @@ export function GroupsPage() {
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [groupNotificationsError, setGroupNotificationsError] = useState<string | null>(null);
+  const [isUpdatingGroupNotifications, setIsUpdatingGroupNotifications] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [joinInput, setJoinInput] = useState("");
   const [encryptedComposerText, setEncryptedComposerText] = useState("");
@@ -160,6 +169,7 @@ export function GroupsPage() {
   const joinTokenFromRoute = searchParams.get("join")?.trim() ?? "";
   const searchJumpIntent = readSearchJumpIntent(searchParams);
   const token = authState.status === "authenticated" ? authState.token : "";
+  const authProfile = authState.status === "authenticated" ? authState.profile : null;
   const encryptedGroupLane = useEncryptedGroupLane({
     enabled: authState.status === "authenticated",
     token,
@@ -1269,6 +1279,71 @@ export function GroupsPage() {
       }
     } finally {
       setIsRefreshing(false);
+    }
+  }
+
+  async function handleGroupNotificationsToggle(nextEnabled: boolean) {
+    if (selectedState.status !== "ready") {
+      return;
+    }
+
+    setGroupNotificationsError(null);
+    webNotifications.clearError();
+    clearNotice();
+    setIsUpdatingGroupNotifications(true);
+
+    try {
+      if (nextEnabled && authProfile?.pushNotificationsEnabled !== true) {
+        const pushReady = await webNotifications.ensureBrowserPush(token);
+        if (!pushReady) {
+          throw new Error(
+            webNotifications.error ??
+              "Не удалось подготовить browser push для этого устройства.",
+          );
+        }
+
+        await updateProfile({
+          pushNotificationsEnabled: true,
+        });
+      }
+
+      const nextGroup = await gatewayClient.setGroupNotifications(
+        token,
+        selectedState.snapshot.group.id,
+        nextEnabled,
+      );
+      setGroups((current) =>
+        current.map((group) => (group.id === nextGroup.id ? nextGroup : group)),
+      );
+      setSelectedState((current) => {
+        if (current.status !== "ready" || current.snapshot.group.id !== nextGroup.id) {
+          return current;
+        }
+
+        return {
+          ...current,
+          snapshot: {
+            ...current.snapshot,
+            group: nextGroup,
+          },
+        };
+      });
+    } catch (error) {
+      if (isGatewayErrorCode(error, "unauthenticated")) {
+        expireSession();
+        return;
+      }
+
+      setGroupNotificationsError(
+        describeGatewayError(
+          error,
+          nextEnabled
+            ? "Не удалось включить уведомления для этой группы."
+            : "Не удалось отключить уведомления для этой группы.",
+        ),
+      );
+    } finally {
+      setIsUpdatingGroupNotifications(false);
     }
   }
 
@@ -3256,6 +3331,55 @@ export function GroupsPage() {
               <section className={styles.panelCard}>
                 <div className={styles.panelHeader}>
                   <div>
+                    <p className={styles.cardLabel}>Уведомления</p>
+                    <h2 className={styles.panelTitle}>Push для этой группы</h2>
+                  </div>
+                  <p className={styles.panelCopy}>
+                    Новое непрочитанное сообщение может прийти push-уведомлением, если AeroChat не
+                    открыт на активной вкладке.
+                  </p>
+                </div>
+
+                {(groupNotificationsError || webNotifications.error) && (
+                  <div className={styles.error}>
+                    {groupNotificationsError ?? webNotifications.error}
+                  </div>
+                )}
+
+                <label className={styles.notificationToggleCard}>
+                  <div className={styles.notificationToggleCopy}>
+                    <strong>Уведомления по этой группе</strong>
+                    <span>
+                      Отдельный переключатель управляет только этой группой и не меняет остальные
+                      чаты.
+                    </span>
+                  </div>
+                  <input
+                    checked={selectedState.snapshot.group.notificationsEnabled !== false}
+                    className={`${styles.notificationToggleInput} xpCheckbox`}
+                    disabled={
+                      isUpdatingGroupNotifications || webNotifications.isSupported === false
+                    }
+                    onChange={(event) => {
+                      void handleGroupNotificationsToggle(event.target.checked);
+                    }}
+                    type="checkbox"
+                  />
+                </label>
+
+                <p className={styles.helperText}>
+                  Browser push:{" "}
+                  {describeInlineBrowserPushState(
+                    webNotifications.isSupported,
+                    webNotifications.permission,
+                    webNotifications.subscriptionStatus,
+                  )}
+                </p>
+              </section>
+
+              <section className={styles.panelCard}>
+                <div className={styles.panelHeader}>
+                  <div>
                     <p className={styles.cardLabel}>Участники</p>
                     <h2 className={styles.panelTitle}>Участники группы</h2>
                   </div>
@@ -3967,6 +4091,30 @@ function jumpToMessage(elementId: string) {
     behavior: "smooth",
     block: "center",
   });
+}
+
+function describeInlineBrowserPushState(
+  isSupported: boolean,
+  permission: NotificationPermission | "unsupported",
+  subscriptionStatus: "idle" | "syncing" | "active" | "inactive",
+) {
+  if (!isSupported || permission === "unsupported") {
+    return "не поддерживается этим браузером";
+  }
+  if (subscriptionStatus === "syncing") {
+    return "синхронизируем subscription";
+  }
+  if (permission === "denied") {
+    return "разрешение заблокировано";
+  }
+  if (permission === "default") {
+    return "разрешение ещё не выдано";
+  }
+  if (subscriptionStatus === "active") {
+    return "готов на этом устройстве";
+  }
+
+  return "разрешение выдано, но push ещё не активирован";
 }
 
 function formatDateTime(value: string): string {

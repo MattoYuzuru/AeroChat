@@ -60,6 +60,7 @@ func (r *Repository) CreateAccount(ctx context.Context, params identity.CreateAc
 		ReadReceiptsEnabled:     params.User.ReadReceiptsEnabled,
 		PresenceEnabled:         params.User.PresenceEnabled,
 		TypingVisibilityEnabled: params.User.TypingVisibilityEnabled,
+		PushNotificationsEnabled: params.User.PushNotificationsEnabled,
 		KeyBackupStatus:         params.User.KeyBackupStatus,
 		CreatedAt:               timestampValue(params.User.CreatedAt),
 		UpdatedAt:               timestampValue(params.User.UpdatedAt),
@@ -107,7 +108,7 @@ func (r *Repository) CreateAccount(ctx context.Context, params identity.CreateAc
 	}
 
 	return &identity.AuthSession{
-		User:    toDomainUser(userRow),
+		User:    toDomainCreatedUser(userRow),
 		Device:  toDomainDevice(deviceRow),
 		Session: toDomainSession(sessionRow),
 	}, nil
@@ -135,6 +136,7 @@ func (r *Repository) GetPasswordCredentialByLogin(ctx context.Context, login str
 			ReadReceiptsEnabled:     row.ReadReceiptsEnabled,
 			PresenceEnabled:         row.PresenceEnabled,
 			TypingVisibilityEnabled: row.TypingVisibilityEnabled,
+			PushNotificationsEnabled: row.PushNotificationsEnabled,
 			KeyBackupStatus:         row.KeyBackupStatus,
 			CreatedAt:               timestampPointer(row.CreatedAt),
 			UpdatedAt:               timestampPointer(row.UpdatedAt),
@@ -189,7 +191,7 @@ func (r *Repository) CreateSession(ctx context.Context, params identity.CreateSe
 	}
 
 	return &identity.AuthSession{
-		User:    toDomainUser(userRow),
+		User:    toDomainUserByID(userRow),
 		Device:  toDomainDevice(deviceRow),
 		Session: toDomainSession(sessionRow),
 	}, nil
@@ -217,6 +219,7 @@ func (r *Repository) GetSessionAuthByID(ctx context.Context, sessionID string) (
 			ReadReceiptsEnabled:     row.ReadReceiptsEnabled,
 			PresenceEnabled:         row.PresenceEnabled,
 			TypingVisibilityEnabled: row.TypingVisibilityEnabled,
+			PushNotificationsEnabled: row.PushNotificationsEnabled,
 			KeyBackupStatus:         row.KeyBackupStatus,
 			CreatedAt:               timestampPointer(row.UserCreatedAt),
 			UpdatedAt:               timestampPointer(row.UserUpdatedAt),
@@ -272,6 +275,7 @@ func (r *Repository) UpdateUserProfile(ctx context.Context, user identity.User) 
 		ReadReceiptsEnabled:     user.ReadReceiptsEnabled,
 		PresenceEnabled:         user.PresenceEnabled,
 		TypingVisibilityEnabled: user.TypingVisibilityEnabled,
+		PushNotificationsEnabled: user.PushNotificationsEnabled,
 		KeyBackupStatus:         user.KeyBackupStatus,
 		UpdatedAt:               timestampValue(user.UpdatedAt),
 	})
@@ -279,7 +283,7 @@ func (r *Repository) UpdateUserProfile(ctx context.Context, user identity.User) 
 		return nil, convertError(err)
 	}
 
-	updated := toDomainUser(row)
+	updated := toDomainUpdatedUser(row)
 	return &updated, nil
 }
 
@@ -375,7 +379,7 @@ func (r *Repository) GetUserByLogin(ctx context.Context, login string) (*identit
 		return nil, convertError(err)
 	}
 
-	user := toDomainUser(row)
+	user := toDomainUserByLogin(row)
 	return &user, nil
 }
 
@@ -403,6 +407,7 @@ func (r *Repository) ListBlockedUsers(ctx context.Context, userID string) ([]ide
 				ReadReceiptsEnabled:     row.ReadReceiptsEnabled,
 				PresenceEnabled:         row.PresenceEnabled,
 				TypingVisibilityEnabled: row.TypingVisibilityEnabled,
+				PushNotificationsEnabled: row.PushNotificationsEnabled,
 				KeyBackupStatus:         row.KeyBackupStatus,
 				CreatedAt:               timestampPointer(row.CreatedAt),
 				UpdatedAt:               timestampPointer(row.UpdatedAt),
@@ -467,25 +472,209 @@ func (r *Repository) UnblockUser(ctx context.Context, blockerUserID string, bloc
 	return affected > 0, nil
 }
 
-func toDomainUser(row identitysqlc.User) identity.User {
+func (r *Repository) UpsertWebPushSubscription(ctx context.Context, subscription identity.WebPushSubscription) error {
+	return convertError(r.queries.UpsertWebPushSubscription(ctx, identitysqlc.UpsertWebPushSubscriptionParams{
+		ID:             mustParseUUID(subscription.ID),
+		UserID:         mustParseUUID(subscription.UserID),
+		Endpoint:       subscription.Endpoint,
+		P256dhKey:      subscription.P256DHKey,
+		AuthSecret:     subscription.AuthSecret,
+		ExpirationTime: timestamptzValue(subscription.ExpirationTime),
+		UserAgent:      textValue(subscription.UserAgent),
+		CreatedAt:      timestampValue(subscription.CreatedAt),
+		UpdatedAt:      timestampValue(subscription.UpdatedAt),
+	}))
+}
+
+func (r *Repository) DeleteWebPushSubscription(ctx context.Context, userID string, endpoint string) (bool, error) {
+	affected, err := r.queries.DeleteWebPushSubscriptionByUserIDAndEndpoint(ctx, identitysqlc.DeleteWebPushSubscriptionByUserIDAndEndpointParams{
+		UserID:   mustParseUUID(userID),
+		Endpoint: endpoint,
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+
+	return affected > 0, nil
+}
+
+func (r *Repository) ListWebPushSubscriptions(ctx context.Context, userID string) ([]identity.WebPushSubscription, error) {
+	rows, err := r.queries.ListWebPushSubscriptionsByUserID(ctx, mustParseUUID(userID))
+	if err != nil {
+		return nil, convertError(err)
+	}
+
+	subscriptions := make([]identity.WebPushSubscription, 0, len(rows))
+	for _, row := range rows {
+		subscriptions = append(subscriptions, toDomainWebPushSubscription(row))
+	}
+
+	return subscriptions, nil
+}
+
+func (r *Repository) DeleteWebPushSubscriptionsByIDs(ctx context.Context, ids []string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	parsedIDs := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		parsedIDs = append(parsedIDs, mustParseUUID(id))
+	}
+
+	affected, err := r.queries.DeleteWebPushSubscriptionsByIDs(ctx, parsedIDs)
+	if err != nil {
+		return 0, convertError(err)
+	}
+
+	return affected, nil
+}
+
+func toDomainUserFields(
+	id uuid.UUID,
+	login string,
+	nickname string,
+	avatarURL pgtype.Text,
+	bio pgtype.Text,
+	timezone pgtype.Text,
+	profileAccent pgtype.Text,
+	statusText pgtype.Text,
+	birthday pgtype.Date,
+	country pgtype.Text,
+	city pgtype.Text,
+	readReceiptsEnabled bool,
+	presenceEnabled bool,
+	typingVisibilityEnabled bool,
+	pushNotificationsEnabled bool,
+	keyBackupStatus string,
+	createdAt pgtype.Timestamptz,
+	updatedAt pgtype.Timestamptz,
+) identity.User {
 	return identity.User{
-		ID:                      row.ID.String(),
-		Login:                   row.Login,
-		Nickname:                row.Nickname,
-		AvatarURL:               textPointer(row.AvatarUrl),
-		Bio:                     textPointer(row.Bio),
-		Timezone:                textPointer(row.Timezone),
-		ProfileAccent:           textPointer(row.ProfileAccent),
-		StatusText:              textPointer(row.StatusText),
-		Birthday:                datePointer(row.Birthday),
-		Country:                 textPointer(row.Country),
-		City:                    textPointer(row.City),
-		ReadReceiptsEnabled:     row.ReadReceiptsEnabled,
-		PresenceEnabled:         row.PresenceEnabled,
-		TypingVisibilityEnabled: row.TypingVisibilityEnabled,
-		KeyBackupStatus:         row.KeyBackupStatus,
-		CreatedAt:               timestampPointer(row.CreatedAt),
-		UpdatedAt:               timestampPointer(row.UpdatedAt),
+		ID:                       id.String(),
+		Login:                    login,
+		Nickname:                 nickname,
+		AvatarURL:                textPointer(avatarURL),
+		Bio:                      textPointer(bio),
+		Timezone:                 textPointer(timezone),
+		ProfileAccent:            textPointer(profileAccent),
+		StatusText:               textPointer(statusText),
+		Birthday:                 datePointer(birthday),
+		Country:                  textPointer(country),
+		City:                     textPointer(city),
+		ReadReceiptsEnabled:      readReceiptsEnabled,
+		PresenceEnabled:          presenceEnabled,
+		TypingVisibilityEnabled:  typingVisibilityEnabled,
+		PushNotificationsEnabled: pushNotificationsEnabled,
+		KeyBackupStatus:          keyBackupStatus,
+		CreatedAt:                timestampPointer(createdAt),
+		UpdatedAt:                timestampPointer(updatedAt),
+	}
+}
+
+func toDomainCreatedUser(row identitysqlc.CreateUserRow) identity.User {
+	return toDomainUserFields(
+		row.ID,
+		row.Login,
+		row.Nickname,
+		row.AvatarUrl,
+		row.Bio,
+		row.Timezone,
+		row.ProfileAccent,
+		row.StatusText,
+		row.Birthday,
+		row.Country,
+		row.City,
+		row.ReadReceiptsEnabled,
+		row.PresenceEnabled,
+		row.TypingVisibilityEnabled,
+		row.PushNotificationsEnabled,
+		row.KeyBackupStatus,
+		row.CreatedAt,
+		row.UpdatedAt,
+	)
+}
+
+func toDomainUserByID(row identitysqlc.GetUserByIDRow) identity.User {
+	return toDomainUserFields(
+		row.ID,
+		row.Login,
+		row.Nickname,
+		row.AvatarUrl,
+		row.Bio,
+		row.Timezone,
+		row.ProfileAccent,
+		row.StatusText,
+		row.Birthday,
+		row.Country,
+		row.City,
+		row.ReadReceiptsEnabled,
+		row.PresenceEnabled,
+		row.TypingVisibilityEnabled,
+		row.PushNotificationsEnabled,
+		row.KeyBackupStatus,
+		row.CreatedAt,
+		row.UpdatedAt,
+	)
+}
+
+func toDomainUpdatedUser(row identitysqlc.UpdateUserProfileRow) identity.User {
+	return toDomainUserFields(
+		row.ID,
+		row.Login,
+		row.Nickname,
+		row.AvatarUrl,
+		row.Bio,
+		row.Timezone,
+		row.ProfileAccent,
+		row.StatusText,
+		row.Birthday,
+		row.Country,
+		row.City,
+		row.ReadReceiptsEnabled,
+		row.PresenceEnabled,
+		row.TypingVisibilityEnabled,
+		row.PushNotificationsEnabled,
+		row.KeyBackupStatus,
+		row.CreatedAt,
+		row.UpdatedAt,
+	)
+}
+
+func toDomainUserByLogin(row identitysqlc.GetUserByLoginRow) identity.User {
+	return toDomainUserFields(
+		row.ID,
+		row.Login,
+		row.Nickname,
+		row.AvatarUrl,
+		row.Bio,
+		row.Timezone,
+		row.ProfileAccent,
+		row.StatusText,
+		row.Birthday,
+		row.Country,
+		row.City,
+		row.ReadReceiptsEnabled,
+		row.PresenceEnabled,
+		row.TypingVisibilityEnabled,
+		row.PushNotificationsEnabled,
+		row.KeyBackupStatus,
+		row.CreatedAt,
+		row.UpdatedAt,
+	)
+}
+
+func toDomainWebPushSubscription(row identitysqlc.WebPushSubscription) identity.WebPushSubscription {
+	return identity.WebPushSubscription{
+		ID:             row.ID.String(),
+		UserID:         row.UserID.String(),
+		Endpoint:       row.Endpoint,
+		P256DHKey:      row.P256dhKey,
+		AuthSecret:     row.AuthSecret,
+		ExpirationTime: timestamptzPointer(row.ExpirationTime),
+		UserAgent:      textPointer(row.UserAgent),
+		CreatedAt:      timestampPointer(row.CreatedAt),
+		UpdatedAt:      timestampPointer(row.UpdatedAt),
 	}
 }
 

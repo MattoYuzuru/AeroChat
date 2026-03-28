@@ -1037,6 +1037,19 @@ func (q *Queries) DeleteGroupMembership(ctx context.Context, arg DeleteGroupMemb
 	return result.RowsAffected(), nil
 }
 
+const deleteWebPushSubscriptionsByIDs = `-- name: DeleteWebPushSubscriptionsByIDs :execrows
+DELETE FROM web_push_subscriptions
+WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteWebPushSubscriptionsByIDs(ctx context.Context, dollar_1 []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWebPushSubscriptionsByIDs, dollar_1)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const detachDirectMessageAttachments = `-- name: DetachDirectMessageAttachments :execrows
 UPDATE attachments AS a
 SET
@@ -1783,12 +1796,16 @@ SELECT
               )
           )
     ), 0)::INT AS encrypted_unread_count,
+    COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
-    u.avatar_url AS participant_avatar_url
+    u.avatar_url AS participant_avatar_url,
+    u.push_notifications_enabled AS participant_push_notifications_enabled
 FROM direct_chat_participants AS self
 JOIN direct_chats AS c ON c.id = self.chat_id
+LEFT JOIN direct_chat_notification_preferences AS self_pref
+    ON self_pref.chat_id = c.id AND self_pref.user_id = self.user_id
 JOIN direct_chat_participants AS p ON p.chat_id = c.id
 JOIN users AS u ON u.id = p.user_id
 WHERE self.user_id = $1 AND c.id = $2
@@ -1801,18 +1818,20 @@ type GetDirectChatRowsByIDAndUserIDParams struct {
 }
 
 type GetDirectChatRowsByIDAndUserIDRow struct {
-	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
-	CreatedByUserID      uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
-	UserLowID            uuid.UUID          `db:"user_low_id" json:"user_low_id"`
-	UserHighID           uuid.UUID          `db:"user_high_id" json:"user_high_id"`
-	ChatCreatedAt        pgtype.Timestamptz `db:"chat_created_at" json:"chat_created_at"`
-	ChatUpdatedAt        pgtype.Timestamptz `db:"chat_updated_at" json:"chat_updated_at"`
-	UnreadCount          int32              `db:"unread_count" json:"unread_count"`
-	EncryptedUnreadCount int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
-	ParticipantUserID    uuid.UUID          `db:"participant_user_id" json:"participant_user_id"`
-	ParticipantLogin     string             `db:"participant_login" json:"participant_login"`
-	ParticipantNickname  string             `db:"participant_nickname" json:"participant_nickname"`
-	ParticipantAvatarUrl pgtype.Text        `db:"participant_avatar_url" json:"participant_avatar_url"`
+	ChatID                              uuid.UUID          `db:"chat_id" json:"chat_id"`
+	CreatedByUserID                     uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	UserLowID                           uuid.UUID          `db:"user_low_id" json:"user_low_id"`
+	UserHighID                          uuid.UUID          `db:"user_high_id" json:"user_high_id"`
+	ChatCreatedAt                       pgtype.Timestamptz `db:"chat_created_at" json:"chat_created_at"`
+	ChatUpdatedAt                       pgtype.Timestamptz `db:"chat_updated_at" json:"chat_updated_at"`
+	UnreadCount                         int32              `db:"unread_count" json:"unread_count"`
+	EncryptedUnreadCount                int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
+	NotificationsEnabled                bool               `db:"notifications_enabled" json:"notifications_enabled"`
+	ParticipantUserID                   uuid.UUID          `db:"participant_user_id" json:"participant_user_id"`
+	ParticipantLogin                    string             `db:"participant_login" json:"participant_login"`
+	ParticipantNickname                 string             `db:"participant_nickname" json:"participant_nickname"`
+	ParticipantAvatarUrl                pgtype.Text        `db:"participant_avatar_url" json:"participant_avatar_url"`
+	ParticipantPushNotificationsEnabled bool               `db:"participant_push_notifications_enabled" json:"participant_push_notifications_enabled"`
 }
 
 func (q *Queries) GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDirectChatRowsByIDAndUserIDParams) ([]GetDirectChatRowsByIDAndUserIDRow, error) {
@@ -1833,10 +1852,12 @@ func (q *Queries) GetDirectChatRowsByIDAndUserID(ctx context.Context, arg GetDir
 			&i.ChatUpdatedAt,
 			&i.UnreadCount,
 			&i.EncryptedUnreadCount,
+			&i.NotificationsEnabled,
 			&i.ParticipantUserID,
 			&i.ParticipantLogin,
 			&i.ParticipantNickname,
 			&i.ParticipantAvatarUrl,
+			&i.ParticipantPushNotificationsEnabled,
 		); err != nil {
 			return nil, err
 		}
@@ -2212,7 +2233,8 @@ SELECT
     m.joined_at,
     u.login,
     u.nickname,
-    u.avatar_url
+    u.avatar_url,
+    u.push_notifications_enabled
 FROM group_memberships AS m
 JOIN users AS u ON u.id = m.user_id
 WHERE m.group_id = $1 AND m.user_id = $2
@@ -2224,15 +2246,16 @@ type GetGroupMemberRowByGroupIDAndUserIDParams struct {
 }
 
 type GetGroupMemberRowByGroupIDAndUserIDRow struct {
-	GroupID           uuid.UUID          `db:"group_id" json:"group_id"`
-	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
-	Role              string             `db:"role" json:"role"`
-	IsWriteRestricted bool               `db:"is_write_restricted" json:"is_write_restricted"`
-	WriteRestrictedAt pgtype.Timestamptz `db:"write_restricted_at" json:"write_restricted_at"`
-	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
-	Login             string             `db:"login" json:"login"`
-	Nickname          string             `db:"nickname" json:"nickname"`
-	AvatarUrl         pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	GroupID                  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	Role                     string             `db:"role" json:"role"`
+	IsWriteRestricted        bool               `db:"is_write_restricted" json:"is_write_restricted"`
+	WriteRestrictedAt        pgtype.Timestamptz `db:"write_restricted_at" json:"write_restricted_at"`
+	JoinedAt                 pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
 }
 
 func (q *Queries) GetGroupMemberRowByGroupIDAndUserID(ctx context.Context, arg GetGroupMemberRowByGroupIDAndUserIDParams) (GetGroupMemberRowByGroupIDAndUserIDRow, error) {
@@ -2248,6 +2271,7 @@ func (q *Queries) GetGroupMemberRowByGroupIDAndUserID(ctx context.Context, arg G
 		&i.Login,
 		&i.Nickname,
 		&i.AvatarUrl,
+		&i.PushNotificationsEnabled,
 	)
 	return i, err
 }
@@ -2400,9 +2424,12 @@ SELECT
         SELECT COUNT(*)::INT
         FROM group_memberships AS members
         WHERE members.group_id = g.id
-    ), 0)::INT AS member_count
+    ), 0)::INT AS member_count,
+    COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
+LEFT JOIN group_notification_preferences AS self_pref
+    ON self_pref.group_id = g.id AND self_pref.user_id = self.user_id
 WHERE self.user_id = $1 AND g.id = $2
 `
 
@@ -2422,6 +2449,7 @@ type GetGroupRowByIDAndUserIDRow struct {
 	UnreadCount           int32              `db:"unread_count" json:"unread_count"`
 	EncryptedUnreadCount  int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
 	MemberCount           int32              `db:"member_count" json:"member_count"`
+	NotificationsEnabled  bool               `db:"notifications_enabled" json:"notifications_enabled"`
 }
 
 func (q *Queries) GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowByIDAndUserIDParams) (GetGroupRowByIDAndUserIDRow, error) {
@@ -2438,6 +2466,7 @@ func (q *Queries) GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowB
 		&i.UnreadCount,
 		&i.EncryptedUnreadCount,
 		&i.MemberCount,
+		&i.NotificationsEnabled,
 	)
 	return i, err
 }
@@ -2464,6 +2493,7 @@ SELECT
     u.read_receipts_enabled,
     u.presence_enabled,
     u.typing_visibility_enabled,
+    u.push_notifications_enabled,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
 FROM user_sessions AS s
@@ -2473,28 +2503,29 @@ WHERE s.id = $1
 `
 
 type GetSessionAuthByIDRow struct {
-	SessionID               uuid.UUID          `db:"session_id" json:"session_id"`
-	SessionUserID           uuid.UUID          `db:"session_user_id" json:"session_user_id"`
-	SessionDeviceID         uuid.UUID          `db:"session_device_id" json:"session_device_id"`
-	TokenHash               string             `db:"token_hash" json:"token_hash"`
-	SessionCreatedAt        pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
-	SessionLastSeenAt       pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
-	SessionRevokedAt        pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
-	DeviceID                uuid.UUID          `db:"device_id" json:"device_id"`
-	DeviceUserID            uuid.UUID          `db:"device_user_id" json:"device_user_id"`
-	DeviceLabel             string             `db:"device_label" json:"device_label"`
-	DeviceCreatedAt         pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
-	DeviceLastSeenAt        pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
-	DeviceRevokedAt         pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
-	UserID                  uuid.UUID          `db:"user_id" json:"user_id"`
-	Login                   string             `db:"login" json:"login"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	UserCreatedAt           pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
-	UserUpdatedAt           pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
+	SessionID                uuid.UUID          `db:"session_id" json:"session_id"`
+	SessionUserID            uuid.UUID          `db:"session_user_id" json:"session_user_id"`
+	SessionDeviceID          uuid.UUID          `db:"session_device_id" json:"session_device_id"`
+	TokenHash                string             `db:"token_hash" json:"token_hash"`
+	SessionCreatedAt         pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
+	SessionLastSeenAt        pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
+	SessionRevokedAt         pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
+	DeviceID                 uuid.UUID          `db:"device_id" json:"device_id"`
+	DeviceUserID             uuid.UUID          `db:"device_user_id" json:"device_user_id"`
+	DeviceLabel              string             `db:"device_label" json:"device_label"`
+	DeviceCreatedAt          pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
+	DeviceLastSeenAt         pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
+	DeviceRevokedAt          pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	UserCreatedAt            pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
+	UserUpdatedAt            pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
 }
 
 func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error) {
@@ -2521,6 +2552,7 @@ func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSess
 		&i.ReadReceiptsEnabled,
 		&i.PresenceEnabled,
 		&i.TypingVisibilityEnabled,
+		&i.PushNotificationsEnabled,
 		&i.UserCreatedAt,
 		&i.UserUpdatedAt,
 	)
@@ -2651,6 +2683,54 @@ func (q *Queries) ListActiveCryptoDevicesByUserIDs(ctx context.Context, dollar_1
 	for rows.Next() {
 		var i ListActiveCryptoDevicesByUserIDsRow
 		if err := rows.Scan(&i.ID, &i.UserID, &i.Status); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listActiveWebPushSubscriptionsByUserIDs = `-- name: ListActiveWebPushSubscriptionsByUserIDs :many
+SELECT
+    s.id,
+    s.user_id,
+    s.endpoint,
+    s.p256dh_key,
+    s.auth_secret,
+    s.expiration_time,
+    s.user_agent,
+    s.created_at,
+    s.updated_at
+FROM web_push_subscriptions AS s
+JOIN users AS u ON u.id = s.user_id
+WHERE s.user_id = ANY($1::uuid[])
+  AND u.push_notifications_enabled = TRUE
+ORDER BY s.created_at DESC, s.id DESC
+`
+
+func (q *Queries) ListActiveWebPushSubscriptionsByUserIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]WebPushSubscription, error) {
+	rows, err := q.db.Query(ctx, listActiveWebPushSubscriptionsByUserIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WebPushSubscription
+	for rows.Next() {
+		var i WebPushSubscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Endpoint,
+			&i.P256dhKey,
+			&i.AuthSecret,
+			&i.ExpirationTime,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -3254,12 +3334,16 @@ SELECT
               )
           )
     ), 0)::INT AS encrypted_unread_count,
+    COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
     p.user_id AS participant_user_id,
     u.login AS participant_login,
     u.nickname AS participant_nickname,
-    u.avatar_url AS participant_avatar_url
+    u.avatar_url AS participant_avatar_url,
+    u.push_notifications_enabled AS participant_push_notifications_enabled
 FROM direct_chat_participants AS self
 JOIN direct_chats AS c ON c.id = self.chat_id
+LEFT JOIN direct_chat_notification_preferences AS self_pref
+    ON self_pref.chat_id = c.id AND self_pref.user_id = self.user_id
 JOIN direct_chat_participants AS p ON p.chat_id = c.id
 JOIN users AS u ON u.id = p.user_id
 WHERE self.user_id = $1
@@ -3267,18 +3351,20 @@ ORDER BY c.updated_at DESC, c.id DESC, p.joined_at ASC, p.user_id ASC
 `
 
 type ListDirectChatRowsByUserIDRow struct {
-	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
-	CreatedByUserID      uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
-	UserLowID            uuid.UUID          `db:"user_low_id" json:"user_low_id"`
-	UserHighID           uuid.UUID          `db:"user_high_id" json:"user_high_id"`
-	ChatCreatedAt        pgtype.Timestamptz `db:"chat_created_at" json:"chat_created_at"`
-	ChatUpdatedAt        pgtype.Timestamptz `db:"chat_updated_at" json:"chat_updated_at"`
-	UnreadCount          int32              `db:"unread_count" json:"unread_count"`
-	EncryptedUnreadCount int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
-	ParticipantUserID    uuid.UUID          `db:"participant_user_id" json:"participant_user_id"`
-	ParticipantLogin     string             `db:"participant_login" json:"participant_login"`
-	ParticipantNickname  string             `db:"participant_nickname" json:"participant_nickname"`
-	ParticipantAvatarUrl pgtype.Text        `db:"participant_avatar_url" json:"participant_avatar_url"`
+	ChatID                              uuid.UUID          `db:"chat_id" json:"chat_id"`
+	CreatedByUserID                     uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	UserLowID                           uuid.UUID          `db:"user_low_id" json:"user_low_id"`
+	UserHighID                          uuid.UUID          `db:"user_high_id" json:"user_high_id"`
+	ChatCreatedAt                       pgtype.Timestamptz `db:"chat_created_at" json:"chat_created_at"`
+	ChatUpdatedAt                       pgtype.Timestamptz `db:"chat_updated_at" json:"chat_updated_at"`
+	UnreadCount                         int32              `db:"unread_count" json:"unread_count"`
+	EncryptedUnreadCount                int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
+	NotificationsEnabled                bool               `db:"notifications_enabled" json:"notifications_enabled"`
+	ParticipantUserID                   uuid.UUID          `db:"participant_user_id" json:"participant_user_id"`
+	ParticipantLogin                    string             `db:"participant_login" json:"participant_login"`
+	ParticipantNickname                 string             `db:"participant_nickname" json:"participant_nickname"`
+	ParticipantAvatarUrl                pgtype.Text        `db:"participant_avatar_url" json:"participant_avatar_url"`
+	ParticipantPushNotificationsEnabled bool               `db:"participant_push_notifications_enabled" json:"participant_push_notifications_enabled"`
 }
 
 func (q *Queries) ListDirectChatRowsByUserID(ctx context.Context, userID uuid.UUID) ([]ListDirectChatRowsByUserIDRow, error) {
@@ -3299,10 +3385,12 @@ func (q *Queries) ListDirectChatRowsByUserID(ctx context.Context, userID uuid.UU
 			&i.ChatUpdatedAt,
 			&i.UnreadCount,
 			&i.EncryptedUnreadCount,
+			&i.NotificationsEnabled,
 			&i.ParticipantUserID,
 			&i.ParticipantLogin,
 			&i.ParticipantNickname,
 			&i.ParticipantAvatarUrl,
+			&i.ParticipantPushNotificationsEnabled,
 		); err != nil {
 			return nil, err
 		}
@@ -3871,7 +3959,8 @@ SELECT
     m.joined_at,
     u.login,
     u.nickname,
-    u.avatar_url
+    u.avatar_url,
+    u.push_notifications_enabled
 FROM group_memberships AS self
 JOIN group_memberships AS m ON m.group_id = self.group_id
 JOIN users AS u ON u.id = m.user_id
@@ -3894,15 +3983,16 @@ type ListGroupMemberRowsByGroupIDAndUserIDParams struct {
 }
 
 type ListGroupMemberRowsByGroupIDAndUserIDRow struct {
-	GroupID           uuid.UUID          `db:"group_id" json:"group_id"`
-	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
-	Role              string             `db:"role" json:"role"`
-	IsWriteRestricted bool               `db:"is_write_restricted" json:"is_write_restricted"`
-	WriteRestrictedAt pgtype.Timestamptz `db:"write_restricted_at" json:"write_restricted_at"`
-	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
-	Login             string             `db:"login" json:"login"`
-	Nickname          string             `db:"nickname" json:"nickname"`
-	AvatarUrl         pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	GroupID                  uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	Role                     string             `db:"role" json:"role"`
+	IsWriteRestricted        bool               `db:"is_write_restricted" json:"is_write_restricted"`
+	WriteRestrictedAt        pgtype.Timestamptz `db:"write_restricted_at" json:"write_restricted_at"`
+	JoinedAt                 pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
 }
 
 func (q *Queries) ListGroupMemberRowsByGroupIDAndUserID(ctx context.Context, arg ListGroupMemberRowsByGroupIDAndUserIDParams) ([]ListGroupMemberRowsByGroupIDAndUserIDRow, error) {
@@ -3924,6 +4014,7 @@ func (q *Queries) ListGroupMemberRowsByGroupIDAndUserID(ctx context.Context, arg
 			&i.Login,
 			&i.Nickname,
 			&i.AvatarUrl,
+			&i.PushNotificationsEnabled,
 		); err != nil {
 			return nil, err
 		}
@@ -4211,9 +4302,12 @@ SELECT
         SELECT COUNT(*)::INT
         FROM group_memberships AS members
         WHERE members.group_id = g.id
-    ), 0)::INT AS member_count
+    ), 0)::INT AS member_count,
+    COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled
 FROM group_memberships AS self
 JOIN groups AS g ON g.id = self.group_id
+LEFT JOIN group_notification_preferences AS self_pref
+    ON self_pref.group_id = g.id AND self_pref.user_id = self.user_id
 WHERE self.user_id = $1
 ORDER BY g.updated_at DESC, g.id DESC
 `
@@ -4229,6 +4323,7 @@ type ListGroupRowsByUserIDRow struct {
 	UnreadCount           int32              `db:"unread_count" json:"unread_count"`
 	EncryptedUnreadCount  int32              `db:"encrypted_unread_count" json:"encrypted_unread_count"`
 	MemberCount           int32              `db:"member_count" json:"member_count"`
+	NotificationsEnabled  bool               `db:"notifications_enabled" json:"notifications_enabled"`
 }
 
 func (q *Queries) ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) ([]ListGroupRowsByUserIDRow, error) {
@@ -4251,6 +4346,7 @@ func (q *Queries) ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) (
 			&i.UnreadCount,
 			&i.EncryptedUnreadCount,
 			&i.MemberCount,
+			&i.NotificationsEnabled,
 		); err != nil {
 			return nil, err
 		}
@@ -4748,6 +4844,68 @@ func (q *Queries) SearchGroupMessages(ctx context.Context, arg SearchGroupMessag
 	return items, nil
 }
 
+const setAllDirectChatNotificationPreferencesByUserID = `-- name: SetAllDirectChatNotificationPreferencesByUserID :exec
+INSERT INTO direct_chat_notification_preferences (
+    chat_id,
+    user_id,
+    notifications_enabled,
+    updated_at
+)
+SELECT
+    self.chat_id,
+    self.user_id,
+    $2,
+    $3
+FROM direct_chat_participants AS self
+WHERE self.user_id = $1
+ON CONFLICT (chat_id, user_id) DO UPDATE
+SET
+    notifications_enabled = EXCLUDED.notifications_enabled,
+    updated_at = EXCLUDED.updated_at
+`
+
+type SetAllDirectChatNotificationPreferencesByUserIDParams struct {
+	UserID               uuid.UUID          `db:"user_id" json:"user_id"`
+	NotificationsEnabled bool               `db:"notifications_enabled" json:"notifications_enabled"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) SetAllDirectChatNotificationPreferencesByUserID(ctx context.Context, arg SetAllDirectChatNotificationPreferencesByUserIDParams) error {
+	_, err := q.db.Exec(ctx, setAllDirectChatNotificationPreferencesByUserID, arg.UserID, arg.NotificationsEnabled, arg.UpdatedAt)
+	return err
+}
+
+const setAllGroupNotificationPreferencesByUserID = `-- name: SetAllGroupNotificationPreferencesByUserID :exec
+INSERT INTO group_notification_preferences (
+    group_id,
+    user_id,
+    notifications_enabled,
+    updated_at
+)
+SELECT
+    self.group_id,
+    self.user_id,
+    $2,
+    $3
+FROM group_memberships AS self
+WHERE self.user_id = $1
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+    notifications_enabled = EXCLUDED.notifications_enabled,
+    updated_at = EXCLUDED.updated_at
+`
+
+type SetAllGroupNotificationPreferencesByUserIDParams struct {
+	UserID               uuid.UUID          `db:"user_id" json:"user_id"`
+	NotificationsEnabled bool               `db:"notifications_enabled" json:"notifications_enabled"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) SetAllGroupNotificationPreferencesByUserID(ctx context.Context, arg SetAllGroupNotificationPreferencesByUserIDParams) error {
+	_, err := q.db.Exec(ctx, setAllGroupNotificationPreferencesByUserID, arg.UserID, arg.NotificationsEnabled, arg.UpdatedAt)
+	return err
+}
+
 const setGroupMembershipWriteRestriction = `-- name: SetGroupMembershipWriteRestriction :execrows
 UPDATE group_memberships
 SET
@@ -5016,6 +5174,36 @@ func (q *Queries) UpdateGroupMembershipRole(ctx context.Context, arg UpdateGroup
 	return result.RowsAffected(), nil
 }
 
+const upsertDirectChatNotificationPreference = `-- name: UpsertDirectChatNotificationPreference :exec
+INSERT INTO direct_chat_notification_preferences (
+    chat_id,
+    user_id,
+    notifications_enabled,
+    updated_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (chat_id, user_id) DO UPDATE
+SET
+    notifications_enabled = EXCLUDED.notifications_enabled,
+    updated_at = EXCLUDED.updated_at
+`
+
+type UpsertDirectChatNotificationPreferenceParams struct {
+	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
+	UserID               uuid.UUID          `db:"user_id" json:"user_id"`
+	NotificationsEnabled bool               `db:"notifications_enabled" json:"notifications_enabled"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpsertDirectChatNotificationPreference(ctx context.Context, arg UpsertDirectChatNotificationPreferenceParams) error {
+	_, err := q.db.Exec(ctx, upsertDirectChatNotificationPreference,
+		arg.ChatID,
+		arg.UserID,
+		arg.NotificationsEnabled,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const upsertDirectChatReadReceipt = `-- name: UpsertDirectChatReadReceipt :execrows
 INSERT INTO direct_chat_read_receipts (
     chat_id,
@@ -5182,4 +5370,34 @@ func (q *Queries) UpsertGroupChatReadState(ctx context.Context, arg UpsertGroupC
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const upsertGroupNotificationPreference = `-- name: UpsertGroupNotificationPreference :exec
+INSERT INTO group_notification_preferences (
+    group_id,
+    user_id,
+    notifications_enabled,
+    updated_at
+) VALUES ($1, $2, $3, $4)
+ON CONFLICT (group_id, user_id) DO UPDATE
+SET
+    notifications_enabled = EXCLUDED.notifications_enabled,
+    updated_at = EXCLUDED.updated_at
+`
+
+type UpsertGroupNotificationPreferenceParams struct {
+	GroupID              uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID               uuid.UUID          `db:"user_id" json:"user_id"`
+	NotificationsEnabled bool               `db:"notifications_enabled" json:"notifications_enabled"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpsertGroupNotificationPreference(ctx context.Context, arg UpsertGroupNotificationPreferenceParams) error {
+	_, err := q.db.Exec(ctx, upsertGroupNotificationPreference,
+		arg.GroupID,
+		arg.UserID,
+		arg.NotificationsEnabled,
+		arg.UpdatedAt,
+	)
+	return err
 }

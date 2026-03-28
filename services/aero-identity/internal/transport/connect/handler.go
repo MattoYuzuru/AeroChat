@@ -115,6 +115,7 @@ func (h *Handler) UpdateCurrentProfile(ctx context.Context, req *connect.Request
 		ReadReceiptsEnabled:     req.Msg.ReadReceiptsEnabled,
 		PresenceEnabled:         req.Msg.PresenceEnabled,
 		TypingVisibilityEnabled: req.Msg.TypingVisibilityEnabled,
+		PushNotificationsEnabled: req.Msg.PushNotificationsEnabled,
 	})
 	if err != nil {
 		return nil, mapError(err)
@@ -123,6 +124,56 @@ func (h *Handler) UpdateCurrentProfile(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&identityv1.UpdateCurrentProfileResponse{
 		Profile: toProtoProfile(*profile),
 	}), nil
+}
+
+func (h *Handler) GetWebPushPublicKey(
+	context.Context,
+	*connect.Request[identityv1.GetWebPushPublicKeyRequest],
+) (*connect.Response[identityv1.GetWebPushPublicKeyResponse], error) {
+	publicKey := h.service.GetWebPushPublicKey()
+
+	return connect.NewResponse(&identityv1.GetWebPushPublicKeyResponse{
+		Available: publicKey != "",
+		PublicKey: publicKey,
+	}), nil
+}
+
+func (h *Handler) UpsertWebPushSubscription(
+	ctx context.Context,
+	req *connect.Request[identityv1.UpsertWebPushSubscriptionRequest],
+) (*connect.Response[identityv1.UpsertWebPushSubscriptionResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.UpsertWebPushSubscription(ctx, token, identity.UpsertWebPushSubscriptionInput{
+		Endpoint:       req.Msg.Endpoint,
+		P256DHKey:      req.Msg.P256DhKey,
+		AuthSecret:     req.Msg.AuthSecret,
+		ExpirationTime: protoTimestampPointer(req.Msg.ExpirationTime),
+		UserAgent:      req.Msg.UserAgent,
+	}); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.UpsertWebPushSubscriptionResponse{}), nil
+}
+
+func (h *Handler) DeleteWebPushSubscription(
+	ctx context.Context,
+	req *connect.Request[identityv1.DeleteWebPushSubscriptionRequest],
+) (*connect.Response[identityv1.DeleteWebPushSubscriptionResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.DeleteWebPushSubscription(ctx, token, req.Msg.Endpoint); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&identityv1.DeleteWebPushSubscriptionResponse{}), nil
 }
 
 func (h *Handler) ListDevices(ctx context.Context, req *connect.Request[identityv1.ListDevicesRequest]) (*connect.Response[identityv1.ListDevicesResponse], error) {
@@ -608,6 +659,7 @@ func toProtoProfile(value identity.User) *identityv1.Profile {
 		ReadReceiptsEnabled:     value.ReadReceiptsEnabled,
 		PresenceEnabled:         value.PresenceEnabled,
 		TypingVisibilityEnabled: value.TypingVisibilityEnabled,
+		PushNotificationsEnabled: value.PushNotificationsEnabled,
 		KeyBackupStatus:         toProtoKeyBackupStatus(value.KeyBackupStatus),
 		CreatedAt:               timestamppb.New(value.CreatedAt),
 		UpdatedAt:               timestamppb.New(value.UpdatedAt),
@@ -639,6 +691,15 @@ func toProtoProfile(value identity.User) *identityv1.Profile {
 	}
 
 	return profile
+}
+
+func protoTimestampPointer(value *timestamppb.Timestamp) *time.Time {
+	if value == nil {
+		return nil
+	}
+
+	timestamp := value.AsTime().UTC()
+	return &timestamp
 }
 
 func fromProtoCryptoDeviceBundlePayload(value *identityv1.CryptoDeviceBundlePayload) identity.CryptoDeviceBundleInput {

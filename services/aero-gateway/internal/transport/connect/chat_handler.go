@@ -65,6 +65,10 @@ func (h *ChatHandler) GetDirectChat(ctx context.Context, req *connect.Request[ch
 	return forwardUnary(ctx, req, h.client.GetDirectChat)
 }
 
+func (h *ChatHandler) SetDirectChatNotifications(ctx context.Context, req *connect.Request[chatv1.SetDirectChatNotificationsRequest]) (*connect.Response[chatv1.SetDirectChatNotificationsResponse], error) {
+	return forwardUnary(ctx, req, h.client.SetDirectChatNotifications)
+}
+
 func (h *ChatHandler) CreateAttachmentUploadIntent(ctx context.Context, req *connect.Request[chatv1.CreateAttachmentUploadIntentRequest]) (*connect.Response[chatv1.CreateAttachmentUploadIntentResponse], error) {
 	return forwardUnary(ctx, req, h.client.CreateAttachmentUploadIntent)
 }
@@ -89,8 +93,16 @@ func (h *ChatHandler) GetGroup(ctx context.Context, req *connect.Request[chatv1.
 	return forwardUnary(ctx, req, h.client.GetGroup)
 }
 
+func (h *ChatHandler) SetGroupNotifications(ctx context.Context, req *connect.Request[chatv1.SetGroupNotificationsRequest]) (*connect.Response[chatv1.SetGroupNotificationsResponse], error) {
+	return forwardUnary(ctx, req, h.client.SetGroupNotifications)
+}
+
 func (h *ChatHandler) GetGroupChat(ctx context.Context, req *connect.Request[chatv1.GetGroupChatRequest]) (*connect.Response[chatv1.GetGroupChatResponse], error) {
 	return forwardUnary(ctx, req, h.client.GetGroupChat)
+}
+
+func (h *ChatHandler) SetAllNotifications(ctx context.Context, req *connect.Request[chatv1.SetAllNotificationsRequest]) (*connect.Response[chatv1.SetAllNotificationsResponse], error) {
+	return forwardUnary(ctx, req, h.client.SetAllNotifications)
 }
 
 func (h *ChatHandler) ListGroupMembers(ctx context.Context, req *connect.Request[chatv1.ListGroupMembersRequest]) (*connect.Response[chatv1.ListGroupMembersResponse], error) {

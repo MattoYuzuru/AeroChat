@@ -49,6 +49,15 @@ const (
 	// IdentityServiceUpdateCurrentProfileProcedure is the fully-qualified name of the IdentityService's
 	// UpdateCurrentProfile RPC.
 	IdentityServiceUpdateCurrentProfileProcedure = "/aerochat.identity.v1.IdentityService/UpdateCurrentProfile"
+	// IdentityServiceGetWebPushPublicKeyProcedure is the fully-qualified name of the IdentityService's
+	// GetWebPushPublicKey RPC.
+	IdentityServiceGetWebPushPublicKeyProcedure = "/aerochat.identity.v1.IdentityService/GetWebPushPublicKey"
+	// IdentityServiceUpsertWebPushSubscriptionProcedure is the fully-qualified name of the
+	// IdentityService's UpsertWebPushSubscription RPC.
+	IdentityServiceUpsertWebPushSubscriptionProcedure = "/aerochat.identity.v1.IdentityService/UpsertWebPushSubscription"
+	// IdentityServiceDeleteWebPushSubscriptionProcedure is the fully-qualified name of the
+	// IdentityService's DeleteWebPushSubscription RPC.
+	IdentityServiceDeleteWebPushSubscriptionProcedure = "/aerochat.identity.v1.IdentityService/DeleteWebPushSubscription"
 	// IdentityServiceListDevicesProcedure is the fully-qualified name of the IdentityService's
 	// ListDevices RPC.
 	IdentityServiceListDevicesProcedure = "/aerochat.identity.v1.IdentityService/ListDevices"
@@ -131,6 +140,9 @@ type IdentityServiceClient interface {
 	LogoutCurrentSession(context.Context, *connect.Request[v1.LogoutCurrentSessionRequest]) (*connect.Response[v1.LogoutCurrentSessionResponse], error)
 	GetCurrentProfile(context.Context, *connect.Request[v1.GetCurrentProfileRequest]) (*connect.Response[v1.GetCurrentProfileResponse], error)
 	UpdateCurrentProfile(context.Context, *connect.Request[v1.UpdateCurrentProfileRequest]) (*connect.Response[v1.UpdateCurrentProfileResponse], error)
+	GetWebPushPublicKey(context.Context, *connect.Request[v1.GetWebPushPublicKeyRequest]) (*connect.Response[v1.GetWebPushPublicKeyResponse], error)
+	UpsertWebPushSubscription(context.Context, *connect.Request[v1.UpsertWebPushSubscriptionRequest]) (*connect.Response[v1.UpsertWebPushSubscriptionResponse], error)
+	DeleteWebPushSubscription(context.Context, *connect.Request[v1.DeleteWebPushSubscriptionRequest]) (*connect.Response[v1.DeleteWebPushSubscriptionResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	RevokeSessionOrDevice(context.Context, *connect.Request[v1.RevokeSessionOrDeviceRequest]) (*connect.Response[v1.RevokeSessionOrDeviceResponse], error)
 	ListBlockedUsers(context.Context, *connect.Request[v1.ListBlockedUsersRequest]) (*connect.Response[v1.ListBlockedUsersResponse], error)
@@ -202,6 +214,24 @@ func NewIdentityServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			httpClient,
 			baseURL+IdentityServiceUpdateCurrentProfileProcedure,
 			connect.WithSchema(identityServiceMethods.ByName("UpdateCurrentProfile")),
+			connect.WithClientOptions(opts...),
+		),
+		getWebPushPublicKey: connect.NewClient[v1.GetWebPushPublicKeyRequest, v1.GetWebPushPublicKeyResponse](
+			httpClient,
+			baseURL+IdentityServiceGetWebPushPublicKeyProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("GetWebPushPublicKey")),
+			connect.WithClientOptions(opts...),
+		),
+		upsertWebPushSubscription: connect.NewClient[v1.UpsertWebPushSubscriptionRequest, v1.UpsertWebPushSubscriptionResponse](
+			httpClient,
+			baseURL+IdentityServiceUpsertWebPushSubscriptionProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("UpsertWebPushSubscription")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteWebPushSubscription: connect.NewClient[v1.DeleteWebPushSubscriptionRequest, v1.DeleteWebPushSubscriptionResponse](
+			httpClient,
+			baseURL+IdentityServiceDeleteWebPushSubscriptionProcedure,
+			connect.WithSchema(identityServiceMethods.ByName("DeleteWebPushSubscription")),
 			connect.WithClientOptions(opts...),
 		),
 		listDevices: connect.NewClient[v1.ListDevicesRequest, v1.ListDevicesResponse](
@@ -359,6 +389,9 @@ type identityServiceClient struct {
 	logoutCurrentSession                     *connect.Client[v1.LogoutCurrentSessionRequest, v1.LogoutCurrentSessionResponse]
 	getCurrentProfile                        *connect.Client[v1.GetCurrentProfileRequest, v1.GetCurrentProfileResponse]
 	updateCurrentProfile                     *connect.Client[v1.UpdateCurrentProfileRequest, v1.UpdateCurrentProfileResponse]
+	getWebPushPublicKey                      *connect.Client[v1.GetWebPushPublicKeyRequest, v1.GetWebPushPublicKeyResponse]
+	upsertWebPushSubscription                *connect.Client[v1.UpsertWebPushSubscriptionRequest, v1.UpsertWebPushSubscriptionResponse]
+	deleteWebPushSubscription                *connect.Client[v1.DeleteWebPushSubscriptionRequest, v1.DeleteWebPushSubscriptionResponse]
 	listDevices                              *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
 	revokeSessionOrDevice                    *connect.Client[v1.RevokeSessionOrDeviceRequest, v1.RevokeSessionOrDeviceResponse]
 	listBlockedUsers                         *connect.Client[v1.ListBlockedUsersRequest, v1.ListBlockedUsersResponse]
@@ -413,6 +446,21 @@ func (c *identityServiceClient) GetCurrentProfile(ctx context.Context, req *conn
 // UpdateCurrentProfile calls aerochat.identity.v1.IdentityService.UpdateCurrentProfile.
 func (c *identityServiceClient) UpdateCurrentProfile(ctx context.Context, req *connect.Request[v1.UpdateCurrentProfileRequest]) (*connect.Response[v1.UpdateCurrentProfileResponse], error) {
 	return c.updateCurrentProfile.CallUnary(ctx, req)
+}
+
+// GetWebPushPublicKey calls aerochat.identity.v1.IdentityService.GetWebPushPublicKey.
+func (c *identityServiceClient) GetWebPushPublicKey(ctx context.Context, req *connect.Request[v1.GetWebPushPublicKeyRequest]) (*connect.Response[v1.GetWebPushPublicKeyResponse], error) {
+	return c.getWebPushPublicKey.CallUnary(ctx, req)
+}
+
+// UpsertWebPushSubscription calls aerochat.identity.v1.IdentityService.UpsertWebPushSubscription.
+func (c *identityServiceClient) UpsertWebPushSubscription(ctx context.Context, req *connect.Request[v1.UpsertWebPushSubscriptionRequest]) (*connect.Response[v1.UpsertWebPushSubscriptionResponse], error) {
+	return c.upsertWebPushSubscription.CallUnary(ctx, req)
+}
+
+// DeleteWebPushSubscription calls aerochat.identity.v1.IdentityService.DeleteWebPushSubscription.
+func (c *identityServiceClient) DeleteWebPushSubscription(ctx context.Context, req *connect.Request[v1.DeleteWebPushSubscriptionRequest]) (*connect.Response[v1.DeleteWebPushSubscriptionResponse], error) {
+	return c.deleteWebPushSubscription.CallUnary(ctx, req)
 }
 
 // ListDevices calls aerochat.identity.v1.IdentityService.ListDevices.
@@ -550,6 +598,9 @@ type IdentityServiceHandler interface {
 	LogoutCurrentSession(context.Context, *connect.Request[v1.LogoutCurrentSessionRequest]) (*connect.Response[v1.LogoutCurrentSessionResponse], error)
 	GetCurrentProfile(context.Context, *connect.Request[v1.GetCurrentProfileRequest]) (*connect.Response[v1.GetCurrentProfileResponse], error)
 	UpdateCurrentProfile(context.Context, *connect.Request[v1.UpdateCurrentProfileRequest]) (*connect.Response[v1.UpdateCurrentProfileResponse], error)
+	GetWebPushPublicKey(context.Context, *connect.Request[v1.GetWebPushPublicKeyRequest]) (*connect.Response[v1.GetWebPushPublicKeyResponse], error)
+	UpsertWebPushSubscription(context.Context, *connect.Request[v1.UpsertWebPushSubscriptionRequest]) (*connect.Response[v1.UpsertWebPushSubscriptionResponse], error)
+	DeleteWebPushSubscription(context.Context, *connect.Request[v1.DeleteWebPushSubscriptionRequest]) (*connect.Response[v1.DeleteWebPushSubscriptionResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	RevokeSessionOrDevice(context.Context, *connect.Request[v1.RevokeSessionOrDeviceRequest]) (*connect.Response[v1.RevokeSessionOrDeviceResponse], error)
 	ListBlockedUsers(context.Context, *connect.Request[v1.ListBlockedUsersRequest]) (*connect.Response[v1.ListBlockedUsersResponse], error)
@@ -617,6 +668,24 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 		IdentityServiceUpdateCurrentProfileProcedure,
 		svc.UpdateCurrentProfile,
 		connect.WithSchema(identityServiceMethods.ByName("UpdateCurrentProfile")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceGetWebPushPublicKeyHandler := connect.NewUnaryHandler(
+		IdentityServiceGetWebPushPublicKeyProcedure,
+		svc.GetWebPushPublicKey,
+		connect.WithSchema(identityServiceMethods.ByName("GetWebPushPublicKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceUpsertWebPushSubscriptionHandler := connect.NewUnaryHandler(
+		IdentityServiceUpsertWebPushSubscriptionProcedure,
+		svc.UpsertWebPushSubscription,
+		connect.WithSchema(identityServiceMethods.ByName("UpsertWebPushSubscription")),
+		connect.WithHandlerOptions(opts...),
+	)
+	identityServiceDeleteWebPushSubscriptionHandler := connect.NewUnaryHandler(
+		IdentityServiceDeleteWebPushSubscriptionProcedure,
+		svc.DeleteWebPushSubscription,
+		connect.WithSchema(identityServiceMethods.ByName("DeleteWebPushSubscription")),
 		connect.WithHandlerOptions(opts...),
 	)
 	identityServiceListDevicesHandler := connect.NewUnaryHandler(
@@ -777,6 +846,12 @@ func NewIdentityServiceHandler(svc IdentityServiceHandler, opts ...connect.Handl
 			identityServiceGetCurrentProfileHandler.ServeHTTP(w, r)
 		case IdentityServiceUpdateCurrentProfileProcedure:
 			identityServiceUpdateCurrentProfileHandler.ServeHTTP(w, r)
+		case IdentityServiceGetWebPushPublicKeyProcedure:
+			identityServiceGetWebPushPublicKeyHandler.ServeHTTP(w, r)
+		case IdentityServiceUpsertWebPushSubscriptionProcedure:
+			identityServiceUpsertWebPushSubscriptionHandler.ServeHTTP(w, r)
+		case IdentityServiceDeleteWebPushSubscriptionProcedure:
+			identityServiceDeleteWebPushSubscriptionHandler.ServeHTTP(w, r)
 		case IdentityServiceListDevicesProcedure:
 			identityServiceListDevicesHandler.ServeHTTP(w, r)
 		case IdentityServiceRevokeSessionOrDeviceProcedure:
@@ -856,6 +931,18 @@ func (UnimplementedIdentityServiceHandler) GetCurrentProfile(context.Context, *c
 
 func (UnimplementedIdentityServiceHandler) UpdateCurrentProfile(context.Context, *connect.Request[v1.UpdateCurrentProfileRequest]) (*connect.Response[v1.UpdateCurrentProfileResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.UpdateCurrentProfile is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) GetWebPushPublicKey(context.Context, *connect.Request[v1.GetWebPushPublicKeyRequest]) (*connect.Response[v1.GetWebPushPublicKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.GetWebPushPublicKey is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) UpsertWebPushSubscription(context.Context, *connect.Request[v1.UpsertWebPushSubscriptionRequest]) (*connect.Response[v1.UpsertWebPushSubscriptionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.UpsertWebPushSubscription is not implemented"))
+}
+
+func (UnimplementedIdentityServiceHandler) DeleteWebPushSubscription(context.Context, *connect.Request[v1.DeleteWebPushSubscriptionRequest]) (*connect.Response[v1.DeleteWebPushSubscriptionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.identity.v1.IdentityService.DeleteWebPushSubscription is not implemented"))
 }
 
 func (UnimplementedIdentityServiceHandler) ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error) {

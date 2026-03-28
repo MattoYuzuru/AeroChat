@@ -110,6 +110,7 @@ interface ProfileWire extends TimestampedWire {
   readReceiptsEnabled?: boolean;
   presenceEnabled?: boolean;
   typingVisibilityEnabled?: boolean;
+  pushNotificationsEnabled?: boolean;
   keyBackupStatus?: string;
 }
 
@@ -149,6 +150,18 @@ interface GetCurrentProfileResponseWire {
 
 interface UpdateCurrentProfileResponseWire {
   profile?: ProfileWire;
+}
+
+interface GetWebPushPublicKeyResponseWire {
+  publicKey?: string;
+}
+
+interface DirectChatNotificationsResponseWire {
+  chat?: DirectChatWire;
+}
+
+interface GroupNotificationsResponseWire {
+  group?: GroupWire;
 }
 
 interface ListDevicesResponseWire {
@@ -278,6 +291,7 @@ interface DirectChatWire extends TimestampedWire {
   encryptedPinnedMessageIds?: string[];
   unreadState?: UnreadStateWire;
   encryptedUnreadState?: UnreadStateWire;
+  notificationsEnabled?: boolean;
 }
 
 interface GroupWire extends TimestampedWire {
@@ -289,6 +303,7 @@ interface GroupWire extends TimestampedWire {
   encryptedPinnedMessageIds?: string[];
   unreadState?: UnreadStateWire;
   encryptedUnreadState?: UnreadStateWire;
+  notificationsEnabled?: boolean;
   permissions?: GroupPermissionsWire;
 }
 
@@ -986,6 +1001,49 @@ export function createGatewayClient(
       return normalizeProfile(response.profile);
     },
 
+    async getWebPushPublicKey(token) {
+      const response = await unaryCall<GetWebPushPublicKeyResponseWire>(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "GetWebPushPublicKey",
+        {},
+        token,
+      );
+
+      return response.publicKey?.trim() ?? "";
+    },
+
+    async upsertWebPushSubscription(token, input) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "UpsertWebPushSubscription",
+        {
+          endpoint: input.endpoint.trim(),
+          p256dhKey: input.p256dhKey.trim(),
+          authSecret: input.authSecret.trim(),
+          expirationTime: normalizeOptionalString(input.expirationTime ?? ""),
+          userAgent: normalizeOptionalString(input.userAgent ?? ""),
+        },
+        token,
+      );
+    },
+
+    async deleteWebPushSubscription(token, endpoint) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        identityServicePath,
+        "DeleteWebPushSubscription",
+        {
+          endpoint: endpoint.trim(),
+        },
+        token,
+      );
+    },
+
     async registerFirstCryptoDevice(token, input) {
       const response = await unaryCall<RegisterCryptoDeviceResponseWire>(
         fetchImpl,
@@ -1541,6 +1599,22 @@ export function createGatewayClient(
       return normalizeGroup(response.group);
     },
 
+    async setGroupNotifications(token, groupId, notificationsEnabled) {
+      const response = await unaryCall<GroupNotificationsResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "SetGroupNotifications",
+        {
+          groupId: groupId.trim(),
+          notificationsEnabled,
+        },
+        token,
+      );
+
+      return normalizeGroup(response.group);
+    },
+
     async createDirectChat(token, peerUserId) {
       const response = await unaryCall<CreateDirectChatResponseWire>(
         fetchImpl,
@@ -1582,6 +1656,35 @@ export function createGatewayClient(
       );
 
       return normalizeDirectChatSnapshot(response);
+    },
+
+    async setDirectChatNotifications(token, chatId, notificationsEnabled) {
+      const response = await unaryCall<DirectChatNotificationsResponseWire>(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "SetDirectChatNotifications",
+        {
+          chatId: chatId.trim(),
+          notificationsEnabled,
+        },
+        token,
+      );
+
+      return normalizeDirectChat(response.chat);
+    },
+
+    async setAllNotifications(token, notificationsEnabled) {
+      await unaryCall(
+        fetchImpl,
+        baseUrl,
+        chatServicePath,
+        "SetAllNotifications",
+        {
+          notificationsEnabled,
+        },
+        token,
+      );
     },
 
     async getRtcIceServers(token) {
@@ -2441,6 +2544,7 @@ function normalizeProfile(input: ProfileWire | undefined): Profile {
     readReceiptsEnabled: input?.readReceiptsEnabled ?? false,
     presenceEnabled: input?.presenceEnabled ?? false,
     typingVisibilityEnabled: input?.typingVisibilityEnabled ?? false,
+    pushNotificationsEnabled: input?.pushNotificationsEnabled ?? false,
     keyBackupStatus: input?.keyBackupStatus ?? "KEY_BACKUP_STATUS_UNSPECIFIED",
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
@@ -2697,6 +2801,7 @@ function normalizeGroup(input: GroupWire | undefined): Group {
     ),
     unreadCount: normalizeUnreadCount(input?.unreadState),
     encryptedUnreadCount: normalizeUnreadCount(input?.encryptedUnreadState),
+    notificationsEnabled: input?.notificationsEnabled ?? true,
     permissions: normalizeGroupPermissions(input?.permissions),
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
@@ -2954,6 +3059,7 @@ function normalizeDirectChat(input: DirectChatWire | undefined): DirectChat {
     ),
     unreadCount: normalizeUnreadCount(input?.unreadState),
     encryptedUnreadCount: normalizeUnreadCount(input?.encryptedUnreadState),
+    notificationsEnabled: input?.notificationsEnabled ?? true,
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
   };
@@ -3831,6 +3937,7 @@ function buildUpdateCurrentProfileBody(
     readReceiptsEnabled: boolean;
     presenceEnabled: boolean;
     typingVisibilityEnabled: boolean;
+    pushNotificationsEnabled: boolean;
   }>,
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {};
@@ -3881,6 +3988,10 @@ function buildUpdateCurrentProfileBody(
 
   if (input.typingVisibilityEnabled !== undefined) {
     body.typingVisibilityEnabled = input.typingVisibilityEnabled;
+  }
+
+  if (input.pushNotificationsEnabled !== undefined) {
+    body.pushNotificationsEnabled = input.pushNotificationsEnabled;
   }
 
   return body;

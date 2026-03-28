@@ -54,6 +54,7 @@ type UserSummary struct {
 	ReadReceiptsEnabled     bool
 	PresenceEnabled         bool
 	TypingVisibilityEnabled bool
+	PushNotificationsEnabled bool
 }
 
 type Session struct {
@@ -158,6 +159,7 @@ type DirectChat struct {
 	EncryptedPinnedMessageIDs []string
 	UnreadCount               int32
 	EncryptedUnreadCount      int32
+	NotificationsEnabled      bool
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
 }
@@ -174,8 +176,17 @@ type Group struct {
 	EncryptedPinnedMessageIDs []string
 	UnreadCount               int32
 	EncryptedUnreadCount      int32
+	NotificationsEnabled      bool
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
+}
+
+type WebPushSubscription struct {
+	ID         string
+	UserID     string
+	Endpoint   string
+	P256DHKey  string
+	AuthSecret string
 }
 
 type GroupPermissions struct {

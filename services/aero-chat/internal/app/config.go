@@ -32,6 +32,9 @@ type Config struct {
 	MediaUnattachedAttachmentTTL     time.Duration
 	MediaDetachedAttachmentRetention time.Duration
 	MediaAttachmentCleanupBatchSize  int
+	WebPushSubscriber                string
+	WebPushVAPIDPublicKey            string
+	WebPushVAPIDPrivateKey           string
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -115,6 +118,9 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		MediaUnattachedAttachmentTTL:     unattachedAttachmentTTL,
 		MediaDetachedAttachmentRetention: detachedAttachmentRetention,
 		MediaAttachmentCleanupBatchSize:  attachmentCleanupBatchSize,
+		WebPushSubscriber:                lookupString("AERO_WEB_PUSH_SUBSCRIBER", ""),
+		WebPushVAPIDPublicKey:            lookupString("AERO_WEB_PUSH_VAPID_PUBLIC_KEY", ""),
+		WebPushVAPIDPrivateKey:           lookupString("AERO_WEB_PUSH_VAPID_PRIVATE_KEY", ""),
 	}, nil
 }
 

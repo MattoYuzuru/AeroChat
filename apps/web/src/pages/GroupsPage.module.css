@@ -191,6 +191,30 @@
     var(--xp-field-shadow);
 }
 
+.notificationToggleCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--xp-note-border);
+  background: var(--xp-panel-surface-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.notificationToggleCopy {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.notificationToggleCopy strong {
+  color: #153b64;
+}
+
+.notificationToggleInput {
+  margin-top: 0.1rem;
+}
+
 .primaryButton,
 .secondaryButton,
 .dangerButton,

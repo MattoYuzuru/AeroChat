@@ -22,6 +22,7 @@ type User struct {
 	ReadReceiptsEnabled     bool
 	PresenceEnabled         bool
 	TypingVisibilityEnabled bool
+	PushNotificationsEnabled bool
 	KeyBackupStatus         string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
@@ -110,6 +111,27 @@ type ProfilePatch struct {
 	ReadReceiptsEnabled     *bool
 	PresenceEnabled         *bool
 	TypingVisibilityEnabled *bool
+	PushNotificationsEnabled *bool
+}
+
+type WebPushSubscription struct {
+	ID             string
+	UserID         string
+	Endpoint       string
+	P256DHKey      string
+	AuthSecret     string
+	ExpirationTime *time.Time
+	UserAgent      *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type UpsertWebPushSubscriptionInput struct {
+	Endpoint       string
+	P256DHKey      string
+	AuthSecret     string
+	ExpirationTime *time.Time
+	UserAgent      *string
 }
 
 type SessionTarget struct {

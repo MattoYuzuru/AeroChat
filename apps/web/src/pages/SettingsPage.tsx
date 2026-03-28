@@ -8,6 +8,7 @@ import {
 } from "react";
 import { getAuthErrorMessage, useAuth } from "../auth/useAuth";
 import type { DeviceWithSessions, Session } from "../gateway/types";
+import { gatewayClient } from "../gateway/runtime";
 import { getRevocationTargetKey } from "../settings/devices-state";
 import {
   buildSettingsPatch,
@@ -21,6 +22,7 @@ import {
   useDevices,
 } from "../settings/useDevices";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
+import { useWebNotifications } from "../notifications/context";
 import styles from "./SettingsPage.module.css";
 
 const privacyItems = [
@@ -79,6 +81,9 @@ export function SettingsPage() {
     onUnauthenticated: expireSession,
   });
   const cryptoRuntime = useCryptoRuntime();
+  const webNotifications = useWebNotifications();
+  const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
 
   loadSettingsRef.current = async () => {
     clearNotice();
@@ -127,6 +132,7 @@ export function SettingsPage() {
     return null;
   }
 
+  const sessionToken = state.token;
   const profile = state.profile;
   const isDirty = hasSettingsChanges(profile, form);
 
@@ -190,6 +196,83 @@ export function SettingsPage() {
     }
 
     await devices.revokeSession(session.id);
+  }
+
+  async function handleBrowserPushToggle(nextEnabled: boolean) {
+    setNotificationsError(null);
+    webNotifications.clearError();
+    clearNotice();
+    setIsUpdatingNotifications(true);
+
+    try {
+      if (nextEnabled) {
+        const enabled = await webNotifications.ensureBrowserPush(sessionToken);
+        if (!enabled) {
+          throw new Error(
+            webNotifications.error ??
+              "Не удалось подготовить browser push для этого устройства.",
+          );
+        }
+
+        await updateProfile({
+          pushNotificationsEnabled: true,
+        });
+        return;
+      }
+
+      await updateProfile({
+        pushNotificationsEnabled: false,
+      });
+      await webNotifications.disableBrowserPush(sessionToken);
+    } catch (error) {
+      setNotificationsError(
+        getAuthErrorMessage(
+          error,
+          nextEnabled
+            ? "Не удалось включить browser push."
+            : "Не удалось выключить browser push.",
+        ),
+      );
+    } finally {
+      setIsUpdatingNotifications(false);
+    }
+  }
+
+  async function handleSetAllNotifications(nextEnabled: boolean) {
+    setNotificationsError(null);
+    webNotifications.clearError();
+    clearNotice();
+    setIsUpdatingNotifications(true);
+
+    try {
+      if (nextEnabled && profile.pushNotificationsEnabled !== true) {
+        const enabled = await webNotifications.ensureBrowserPush(sessionToken);
+        if (!enabled) {
+          throw new Error(
+            webNotifications.error ??
+              "Не удалось подготовить browser push для этого устройства.",
+          );
+        }
+
+        await updateProfile({
+          pushNotificationsEnabled: true,
+        });
+      }
+
+      await gatewayClient.setAllNotifications(sessionToken, nextEnabled);
+      await refreshProfile();
+    } catch (error) {
+      setNotificationsError(
+        getAuthErrorMessage(
+          error,
+          nextEnabled
+            ? "Не удалось включить уведомления для всех чатов."
+            : "Не удалось отключить уведомления для всех чатов.",
+        ),
+      );
+    } finally {
+      setIsUpdatingNotifications(false);
+    }
   }
 
   return (
@@ -334,6 +417,80 @@ export function SettingsPage() {
                     value={form.statusText}
                   />
                 </label>
+              </div>
+            </section>
+
+            <section className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <div>
+                  <p className={styles.cardLabel}>Уведомления</p>
+                  <h2 className={styles.sectionTitle}>Browser push и охват чатов</h2>
+                </div>
+                <p className={styles.sectionDescription}>
+                  Push работает только после разрешения браузера. Пока AeroChat открыт и видим,
+                  системные уведомления не дублируются.
+                </p>
+              </div>
+
+              {(notificationsError || webNotifications.error) && (
+                <div className={styles.error}>
+                  {notificationsError ?? webNotifications.error}
+                </div>
+              )}
+
+              <div className={styles.toggleList}>
+                <label className={styles.toggleCard}>
+                  <div className={styles.toggleCopy}>
+                    <strong>Браузерные уведомления</strong>
+                    <span>
+                      Разрешает доставку push на этот браузер для ПК и мобильных устройств.
+                    </span>
+                  </div>
+                  <input
+                    checked={profile.pushNotificationsEnabled === true}
+                    className={`${styles.toggleInput} xpCheckbox`}
+                    disabled={
+                      isUpdatingNotifications || !webNotifications.isSupported
+                    }
+                    onChange={(event) => {
+                      void handleBrowserPushToggle(event.target.checked);
+                    }}
+                    type="checkbox"
+                  />
+                </label>
+              </div>
+
+              <div className={styles.sectionToolbar}>
+                <p className={styles.sectionDescription}>
+                  Статус браузера:{" "}
+                  {describeBrowserPushState(
+                    webNotifications.isSupported,
+                    webNotifications.permission,
+                    webNotifications.subscriptionStatus,
+                  )}
+                </p>
+                <div className={styles.actions}>
+                  <button
+                    className={styles.secondaryButton}
+                    disabled={isUpdatingNotifications}
+                    onClick={() => {
+                      void handleSetAllNotifications(true);
+                    }}
+                    type="button"
+                  >
+                    ВКЛ везде
+                  </button>
+                  <button
+                    className={styles.secondaryButton}
+                    disabled={isUpdatingNotifications}
+                    onClick={() => {
+                      void handleSetAllNotifications(false);
+                    }}
+                    type="button"
+                  >
+                    ВЫКЛ везде
+                  </button>
+                </div>
               </div>
             </section>
 
@@ -819,6 +976,30 @@ export function SettingsPage() {
       )}
     </div>
   );
+}
+
+function describeBrowserPushState(
+  isSupported: boolean,
+  permission: NotificationPermission | "unsupported",
+  subscriptionStatus: "idle" | "syncing" | "active" | "inactive",
+) {
+  if (!isSupported || permission === "unsupported") {
+    return "текущий браузер не поддерживает push";
+  }
+  if (subscriptionStatus === "syncing") {
+    return "синхронизируем subscription";
+  }
+  if (permission === "denied") {
+    return "разрешение заблокировано браузером";
+  }
+  if (permission === "default") {
+    return "разрешение ещё не выдано";
+  }
+  if (subscriptionStatus === "active") {
+    return "push готов на этом устройстве";
+  }
+
+  return "разрешение выдано, но subscription ещё не активирована";
 }
 
 interface MetricCardProps {
