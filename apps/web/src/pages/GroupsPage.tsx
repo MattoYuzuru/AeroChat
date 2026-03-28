@@ -85,6 +85,10 @@ import {
 } from "../search/jump";
 import { primeEncryptedGroupLocalSearchIndex } from "../search/encrypted-local-search";
 import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
+import {
+  isViewportPinnedToBottom,
+  useThreadViewportAutoPin,
+} from "../ui/thread-viewport";
 import styles from "./GroupsPage.module.css";
 
 export function GroupsPage() {
@@ -154,9 +158,8 @@ export function GroupsPage() {
   );
   const groupCallAwarenessStateRef = useRef(groupCallAwarenessState);
   const previousSelectedGroupCallIdRef = useRef<string | null>(null);
-  const previousSelectedGroupIdRef = useRef<string | null>(null);
-  const threadEndRef = useRef<HTMLDivElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesListRef = useRef<HTMLDivElement | null>(null);
   const keepScrollPinnedToBottomRef = useRef(true);
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const activeTypingTargetRef = useRef<GroupTypingSessionTarget | null>(null);
@@ -933,7 +936,7 @@ export function GroupsPage() {
 
       setSearchJumpNotice(null);
       setHighlightedMessageId(encryptedTarget.messageId);
-      jumpToMessage(`encrypted-group-message-${encryptedTarget.messageId}`);
+      jumpToThreadMessage(`encrypted-group-message-${encryptedTarget.messageId}`);
       setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
       return;
     }
@@ -950,7 +953,7 @@ export function GroupsPage() {
 
     setSearchJumpNotice(null);
     setHighlightedMessageId(targetMessage.id);
-    jumpToMessage(`group-message-${targetMessage.id}`);
+    jumpToThreadMessage(`group-message-${targetMessage.id}`);
     setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
   }, [
     encryptedGroupLane.errorMessage,
@@ -1198,56 +1201,14 @@ export function GroupsPage() {
     selectedState.status === "ready"
       ? describeGroupTypingLabel(selectedState.snapshot.typingState, currentUserId)
       : null;
-
-  useEffect(() => {
-    if (
-      groupWindowContentMode !== "thread" ||
-      selectedState.status !== "ready" ||
-      encryptedGroupLane.status !== "ready" ||
-      searchJumpIntent !== null
-    ) {
-      return;
-    }
-
-    const viewport = messagesViewportRef.current;
-    const target = threadEndRef.current;
-    if (target === null || viewport === null) {
-      return;
-    }
-
-    const selectedGroupChanged = previousSelectedGroupIdRef.current !== selectedGroupId;
-    previousSelectedGroupIdRef.current = selectedGroupId;
-
-    if (!selectedGroupChanged && !keepScrollPinnedToBottomRef.current) {
-      return;
-    }
-
-    const scrollToEnd = () => {
-      viewport.scrollTop = viewport.scrollHeight;
-      target.scrollIntoView({
-        block: "end",
-      });
-    };
-
-    const firstFrame = requestAnimationFrame(() => {
-      scrollToEnd();
-      requestAnimationFrame(scrollToEnd);
-    });
-    const timeoutId = window.setTimeout(scrollToEnd, 80);
-
-    return () => {
-      cancelAnimationFrame(firstFrame);
-      window.clearTimeout(timeoutId);
-    };
-  }, [
-    encryptedGroupLane.status,
-    encryptedThreadMessages.length,
-    groupWindowContentMode,
-    searchJumpIntent,
-    selectedGroupId,
-    selectedGroupCallEntry?.call.id,
-    selectedState,
-  ]);
+  useThreadViewportAutoPin({
+    contentRef: messagesListRef,
+    enabled: groupWindowContentMode === "thread" && selectedGroupId !== "" && searchJumpIntent === null,
+    keepPinnedToBottomRef: keepScrollPinnedToBottomRef,
+    layoutVersion: `${selectedState.status}:${encryptedGroupLane.status}:${encryptedThreadMessages.length}:${selectedGroupCallEntry?.call.id ?? ""}`,
+    threadKey: selectedGroupId === "" ? null : selectedGroupId,
+    viewportRef: messagesViewportRef,
+  });
 
   if (authState.status !== "authenticated") {
     return null;
@@ -2129,9 +2090,12 @@ export function GroupsPage() {
       return;
     }
 
-    const distanceFromBottom =
-      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-    keepScrollPinnedToBottomRef.current = distanceFromBottom < 64;
+    keepScrollPinnedToBottomRef.current = isViewportPinnedToBottom(viewport);
+  }
+
+  function jumpToThreadMessage(elementId: string) {
+    keepScrollPinnedToBottomRef.current = false;
+    jumpToMessage(elementId);
   }
 
   return (
@@ -2438,7 +2402,7 @@ export function GroupsPage() {
                             return;
                           }
 
-                          jumpToMessage("group-call-card");
+                          jumpToThreadMessage("group-call-card");
                         }}
                         type="button"
                       >
@@ -2917,7 +2881,7 @@ export function GroupsPage() {
                       onScroll={handleMessagesViewportScroll}
                       ref={messagesViewportRef}
                     >
-                      <div className={styles.messagesList}>
+                      <div className={styles.messagesList} ref={messagesListRef}>
                       {encryptedThreadMessages.length === 0 ? (
                         <InlineState
                           title="Сообщений пока нет"
@@ -2999,7 +2963,7 @@ export function GroupsPage() {
                                             selectedState.members,
                                           );
                                           if (target !== null && target.messageId !== null) {
-                                            jumpToMessage(
+                                            jumpToThreadMessage(
                                               `encrypted-group-message-${target.messageId}`,
                                             );
                                           }
@@ -3317,7 +3281,6 @@ export function GroupsPage() {
                         пока не открываются.
                         {typingLabel ? ` ${typingLabel}` : ""}
                       </div>
-                      <div ref={threadEndRef} />
                       </div>
                     </div>
                   </>
