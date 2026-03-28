@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	libnotifications "github.com/MattoYuzuru/AeroChat/libs/go/notifications"
 )
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
@@ -29,7 +31,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		return Config{}, err
 	}
 
-	return Config{
+	cfg := Config{
 		DatabaseURL:              lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
 		HTTPAddress:              lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
 		LogLevel:                 lookupString("AERO_LOG_LEVEL", "info"),
@@ -38,7 +40,16 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		WebPushSubscriber:        lookupString("AERO_WEB_PUSH_SUBSCRIBER", ""),
 		WebPushVAPIDPublicKey:    lookupString("AERO_WEB_PUSH_VAPID_PUBLIC_KEY", ""),
 		WebPushVAPIDPrivateKey:   lookupString("AERO_WEB_PUSH_VAPID_PRIVATE_KEY", ""),
-	}, nil
+	}
+	if err := libnotifications.ValidateWebPushConfig(
+		cfg.WebPushSubscriber,
+		cfg.WebPushVAPIDPublicKey,
+		cfg.WebPushVAPIDPrivateKey,
+	); err != nil {
+		return Config{}, err
+	}
+
+	return cfg, nil
 }
 
 func lookupString(key string, fallback string) string {

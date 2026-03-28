@@ -262,6 +262,7 @@ cp .env.server.secrets.example .env.server.secrets
 - `MEDIA_S3_CORS_ALLOWED_ORIGINS` должен перечислять только доверенные application origins;
 - `AERO_WEB_PUSH_SUBSCRIBER` должен содержать корректный VAPID subject, обычно `mailto:` URL;
 - `AERO_WEB_PUSH_VAPID_PUBLIC_KEY` должен совпадать с private key из `.env.server.secrets`;
+- неполный набор `AERO_WEB_PUSH_*` не допускается: либо заполняется весь блок, либо он целиком остаётся выключенным;
 - `AERO_RTC_TURN_EXTERNAL_IP` должен соответствовать browser-visible TURN host из `AERO_RTC_TURN_URLS`;
 - `AERO_RTC_TURN_RELAY_IP` должен указывать на локальный bind IP хоста, если public TURN IP не принадлежит интерфейсу VPS;
 - при NAT-сценарии coturn будет рекламировать mapping `AERO_RTC_TURN_EXTERNAL_IP/AERO_RTC_TURN_RELAY_IP`;
