@@ -165,16 +165,16 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (*AuthSessi
 
 	now := s.now()
 	user := User{
-		ID:                      s.newID(),
-		Login:                   login,
-		Nickname:                nickname,
-		ReadReceiptsEnabled:     true,
-		PresenceEnabled:         true,
-		TypingVisibilityEnabled: true,
+		ID:                       s.newID(),
+		Login:                    login,
+		Nickname:                 nickname,
+		ReadReceiptsEnabled:      true,
+		PresenceEnabled:          true,
+		TypingVisibilityEnabled:  true,
 		PushNotificationsEnabled: true,
-		KeyBackupStatus:         KeyBackupStatusNotConfigured,
-		CreatedAt:               now,
-		UpdatedAt:               now,
+		KeyBackupStatus:          KeyBackupStatusNotConfigured,
+		CreatedAt:                now,
+		UpdatedAt:                now,
 	}
 	device := Device{
 		ID:         s.newID(),

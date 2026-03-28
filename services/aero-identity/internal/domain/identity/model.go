@@ -8,24 +8,24 @@ const (
 )
 
 type User struct {
-	ID                      string
-	Login                   string
-	Nickname                string
-	AvatarURL               *string
-	Bio                     *string
-	Timezone                *string
-	ProfileAccent           *string
-	StatusText              *string
-	Birthday                *time.Time
-	Country                 *string
-	City                    *string
-	ReadReceiptsEnabled     bool
-	PresenceEnabled         bool
-	TypingVisibilityEnabled bool
+	ID                       string
+	Login                    string
+	Nickname                 string
+	AvatarURL                *string
+	Bio                      *string
+	Timezone                 *string
+	ProfileAccent            *string
+	StatusText               *string
+	Birthday                 *time.Time
+	Country                  *string
+	City                     *string
+	ReadReceiptsEnabled      bool
+	PresenceEnabled          bool
+	TypingVisibilityEnabled  bool
 	PushNotificationsEnabled bool
-	KeyBackupStatus         string
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	KeyBackupStatus          string
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 type Device struct {
@@ -99,18 +99,18 @@ type LoginInput struct {
 }
 
 type ProfilePatch struct {
-	Nickname                *string
-	AvatarURL               *string
-	Bio                     *string
-	Timezone                *string
-	ProfileAccent           *string
-	StatusText              *string
-	Birthday                *string
-	Country                 *string
-	City                    *string
-	ReadReceiptsEnabled     *bool
-	PresenceEnabled         *bool
-	TypingVisibilityEnabled *bool
+	Nickname                 *string
+	AvatarURL                *string
+	Bio                      *string
+	Timezone                 *string
+	ProfileAccent            *string
+	StatusText               *string
+	Birthday                 *string
+	Country                  *string
+	City                     *string
+	ReadReceiptsEnabled      *bool
+	PresenceEnabled          *bool
+	TypingVisibilityEnabled  *bool
 	PushNotificationsEnabled *bool
 }
 

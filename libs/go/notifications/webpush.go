@@ -22,11 +22,11 @@ type Subscription struct {
 }
 
 type WebPushClient struct {
-	httpClient  *http.Client
-	subscriber  string
-	publicKey   string
-	privateKey  string
-	ttlSeconds  int
+	httpClient *http.Client
+	subscriber string
+	publicKey  string
+	privateKey string
+	ttlSeconds int
 }
 
 func NewWebPushClient(httpClient *http.Client, subscriber string, publicKey string, privateKey string) *WebPushClient {

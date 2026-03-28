@@ -1109,7 +1109,7 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, token string, groupI
 		return nil, err
 	}
 
-s.dispatchGroupMessageNotification(ctx, authSession.User, *group, false, normalizedText, now)
+	s.dispatchGroupMessageNotification(ctx, authSession.User, *group, false, normalizedText, now)
 
 	return message, nil
 }
@@ -1712,7 +1712,7 @@ func (s *Service) SendTextMessage(ctx context.Context, token string, chatID stri
 		return nil, err
 	}
 
-s.dispatchDirectMessageNotification(ctx, authSession.User, *directChat, false, normalizedText, now)
+	s.dispatchDirectMessageNotification(ctx, authSession.User, *directChat, false, normalizedText, now)
 
 	return message, nil
 }

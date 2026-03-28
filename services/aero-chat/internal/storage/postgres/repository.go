@@ -43,13 +43,13 @@ func (r *Repository) GetSessionAuthByID(ctx context.Context, sessionID string) (
 
 	return &chat.SessionAuth{
 		User: chat.UserSummary{
-			ID:                      row.UserID.String(),
-			Login:                   row.Login,
-			Nickname:                row.Nickname,
-			AvatarURL:               textPointer(row.AvatarUrl),
-			ReadReceiptsEnabled:     row.ReadReceiptsEnabled,
-			PresenceEnabled:         row.PresenceEnabled,
-			TypingVisibilityEnabled: row.TypingVisibilityEnabled,
+			ID:                       row.UserID.String(),
+			Login:                    row.Login,
+			Nickname:                 row.Nickname,
+			AvatarURL:                textPointer(row.AvatarUrl),
+			ReadReceiptsEnabled:      row.ReadReceiptsEnabled,
+			PresenceEnabled:          row.PresenceEnabled,
+			TypingVisibilityEnabled:  row.TypingVisibilityEnabled,
 			PushNotificationsEnabled: row.PushNotificationsEnabled,
 		},
 		Device: chat.Device{
@@ -196,10 +196,10 @@ func (r *Repository) UpsertDirectChatNotificationPreference(
 	updatedAt time.Time,
 ) error {
 	return convertError(r.queries.UpsertDirectChatNotificationPreference(ctx, chatsqlc.UpsertDirectChatNotificationPreferenceParams{
-		ChatID:                mustParseUUID(chatID),
-		UserID:                mustParseUUID(userID),
-		NotificationsEnabled:  enabled,
-		UpdatedAt:             timestamptzValue(updatedAt),
+		ChatID:               mustParseUUID(chatID),
+		UserID:               mustParseUUID(userID),
+		NotificationsEnabled: enabled,
+		UpdatedAt:            timestamptzValue(updatedAt),
 	}))
 }
 
@@ -364,10 +364,10 @@ func (r *Repository) UpsertGroupNotificationPreference(
 	updatedAt time.Time,
 ) error {
 	return convertError(r.queries.UpsertGroupNotificationPreference(ctx, chatsqlc.UpsertGroupNotificationPreferenceParams{
-		GroupID:               mustParseUUID(groupID),
-		UserID:                mustParseUUID(userID),
-		NotificationsEnabled:  enabled,
-		UpdatedAt:             timestamptzValue(updatedAt),
+		GroupID:              mustParseUUID(groupID),
+		UserID:               mustParseUUID(userID),
+		NotificationsEnabled: enabled,
+		UpdatedAt:            timestamptzValue(updatedAt),
 	}))
 }
 
@@ -496,10 +496,10 @@ func (r *Repository) ListGroupMembers(ctx context.Context, userID string, groupI
 		result = append(result, chat.GroupMember{
 			GroupID: row.GroupID.String(),
 			User: chat.UserSummary{
-				ID:        row.UserID.String(),
-				Login:     row.Login,
-				Nickname:  row.Nickname,
-				AvatarURL: textPointer(row.AvatarUrl),
+				ID:                       row.UserID.String(),
+				Login:                    row.Login,
+				Nickname:                 row.Nickname,
+				AvatarURL:                textPointer(row.AvatarUrl),
 				PushNotificationsEnabled: row.PushNotificationsEnabled,
 			},
 			Role:              row.Role,
@@ -577,10 +577,10 @@ func (r *Repository) GetGroupMember(ctx context.Context, groupID string, userID 
 	member := &chat.GroupMember{
 		GroupID: row.GroupID.String(),
 		User: chat.UserSummary{
-			ID:        row.UserID.String(),
-			Login:     row.Login,
-			Nickname:  row.Nickname,
-			AvatarURL: textPointer(row.AvatarUrl),
+			ID:                       row.UserID.String(),
+			Login:                    row.Login,
+			Nickname:                 row.Nickname,
+			AvatarURL:                textPointer(row.AvatarUrl),
 			PushNotificationsEnabled: row.PushNotificationsEnabled,
 		},
 		Role:              row.Role,
@@ -2398,16 +2398,16 @@ func (r *Repository) UnpinEncryptedGroupMessage(ctx context.Context, groupID str
 }
 
 type listChatRow struct {
-	ChatID               uuid.UUID
-	ChatCreatedAt        pgtype.Timestamptz
-	ChatUpdatedAt        pgtype.Timestamptz
-	UnreadCount          int32
-	EncryptedUnreadCount int32
-	NotificationsEnabled bool
-	ParticipantUserID    uuid.UUID
-	ParticipantLogin     string
-	ParticipantNickname  string
-	ParticipantAvatarURL pgtype.Text
+	ChatID                              uuid.UUID
+	ChatCreatedAt                       pgtype.Timestamptz
+	ChatUpdatedAt                       pgtype.Timestamptz
+	UnreadCount                         int32
+	EncryptedUnreadCount                int32
+	NotificationsEnabled                bool
+	ParticipantUserID                   uuid.UUID
+	ParticipantLogin                    string
+	ParticipantNickname                 string
+	ParticipantAvatarURL                pgtype.Text
 	ParticipantPushNotificationsEnabled bool
 }
 
@@ -2415,16 +2415,16 @@ func rowsToListChatRows(rows []chatsqlc.ListDirectChatRowsByUserIDRow) []listCha
 	items := make([]listChatRow, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, listChatRow{
-			ChatID:               row.ChatID,
-			ChatCreatedAt:        row.ChatCreatedAt,
-			ChatUpdatedAt:        row.ChatUpdatedAt,
-			UnreadCount:          row.UnreadCount,
-			EncryptedUnreadCount: row.EncryptedUnreadCount,
-			NotificationsEnabled: row.NotificationsEnabled,
-			ParticipantUserID:    row.ParticipantUserID,
-			ParticipantLogin:     row.ParticipantLogin,
-			ParticipantNickname:  row.ParticipantNickname,
-			ParticipantAvatarURL: row.ParticipantAvatarUrl,
+			ChatID:                              row.ChatID,
+			ChatCreatedAt:                       row.ChatCreatedAt,
+			ChatUpdatedAt:                       row.ChatUpdatedAt,
+			UnreadCount:                         row.UnreadCount,
+			EncryptedUnreadCount:                row.EncryptedUnreadCount,
+			NotificationsEnabled:                row.NotificationsEnabled,
+			ParticipantUserID:                   row.ParticipantUserID,
+			ParticipantLogin:                    row.ParticipantLogin,
+			ParticipantNickname:                 row.ParticipantNickname,
+			ParticipantAvatarURL:                row.ParticipantAvatarUrl,
 			ParticipantPushNotificationsEnabled: row.ParticipantPushNotificationsEnabled,
 		})
 	}
@@ -2435,16 +2435,16 @@ func rowsToGetChatRows(rows []chatsqlc.GetDirectChatRowsByIDAndUserIDRow) []list
 	items := make([]listChatRow, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, listChatRow{
-			ChatID:               row.ChatID,
-			ChatCreatedAt:        row.ChatCreatedAt,
-			ChatUpdatedAt:        row.ChatUpdatedAt,
-			UnreadCount:          row.UnreadCount,
-			EncryptedUnreadCount: row.EncryptedUnreadCount,
-			NotificationsEnabled: row.NotificationsEnabled,
-			ParticipantUserID:    row.ParticipantUserID,
-			ParticipantLogin:     row.ParticipantLogin,
-			ParticipantNickname:  row.ParticipantNickname,
-			ParticipantAvatarURL: row.ParticipantAvatarUrl,
+			ChatID:                              row.ChatID,
+			ChatCreatedAt:                       row.ChatCreatedAt,
+			ChatUpdatedAt:                       row.ChatUpdatedAt,
+			UnreadCount:                         row.UnreadCount,
+			EncryptedUnreadCount:                row.EncryptedUnreadCount,
+			NotificationsEnabled:                row.NotificationsEnabled,
+			ParticipantUserID:                   row.ParticipantUserID,
+			ParticipantLogin:                    row.ParticipantLogin,
+			ParticipantNickname:                 row.ParticipantNickname,
+			ParticipantAvatarURL:                row.ParticipantAvatarUrl,
 			ParticipantPushNotificationsEnabled: row.ParticipantPushNotificationsEnabled,
 		})
 	}
@@ -2488,10 +2488,10 @@ func (r *Repository) collectChats(ctx context.Context, rows []listChatRow) ([]ch
 		}
 
 		result[index].Participants = append(result[index].Participants, chat.UserSummary{
-			ID:        row.ParticipantUserID.String(),
-			Login:     row.ParticipantLogin,
-			Nickname:  row.ParticipantNickname,
-			AvatarURL: textPointer(row.ParticipantAvatarURL),
+			ID:                       row.ParticipantUserID.String(),
+			Login:                    row.ParticipantLogin,
+			Nickname:                 row.ParticipantNickname,
+			AvatarURL:                textPointer(row.ParticipantAvatarURL),
 			PushNotificationsEnabled: row.ParticipantPushNotificationsEnabled,
 		})
 	}

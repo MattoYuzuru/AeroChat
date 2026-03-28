@@ -47,13 +47,13 @@ const (
 )
 
 type UserSummary struct {
-	ID                      string
-	Login                   string
-	Nickname                string
-	AvatarURL               *string
-	ReadReceiptsEnabled     bool
-	PresenceEnabled         bool
-	TypingVisibilityEnabled bool
+	ID                       string
+	Login                    string
+	Nickname                 string
+	AvatarURL                *string
+	ReadReceiptsEnabled      bool
+	PresenceEnabled          bool
+	TypingVisibilityEnabled  bool
 	PushNotificationsEnabled bool
 }
 

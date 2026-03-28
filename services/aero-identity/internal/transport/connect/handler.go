@@ -103,18 +103,18 @@ func (h *Handler) UpdateCurrentProfile(ctx context.Context, req *connect.Request
 	}
 
 	profile, err := h.service.UpdateCurrentProfile(ctx, token, identity.ProfilePatch{
-		Nickname:                req.Msg.Nickname,
-		AvatarURL:               req.Msg.AvatarUrl,
-		Bio:                     req.Msg.Bio,
-		Timezone:                req.Msg.Timezone,
-		ProfileAccent:           req.Msg.ProfileAccent,
-		StatusText:              req.Msg.StatusText,
-		Birthday:                req.Msg.Birthday,
-		Country:                 req.Msg.Country,
-		City:                    req.Msg.City,
-		ReadReceiptsEnabled:     req.Msg.ReadReceiptsEnabled,
-		PresenceEnabled:         req.Msg.PresenceEnabled,
-		TypingVisibilityEnabled: req.Msg.TypingVisibilityEnabled,
+		Nickname:                 req.Msg.Nickname,
+		AvatarURL:                req.Msg.AvatarUrl,
+		Bio:                      req.Msg.Bio,
+		Timezone:                 req.Msg.Timezone,
+		ProfileAccent:            req.Msg.ProfileAccent,
+		StatusText:               req.Msg.StatusText,
+		Birthday:                 req.Msg.Birthday,
+		Country:                  req.Msg.Country,
+		City:                     req.Msg.City,
+		ReadReceiptsEnabled:      req.Msg.ReadReceiptsEnabled,
+		PresenceEnabled:          req.Msg.PresenceEnabled,
+		TypingVisibilityEnabled:  req.Msg.TypingVisibilityEnabled,
 		PushNotificationsEnabled: req.Msg.PushNotificationsEnabled,
 	})
 	if err != nil {
@@ -653,16 +653,16 @@ func toProtoAuth(value *identity.AuthSession) *identityv1.CurrentAuth {
 
 func toProtoProfile(value identity.User) *identityv1.Profile {
 	profile := &identityv1.Profile{
-		Id:                      value.ID,
-		Login:                   value.Login,
-		Nickname:                value.Nickname,
-		ReadReceiptsEnabled:     value.ReadReceiptsEnabled,
-		PresenceEnabled:         value.PresenceEnabled,
-		TypingVisibilityEnabled: value.TypingVisibilityEnabled,
+		Id:                       value.ID,
+		Login:                    value.Login,
+		Nickname:                 value.Nickname,
+		ReadReceiptsEnabled:      value.ReadReceiptsEnabled,
+		PresenceEnabled:          value.PresenceEnabled,
+		TypingVisibilityEnabled:  value.TypingVisibilityEnabled,
 		PushNotificationsEnabled: value.PushNotificationsEnabled,
-		KeyBackupStatus:         toProtoKeyBackupStatus(value.KeyBackupStatus),
-		CreatedAt:               timestamppb.New(value.CreatedAt),
-		UpdatedAt:               timestamppb.New(value.UpdatedAt),
+		KeyBackupStatus:          toProtoKeyBackupStatus(value.KeyBackupStatus),
+		CreatedAt:                timestamppb.New(value.CreatedAt),
+		UpdatedAt:                timestamppb.New(value.UpdatedAt),
 	}
 	if value.AvatarURL != nil {
 		profile.AvatarUrl = value.AvatarURL
