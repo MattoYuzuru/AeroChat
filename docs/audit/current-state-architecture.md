@@ -62,7 +62,7 @@
 - `desktop shell` теперь уже умеет canonical self-chat, direct/group chat, person-profile, friend-requests и explorer organizer windows с dedicated launch semantics, shell-local custom folders V1, dynamic desktop grid c drag/drop behavior, real Start launcher surface с bounded recents/folder access, desktop context menus с bounded shell-local actions, shell-local window placement persistence/cascade opening и narrow/mobile launcher home surface, но всё ещё не завершён как full product shell;
 - encrypted lanes реализованы как usable, но bounded foundation без full parity и без unified history;
 - `aero-rtc-control` теперь имеет usable direct-call continuity slice для web, но calls ещё не являются finished product subsystem;
-- `aero-jobs`, PWA и push пока не реализованы как продуктовые возможности, а desktop/mobile polish остаётся частично bootstrap-only.
+- `aero-jobs` и finished PWA install/offline model пока не реализованы как продуктовые возможности, а desktop/mobile polish остаётся частично bootstrap-only.
 
 ## Monorepo architecture map
 
@@ -329,14 +329,14 @@ Realtime сейчас:
 ### RTC / calls
 
 - `implemented`: server-backed RTC signaling/call-control foundation, web audio-only direct-call bootstrap, one-active-call-per-user policy и group call control/lobby surface в `GroupsPage`.
-- `partial/bootstrap/bounded`: direct media остаётся audio-only и page-scoped; group calls пока ограничены control/lobby semantics без multiparty browser media transport, video, device controls и push/recovery parity.
-- `not implemented yet`: finished group audio/video calling, global call manager, notifications, durable recovery и более богатая switching/policy semantics.
+- `partial/bootstrap/bounded`: direct media остаётся audio-only и page-scoped; group calls пока ограничены control/lobby semantics без multiparty browser media transport, video, device controls и missed-call/background ringing parity.
+- `not implemented yet`: finished group audio/video calling, global call manager, durable recovery и более богатая switching/policy semantics.
 
 ### PWA / mobile / desktop shell polish
 
 - `implemented`: responsive SPA shell с route-based workspace, real desktop shell на wide screens и dedicated mobile launcher/home surface на narrow screens.
-- `partial/bootstrap/bounded`: mobile launcher уже reuse'ит canonical targets, recent items и folder entry path, но нижняя mobile navigation, richer call-aware mobile shell chrome и более глубокий mobile productivity polish ещё не доведены.
-- `not implemented yet`: service worker, manifest/install flow, push, desktop wrapper, richer mobile shell/navigation polish beyond current launcher slice.
+- `partial/bootstrap/bounded`: mobile launcher уже reuse'ит canonical targets, recent items и folder entry path; web notifications и service worker уже есть, но install/offline/PWA slice и более глубокий mobile productivity polish ещё не доведены.
+- `not implemented yet`: manifest/install flow, desktop wrapper, richer mobile shell/navigation polish beyond current launcher slice.
 
 ## Service ownership and boundaries
 
@@ -470,6 +470,6 @@ Realtime сейчас:
 
 Ограничения:
 
-- отсутствуют service worker, manifest, offline model и push;
+- есть service worker и web push foundation, но отсутствуют manifest/install flow и offline model;
 - media recording и realtime path не описаны как install/offline-safe;
 - mobile polish как отдельный slice ещё не проведён.

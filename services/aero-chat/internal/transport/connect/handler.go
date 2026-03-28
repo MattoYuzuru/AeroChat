@@ -517,6 +517,51 @@ func (h *Handler) MarkDirectChatRead(ctx context.Context, req *connect.Request[c
 	}), nil
 }
 
+func (h *Handler) SetDirectChatNotifications(ctx context.Context, req *connect.Request[chatv1.SetDirectChatNotificationsRequest]) (*connect.Response[chatv1.SetDirectChatNotificationsResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	directChat, err := h.service.SetDirectChatNotifications(ctx, token, req.Msg.ChatId, req.Msg.NotificationsEnabled)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.SetDirectChatNotificationsResponse{
+		Chat: toProtoDirectChat(*directChat),
+	}), nil
+}
+
+func (h *Handler) SetGroupNotifications(ctx context.Context, req *connect.Request[chatv1.SetGroupNotificationsRequest]) (*connect.Response[chatv1.SetGroupNotificationsResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := h.service.SetGroupNotifications(ctx, token, req.Msg.GroupId, req.Msg.NotificationsEnabled)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.SetGroupNotificationsResponse{
+		Group: toProtoGroup(*group),
+	}), nil
+}
+
+func (h *Handler) SetAllNotifications(ctx context.Context, req *connect.Request[chatv1.SetAllNotificationsRequest]) (*connect.Response[chatv1.SetAllNotificationsResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.service.SetAllNotifications(ctx, token, req.Msg.NotificationsEnabled); err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&chatv1.SetAllNotificationsResponse{}), nil
+}
+
 func (h *Handler) MarkEncryptedDirectChatRead(ctx context.Context, req *connect.Request[chatv1.MarkEncryptedDirectChatReadRequest]) (*connect.Response[chatv1.MarkEncryptedDirectChatReadResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
@@ -1093,6 +1138,7 @@ func toProtoDirectChat(value chat.DirectChat) *chatv1.DirectChat {
 		UnreadState:               toProtoDirectChatUnreadState(value.UnreadCount),
 		EncryptedPinnedMessageIds: append([]string(nil), value.EncryptedPinnedMessageIDs...),
 		EncryptedUnreadState:      toProtoEncryptedUnreadState(value.EncryptedUnreadCount),
+		NotificationsEnabled:      value.NotificationsEnabled,
 	}
 	for _, participant := range value.Participants {
 		result.Participants = append(result.Participants, toProtoChatUser(participant))
@@ -1114,6 +1160,7 @@ func toProtoGroup(value chat.Group) *chatv1.Group {
 		Permissions:               toProtoGroupPermissions(value.SelfPermissions),
 		EncryptedPinnedMessageIds: append([]string(nil), value.EncryptedPinnedMessageIDs...),
 		EncryptedUnreadState:      toProtoEncryptedUnreadState(value.EncryptedUnreadCount),
+		NotificationsEnabled:      value.NotificationsEnabled,
 	}
 }
 

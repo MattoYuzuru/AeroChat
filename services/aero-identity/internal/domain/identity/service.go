@@ -57,6 +57,10 @@ type Repository interface {
 	DeleteFriendship(context.Context, string, string) (bool, error)
 	BlockUser(context.Context, string, string, time.Time) error
 	UnblockUser(context.Context, string, string) (bool, error)
+	UpsertWebPushSubscription(context.Context, WebPushSubscription) error
+	DeleteWebPushSubscription(context.Context, string, string) (bool, error)
+	ListWebPushSubscriptions(context.Context, string) ([]WebPushSubscription, error)
+	DeleteWebPushSubscriptionsByIDs(context.Context, []string) (int64, error)
 	GetCryptoDeviceRegistryStatsByUserID(context.Context, string) (int64, int64, int64, error)
 	CreateCryptoDevice(context.Context, CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error)
 	ListCryptoDevices(context.Context, string) ([]CryptoDevice, error)
@@ -70,10 +74,22 @@ type Repository interface {
 	RevokeCryptoDevice(context.Context, RevokeCryptoDeviceParams) (*CryptoDevice, error)
 }
 
+type NotificationDispatcher interface {
+	PublicKey() string
+	DispatchFriendRequest(
+		context.Context,
+		User,
+		User,
+		[]WebPushSubscription,
+		time.Time,
+	) []string
+}
+
 type Service struct {
 	repo                            Repository
 	passwords                       *identityauth.PasswordHasher
 	sessionToken                    *libauth.SessionTokenManager
+	notificationDispatcher          NotificationDispatcher
 	sessionTouchInterval            time.Duration
 	cryptoLinkIntentTTL             time.Duration
 	cryptoBundlePublishChallengeTTL time.Duration
@@ -83,11 +99,17 @@ type Service struct {
 	newID                           func() string
 }
 
-func NewService(repo Repository, passwords *identityauth.PasswordHasher, sessionToken *libauth.SessionTokenManager) *Service {
+func NewService(
+	repo Repository,
+	passwords *identityauth.PasswordHasher,
+	sessionToken *libauth.SessionTokenManager,
+	notificationDispatcher NotificationDispatcher,
+) *Service {
 	return &Service{
 		repo:                            repo,
 		passwords:                       passwords,
 		sessionToken:                    sessionToken,
+		notificationDispatcher:          notificationDispatcher,
 		sessionTouchInterval:            defaultSessionTouchInterval,
 		cryptoLinkIntentTTL:             defaultCryptoLinkIntentTTL,
 		cryptoBundlePublishChallengeTTL: defaultCryptoBundlePublishChallengeTTL,
@@ -143,15 +165,16 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (*AuthSessi
 
 	now := s.now()
 	user := User{
-		ID:                      s.newID(),
-		Login:                   login,
-		Nickname:                nickname,
-		ReadReceiptsEnabled:     true,
-		PresenceEnabled:         true,
-		TypingVisibilityEnabled: true,
-		KeyBackupStatus:         KeyBackupStatusNotConfigured,
-		CreatedAt:               now,
-		UpdatedAt:               now,
+		ID:                       s.newID(),
+		Login:                    login,
+		Nickname:                 nickname,
+		ReadReceiptsEnabled:      true,
+		PresenceEnabled:          true,
+		TypingVisibilityEnabled:  true,
+		PushNotificationsEnabled: true,
+		KeyBackupStatus:          KeyBackupStatusNotConfigured,
+		CreatedAt:                now,
+		UpdatedAt:                now,
 	}
 	device := Device{
 		ID:         s.newID(),
@@ -293,6 +316,70 @@ func (s *Service) UpdateCurrentProfile(ctx context.Context, token string, patch 
 	updatedUser.UpdatedAt = s.now()
 
 	return s.repo.UpdateUserProfile(ctx, updatedUser)
+}
+
+func (s *Service) GetWebPushPublicKey() string {
+	if s.notificationDispatcher == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(s.notificationDispatcher.PublicKey())
+}
+
+func (s *Service) UpsertWebPushSubscription(
+	ctx context.Context,
+	token string,
+	input UpsertWebPushSubscriptionInput,
+) error {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	endpoint, err := normalizeRequiredURLString(input.Endpoint, "endpoint")
+	if err != nil {
+		return err
+	}
+	p256dhKey, err := normalizeRequiredTokenString(input.P256DHKey, "p256dh_key", 512)
+	if err != nil {
+		return err
+	}
+	authSecret, err := normalizeRequiredTokenString(input.AuthSecret, "auth_secret", 512)
+	if err != nil {
+		return err
+	}
+	userAgent, err := normalizeOptionalString(valueOrEmptyString(input.UserAgent), 512)
+	if err != nil {
+		return fmt.Errorf("%w: user_agent: %v", ErrInvalidArgument, err)
+	}
+
+	now := s.now()
+	return s.repo.UpsertWebPushSubscription(ctx, WebPushSubscription{
+		ID:             s.newID(),
+		UserID:         authSession.User.ID,
+		Endpoint:       endpoint,
+		P256DHKey:      p256dhKey,
+		AuthSecret:     authSecret,
+		ExpirationTime: input.ExpirationTime,
+		UserAgent:      userAgent,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	})
+}
+
+func (s *Service) DeleteWebPushSubscription(ctx context.Context, token string, endpoint string) error {
+	authSession, err := s.authenticate(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	normalizedEndpoint, err := normalizeRequiredURLString(endpoint, "endpoint")
+	if err != nil {
+		return err
+	}
+
+	_, err = s.repo.DeleteWebPushSubscription(ctx, authSession.User.ID, normalizedEndpoint)
+	return err
 }
 
 func (s *Service) ListDevices(ctx context.Context, token string) ([]DeviceWithSessions, error) {
@@ -498,6 +585,9 @@ func applyProfilePatch(user User, patch ProfilePatch) (User, error) {
 	if patch.TypingVisibilityEnabled != nil {
 		updated.TypingVisibilityEnabled = *patch.TypingVisibilityEnabled
 	}
+	if patch.PushNotificationsEnabled != nil {
+		updated.PushNotificationsEnabled = *patch.PushNotificationsEnabled
+	}
 
 	return updated, nil
 }
@@ -554,6 +644,38 @@ func normalizeOptionalString(value string, maxLen int) (*string, error) {
 	}
 
 	return &trimmed, nil
+}
+
+func valueOrEmptyString(value *string) string {
+	if value == nil {
+		return ""
+	}
+
+	return *value
+}
+
+func normalizeRequiredURLString(value string, field string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", fmt.Errorf("%w: %s is required", ErrInvalidArgument, field)
+	}
+	if len(trimmed) > 4096 {
+		return "", fmt.Errorf("%w: %s is too long", ErrInvalidArgument, field)
+	}
+
+	return trimmed, nil
+}
+
+func normalizeRequiredTokenString(value string, field string, maxLen int) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", fmt.Errorf("%w: %s is required", ErrInvalidArgument, field)
+	}
+	if len(trimmed) > maxLen {
+		return "", fmt.Errorf("%w: %s is too long", ErrInvalidArgument, field)
+	}
+
+	return trimmed, nil
 }
 
 func normalizeBirthday(value string) (*time.Time, error) {

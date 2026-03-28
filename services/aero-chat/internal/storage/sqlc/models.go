@@ -166,6 +166,13 @@ type DirectChatMessageTombstone struct {
 	DeletedAt       pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 }
 
+type DirectChatNotificationPreference struct {
+	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
+	UserID               uuid.UUID          `db:"user_id" json:"user_id"`
+	NotificationsEnabled bool               `db:"notifications_enabled" json:"notifications_enabled"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type DirectChatParticipant struct {
 	ChatID   uuid.UUID          `db:"chat_id" json:"chat_id"`
 	UserID   uuid.UUID          `db:"user_id" json:"user_id"`
@@ -306,6 +313,13 @@ type GroupMessage struct {
 	SearchVector     interface{}        `db:"search_vector" json:"search_vector"`
 }
 
+type GroupNotificationPreference struct {
+	GroupID              uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID               uuid.UUID          `db:"user_id" json:"user_id"`
+	NotificationsEnabled bool               `db:"notifications_enabled" json:"notifications_enabled"`
+	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type GroupThread struct {
 	ID        uuid.UUID          `db:"id" json:"id"`
 	GroupID   uuid.UUID          `db:"group_id" json:"group_id"`
@@ -325,23 +339,24 @@ type MessageAttachment struct {
 }
 
 type User struct {
-	ID                      uuid.UUID          `db:"id" json:"id"`
-	Login                   string             `db:"login" json:"login"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	Bio                     pgtype.Text        `db:"bio" json:"bio"`
-	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
-	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
-	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
-	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
-	Country                 pgtype.Text        `db:"country" json:"country"`
-	City                    pgtype.Text        `db:"city" json:"city"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
-	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
 }
 
 type UserBlock struct {
@@ -388,4 +403,16 @@ type UserSession struct {
 	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
 	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+}
+
+type WebPushSubscription struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	Endpoint       string             `db:"endpoint" json:"endpoint"`
+	P256dhKey      string             `db:"p256dh_key" json:"p256dh_key"`
+	AuthSecret     string             `db:"auth_secret" json:"auth_secret"`
+	ExpirationTime pgtype.Timestamptz `db:"expiration_time" json:"expiration_time"`
+	UserAgent      pgtype.Text        `db:"user_agent" json:"user_agent"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }

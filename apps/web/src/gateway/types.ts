@@ -40,6 +40,7 @@ export interface Profile {
   readReceiptsEnabled: boolean;
   presenceEnabled: boolean;
   typingVisibilityEnabled: boolean;
+  pushNotificationsEnabled?: boolean;
   keyBackupStatus: string;
   createdAt: string;
   updatedAt: string;
@@ -224,6 +225,7 @@ export interface Group {
   encryptedPinnedMessageIds: string[];
   unreadCount: number;
   encryptedUnreadCount: number;
+  notificationsEnabled?: boolean;
   permissions: GroupPermissions;
   createdAt: string;
   updatedAt: string;
@@ -290,8 +292,17 @@ export interface DirectChat {
   encryptedPinnedMessageIds: string[];
   unreadCount: number;
   encryptedUnreadCount: number;
+  notificationsEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WebPushSubscriptionInput {
+  endpoint: string;
+  p256dhKey: string;
+  authSecret: string;
+  expirationTime?: string | null;
+  userAgent?: string | null;
 }
 
 export type RtcConversationScopeType = "direct" | "group";
@@ -785,6 +796,7 @@ export interface UpdateCurrentProfileInput {
   readReceiptsEnabled?: boolean;
   presenceEnabled?: boolean;
   typingVisibilityEnabled?: boolean;
+  pushNotificationsEnabled?: boolean;
 }
 
 export type RevokeSessionOrDeviceTarget =
@@ -802,6 +814,12 @@ export interface GatewayClient {
   login(input: LoginInput): Promise<CurrentAuth>;
   logoutCurrentSession(token: string): Promise<void>;
   getCurrentProfile(token: string): Promise<Profile>;
+  getWebPushPublicKey(token: string): Promise<string>;
+  upsertWebPushSubscription(
+    token: string,
+    input: WebPushSubscriptionInput,
+  ): Promise<void>;
+  deleteWebPushSubscription(token: string, endpoint: string): Promise<void>;
   registerFirstCryptoDevice(
     token: string,
     input: {
@@ -865,7 +883,13 @@ export interface GatewayClient {
   createGroup(token: string, name: string): Promise<Group>;
   listGroups(token: string): Promise<Group[]>;
   getGroup(token: string, groupId: string): Promise<Group>;
+  setGroupNotifications(
+    token: string,
+    groupId: string,
+    notificationsEnabled: boolean,
+  ): Promise<Group>;
   getGroupChat(token: string, groupId: string): Promise<GroupChatSnapshot>;
+  setAllNotifications(token: string, notificationsEnabled: boolean): Promise<void>;
   markGroupChatRead(
     token: string,
     groupId: string,
@@ -940,6 +964,11 @@ export interface GatewayClient {
   createDirectChat(token: string, peerUserId: string): Promise<DirectChat>;
   listDirectChats(token: string): Promise<DirectChat[]>;
   getDirectChat(token: string, chatId: string): Promise<DirectChatSnapshot>;
+  setDirectChatNotifications(
+    token: string,
+    chatId: string,
+    notificationsEnabled: boolean,
+  ): Promise<DirectChat>;
   getRtcIceServers(token: string): Promise<RtcIceServer[]>;
   getActiveCall(token: string, scope: RtcConversationScopeInput): Promise<RtcCall | null>;
   startCall(

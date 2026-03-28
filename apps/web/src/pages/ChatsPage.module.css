@@ -390,6 +390,38 @@
   background: rgba(246, 251, 255, 0.88);
 }
 
+.notificationToggleCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: start;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid rgba(91, 132, 176, 0.22);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.notificationToggleCopy {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.notificationToggleCopy strong {
+  color: rgba(3, 50, 82, 0.92);
+}
+
+.notificationToggleCopy span,
+.helperText {
+  margin: 0;
+  color: rgba(34, 77, 118, 0.82);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.notificationToggleInput {
+  margin-top: 0.1rem;
+}
+
 .profileFactList,
 .profileFactList div {
   display: grid;

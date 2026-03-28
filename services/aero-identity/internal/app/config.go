@@ -13,6 +13,9 @@ type Config struct {
 	LogLevel                 string
 	ShutdownTimeout          time.Duration
 	DatabaseBootstrapTimeout time.Duration
+	WebPushSubscriber        string
+	WebPushVAPIDPublicKey    string
+	WebPushVAPIDPrivateKey   string
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -32,6 +35,9 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		LogLevel:                 lookupString("AERO_LOG_LEVEL", "info"),
 		ShutdownTimeout:          shutdownTimeout,
 		DatabaseBootstrapTimeout: bootstrapTimeout,
+		WebPushSubscriber:        lookupString("AERO_WEB_PUSH_SUBSCRIBER", ""),
+		WebPushVAPIDPublicKey:    lookupString("AERO_WEB_PUSH_VAPID_PUBLIC_KEY", ""),
+		WebPushVAPIDPrivateKey:   lookupString("AERO_WEB_PUSH_VAPID_PRIVATE_KEY", ""),
 	}, nil
 }
 

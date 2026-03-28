@@ -55,6 +55,7 @@ import {
   readSearchJumpIntent,
 } from "../search/jump";
 import { primeEncryptedDirectLocalSearchIndex } from "../search/encrypted-local-search";
+import { useWebNotifications } from "../notifications/context";
 import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import { useDirectCallSession } from "../rtc/useDirectCallSession";
 import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
@@ -70,11 +71,17 @@ const encryptedDirectMaxPageSize = 200;
 
 export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const navigate = useNavigate();
-  const { state: authState, expireSession } = useAuth();
+  const {
+    state: authState,
+    expireSession,
+    updateProfile,
+    clearNotice,
+  } = useAuth();
   const desktopShellHost = useDesktopShellHost();
   const windowLocation = useDesktopShellWindowLocation();
   const directCallAwareness = useDirectCallAwareness();
   const cryptoRuntime = useCryptoRuntime();
+  const webNotifications = useWebNotifications();
   const [, setSearchParams] = useSearchParams();
   const searchParams = useMemo(
     () => new URLSearchParams(windowLocation.search),
@@ -87,6 +94,8 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     useState<string | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [directNotificationsError, setDirectNotificationsError] = useState<string | null>(null);
+  const [isUpdatingDirectNotifications, setIsUpdatingDirectNotifications] = useState(false);
   const [encryptedPageSize, setEncryptedPageSize] = useState(encryptedDirectInitialPageSize);
   const [activePinnedIndex, setActivePinnedIndex] = useState(0);
   const pendingPeerRef = useRef<string | null>(null);
@@ -104,6 +113,8 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     authState.status === "authenticated" ? authState.token : "";
   const currentUserId =
     authState.status === "authenticated" ? authState.profile.id : "";
+  const authProfile =
+    authState.status === "authenticated" ? authState.profile : null;
   const chats = useChats({
     enabled: authState.status === "authenticated",
     token: sessionToken,
@@ -1075,6 +1086,57 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     setDirectInfoMode("info");
   }
 
+  async function handleDirectNotificationsToggle(nextEnabled: boolean) {
+    if (selectedThread === null) {
+      return;
+    }
+
+    setDirectNotificationsError(null);
+    webNotifications.clearError();
+    clearNotice();
+    setIsUpdatingDirectNotifications(true);
+
+    try {
+      if (nextEnabled && authProfile?.pushNotificationsEnabled !== true) {
+        const pushReady = await webNotifications.ensureBrowserPush(sessionToken);
+        if (!pushReady) {
+          throw new Error(
+            webNotifications.error ??
+              "Не удалось подготовить browser push для этого устройства.",
+          );
+        }
+
+        await updateProfile({
+          pushNotificationsEnabled: true,
+        });
+      }
+
+      await gatewayClient.setDirectChatNotifications(
+        sessionToken,
+        selectedThread.chat.id,
+        nextEnabled,
+      );
+      await chats.reloadChats();
+      await chats.openChat(selectedThread.chat.id);
+    } catch (error) {
+      if (isGatewayErrorCode(error, "unauthenticated")) {
+        expireSession();
+        return;
+      }
+
+      setDirectNotificationsError(
+        describeGatewayError(
+          error,
+          nextEnabled
+            ? "Не удалось включить уведомления для этого чата."
+            : "Не удалось отключить уведомления для этого чата.",
+        ),
+      );
+    } finally {
+      setIsUpdatingDirectNotifications(false);
+    }
+  }
+
   function handleMessagesViewportScroll() {
     const viewport = messagesViewportRef.current;
     if (viewport === null) {
@@ -1534,8 +1596,46 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                     )}
 
                     {people.state.notice && <div className={styles.notice}>{people.state.notice}</div>}
+                    {(directNotificationsError || webNotifications.error) && (
+                      <div className={styles.error}>
+                        {directNotificationsError ?? webNotifications.error}
+                      </div>
+                    )}
 
                     <div className={styles.profileFactsGrid}>
+                      <article className={styles.profileFactCard}>
+                        <p className={styles.cardLabel}>Уведомления</p>
+                        <label className={styles.notificationToggleCard}>
+                          <div className={styles.notificationToggleCopy}>
+                            <strong>Уведомления по этому чату</strong>
+                            <span>
+                              Push приходит только для непрочитанного входа и не дублируется,
+                              если AeroChat уже открыт на экране.
+                            </span>
+                          </div>
+                          <input
+                            checked={selectedThread.chat.notificationsEnabled !== false}
+                            className={`${styles.notificationToggleInput} xpCheckbox`}
+                            disabled={
+                              isUpdatingDirectNotifications ||
+                              webNotifications.isSupported === false
+                            }
+                            onChange={(event) => {
+                              void handleDirectNotificationsToggle(event.target.checked);
+                            }}
+                            type="checkbox"
+                          />
+                        </label>
+                        <p className={styles.helperText}>
+                          Browser push:{" "}
+                          {describeInlineBrowserPushState(
+                            webNotifications.isSupported,
+                            webNotifications.permission,
+                            webNotifications.subscriptionStatus,
+                          )}
+                        </p>
+                      </article>
+
                       <article className={styles.profileFactCard}>
                         <p className={styles.cardLabel}>Контакт</p>
                         <dl className={styles.profileFactList}>
@@ -2946,6 +3046,30 @@ function jumpToMessage(elementId: string) {
     behavior: "smooth",
     block: "center",
   });
+}
+
+function describeInlineBrowserPushState(
+  isSupported: boolean,
+  permission: NotificationPermission | "unsupported",
+  subscriptionStatus: "idle" | "syncing" | "active" | "inactive",
+) {
+  if (!isSupported || permission === "unsupported") {
+    return "не поддерживается этим браузером";
+  }
+  if (subscriptionStatus === "syncing") {
+    return "синхронизируем subscription";
+  }
+  if (permission === "denied") {
+    return "разрешение заблокировано";
+  }
+  if (permission === "default") {
+    return "разрешение ещё не выдано";
+  }
+  if (subscriptionStatus === "active") {
+    return "готов на этом устройстве";
+  }
+
+  return "разрешение выдано, но push ещё не активирован";
 }
 
 function formatDateTime(value: string): string {

@@ -109,6 +109,15 @@ const (
 	// ChatServiceMarkDirectChatReadProcedure is the fully-qualified name of the ChatService's
 	// MarkDirectChatRead RPC.
 	ChatServiceMarkDirectChatReadProcedure = "/aerochat.chat.v1.ChatService/MarkDirectChatRead"
+	// ChatServiceSetDirectChatNotificationsProcedure is the fully-qualified name of the ChatService's
+	// SetDirectChatNotifications RPC.
+	ChatServiceSetDirectChatNotificationsProcedure = "/aerochat.chat.v1.ChatService/SetDirectChatNotifications"
+	// ChatServiceSetGroupNotificationsProcedure is the fully-qualified name of the ChatService's
+	// SetGroupNotifications RPC.
+	ChatServiceSetGroupNotificationsProcedure = "/aerochat.chat.v1.ChatService/SetGroupNotifications"
+	// ChatServiceSetAllNotificationsProcedure is the fully-qualified name of the ChatService's
+	// SetAllNotifications RPC.
+	ChatServiceSetAllNotificationsProcedure = "/aerochat.chat.v1.ChatService/SetAllNotifications"
 	// ChatServiceSetDirectChatTypingProcedure is the fully-qualified name of the ChatService's
 	// SetDirectChatTyping RPC.
 	ChatServiceSetDirectChatTypingProcedure = "/aerochat.chat.v1.ChatService/SetDirectChatTyping"
@@ -223,6 +232,9 @@ type ChatServiceClient interface {
 	ClearGroupTyping(context.Context, *connect.Request[v1.ClearGroupTypingRequest]) (*connect.Response[v1.ClearGroupTypingResponse], error)
 	MarkGroupChatRead(context.Context, *connect.Request[v1.MarkGroupChatReadRequest]) (*connect.Response[v1.MarkGroupChatReadResponse], error)
 	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
+	SetDirectChatNotifications(context.Context, *connect.Request[v1.SetDirectChatNotificationsRequest]) (*connect.Response[v1.SetDirectChatNotificationsResponse], error)
+	SetGroupNotifications(context.Context, *connect.Request[v1.SetGroupNotificationsRequest]) (*connect.Response[v1.SetGroupNotificationsResponse], error)
+	SetAllNotifications(context.Context, *connect.Request[v1.SetAllNotificationsRequest]) (*connect.Response[v1.SetAllNotificationsResponse], error)
 	SetDirectChatTyping(context.Context, *connect.Request[v1.SetDirectChatTypingRequest]) (*connect.Response[v1.SetDirectChatTypingResponse], error)
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
 	SetDirectChatPresenceHeartbeat(context.Context, *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error)
@@ -426,6 +438,24 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceMethods.ByName("MarkDirectChatRead")),
 			connect.WithClientOptions(opts...),
 		),
+		setDirectChatNotifications: connect.NewClient[v1.SetDirectChatNotificationsRequest, v1.SetDirectChatNotificationsResponse](
+			httpClient,
+			baseURL+ChatServiceSetDirectChatNotificationsProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("SetDirectChatNotifications")),
+			connect.WithClientOptions(opts...),
+		),
+		setGroupNotifications: connect.NewClient[v1.SetGroupNotificationsRequest, v1.SetGroupNotificationsResponse](
+			httpClient,
+			baseURL+ChatServiceSetGroupNotificationsProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("SetGroupNotifications")),
+			connect.WithClientOptions(opts...),
+		),
+		setAllNotifications: connect.NewClient[v1.SetAllNotificationsRequest, v1.SetAllNotificationsResponse](
+			httpClient,
+			baseURL+ChatServiceSetAllNotificationsProcedure,
+			connect.WithSchema(chatServiceMethods.ByName("SetAllNotifications")),
+			connect.WithClientOptions(opts...),
+		),
 		setDirectChatTyping: connect.NewClient[v1.SetDirectChatTypingRequest, v1.SetDirectChatTypingResponse](
 			httpClient,
 			baseURL+ChatServiceSetDirectChatTypingProcedure,
@@ -626,6 +656,9 @@ type chatServiceClient struct {
 	clearGroupTyping                         *connect.Client[v1.ClearGroupTypingRequest, v1.ClearGroupTypingResponse]
 	markGroupChatRead                        *connect.Client[v1.MarkGroupChatReadRequest, v1.MarkGroupChatReadResponse]
 	markDirectChatRead                       *connect.Client[v1.MarkDirectChatReadRequest, v1.MarkDirectChatReadResponse]
+	setDirectChatNotifications               *connect.Client[v1.SetDirectChatNotificationsRequest, v1.SetDirectChatNotificationsResponse]
+	setGroupNotifications                    *connect.Client[v1.SetGroupNotificationsRequest, v1.SetGroupNotificationsResponse]
+	setAllNotifications                      *connect.Client[v1.SetAllNotificationsRequest, v1.SetAllNotificationsResponse]
 	setDirectChatTyping                      *connect.Client[v1.SetDirectChatTypingRequest, v1.SetDirectChatTypingResponse]
 	clearDirectChatTyping                    *connect.Client[v1.ClearDirectChatTypingRequest, v1.ClearDirectChatTypingResponse]
 	setDirectChatPresenceHeartbeat           *connect.Client[v1.SetDirectChatPresenceHeartbeatRequest, v1.SetDirectChatPresenceHeartbeatResponse]
@@ -789,6 +822,21 @@ func (c *chatServiceClient) MarkGroupChatRead(ctx context.Context, req *connect.
 // MarkDirectChatRead calls aerochat.chat.v1.ChatService.MarkDirectChatRead.
 func (c *chatServiceClient) MarkDirectChatRead(ctx context.Context, req *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error) {
 	return c.markDirectChatRead.CallUnary(ctx, req)
+}
+
+// SetDirectChatNotifications calls aerochat.chat.v1.ChatService.SetDirectChatNotifications.
+func (c *chatServiceClient) SetDirectChatNotifications(ctx context.Context, req *connect.Request[v1.SetDirectChatNotificationsRequest]) (*connect.Response[v1.SetDirectChatNotificationsResponse], error) {
+	return c.setDirectChatNotifications.CallUnary(ctx, req)
+}
+
+// SetGroupNotifications calls aerochat.chat.v1.ChatService.SetGroupNotifications.
+func (c *chatServiceClient) SetGroupNotifications(ctx context.Context, req *connect.Request[v1.SetGroupNotificationsRequest]) (*connect.Response[v1.SetGroupNotificationsResponse], error) {
+	return c.setGroupNotifications.CallUnary(ctx, req)
+}
+
+// SetAllNotifications calls aerochat.chat.v1.ChatService.SetAllNotifications.
+func (c *chatServiceClient) SetAllNotifications(ctx context.Context, req *connect.Request[v1.SetAllNotificationsRequest]) (*connect.Response[v1.SetAllNotificationsResponse], error) {
+	return c.setAllNotifications.CallUnary(ctx, req)
 }
 
 // SetDirectChatTyping calls aerochat.chat.v1.ChatService.SetDirectChatTyping.
@@ -961,6 +1009,9 @@ type ChatServiceHandler interface {
 	ClearGroupTyping(context.Context, *connect.Request[v1.ClearGroupTypingRequest]) (*connect.Response[v1.ClearGroupTypingResponse], error)
 	MarkGroupChatRead(context.Context, *connect.Request[v1.MarkGroupChatReadRequest]) (*connect.Response[v1.MarkGroupChatReadResponse], error)
 	MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error)
+	SetDirectChatNotifications(context.Context, *connect.Request[v1.SetDirectChatNotificationsRequest]) (*connect.Response[v1.SetDirectChatNotificationsResponse], error)
+	SetGroupNotifications(context.Context, *connect.Request[v1.SetGroupNotificationsRequest]) (*connect.Response[v1.SetGroupNotificationsResponse], error)
+	SetAllNotifications(context.Context, *connect.Request[v1.SetAllNotificationsRequest]) (*connect.Response[v1.SetAllNotificationsResponse], error)
 	SetDirectChatTyping(context.Context, *connect.Request[v1.SetDirectChatTypingRequest]) (*connect.Response[v1.SetDirectChatTypingResponse], error)
 	ClearDirectChatTyping(context.Context, *connect.Request[v1.ClearDirectChatTypingRequest]) (*connect.Response[v1.ClearDirectChatTypingResponse], error)
 	SetDirectChatPresenceHeartbeat(context.Context, *connect.Request[v1.SetDirectChatPresenceHeartbeatRequest]) (*connect.Response[v1.SetDirectChatPresenceHeartbeatResponse], error)
@@ -1158,6 +1209,24 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		ChatServiceMarkDirectChatReadProcedure,
 		svc.MarkDirectChatRead,
 		connect.WithSchema(chatServiceMethods.ByName("MarkDirectChatRead")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceSetDirectChatNotificationsHandler := connect.NewUnaryHandler(
+		ChatServiceSetDirectChatNotificationsProcedure,
+		svc.SetDirectChatNotifications,
+		connect.WithSchema(chatServiceMethods.ByName("SetDirectChatNotifications")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceSetGroupNotificationsHandler := connect.NewUnaryHandler(
+		ChatServiceSetGroupNotificationsProcedure,
+		svc.SetGroupNotifications,
+		connect.WithSchema(chatServiceMethods.ByName("SetGroupNotifications")),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceSetAllNotificationsHandler := connect.NewUnaryHandler(
+		ChatServiceSetAllNotificationsProcedure,
+		svc.SetAllNotifications,
+		connect.WithSchema(chatServiceMethods.ByName("SetAllNotifications")),
 		connect.WithHandlerOptions(opts...),
 	)
 	chatServiceSetDirectChatTypingHandler := connect.NewUnaryHandler(
@@ -1384,6 +1453,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceMarkGroupChatReadHandler.ServeHTTP(w, r)
 		case ChatServiceMarkDirectChatReadProcedure:
 			chatServiceMarkDirectChatReadHandler.ServeHTTP(w, r)
+		case ChatServiceSetDirectChatNotificationsProcedure:
+			chatServiceSetDirectChatNotificationsHandler.ServeHTTP(w, r)
+		case ChatServiceSetGroupNotificationsProcedure:
+			chatServiceSetGroupNotificationsHandler.ServeHTTP(w, r)
+		case ChatServiceSetAllNotificationsProcedure:
+			chatServiceSetAllNotificationsHandler.ServeHTTP(w, r)
 		case ChatServiceSetDirectChatTypingProcedure:
 			chatServiceSetDirectChatTypingHandler.ServeHTTP(w, r)
 		case ChatServiceClearDirectChatTypingProcedure:
@@ -1555,6 +1630,18 @@ func (UnimplementedChatServiceHandler) MarkGroupChatRead(context.Context, *conne
 
 func (UnimplementedChatServiceHandler) MarkDirectChatRead(context.Context, *connect.Request[v1.MarkDirectChatReadRequest]) (*connect.Response[v1.MarkDirectChatReadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.MarkDirectChatRead is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) SetDirectChatNotifications(context.Context, *connect.Request[v1.SetDirectChatNotificationsRequest]) (*connect.Response[v1.SetDirectChatNotificationsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.SetDirectChatNotifications is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) SetGroupNotifications(context.Context, *connect.Request[v1.SetGroupNotificationsRequest]) (*connect.Response[v1.SetGroupNotificationsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.SetGroupNotifications is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) SetAllNotifications(context.Context, *connect.Request[v1.SetAllNotificationsRequest]) (*connect.Response[v1.SetAllNotificationsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.chat.v1.ChatService.SetAllNotifications is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) SetDirectChatTyping(context.Context, *connect.Request[v1.SetDirectChatTypingRequest]) (*connect.Response[v1.SetDirectChatTypingResponse], error) {

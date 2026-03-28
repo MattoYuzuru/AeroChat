@@ -14,6 +14,9 @@ service IdentityService {
   rpc LogoutCurrentSession(LogoutCurrentSessionRequest) returns (LogoutCurrentSessionResponse);
   rpc GetCurrentProfile(GetCurrentProfileRequest) returns (GetCurrentProfileResponse);
   rpc UpdateCurrentProfile(UpdateCurrentProfileRequest) returns (UpdateCurrentProfileResponse);
+  rpc GetWebPushPublicKey(GetWebPushPublicKeyRequest) returns (GetWebPushPublicKeyResponse);
+  rpc UpsertWebPushSubscription(UpsertWebPushSubscriptionRequest) returns (UpsertWebPushSubscriptionResponse);
+  rpc DeleteWebPushSubscription(DeleteWebPushSubscriptionRequest) returns (DeleteWebPushSubscriptionResponse);
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
   rpc RevokeSessionOrDevice(RevokeSessionOrDeviceRequest) returns (RevokeSessionOrDeviceResponse);
   rpc ListBlockedUsers(ListBlockedUsersRequest) returns (ListBlockedUsersResponse);
@@ -78,6 +81,7 @@ message Profile {
   KeyBackupStatus key_backup_status = 15;
   google.protobuf.Timestamp created_at = 16;
   google.protobuf.Timestamp updated_at = 17;
+  bool push_notifications_enabled = 18;
 }
 
 message Device {
@@ -277,11 +281,35 @@ message UpdateCurrentProfileRequest {
   optional bool read_receipts_enabled = 10;
   optional bool presence_enabled = 11;
   optional bool typing_visibility_enabled = 12;
+  optional bool push_notifications_enabled = 13;
 }
 
 message UpdateCurrentProfileResponse {
   Profile profile = 1;
 }
+
+message GetWebPushPublicKeyRequest {}
+
+message GetWebPushPublicKeyResponse {
+  bool available = 1;
+  string public_key = 2;
+}
+
+message UpsertWebPushSubscriptionRequest {
+  string endpoint = 1;
+  string p256dh_key = 2;
+  string auth_secret = 3;
+  optional google.protobuf.Timestamp expiration_time = 4;
+  optional string user_agent = 5;
+}
+
+message UpsertWebPushSubscriptionResponse {}
+
+message DeleteWebPushSubscriptionRequest {
+  string endpoint = 1;
+}
+
+message DeleteWebPushSubscriptionResponse {}
 
 message ListDevicesRequest {}
 

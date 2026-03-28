@@ -250,7 +250,7 @@ orchestration и без device controls. Group call flow сейчас покры
 
 - [x] Web direct chat polish foundation в `apps/web`
 - [x] Web message search bootstrap через `aero-gateway`
-- [ ] Push notifications
+- [x] Push notifications
 - [ ] PWA
 - [x] Desktop shell XP runtime scaffold
 - [x] Boot/login application model внутри нового shell

@@ -403,7 +403,7 @@ func TestListFriendsRefreshesSessionTouchWhenLastSeenIsStale(t *testing.T) {
 
 func newTestService() *Service {
 	repo := newFakeRepository()
-	service := NewService(repo, identityauth.NewPasswordHasher(), libauth.NewSessionTokenManager())
+	service := NewService(repo, identityauth.NewPasswordHasher(), libauth.NewSessionTokenManager(), nil)
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	service.now = func() time.Time {
 		now = now.Add(time.Second)
@@ -457,6 +457,7 @@ type fakeRepository struct {
 	blocks                  map[string]map[string]time.Time
 	friendReqs              map[string]PendingFriendRequest
 	friendships             map[string]time.Time
+	webPushSubscriptions    map[string]WebPushSubscription
 	touchCalls              int
 }
 
@@ -474,6 +475,7 @@ func newFakeRepository() *fakeRepository {
 		blocks:                  make(map[string]map[string]time.Time),
 		friendReqs:              make(map[string]PendingFriendRequest),
 		friendships:             make(map[string]time.Time),
+		webPushSubscriptions:    make(map[string]WebPushSubscription),
 	}
 }
 
@@ -775,6 +777,57 @@ func (r *fakeRepository) UnblockUser(_ context.Context, blockerID string, blocke
 
 	delete(blockedSet, blockedID)
 	return true, nil
+}
+
+func (r *fakeRepository) UpsertWebPushSubscription(_ context.Context, subscription WebPushSubscription) error {
+	for id, current := range r.webPushSubscriptions {
+		if current.UserID == subscription.UserID && current.Endpoint == subscription.Endpoint && id != subscription.ID {
+			subscription.ID = current.ID
+			delete(r.webPushSubscriptions, id)
+			break
+		}
+	}
+
+	r.webPushSubscriptions[subscription.ID] = subscription
+	return nil
+}
+
+func (r *fakeRepository) DeleteWebPushSubscription(_ context.Context, userID string, endpoint string) (bool, error) {
+	for id, subscription := range r.webPushSubscriptions {
+		if subscription.UserID != userID || subscription.Endpoint != endpoint {
+			continue
+		}
+
+		delete(r.webPushSubscriptions, id)
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (r *fakeRepository) ListWebPushSubscriptions(_ context.Context, userID string) ([]WebPushSubscription, error) {
+	result := make([]WebPushSubscription, 0)
+	for _, subscription := range r.webPushSubscriptions {
+		if subscription.UserID == userID {
+			result = append(result, subscription)
+		}
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) DeleteWebPushSubscriptionsByIDs(_ context.Context, ids []string) (int64, error) {
+	var affected int64
+	for _, id := range ids {
+		if _, ok := r.webPushSubscriptions[id]; !ok {
+			continue
+		}
+
+		delete(r.webPushSubscriptions, id)
+		affected++
+	}
+
+	return affected, nil
 }
 
 func (r *fakeRepository) GetCryptoDeviceRegistryStatsByUserID(_ context.Context, userID string) (int64, int64, int64, error) {

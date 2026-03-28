@@ -165,6 +165,7 @@ INSERT INTO users (
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at
 ) VALUES (
@@ -184,7 +185,8 @@ INSERT INTO users (
     $14,
     $15,
     $16,
-    $17
+    $17,
+    $18
 )
 RETURNING
     id,
@@ -202,31 +204,54 @@ RETURNING
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at
 `
 
 type CreateUserParams struct {
-	ID                      uuid.UUID          `db:"id" json:"id"`
-	Login                   string             `db:"login" json:"login"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	Bio                     pgtype.Text        `db:"bio" json:"bio"`
-	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
-	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
-	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
-	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
-	Country                 pgtype.Text        `db:"country" json:"country"`
-	City                    pgtype.Text        `db:"city" json:"city"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
-	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+type CreateUserRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
 	row := q.db.QueryRow(ctx, createUser,
 		arg.ID,
 		arg.Login,
@@ -243,10 +268,11 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.PresenceEnabled,
 		arg.TypingVisibilityEnabled,
 		arg.KeyBackupStatus,
+		arg.PushNotificationsEnabled,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i User
+	var i CreateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Login,
@@ -263,6 +289,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PresenceEnabled,
 		&i.TypingVisibilityEnabled,
 		&i.KeyBackupStatus,
+		&i.PushNotificationsEnabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -384,6 +411,37 @@ func (q *Queries) DeleteUserBlock(ctx context.Context, arg DeleteUserBlockParams
 	return result.RowsAffected(), nil
 }
 
+const deleteWebPushSubscriptionByUserIDAndEndpoint = `-- name: DeleteWebPushSubscriptionByUserIDAndEndpoint :execrows
+DELETE FROM web_push_subscriptions
+WHERE user_id = $1 AND endpoint = $2
+`
+
+type DeleteWebPushSubscriptionByUserIDAndEndpointParams struct {
+	UserID   uuid.UUID `db:"user_id" json:"user_id"`
+	Endpoint string    `db:"endpoint" json:"endpoint"`
+}
+
+func (q *Queries) DeleteWebPushSubscriptionByUserIDAndEndpoint(ctx context.Context, arg DeleteWebPushSubscriptionByUserIDAndEndpointParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWebPushSubscriptionByUserIDAndEndpoint, arg.UserID, arg.Endpoint)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteWebPushSubscriptionsByIDs = `-- name: DeleteWebPushSubscriptionsByIDs :execrows
+DELETE FROM web_push_subscriptions
+WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) DeleteWebPushSubscriptionsByIDs(ctx context.Context, dollar_1 []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWebPushSubscriptionsByIDs, dollar_1)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getPasswordCredentialByLogin = `-- name: GetPasswordCredentialByLogin :one
 SELECT
     u.id,
@@ -401,6 +459,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at,
     c.password_hash,
@@ -412,26 +471,27 @@ WHERE u.login = $1
 `
 
 type GetPasswordCredentialByLoginRow struct {
-	ID                      uuid.UUID          `db:"id" json:"id"`
-	Login                   string             `db:"login" json:"login"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	Bio                     pgtype.Text        `db:"bio" json:"bio"`
-	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
-	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
-	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
-	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
-	Country                 pgtype.Text        `db:"country" json:"country"`
-	City                    pgtype.Text        `db:"city" json:"city"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
-	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	PasswordHash            string             `db:"password_hash" json:"password_hash"`
-	PasswordCreatedAt       pgtype.Timestamptz `db:"password_created_at" json:"password_created_at"`
-	PasswordUpdatedAt       pgtype.Timestamptz `db:"password_updated_at" json:"password_updated_at"`
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PasswordHash             string             `db:"password_hash" json:"password_hash"`
+	PasswordCreatedAt        pgtype.Timestamptz `db:"password_created_at" json:"password_created_at"`
+	PasswordUpdatedAt        pgtype.Timestamptz `db:"password_updated_at" json:"password_updated_at"`
 }
 
 func (q *Queries) GetPasswordCredentialByLogin(ctx context.Context, login string) (GetPasswordCredentialByLoginRow, error) {
@@ -453,6 +513,7 @@ func (q *Queries) GetPasswordCredentialByLogin(ctx context.Context, login string
 		&i.PresenceEnabled,
 		&i.TypingVisibilityEnabled,
 		&i.KeyBackupStatus,
+		&i.PushNotificationsEnabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PasswordHash,
@@ -492,6 +553,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
 FROM user_sessions AS s
@@ -501,36 +563,37 @@ WHERE s.id = $1
 `
 
 type GetSessionAuthByIDRow struct {
-	SessionID               uuid.UUID          `db:"session_id" json:"session_id"`
-	SessionUserID           uuid.UUID          `db:"session_user_id" json:"session_user_id"`
-	SessionDeviceID         uuid.UUID          `db:"session_device_id" json:"session_device_id"`
-	TokenHash               string             `db:"token_hash" json:"token_hash"`
-	SessionCreatedAt        pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
-	SessionLastSeenAt       pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
-	SessionRevokedAt        pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
-	DeviceID                uuid.UUID          `db:"device_id" json:"device_id"`
-	DeviceUserID            uuid.UUID          `db:"device_user_id" json:"device_user_id"`
-	DeviceLabel             string             `db:"device_label" json:"device_label"`
-	DeviceCreatedAt         pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
-	DeviceLastSeenAt        pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
-	DeviceRevokedAt         pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
-	UserID                  uuid.UUID          `db:"user_id" json:"user_id"`
-	Login                   string             `db:"login" json:"login"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	Bio                     pgtype.Text        `db:"bio" json:"bio"`
-	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
-	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
-	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
-	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
-	Country                 pgtype.Text        `db:"country" json:"country"`
-	City                    pgtype.Text        `db:"city" json:"city"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
-	UserCreatedAt           pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
-	UserUpdatedAt           pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
+	SessionID                uuid.UUID          `db:"session_id" json:"session_id"`
+	SessionUserID            uuid.UUID          `db:"session_user_id" json:"session_user_id"`
+	SessionDeviceID          uuid.UUID          `db:"session_device_id" json:"session_device_id"`
+	TokenHash                string             `db:"token_hash" json:"token_hash"`
+	SessionCreatedAt         pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
+	SessionLastSeenAt        pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
+	SessionRevokedAt         pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
+	DeviceID                 uuid.UUID          `db:"device_id" json:"device_id"`
+	DeviceUserID             uuid.UUID          `db:"device_user_id" json:"device_user_id"`
+	DeviceLabel              string             `db:"device_label" json:"device_label"`
+	DeviceCreatedAt          pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
+	DeviceLastSeenAt         pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
+	DeviceRevokedAt          pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
+	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	UserCreatedAt            pgtype.Timestamptz `db:"user_created_at" json:"user_created_at"`
+	UserUpdatedAt            pgtype.Timestamptz `db:"user_updated_at" json:"user_updated_at"`
 }
 
 func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error) {
@@ -565,6 +628,7 @@ func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSess
 		&i.PresenceEnabled,
 		&i.TypingVisibilityEnabled,
 		&i.KeyBackupStatus,
+		&i.PushNotificationsEnabled,
 		&i.UserCreatedAt,
 		&i.UserUpdatedAt,
 	)
@@ -651,15 +715,37 @@ SELECT
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at
 FROM users
 WHERE id = $1
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
+type GetUserByIDRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
-	var i User
+	var i GetUserByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Login,
@@ -676,6 +762,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.PresenceEnabled,
 		&i.TypingVisibilityEnabled,
 		&i.KeyBackupStatus,
+		&i.PushNotificationsEnabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -699,15 +786,37 @@ SELECT
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at
 FROM users
 WHERE login = $1
 `
 
-func (q *Queries) GetUserByLogin(ctx context.Context, login string) (User, error) {
+type GetUserByLoginRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetUserByLogin(ctx context.Context, login string) (GetUserByLoginRow, error) {
 	row := q.db.QueryRow(ctx, getUserByLogin, login)
-	var i User
+	var i GetUserByLoginRow
 	err := row.Scan(
 		&i.ID,
 		&i.Login,
@@ -724,6 +833,7 @@ func (q *Queries) GetUserByLogin(ctx context.Context, login string) (User, error
 		&i.PresenceEnabled,
 		&i.TypingVisibilityEnabled,
 		&i.KeyBackupStatus,
+		&i.PushNotificationsEnabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -748,6 +858,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at
 FROM user_blocks AS b
@@ -757,24 +868,25 @@ ORDER BY b.created_at DESC
 `
 
 type ListBlockedUsersByUserIDRow struct {
-	BlockedAt               pgtype.Timestamptz `db:"blocked_at" json:"blocked_at"`
-	ID                      uuid.UUID          `db:"id" json:"id"`
-	Login                   string             `db:"login" json:"login"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	Bio                     pgtype.Text        `db:"bio" json:"bio"`
-	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
-	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
-	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
-	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
-	Country                 pgtype.Text        `db:"country" json:"country"`
-	City                    pgtype.Text        `db:"city" json:"city"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
-	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	BlockedAt                pgtype.Timestamptz `db:"blocked_at" json:"blocked_at"`
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) ListBlockedUsersByUserID(ctx context.Context, blockerUserID uuid.UUID) ([]ListBlockedUsersByUserIDRow, error) {
@@ -803,6 +915,7 @@ func (q *Queries) ListBlockedUsersByUserID(ctx context.Context, blockerUserID uu
 			&i.PresenceEnabled,
 			&i.TypingVisibilityEnabled,
 			&i.KeyBackupStatus,
+			&i.PushNotificationsEnabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -874,6 +987,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at
 FROM user_friendships AS f
@@ -887,24 +1001,25 @@ ORDER BY f.created_at DESC
 `
 
 type ListFriendsByUserIDRow struct {
-	FriendsSince            pgtype.Timestamptz `db:"friends_since" json:"friends_since"`
-	ID                      uuid.UUID          `db:"id" json:"id"`
-	Login                   string             `db:"login" json:"login"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	Bio                     pgtype.Text        `db:"bio" json:"bio"`
-	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
-	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
-	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
-	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
-	Country                 pgtype.Text        `db:"country" json:"country"`
-	City                    pgtype.Text        `db:"city" json:"city"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
-	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	FriendsSince             pgtype.Timestamptz `db:"friends_since" json:"friends_since"`
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) ListFriendsByUserID(ctx context.Context, userLowID uuid.UUID) ([]ListFriendsByUserIDRow, error) {
@@ -933,6 +1048,7 @@ func (q *Queries) ListFriendsByUserID(ctx context.Context, userLowID uuid.UUID) 
 			&i.PresenceEnabled,
 			&i.TypingVisibilityEnabled,
 			&i.KeyBackupStatus,
+			&i.PushNotificationsEnabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -964,6 +1080,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at
 FROM user_friend_requests AS fr
@@ -973,24 +1090,25 @@ ORDER BY fr.created_at DESC
 `
 
 type ListIncomingFriendRequestsByUserIDRow struct {
-	RequestedAt             pgtype.Timestamptz `db:"requested_at" json:"requested_at"`
-	ID                      uuid.UUID          `db:"id" json:"id"`
-	Login                   string             `db:"login" json:"login"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	Bio                     pgtype.Text        `db:"bio" json:"bio"`
-	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
-	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
-	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
-	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
-	Country                 pgtype.Text        `db:"country" json:"country"`
-	City                    pgtype.Text        `db:"city" json:"city"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
-	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	RequestedAt              pgtype.Timestamptz `db:"requested_at" json:"requested_at"`
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) ListIncomingFriendRequestsByUserID(ctx context.Context, addresseeUserID uuid.UUID) ([]ListIncomingFriendRequestsByUserIDRow, error) {
@@ -1019,6 +1137,7 @@ func (q *Queries) ListIncomingFriendRequestsByUserID(ctx context.Context, addres
 			&i.PresenceEnabled,
 			&i.TypingVisibilityEnabled,
 			&i.KeyBackupStatus,
+			&i.PushNotificationsEnabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -1050,6 +1169,7 @@ SELECT
     u.presence_enabled,
     u.typing_visibility_enabled,
     u.key_backup_status,
+    u.push_notifications_enabled,
     u.created_at,
     u.updated_at
 FROM user_friend_requests AS fr
@@ -1059,24 +1179,25 @@ ORDER BY fr.created_at DESC
 `
 
 type ListOutgoingFriendRequestsByUserIDRow struct {
-	RequestedAt             pgtype.Timestamptz `db:"requested_at" json:"requested_at"`
-	ID                      uuid.UUID          `db:"id" json:"id"`
-	Login                   string             `db:"login" json:"login"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	Bio                     pgtype.Text        `db:"bio" json:"bio"`
-	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
-	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
-	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
-	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
-	Country                 pgtype.Text        `db:"country" json:"country"`
-	City                    pgtype.Text        `db:"city" json:"city"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
-	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	RequestedAt              pgtype.Timestamptz `db:"requested_at" json:"requested_at"`
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) ListOutgoingFriendRequestsByUserID(ctx context.Context, requesterUserID uuid.UUID) ([]ListOutgoingFriendRequestsByUserIDRow, error) {
@@ -1105,6 +1226,7 @@ func (q *Queries) ListOutgoingFriendRequestsByUserID(ctx context.Context, reques
 			&i.PresenceEnabled,
 			&i.TypingVisibilityEnabled,
 			&i.KeyBackupStatus,
+			&i.PushNotificationsEnabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -1149,6 +1271,52 @@ func (q *Queries) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([
 			&i.CreatedAt,
 			&i.LastSeenAt,
 			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWebPushSubscriptionsByUserID = `-- name: ListWebPushSubscriptionsByUserID :many
+SELECT
+    id,
+    user_id,
+    endpoint,
+    p256dh_key,
+    auth_secret,
+    expiration_time,
+    user_agent,
+    created_at,
+    updated_at
+FROM web_push_subscriptions
+WHERE user_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListWebPushSubscriptionsByUserID(ctx context.Context, userID uuid.UUID) ([]WebPushSubscription, error) {
+	rows, err := q.db.Query(ctx, listWebPushSubscriptionsByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WebPushSubscription
+	for rows.Next() {
+		var i WebPushSubscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Endpoint,
+			&i.P256dhKey,
+			&i.AuthSecret,
+			&i.ExpirationTime,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1257,7 +1425,8 @@ SET
     presence_enabled = $12,
     typing_visibility_enabled = $13,
     key_backup_status = $14,
-    updated_at = $15
+    push_notifications_enabled = $15,
+    updated_at = $16
 WHERE id = $1
 RETURNING
     id,
@@ -1275,29 +1444,52 @@ RETURNING
     presence_enabled,
     typing_visibility_enabled,
     key_backup_status,
+    push_notifications_enabled,
     created_at,
     updated_at
 `
 
 type UpdateUserProfileParams struct {
-	ID                      uuid.UUID          `db:"id" json:"id"`
-	Nickname                string             `db:"nickname" json:"nickname"`
-	AvatarUrl               pgtype.Text        `db:"avatar_url" json:"avatar_url"`
-	Bio                     pgtype.Text        `db:"bio" json:"bio"`
-	Timezone                pgtype.Text        `db:"timezone" json:"timezone"`
-	ProfileAccent           pgtype.Text        `db:"profile_accent" json:"profile_accent"`
-	StatusText              pgtype.Text        `db:"status_text" json:"status_text"`
-	Birthday                pgtype.Date        `db:"birthday" json:"birthday"`
-	Country                 pgtype.Text        `db:"country" json:"country"`
-	City                    pgtype.Text        `db:"city" json:"city"`
-	ReadReceiptsEnabled     bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
-	PresenceEnabled         bool               `db:"presence_enabled" json:"presence_enabled"`
-	TypingVisibilityEnabled bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
-	KeyBackupStatus         string             `db:"key_backup_status" json:"key_backup_status"`
-	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
+type UpdateUserProfileRow struct {
+	ID                       uuid.UUID          `db:"id" json:"id"`
+	Login                    string             `db:"login" json:"login"`
+	Nickname                 string             `db:"nickname" json:"nickname"`
+	AvatarUrl                pgtype.Text        `db:"avatar_url" json:"avatar_url"`
+	Bio                      pgtype.Text        `db:"bio" json:"bio"`
+	Timezone                 pgtype.Text        `db:"timezone" json:"timezone"`
+	ProfileAccent            pgtype.Text        `db:"profile_accent" json:"profile_accent"`
+	StatusText               pgtype.Text        `db:"status_text" json:"status_text"`
+	Birthday                 pgtype.Date        `db:"birthday" json:"birthday"`
+	Country                  pgtype.Text        `db:"country" json:"country"`
+	City                     pgtype.Text        `db:"city" json:"city"`
+	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
+	PresenceEnabled          bool               `db:"presence_enabled" json:"presence_enabled"`
+	TypingVisibilityEnabled  bool               `db:"typing_visibility_enabled" json:"typing_visibility_enabled"`
+	KeyBackupStatus          string             `db:"key_backup_status" json:"key_backup_status"`
+	PushNotificationsEnabled bool               `db:"push_notifications_enabled" json:"push_notifications_enabled"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UpdateUserProfileRow, error) {
 	row := q.db.QueryRow(ctx, updateUserProfile,
 		arg.ID,
 		arg.Nickname,
@@ -1313,9 +1505,10 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		arg.PresenceEnabled,
 		arg.TypingVisibilityEnabled,
 		arg.KeyBackupStatus,
+		arg.PushNotificationsEnabled,
 		arg.UpdatedAt,
 	)
-	var i User
+	var i UpdateUserProfileRow
 	err := row.Scan(
 		&i.ID,
 		&i.Login,
@@ -1332,8 +1525,68 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.PresenceEnabled,
 		&i.TypingVisibilityEnabled,
 		&i.KeyBackupStatus,
+		&i.PushNotificationsEnabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const upsertWebPushSubscription = `-- name: UpsertWebPushSubscription :exec
+INSERT INTO web_push_subscriptions (
+    id,
+    user_id,
+    endpoint,
+    p256dh_key,
+    auth_secret,
+    expiration_time,
+    user_agent,
+    created_at,
+    updated_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9
+)
+ON CONFLICT (endpoint) DO UPDATE
+SET
+    user_id = EXCLUDED.user_id,
+    p256dh_key = EXCLUDED.p256dh_key,
+    auth_secret = EXCLUDED.auth_secret,
+    expiration_time = EXCLUDED.expiration_time,
+    user_agent = EXCLUDED.user_agent,
+    updated_at = EXCLUDED.updated_at
+`
+
+type UpsertWebPushSubscriptionParams struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	Endpoint       string             `db:"endpoint" json:"endpoint"`
+	P256dhKey      string             `db:"p256dh_key" json:"p256dh_key"`
+	AuthSecret     string             `db:"auth_secret" json:"auth_secret"`
+	ExpirationTime pgtype.Timestamptz `db:"expiration_time" json:"expiration_time"`
+	UserAgent      pgtype.Text        `db:"user_agent" json:"user_agent"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpsertWebPushSubscription(ctx context.Context, arg UpsertWebPushSubscriptionParams) error {
+	_, err := q.db.Exec(ctx, upsertWebPushSubscription,
+		arg.ID,
+		arg.UserID,
+		arg.Endpoint,
+		arg.P256dhKey,
+		arg.AuthSecret,
+		arg.ExpirationTime,
+		arg.UserAgent,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
 }

@@ -28,7 +28,32 @@ func (s *Service) SendFriendRequest(ctx context.Context, token string, login str
 		return fmt.Errorf("%w: incoming friend request already exists", ErrConflict)
 	}
 
-	return s.repo.CreateFriendRequest(ctx, authSession.User.ID, target.ID, s.now())
+	requestedAt := s.now()
+	if err := s.repo.CreateFriendRequest(ctx, authSession.User.ID, target.ID, requestedAt); err != nil {
+		return err
+	}
+
+	if s.notificationDispatcher == nil || !target.PushNotificationsEnabled {
+		return nil
+	}
+
+	subscriptions, err := s.repo.ListWebPushSubscriptions(ctx, target.ID)
+	if err != nil {
+		return nil
+	}
+	invalidSubscriptionIDs := s.notificationDispatcher.DispatchFriendRequest(
+		ctx,
+		authSession.User,
+		*target,
+		subscriptions,
+		requestedAt,
+	)
+	if len(invalidSubscriptionIDs) == 0 {
+		return nil
+	}
+
+	_, _ = s.repo.DeleteWebPushSubscriptionsByIDs(ctx, invalidSubscriptionIDs)
+	return nil
 }
 
 func (s *Service) AcceptFriendRequest(ctx context.Context, token string, login string) error {

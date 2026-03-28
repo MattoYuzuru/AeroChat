@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
 	"github.com/MattoYuzuru/AeroChat/libs/go/dbbootstrap"
+	libnotifications "github.com/MattoYuzuru/AeroChat/libs/go/notifications"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	identityschema "github.com/MattoYuzuru/AeroChat/services/aero-identity/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/app"
@@ -69,6 +71,14 @@ func run() error {
 		repository,
 		identityauth.NewPasswordHasher(),
 		libauth.NewSessionTokenManager(),
+		app.NewFriendRequestNotificationDispatcher(
+			libnotifications.NewWebPushClient(
+				&http.Client{},
+				cfg.WebPushSubscriber,
+				cfg.WebPushVAPIDPublicKey,
+				cfg.WebPushVAPIDPrivateKey,
+			),
+		),
 	)
 	handler := connecthandler.NewHandler(serviceName, version, service)
 

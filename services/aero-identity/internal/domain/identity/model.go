@@ -8,23 +8,24 @@ const (
 )
 
 type User struct {
-	ID                      string
-	Login                   string
-	Nickname                string
-	AvatarURL               *string
-	Bio                     *string
-	Timezone                *string
-	ProfileAccent           *string
-	StatusText              *string
-	Birthday                *time.Time
-	Country                 *string
-	City                    *string
-	ReadReceiptsEnabled     bool
-	PresenceEnabled         bool
-	TypingVisibilityEnabled bool
-	KeyBackupStatus         string
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	ID                       string
+	Login                    string
+	Nickname                 string
+	AvatarURL                *string
+	Bio                      *string
+	Timezone                 *string
+	ProfileAccent            *string
+	StatusText               *string
+	Birthday                 *time.Time
+	Country                  *string
+	City                     *string
+	ReadReceiptsEnabled      bool
+	PresenceEnabled          bool
+	TypingVisibilityEnabled  bool
+	PushNotificationsEnabled bool
+	KeyBackupStatus          string
+	CreatedAt                time.Time
+	UpdatedAt                time.Time
 }
 
 type Device struct {
@@ -98,18 +99,39 @@ type LoginInput struct {
 }
 
 type ProfilePatch struct {
-	Nickname                *string
-	AvatarURL               *string
-	Bio                     *string
-	Timezone                *string
-	ProfileAccent           *string
-	StatusText              *string
-	Birthday                *string
-	Country                 *string
-	City                    *string
-	ReadReceiptsEnabled     *bool
-	PresenceEnabled         *bool
-	TypingVisibilityEnabled *bool
+	Nickname                 *string
+	AvatarURL                *string
+	Bio                      *string
+	Timezone                 *string
+	ProfileAccent            *string
+	StatusText               *string
+	Birthday                 *string
+	Country                  *string
+	City                     *string
+	ReadReceiptsEnabled      *bool
+	PresenceEnabled          *bool
+	TypingVisibilityEnabled  *bool
+	PushNotificationsEnabled *bool
+}
+
+type WebPushSubscription struct {
+	ID             string
+	UserID         string
+	Endpoint       string
+	P256DHKey      string
+	AuthSecret     string
+	ExpirationTime *time.Time
+	UserAgent      *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type UpsertWebPushSubscriptionInput struct {
+	Endpoint       string
+	P256DHKey      string
+	AuthSecret     string
+	ExpirationTime *time.Time
+	UserAgent      *string
 }
 
 type SessionTarget struct {

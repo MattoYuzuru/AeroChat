@@ -2115,6 +2115,7 @@ func newTestService() (*Service, *fakeRepository) {
 		repo.typingStore,
 		repo.presenceStore,
 		repo.objectStorage,
+		nil,
 		libauth.NewSessionTokenManager(),
 		6*time.Second,
 		30*time.Second,
@@ -2298,6 +2299,9 @@ type fakeRepository struct {
 	objectStorage               *fakeObjectStorage
 	attachments                 map[string]Attachment
 	uploadSessions              map[string]AttachmentUploadSession
+	directNotificationPrefs     map[string]bool
+	groupNotificationPrefs      map[string]bool
+	webPushSubscriptions        map[string]WebPushSubscription
 	touchCalls                  int
 }
 
@@ -2331,6 +2335,9 @@ func newFakeRepository() *fakeRepository {
 		objectStorage:               newFakeObjectStorage(),
 		attachments:                 make(map[string]Attachment),
 		uploadSessions:              make(map[string]AttachmentUploadSession),
+		directNotificationPrefs:     make(map[string]bool),
+		groupNotificationPrefs:      make(map[string]bool),
+		webPushSubscriptions:        make(map[string]WebPushSubscription),
 	}
 }
 
@@ -2724,12 +2731,13 @@ func (r *fakeRepository) CreateDirectChat(_ context.Context, params CreateDirect
 		participants = append(participants, r.users[params.SecondUserID])
 	}
 	directChat := DirectChat{
-		ID:           params.ChatID,
-		Kind:         ChatKindDirect,
-		Participants: participants,
-		UnreadCount:  0,
-		CreatedAt:    params.CreatedAt,
-		UpdatedAt:    params.CreatedAt,
+		ID:                   params.ChatID,
+		Kind:                 ChatKindDirect,
+		Participants:         participants,
+		UnreadCount:          0,
+		NotificationsEnabled: true,
+		CreatedAt:            params.CreatedAt,
+		UpdatedAt:            params.CreatedAt,
 	}
 	r.chats[directChat.ID] = directChat
 	copy := directChat
@@ -2758,7 +2766,76 @@ func (r *fakeRepository) GetDirectChat(_ context.Context, userID string, chatID 
 	copy := directChat
 	copy.UnreadCount = r.directUnreadCount(chatID, userID)
 	copy.EncryptedUnreadCount = r.encryptedDirectUnreadCount(chatID, userID)
+	copy.NotificationsEnabled = r.directNotificationsEnabled(chatID, userID)
 	return &copy, nil
+}
+
+func (r *fakeRepository) UpsertDirectChatNotificationPreference(_ context.Context, chatID string, userID string, enabled bool, _ time.Time) error {
+	if _, err := r.GetDirectChat(context.Background(), userID, chatID); err != nil {
+		return err
+	}
+
+	r.directNotificationPrefs[chatID+":"+userID] = enabled
+	return nil
+}
+
+func (r *fakeRepository) UpsertGroupNotificationPreference(_ context.Context, groupID string, userID string, enabled bool, _ time.Time) error {
+	if _, err := r.GetGroup(context.Background(), userID, groupID); err != nil {
+		return err
+	}
+
+	r.groupNotificationPrefs[groupID+":"+userID] = enabled
+	return nil
+}
+
+func (r *fakeRepository) SetAllDirectChatNotificationPreferences(_ context.Context, userID string, enabled bool, _ time.Time) error {
+	for chatID, directChat := range r.chats {
+		if isParticipant(directChat, userID) {
+			r.directNotificationPrefs[chatID+":"+userID] = enabled
+		}
+	}
+
+	return nil
+}
+
+func (r *fakeRepository) SetAllGroupNotificationPreferences(_ context.Context, userID string, enabled bool, _ time.Time) error {
+	for groupID, memberships := range r.groupMembers {
+		if _, ok := memberships[userID]; ok {
+			r.groupNotificationPrefs[groupID+":"+userID] = enabled
+		}
+	}
+
+	return nil
+}
+
+func (r *fakeRepository) ListActiveWebPushSubscriptionsByUserIDs(_ context.Context, userIDs []string) ([]WebPushSubscription, error) {
+	allowed := make(map[string]struct{}, len(userIDs))
+	for _, userID := range userIDs {
+		allowed[userID] = struct{}{}
+	}
+
+	result := make([]WebPushSubscription, 0)
+	for _, subscription := range r.webPushSubscriptions {
+		if _, ok := allowed[subscription.UserID]; ok {
+			result = append(result, subscription)
+		}
+	}
+
+	return result, nil
+}
+
+func (r *fakeRepository) DeleteWebPushSubscriptionsByIDs(_ context.Context, ids []string) (int64, error) {
+	var affected int64
+	for _, id := range ids {
+		if _, ok := r.webPushSubscriptions[id]; !ok {
+			continue
+		}
+
+		delete(r.webPushSubscriptions, id)
+		affected++
+	}
+
+	return affected, nil
 }
 
 func (r *fakeRepository) CreateAttachmentUploadIntent(_ context.Context, params CreateAttachmentUploadIntentParams) (*AttachmentUploadIntent, error) {
@@ -3024,16 +3101,17 @@ func (r *fakeRepository) CreateGroup(_ context.Context, params CreateGroupParams
 	}
 
 	group := Group{
-		ID:                  params.GroupID,
-		Name:                params.Name,
-		Kind:                ChatKindGroup,
-		CreatedByUserID:     params.CreatedByUserID,
-		SelfRole:            GroupMemberRoleOwner,
-		SelfWriteRestricted: false,
-		MemberCount:         1,
-		UnreadCount:         0,
-		CreatedAt:           params.CreatedAt,
-		UpdatedAt:           params.CreatedAt,
+		ID:                   params.GroupID,
+		Name:                 params.Name,
+		Kind:                 ChatKindGroup,
+		CreatedByUserID:      params.CreatedByUserID,
+		SelfRole:             GroupMemberRoleOwner,
+		SelfWriteRestricted:  false,
+		MemberCount:          1,
+		UnreadCount:          0,
+		NotificationsEnabled: true,
+		CreatedAt:            params.CreatedAt,
+		UpdatedAt:            params.CreatedAt,
 	}
 	r.groups[group.ID] = group
 	r.groupMembers[group.ID] = map[string]GroupMember{
@@ -3070,6 +3148,7 @@ func (r *fakeRepository) ListGroups(_ context.Context, userID string) ([]Group, 
 		group.MemberCount = int32(len(memberships))
 		group.UnreadCount = r.groupUnreadCount(groupID, userID)
 		group.EncryptedUnreadCount = r.encryptedGroupUnreadCount(groupID, userID)
+		group.NotificationsEnabled = r.groupNotificationsEnabled(groupID, userID)
 		result = append(result, group)
 	}
 
@@ -3091,6 +3170,7 @@ func (r *fakeRepository) GetGroup(_ context.Context, userID string, groupID stri
 	group.MemberCount = int32(len(r.groupMembers[groupID]))
 	group.UnreadCount = r.groupUnreadCount(groupID, userID)
 	group.EncryptedUnreadCount = r.encryptedGroupUnreadCount(groupID, userID)
+	group.NotificationsEnabled = r.groupNotificationsEnabled(groupID, userID)
 	copy := group
 	return &copy, nil
 }
@@ -4487,6 +4567,24 @@ func (r *fakeRepository) encryptedGroupUnreadCount(groupID string, userID string
 	}
 
 	return count
+}
+
+func (r *fakeRepository) directNotificationsEnabled(chatID string, userID string) bool {
+	enabled, ok := r.directNotificationPrefs[chatID+":"+userID]
+	if !ok {
+		return true
+	}
+
+	return enabled
+}
+
+func (r *fakeRepository) groupNotificationsEnabled(groupID string, userID string) bool {
+	enabled, ok := r.groupNotificationPrefs[groupID+":"+userID]
+	if !ok {
+		return true
+	}
+
+	return enabled
 }
 
 func (r *fakeRepository) encryptedDirectUnreadCountForDelivery(

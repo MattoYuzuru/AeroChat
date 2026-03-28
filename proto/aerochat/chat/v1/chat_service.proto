@@ -35,6 +35,9 @@ service ChatService {
   rpc ClearGroupTyping(ClearGroupTypingRequest) returns (ClearGroupTypingResponse);
   rpc MarkGroupChatRead(MarkGroupChatReadRequest) returns (MarkGroupChatReadResponse);
   rpc MarkDirectChatRead(MarkDirectChatReadRequest) returns (MarkDirectChatReadResponse);
+  rpc SetDirectChatNotifications(SetDirectChatNotificationsRequest) returns (SetDirectChatNotificationsResponse);
+  rpc SetGroupNotifications(SetGroupNotificationsRequest) returns (SetGroupNotificationsResponse);
+  rpc SetAllNotifications(SetAllNotificationsRequest) returns (SetAllNotificationsResponse);
   rpc SetDirectChatTyping(SetDirectChatTypingRequest) returns (SetDirectChatTypingResponse);
   rpc ClearDirectChatTyping(ClearDirectChatTypingRequest) returns (ClearDirectChatTypingResponse);
   rpc SetDirectChatPresenceHeartbeat(SetDirectChatPresenceHeartbeatRequest) returns (SetDirectChatPresenceHeartbeatResponse);
@@ -158,6 +161,7 @@ message DirectChat {
   DirectChatUnreadState unread_state = 7;
   repeated string encrypted_pinned_message_ids = 8;
   EncryptedUnreadState encrypted_unread_state = 9;
+  bool notifications_enabled = 10;
 }
 
 message Group {
@@ -172,6 +176,7 @@ message Group {
   GroupPermissions permissions = 9;
   repeated string encrypted_pinned_message_ids = 10;
   EncryptedUnreadState encrypted_unread_state = 11;
+  bool notifications_enabled = 12;
 }
 
 message GroupPermissions {
@@ -805,6 +810,30 @@ message MarkDirectChatReadResponse {
   DirectChatReadState read_state = 1;
   DirectChatUnreadState unread_state = 2;
 }
+
+message SetDirectChatNotificationsRequest {
+  string chat_id = 1;
+  bool notifications_enabled = 2;
+}
+
+message SetDirectChatNotificationsResponse {
+  DirectChat chat = 1;
+}
+
+message SetGroupNotificationsRequest {
+  string group_id = 1;
+  bool notifications_enabled = 2;
+}
+
+message SetGroupNotificationsResponse {
+  Group group = 1;
+}
+
+message SetAllNotificationsRequest {
+  bool notifications_enabled = 1;
+}
+
+message SetAllNotificationsResponse {}
 
 message MarkEncryptedDirectChatReadRequest {
   string chat_id = 1;
