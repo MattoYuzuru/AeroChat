@@ -374,6 +374,8 @@ docker compose -f infra/compose/docker-compose.yml up --build -d
 - `AERO_WEB_PUSH_SUBSCRIBER` для VAPID subject, обычно в формате `mailto:ops@example.com`;
 - `AERO_WEB_PUSH_VAPID_PUBLIC_KEY` и `AERO_WEB_PUSH_VAPID_PRIVATE_KEY` как одна VAPID-пара;
 - без этих значений UI-тогглы остаются видимыми, но реальный background push не активируется.
+- partial-конфигурация `AERO_WEB_PUSH_*` теперь считается ошибкой старта сервисов;
+- production deploy отдельно предупреждает, если весь блок `AERO_WEB_PUSH_*` отсутствует, и прерывается при неполном наборе.
 
 Для dev-проверки push нужен secure context:
 

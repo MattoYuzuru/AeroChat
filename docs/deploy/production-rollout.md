@@ -131,12 +131,13 @@ Manual workflow `Deploy Production` выполняет один последов
 2. проверяет обязательные environment secrets и variables;
 3. подключается к VPS по SSH;
 4. подтверждает наличие `.env.server`, `.env.server.secrets` и compose file;
-5. обновляет `AERO_IMAGE_TAG` в `.env.server`;
-6. выполняет `docker compose ... config`;
-7. выполняет `docker compose ... pull`;
-8. выполняет `docker compose ... up -d`;
-9. показывает `docker compose ... ps`;
-10. читает `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT` и `AERO_MEDIA_HOST_PORT` из `.env.server`;
+5. валидирует `AERO_WEB_PUSH_*`: полный absence даёт warning, partial-набор прерывает rollout;
+6. обновляет `AERO_IMAGE_TAG` в `.env.server`;
+7. выполняет `docker compose ... config`;
+8. выполняет `docker compose ... pull`;
+9. выполняет `docker compose ... up -d`;
+10. показывает `docker compose ... ps`;
+11. читает `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT` и `AERO_MEDIA_HOST_PORT` из `.env.server`;
 11. ждёт успешных проверок:
     - `http://<shared-edge-host-ip>:<web-port>/`
     - `http://<shared-edge-host-ip>:<gateway-port>/readyz`

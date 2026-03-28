@@ -45,6 +45,16 @@ func TestLoadConfigRejectsInvalidBootstrapDuration(t *testing.T) {
 	}
 }
 
+func TestLoadConfigRejectsPartialWebPushConfig(t *testing.T) {
+	t.Setenv("AERO_WEB_PUSH_SUBSCRIBER", "mailto:test@example.com")
+	t.Setenv("AERO_WEB_PUSH_VAPID_PUBLIC_KEY", "")
+	t.Setenv("AERO_WEB_PUSH_VAPID_PRIVATE_KEY", "")
+
+	if _, err := LoadConfig(":8081"); err == nil {
+		t.Fatal("ожидалась ошибка для неполной web push конфигурации")
+	}
+}
+
 func TestLookupStringUsesFallback(t *testing.T) {
 	if err := os.Unsetenv("AERO_SAMPLE_ENV"); err != nil {
 		t.Fatalf("unset env: %v", err)

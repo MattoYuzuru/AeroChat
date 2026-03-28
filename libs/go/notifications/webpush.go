@@ -29,6 +29,34 @@ type WebPushClient struct {
 	ttlSeconds int
 }
 
+func MissingWebPushConfigFields(subscriber string, publicKey string, privateKey string) []string {
+	missing := make([]string, 0, 3)
+	if strings.TrimSpace(subscriber) == "" {
+		missing = append(missing, "AERO_WEB_PUSH_SUBSCRIBER")
+	}
+	if strings.TrimSpace(publicKey) == "" {
+		missing = append(missing, "AERO_WEB_PUSH_VAPID_PUBLIC_KEY")
+	}
+	if strings.TrimSpace(privateKey) == "" {
+		missing = append(missing, "AERO_WEB_PUSH_VAPID_PRIVATE_KEY")
+	}
+
+	return missing
+}
+
+func WebPushConfigEnabled(subscriber string, publicKey string, privateKey string) bool {
+	return len(MissingWebPushConfigFields(subscriber, publicKey, privateKey)) == 0
+}
+
+func ValidateWebPushConfig(subscriber string, publicKey string, privateKey string) error {
+	missing := MissingWebPushConfigFields(subscriber, publicKey, privateKey)
+	if len(missing) == 0 || len(missing) == 3 {
+		return nil
+	}
+
+	return fmt.Errorf("неполная web push конфигурация: отсутствуют %s", strings.Join(missing, ", "))
+}
+
 func NewWebPushClient(httpClient *http.Client, subscriber string, publicKey string, privateKey string) *WebPushClient {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 10 * time.Second}
@@ -44,7 +72,7 @@ func NewWebPushClient(httpClient *http.Client, subscriber string, publicKey stri
 }
 
 func (c *WebPushClient) Enabled() bool {
-	return c != nil && c.publicKey != "" && c.privateKey != "" && c.subscriber != ""
+	return c != nil && WebPushConfigEnabled(c.subscriber, c.publicKey, c.privateKey)
 }
 
 func (c *WebPushClient) PublicKey() string {

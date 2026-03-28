@@ -154,6 +154,20 @@ jobs:
             printf '%s\n' "${line#*=}"
           }
 
+          read_optional_env_var() {
+            local file="$1"
+            local key="$2"
+            local line
+
+            line="$(grep -m1 "^${key}=" "$file" || true)"
+            if [ -z "$line" ]; then
+              printf '\n'
+              return 0
+            fi
+
+            printf '%s\n' "${line#*=}"
+          }
+
           update_env_var() {
             local file="$1"
             local key="$2"
@@ -200,9 +214,30 @@ jobs:
           web_host_port="$(read_env_var .env.server AERO_WEB_HOST_PORT)"
           gateway_host_port="$(read_env_var .env.server AERO_GATEWAY_HOST_PORT)"
           media_host_port="$(read_env_var .env.server AERO_MEDIA_HOST_PORT)"
+          web_push_subscriber="$(read_optional_env_var .env.server AERO_WEB_PUSH_SUBSCRIBER)"
+          web_push_public_key="$(read_optional_env_var .env.server AERO_WEB_PUSH_VAPID_PUBLIC_KEY)"
+          web_push_private_key="$(read_optional_env_var .env.server.secrets AERO_WEB_PUSH_VAPID_PRIVATE_KEY)"
 
           if [ "$shared_edge_host_ip" = "127.0.0.1" ]; then
             echo "AERO_SHARED_EDGE_HOST_IP не должен оставаться loopback для shared Traefik edge" >&2
+            exit 1
+          fi
+
+          web_push_values_set=0
+          if [ -n "$web_push_subscriber" ]; then
+            web_push_values_set=$((web_push_values_set + 1))
+          fi
+          if [ -n "$web_push_public_key" ]; then
+            web_push_values_set=$((web_push_values_set + 1))
+          fi
+          if [ -n "$web_push_private_key" ]; then
+            web_push_values_set=$((web_push_values_set + 1))
+          fi
+
+          if [ "$web_push_values_set" -eq 0 ]; then
+            echo "::warning::AERO_WEB_PUSH_* не заданы: browser push останется отключённым на production"
+          elif [ "$web_push_values_set" -ne 3 ]; then
+            echo "Неполная web push конфигурация: должны быть заданы AERO_WEB_PUSH_SUBSCRIBER, AERO_WEB_PUSH_VAPID_PUBLIC_KEY и AERO_WEB_PUSH_VAPID_PRIVATE_KEY" >&2
             exit 1
           fi
 

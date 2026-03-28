@@ -107,3 +107,13 @@ func TestLoadConfigRejectsNonPositiveMaxActiveGroupMembershipsPerUser(t *testing
 		t.Fatal("ожидалась ошибка для неположительного лимита active group memberships")
 	}
 }
+
+func TestLoadConfigRejectsPartialWebPushConfig(t *testing.T) {
+	t.Setenv("AERO_WEB_PUSH_SUBSCRIBER", "mailto:test@example.com")
+	t.Setenv("AERO_WEB_PUSH_VAPID_PUBLIC_KEY", "")
+	t.Setenv("AERO_WEB_PUSH_VAPID_PRIVATE_KEY", "")
+
+	if _, err := LoadConfig(":8082"); err == nil {
+		t.Fatal("ожидалась ошибка для неполной web push конфигурации")
+	}
+}

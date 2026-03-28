@@ -49,6 +49,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	if !libnotifications.WebPushConfigEnabled(
+		cfg.WebPushSubscriber,
+		cfg.WebPushVAPIDPublicKey,
+		cfg.WebPushVAPIDPrivateKey,
+	) {
+		logger.Warn("web push отключён: AERO_WEB_PUSH_* не заданы, message уведомления не будут отправляться")
+	}
 
 	db, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
 	if err != nil {
