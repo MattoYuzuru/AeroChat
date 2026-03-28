@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -82,7 +83,7 @@ import {
   readSearchJumpIntent,
 } from "../search/jump";
 import { primeEncryptedGroupLocalSearchIndex } from "../search/encrypted-local-search";
-import { useDesktopShellHost } from "../shell/context";
+import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
 import styles from "./GroupsPage.module.css";
 
 export function GroupsPage() {
@@ -90,8 +91,13 @@ export function GroupsPage() {
   const { state: authState, expireSession } = useAuth();
   const currentUserId = authState.status === "authenticated" ? authState.profile.id : "";
   const desktopShellHost = useDesktopShellHost();
+  const windowLocation = useDesktopShellWindowLocation();
   const cryptoRuntime = useCryptoRuntime();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
+  const searchParams = useMemo(
+    () => new URLSearchParams(windowLocation.search),
+    [windowLocation.search],
+  );
   const [mobileWindowContentMode, setMobileWindowContentMode] = useState<"thread" | "info">(
     "thread",
   );
@@ -139,7 +145,10 @@ export function GroupsPage() {
   );
   const groupCallAwarenessStateRef = useRef(groupCallAwarenessState);
   const previousSelectedGroupCallIdRef = useRef<string | null>(null);
+  const previousSelectedGroupIdRef = useRef<string | null>(null);
   const threadEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const keepScrollPinnedToBottomRef = useRef(true);
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const activeTypingTargetRef = useRef<GroupTypingSessionTarget | null>(null);
   const typingLastSentAtRef = useRef(0);
@@ -215,6 +224,7 @@ export function GroupsPage() {
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
     discardEncryptedMediaNoteDrafts();
+    keepScrollPinnedToBottomRef.current = true;
   }, [selectedGroupId]);
 
   useEffect(() => {
@@ -1082,7 +1092,7 @@ export function GroupsPage() {
       ? selectedState.snapshot.group.name
       : "Группа";
   const groupWindowContentMode =
-    desktopShellHost?.activeWindowContentMode ?? mobileWindowContentMode;
+    desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
   const isDesktopTargetWindow = desktopShellHost !== null && selectedGroupId !== "";
 
   useEffect(() => {
@@ -1189,12 +1199,21 @@ export function GroupsPage() {
       return;
     }
 
+    const viewport = messagesViewportRef.current;
     const target = threadEndRef.current;
-    if (target === null) {
+    if (target === null || viewport === null) {
+      return;
+    }
+
+    const selectedGroupChanged = previousSelectedGroupIdRef.current !== selectedGroupId;
+    previousSelectedGroupIdRef.current = selectedGroupId;
+
+    if (!selectedGroupChanged && !keepScrollPinnedToBottomRef.current) {
       return;
     }
 
     const scrollToEnd = () => {
+      viewport.scrollTop = viewport.scrollHeight;
       target.scrollIntoView({
         block: "end",
       });
@@ -1215,6 +1234,7 @@ export function GroupsPage() {
     encryptedThreadMessages.length,
     groupWindowContentMode,
     searchJumpIntent,
+    selectedGroupId,
     selectedGroupCallEntry?.call.id,
     selectedState,
   ]);
@@ -2028,12 +2048,26 @@ export function GroupsPage() {
     setMobileWindowContentMode(nextMode);
   }
 
+  function handleMessagesViewportScroll() {
+    const viewport = messagesViewportRef.current;
+    if (viewport === null) {
+      return;
+    }
+
+    const distanceFromBottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    keepScrollPinnedToBottomRef.current = distanceFromBottom < 64;
+  }
+
   return (
     <div
       className={`${styles.layout} ${isDesktopTargetWindow ? styles.desktopWindowLayout : ""}`}
     >
       {!isDesktopTargetWindow && (
-        <section className={styles.heroCard}>
+        <section
+          className={styles.heroCard}
+          data-mobile-hidden={selectedGroupId !== "" || undefined}
+        >
         <div className={styles.heroHeader}>
           <div>
             <p className={styles.cardLabel}>Группы</p>
@@ -2236,6 +2270,7 @@ export function GroupsPage() {
 
         <section
           className={`${styles.mainColumn} ${isDesktopTargetWindow ? styles.desktopMainColumn : ""}`}
+          data-mobile-thread-active={selectedGroupId !== "" || undefined}
         >
           {isDesktopTargetWindow && notice && <div className={styles.notice}>{notice}</div>}
           {isDesktopTargetWindow && searchJumpNotice && (
@@ -2378,7 +2413,7 @@ export function GroupsPage() {
 
               {groupWindowContentMode === "thread" && (
                 <>
-              <section className={styles.panelCard}>
+              <section className={`${styles.panelCard} ${styles.threadPanel}`}>
                 <div className={styles.panelHeader}>
                   <div>
                     <p className={styles.cardLabel}>Сообщения</p>
@@ -2802,7 +2837,12 @@ export function GroupsPage() {
                       </div>
                     </form>
 
-                    <div className={styles.messagesList}>
+                    <div
+                      className={styles.messagesViewport}
+                      onScroll={handleMessagesViewportScroll}
+                      ref={messagesViewportRef}
+                    >
+                      <div className={styles.messagesList}>
                       {encryptedThreadMessages.length === 0 ? (
                         <InlineState
                           title="Сообщений пока нет"
@@ -3203,6 +3243,7 @@ export function GroupsPage() {
                         {typingLabel ? ` ${typingLabel}` : ""}
                       </div>
                       <div ref={threadEndRef} />
+                      </div>
                     </div>
                   </>
                 )}

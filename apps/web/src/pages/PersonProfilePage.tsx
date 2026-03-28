@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { buildFriendRequestsRoutePath } from "../app/app-routes";
 import { useAuth } from "../auth/useAuth";
 import { describeGatewayError, isGatewayErrorCode } from "../gateway/types";
@@ -16,13 +16,17 @@ import {
 } from "../people/navigation";
 import { resolvePersonRelationshipActions } from "../people/relationship-actions";
 import { usePeople } from "../people/usePeople";
-import { useDesktopShellHost } from "../shell/context";
+import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
 import styles from "./PersonProfilePage.module.css";
 
 export function PersonProfilePage() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const desktopShellHost = useDesktopShellHost();
+  const windowLocation = useDesktopShellWindowLocation();
+  const searchParams = useMemo(
+    () => new URLSearchParams(windowLocation.search),
+    [windowLocation.search],
+  );
   const { state: authState, expireSession } = useAuth();
   const [isOpeningChat, setIsOpeningChat] = useState(false);
   const [chatActionError, setChatActionError] = useState<string | null>(null);

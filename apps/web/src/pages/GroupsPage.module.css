@@ -289,6 +289,8 @@
 
 .desktopMainColumn {
   min-height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
 }
 
 .list,
@@ -299,6 +301,12 @@
   gap: 0.65rem;
 }
 
+.threadPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .groupCard,
 .memberCard,
 .inviteCard,
@@ -306,7 +314,7 @@
   display: grid;
   gap: 0.65rem;
   max-width: min(100%, 46rem);
-  padding: 0.65rem;
+  padding: 0.5rem 0.55rem;
 }
 
 .messageCard[data-own="true"] {
@@ -413,9 +421,9 @@
 
 .messageBody {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.4rem;
   min-width: 0;
-  padding: 0.6rem 0.65rem;
+  padding: 0.42rem 0.48rem;
   border-radius: 0;
   background: rgba(255, 255, 255, 0.78);
 }
@@ -471,6 +479,12 @@
   display: grid;
   gap: 0.7rem;
   margin-top: 0.65rem;
+}
+
+.threadPanel .composer {
+  order: 2;
+  flex: 0 0 auto;
+  margin-top: 0.55rem;
 }
 
 .composerRow {
@@ -687,10 +701,52 @@
   font-size: 0.86rem;
 }
 
+.messagesViewport {
+  order: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 0.65rem;
+  padding: 0.3rem 0.1rem 0;
+}
+
+.threadPanel .panelHeader,
+.threadPanel .timelineMeta,
+.threadPanel .readOnlyNotice,
+.threadPanel .messagesList:first-child {
+  flex: 0 0 auto;
+}
+
+.messageAuthor {
+  font-size: 0.96rem;
+}
+
+.messageMeta,
+.historyNotice {
+  font-size: 0.78rem;
+}
+
+.messageText {
+  font-size: 0.92rem;
+  line-height: 1.36;
+}
+
 @media (max-width: 1100px) {
   .workspace,
   .heroForms {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 920px) {
+  .heroCard[data-mobile-hidden="true"] {
+    display: none;
+  }
+
+  .mainColumn[data-mobile-thread-active="true"] {
+    min-height: calc(100dvh - 12.5rem);
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: stretch;
   }
 }
 
