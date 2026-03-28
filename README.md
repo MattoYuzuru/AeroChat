@@ -175,7 +175,7 @@ AeroChat должен поддерживать:
     - несколько открытых переписок остаются живыми одновременно;
     - у каждого окна сохраняется свой target/route context;
     - можно видеть новые сообщения в нескольких открытых окнах параллельно, даже если в фокусе другое окно;
-  - direct/group thread surface в desktop окне теперь открывается с нижней границы переписки и держит header/composer видимыми, пока история скроллится отдельно;
+  - direct/group thread surface теперь открывается с нижней границы переписки и на desktop, и на mobile, а header/composer остаются видимыми, пока история скроллится отдельно;
   - на mobile используется launcher home и route-backed app pages без desktop window runtime;
   - отдельное shell-приложение `Создать группу` теперь является дефолтным desktop entrypoint для group bootstrap:
     - оно открывается как отдельный singleton app, а не прячется внутри общего group page flow;

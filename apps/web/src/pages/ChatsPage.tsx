@@ -59,6 +59,11 @@ import { useWebNotifications } from "../notifications/context";
 import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import { useDirectCallSession } from "../rtc/useDirectCallSession";
 import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
+import {
+  isViewportPinnedToBottom,
+  useThreadViewportAutoPin,
+  type ThreadViewportOlderHistoryAnchor,
+} from "../ui/thread-viewport";
 import styles from "./ChatsPage.module.css";
 
 interface ChatsPageProps {
@@ -102,12 +107,9 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const encryptedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
   const directCallAudioRef = useRef<HTMLAudioElement | null>(null);
   const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesListRef = useRef<HTMLDivElement | null>(null);
   const keepScrollPinnedToBottomRef = useRef(true);
-  const olderHistoryAnchorRef = useRef<{
-    previousScrollHeight: number;
-    previousScrollTop: number;
-  } | null>(null);
-  const previousSelectedThreadIDRef = useRef<string | null>(null);
+  const olderHistoryAnchorRef = useRef<ThreadViewportOlderHistoryAnchor | null>(null);
   const isPageVisible = usePageVisibility();
   const sessionToken =
     authState.status === "authenticated" ? authState.token : "";
@@ -465,7 +467,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
         setSearchJumpNotice(input.notice);
         setHighlightedMessageId(input.highlightedMessageId);
         if (input.anchorId !== null) {
-          jumpToMessage(input.anchorId);
+          jumpToThreadMessage(input.anchorId);
         }
         setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
       }, 0);
@@ -803,57 +805,14 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
       };
     }
   }, [activePinnedIndex, encryptedPinnedMessages.length]);
-
-  useEffect(() => {
-    const viewport = messagesViewportRef.current;
-    if (viewport === null) {
-      return;
-    }
-
-    let animationFrameID = 0;
-    let nestedAnimationFrameID = 0;
-    let timeoutID = 0;
-
-    const selectedThreadID = selectedThread?.chat.id ?? null;
-    const selectedThreadChanged = previousSelectedThreadIDRef.current !== selectedThreadID;
-    const olderHistoryAnchor = olderHistoryAnchorRef.current;
-
-    if (olderHistoryAnchor !== null) {
-      const nextScrollTop =
-        viewport.scrollHeight - olderHistoryAnchor.previousScrollHeight +
-        olderHistoryAnchor.previousScrollTop;
-      viewport.scrollTop = Math.max(0, nextScrollTop);
-      olderHistoryAnchorRef.current = null;
-    } else if (selectedThreadChanged || keepScrollPinnedToBottomRef.current) {
-      const scrollToBottom = () => {
-        viewport.scrollTop = viewport.scrollHeight;
-      };
-
-      scrollToBottom();
-      animationFrameID = window.requestAnimationFrame(() => {
-        nestedAnimationFrameID = window.requestAnimationFrame(() => {
-          scrollToBottom();
-        });
-      });
-      timeoutID = window.setTimeout(() => {
-        scrollToBottom();
-      }, 60);
-    }
-
-    previousSelectedThreadIDRef.current = selectedThreadID;
-
-    return () => {
-      if (animationFrameID !== 0) {
-        window.cancelAnimationFrame(animationFrameID);
-      }
-      if (nestedAnimationFrameID !== 0) {
-        window.cancelAnimationFrame(nestedAnimationFrameID);
-      }
-      if (timeoutID !== 0) {
-        window.clearTimeout(timeoutID);
-      }
-    };
-  }, [encryptedLane.items, encryptedLane.status, selectedThread?.chat.id]);
+  useThreadViewportAutoPin({
+    contentRef: messagesListRef,
+    keepPinnedToBottomRef: keepScrollPinnedToBottomRef,
+    layoutVersion: `${encryptedLane.status}:${encryptedLane.items.length}:${directCall.state.call?.id ?? ""}:${directCall.phase}`,
+    olderHistoryAnchorRef,
+    threadKey: selectedThread?.chat.id ?? null,
+    viewportRef: messagesViewportRef,
+  });
 
   if (authState.status !== "authenticated") {
     return null;
@@ -1143,9 +1102,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
       return;
     }
 
-    const distanceFromBottom =
-      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-    keepScrollPinnedToBottomRef.current = distanceFromBottom < 64;
+    keepScrollPinnedToBottomRef.current = isViewportPinnedToBottom(viewport);
   }
 
   function handleLoadOlderEncryptedMessages() {
@@ -1167,7 +1124,12 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
       return;
     }
 
-    jumpToMessage(`encrypted-direct-message-${messageId}`);
+    jumpToThreadMessage(`encrypted-direct-message-${messageId}`);
+  }
+
+  function jumpToThreadMessage(elementId: string) {
+    keepScrollPinnedToBottomRef.current = false;
+    jumpToMessage(elementId);
   }
 
   function handlePrimaryDirectCallAction() {
@@ -1852,7 +1814,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                     onScroll={handleMessagesViewportScroll}
                     ref={messagesViewportRef}
                   >
-                    <div className={styles.messagesList}>
+                    <div className={styles.messagesList} ref={messagesListRef}>
                       {canLoadOlderEncryptedMessages && (
                         <div className={styles.loadMoreRow}>
                           <button
@@ -1931,7 +1893,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                               item.messageId,
                             ),
                           onJumpToReplyTarget: (messageId) => {
-                            jumpToMessage(`encrypted-direct-message-${messageId}`);
+                            jumpToThreadMessage(`encrypted-direct-message-${messageId}`);
                           },
                           onReply:
                             item.kind !== "message"
