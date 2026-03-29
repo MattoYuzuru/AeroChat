@@ -87,6 +87,7 @@ import { primeEncryptedGroupLocalSearchIndex } from "../search/encrypted-local-s
 import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
 import {
   isViewportPinnedToBottom,
+  scheduleThreadViewportBottomAlignment,
   useThreadViewportAutoPin,
 } from "../ui/thread-viewport";
 import styles from "./GroupsPage.module.css";
@@ -1232,37 +1233,29 @@ export function GroupsPage() {
     ) {
       return;
     }
+    if (revealedGroupThreadKey === selectedGroupId) {
+      return;
+    }
 
-    let animationFrameID = 0;
-    let nestedAnimationFrameID = 0;
-    let timeoutID = 0;
+    const viewport = messagesViewportRef.current;
+    if (viewport === null) {
+      return;
+    }
 
-    const revealThread = () => {
-      setRevealedGroupThreadKey((current) => (current === selectedGroupId ? current : selectedGroupId));
-    };
-
-    animationFrameID = window.requestAnimationFrame(() => {
-      nestedAnimationFrameID = window.requestAnimationFrame(() => {
-        revealThread();
-      });
+    return scheduleThreadViewportBottomAlignment({
+      keepPinnedToBottomRef: keepScrollPinnedToBottomRef,
+      onComplete: () => {
+        setRevealedGroupThreadKey((current) =>
+          current === selectedGroupId ? current : selectedGroupId,
+        );
+      },
+      viewport,
     });
-    timeoutID = window.setTimeout(revealThread, 110);
-
-    return () => {
-      if (animationFrameID !== 0) {
-        window.cancelAnimationFrame(animationFrameID);
-      }
-      if (nestedAnimationFrameID !== 0) {
-        window.cancelAnimationFrame(nestedAnimationFrameID);
-      }
-      if (timeoutID !== 0) {
-        window.clearTimeout(timeoutID);
-      }
-    };
   }, [
     encryptedGroupLane.status,
     encryptedThreadMessages.length,
     groupWindowContentMode,
+    revealedGroupThreadKey,
     searchJumpIntent,
     selectedGroupCallEntry?.call.id,
     selectedGroupId,
@@ -2265,9 +2258,13 @@ export function GroupsPage() {
 
       <div
         className={`${styles.workspace} ${isDesktopTargetWindow ? styles.desktopWindowWorkspace : ""}`}
+        data-mobile-thread-active={selectedGroupId !== "" || undefined}
       >
         {!isDesktopTargetWindow && (
-          <aside className={styles.sideColumn}>
+          <aside
+            className={styles.sideColumn}
+            data-mobile-hidden={selectedGroupId !== "" || undefined}
+          >
           <section className={styles.panelCard}>
             <div className={styles.panelHeader}>
               <div>

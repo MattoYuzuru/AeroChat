@@ -61,6 +61,7 @@ import { useDirectCallSession } from "../rtc/useDirectCallSession";
 import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
 import {
   isViewportPinnedToBottom,
+  scheduleThreadViewportBottomAlignment,
   useThreadViewportAutoPin,
   type ThreadViewportOlderHistoryAnchor,
 } from "../ui/thread-viewport";
@@ -833,34 +834,30 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     if (threadKey === null || encryptedLane.status !== "ready") {
       return;
     }
+    if (revealedDirectThreadKey === threadKey) {
+      return;
+    }
 
-    let animationFrameID = 0;
-    let nestedAnimationFrameID = 0;
-    let timeoutID = 0;
+    const viewport = messagesViewportRef.current;
+    if (viewport === null) {
+      return;
+    }
 
-    const revealThread = () => {
-      setRevealedDirectThreadKey((current) => (current === threadKey ? current : threadKey));
-    };
-
-    animationFrameID = window.requestAnimationFrame(() => {
-      nestedAnimationFrameID = window.requestAnimationFrame(() => {
-        revealThread();
-      });
+    return scheduleThreadViewportBottomAlignment({
+      keepPinnedToBottomRef: keepScrollPinnedToBottomRef,
+      onComplete: () => {
+        setRevealedDirectThreadKey((current) => (current === threadKey ? current : threadKey));
+      },
+      viewport,
     });
-    timeoutID = window.setTimeout(revealThread, 110);
-
-    return () => {
-      if (animationFrameID !== 0) {
-        window.cancelAnimationFrame(animationFrameID);
-      }
-      if (nestedAnimationFrameID !== 0) {
-        window.cancelAnimationFrame(nestedAnimationFrameID);
-      }
-      if (timeoutID !== 0) {
-        window.clearTimeout(timeoutID);
-      }
-    };
-  }, [directCall.phase, directCall.state.call?.id, encryptedLane.items.length, encryptedLane.status, selectedThread?.chat.id]);
+  }, [
+    directCall.phase,
+    directCall.state.call?.id,
+    encryptedLane.items.length,
+    encryptedLane.status,
+    revealedDirectThreadKey,
+    selectedThread?.chat.id,
+  ]);
 
   if (authState.status !== "authenticated") {
     return null;

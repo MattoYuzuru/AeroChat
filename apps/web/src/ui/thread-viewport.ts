@@ -17,6 +17,10 @@ interface ThreadViewportMetrics {
   scrollTop: number;
 }
 
+interface MutableThreadViewportMetrics extends ThreadViewportMetrics {
+  scrollTop: number;
+}
+
 interface UseThreadViewportAutoPinInput {
   contentRef: RefObject<HTMLElement | null>;
   enabled?: boolean;
@@ -28,9 +32,22 @@ interface UseThreadViewportAutoPinInput {
 }
 
 export const threadViewportBottomThresholdPx = 64;
+export const threadViewportBottomAlignmentDelayMs = 96;
+export const threadViewportBottomAlignmentSettleDelayMs = 220;
+
+export interface ThreadViewportBottomAlignmentScheduler {
+  cancelAnimationFrame: (id: number) => void;
+  clearTimeout: (id: number) => void;
+  requestAnimationFrame: (callback: () => void) => number;
+  setTimeout: (callback: () => void, delayMs: number) => number;
+}
 
 export function getViewportDistanceFromBottom(input: ThreadViewportMetrics): number {
   return input.scrollHeight - input.scrollTop - input.clientHeight;
+}
+
+export function scrollThreadViewportToBottom(input: MutableThreadViewportMetrics): void {
+  input.scrollTop = input.scrollHeight;
 }
 
 export function isViewportPinnedToBottom(
@@ -64,6 +81,97 @@ export function shouldScrollThreadViewportToBottom(input: {
   return input.threadChanged || input.keepPinnedToBottom;
 }
 
+function resolveThreadViewportBottomAlignmentScheduler():
+  | ThreadViewportBottomAlignmentScheduler
+  | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return {
+    cancelAnimationFrame: (id) => {
+      window.cancelAnimationFrame(id);
+    },
+    clearTimeout: (id) => {
+      window.clearTimeout(id);
+    },
+    requestAnimationFrame: (callback) => window.requestAnimationFrame(() => callback()),
+    setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
+  };
+}
+
+export function scheduleThreadViewportBottomAlignment(input: {
+  keepPinnedToBottomRef?: MutableRefObject<boolean> | { current: boolean };
+  onComplete?: () => void;
+  scheduler?: ThreadViewportBottomAlignmentScheduler;
+  viewport: MutableThreadViewportMetrics;
+}): () => void {
+  const scheduler = input.scheduler ?? resolveThreadViewportBottomAlignmentScheduler();
+  let completed = false;
+  let cancelled = false;
+
+  const alignToBottom = () => {
+    scrollThreadViewportToBottom(input.viewport);
+    if (input.keepPinnedToBottomRef !== undefined) {
+      input.keepPinnedToBottomRef.current = true;
+    }
+  };
+  const complete = () => {
+    if (completed || cancelled) {
+      return;
+    }
+
+    completed = true;
+    input.onComplete?.();
+  };
+
+  alignToBottom();
+
+  if (scheduler === null) {
+    complete();
+    return () => undefined;
+  }
+
+  const animationFrameIDs: number[] = [];
+  const timeoutIDs: number[] = [];
+
+  animationFrameIDs.push(
+    scheduler.requestAnimationFrame(() => {
+      alignToBottom();
+      animationFrameIDs.push(
+        scheduler.requestAnimationFrame(() => {
+          alignToBottom();
+        }),
+      );
+    }),
+  );
+  timeoutIDs.push(
+    scheduler.setTimeout(() => {
+      alignToBottom();
+    }, threadViewportBottomAlignmentDelayMs),
+  );
+  timeoutIDs.push(
+    scheduler.setTimeout(() => {
+      alignToBottom();
+      complete();
+    }, threadViewportBottomAlignmentSettleDelayMs),
+  );
+
+  return () => {
+    if (completed || cancelled) {
+      return;
+    }
+
+    cancelled = true;
+    animationFrameIDs.forEach((id) => {
+      scheduler.cancelAnimationFrame(id);
+    });
+    timeoutIDs.forEach((id) => {
+      scheduler.clearTimeout(id);
+    });
+  };
+}
+
 export function useThreadViewportAutoPin({
   contentRef,
   enabled = true,
@@ -85,10 +193,6 @@ export function useThreadViewportAutoPin({
       return;
     }
 
-    let animationFrameID = 0;
-    let nestedAnimationFrameID = 0;
-    let timeoutID = 0;
-
     const threadChanged = previousThreadKeyRef.current !== threadKey;
     const olderHistoryAnchor = olderHistoryAnchorRef?.current ?? null;
 
@@ -108,32 +212,20 @@ export function useThreadViewportAutoPin({
         threadChanged,
       })
     ) {
-      const scrollToBottom = () => {
-        viewport.scrollTop = viewport.scrollHeight;
-      };
-
-      scrollToBottom();
-      animationFrameID = window.requestAnimationFrame(() => {
-        nestedAnimationFrameID = window.requestAnimationFrame(() => {
-          scrollToBottom();
-        });
+      const cancelBottomAlignment = scheduleThreadViewportBottomAlignment({
+        keepPinnedToBottomRef,
+        viewport,
       });
-      timeoutID = window.setTimeout(scrollToBottom, 80);
+      previousThreadKeyRef.current = threadKey;
+
+      return () => {
+        cancelBottomAlignment();
+      };
     }
 
     previousThreadKeyRef.current = threadKey;
 
-    return () => {
-      if (animationFrameID !== 0) {
-        window.cancelAnimationFrame(animationFrameID);
-      }
-      if (nestedAnimationFrameID !== 0) {
-        window.cancelAnimationFrame(nestedAnimationFrameID);
-      }
-      if (timeoutID !== 0) {
-        window.clearTimeout(timeoutID);
-      }
-    };
+    return undefined;
   }, [enabled, keepPinnedToBottomRef, layoutVersion, olderHistoryAnchorRef, threadKey, viewportRef]);
 
   useEffect(() => {
@@ -159,7 +251,7 @@ export function useThreadViewportAutoPin({
       }
 
       animationFrameID = window.requestAnimationFrame(() => {
-        viewport.scrollTop = viewport.scrollHeight;
+        scrollThreadViewportToBottom(viewport);
       });
     };
 

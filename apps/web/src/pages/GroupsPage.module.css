@@ -329,6 +329,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .groupCard,
@@ -768,8 +769,16 @@
     display: none;
   }
 
-  .mainColumn[data-mobile-thread-active="true"] {
+  .sideColumn[data-mobile-hidden="true"] {
+    display: none;
+  }
+
+  .workspace[data-mobile-thread-active="true"] {
     min-height: calc(100dvh - 12.5rem);
+  }
+
+  .mainColumn[data-mobile-thread-active="true"] {
+    min-height: inherit;
     grid-template-rows: auto minmax(0, 1fr);
     align-content: stretch;
   }
