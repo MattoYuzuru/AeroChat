@@ -13,6 +13,7 @@ func TestLoadConfigDefaults(t *testing.T) {
 	t.Setenv("AERO_DATABASE_BOOTSTRAP_TIMEOUT", "")
 	t.Setenv("AERO_DOWNSTREAM_TIMEOUT", "")
 	t.Setenv("AERO_RTC_TURN_USERNAME_TTL", "")
+	t.Setenv("AERO_RTC_ACTIVE_PARTICIPANT_STALE_TIMEOUT", "")
 	t.Setenv("AERO_IDENTITY_URL", "")
 	t.Setenv("AERO_CHAT_URL", "")
 	t.Setenv("AERO_RTC_STUN_URLS", "")
@@ -45,6 +46,9 @@ func TestLoadConfigDefaults(t *testing.T) {
 	}
 	if cfg.TURNUsernameTTL != 10*time.Minute {
 		t.Fatalf("ожидался turn ttl по умолчанию 10m, получен %s", cfg.TURNUsernameTTL)
+	}
+	if cfg.ActiveParticipantStaleTimeout != 75*time.Second {
+		t.Fatalf("ожидался participant stale timeout по умолчанию 75s, получен %s", cfg.ActiveParticipantStaleTimeout)
 	}
 	if cfg.MaxSignalPayloadSizeBytes != 16*1024 {
 		t.Fatalf("ожидался дефолтный signal payload limit 16384, получен %d", cfg.MaxSignalPayloadSizeBytes)

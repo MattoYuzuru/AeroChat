@@ -81,6 +81,8 @@ func run() error {
 		downstream.NewIdentityAuthenticator(clients.Identity),
 		downstream.NewChatScopeAuthorizer(clients.Chat),
 		cfg.MaxSignalPayloadSizeBytes,
+	).WithActiveParticipantStaleTimeout(
+		cfg.ActiveParticipantStaleTimeout,
 	).WithICEServerProvider(
 		rtc.NewConfigurableICEServerProvider(
 			cfg.STUNServerURLs,

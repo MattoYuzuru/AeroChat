@@ -93,6 +93,7 @@ func TestStartCallRejectsUserAlreadyActiveInAnotherCall(t *testing.T) {
 		},
 		16*1024,
 	)
+	service.now = func() time.Time { return now }
 
 	_, _, err := service.StartCall(context.Background(), "token", ConversationScope{
 		Type:         ScopeTypeDirect,
@@ -144,6 +145,7 @@ func TestJoinCallRejectsUserAlreadyActiveInAnotherCall(t *testing.T) {
 		},
 		16*1024,
 	)
+	service.now = func() time.Time { return now }
 
 	_, _, err := service.JoinCall(context.Background(), "token", "12121212-1212-1212-1212-121212121212")
 
@@ -199,6 +201,144 @@ func TestUserCanStartAnotherCallAfterLeavingPrevious(t *testing.T) {
 	}
 	if call == nil || participant == nil {
 		t.Fatal("ожидался новый call после leave")
+	}
+}
+
+func TestStartCallEvictsStaleActiveParticipation(t *testing.T) {
+	repo := newFakeRepository()
+	startedAt := time.Date(2026, 3, 29, 10, 0, 0, 0, time.UTC)
+	now := startedAt.Add(2 * time.Minute)
+	repo.calls["15151515-1515-1515-1515-151515151515"] = &Call{
+		ID:              "15151515-1515-1515-1515-151515151515",
+		Scope:           ConversationScope{Type: ScopeTypeDirect, DirectChatID: "16161616-1616-1616-1616-161616161616"},
+		CreatedByUserID: "11111111-1111-1111-1111-111111111111",
+		Status:          CallStatusActive,
+		CreatedAt:       startedAt,
+		UpdatedAt:       startedAt,
+		StartedAt:       startedAt,
+	}
+	repo.addActiveParticipant("17171717-1717-1717-1717-171717171717", "15151515-1515-1515-1515-151515151515", "11111111-1111-1111-1111-111111111111", startedAt)
+
+	service := NewService(
+		repo,
+		&fakeAuthenticator{userID: "11111111-1111-1111-1111-111111111111"},
+		&fakeScopeAuthorizer{
+			accessByScope: map[string]*ScopeAccess{
+				"direct:16161616-1616-1616-1616-161616161616": {
+					Scope: ConversationScope{Type: ScopeTypeDirect, DirectChatID: "16161616-1616-1616-1616-161616161616"},
+				},
+				"direct:18181818-1818-1818-1818-181818181818": {
+					Scope: ConversationScope{Type: ScopeTypeDirect, DirectChatID: "18181818-1818-1818-1818-181818181818"},
+				},
+			},
+		},
+		16*1024,
+	)
+	service.now = func() time.Time { return now }
+
+	call, participant, err := service.StartCall(context.Background(), "token", ConversationScope{
+		Type:         ScopeTypeDirect,
+		DirectChatID: "18181818-1818-1818-1818-181818181818",
+	})
+	if err != nil {
+		t.Fatalf("start call after stale participation: %v", err)
+	}
+	if call == nil || participant == nil {
+		t.Fatal("ожидался новый call после eviction stale participation")
+	}
+	if repo.calls["15151515-1515-1515-1515-151515151515"].Status != CallStatusEnded {
+		t.Fatalf("ожидался auto-end старого call, получен %q", repo.calls["15151515-1515-1515-1515-151515151515"].Status)
+	}
+	if repo.participants["17171717-1717-1717-1717-171717171717"].State != ParticipantStateLeft {
+		t.Fatalf("ожидался left state для stale participant, получен %q", repo.participants["17171717-1717-1717-1717-171717171717"].State)
+	}
+}
+
+func TestGetActiveCallPrunesStaleParticipants(t *testing.T) {
+	repo := newFakeRepository()
+	startedAt := time.Date(2026, 3, 29, 11, 0, 0, 0, time.UTC)
+	now := startedAt.Add(2 * time.Minute)
+	repo.calls["19191919-1919-1919-1919-191919191919"] = &Call{
+		ID:              "19191919-1919-1919-1919-191919191919",
+		Scope:           ConversationScope{Type: ScopeTypeDirect, DirectChatID: "20202020-2020-2020-2020-202020202020"},
+		CreatedByUserID: "11111111-1111-1111-1111-111111111111",
+		Status:          CallStatusActive,
+		CreatedAt:       startedAt,
+		UpdatedAt:       startedAt,
+		StartedAt:       startedAt,
+	}
+	repo.addActiveParticipant("21212121-2121-2121-2121-212121212121", "19191919-1919-1919-1919-191919191919", "11111111-1111-1111-1111-111111111111", startedAt)
+
+	service := NewService(
+		repo,
+		&fakeAuthenticator{userID: "11111111-1111-1111-1111-111111111111"},
+		&fakeScopeAuthorizer{
+			accessByScope: map[string]*ScopeAccess{
+				"direct:20202020-2020-2020-2020-202020202020": {
+					Scope: ConversationScope{Type: ScopeTypeDirect, DirectChatID: "20202020-2020-2020-2020-202020202020"},
+				},
+			},
+		},
+		16*1024,
+	)
+	service.now = func() time.Time { return now }
+
+	call, err := service.GetActiveCall(context.Background(), "token", ConversationScope{
+		Type:         ScopeTypeDirect,
+		DirectChatID: "20202020-2020-2020-2020-202020202020",
+	})
+	if err != nil {
+		t.Fatalf("get active call after stale prune: %v", err)
+	}
+	if call != nil {
+		t.Fatalf("ожидался nil после prune stale call, получен %#v", call)
+	}
+	if repo.calls["19191919-1919-1919-1919-191919191919"].Status != CallStatusEnded {
+		t.Fatalf("ожидался ended status после stale prune, получен %q", repo.calls["19191919-1919-1919-1919-191919191919"].Status)
+	}
+}
+
+func TestTouchCallParticipantRefreshesActivityTimestamp(t *testing.T) {
+	repo := newFakeRepository()
+	startedAt := time.Date(2026, 3, 29, 12, 0, 0, 0, time.UTC)
+	now := startedAt.Add(20 * time.Second)
+	repo.calls["22222222-2222-2222-2222-222222222222"] = &Call{
+		ID:              "22222222-2222-2222-2222-222222222222",
+		Scope:           ConversationScope{Type: ScopeTypeDirect, DirectChatID: "23232323-2323-2323-2323-232323232323"},
+		CreatedByUserID: "11111111-1111-1111-1111-111111111111",
+		Status:          CallStatusActive,
+		CreatedAt:       startedAt,
+		UpdatedAt:       startedAt,
+		StartedAt:       startedAt,
+	}
+	repo.addActiveParticipant("24242424-2424-2424-2424-242424242424", "22222222-2222-2222-2222-222222222222", "11111111-1111-1111-1111-111111111111", startedAt)
+
+	service := NewService(
+		repo,
+		&fakeAuthenticator{userID: "11111111-1111-1111-1111-111111111111"},
+		&fakeScopeAuthorizer{
+			accessByScope: map[string]*ScopeAccess{
+				"direct:23232323-2323-2323-2323-232323232323": {
+					Scope: ConversationScope{Type: ScopeTypeDirect, DirectChatID: "23232323-2323-2323-2323-232323232323"},
+				},
+			},
+		},
+		16*1024,
+	)
+	service.now = func() time.Time { return now }
+
+	participant, err := service.TouchCallParticipant(context.Background(), "token", "22222222-2222-2222-2222-222222222222")
+	if err != nil {
+		t.Fatalf("touch call participant: %v", err)
+	}
+	if participant == nil {
+		t.Fatal("ожидался refreshed participant")
+	}
+	if !participant.UpdatedAt.Equal(now) {
+		t.Fatalf("ожидался updatedAt %s, получен %s", now, participant.UpdatedAt)
+	}
+	if participant.LastSignalAt == nil || !participant.LastSignalAt.Equal(now) {
+		t.Fatalf("ожидался lastSignalAt %s, получен %#v", now, participant.LastSignalAt)
 	}
 }
 
@@ -361,6 +501,7 @@ func TestSendSignalRequiresActiveTargetAndBoundedPayload(t *testing.T) {
 		},
 		4,
 	)
+	service.now = func() time.Time { return now }
 
 	if _, err := service.SendSignal(context.Background(), "token", "99999999-9999-9999-9999-999999999999", "22222222-2222-2222-2222-222222222222", SignalTypeOffer, []byte("12345")); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("ожидалась ошибка bounded payload, получено: %v", err)

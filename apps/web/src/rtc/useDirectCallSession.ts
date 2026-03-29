@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { resolveGatewayBaseUrl } from "../gateway/client";
 import { gatewayClient } from "../gateway/runtime";
 import {
   describeGatewayError,
@@ -9,8 +10,17 @@ import {
   type RtcCallParticipant,
   type RtcSignalEnvelope,
 } from "../gateway/types";
-import { subscribeRealtimeEnvelopes } from "../realtime/events";
+import {
+  subscribeRealtimeEnvelopes,
+  subscribeRealtimeLifecycleEvents,
+} from "../realtime/events";
 import type { DirectCallAwarenessEntry } from "./awareness";
+import {
+  applyDirectCallTrackContentHint,
+  buildDirectCallAudioConstraints,
+  tuneDirectCallSenderForVoice,
+} from "./audio";
+import { sendRtcLeaveCallKeepalive } from "./network";
 import { parseRTCRealtimeEvent } from "./realtime";
 import {
   decodeRTCIceCandidatePayload,
@@ -26,10 +36,11 @@ import {
   selectDirectCallSelfParticipant,
 } from "./state";
 import {
+  buildNextPeerRecoveryPlan,
   flushPendingRemoteICECandidates,
   hasMatchingRemoteSessionDescription,
   queueOrApplyRemoteICECandidate,
-  shouldBlockPeerRuntimeAfterFailure,
+  shouldDelayPeerRuntimeRecovery,
   teardownDirectCallPeerRuntime,
   teardownDirectCallRuntime,
 } from "./runtime";
@@ -38,7 +49,8 @@ import {
   directCallRTCConfiguration,
 } from "./config";
 
-const directCallRefreshIntervalMs = 5000;
+const directCallGatewayBaseUrl = resolveGatewayBaseUrl();
+const directCallParticipantHeartbeatIntervalMs = 20_000;
 
 interface UseDirectCallSessionOptions {
   enabled: boolean;
@@ -82,7 +94,6 @@ export function useDirectCallSession(
     currentUserId,
     enabled,
     onUnauthenticated,
-    pageVisible,
     refreshDirectChatCall,
     token,
   } = options;
@@ -96,14 +107,25 @@ export function useDirectCallSession(
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const localJoinedCallIdRef = useRef<string | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
-  const pendingRemoteICECandidatesRef = useRef<RTCIceCandidateInit[]>([]);
-  const rtcConfigurationRef = useRef<RTCConfiguration>(directCallRTCConfiguration);
-  const peerFailureMarkerRef = useRef<{
+  const peerRecoveryHandlerRef = useRef<(reason: "disconnected" | "failed") => boolean>(
+    () => false,
+  );
+  const peerRecoveryPlanRef = useRef<{
+    attempts: number;
+    blockedUntilMs: number;
     callId: string;
     remoteUserId: string;
   } | null>(null);
+  const peerRecoveryTimerRef = useRef<number | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
+  const pendingRemoteICECandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const rtcConfigurationRef = useRef<RTCConfiguration>(directCallRTCConfiguration);
+  const onUnauthenticatedRef = useRef(onUnauthenticated);
   const refreshDirectChatCallRef = useRef(refreshDirectChatCall);
+
+  useEffect(() => {
+    onUnauthenticatedRef.current = onUnauthenticated;
+  }, [onUnauthenticated]);
 
   useEffect(() => {
     refreshDirectChatCallRef.current = refreshDirectChatCall;
@@ -123,15 +145,26 @@ export function useDirectCallSession(
   const isDirectChatSupported =
     chat !== null && isDirectAudioCallSupportedForChatKind(chat.kind);
   const activeChatID = chat?.id ?? null;
+  const joinedCallID = state.call?.id ?? null;
   const selfParticipant = selectDirectCallSelfParticipant(state, currentUserId);
   const remoteParticipant = selectDirectCallRemoteParticipant(state, currentUserId);
   const phase = deriveDirectCallUiPhase(state, currentUserId);
   const isLocallyJoined =
     state.call !== null && state.localJoinedCallId === state.call.id;
 
-  const clearPeerFailureMarker = useCallback(() => {
-    peerFailureMarkerRef.current = null;
+  const clearPeerRecoveryTimer = useCallback(() => {
+    if (peerRecoveryTimerRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(peerRecoveryTimerRef.current);
+    peerRecoveryTimerRef.current = null;
   }, []);
+
+  const clearPeerRecoveryPlan = useCallback(() => {
+    clearPeerRecoveryTimer();
+    peerRecoveryPlanRef.current = null;
+  }, [clearPeerRecoveryTimer]);
 
   const refreshRTCConfiguration = useCallback(async () => {
     try {
@@ -168,7 +201,7 @@ export function useDirectCallSession(
   }, []);
 
   const disposeLocalRuntime = useCallback(() => {
-    clearPeerFailureMarker();
+    clearPeerRecoveryPlan();
     teardownDirectCallRuntime({
       localStream: localStreamRef.current,
       peerConnection: peerConnectionRef.current,
@@ -181,7 +214,7 @@ export function useDirectCallSession(
     pendingRemoteICECandidatesRef.current = [];
     setRemoteAudioStream(null);
     dispatch({ type: "local_left" });
-  }, [clearPeerFailureMarker]);
+  }, [clearPeerRecoveryPlan]);
 
   const describeError = useCallback((error: unknown, fallbackMessage: string): string => {
     if (isGatewayErrorCode(error, "unauthenticated")) {
@@ -235,7 +268,11 @@ export function useDirectCallSession(
     dispatch({ type: "media_request_started" });
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: buildDirectCallAudioConstraints(
+          navigator.mediaDevices.getSupportedConstraints?.() ?? {},
+        ),
+      });
       if (stream.getAudioTracks().length === 0) {
         teardownDirectCallRuntime({
           localStream: stream,
@@ -251,6 +288,9 @@ export function useDirectCallSession(
         throw new Error(message);
       }
 
+      stream.getAudioTracks().forEach((track) => {
+        applyDirectCallTrackContentHint(track);
+      });
       localStreamRef.current = stream;
       dispatch({ type: "media_ready" });
       return stream;
@@ -300,7 +340,9 @@ export function useDirectCallSession(
 
     const peerConnection = new RTCPeerConnection(rtcConfigurationRef.current);
     for (const track of localStream.getTracks()) {
-      peerConnection.addTrack(track, localStream);
+      applyDirectCallTrackContentHint(track);
+      const sender = peerConnection.addTrack(track, localStream);
+      void tuneDirectCallSenderForVoice(sender);
     }
 
     peerConnection.addEventListener("icecandidate", (event) => {
@@ -334,9 +376,43 @@ export function useDirectCallSession(
       });
     });
 
+    peerConnection.addEventListener("iceconnectionstatechange", () => {
+      switch (peerConnection.iceConnectionState) {
+        case "connected":
+        case "completed":
+          clearPeerRecoveryPlan();
+          return;
+        case "disconnected":
+          if (peerRecoveryHandlerRef.current("disconnected")) {
+            dispatch({
+              type: "peer_state_replaced",
+              peerConnectionState: "connecting",
+            });
+          }
+          return;
+        case "failed":
+          if (peerRecoveryHandlerRef.current("failed")) {
+            dispatch({
+              type: "peer_state_replaced",
+              peerConnectionState: "connecting",
+            });
+            return;
+          }
+          dispatch({
+            type: "peer_state_replaced",
+            peerConnectionState: "failed",
+            message: "WebRTC-соединение завершилось с ошибкой.",
+          });
+          resetPeerRuntime();
+          return;
+        default:
+      }
+    });
+
     peerConnection.addEventListener("connectionstatechange", () => {
       switch (peerConnection.connectionState) {
         case "connected":
+          clearPeerRecoveryPlan();
           dispatch({
             type: "peer_state_replaced",
             peerConnectionState: "connected",
@@ -348,19 +424,21 @@ export function useDirectCallSession(
             peerConnectionState: "connecting",
           });
           return;
+        case "disconnected":
+          if (peerRecoveryHandlerRef.current("disconnected")) {
+            dispatch({
+              type: "peer_state_replaced",
+              peerConnectionState: "connecting",
+            });
+          }
+          return;
         case "failed":
-          {
-            const failedCall = stateRef.current.call;
-            const failedRemoteParticipant =
-              failedCall === null
-                ? null
-                : selectDirectCallRemoteParticipant(stateRef.current, currentUserId);
-            if (failedCall !== null && failedRemoteParticipant !== null) {
-              peerFailureMarkerRef.current = {
-                callId: failedCall.id,
-                remoteUserId: failedRemoteParticipant.userId,
-              };
-            }
+          if (peerRecoveryHandlerRef.current("failed")) {
+            dispatch({
+              type: "peer_state_replaced",
+              peerConnectionState: "connecting",
+            });
+            return;
           }
           dispatch({
             type: "peer_state_replaced",
@@ -370,6 +448,7 @@ export function useDirectCallSession(
           resetPeerRuntime();
           return;
         case "closed":
+          clearPeerRecoveryPlan();
           dispatch({
             type: "peer_state_replaced",
             peerConnectionState: "idle",
@@ -381,7 +460,7 @@ export function useDirectCallSession(
 
     peerConnectionRef.current = peerConnection;
     return peerConnection;
-  }, [currentUserId, describeError, resetPeerRuntime, sendRTCSignal]);
+  }, [clearPeerRecoveryPlan, currentUserId, describeError, resetPeerRuntime, sendRTCSignal]);
 
   const applyIncomingRTCSignal = useCallback(async (signal: RtcSignalEnvelope) => {
     const currentCall = stateRef.current.call;
@@ -393,20 +472,11 @@ export function useDirectCallSession(
       return;
     }
 
-    if (
-      shouldBlockPeerRuntimeAfterFailure(
-        peerFailureMarkerRef.current,
-        signal.callId,
-        signal.fromUserId,
-      )
-    ) {
-      return;
-    }
-
     const peerConnection = ensurePeerConnection();
     if (peerConnection === null) {
       return;
     }
+    clearPeerRecoveryTimer();
 
     try {
       switch (signal.type) {
@@ -506,7 +576,13 @@ export function useDirectCallSession(
         message: describeError(error, "Не удалось применить входящий RTC signal."),
       });
     }
-  }, [describeError, ensurePeerConnection, resetPeerRuntime, sendRTCSignal]);
+  }, [
+    clearPeerRecoveryTimer,
+    describeError,
+    ensurePeerConnection,
+    resetPeerRuntime,
+    sendRTCSignal,
+  ]);
 
   const createOfferForRemoteParticipant = useCallback(async (participant: RtcCallParticipant) => {
     const currentCall = stateRef.current.call;
@@ -519,10 +595,11 @@ export function useDirectCallSession(
     }
 
     if (
-      shouldBlockPeerRuntimeAfterFailure(
-        peerFailureMarkerRef.current,
+      shouldDelayPeerRuntimeRecovery(
+        peerRecoveryPlanRef.current,
         currentCall.id,
         participant.userId,
+        Date.now(),
       )
     ) {
       return;
@@ -562,11 +639,100 @@ export function useDirectCallSession(
     }
   }, [currentUserId, describeError, ensurePeerConnection, sendRTCSignal]);
 
+  const schedulePeerRecovery = useCallback((reason: "disconnected" | "failed"): boolean => {
+    const currentCall = stateRef.current.call;
+    const remoteParticipant =
+      currentCall === null
+        ? null
+        : selectDirectCallRemoteParticipant(stateRef.current, currentUserId);
+    if (
+      currentCall === null ||
+      remoteParticipant === null ||
+      localJoinedCallIdRef.current !== currentCall.id
+    ) {
+      return false;
+    }
+
+    const nextPlan = buildNextPeerRecoveryPlan(
+      peerRecoveryPlanRef.current,
+      currentCall.id,
+      remoteParticipant.userId,
+      Date.now(),
+      reason === "failed"
+        ? {
+            baseDelayMs: 750,
+            maxDelayMs: 4000,
+            maxAttempts: 4,
+          }
+        : {
+            baseDelayMs: 1500,
+            maxDelayMs: 5000,
+            maxAttempts: 4,
+          },
+    );
+    if (nextPlan === null) {
+      return false;
+    }
+
+    clearPeerRecoveryTimer();
+    peerRecoveryPlanRef.current = nextPlan;
+    peerRecoveryTimerRef.current = window.setTimeout(() => {
+      void (async () => {
+        const plan = peerRecoveryPlanRef.current;
+        if (
+          plan === null ||
+          plan.callId !== currentCall.id ||
+          plan.remoteUserId !== remoteParticipant.userId
+        ) {
+          return;
+        }
+
+        await refreshRTCConfiguration();
+        resetPeerRuntime();
+
+        const refreshedCall = stateRef.current.call;
+        const refreshedRemoteParticipant =
+          refreshedCall === null
+            ? null
+            : selectDirectCallRemoteParticipant(stateRef.current, currentUserId);
+        if (
+          refreshedCall === null ||
+          refreshedRemoteParticipant === null ||
+          localJoinedCallIdRef.current !== refreshedCall.id
+        ) {
+          return;
+        }
+
+        ensurePeerConnection();
+        if (refreshedCall.createdByUserId === currentUserId) {
+          await createOfferForRemoteParticipant(refreshedRemoteParticipant);
+          return;
+        }
+
+        dispatch({
+          type: "peer_state_replaced",
+          peerConnectionState: "connecting",
+        });
+      })().catch(() => {
+        // Любая ошибка следующего recovery attempt всё равно проявится через очередной failure/disconnect event.
+      });
+    }, Math.max(0, nextPlan.blockedUntilMs - Date.now()));
+
+    return true;
+  }, [
+    clearPeerRecoveryTimer,
+    createOfferForRemoteParticipant,
+    currentUserId,
+    ensurePeerConnection,
+    refreshRTCConfiguration,
+    resetPeerRuntime,
+  ]);
+
   const bootstrapJoinedCall = useCallback(async (
     call: RtcCall,
     selfParticipant: RtcCallParticipant | null,
   ) => {
-    clearPeerFailureMarker();
+    clearPeerRecoveryPlan();
     localJoinedCallIdRef.current = call.id;
     dispatch({
       type: "local_call_bootstrapped",
@@ -575,7 +741,15 @@ export function useDirectCallSession(
     });
     ensurePeerConnection();
     await runRefreshDirectChatCall(false);
-  }, [clearPeerFailureMarker, ensurePeerConnection, runRefreshDirectChatCall]);
+  }, [clearPeerRecoveryPlan, ensurePeerConnection, runRefreshDirectChatCall]);
+
+  useEffect(() => {
+    peerRecoveryHandlerRef.current = schedulePeerRecovery;
+
+    return () => {
+      peerRecoveryHandlerRef.current = () => false;
+    };
+  }, [schedulePeerRecovery]);
 
   async function startCall() {
     if (!enabled || chat === null || !isDirectChatSupported) {
@@ -597,6 +771,7 @@ export function useDirectCallSession(
       await bootstrapJoinedCall(response.call, response.selfParticipant);
     } catch (error) {
       if (localStream !== null) {
+        clearPeerRecoveryPlan();
         teardownDirectCallRuntime({
           localStream: localStreamRef.current ?? localStream,
           peerConnection: peerConnectionRef.current,
@@ -658,6 +833,7 @@ export function useDirectCallSession(
       await bootstrapJoinedCall(response.call, response.selfParticipant);
     } catch (error) {
       if (localStream !== null) {
+        clearPeerRecoveryPlan();
         teardownDirectCallRuntime({
           localStream: localStreamRef.current ?? localStream,
           peerConnection: peerConnectionRef.current,
@@ -832,33 +1008,16 @@ export function useDirectCallSession(
   }, [activeChatID, applyIncomingRTCSignal, enabled, isDirectChatSupported]);
 
   useEffect(() => {
-    if (
-      !enabled ||
-      !pageVisible ||
-      activeChatID === null ||
-      !isDirectChatSupported ||
-      (state.call === null && state.localJoinedCallId === null)
-    ) {
+    if (!enabled || activeChatID === null || !isDirectChatSupported) {
       return;
     }
 
-    const intervalID = window.setInterval(() => {
-      void runRefreshDirectChatCall(false);
-    }, directCallRefreshIntervalMs);
-
-    return () => {
-      window.clearInterval(intervalID);
-    };
-  }, [
-    activeChatID,
-    isDirectChatSupported,
-    enabled,
-    pageVisible,
-    token,
-    runRefreshDirectChatCall,
-    state.call,
-    state.localJoinedCallId,
-  ]);
+    return subscribeRealtimeLifecycleEvents((event) => {
+      if (event.type === "realtime.connected") {
+        void runRefreshDirectChatCall(false);
+      }
+    });
+  }, [activeChatID, enabled, isDirectChatSupported, runRefreshDirectChatCall]);
 
   useEffect(() => {
     if (state.call !== null || state.localJoinedCallId !== null) {
@@ -875,8 +1034,8 @@ export function useDirectCallSession(
   useEffect(() => {
     const joinedCall = state.call;
     if (joinedCall === null || state.localJoinedCallId !== joinedCall.id) {
+      clearPeerRecoveryPlan();
       if (state.localJoinedCallId === null) {
-        clearPeerFailureMarker();
         localJoinedCallIdRef.current = null;
       }
       resetPeerRuntime();
@@ -892,7 +1051,7 @@ export function useDirectCallSession(
     }
 
     if (nextRemoteParticipant === null) {
-      clearPeerFailureMarker();
+      clearPeerRecoveryPlan();
       resetPeerRuntime();
       if (state.peerConnectionState !== "waiting_for_peer") {
         dispatch({
@@ -904,16 +1063,11 @@ export function useDirectCallSession(
     }
 
     if (
-      peerFailureMarkerRef.current?.callId === joinedCall.id &&
-      peerFailureMarkerRef.current.remoteUserId !== nextRemoteParticipant.userId
-    ) {
-      clearPeerFailureMarker();
-    }
-    if (
-      shouldBlockPeerRuntimeAfterFailure(
-        peerFailureMarkerRef.current,
+      shouldDelayPeerRuntimeRecovery(
+        peerRecoveryPlanRef.current,
         joinedCall.id,
         nextRemoteParticipant.userId,
+        Date.now(),
       )
     ) {
       return;
@@ -933,13 +1087,90 @@ export function useDirectCallSession(
     }
   }, [
     createOfferForRemoteParticipant,
-    clearPeerFailureMarker,
+    clearPeerRecoveryPlan,
     disposeLocalRuntime,
     ensurePeerConnection,
     currentUserId,
     resetPeerRuntime,
     state,
   ]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      joinedCallID === null ||
+      state.localJoinedCallId !== joinedCallID ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+
+    let disposed = false;
+    const sendParticipantHeartbeat = async () => {
+      if (
+        disposed ||
+        stateRef.current.call?.id !== joinedCallID ||
+        localJoinedCallIdRef.current !== joinedCallID
+      ) {
+        return;
+      }
+
+      try {
+        await gatewayClient.touchCallParticipant(token, joinedCallID);
+      } catch (error) {
+        if (isGatewayErrorCode(error, "unauthenticated")) {
+          onUnauthenticatedRef.current();
+          return;
+        }
+
+        if (
+          isGatewayErrorCode(error, "failed_precondition") ||
+          isGatewayErrorCode(error, "not_found")
+        ) {
+          await runRefreshDirectChatCall(false);
+        }
+      }
+    };
+
+    void sendParticipantHeartbeat();
+    const intervalId = window.setInterval(() => {
+      void sendParticipantHeartbeat();
+    }, directCallParticipantHeartbeatIntervalMs);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    enabled,
+    joinedCallID,
+    runRefreshDirectChatCall,
+    state.localJoinedCallId,
+    token,
+  ]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      joinedCallID === null ||
+      state.localJoinedCallId !== joinedCallID ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+
+    const leaveOnPageHide = () => {
+      sendRtcLeaveCallKeepalive(token, joinedCallID, directCallGatewayBaseUrl);
+    };
+
+    window.addEventListener("beforeunload", leaveOnPageHide);
+    window.addEventListener("pagehide", leaveOnPageHide);
+
+    return () => {
+      window.removeEventListener("beforeunload", leaveOnPageHide);
+      window.removeEventListener("pagehide", leaveOnPageHide);
+    };
+  }, [enabled, joinedCallID, state.localJoinedCallId, token]);
 
   return {
     state,

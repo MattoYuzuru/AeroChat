@@ -68,8 +68,14 @@ func (h *RTCHandler) StartCall(ctx context.Context, req *connect.Request[rtcv1.S
 		return nil, err
 	}
 
-	h.publishCallUpdate(ctx, req.Header(), response.Msg.Call)
-	h.publishParticipantUpdate(ctx, req.Header(), response.Msg.Call, response.Msg.SelfParticipant)
+	recipients, err := h.scopeRecipientUserIDs(ctx, req.Header(), response.Msg.Call.GetScope())
+	if err != nil {
+		h.logger.Warn("не удалось определить recipients для rtc start call событий", slog.String("error", err.Error()))
+		return response, nil
+	}
+
+	h.publishCallUpdate(recipients, response.Msg.Call)
+	h.publishParticipantUpdate(recipients, response.Msg.Call, response.Msg.SelfParticipant)
 
 	return response, nil
 }
@@ -80,8 +86,14 @@ func (h *RTCHandler) JoinCall(ctx context.Context, req *connect.Request[rtcv1.Jo
 		return nil, err
 	}
 
-	h.publishCallUpdate(ctx, req.Header(), response.Msg.Call)
-	h.publishParticipantUpdate(ctx, req.Header(), response.Msg.Call, response.Msg.SelfParticipant)
+	recipients, err := h.scopeRecipientUserIDs(ctx, req.Header(), response.Msg.Call.GetScope())
+	if err != nil {
+		h.logger.Warn("не удалось определить recipients для rtc join call событий", slog.String("error", err.Error()))
+		return response, nil
+	}
+
+	h.publishCallUpdate(recipients, response.Msg.Call)
+	h.publishParticipantUpdate(recipients, response.Msg.Call, response.Msg.SelfParticipant)
 
 	return response, nil
 }
@@ -92,8 +104,14 @@ func (h *RTCHandler) LeaveCall(ctx context.Context, req *connect.Request[rtcv1.L
 		return nil, err
 	}
 
-	h.publishParticipantUpdate(ctx, req.Header(), response.Msg.Call, response.Msg.SelfParticipant)
-	h.publishCallUpdate(ctx, req.Header(), response.Msg.Call)
+	recipients, err := h.scopeRecipientUserIDs(ctx, req.Header(), response.Msg.Call.GetScope())
+	if err != nil {
+		h.logger.Warn("не удалось определить recipients для rtc leave call событий", slog.String("error", err.Error()))
+		return response, nil
+	}
+
+	h.publishParticipantUpdate(recipients, response.Msg.Call, response.Msg.SelfParticipant)
+	h.publishCallUpdate(recipients, response.Msg.Call)
 
 	return response, nil
 }
@@ -104,16 +122,26 @@ func (h *RTCHandler) EndCall(ctx context.Context, req *connect.Request[rtcv1.End
 		return nil, err
 	}
 
-	for _, participant := range response.Msg.AffectedParticipants {
-		h.publishParticipantUpdate(ctx, req.Header(), response.Msg.Call, participant)
+	recipients, err := h.scopeRecipientUserIDs(ctx, req.Header(), response.Msg.Call.GetScope())
+	if err != nil {
+		h.logger.Warn("не удалось определить recipients для rtc end call событий", slog.String("error", err.Error()))
+		return response, nil
 	}
-	h.publishCallUpdate(ctx, req.Header(), response.Msg.Call)
+
+	for _, participant := range response.Msg.AffectedParticipants {
+		h.publishParticipantUpdate(recipients, response.Msg.Call, participant)
+	}
+	h.publishCallUpdate(recipients, response.Msg.Call)
 
 	return response, nil
 }
 
 func (h *RTCHandler) ListCallParticipants(ctx context.Context, req *connect.Request[rtcv1.ListCallParticipantsRequest]) (*connect.Response[rtcv1.ListCallParticipantsResponse], error) {
 	return forwardUnary(ctx, req, h.client.ListCallParticipants)
+}
+
+func (h *RTCHandler) TouchCallParticipant(ctx context.Context, req *connect.Request[rtcv1.TouchCallParticipantRequest]) (*connect.Response[rtcv1.TouchCallParticipantResponse], error) {
+	return forwardUnary(ctx, req, h.client.TouchCallParticipant)
 }
 
 func (h *RTCHandler) SendSignal(ctx context.Context, req *connect.Request[rtcv1.SendSignalRequest]) (*connect.Response[rtcv1.SendSignalResponse], error) {
@@ -129,26 +157,14 @@ func (h *RTCHandler) SendSignal(ctx context.Context, req *connect.Request[rtcv1.
 	return response, nil
 }
 
-func (h *RTCHandler) publishCallUpdate(ctx context.Context, header http.Header, call *rtcv1.Call) {
-	recipients, err := h.scopeRecipientUserIDs(ctx, header, call.GetScope())
-	if err != nil {
-		h.logger.Warn("не удалось определить recipients для rtc.call.updated", slog.String("error", err.Error()))
-		return
-	}
-
+func (h *RTCHandler) publishCallUpdate(recipients []string, call *rtcv1.Call) {
 	envelope := realtime.NewRTCCallUpdatedEnvelope(call)
 	for _, userID := range recipients {
 		h.realtimeHub.PublishToUser(userID, envelope)
 	}
 }
 
-func (h *RTCHandler) publishParticipantUpdate(ctx context.Context, header http.Header, call *rtcv1.Call, participant *rtcv1.CallParticipant) {
-	recipients, err := h.scopeRecipientUserIDs(ctx, header, call.GetScope())
-	if err != nil {
-		h.logger.Warn("не удалось определить recipients для rtc.participant.updated", slog.String("error", err.Error()))
-		return
-	}
-
+func (h *RTCHandler) publishParticipantUpdate(recipients []string, call *rtcv1.Call, participant *rtcv1.CallParticipant) {
 	envelope := realtime.NewRTCParticipantUpdatedEnvelope(call.GetId(), participant)
 	for _, userID := range recipients {
 		h.realtimeHub.PublishToUser(userID, envelope)

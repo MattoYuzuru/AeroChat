@@ -11,19 +11,20 @@ import (
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
 type Config struct {
-	DatabaseURL               string
-	HTTPAddress               string
-	LogLevel                  string
-	ShutdownTimeout           time.Duration
-	DatabaseBootstrapTimeout  time.Duration
-	DownstreamTimeout         time.Duration
-	IdentityBaseURL           string
-	ChatBaseURL               string
-	STUNServerURLs            []string
-	TURNServerURLs            []string
-	TURNAuthSecret            string
-	TURNUsernameTTL           time.Duration
-	MaxSignalPayloadSizeBytes int
+	DatabaseURL                   string
+	HTTPAddress                   string
+	LogLevel                      string
+	ShutdownTimeout               time.Duration
+	DatabaseBootstrapTimeout      time.Duration
+	DownstreamTimeout             time.Duration
+	IdentityBaseURL               string
+	ChatBaseURL                   string
+	STUNServerURLs                []string
+	TURNServerURLs                []string
+	TURNAuthSecret                string
+	TURNUsernameTTL               time.Duration
+	ActiveParticipantStaleTimeout time.Duration
+	MaxSignalPayloadSizeBytes     int
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -44,6 +45,10 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	activeParticipantStaleTimeout, err := lookupDuration("AERO_RTC_ACTIVE_PARTICIPANT_STALE_TIMEOUT", 75*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
 	identityBaseURL, err := lookupURL("AERO_IDENTITY_URL", "http://127.0.0.1:8081")
 	if err != nil {
 		return Config{}, err
@@ -61,19 +66,20 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	}
 
 	return Config{
-		DatabaseURL:               lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
-		HTTPAddress:               lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
-		LogLevel:                  lookupString("AERO_LOG_LEVEL", "info"),
-		ShutdownTimeout:           shutdownTimeout,
-		DatabaseBootstrapTimeout:  bootstrapTimeout,
-		DownstreamTimeout:         downstreamTimeout,
-		IdentityBaseURL:           identityBaseURL,
-		ChatBaseURL:               chatBaseURL,
-		STUNServerURLs:            lookupStringList("AERO_RTC_STUN_URLS", []string{"stun:stun.cloudflare.com:3478"}),
-		TURNServerURLs:            lookupStringList("AERO_RTC_TURN_URLS", nil),
-		TURNAuthSecret:            lookupString("AERO_RTC_TURN_AUTH_SECRET", ""),
-		TURNUsernameTTL:           turnUsernameTTL,
-		MaxSignalPayloadSizeBytes: maxSignalPayloadSizeBytes,
+		DatabaseURL:                   lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
+		HTTPAddress:                   lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
+		LogLevel:                      lookupString("AERO_LOG_LEVEL", "info"),
+		ShutdownTimeout:               shutdownTimeout,
+		DatabaseBootstrapTimeout:      bootstrapTimeout,
+		DownstreamTimeout:             downstreamTimeout,
+		IdentityBaseURL:               identityBaseURL,
+		ChatBaseURL:                   chatBaseURL,
+		STUNServerURLs:                lookupStringList("AERO_RTC_STUN_URLS", []string{"stun:stun.cloudflare.com:3478"}),
+		TURNServerURLs:                lookupStringList("AERO_RTC_TURN_URLS", nil),
+		TURNAuthSecret:                lookupString("AERO_RTC_TURN_AUTH_SECRET", ""),
+		TURNUsernameTTL:               turnUsernameTTL,
+		ActiveParticipantStaleTimeout: activeParticipantStaleTimeout,
+		MaxSignalPayloadSizeBytes:     maxSignalPayloadSizeBytes,
 	}, nil
 }
 
