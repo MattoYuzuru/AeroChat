@@ -7,6 +7,7 @@ interface DirectCallRTCEnvironment {
 }
 
 const defaultDirectCallIceServerURLs = ["stun:stun.cloudflare.com:3478"];
+const defaultDirectCallICECandidatePoolSize = 4;
 
 export function resolveDirectCallRTCConfiguration(
   environment: DirectCallRTCEnvironment,
@@ -21,10 +22,20 @@ export function buildDirectCallRTCConfiguration(
 ): RTCConfiguration {
   const configuredIceServers = normalizeGatewayIceServers(iceServers);
   if (configuredIceServers.length > 0) {
-    return { iceServers: configuredIceServers };
+    return {
+      bundlePolicy: "max-bundle",
+      iceCandidatePoolSize: defaultDirectCallICECandidatePoolSize,
+      iceServers: configuredIceServers,
+      rtcpMuxPolicy: "require",
+    };
   }
 
-  return { iceServers: resolveFallbackBrowserIceServers(environment) };
+  return {
+    bundlePolicy: "max-bundle",
+    iceCandidatePoolSize: defaultDirectCallICECandidatePoolSize,
+    iceServers: resolveFallbackBrowserIceServers(environment),
+    rtcpMuxPolicy: "require",
+  };
 }
 
 export const directCallRTCConfiguration = resolveDirectCallRTCConfiguration(

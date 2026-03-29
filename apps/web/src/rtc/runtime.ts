@@ -21,9 +21,17 @@ interface SessionDescriptionCapablePeerConnectionLike {
   pendingRemoteDescription?: RTCSessionDescriptionInit | null;
 }
 
-export interface DirectCallPeerFailureMarker {
+export interface DirectCallPeerRecoveryPlan {
   callId: string;
   remoteUserId: string;
+  attempts: number;
+  blockedUntilMs: number;
+}
+
+interface DirectCallPeerRecoveryOptions {
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+  maxAttempts?: number;
 }
 
 interface DirectCallPeerRuntimeInput {
@@ -92,14 +100,48 @@ export function hasMatchingRemoteSessionDescription(
   );
 }
 
-export function shouldBlockPeerRuntimeAfterFailure(
-  marker: DirectCallPeerFailureMarker | null,
+export function buildNextPeerRecoveryPlan(
+  previousPlan: DirectCallPeerRecoveryPlan | null,
   callId: string,
   remoteUserId: string,
+  nowMs: number,
+  options: DirectCallPeerRecoveryOptions = {},
+): DirectCallPeerRecoveryPlan | null {
+  const baseDelayMs = options.baseDelayMs ?? 1000;
+  const maxDelayMs = options.maxDelayMs ?? 5000;
+  const maxAttempts = options.maxAttempts ?? 4;
+  const isSamePeer =
+    previousPlan !== null &&
+    previousPlan.callId === callId &&
+    previousPlan.remoteUserId === remoteUserId;
+  const attempts = isSamePeer ? previousPlan.attempts + 1 : 1;
+
+  if (attempts > maxAttempts) {
+    return null;
+  }
+
+  const nextDelayMs = Math.min(baseDelayMs * 2 ** (attempts - 1), maxDelayMs);
+  return {
+    callId,
+    remoteUserId,
+    attempts,
+    blockedUntilMs: nowMs + nextDelayMs,
+  };
+}
+
+export function shouldDelayPeerRuntimeRecovery(
+  plan: DirectCallPeerRecoveryPlan | null,
+  callId: string,
+  remoteUserId: string,
+  nowMs: number,
 ): boolean {
-  if (marker === null) {
+  if (plan === null) {
     return false;
   }
 
-  return marker.callId === callId && marker.remoteUserId === remoteUserId;
+  return (
+    plan.callId === callId &&
+    plan.remoteUserId === remoteUserId &&
+    nowMs < plan.blockedUntilMs
+  );
 }

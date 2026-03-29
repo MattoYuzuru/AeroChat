@@ -17,10 +17,11 @@ import {
   type DirectCallAwarenessEntry,
   type DirectCallAwarenessState,
 } from "./awareness";
+import { runKeyedQueuedRefresh, runQueuedRefresh } from "./refresh";
 import { subscribeRealtimeEnvelopes, subscribeRealtimeLifecycleEvents } from "../realtime/events";
 import { parseRTCRealtimeEvent } from "./realtime";
 
-const refreshActiveCallsIntervalMs = 5000;
+const refreshActiveCallsIntervalMs = 15000;
 
 interface DirectCallAwarenessContextValue {
   state: DirectCallAwarenessState;
@@ -40,6 +41,12 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
     createInitialDirectCallAwarenessState,
   );
   const stateRef = useRef(state);
+  const fullRefreshControllerRef = useRef({
+    inFlight: null as Promise<void> | null,
+    queued: false,
+  });
+  const chatRefreshInFlightRef = useRef(new Map<string, Promise<void>>());
+  const chatRefreshQueuedRef = useRef(new Set<string>());
   const isPageVisible = usePageVisibility();
   const token = authState.status === "authenticated" ? authState.token : "";
 
@@ -64,49 +71,51 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
         return;
       }
 
-      if (showLoading) {
-        dispatch({ type: "full_sync_started" });
-      }
+      await runQueuedRefresh(fullRefreshControllerRef.current, async () => {
+        if (showLoading) {
+          dispatch({ type: "full_sync_started" });
+        }
 
-      try {
-        const chats = await gatewayClient.listDirectChats(token);
-        const activeEntries = (
-          await Promise.all<DirectCallAwarenessEntry | null>(
-            chats.map(async (chat) => {
-              const call = await gatewayClient.getActiveCall(token, {
-                kind: "direct",
-                directChatId: chat.id,
-              });
-              if (call === null || call.scope.kind !== "direct") {
-                return null;
-              }
+        try {
+          const chats = await gatewayClient.listDirectChats(token);
+          const activeEntries = (
+            await Promise.all<DirectCallAwarenessEntry | null>(
+              chats.map(async (chat) => {
+                const call = await gatewayClient.getActiveCall(token, {
+                  kind: "direct",
+                  directChatId: chat.id,
+                });
+                if (call === null || call.scope.kind !== "direct") {
+                  return null;
+                }
 
-              const participants = await gatewayClient.listCallParticipants(token, call.id);
-              return {
-                chat,
-                call,
-                participants,
-                syncStatus: "ready",
-                errorMessage: null,
-              };
-            }),
-          )
-        ).filter((entry): entry is DirectCallAwarenessEntry => entry !== null);
+                const participants = await gatewayClient.listCallParticipants(token, call.id);
+                return {
+                  chat,
+                  call,
+                  participants,
+                  syncStatus: "ready",
+                  errorMessage: null,
+                };
+              }),
+            )
+          ).filter((entry): entry is DirectCallAwarenessEntry => entry !== null);
 
-        dispatch({
-          type: "full_sync_succeeded",
-          chats,
-          activeEntries,
-        });
-      } catch (error) {
-        dispatch({
-          type: "full_sync_failed",
-          message: resolveProtectedError(
-            error,
-            "Не удалось обновить active direct calls из RTC control plane.",
-          ),
-        });
-      }
+          dispatch({
+            type: "full_sync_succeeded",
+            chats,
+            activeEntries,
+          });
+        } catch (error) {
+          dispatch({
+            type: "full_sync_failed",
+            message: resolveProtectedError(
+              error,
+              "Не удалось обновить active direct calls из RTC control plane.",
+            ),
+          });
+        }
+      });
     },
     [authState.status, resolveProtectedError, token],
   );
@@ -122,40 +131,58 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
         dispatch({ type: "full_sync_started" });
       }
 
-      try {
-        let chat = stateRef.current.chatsById[normalizedChatId] ?? null;
-        if (chat === null) {
-          const chats = await gatewayClient.listDirectChats(token);
-          chat = chats.find((item) => item.id === normalizedChatId) ?? null;
-        }
+      await runKeyedQueuedRefresh(
+        chatRefreshInFlightRef.current,
+        chatRefreshQueuedRef.current,
+        normalizedChatId,
+        async () => {
+          try {
+            let chat = stateRef.current.chatsById[normalizedChatId] ?? null;
+            if (chat === null) {
+              const chats = await gatewayClient.listDirectChats(token);
+              chat = chats.find((item) => item.id === normalizedChatId) ?? null;
+            }
 
-        const call = await gatewayClient.getActiveCall(token, {
-          kind: "direct",
-          directChatId: normalizedChatId,
-        });
-        const participants =
-          call === null ? [] : await gatewayClient.listCallParticipants(token, call.id);
+            const call = await gatewayClient.getActiveCall(token, {
+              kind: "direct",
+              directChatId: normalizedChatId,
+            });
+            const participants =
+              call === null ? [] : await gatewayClient.listCallParticipants(token, call.id);
 
-        dispatch({
-          type: "chat_sync_succeeded",
-          chat,
-          chatId: normalizedChatId,
-          call,
-          participants,
-        });
-      } catch (error) {
-        dispatch({
-          type: "chat_sync_failed",
-          chatId: normalizedChatId,
-          message: resolveProtectedError(
-            error,
-            "Не удалось обновить direct-call состояние для выбранного чата.",
-          ),
-        });
-      }
+            dispatch({
+              type: "chat_sync_succeeded",
+              chat,
+              chatId: normalizedChatId,
+              call,
+              participants,
+            });
+          } catch (error) {
+            dispatch({
+              type: "chat_sync_failed",
+              chatId: normalizedChatId,
+              message: resolveProtectedError(
+                error,
+                "Не удалось обновить direct-call состояние для выбранного чата.",
+              ),
+            });
+          }
+        },
+      );
     },
     [authState.status, resolveProtectedError, token],
   );
+
+  const refreshKnownActiveDirectCalls = useCallback(async () => {
+    const activeChatIds = Object.keys(stateRef.current.activeCallsByChatId);
+    if (activeChatIds.length === 0) {
+      return;
+    }
+
+    await Promise.all(
+      activeChatIds.map((chatId) => refreshDirectChatCall(chatId, false)),
+    );
+  }, [refreshDirectChatCall]);
 
   useEffect(() => {
     if (authState.status !== "authenticated") {
@@ -218,13 +245,13 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
     }
 
     const intervalId = window.setInterval(() => {
-      void refreshAllActiveDirectCalls(false);
+      void refreshKnownActiveDirectCalls();
     }, refreshActiveCallsIntervalMs);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [authState.status, isPageVisible, refreshAllActiveDirectCalls, state.activeCallsByChatId]);
+  }, [authState.status, isPageVisible, refreshKnownActiveDirectCalls, state.activeCallsByChatId]);
 
   const value: DirectCallAwarenessContextValue = {
     state,
