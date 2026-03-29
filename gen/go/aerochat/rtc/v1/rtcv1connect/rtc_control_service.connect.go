@@ -59,6 +59,9 @@ const (
 	// RtcControlServiceListCallParticipantsProcedure is the fully-qualified name of the
 	// RtcControlService's ListCallParticipants RPC.
 	RtcControlServiceListCallParticipantsProcedure = "/aerochat.rtc.v1.RtcControlService/ListCallParticipants"
+	// RtcControlServiceTouchCallParticipantProcedure is the fully-qualified name of the
+	// RtcControlService's TouchCallParticipant RPC.
+	RtcControlServiceTouchCallParticipantProcedure = "/aerochat.rtc.v1.RtcControlService/TouchCallParticipant"
 	// RtcControlServiceSendSignalProcedure is the fully-qualified name of the RtcControlService's
 	// SendSignal RPC.
 	RtcControlServiceSendSignalProcedure = "/aerochat.rtc.v1.RtcControlService/SendSignal"
@@ -75,6 +78,7 @@ type RtcControlServiceClient interface {
 	LeaveCall(context.Context, *connect.Request[v1.LeaveCallRequest]) (*connect.Response[v1.LeaveCallResponse], error)
 	EndCall(context.Context, *connect.Request[v1.EndCallRequest]) (*connect.Response[v1.EndCallResponse], error)
 	ListCallParticipants(context.Context, *connect.Request[v1.ListCallParticipantsRequest]) (*connect.Response[v1.ListCallParticipantsResponse], error)
+	TouchCallParticipant(context.Context, *connect.Request[v1.TouchCallParticipantRequest]) (*connect.Response[v1.TouchCallParticipantResponse], error)
 	SendSignal(context.Context, *connect.Request[v1.SendSignalRequest]) (*connect.Response[v1.SendSignalResponse], error)
 }
 
@@ -143,6 +147,12 @@ func NewRtcControlServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(rtcControlServiceMethods.ByName("ListCallParticipants")),
 			connect.WithClientOptions(opts...),
 		),
+		touchCallParticipant: connect.NewClient[v1.TouchCallParticipantRequest, v1.TouchCallParticipantResponse](
+			httpClient,
+			baseURL+RtcControlServiceTouchCallParticipantProcedure,
+			connect.WithSchema(rtcControlServiceMethods.ByName("TouchCallParticipant")),
+			connect.WithClientOptions(opts...),
+		),
 		sendSignal: connect.NewClient[v1.SendSignalRequest, v1.SendSignalResponse](
 			httpClient,
 			baseURL+RtcControlServiceSendSignalProcedure,
@@ -163,6 +173,7 @@ type rtcControlServiceClient struct {
 	leaveCall            *connect.Client[v1.LeaveCallRequest, v1.LeaveCallResponse]
 	endCall              *connect.Client[v1.EndCallRequest, v1.EndCallResponse]
 	listCallParticipants *connect.Client[v1.ListCallParticipantsRequest, v1.ListCallParticipantsResponse]
+	touchCallParticipant *connect.Client[v1.TouchCallParticipantRequest, v1.TouchCallParticipantResponse]
 	sendSignal           *connect.Client[v1.SendSignalRequest, v1.SendSignalResponse]
 }
 
@@ -211,6 +222,11 @@ func (c *rtcControlServiceClient) ListCallParticipants(ctx context.Context, req 
 	return c.listCallParticipants.CallUnary(ctx, req)
 }
 
+// TouchCallParticipant calls aerochat.rtc.v1.RtcControlService.TouchCallParticipant.
+func (c *rtcControlServiceClient) TouchCallParticipant(ctx context.Context, req *connect.Request[v1.TouchCallParticipantRequest]) (*connect.Response[v1.TouchCallParticipantResponse], error) {
+	return c.touchCallParticipant.CallUnary(ctx, req)
+}
+
 // SendSignal calls aerochat.rtc.v1.RtcControlService.SendSignal.
 func (c *rtcControlServiceClient) SendSignal(ctx context.Context, req *connect.Request[v1.SendSignalRequest]) (*connect.Response[v1.SendSignalResponse], error) {
 	return c.sendSignal.CallUnary(ctx, req)
@@ -227,6 +243,7 @@ type RtcControlServiceHandler interface {
 	LeaveCall(context.Context, *connect.Request[v1.LeaveCallRequest]) (*connect.Response[v1.LeaveCallResponse], error)
 	EndCall(context.Context, *connect.Request[v1.EndCallRequest]) (*connect.Response[v1.EndCallResponse], error)
 	ListCallParticipants(context.Context, *connect.Request[v1.ListCallParticipantsRequest]) (*connect.Response[v1.ListCallParticipantsResponse], error)
+	TouchCallParticipant(context.Context, *connect.Request[v1.TouchCallParticipantRequest]) (*connect.Response[v1.TouchCallParticipantResponse], error)
 	SendSignal(context.Context, *connect.Request[v1.SendSignalRequest]) (*connect.Response[v1.SendSignalResponse], error)
 }
 
@@ -291,6 +308,12 @@ func NewRtcControlServiceHandler(svc RtcControlServiceHandler, opts ...connect.H
 		connect.WithSchema(rtcControlServiceMethods.ByName("ListCallParticipants")),
 		connect.WithHandlerOptions(opts...),
 	)
+	rtcControlServiceTouchCallParticipantHandler := connect.NewUnaryHandler(
+		RtcControlServiceTouchCallParticipantProcedure,
+		svc.TouchCallParticipant,
+		connect.WithSchema(rtcControlServiceMethods.ByName("TouchCallParticipant")),
+		connect.WithHandlerOptions(opts...),
+	)
 	rtcControlServiceSendSignalHandler := connect.NewUnaryHandler(
 		RtcControlServiceSendSignalProcedure,
 		svc.SendSignal,
@@ -317,6 +340,8 @@ func NewRtcControlServiceHandler(svc RtcControlServiceHandler, opts ...connect.H
 			rtcControlServiceEndCallHandler.ServeHTTP(w, r)
 		case RtcControlServiceListCallParticipantsProcedure:
 			rtcControlServiceListCallParticipantsHandler.ServeHTTP(w, r)
+		case RtcControlServiceTouchCallParticipantProcedure:
+			rtcControlServiceTouchCallParticipantHandler.ServeHTTP(w, r)
 		case RtcControlServiceSendSignalProcedure:
 			rtcControlServiceSendSignalHandler.ServeHTTP(w, r)
 		default:
@@ -362,6 +387,10 @@ func (UnimplementedRtcControlServiceHandler) EndCall(context.Context, *connect.R
 
 func (UnimplementedRtcControlServiceHandler) ListCallParticipants(context.Context, *connect.Request[v1.ListCallParticipantsRequest]) (*connect.Response[v1.ListCallParticipantsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.ListCallParticipants is not implemented"))
+}
+
+func (UnimplementedRtcControlServiceHandler) TouchCallParticipant(context.Context, *connect.Request[v1.TouchCallParticipantRequest]) (*connect.Response[v1.TouchCallParticipantResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("aerochat.rtc.v1.RtcControlService.TouchCallParticipant is not implemented"))
 }
 
 func (UnimplementedRtcControlServiceHandler) SendSignal(context.Context, *connect.Request[v1.SendSignalRequest]) (*connect.Response[v1.SendSignalResponse], error) {

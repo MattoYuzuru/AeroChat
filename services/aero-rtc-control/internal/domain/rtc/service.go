@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const defaultActiveParticipantStaleTimeout = 75 * time.Second
+
 type Repository interface {
 	GetCallByID(context.Context, string) (*Call, error)
 	GetActiveCallByScope(context.Context, ConversationScope) (*Call, error)
@@ -34,13 +36,14 @@ type ScopeAuthorizer interface {
 }
 
 type Service struct {
-	repo                 Repository
-	authenticator        Authenticator
-	scopeAuthorizer      ScopeAuthorizer
-	iceServerProvider    ICEServerProvider
-	maxSignalPayloadSize int
-	now                  func() time.Time
-	newID                func() string
+	repo                          Repository
+	authenticator                 Authenticator
+	scopeAuthorizer               ScopeAuthorizer
+	iceServerProvider             ICEServerProvider
+	maxSignalPayloadSize          int
+	activeParticipantStaleTimeout time.Duration
+	now                           func() time.Time
+	newID                         func() string
 }
 
 func NewService(repo Repository, authenticator Authenticator, scopeAuthorizer ScopeAuthorizer, maxSignalPayloadSize int) *Service {
@@ -49,10 +52,11 @@ func NewService(repo Repository, authenticator Authenticator, scopeAuthorizer Sc
 	}
 
 	return &Service{
-		repo:                 repo,
-		authenticator:        authenticator,
-		scopeAuthorizer:      scopeAuthorizer,
-		maxSignalPayloadSize: maxSignalPayloadSize,
+		repo:                          repo,
+		authenticator:                 authenticator,
+		scopeAuthorizer:               scopeAuthorizer,
+		maxSignalPayloadSize:          maxSignalPayloadSize,
+		activeParticipantStaleTimeout: defaultActiveParticipantStaleTimeout,
 		now: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -64,6 +68,14 @@ func NewService(repo Repository, authenticator Authenticator, scopeAuthorizer Sc
 
 func (s *Service) WithICEServerProvider(provider ICEServerProvider) *Service {
 	s.iceServerProvider = provider
+	return s
+}
+
+func (s *Service) WithActiveParticipantStaleTimeout(timeout time.Duration) *Service {
+	if timeout > 0 {
+		s.activeParticipantStaleTimeout = timeout
+	}
+
 	return s
 }
 
@@ -89,8 +101,19 @@ func (s *Service) GetActiveCall(ctx context.Context, token string, scope Convers
 	if errors.Is(err, ErrNotFound) {
 		return nil, nil
 	}
+	if err != nil {
+		return nil, err
+	}
 
-	return call, err
+	call, err = s.refreshCallSnapshotAfterStalePrune(ctx, call, "", s.now())
+	if err != nil {
+		return nil, err
+	}
+	if call != nil && call.Status != CallStatusActive {
+		return nil, nil
+	}
+
+	return call, nil
 }
 
 func (s *Service) GetCall(ctx context.Context, token string, callID string) (*Call, error) {
@@ -108,6 +131,11 @@ func (s *Service) GetCall(ctx context.Context, token string, callID string) (*Ca
 		return nil, err
 	}
 
+	call, err = s.refreshCallSnapshotAfterStalePrune(ctx, call, "", s.now())
+	if err != nil {
+		return nil, err
+	}
+
 	return call, nil
 }
 
@@ -121,10 +149,21 @@ func (s *Service) StartCall(ctx context.Context, token string, scope Conversatio
 		return nil, nil, err
 	}
 
-	if _, err := s.repo.GetActiveCallByScope(ctx, access.Scope); err == nil {
-		return nil, nil, fmt.Errorf("%w: active call already exists for scope", ErrConflict)
+	existingCall, err := s.repo.GetActiveCallByScope(ctx, access.Scope)
+	if err == nil {
+		existingCall, err = s.refreshCallSnapshotAfterStalePrune(ctx, existingCall, user.ID, s.now())
+		if err != nil {
+			return nil, nil, err
+		}
+		if existingCall != nil && existingCall.Status == CallStatusActive {
+			return nil, nil, fmt.Errorf("%w: active call already exists for scope", ErrConflict)
+		}
 	} else if !errors.Is(err, ErrNotFound) {
 		return nil, nil, err
+	}
+
+	if existingCall != nil && existingCall.Status == CallStatusActive {
+		return nil, nil, fmt.Errorf("%w: active call already exists for scope", ErrConflict)
 	}
 
 	now := s.now()
@@ -164,6 +203,14 @@ func (s *Service) JoinCall(ctx context.Context, token string, callID string) (*C
 	call, user, _, err := s.authorizeCallForActiveParticipation(ctx, token, callID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	call, err = s.refreshCallSnapshotAfterStalePrune(ctx, call, user.ID, s.now())
+	if err != nil {
+		return nil, nil, err
+	}
+	if call == nil || call.Status != CallStatusActive {
+		return nil, nil, fmt.Errorf("%w: call is not active", ErrConflict)
 	}
 
 	existing, err := s.repo.GetActiveParticipant(ctx, call.ID, user.ID)
@@ -229,6 +276,18 @@ func (s *Service) ensureNoOtherActiveParticipation(ctx context.Context, userID s
 	if err != nil {
 		return err
 	}
+	if s.isParticipantStale(participation.Participant, s.now()) {
+		if _, err := s.leaveParticipantAndMaybeEndCall(
+			ctx,
+			participation.Call.ID,
+			participation.Participant.ID,
+			s.now(),
+		); err != nil {
+			return err
+		}
+
+		return nil
+	}
 	if allowedCallID != "" && participation.Call.ID == allowedCallID {
 		return nil
 	}
@@ -247,6 +306,18 @@ func (s *Service) resolveActiveParticipationConflict(ctx context.Context, userID
 	if err != nil {
 		return err
 	}
+	if s.isParticipantStale(participation.Participant, s.now()) {
+		if _, err := s.leaveParticipantAndMaybeEndCall(
+			ctx,
+			participation.Call.ID,
+			participation.Participant.ID,
+			s.now(),
+		); err != nil {
+			return err
+		}
+
+		return nil
+	}
 	if allowedCallID != "" && participation.Call.ID == allowedCallID {
 		return nil
 	}
@@ -257,10 +328,106 @@ func (s *Service) resolveActiveParticipationConflict(ctx context.Context, userID
 	}
 }
 
+func (s *Service) refreshCallSnapshotAfterStalePrune(
+	ctx context.Context,
+	call *Call,
+	preservedUserID string,
+	now time.Time,
+) (*Call, error) {
+	if call == nil || call.Status != CallStatusActive {
+		return call, nil
+	}
+
+	pruned, err := s.pruneStaleParticipantsForCall(ctx, call.ID, preservedUserID, now)
+	if err != nil {
+		return nil, err
+	}
+	if !pruned {
+		return call, nil
+	}
+
+	return s.repo.GetCallByID(ctx, call.ID)
+}
+
+func (s *Service) pruneStaleParticipantsForCall(
+	ctx context.Context,
+	callID string,
+	preservedUserID string,
+	now time.Time,
+) (bool, error) {
+	if s.activeParticipantStaleTimeout <= 0 {
+		return false, nil
+	}
+
+	participants, err := s.repo.ListActiveParticipants(ctx, callID)
+	if err != nil {
+		return false, err
+	}
+
+	pruned := false
+	for _, participant := range participants {
+		if participant.UserID == preservedUserID || !s.isParticipantStale(participant, now) {
+			continue
+		}
+
+		updated, leaveErr := s.leaveParticipantAndMaybeEndCall(ctx, callID, participant.ID, now)
+		if leaveErr != nil {
+			return false, leaveErr
+		}
+		if updated {
+			pruned = true
+		}
+	}
+
+	return pruned, nil
+}
+
+func (s *Service) leaveParticipantAndMaybeEndCall(
+	ctx context.Context,
+	callID string,
+	participantID string,
+	at time.Time,
+) (bool, error) {
+	updated, err := s.repo.LeaveParticipant(ctx, participantID, at)
+	if err != nil {
+		return false, err
+	}
+	if !updated {
+		return false, nil
+	}
+
+	activeCount, err := s.repo.CountActiveParticipants(ctx, callID)
+	if err != nil {
+		return false, err
+	}
+	if activeCount == 0 {
+		if _, err := s.repo.EndCall(ctx, callID, nil, CallEndReasonLastParticipant, at); err != nil {
+			return false, err
+		}
+	}
+
+	return true, nil
+}
+
+func (s *Service) isParticipantStale(participant CallParticipant, now time.Time) bool {
+	if s.activeParticipantStaleTimeout <= 0 || participant.State != ParticipantStateActive {
+		return false
+	}
+
+	return !participant.UpdatedAt.After(now.Add(-s.activeParticipantStaleTimeout))
+}
+
 func (s *Service) LeaveCall(ctx context.Context, token string, callID string) (*Call, *CallParticipant, error) {
 	call, user, _, err := s.authorizeCallView(ctx, token, callID)
 	if err != nil {
 		return nil, nil, err
+	}
+	call, err = s.refreshCallSnapshotAfterStalePrune(ctx, call, user.ID, s.now())
+	if err != nil {
+		return nil, nil, err
+	}
+	if call == nil || call.Status != CallStatusActive {
+		return nil, nil, fmt.Errorf("%w: call is not active", ErrConflict)
 	}
 
 	participant, err := s.repo.GetActiveParticipant(ctx, call.ID, user.ID)
@@ -269,7 +436,7 @@ func (s *Service) LeaveCall(ctx context.Context, token string, callID string) (*
 	}
 
 	now := s.now()
-	updated, err := s.repo.LeaveParticipant(ctx, participant.ID, now)
+	updated, err := s.leaveParticipantAndMaybeEndCall(ctx, call.ID, participant.ID, now)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -280,17 +447,6 @@ func (s *Service) LeaveCall(ctx context.Context, token string, callID string) (*
 	participant.State = ParticipantStateLeft
 	participant.LeftAt = &now
 	participant.UpdatedAt = now
-
-	activeCount, err := s.repo.CountActiveParticipants(ctx, call.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if activeCount == 0 {
-		if _, err := s.repo.EndCall(ctx, call.ID, nil, CallEndReasonLastParticipant, now); err != nil {
-			return nil, nil, err
-		}
-	}
 
 	call, err = s.repo.GetCallByID(ctx, call.ID)
 	if err != nil {
@@ -305,11 +461,15 @@ func (s *Service) EndCall(ctx context.Context, token string, callID string) (*Ca
 	if err != nil {
 		return nil, nil, err
 	}
+	call, err = s.refreshCallSnapshotAfterStalePrune(ctx, call, user.ID, s.now())
+	if err != nil {
+		return nil, nil, err
+	}
+	if call == nil || call.Status != CallStatusActive {
+		return nil, nil, fmt.Errorf("%w: call is not active", ErrConflict)
+	}
 	if call.CreatedByUserID != user.ID {
 		return nil, nil, fmt.Errorf("%w: only call creator can end call", ErrPermissionDenied)
-	}
-	if call.Status != CallStatusActive {
-		return nil, nil, fmt.Errorf("%w: call is not active", ErrConflict)
 	}
 
 	affected, err := s.repo.ListActiveParticipants(ctx, call.ID)
@@ -340,18 +500,63 @@ func (s *Service) EndCall(ctx context.Context, token string, callID string) (*Ca
 }
 
 func (s *Service) ListCallParticipants(ctx context.Context, token string, callID string) ([]CallParticipant, error) {
-	call, _, _, err := s.authorizeCallView(ctx, token, callID)
+	call, user, _, err := s.authorizeCallView(ctx, token, callID)
+	if err != nil {
+		return nil, err
+	}
+	call, err = s.refreshCallSnapshotAfterStalePrune(ctx, call, user.ID, s.now())
+	if err != nil {
+		return nil, err
+	}
+	if call == nil || call.Status != CallStatusActive {
+		return nil, nil
+	}
+
+	return s.repo.ListActiveParticipants(ctx, call.ID)
+}
+
+func (s *Service) TouchCallParticipant(ctx context.Context, token string, callID string) (*CallParticipant, error) {
+	call, user, _, err := s.authorizeCallForActiveParticipation(ctx, token, callID)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.repo.ListActiveParticipants(ctx, call.ID)
+	call, err = s.refreshCallSnapshotAfterStalePrune(ctx, call, user.ID, s.now())
+	if err != nil {
+		return nil, err
+	}
+	if call == nil || call.Status != CallStatusActive {
+		return nil, fmt.Errorf("%w: call is not active", ErrConflict)
+	}
+
+	participant, err := s.repo.GetActiveParticipant(ctx, call.ID, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	// Heartbeat reuse существующий touch path, чтобы хранить единый activity timestamp без новой persistence schema.
+	if err := s.repo.TouchParticipantSignal(ctx, participant.ID, now); err != nil {
+		return nil, err
+	}
+
+	participant.UpdatedAt = now
+	participant.LastSignalAt = &now
+
+	return participant, nil
 }
 
 func (s *Service) SendSignal(ctx context.Context, token string, callID string, targetUserID string, signalType string, payload []byte) (*SignalEnvelope, error) {
 	call, user, _, err := s.authorizeCallForActiveParticipation(ctx, token, callID)
 	if err != nil {
 		return nil, err
+	}
+	call, err = s.refreshCallSnapshotAfterStalePrune(ctx, call, user.ID, s.now())
+	if err != nil {
+		return nil, err
+	}
+	if call == nil || call.Status != CallStatusActive {
+		return nil, fmt.Errorf("%w: call is not active", ErrConflict)
 	}
 
 	targetUserID, err = normalizeID(targetUserID, "target_user_id")

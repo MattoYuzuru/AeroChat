@@ -1515,6 +1515,94 @@ func (x *ListCallParticipantsResponse) GetParticipants() []*CallParticipant {
 	return nil
 }
 
+type TouchCallParticipantRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TouchCallParticipantRequest) Reset() {
+	*x = TouchCallParticipantRequest{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TouchCallParticipantRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TouchCallParticipantRequest) ProtoMessage() {}
+
+func (x *TouchCallParticipantRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TouchCallParticipantRequest.ProtoReflect.Descriptor instead.
+func (*TouchCallParticipantRequest) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *TouchCallParticipantRequest) GetCallId() string {
+	if x != nil {
+		return x.CallId
+	}
+	return ""
+}
+
+type TouchCallParticipantResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	SelfParticipant *CallParticipant       `protobuf:"bytes,1,opt,name=self_participant,json=selfParticipant,proto3" json:"self_participant,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *TouchCallParticipantResponse) Reset() {
+	*x = TouchCallParticipantResponse{}
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TouchCallParticipantResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TouchCallParticipantResponse) ProtoMessage() {}
+
+func (x *TouchCallParticipantResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TouchCallParticipantResponse.ProtoReflect.Descriptor instead.
+func (*TouchCallParticipantResponse) Descriptor() ([]byte, []int) {
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *TouchCallParticipantResponse) GetSelfParticipant() *CallParticipant {
+	if x != nil {
+		return x.SelfParticipant
+	}
+	return nil
+}
+
 type SendSignalRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CallId        string                 `protobuf:"bytes,1,opt,name=call_id,json=callId,proto3" json:"call_id,omitempty"`
@@ -1527,7 +1615,7 @@ type SendSignalRequest struct {
 
 func (x *SendSignalRequest) Reset() {
 	*x = SendSignalRequest{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[23]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1539,7 +1627,7 @@ func (x *SendSignalRequest) String() string {
 func (*SendSignalRequest) ProtoMessage() {}
 
 func (x *SendSignalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[23]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1552,7 +1640,7 @@ func (x *SendSignalRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendSignalRequest.ProtoReflect.Descriptor instead.
 func (*SendSignalRequest) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{23}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SendSignalRequest) GetCallId() string {
@@ -1592,7 +1680,7 @@ type SendSignalResponse struct {
 
 func (x *SendSignalResponse) Reset() {
 	*x = SendSignalResponse{}
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[24]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1604,7 +1692,7 @@ func (x *SendSignalResponse) String() string {
 func (*SendSignalResponse) ProtoMessage() {}
 
 func (x *SendSignalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[24]
+	mi := &file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1617,7 +1705,7 @@ func (x *SendSignalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendSignalResponse.ProtoReflect.Descriptor instead.
 func (*SendSignalResponse) Descriptor() ([]byte, []int) {
-	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{24}
+	return file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SendSignalResponse) GetSignal() *SignalEnvelope {
@@ -1718,7 +1806,11 @@ const file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc = "" +
 	"\x1bListCallParticipantsRequest\x12\x17\n" +
 	"\acall_id\x18\x01 \x01(\tR\x06callId\"d\n" +
 	"\x1cListCallParticipantsResponse\x12D\n" +
-	"\fparticipants\x18\x01 \x03(\v2 .aerochat.rtc.v1.CallParticipantR\fparticipants\"\xa5\x01\n" +
+	"\fparticipants\x18\x01 \x03(\v2 .aerochat.rtc.v1.CallParticipantR\fparticipants\"6\n" +
+	"\x1bTouchCallParticipantRequest\x12\x17\n" +
+	"\acall_id\x18\x01 \x01(\tR\x06callId\"k\n" +
+	"\x1cTouchCallParticipantResponse\x12K\n" +
+	"\x10self_participant\x18\x01 \x01(\v2 .aerochat.rtc.v1.CallParticipantR\x0fselfParticipant\"\xa5\x01\n" +
 	"\x11SendSignalRequest\x12\x17\n" +
 	"\acall_id\x18\x01 \x01(\tR\x06callId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x127\n" +
@@ -1747,7 +1839,7 @@ const file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc = "" +
 	" SIGNAL_ENVELOPE_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aSIGNAL_ENVELOPE_TYPE_OFFER\x10\x01\x12\x1f\n" +
 	"\x1bSIGNAL_ENVELOPE_TYPE_ANSWER\x10\x02\x12&\n" +
-	"\"SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE\x10\x032\xf9\x06\n" +
+	"\"SIGNAL_ENVELOPE_TYPE_ICE_CANDIDATE\x10\x032\xee\a\n" +
 	"\x11RtcControlService\x12C\n" +
 	"\x04Ping\x12\x1c.aerochat.rtc.v1.PingRequest\x1a\x1d.aerochat.rtc.v1.PingResponse\x12^\n" +
 	"\rGetIceServers\x12%.aerochat.rtc.v1.GetIceServersRequest\x1a&.aerochat.rtc.v1.GetIceServersResponse\x12^\n" +
@@ -1757,7 +1849,8 @@ const file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc = "" +
 	"\bJoinCall\x12 .aerochat.rtc.v1.JoinCallRequest\x1a!.aerochat.rtc.v1.JoinCallResponse\x12R\n" +
 	"\tLeaveCall\x12!.aerochat.rtc.v1.LeaveCallRequest\x1a\".aerochat.rtc.v1.LeaveCallResponse\x12L\n" +
 	"\aEndCall\x12\x1f.aerochat.rtc.v1.EndCallRequest\x1a .aerochat.rtc.v1.EndCallResponse\x12s\n" +
-	"\x14ListCallParticipants\x12,.aerochat.rtc.v1.ListCallParticipantsRequest\x1a-.aerochat.rtc.v1.ListCallParticipantsResponse\x12U\n" +
+	"\x14ListCallParticipants\x12,.aerochat.rtc.v1.ListCallParticipantsRequest\x1a-.aerochat.rtc.v1.ListCallParticipantsResponse\x12s\n" +
+	"\x14TouchCallParticipant\x12,.aerochat.rtc.v1.TouchCallParticipantRequest\x1a-.aerochat.rtc.v1.TouchCallParticipantResponse\x12U\n" +
 	"\n" +
 	"SendSignal\x12\".aerochat.rtc.v1.SendSignalRequest\x1a#.aerochat.rtc.v1.SendSignalResponseB>Z<github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1;rtcv1b\x06proto3"
 
@@ -1774,7 +1867,7 @@ func file_aerochat_rtc_v1_rtc_control_service_proto_rawDescGZIP() []byte {
 }
 
 var file_aerochat_rtc_v1_rtc_control_service_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_aerochat_rtc_v1_rtc_control_service_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_aerochat_rtc_v1_rtc_control_service_proto_goTypes = []any{
 	(ConversationScopeType)(0),           // 0: aerochat.rtc.v1.ConversationScopeType
 	(CallStatus)(0),                      // 1: aerochat.rtc.v1.CallStatus
@@ -1804,29 +1897,31 @@ var file_aerochat_rtc_v1_rtc_control_service_proto_goTypes = []any{
 	(*EndCallResponse)(nil),              // 25: aerochat.rtc.v1.EndCallResponse
 	(*ListCallParticipantsRequest)(nil),  // 26: aerochat.rtc.v1.ListCallParticipantsRequest
 	(*ListCallParticipantsResponse)(nil), // 27: aerochat.rtc.v1.ListCallParticipantsResponse
-	(*SendSignalRequest)(nil),            // 28: aerochat.rtc.v1.SendSignalRequest
-	(*SendSignalResponse)(nil),           // 29: aerochat.rtc.v1.SendSignalResponse
-	(*v1.ServiceMeta)(nil),               // 30: aerochat.common.v1.ServiceMeta
-	(*timestamppb.Timestamp)(nil),        // 31: google.protobuf.Timestamp
+	(*TouchCallParticipantRequest)(nil),  // 28: aerochat.rtc.v1.TouchCallParticipantRequest
+	(*TouchCallParticipantResponse)(nil), // 29: aerochat.rtc.v1.TouchCallParticipantResponse
+	(*SendSignalRequest)(nil),            // 30: aerochat.rtc.v1.SendSignalRequest
+	(*SendSignalResponse)(nil),           // 31: aerochat.rtc.v1.SendSignalResponse
+	(*v1.ServiceMeta)(nil),               // 32: aerochat.common.v1.ServiceMeta
+	(*timestamppb.Timestamp)(nil),        // 33: google.protobuf.Timestamp
 }
 var file_aerochat_rtc_v1_rtc_control_service_proto_depIdxs = []int32{
-	30, // 0: aerochat.rtc.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
+	32, // 0: aerochat.rtc.v1.PingResponse.service:type_name -> aerochat.common.v1.ServiceMeta
 	0,  // 1: aerochat.rtc.v1.ConversationScope.type:type_name -> aerochat.rtc.v1.ConversationScopeType
 	7,  // 2: aerochat.rtc.v1.Call.scope:type_name -> aerochat.rtc.v1.ConversationScope
 	1,  // 3: aerochat.rtc.v1.Call.status:type_name -> aerochat.rtc.v1.CallStatus
-	31, // 4: aerochat.rtc.v1.Call.created_at:type_name -> google.protobuf.Timestamp
-	31, // 5: aerochat.rtc.v1.Call.updated_at:type_name -> google.protobuf.Timestamp
-	31, // 6: aerochat.rtc.v1.Call.started_at:type_name -> google.protobuf.Timestamp
-	31, // 7: aerochat.rtc.v1.Call.ended_at:type_name -> google.protobuf.Timestamp
+	33, // 4: aerochat.rtc.v1.Call.created_at:type_name -> google.protobuf.Timestamp
+	33, // 5: aerochat.rtc.v1.Call.updated_at:type_name -> google.protobuf.Timestamp
+	33, // 6: aerochat.rtc.v1.Call.started_at:type_name -> google.protobuf.Timestamp
+	33, // 7: aerochat.rtc.v1.Call.ended_at:type_name -> google.protobuf.Timestamp
 	2,  // 8: aerochat.rtc.v1.Call.end_reason:type_name -> aerochat.rtc.v1.CallEndReason
 	3,  // 9: aerochat.rtc.v1.CallParticipant.state:type_name -> aerochat.rtc.v1.ParticipantState
-	31, // 10: aerochat.rtc.v1.CallParticipant.joined_at:type_name -> google.protobuf.Timestamp
-	31, // 11: aerochat.rtc.v1.CallParticipant.left_at:type_name -> google.protobuf.Timestamp
-	31, // 12: aerochat.rtc.v1.CallParticipant.updated_at:type_name -> google.protobuf.Timestamp
-	31, // 13: aerochat.rtc.v1.CallParticipant.last_signal_at:type_name -> google.protobuf.Timestamp
+	33, // 10: aerochat.rtc.v1.CallParticipant.joined_at:type_name -> google.protobuf.Timestamp
+	33, // 11: aerochat.rtc.v1.CallParticipant.left_at:type_name -> google.protobuf.Timestamp
+	33, // 12: aerochat.rtc.v1.CallParticipant.updated_at:type_name -> google.protobuf.Timestamp
+	33, // 13: aerochat.rtc.v1.CallParticipant.last_signal_at:type_name -> google.protobuf.Timestamp
 	4,  // 14: aerochat.rtc.v1.SignalEnvelope.type:type_name -> aerochat.rtc.v1.SignalEnvelopeType
-	31, // 15: aerochat.rtc.v1.SignalEnvelope.created_at:type_name -> google.protobuf.Timestamp
-	31, // 16: aerochat.rtc.v1.IceServer.expires_at:type_name -> google.protobuf.Timestamp
+	33, // 15: aerochat.rtc.v1.SignalEnvelope.created_at:type_name -> google.protobuf.Timestamp
+	33, // 16: aerochat.rtc.v1.IceServer.expires_at:type_name -> google.protobuf.Timestamp
 	11, // 17: aerochat.rtc.v1.GetIceServersResponse.ice_servers:type_name -> aerochat.rtc.v1.IceServer
 	7,  // 18: aerochat.rtc.v1.GetActiveCallRequest.scope:type_name -> aerochat.rtc.v1.ConversationScope
 	8,  // 19: aerochat.rtc.v1.GetActiveCallResponse.call:type_name -> aerochat.rtc.v1.Call
@@ -1841,33 +1936,36 @@ var file_aerochat_rtc_v1_rtc_control_service_proto_depIdxs = []int32{
 	8,  // 28: aerochat.rtc.v1.EndCallResponse.call:type_name -> aerochat.rtc.v1.Call
 	9,  // 29: aerochat.rtc.v1.EndCallResponse.affected_participants:type_name -> aerochat.rtc.v1.CallParticipant
 	9,  // 30: aerochat.rtc.v1.ListCallParticipantsResponse.participants:type_name -> aerochat.rtc.v1.CallParticipant
-	4,  // 31: aerochat.rtc.v1.SendSignalRequest.type:type_name -> aerochat.rtc.v1.SignalEnvelopeType
-	10, // 32: aerochat.rtc.v1.SendSignalResponse.signal:type_name -> aerochat.rtc.v1.SignalEnvelope
-	5,  // 33: aerochat.rtc.v1.RtcControlService.Ping:input_type -> aerochat.rtc.v1.PingRequest
-	12, // 34: aerochat.rtc.v1.RtcControlService.GetIceServers:input_type -> aerochat.rtc.v1.GetIceServersRequest
-	14, // 35: aerochat.rtc.v1.RtcControlService.GetActiveCall:input_type -> aerochat.rtc.v1.GetActiveCallRequest
-	16, // 36: aerochat.rtc.v1.RtcControlService.GetCall:input_type -> aerochat.rtc.v1.GetCallRequest
-	18, // 37: aerochat.rtc.v1.RtcControlService.StartCall:input_type -> aerochat.rtc.v1.StartCallRequest
-	20, // 38: aerochat.rtc.v1.RtcControlService.JoinCall:input_type -> aerochat.rtc.v1.JoinCallRequest
-	22, // 39: aerochat.rtc.v1.RtcControlService.LeaveCall:input_type -> aerochat.rtc.v1.LeaveCallRequest
-	24, // 40: aerochat.rtc.v1.RtcControlService.EndCall:input_type -> aerochat.rtc.v1.EndCallRequest
-	26, // 41: aerochat.rtc.v1.RtcControlService.ListCallParticipants:input_type -> aerochat.rtc.v1.ListCallParticipantsRequest
-	28, // 42: aerochat.rtc.v1.RtcControlService.SendSignal:input_type -> aerochat.rtc.v1.SendSignalRequest
-	6,  // 43: aerochat.rtc.v1.RtcControlService.Ping:output_type -> aerochat.rtc.v1.PingResponse
-	13, // 44: aerochat.rtc.v1.RtcControlService.GetIceServers:output_type -> aerochat.rtc.v1.GetIceServersResponse
-	15, // 45: aerochat.rtc.v1.RtcControlService.GetActiveCall:output_type -> aerochat.rtc.v1.GetActiveCallResponse
-	17, // 46: aerochat.rtc.v1.RtcControlService.GetCall:output_type -> aerochat.rtc.v1.GetCallResponse
-	19, // 47: aerochat.rtc.v1.RtcControlService.StartCall:output_type -> aerochat.rtc.v1.StartCallResponse
-	21, // 48: aerochat.rtc.v1.RtcControlService.JoinCall:output_type -> aerochat.rtc.v1.JoinCallResponse
-	23, // 49: aerochat.rtc.v1.RtcControlService.LeaveCall:output_type -> aerochat.rtc.v1.LeaveCallResponse
-	25, // 50: aerochat.rtc.v1.RtcControlService.EndCall:output_type -> aerochat.rtc.v1.EndCallResponse
-	27, // 51: aerochat.rtc.v1.RtcControlService.ListCallParticipants:output_type -> aerochat.rtc.v1.ListCallParticipantsResponse
-	29, // 52: aerochat.rtc.v1.RtcControlService.SendSignal:output_type -> aerochat.rtc.v1.SendSignalResponse
-	43, // [43:53] is the sub-list for method output_type
-	33, // [33:43] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	9,  // 31: aerochat.rtc.v1.TouchCallParticipantResponse.self_participant:type_name -> aerochat.rtc.v1.CallParticipant
+	4,  // 32: aerochat.rtc.v1.SendSignalRequest.type:type_name -> aerochat.rtc.v1.SignalEnvelopeType
+	10, // 33: aerochat.rtc.v1.SendSignalResponse.signal:type_name -> aerochat.rtc.v1.SignalEnvelope
+	5,  // 34: aerochat.rtc.v1.RtcControlService.Ping:input_type -> aerochat.rtc.v1.PingRequest
+	12, // 35: aerochat.rtc.v1.RtcControlService.GetIceServers:input_type -> aerochat.rtc.v1.GetIceServersRequest
+	14, // 36: aerochat.rtc.v1.RtcControlService.GetActiveCall:input_type -> aerochat.rtc.v1.GetActiveCallRequest
+	16, // 37: aerochat.rtc.v1.RtcControlService.GetCall:input_type -> aerochat.rtc.v1.GetCallRequest
+	18, // 38: aerochat.rtc.v1.RtcControlService.StartCall:input_type -> aerochat.rtc.v1.StartCallRequest
+	20, // 39: aerochat.rtc.v1.RtcControlService.JoinCall:input_type -> aerochat.rtc.v1.JoinCallRequest
+	22, // 40: aerochat.rtc.v1.RtcControlService.LeaveCall:input_type -> aerochat.rtc.v1.LeaveCallRequest
+	24, // 41: aerochat.rtc.v1.RtcControlService.EndCall:input_type -> aerochat.rtc.v1.EndCallRequest
+	26, // 42: aerochat.rtc.v1.RtcControlService.ListCallParticipants:input_type -> aerochat.rtc.v1.ListCallParticipantsRequest
+	28, // 43: aerochat.rtc.v1.RtcControlService.TouchCallParticipant:input_type -> aerochat.rtc.v1.TouchCallParticipantRequest
+	30, // 44: aerochat.rtc.v1.RtcControlService.SendSignal:input_type -> aerochat.rtc.v1.SendSignalRequest
+	6,  // 45: aerochat.rtc.v1.RtcControlService.Ping:output_type -> aerochat.rtc.v1.PingResponse
+	13, // 46: aerochat.rtc.v1.RtcControlService.GetIceServers:output_type -> aerochat.rtc.v1.GetIceServersResponse
+	15, // 47: aerochat.rtc.v1.RtcControlService.GetActiveCall:output_type -> aerochat.rtc.v1.GetActiveCallResponse
+	17, // 48: aerochat.rtc.v1.RtcControlService.GetCall:output_type -> aerochat.rtc.v1.GetCallResponse
+	19, // 49: aerochat.rtc.v1.RtcControlService.StartCall:output_type -> aerochat.rtc.v1.StartCallResponse
+	21, // 50: aerochat.rtc.v1.RtcControlService.JoinCall:output_type -> aerochat.rtc.v1.JoinCallResponse
+	23, // 51: aerochat.rtc.v1.RtcControlService.LeaveCall:output_type -> aerochat.rtc.v1.LeaveCallResponse
+	25, // 52: aerochat.rtc.v1.RtcControlService.EndCall:output_type -> aerochat.rtc.v1.EndCallResponse
+	27, // 53: aerochat.rtc.v1.RtcControlService.ListCallParticipants:output_type -> aerochat.rtc.v1.ListCallParticipantsResponse
+	29, // 54: aerochat.rtc.v1.RtcControlService.TouchCallParticipant:output_type -> aerochat.rtc.v1.TouchCallParticipantResponse
+	31, // 55: aerochat.rtc.v1.RtcControlService.SendSignal:output_type -> aerochat.rtc.v1.SendSignalResponse
+	45, // [45:56] is the sub-list for method output_type
+	34, // [34:45] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_aerochat_rtc_v1_rtc_control_service_proto_init() }
@@ -1881,7 +1979,7 @@ func file_aerochat_rtc_v1_rtc_control_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc), len(file_aerochat_rtc_v1_rtc_control_service_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

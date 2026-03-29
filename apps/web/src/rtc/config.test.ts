@@ -7,11 +7,14 @@ import {
 describe("resolveDirectCallRTCConfiguration", () => {
   it("falls back to the default STUN server when env is empty", () => {
     expect(resolveDirectCallRTCConfiguration({})).toEqual({
+      bundlePolicy: "max-bundle",
+      iceCandidatePoolSize: 4,
       iceServers: [
         {
           urls: ["stun:stun.cloudflare.com:3478"],
         },
       ],
+      rtcpMuxPolicy: "require",
     });
   });
 
@@ -22,11 +25,14 @@ describe("resolveDirectCallRTCConfiguration", () => {
           "stun:stun.cloudflare.com:3478, turns:turn.example.com:5349",
       }),
     ).toEqual({
+      bundlePolicy: "max-bundle",
+      iceCandidatePoolSize: 4,
       iceServers: [
         {
           urls: ["stun:stun.cloudflare.com:3478", "turns:turn.example.com:5349"],
         },
       ],
+      rtcpMuxPolicy: "require",
     });
   });
 
@@ -38,6 +44,8 @@ describe("resolveDirectCallRTCConfiguration", () => {
         VITE_RTC_TURN_CREDENTIAL: "secret",
       }),
     ).toEqual({
+      bundlePolicy: "max-bundle",
+      iceCandidatePoolSize: 4,
       iceServers: [
         {
           urls: ["turns:turn.example.com:5349"],
@@ -45,6 +53,7 @@ describe("resolveDirectCallRTCConfiguration", () => {
           credential: "secret",
         },
       ],
+      rtcpMuxPolicy: "require",
     });
   });
 
@@ -55,11 +64,14 @@ describe("resolveDirectCallRTCConfiguration", () => {
         VITE_RTC_TURN_USERNAME: "aerochat",
       }),
     ).toEqual({
+      bundlePolicy: "max-bundle",
+      iceCandidatePoolSize: 4,
       iceServers: [
         {
           urls: ["turns:turn.example.com:5349"],
         },
       ],
+      rtcpMuxPolicy: "require",
     });
   });
 
@@ -83,6 +95,8 @@ describe("resolveDirectCallRTCConfiguration", () => {
         },
       ]),
     ).toEqual({
+      bundlePolicy: "max-bundle",
+      iceCandidatePoolSize: 4,
       iceServers: [
         {
           urls: ["stun:stun.aerochat.example:3478"],
@@ -96,6 +110,7 @@ describe("resolveDirectCallRTCConfiguration", () => {
           credential: "signed-secret",
         },
       ],
+      rtcpMuxPolicy: "require",
     });
   });
 
@@ -115,11 +130,14 @@ describe("resolveDirectCallRTCConfiguration", () => {
         },
       ),
     ).toEqual({
+      bundlePolicy: "max-bundle",
+      iceCandidatePoolSize: 4,
       iceServers: [
         {
           urls: ["stun:stun.cloudflare.com:3478"],
         },
       ],
+      rtcpMuxPolicy: "require",
     });
   });
 });

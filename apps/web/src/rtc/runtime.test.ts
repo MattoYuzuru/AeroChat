@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildNextPeerRecoveryPlan,
   flushPendingRemoteICECandidates,
   hasMatchingRemoteSessionDescription,
   queueOrApplyRemoteICECandidate,
-  shouldBlockPeerRuntimeAfterFailure,
+  shouldDelayPeerRuntimeRecovery,
   stopMediaStreamTracks,
   teardownDirectCallPeerRuntime,
   teardownDirectCallRuntime,
@@ -140,38 +141,78 @@ describe("rtc runtime cleanup helpers", () => {
     ).toBe(false);
   });
 
-  it("blocks peer runtime restart for the same failed call and remote user", () => {
+  it("builds an exponential backoff recovery plan for the same peer", () => {
+    const firstPlan = buildNextPeerRecoveryPlan(null, "call-1", "user-2", 1_000);
+    const secondPlan = buildNextPeerRecoveryPlan(firstPlan, "call-1", "user-2", 2_000);
+
+    expect(firstPlan).toEqual({
+      attempts: 1,
+      blockedUntilMs: 2_000,
+      callId: "call-1",
+      remoteUserId: "user-2",
+    });
+    expect(secondPlan).toEqual({
+      attempts: 2,
+      blockedUntilMs: 4_000,
+      callId: "call-1",
+      remoteUserId: "user-2",
+    });
+  });
+
+  it("stops automatic recovery after the configured attempt budget", () => {
     expect(
-      shouldBlockPeerRuntimeAfterFailure(
+      buildNextPeerRecoveryPlan(
         {
+          attempts: 4,
+          blockedUntilMs: 10_000,
           callId: "call-1",
           remoteUserId: "user-2",
         },
         "call-1",
         "user-2",
+        11_000,
       ),
-    ).toBe(true);
+    ).toBeNull();
   });
 
-  it("allows peer runtime restart when call or remote user changes", () => {
+  it("delays peer runtime recovery only while the matching plan is still cooling down", () => {
     expect(
-      shouldBlockPeerRuntimeAfterFailure(
+      shouldDelayPeerRuntimeRecovery(
         {
+          attempts: 2,
+          blockedUntilMs: 5_000,
+          callId: "call-1",
+          remoteUserId: "user-2",
+        },
+        "call-1",
+        "user-2",
+        4_500,
+      ),
+    ).toBe(true);
+    expect(
+      shouldDelayPeerRuntimeRecovery(
+        {
+          attempts: 2,
+          blockedUntilMs: 5_000,
           callId: "call-1",
           remoteUserId: "user-2",
         },
         "call-2",
         "user-2",
+        4_500,
       ),
     ).toBe(false);
     expect(
-      shouldBlockPeerRuntimeAfterFailure(
+      shouldDelayPeerRuntimeRecovery(
         {
+          attempts: 2,
+          blockedUntilMs: 5_000,
           callId: "call-1",
           remoteUserId: "user-2",
         },
         "call-1",
-        "user-3",
+        "user-2",
+        5_000,
       ),
     ).toBe(false);
   });

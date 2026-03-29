@@ -1119,6 +1119,7 @@ function createGatewayClient(overrides: Partial<GatewayClient>): GatewayClient {
     leaveCall: vi.fn(),
     endCall: vi.fn(),
     listCallParticipants: vi.fn(),
+    touchCallParticipant: vi.fn(),
     sendRtcSignal: vi.fn(),
     markDirectChatRead: vi.fn(),
     markEncryptedDirectChatRead: vi.fn(),

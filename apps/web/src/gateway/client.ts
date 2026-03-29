@@ -727,6 +727,10 @@ interface ListCallParticipantsResponseWire {
   participants?: RtcCallParticipantWire[];
 }
 
+interface TouchCallParticipantResponseWire {
+  selfParticipant?: RtcCallParticipantWire;
+}
+
 interface SendSignalResponseWire {
   signal?: RtcSignalEnvelopeWire;
 }
@@ -1802,6 +1806,21 @@ export function createGatewayClient(
       );
 
       return (response.participants ?? []).map(normalizeRtcCallParticipant);
+    },
+
+    async touchCallParticipant(token, callId) {
+      const response = await unaryCall<TouchCallParticipantResponseWire>(
+        fetchImpl,
+        baseUrl,
+        rtcServicePath,
+        "TouchCallParticipant",
+        {
+          callId: callId.trim(),
+        },
+        token,
+      );
+
+      return normalizeRtcCallParticipant(response.selfParticipant);
     },
 
     async sendRtcSignal(token, input) {

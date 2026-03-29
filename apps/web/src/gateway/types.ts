@@ -1000,6 +1000,7 @@ export interface GatewayClient {
     affectedParticipants: RtcCallParticipant[];
   }>;
   listCallParticipants(token: string, callId: string): Promise<RtcCallParticipant[]>;
+  touchCallParticipant(token: string, callId: string): Promise<RtcCallParticipant>;
   sendRtcSignal(
     token: string,
     input: {

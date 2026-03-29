@@ -2340,6 +2340,55 @@ describe("createGatewayClient", () => {
     );
   });
 
+  it("touches rtc participant heartbeat through gateway rtc endpoint", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          selfParticipant: {
+            id: "participant-1",
+            callId: "call-1",
+            userId: "user-1",
+            state: "PARTICIPANT_STATE_ACTIVE",
+            joinedAt: "2026-03-29T12:00:00Z",
+            updatedAt: "2026-03-29T12:00:20Z",
+            lastSignalAt: "2026-03-29T12:00:20Z",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+    const client = createGatewayClient(fetchMock, "/api");
+
+    const result = await client.touchCallParticipant("token-1", "call-1");
+
+    expect(result).toEqual({
+      id: "participant-1",
+      callId: "call-1",
+      userId: "user-1",
+      state: "active",
+      joinedAt: "2026-03-29T12:00:00Z",
+      leftAt: null,
+      updatedAt: "2026-03-29T12:00:20Z",
+      lastSignalAt: "2026-03-29T12:00:20Z",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/aerochat.rtc.v1.RtcControlService/TouchCallParticipant",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+        }),
+        body: JSON.stringify({
+          callId: "call-1",
+        }),
+      }),
+    );
+  });
+
   it("previews group invite link before join", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

@@ -182,6 +182,22 @@ func (h *Handler) ListCallParticipants(ctx context.Context, req *connect.Request
 	return connect.NewResponse(response), nil
 }
 
+func (h *Handler) TouchCallParticipant(ctx context.Context, req *connect.Request[rtcv1.TouchCallParticipantRequest]) (*connect.Response[rtcv1.TouchCallParticipantResponse], error) {
+	token, err := bearerToken(req)
+	if err != nil {
+		return nil, err
+	}
+
+	participant, err := h.service.TouchCallParticipant(ctx, token, req.Msg.CallId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	return connect.NewResponse(&rtcv1.TouchCallParticipantResponse{
+		SelfParticipant: toProtoParticipant(participant),
+	}), nil
+}
+
 func (h *Handler) SendSignal(ctx context.Context, req *connect.Request[rtcv1.SendSignalRequest]) (*connect.Response[rtcv1.SendSignalResponse], error) {
 	token, err := bearerToken(req)
 	if err != nil {
