@@ -2008,26 +2008,31 @@ export function DesktopShell({
                     </div>
                   </div>
                   <div className={styles.windowBody}>
-                    <DesktopShellHostContext.Provider
-                      value={{
-                        ...baseDesktopShellHost,
-                        currentWindowId: window.windowId,
-                        currentWindowContentMode: window.contentMode,
-                        currentWindowRoutePath: window.routePath,
-                        currentWindowPathname: windowRouteLocation?.pathname ?? null,
-                        currentWindowSearch: windowRouteLocation?.search ?? "",
-                        currentWindowTargetKey: window.target?.key ?? null,
-                        isCurrentWindowActive: runtimeState.activeWindowId === window.windowId,
-                        setActiveWindowContentMode: (contentMode) => {
-                          setWindowContentMode(window, contentMode);
-                        },
-                        syncCurrentRouteTitle: (title) => {
-                          syncWindowRouteTitle(window, title);
-                        },
-                      }}
+                    <div
+                      className={styles.windowBodyViewport}
+                      data-scroll-mode={resolveShellWindowScrollMode(window.appId)}
                     >
-                      <ShellWindowBody window={window} />
-                    </DesktopShellHostContext.Provider>
+                      <DesktopShellHostContext.Provider
+                        value={{
+                          ...baseDesktopShellHost,
+                          currentWindowId: window.windowId,
+                          currentWindowContentMode: window.contentMode,
+                          currentWindowRoutePath: window.routePath,
+                          currentWindowPathname: windowRouteLocation?.pathname ?? null,
+                          currentWindowSearch: windowRouteLocation?.search ?? "",
+                          currentWindowTargetKey: window.target?.key ?? null,
+                          isCurrentWindowActive: runtimeState.activeWindowId === window.windowId,
+                          setActiveWindowContentMode: (contentMode) => {
+                            setWindowContentMode(window, contentMode);
+                          },
+                          syncCurrentRouteTitle: (title) => {
+                            syncWindowRouteTitle(window, title);
+                          },
+                        }}
+                      >
+                        <ShellWindowBody window={window} />
+                      </DesktopShellHostContext.Provider>
+                    </div>
                   </div>
                   {window.state !== "maximized" &&
                     windowResizeHandles.map((handle) => (
@@ -2432,6 +2437,19 @@ function ShellWindowBody({ window }: { window: ShellWindow }) {
       {renderShellAppContent(appId)}
     </div>
   );
+}
+
+function resolveShellWindowScrollMode(appId: ShellAppId): "contained" | "document" {
+  switch (appId) {
+    case "self_chat":
+    case "chats":
+    case "direct_chat":
+    case "groups":
+    case "group_chat":
+      return "contained";
+    default:
+      return "document";
+  }
 }
 
 function DesktopContextMenuPanel({

@@ -636,9 +636,21 @@
 
 .windowBody {
   min-height: 0;
-  overflow: auto;
   background:
     linear-gradient(180deg, rgba(251, 253, 254, 0.98), rgba(226, 236, 244, 0.96));
+}
+
+.windowBodyViewport {
+  min-height: 0;
+  height: 100%;
+}
+
+.windowBodyViewport[data-scroll-mode="document"] {
+  overflow: auto;
+}
+
+.windowBodyViewport[data-scroll-mode="contained"] {
+  overflow: hidden;
 }
 
 .windowResizeHandle {
@@ -715,6 +727,12 @@
 .routeHost,
 .placeholderCard {
   min-height: 100%;
+}
+
+.windowBodyViewport[data-scroll-mode="contained"] > .routeHost {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .placeholderCard {
