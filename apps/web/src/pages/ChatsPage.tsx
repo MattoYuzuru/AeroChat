@@ -33,7 +33,6 @@ import {
   useEncryptedDirectMessageV2Lane,
 } from "../chats/useEncryptedDirectMessageV2Lane";
 import { encryptedDirectMessageV2ProjectionLimit } from "../chats/encrypted-v2-projection";
-import type { CryptoContextState } from "../crypto/runtime-context";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { useChats } from "../chats/useChats";
 import { gatewayClient } from "../gateway/runtime";
@@ -743,15 +742,6 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     !encryptedMediaAttachmentDraft.isUploading &&
     (normalizeComposerMessageText(composerText) !== "" ||
       uploadedEncryptedAttachmentDraft !== null);
-  const encryptedSendHint = describeEncryptedBootstrapSendHint({
-    chatSelected: selectedThread !== null,
-    composerText,
-    encryptedAttachmentDraft,
-    hasEncryptedReplyTarget: selectedEncryptedReplyEntry !== null,
-    isEditingEncryptedMessage: editingEncryptedEntry !== null,
-    cryptoRuntimeState: cryptoRuntime.state,
-  });
-
   useEffect(() => {
     if (desktopShellHost === null || selectedThread === null) {
       return;
@@ -1739,63 +1729,60 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
               ) : (
               <div className={styles.threadLayout}>
                 <section className={styles.threadHero}>
-                  <button
-                    className={styles.threadIdentityButton}
-                    onClick={handleThreadHeaderClick}
-                    type="button"
-                  >
-                    <div className={styles.threadIdentity}>
-                      <span className={`${styles.avatarBadge} ${styles.avatarBadgeLarge}`} aria-hidden="true">
-                        {getParticipantInitials(selectedPeer)}
-                      </span>
+                  <div className={styles.threadHeroRow}>
+                    <button
+                      className={styles.threadIdentityButton}
+                      onClick={handleThreadHeaderClick}
+                      type="button"
+                    >
+                      <div className={styles.threadIdentity}>
+                        <span className={`${styles.avatarBadge} ${styles.avatarBadgeLarge}`} aria-hidden="true">
+                          {getParticipantInitials(selectedPeer)}
+                        </span>
 
-                      <div>
-                        <div className={styles.chatItemHeader}>
-                          <h3 className={styles.threadTitle}>{selectedPeerTitle}</h3>
-                          {!isSelectedSelfChat && selectedPeer ? (
-                            <span className={styles.threadDescription}>@{selectedPeer.login}</span>
-                          ) : null}
+                        <div>
+                          <div className={styles.chatItemHeader}>
+                            <h3 className={styles.threadTitle}>{selectedPeerTitle}</h3>
+                            {!isSelectedSelfChat && selectedPeer ? (
+                              <span className={styles.threadDescription}>@{selectedPeer.login}</span>
+                            ) : null}
+                          </div>
+                          <p className={styles.threadEyebrow}>
+                            {describeDirectThreadStatus(
+                              isSelectedSelfChat,
+                              selectedThread.presenceState,
+                              selectedThread.typingState,
+                            )}
+                          </p>
                         </div>
-                        <p className={styles.threadEyebrow}>
-                          {describeDirectThreadStatus(
-                            isSelectedSelfChat,
-                            selectedThread.presenceState,
-                            selectedThread.typingState,
-                          )}
-                        </p>
-                        <p className={styles.identityActionHint}>
-                          {isSelectedSelfChat
-                            ? "Открыть профиль и настройки аккаунта"
-                            : "Открыть профиль контакта в этом же окне"}
-                        </p>
                       </div>
-                    </div>
-                  </button>
+                    </button>
 
-                  <div className={styles.threadStatusRow}>
-                    {selectedThread.chat.encryptedUnreadCount > 0 && (
-                      <span className={styles.statusBadge} data-tone="accent">
-                        Новых: {selectedThread.chat.encryptedUnreadCount}
+                    <div className={styles.threadStatusRow}>
+                      {selectedThread.chat.encryptedUnreadCount > 0 && (
+                        <span className={styles.statusBadge} data-tone="accent">
+                          Новых: {selectedThread.chat.encryptedUnreadCount}
+                        </span>
+                      )}
+                      <span className={styles.metaTag}>
+                        {encryptedLane.status === "ready"
+                          ? `${encryptedMessageCount} сообщений`
+                          : encryptedLane.status === "unavailable"
+                            ? "Недоступно"
+                            : "Загружаем"}
                       </span>
-                    )}
-                    <span className={styles.metaTag}>
-                      {encryptedLane.status === "ready"
-                        ? `${encryptedMessageCount} сообщений`
-                        : encryptedLane.status === "unavailable"
-                          ? "Недоступно"
-                          : "Загружаем"}
-                    </span>
-                    {!isSelectedSelfChat && (
-                      <button
-                        aria-label="Позвонить"
-                        className={styles.iconButton}
-                        disabled={!directCall.canJoin && !directCall.canStart}
-                        onClick={handlePrimaryDirectCallAction}
-                        type="button"
-                      >
-                        <ChatGlyph kind="phone" />
-                      </button>
-                    )}
+                      {!isSelectedSelfChat && (
+                        <button
+                          aria-label="Позвонить"
+                          className={styles.iconButton}
+                          disabled={!directCall.canJoin && !directCall.canStart}
+                          onClick={handlePrimaryDirectCallAction}
+                          type="button"
+                        >
+                          <ChatGlyph kind="phone" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </section>
 
@@ -2449,13 +2436,6 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                         <ChatGlyph kind="send" />
                       </button>
                     </div>
-
-                    <div className={styles.composerFooter}>
-                      <span className={styles.characterCount}>
-                        {composerText.trim().length}/4000
-                      </span>
-                    </div>
-                    <p className={styles.attachmentHint}>{encryptedSendHint}</p>
                   </form>
                 </section>
 
@@ -2997,62 +2977,6 @@ function describeEncryptedReadTarget(
   const preview = describeEncryptedDirectComposerReplyTarget(entry);
   const authorLabel = entry.senderUserId === currentUserId ? "вы" : fallbackPeerName;
   return `${authorLabel}: ${preview}`;
-}
-
-function describeEncryptedBootstrapSendHint(input: {
-  chatSelected: boolean;
-  composerText: string;
-  encryptedAttachmentDraft: ReturnType<
-    typeof useEncryptedMediaAttachmentDraft
-  >["draft"];
-  hasEncryptedReplyTarget: boolean;
-  isEditingEncryptedMessage: boolean;
-  cryptoRuntimeState: CryptoContextState;
-}): string {
-  if (!input.chatSelected) {
-    return "Откройте чат, чтобы отправить сообщение.";
-  }
-  if (input.cryptoRuntimeState.status !== "ready") {
-    return "Подготавливаем защищённый режим отправки.";
-  }
-  const snapshot = input.cryptoRuntimeState.snapshot;
-  if (
-    snapshot === null ||
-    snapshot.support !== "available" ||
-    snapshot.phase === "error" ||
-    snapshot.localDevice?.status !== "active"
-  ) {
-    return (
-      snapshot?.errorMessage ??
-      "Для отправки сообщений нужно активное локальное устройство."
-    );
-  }
-  if (input.encryptedAttachmentDraft?.status === "preparing") {
-    return "Подготавливаем файл перед загрузкой.";
-  }
-  if (input.encryptedAttachmentDraft?.status === "uploading") {
-    return "Загружаем файл и готовим его к отправке.";
-  }
-  if (input.encryptedAttachmentDraft?.status === "error") {
-    return "Не удалось подготовить файл. Исправьте ошибку и повторите.";
-  }
-  if (input.isEditingEncryptedMessage) {
-    return "Следующее действие сохранит изменения сообщения.";
-  }
-  if (input.hasEncryptedReplyTarget) {
-    return "Следующее сообщение будет отправлено как ответ.";
-  }
-  if (
-    normalizeComposerMessageText(input.composerText) === "" &&
-    input.encryptedAttachmentDraft?.status !== "uploaded"
-  ) {
-    return "Введите текст или подготовьте файл для отправки.";
-  }
-  if (input.encryptedAttachmentDraft?.status === "uploaded") {
-    return "Файл готов. Можно отправлять сообщение.";
-  }
-
-  return "Сообщение будет отправлено обычным действием из этого окна.";
 }
 
 function jumpToMessage(elementId: string) {

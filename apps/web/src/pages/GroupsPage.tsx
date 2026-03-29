@@ -21,7 +21,6 @@ import { ChatGlyph } from "../chats/ChatGlyph";
 import { EncryptedMessageAttachmentList } from "../chats/EncryptedMessageAttachmentList";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
 import { useEncryptedMediaAttachmentDraft } from "../chats/useEncryptedMediaAttachmentDraft";
-import type { CryptoContextState } from "../crypto/runtime-context";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { gatewayClient } from "../gateway/runtime";
 import {
@@ -151,6 +150,7 @@ export function GroupsPage() {
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [revealedGroupThreadKey, setRevealedGroupThreadKey] = useState<string | null>(null);
+  const [activePinnedIndex, setActivePinnedIndex] = useState(0);
   const selectedStateRef = useRef(selectedState);
   const groupsRef = useRef(groups);
   const [groupCallAwarenessState, dispatchGroupCallAwareness] = useReducer(
@@ -238,6 +238,7 @@ export function GroupsPage() {
     previousSelectedGroupCallIdRef.current = null;
     setSearchJumpNotice(null);
     setHighlightedMessageId(null);
+    setActivePinnedIndex(0);
     discardEncryptedMediaNoteDrafts();
     keepScrollPinnedToBottomRef.current = true;
   }, [selectedGroupId]);
@@ -1151,6 +1152,11 @@ export function GroupsPage() {
           messageId,
           entry: encryptedMessageIndex.get(messageId) ?? null,
         }));
+  const activePinnedMessage =
+    encryptedPinnedMessages.length === 0
+      ? null
+      : encryptedPinnedMessages[Math.min(activePinnedIndex, encryptedPinnedMessages.length - 1)] ??
+        null;
   const canPickEncryptedAttachment =
     selectedState.status === "ready" &&
     encryptedGroupLane.status === "ready" &&
@@ -1191,18 +1197,35 @@ export function GroupsPage() {
         uploadedEncryptedAttachmentDraft === null
       : normalizeComposerMessageText(encryptedComposerText) !== "" ||
           uploadedEncryptedAttachmentDraft !== null);
-  const encryptedSendHint = describeEncryptedGroupBootstrapSendHint({
-    groupSelected: selectedState.status === "ready",
-    composerText: encryptedComposerText,
-    encryptedAttachmentDraft,
-    isEditingEncryptedMessage: editingEncryptedEntry !== null,
-    hasEncryptedReplyTarget: selectedEncryptedReplyEntry !== null,
-    cryptoRuntimeState: cryptoRuntime.state,
-  });
   const typingLabel =
     selectedState.status === "ready"
       ? describeGroupTypingLabel(selectedState.snapshot.typingState, currentUserId)
       : null;
+
+  useEffect(() => {
+    if (encryptedPinnedMessages.length === 0) {
+      if (activePinnedIndex !== 0) {
+        const timeoutID = window.setTimeout(() => {
+          setActivePinnedIndex(0);
+        }, 0);
+
+        return () => {
+          window.clearTimeout(timeoutID);
+        };
+      }
+      return;
+    }
+
+    if (activePinnedIndex > encryptedPinnedMessages.length - 1) {
+      const timeoutID = window.setTimeout(() => {
+        setActivePinnedIndex(encryptedPinnedMessages.length - 1);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timeoutID);
+      };
+    }
+  }, [activePinnedIndex, encryptedPinnedMessages.length]);
   useThreadViewportAutoPin({
     contentRef: messagesListRef,
     enabled: groupWindowContentMode === "thread" && selectedGroupId !== "" && searchJumpIntent === null,
@@ -2144,6 +2167,14 @@ export function GroupsPage() {
     keepScrollPinnedToBottomRef.current = isViewportPinnedToBottom(viewport);
   }
 
+  function jumpToPinnedMessage(messageId: string | null) {
+    if (messageId === null) {
+      return;
+    }
+
+    jumpToThreadMessage(`encrypted-group-message-${messageId}`);
+  }
+
   function jumpToThreadMessage(elementId: string) {
     keepScrollPinnedToBottomRef.current = false;
     jumpToMessage(elementId);
@@ -2405,24 +2436,37 @@ export function GroupsPage() {
 
           {selectedState.status === "ready" && (
             <>
-              <section className={styles.panelCard}>
+              <section
+                className={`${styles.panelCard} ${
+                  groupWindowContentMode === "thread" ? styles.threadHeroCard : ""
+                }`}
+              >
                 <div className={styles.splitHeader}>
                   {groupWindowContentMode === "thread" ? (
                     <button
-                      className={styles.groupIdentityButton}
+                      className={`${styles.groupIdentityButton} ${styles.threadIdentityButton}`}
                       onClick={() => {
                         setGroupInfoMode("info");
                       }}
                       type="button"
                     >
-                      <p className={styles.cardLabel}>Группа</p>
-                      <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
-                      <p className={styles.description}>
-                        Текущая роль: {roleLabel(selectedState.snapshot.group.selfRole)}.
-                      </p>
-                      <p className={styles.infoActionHint}>
-                        Открыть участников, роли и ссылки-приглашения в этом же окне
-                      </p>
+                      <div className={styles.threadIdentity}>
+                        <span className={`${styles.avatarBadge} ${styles.avatarBadgeLarge}`} aria-hidden="true">
+                          {getGroupInitials(selectedState.snapshot.group.name)}
+                        </span>
+
+                        <div>
+                          <p className={styles.cardLabel}>Группа</p>
+                          <h2 className={styles.threadTitle}>{selectedState.snapshot.group.name}</h2>
+                          <p className={styles.threadEyebrow}>
+                            {typingLabel ??
+                              `Текущая роль: ${roleLabel(selectedState.snapshot.group.selfRole)}.`}
+                          </p>
+                          <p className={styles.threadDescription}>
+                            Участников: {selectedState.members.length}
+                          </p>
+                        </div>
+                      </div>
                     </button>
                   ) : (
                     <div>
@@ -2435,7 +2479,38 @@ export function GroupsPage() {
                     </div>
                   )}
 
-                  <div className={styles.badgeColumn}>
+                  <div
+                    className={
+                      groupWindowContentMode === "thread"
+                        ? styles.threadStatusRow
+                        : styles.badgeColumn
+                    }
+                  >
+                    {groupWindowContentMode === "thread" && (
+                      <>
+                        {selectedState.snapshot.group.encryptedUnreadCount > 0 && (
+                          <span className={styles.statusPill}>
+                            Новых: {selectedState.snapshot.group.encryptedUnreadCount}
+                          </span>
+                        )}
+                        <span className={styles.metaTag}>
+                          {encryptedGroupLane.status === "ready"
+                            ? `${encryptedThreadMessages.length} сообщений`
+                            : encryptedGroupLane.status === "unavailable"
+                              ? "Недоступно"
+                              : encryptedGroupLane.status === "error"
+                                ? "Ошибка"
+                                : "Загружаем"}
+                        </span>
+                        <span className={styles.statusPill}>
+                          {selectedState.snapshot.thread.canSendMessages
+                            ? "Можно писать"
+                            : selectedSelfMember?.isWriteRestricted
+                              ? "Отправка ограничена"
+                              : "Только чтение"}
+                        </span>
+                      </>
+                    )}
                     {groupWindowContentMode === "thread" && (
                       <button
                         aria-label="Управление звонком"
@@ -2464,6 +2539,15 @@ export function GroupsPage() {
                         <ChatGlyph kind="phone" />
                       </button>
                     )}
+                    {groupWindowContentMode === "thread" && !isDesktopTargetWindow && (
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={clearGroupSelection}
+                        type="button"
+                      >
+                        Назад к списку
+                      </button>
+                    )}
                     {groupWindowContentMode === "info" && (
                       <button
                         className={styles.secondaryButton}
@@ -2475,14 +2559,17 @@ export function GroupsPage() {
                         Назад к переписке
                       </button>
                     )}
-                    <span className={styles.statusPill}>
-                      {selectedState.snapshot.thread.canSendMessages
-                        ? "Можно писать"
-                        : selectedSelfMember?.isWriteRestricted
-                          ? "Отправка ограничена"
-                          : "Только чтение"}
-                    </span>
-                    {selectedState.snapshot.group.permissions.canLeaveGroup && (
+                    {groupWindowContentMode === "info" && (
+                      <span className={styles.statusPill}>
+                        {selectedState.snapshot.thread.canSendMessages
+                          ? "Можно писать"
+                          : selectedSelfMember?.isWriteRestricted
+                            ? "Отправка ограничена"
+                            : "Только чтение"}
+                      </span>
+                    )}
+                    {groupWindowContentMode === "info" &&
+                      selectedState.snapshot.group.permissions.canLeaveGroup && (
                       <button
                         className={styles.dangerButton}
                         disabled={isLeavingGroup}
@@ -2494,69 +2581,23 @@ export function GroupsPage() {
                         {isLeavingGroup ? "Выходим..." : "Покинуть группу"}
                       </button>
                     )}
-                    <button
-                      className={styles.secondaryButton}
-                      onClick={clearGroupSelection}
-                      type="button"
-                    >
-                      Закрыть
-                    </button>
+                    {groupWindowContentMode === "info" && (
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={clearGroupSelection}
+                        type="button"
+                      >
+                        Закрыть
+                      </button>
+                    )}
                   </div>
                 </div>
               </section>
 
               {groupWindowContentMode === "thread" && (
                 <>
-              <section className={`${styles.panelCard} ${styles.threadPanel}`}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <p className={styles.cardLabel}>Сообщения</p>
-                    <h2 className={styles.panelTitle}>Переписка группы</h2>
-                  </div>
-                  <p className={styles.panelCopy}>
-                    Сообщения, вложения и карточка звонка показываются в одной ленте переписки.
-                  </p>
-                </div>
-
-                {selectedState.snapshot.group.encryptedUnreadCount > 0 && (
-                  <div className={styles.timelineMeta}>
-                    <span className={styles.statusPill}>
-                      Новых сообщений {selectedState.snapshot.group.encryptedUnreadCount}
-                    </span>
-                  </div>
-                )}
-
-                {encryptedGroupLane.status === "loading" && (
-                  <InlineState
-                    title="Загружаем сообщения"
-                    message="Подготавливаем переписку группы для чтения."
-                  />
-                )}
-
-                {encryptedGroupLane.status === "unavailable" && (
-                  <InlineState
-                    title="Сообщения недоступны"
-                    message={
-                      encryptedGroupLane.errorMessage ??
-                      "Для этой группы не удалось подготовить переписку."
-                    }
-                  />
-                )}
-
-                {encryptedGroupLane.status === "error" && (
-                  <InlineState
-                    title="Не удалось загрузить сообщения"
-                    message={
-                      encryptedGroupLane.errorMessage ??
-                      "Не удалось подготовить переписку группы."
-                    }
-                    tone="error"
-                  />
-                )}
-
-                {encryptedGroupLane.status === "ready" && (
-                  <>
-                    {!selectedState.snapshot.thread.canSendMessages && (
+                  <section className={`${styles.panelCard} ${styles.threadPanel}`}>
+                    {encryptedGroupLane.status === "ready" && !selectedState.snapshot.thread.canSendMessages && (
                       <div className={styles.readOnlyNotice}>
                         {selectedSelfMember?.isWriteRestricted
                           ? "Сейчас для этого участника отправка сообщений отключена."
@@ -2564,388 +2605,105 @@ export function GroupsPage() {
                       </div>
                     )}
 
-                    {selectedState.snapshot.group.encryptedPinnedMessageIds.length > 0 && (
-                      <div className={styles.messagesList}>
-                        {encryptedPinnedMessages.map(({ messageId, entry }) => (
-                          <article className={styles.messageCard} key={messageId}>
-                            <div className={styles.messageHeader}>
-                              <div>
-                                <p className={styles.messageAuthor}>
-                                  {entry === null
-                                    ? "Сообщение"
-                                    : describeEncryptedGroupAuthor(
-                                        entry,
-                                        authState.profile.id,
-                                        selectedState.members,
-                                      )}
-                                </p>
-                                <p className={styles.messageMeta}>
-                                  {entry === null
-                                    ? "Локально не разрешено"
-                                    : formatDateTime(entry.createdAt)}
-                                </p>
-                              </div>
-                              <div className={styles.badgeColumn}>
-                                <span className={styles.statusPill}>Закреплено</span>
-                              </div>
+                    {encryptedGroupLane.status === "ready" && activePinnedMessage !== null && (
+                      <section className={styles.pinnedStrip}>
+                        <div className={styles.pinnedRow}>
+                          <button
+                            aria-label="Предыдущее закреплённое сообщение"
+                            className={styles.iconButton}
+                            disabled={activePinnedIndex === 0}
+                            onClick={() => {
+                              setActivePinnedIndex((current) => Math.max(0, current - 1));
+                            }}
+                            type="button"
+                          >
+                            <ChatGlyph kind="chevron_left" />
+                          </button>
+
+                          <button
+                            className={styles.pinnedCard}
+                            onClick={() => {
+                              jumpToPinnedMessage(activePinnedMessage.messageId);
+                            }}
+                            type="button"
+                          >
+                            <div className={styles.pinnedHeader}>
+                              <strong>
+                                Сообщение {activePinnedIndex + 1}/{encryptedPinnedMessages.length}
+                              </strong>
+                              <span className={styles.pinnedMeta}>
+                                {activePinnedMessage.entry === null
+                                  ? "Недоступно локально"
+                                  : formatDateTime(activePinnedMessage.entry.createdAt)}
+                              </span>
                             </div>
-                            <div className={styles.messageBody}>
-                              <p className={styles.helperText}>
-                                {describeEncryptedGroupPinnedPreview(entry)}
-                              </p>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
+                            <p className={styles.pinnedText}>
+                              {describeEncryptedGroupPinnedPreview(activePinnedMessage.entry)}
+                            </p>
+                          </button>
+
+                          <button
+                            aria-label="Следующее закреплённое сообщение"
+                            className={styles.iconButton}
+                            disabled={activePinnedIndex >= encryptedPinnedMessages.length - 1}
+                            onClick={() => {
+                              setActivePinnedIndex((current) =>
+                                Math.min(encryptedPinnedMessages.length - 1, current + 1),
+                              );
+                            }}
+                            type="button"
+                          >
+                            <ChatGlyph kind="chevron_right" />
+                          </button>
+                        </div>
+                      </section>
                     )}
 
-                    <form
-                      className={styles.composer}
-                      onSubmit={handleSendEncryptedGroupMessage}
-                    >
-                      {selectedEncryptedReplyEntry && (
-                        <div className={styles.replyComposerCard}>
-                          <div>
-                            <p className={styles.replyPreviewAuthor}>
-                              Ответ на{" "}
-                              {describeEncryptedGroupAuthor(
-                                selectedEncryptedReplyEntry,
-                                authState.profile.id,
-                                selectedState.members,
-                              )}
-                            </p>
-                            <p className={styles.replyPreviewText}>
-                              {describeEncryptedGroupComposerReplyTarget(
-                                selectedEncryptedReplyEntry,
-                              )}
-                            </p>
-                          </div>
-                          <button
-                            className={styles.ghostButton}
-                            onClick={() => {
-                              setSelectedEncryptedReplyMessageId(null);
-                            }}
-                            type="button"
-                          >
-                            Отменить ответ
-                          </button>
-                        </div>
+                    <section className={styles.messagesPanel}>
+                      {encryptedGroupLane.status === "loading" && (
+                        <InlineState
+                          title="Загружаем сообщения"
+                          message="Подготавливаем переписку группы для чтения."
+                        />
                       )}
 
-                      {editingEncryptedEntry && (
-                        <div className={styles.replyComposerCard}>
-                          <div>
-                            <p className={styles.replyPreviewAuthor}>
-                              Редактирование · версия {editingEncryptedEntry.revision + 1}
-                            </p>
-                            <p className={styles.replyPreviewText}>
-                              {describeEncryptedGroupComposerReplyTarget(editingEncryptedEntry)}
-                            </p>
-                          </div>
-                          <button
-                            className={styles.ghostButton}
-                            onClick={() => {
-                              setEditingEncryptedMessageId(null);
-                              setSelectedEncryptedReplyMessageId(null);
-                              setEncryptedComposerText("");
-                            }}
-                            type="button"
-                          >
-                            Отменить редактирование
-                          </button>
-                        </div>
+                      {encryptedGroupLane.status === "unavailable" && (
+                        <InlineState
+                          title="Сообщения недоступны"
+                          message={
+                            encryptedGroupLane.errorMessage ??
+                            "Для этой группы не удалось подготовить переписку."
+                          }
+                        />
                       )}
 
-                      <input
-                        accept="*/*"
-                        className={styles.attachmentInput}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0] ?? null;
-                          void handleEncryptedAttachmentSelection(file);
-                          event.target.value = "";
-                        }}
-                        ref={encryptedAttachmentInputRef}
-                        type="file"
-                      />
+                      {encryptedGroupLane.status === "error" && (
+                        <InlineState
+                          title="Не удалось загрузить сообщения"
+                          message={
+                            encryptedGroupLane.errorMessage ??
+                            "Не удалось подготовить переписку группы."
+                          }
+                          tone="error"
+                        />
+                      )}
 
-                      {encryptedAttachmentDraft && (
-                        <div className={styles.attachmentDraftCard}>
-                          <div>
-                            <p className={styles.attachmentDraftTitle}>
-                              {encryptedAttachmentDraft.fileName}
-                            </p>
-                            <p className={styles.attachmentDraftMeta}>
-                              {formatAttachmentSize(
-                                encryptedAttachmentDraft.plaintextSizeBytes,
-                              )}
-                              {encryptedAttachmentDraft.ciphertextSizeBytes > 0 &&
-                                ` • ${formatAttachmentSize(
-                                  encryptedAttachmentDraft.ciphertextSizeBytes,
-                                )} после подготовки`}
-                              {" • "}
-                              {describeAttachmentMimeType(encryptedAttachmentDraft.mimeType)}
-                            </p>
-                            {encryptedAttachmentDraft.status === "preparing" && (
-                              <p className={styles.attachmentDraftStatus}>
-                                Подготавливаем файл...
-                              </p>
-                            )}
-                            {encryptedAttachmentDraft.status === "uploading" && (
-                              <p className={styles.attachmentDraftStatus}>
-                                Загружаем файл: {encryptedAttachmentDraft.progress}%
-                              </p>
-                            )}
-                            {encryptedAttachmentDraft.status === "uploaded" && (
-                              <p className={styles.attachmentDraftStatus}>
-                                Файл готов к отправке.
-                              </p>
-                            )}
-                            {encryptedAttachmentDraft.status === "error" && (
-                              <p className={styles.attachmentDraftError}>
-                                {encryptedAttachmentDraft.errorMessage}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className={styles.attachmentDraftActions}>
-                            {encryptedAttachmentDraft.status === "error" && (
-                              <button
-                                className={styles.ghostButton}
-                                onClick={() => {
-                                  void encryptedMediaAttachmentDraft.retryUpload();
-                                }}
-                                type="button"
-                              >
-                                Повторить
-                              </button>
-                            )}
-                            <button
-                              className={styles.ghostButton}
-                              onClick={() => {
-                                encryptedMediaAttachmentDraft.removeDraft();
-                              }}
-                              type="button"
+                      {encryptedGroupLane.status === "ready" && (
+                        <div
+                          className={styles.messagesViewport}
+                          onScroll={handleMessagesViewportScroll}
+                          ref={messagesViewportRef}
+                        >
+                          <div className={styles.messagesList} ref={messagesListRef}>
+                            <div
+                              aria-hidden={shouldRevealEncryptedGroupTimeline ? undefined : "true"}
+                              style={
+                                shouldRevealEncryptedGroupTimeline
+                                  ? undefined
+                                  : { visibility: "hidden", pointerEvents: "none" }
+                              }
                             >
-                              Убрать
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {voiceNoteRecorder.state.errorMessage && (
-                        <div className={styles.error}>{voiceNoteRecorder.state.errorMessage}</div>
-                      )}
-
-                      {videoNoteRecorder.state.errorMessage && (
-                        <div className={styles.error}>{videoNoteRecorder.state.errorMessage}</div>
-                      )}
-
-                      {voiceNoteRecorder.state.status === "recorded" &&
-                        voiceNoteRecorder.state.draft !== null && (
-                          <div className={styles.attachmentDraftCard}>
-                            <div>
-                              <p className={styles.attachmentDraftTitle}>
-                                {voiceNoteRecorder.state.draft.fileName}
-                              </p>
-                              <p className={styles.attachmentDraftMeta}>Голосовое сообщение</p>
-                            </div>
-                            <audio
-                              className={styles.hiddenAudio}
-                              controls
-                              preload="metadata"
-                              src={voiceNoteRecorder.state.draft.previewUrl}
-                            />
-                            <div className={styles.attachmentDraftActions}>
-                              <button
-                                className={styles.ghostButton}
-                                onClick={() => {
-                                  voiceNoteRecorder.discardRecording();
-                                }}
-                                type="button"
-                              >
-                                Убрать
-                              </button>
-                              <button
-                                className={styles.primaryButton}
-                                onClick={() => {
-                                  void handleEncryptedGroupMediaNoteSend(
-                                    voiceNoteRecorder.state.draft?.file ?? null,
-                                    () => {
-                                      voiceNoteRecorder.discardRecording();
-                                    },
-                                  );
-                                }}
-                                type="button"
-                              >
-                                Отправить запись
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                      {videoNoteRecorder.state.status === "recorded" &&
-                        videoNoteRecorder.state.draft !== null && (
-                          <div className={styles.attachmentDraftCard}>
-                            <div>
-                              <p className={styles.attachmentDraftTitle}>
-                                {videoNoteRecorder.state.draft.fileName}
-                              </p>
-                              <p className={styles.attachmentDraftMeta}>Видео сообщение</p>
-                            </div>
-                            <video
-                              className={styles.mediaPreview}
-                              controls
-                              playsInline
-                              preload="metadata"
-                              src={videoNoteRecorder.state.draft.previewUrl}
-                            />
-                            <div className={styles.attachmentDraftActions}>
-                              <button
-                                className={styles.ghostButton}
-                                onClick={() => {
-                                  videoNoteRecorder.discardRecording();
-                                }}
-                                type="button"
-                              >
-                                Убрать
-                              </button>
-                              <button
-                                className={styles.primaryButton}
-                                onClick={() => {
-                                  void handleEncryptedGroupMediaNoteSend(
-                                    videoNoteRecorder.state.draft?.file ?? null,
-                                    () => {
-                                      videoNoteRecorder.discardRecording();
-                                    },
-                                  );
-                                }}
-                                type="button"
-                              >
-                                Отправить видео
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                      <div className={styles.composerRow}>
-                        <button
-                          aria-label="Прикрепить файл"
-                          className={styles.iconButton}
-                          disabled={!canPickEncryptedAttachment}
-                          onClick={() => {
-                            encryptedAttachmentInputRef.current?.click();
-                          }}
-                          type="button"
-                        >
-                          <ChatGlyph kind="attach" />
-                        </button>
-
-                        <label className={styles.field}>
-                          <textarea
-                            disabled={
-                              cryptoRuntime.state.isActionPending ||
-                              encryptedMediaAttachmentDraft.isUploading ||
-                              !selectedState.snapshot.thread.canSendMessages
-                            }
-                            maxLength={4000}
-                            onChange={(event) => {
-                              setEncryptedComposerText(event.target.value);
-                              setEncryptedComposerError(null);
-                            }}
-                            placeholder={
-                              selectedState.snapshot.thread.canSendMessages
-                                ? "Напишите сообщение"
-                                : "Текущая роль не может отправлять сообщения"
-                            }
-                            rows={2}
-                            value={encryptedComposerText}
-                          />
-                        </label>
-
-                        <button
-                          aria-label="Записать голосовое сообщение"
-                          className={styles.iconButton}
-                          disabled={voiceNoteStartDisabled}
-                          onClick={() => {
-                            if (voiceNoteRecorder.state.status === "recording") {
-                              voiceNoteRecorder.stopRecording();
-                              return;
-                            }
-
-                            void voiceNoteRecorder.startRecording();
-                          }}
-                          type="button"
-                        >
-                          <ChatGlyph
-                            kind={
-                              voiceNoteRecorder.state.status === "recording"
-                                ? "microphone_active"
-                                : "microphone"
-                            }
-                          />
-                        </button>
-
-                        <button
-                          aria-label="Записать видео сообщение"
-                          className={styles.iconButton}
-                          disabled={videoNoteStartDisabled}
-                          onClick={() => {
-                            if (videoNoteRecorder.state.status === "recording") {
-                              videoNoteRecorder.stopRecording();
-                              return;
-                            }
-
-                            void videoNoteRecorder.startRecording();
-                          }}
-                          type="button"
-                        >
-                          <ChatGlyph
-                            kind={
-                              videoNoteRecorder.state.status === "recording"
-                                ? "camera_active"
-                                : "camera"
-                            }
-                          />
-                        </button>
-
-                        <button
-                          aria-label="Отправить сообщение"
-                          className={styles.primaryIconButton}
-                          disabled={!canSendEncryptedGroupText}
-                          type="submit"
-                        >
-                          <ChatGlyph kind="send" />
-                        </button>
-                      </div>
-
-                      {encryptedComposerError && (
-                        <div className={styles.error}>{encryptedComposerError}</div>
-                      )}
-
-                      <p className={styles.helperText}>{encryptedSendHint}</p>
-
-                      <div className={styles.composerFooter}>
-                        <span className={styles.characterCount}>
-                          {normalizeComposerMessageText(encryptedComposerText).length}/4000
-                        </span>
-                      </div>
-                    </form>
-
-                    <div
-                      className={styles.messagesViewport}
-                      onScroll={handleMessagesViewportScroll}
-                      ref={messagesViewportRef}
-                    >
-                      <div className={styles.messagesList} ref={messagesListRef}>
-                      <div
-                        aria-hidden={shouldRevealEncryptedGroupTimeline ? undefined : "true"}
-                        style={
-                          shouldRevealEncryptedGroupTimeline
-                            ? undefined
-                            : { visibility: "hidden", pointerEvents: "none" }
-                        }
-                      >
-                      {encryptedThreadMessages.length === 0 ? (
+                              {encryptedThreadMessages.length === 0 ? (
                         <InlineState
                           title="Сообщений пока нет"
                           message="В этом окне ещё нет доступных сообщений."
@@ -3339,23 +3097,351 @@ export function GroupsPage() {
                         </article>
                       )}
 
-                      <div className={styles.historyNotice}>
-                        Показан текущий доступный фрагмент истории. Более ранние сообщения здесь
-                        пока не открываются.
-                        {typingLabel ? ` ${typingLabel}` : ""}
-                      </div>
-                      </div>
-                      {!shouldRevealEncryptedGroupTimeline && (
-                        <InlineState
-                          title="Открываем последние сообщения"
-                          message="Фиксируем нижнюю границу переписки перед показом ленты."
-                        />
+                              <div className={styles.historyNotice}>
+                                Показан текущий доступный фрагмент истории. Более ранние сообщения
+                                здесь пока не открываются.
+                                {typingLabel ? ` ${typingLabel}` : ""}
+                              </div>
+                            </div>
+                            {!shouldRevealEncryptedGroupTimeline && (
+                              <InlineState
+                                title="Открываем последние сообщения"
+                                message="Фиксируем нижнюю границу переписки перед показом ленты."
+                              />
+                            )}
+                          </div>
+                        </div>
                       )}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </section>
+                    </section>
+
+                    {encryptedGroupLane.status === "ready" && (
+                      <section className={styles.composerCard}>
+                        <form
+                          className={styles.composer}
+                          onSubmit={handleSendEncryptedGroupMessage}
+                        >
+                          {selectedEncryptedReplyEntry && (
+                            <div className={styles.replyComposerCard}>
+                              <div>
+                                <p className={styles.replyPreviewAuthor}>
+                                  Ответ на{" "}
+                                  {describeEncryptedGroupAuthor(
+                                    selectedEncryptedReplyEntry,
+                                    authState.profile.id,
+                                    selectedState.members,
+                                  )}
+                                </p>
+                                <p className={styles.replyPreviewText}>
+                                  {describeEncryptedGroupComposerReplyTarget(
+                                    selectedEncryptedReplyEntry,
+                                  )}
+                                </p>
+                              </div>
+                              <button
+                                className={styles.ghostButton}
+                                onClick={() => {
+                                  setSelectedEncryptedReplyMessageId(null);
+                                }}
+                                type="button"
+                              >
+                                Отменить ответ
+                              </button>
+                            </div>
+                          )}
+
+                          {editingEncryptedEntry && (
+                            <div className={styles.replyComposerCard}>
+                              <div>
+                                <p className={styles.replyPreviewAuthor}>
+                                  Редактирование · версия {editingEncryptedEntry.revision + 1}
+                                </p>
+                                <p className={styles.replyPreviewText}>
+                                  {describeEncryptedGroupComposerReplyTarget(editingEncryptedEntry)}
+                                </p>
+                              </div>
+                              <button
+                                className={styles.ghostButton}
+                                onClick={() => {
+                                  setEditingEncryptedMessageId(null);
+                                  setSelectedEncryptedReplyMessageId(null);
+                                  setEncryptedComposerText("");
+                                }}
+                                type="button"
+                              >
+                                Отменить редактирование
+                              </button>
+                            </div>
+                          )}
+
+                          <input
+                            accept="*/*"
+                            className={styles.attachmentInput}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] ?? null;
+                              void handleEncryptedAttachmentSelection(file);
+                              event.target.value = "";
+                            }}
+                            ref={encryptedAttachmentInputRef}
+                            type="file"
+                          />
+
+                          {encryptedAttachmentDraft && (
+                            <div className={styles.attachmentDraftCard}>
+                              <div>
+                                <p className={styles.attachmentDraftTitle}>
+                                  {encryptedAttachmentDraft.fileName}
+                                </p>
+                                <p className={styles.attachmentDraftMeta}>
+                                  {formatAttachmentSize(
+                                    encryptedAttachmentDraft.plaintextSizeBytes,
+                                  )}
+                                  {encryptedAttachmentDraft.ciphertextSizeBytes > 0 &&
+                                    ` • ${formatAttachmentSize(
+                                      encryptedAttachmentDraft.ciphertextSizeBytes,
+                                    )} после подготовки`}
+                                  {" • "}
+                                  {describeAttachmentMimeType(encryptedAttachmentDraft.mimeType)}
+                                </p>
+                                {encryptedAttachmentDraft.status === "preparing" && (
+                                  <p className={styles.attachmentDraftStatus}>
+                                    Подготавливаем файл...
+                                  </p>
+                                )}
+                                {encryptedAttachmentDraft.status === "uploading" && (
+                                  <p className={styles.attachmentDraftStatus}>
+                                    Загружаем файл: {encryptedAttachmentDraft.progress}%
+                                  </p>
+                                )}
+                                {encryptedAttachmentDraft.status === "uploaded" && (
+                                  <p className={styles.attachmentDraftStatus}>
+                                    Файл готов к отправке.
+                                  </p>
+                                )}
+                                {encryptedAttachmentDraft.status === "error" && (
+                                  <p className={styles.attachmentDraftError}>
+                                    {encryptedAttachmentDraft.errorMessage}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className={styles.attachmentDraftActions}>
+                                {encryptedAttachmentDraft.status === "error" && (
+                                  <button
+                                    className={styles.ghostButton}
+                                    onClick={() => {
+                                      void encryptedMediaAttachmentDraft.retryUpload();
+                                    }}
+                                    type="button"
+                                  >
+                                    Повторить
+                                  </button>
+                                )}
+                                <button
+                                  className={styles.ghostButton}
+                                  onClick={() => {
+                                    encryptedMediaAttachmentDraft.removeDraft();
+                                  }}
+                                  type="button"
+                                >
+                                  Убрать
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {voiceNoteRecorder.state.errorMessage && (
+                            <div className={styles.error}>{voiceNoteRecorder.state.errorMessage}</div>
+                          )}
+
+                          {videoNoteRecorder.state.errorMessage && (
+                            <div className={styles.error}>{videoNoteRecorder.state.errorMessage}</div>
+                          )}
+
+                          {voiceNoteRecorder.state.status === "recorded" &&
+                            voiceNoteRecorder.state.draft !== null && (
+                              <div className={styles.attachmentDraftCard}>
+                                <div>
+                                  <p className={styles.attachmentDraftTitle}>
+                                    {voiceNoteRecorder.state.draft.fileName}
+                                  </p>
+                                  <p className={styles.attachmentDraftMeta}>Голосовое сообщение</p>
+                                </div>
+                                <audio
+                                  className={styles.hiddenAudio}
+                                  controls
+                                  preload="metadata"
+                                  src={voiceNoteRecorder.state.draft.previewUrl}
+                                />
+                                <div className={styles.attachmentDraftActions}>
+                                  <button
+                                    className={styles.ghostButton}
+                                    onClick={() => {
+                                      voiceNoteRecorder.discardRecording();
+                                    }}
+                                    type="button"
+                                  >
+                                    Убрать
+                                  </button>
+                                  <button
+                                    className={styles.primaryButton}
+                                    onClick={() => {
+                                      void handleEncryptedGroupMediaNoteSend(
+                                        voiceNoteRecorder.state.draft?.file ?? null,
+                                        () => {
+                                          voiceNoteRecorder.discardRecording();
+                                        },
+                                      );
+                                    }}
+                                    type="button"
+                                  >
+                                    Отправить запись
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                          {videoNoteRecorder.state.status === "recorded" &&
+                            videoNoteRecorder.state.draft !== null && (
+                              <div className={styles.attachmentDraftCard}>
+                                <div>
+                                  <p className={styles.attachmentDraftTitle}>
+                                    {videoNoteRecorder.state.draft.fileName}
+                                  </p>
+                                  <p className={styles.attachmentDraftMeta}>Видео сообщение</p>
+                                </div>
+                                <video
+                                  className={styles.mediaPreview}
+                                  controls
+                                  playsInline
+                                  preload="metadata"
+                                  src={videoNoteRecorder.state.draft.previewUrl}
+                                />
+                                <div className={styles.attachmentDraftActions}>
+                                  <button
+                                    className={styles.ghostButton}
+                                    onClick={() => {
+                                      videoNoteRecorder.discardRecording();
+                                    }}
+                                    type="button"
+                                  >
+                                    Убрать
+                                  </button>
+                                  <button
+                                    className={styles.primaryButton}
+                                    onClick={() => {
+                                      void handleEncryptedGroupMediaNoteSend(
+                                        videoNoteRecorder.state.draft?.file ?? null,
+                                        () => {
+                                          videoNoteRecorder.discardRecording();
+                                        },
+                                      );
+                                    }}
+                                    type="button"
+                                  >
+                                    Отправить видео
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                          <div className={styles.composerRow}>
+                            <button
+                              aria-label="Прикрепить файл"
+                              className={styles.iconButton}
+                              disabled={!canPickEncryptedAttachment}
+                              onClick={() => {
+                                encryptedAttachmentInputRef.current?.click();
+                              }}
+                              type="button"
+                            >
+                              <ChatGlyph kind="attach" />
+                            </button>
+
+                            <label className={styles.field}>
+                              <textarea
+                                disabled={
+                                  cryptoRuntime.state.isActionPending ||
+                                  encryptedMediaAttachmentDraft.isUploading ||
+                                  !selectedState.snapshot.thread.canSendMessages
+                                }
+                                maxLength={4000}
+                                onChange={(event) => {
+                                  setEncryptedComposerText(event.target.value);
+                                  setEncryptedComposerError(null);
+                                }}
+                                placeholder={
+                                  selectedState.snapshot.thread.canSendMessages
+                                    ? "Напишите сообщение"
+                                    : "Текущая роль не может отправлять сообщения"
+                                }
+                                rows={2}
+                                value={encryptedComposerText}
+                              />
+                            </label>
+
+                            <button
+                              aria-label="Записать голосовое сообщение"
+                              className={styles.iconButton}
+                              disabled={voiceNoteStartDisabled}
+                              onClick={() => {
+                                if (voiceNoteRecorder.state.status === "recording") {
+                                  voiceNoteRecorder.stopRecording();
+                                  return;
+                                }
+
+                                void voiceNoteRecorder.startRecording();
+                              }}
+                              type="button"
+                            >
+                              <ChatGlyph
+                                kind={
+                                  voiceNoteRecorder.state.status === "recording"
+                                    ? "microphone_active"
+                                    : "microphone"
+                                }
+                              />
+                            </button>
+
+                            <button
+                              aria-label="Записать видео сообщение"
+                              className={styles.iconButton}
+                              disabled={videoNoteStartDisabled}
+                              onClick={() => {
+                                if (videoNoteRecorder.state.status === "recording") {
+                                  videoNoteRecorder.stopRecording();
+                                  return;
+                                }
+
+                                void videoNoteRecorder.startRecording();
+                              }}
+                              type="button"
+                            >
+                              <ChatGlyph
+                                kind={
+                                  videoNoteRecorder.state.status === "recording"
+                                    ? "camera_active"
+                                    : "camera"
+                                }
+                              />
+                            </button>
+
+                            <button
+                              aria-label="Отправить сообщение"
+                              className={styles.primaryIconButton}
+                              disabled={!canSendEncryptedGroupText}
+                              type="submit"
+                            >
+                              <ChatGlyph kind="send" />
+                            </button>
+                          </div>
+
+                          {encryptedComposerError && (
+                            <div className={styles.error}>{encryptedComposerError}</div>
+                          )}
+                        </form>
+                      </section>
+                    )}
+                  </section>
                 </>
               )}
 
@@ -3967,6 +4053,16 @@ function sortGroupCallParticipants(
   });
 }
 
+function getGroupInitials(name: string): string {
+  const normalized = name.trim();
+  if (normalized === "") {
+    return "GR";
+  }
+
+  const parts = normalized.split(/\s+/).slice(0, 2);
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("").slice(0, 2) || "GR";
+}
+
 function describeGroupCallParticipantName(
   participant: RtcCallParticipant,
   member: GroupMember | null,
@@ -4052,62 +4148,6 @@ function describeEncryptedGroupPinnedPreview(
   }
 
   return describeEncryptedGroupComposerReplyTarget(entry);
-}
-
-function describeEncryptedGroupBootstrapSendHint(input: {
-  groupSelected: boolean;
-  composerText: string;
-  encryptedAttachmentDraft: ReturnType<
-    typeof useEncryptedMediaAttachmentDraft
-  >["draft"];
-  isEditingEncryptedMessage: boolean;
-  hasEncryptedReplyTarget: boolean;
-  cryptoRuntimeState: CryptoContextState;
-}): string {
-  if (!input.groupSelected) {
-    return "Откройте группу, чтобы отправить сообщение.";
-  }
-  if (input.cryptoRuntimeState.status !== "ready") {
-    return "Подготавливаем защищённый режим отправки.";
-  }
-  const snapshot = input.cryptoRuntimeState.snapshot;
-  if (
-    snapshot === null ||
-    snapshot.support !== "available" ||
-    snapshot.phase === "error" ||
-    snapshot.localDevice?.status !== "active"
-  ) {
-    return (
-      snapshot?.errorMessage ??
-      "Для отправки сообщений нужно активное локальное устройство."
-    );
-  }
-  if (input.encryptedAttachmentDraft?.status === "preparing") {
-    return "Подготавливаем файл перед загрузкой.";
-  }
-  if (input.encryptedAttachmentDraft?.status === "uploading") {
-    return "Загружаем файл и готовим его к отправке.";
-  }
-  if (input.encryptedAttachmentDraft?.status === "error") {
-    return "Не удалось подготовить файл. Исправьте ошибку и повторите.";
-  }
-  if (input.isEditingEncryptedMessage) {
-    return "Следующее действие сохранит изменения сообщения.";
-  }
-  if (input.hasEncryptedReplyTarget) {
-    return "Следующее сообщение будет отправлено как ответ.";
-  }
-  if (
-    normalizeComposerMessageText(input.composerText) === "" &&
-    input.encryptedAttachmentDraft?.status !== "uploaded"
-  ) {
-    return "Введите текст или подготовьте файл для отправки.";
-  }
-  if (input.encryptedAttachmentDraft?.status === "uploaded") {
-    return "Файл готов. Можно отправлять сообщение.";
-  }
-
-  return "Сообщение будет отправлено обычным действием из этого окна.";
 }
 
 function jumpToMessage(elementId: string) {
