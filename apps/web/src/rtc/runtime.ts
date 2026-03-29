@@ -11,6 +11,8 @@ interface PeerConnectionLike {
 }
 
 interface ICECapablePeerConnectionLike {
+  connectionState?: RTCPeerConnectionState;
+  iceConnectionState?: RTCIceConnectionState;
   remoteDescription: unknown;
   addIceCandidate(candidate: RTCIceCandidateInit): Promise<void>;
 }
@@ -85,6 +87,18 @@ export async function queueOrApplyRemoteICECandidate(
 
   await peerConnection.addIceCandidate(candidate);
   return pendingCandidates;
+}
+
+export function shouldRecoverPeerConnectionAfterDisconnect(
+  peerConnection: Pick<ICECapablePeerConnectionLike, "connectionState" | "iceConnectionState">,
+): boolean {
+  return (
+    peerConnection.connectionState !== "connected" &&
+    peerConnection.connectionState !== "closed" &&
+    peerConnection.iceConnectionState !== "connected" &&
+    peerConnection.iceConnectionState !== "completed" &&
+    peerConnection.iceConnectionState !== "closed"
+  );
 }
 
 export function hasMatchingRemoteSessionDescription(

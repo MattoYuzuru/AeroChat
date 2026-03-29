@@ -4,6 +4,7 @@ import {
   flushPendingRemoteICECandidates,
   hasMatchingRemoteSessionDescription,
   queueOrApplyRemoteICECandidate,
+  shouldRecoverPeerConnectionAfterDisconnect,
   shouldDelayPeerRuntimeRecovery,
   stopMediaStreamTracks,
   teardownDirectCallPeerRuntime,
@@ -214,6 +215,30 @@ describe("rtc runtime cleanup helpers", () => {
         "user-2",
         5_000,
       ),
+    ).toBe(false);
+  });
+
+  it("keeps waiting after a transient disconnect while the peer is already recovering", () => {
+    expect(
+      shouldRecoverPeerConnectionAfterDisconnect({
+        connectionState: "disconnected",
+        iceConnectionState: "checking",
+      }),
+    ).toBe(true);
+  });
+
+  it("skips forced recovery after the peer connection already came back", () => {
+    expect(
+      shouldRecoverPeerConnectionAfterDisconnect({
+        connectionState: "connected",
+        iceConnectionState: "completed",
+      }),
+    ).toBe(false);
+    expect(
+      shouldRecoverPeerConnectionAfterDisconnect({
+        connectionState: "closed",
+        iceConnectionState: "closed",
+      }),
     ).toBe(false);
   });
 });

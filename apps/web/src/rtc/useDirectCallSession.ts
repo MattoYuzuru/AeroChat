@@ -40,6 +40,7 @@ import {
   flushPendingRemoteICECandidates,
   hasMatchingRemoteSessionDescription,
   queueOrApplyRemoteICECandidate,
+  shouldRecoverPeerConnectionAfterDisconnect,
   shouldDelayPeerRuntimeRecovery,
   teardownDirectCallPeerRuntime,
   teardownDirectCallRuntime,
@@ -51,6 +52,7 @@ import {
 
 const directCallGatewayBaseUrl = resolveGatewayBaseUrl();
 const directCallParticipantHeartbeatIntervalMs = 20_000;
+const directCallDisconnectRecoveryGraceMs = 8_000;
 
 interface UseDirectCallSessionOptions {
   enabled: boolean;
@@ -117,6 +119,7 @@ export function useDirectCallSession(
     remoteUserId: string;
   } | null>(null);
   const peerRecoveryTimerRef = useRef<number | null>(null);
+  const disconnectRecoveryTimerRef = useRef<number | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const pendingRemoteICECandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const rtcConfigurationRef = useRef<RTCConfiguration>(directCallRTCConfiguration);
@@ -161,6 +164,15 @@ export function useDirectCallSession(
     peerRecoveryTimerRef.current = null;
   }, []);
 
+  const clearDisconnectRecoveryTimer = useCallback(() => {
+    if (disconnectRecoveryTimerRef.current === null) {
+      return;
+    }
+
+    window.clearTimeout(disconnectRecoveryTimerRef.current);
+    disconnectRecoveryTimerRef.current = null;
+  }, []);
+
   const clearPeerRecoveryPlan = useCallback(() => {
     clearPeerRecoveryTimer();
     peerRecoveryPlanRef.current = null;
@@ -185,6 +197,7 @@ export function useDirectCallSession(
       return;
     }
 
+    clearDisconnectRecoveryTimer();
     teardownDirectCallPeerRuntime({
       peerConnection: peerConnectionRef.current,
       remoteStream: remoteStreamRef.current,
@@ -198,10 +211,11 @@ export function useDirectCallSession(
       remoteAudioState: "idle",
       remoteAudioAvailable: false,
     });
-  }, []);
+  }, [clearDisconnectRecoveryTimer]);
 
   const disposeLocalRuntime = useCallback(() => {
     clearPeerRecoveryPlan();
+    clearDisconnectRecoveryTimer();
     teardownDirectCallRuntime({
       localStream: localStreamRef.current,
       peerConnection: peerConnectionRef.current,
@@ -214,7 +228,35 @@ export function useDirectCallSession(
     pendingRemoteICECandidatesRef.current = [];
     setRemoteAudioStream(null);
     dispatch({ type: "local_left" });
-  }, [clearPeerRecoveryPlan]);
+  }, [clearDisconnectRecoveryTimer, clearPeerRecoveryPlan]);
+
+  const scheduleDisconnectedPeerRecovery = useCallback(
+    (peerConnection: RTCPeerConnection) => {
+      if (typeof window === "undefined" || disconnectRecoveryTimerRef.current !== null) {
+        return;
+      }
+
+      disconnectRecoveryTimerRef.current = window.setTimeout(() => {
+        disconnectRecoveryTimerRef.current = null;
+
+        if (peerConnectionRef.current !== peerConnection) {
+          return;
+        }
+
+        if (!shouldRecoverPeerConnectionAfterDisconnect(peerConnection)) {
+          return;
+        }
+
+        if (peerRecoveryHandlerRef.current("disconnected")) {
+          dispatch({
+            type: "peer_state_replaced",
+            peerConnectionState: "connecting",
+          });
+        }
+      }, directCallDisconnectRecoveryGraceMs);
+    },
+    [],
+  );
 
   const describeError = useCallback((error: unknown, fallbackMessage: string): string => {
     if (isGatewayErrorCode(error, "unauthenticated")) {
@@ -380,30 +422,8 @@ export function useDirectCallSession(
       switch (peerConnection.iceConnectionState) {
         case "connected":
         case "completed":
+          clearDisconnectRecoveryTimer();
           clearPeerRecoveryPlan();
-          return;
-        case "disconnected":
-          if (peerRecoveryHandlerRef.current("disconnected")) {
-            dispatch({
-              type: "peer_state_replaced",
-              peerConnectionState: "connecting",
-            });
-          }
-          return;
-        case "failed":
-          if (peerRecoveryHandlerRef.current("failed")) {
-            dispatch({
-              type: "peer_state_replaced",
-              peerConnectionState: "connecting",
-            });
-            return;
-          }
-          dispatch({
-            type: "peer_state_replaced",
-            peerConnectionState: "failed",
-            message: "WebRTC-соединение завершилось с ошибкой.",
-          });
-          resetPeerRuntime();
           return;
         default:
       }
@@ -412,6 +432,7 @@ export function useDirectCallSession(
     peerConnection.addEventListener("connectionstatechange", () => {
       switch (peerConnection.connectionState) {
         case "connected":
+          clearDisconnectRecoveryTimer();
           clearPeerRecoveryPlan();
           dispatch({
             type: "peer_state_replaced",
@@ -425,14 +446,14 @@ export function useDirectCallSession(
           });
           return;
         case "disconnected":
-          if (peerRecoveryHandlerRef.current("disconnected")) {
-            dispatch({
-              type: "peer_state_replaced",
-              peerConnectionState: "connecting",
-            });
-          }
+          scheduleDisconnectedPeerRecovery(peerConnection);
+          dispatch({
+            type: "peer_state_replaced",
+            peerConnectionState: "connecting",
+          });
           return;
         case "failed":
+          clearDisconnectRecoveryTimer();
           if (peerRecoveryHandlerRef.current("failed")) {
             dispatch({
               type: "peer_state_replaced",
@@ -448,6 +469,7 @@ export function useDirectCallSession(
           resetPeerRuntime();
           return;
         case "closed":
+          clearDisconnectRecoveryTimer();
           clearPeerRecoveryPlan();
           dispatch({
             type: "peer_state_replaced",
@@ -460,7 +482,15 @@ export function useDirectCallSession(
 
     peerConnectionRef.current = peerConnection;
     return peerConnection;
-  }, [clearPeerRecoveryPlan, currentUserId, describeError, resetPeerRuntime, sendRTCSignal]);
+  }, [
+    clearDisconnectRecoveryTimer,
+    clearPeerRecoveryPlan,
+    currentUserId,
+    describeError,
+    resetPeerRuntime,
+    scheduleDisconnectedPeerRecovery,
+    sendRTCSignal,
+  ]);
 
   const applyIncomingRTCSignal = useCallback(async (signal: RtcSignalEnvelope) => {
     const currentCall = stateRef.current.call;
@@ -743,6 +773,27 @@ export function useDirectCallSession(
     await runRefreshDirectChatCall(false);
   }, [clearPeerRecoveryPlan, ensurePeerConnection, runRefreshDirectChatCall]);
 
+  // Выход из звонка должен мгновенно освобождать local media/runtime:
+  // ожидание server round-trip на плохой сети подвешивает страницу и ломает UX.
+  const queueRtcExitMutation = useCallback((
+    callId: string,
+    performExit: () => Promise<unknown>,
+    fallbackToLeaveKeepalive: boolean,
+  ) => {
+    void performExit().catch((error) => {
+      if (isGatewayErrorCode(error, "unauthenticated")) {
+        onUnauthenticatedRef.current();
+        return;
+      }
+
+      if (fallbackToLeaveKeepalive) {
+        sendRtcLeaveCallKeepalive(token, callId, directCallGatewayBaseUrl);
+      }
+    }).finally(() => {
+      void runRefreshDirectChatCall(false);
+    });
+  }, [runRefreshDirectChatCall, token]);
+
   useEffect(() => {
     peerRecoveryHandlerRef.current = schedulePeerRecovery;
 
@@ -871,19 +922,10 @@ export function useDirectCallSession(
     }
 
     dispatch({ type: "action_started", actionState: "leaving" });
-
-    try {
-      await gatewayClient.leaveCall(token, currentCall.id);
-    } catch (error) {
-      dispatch({
-        type: "failure",
-        message: describeError(error, "Не удалось покинуть звонок."),
-      });
-    } finally {
-      dispatch({ type: "action_finished" });
-      disposeLocalRuntime();
-      await runRefreshDirectChatCall(false);
-    }
+    const callId = currentCall.id;
+    disposeLocalRuntime();
+    dispatch({ type: "action_finished" });
+    queueRtcExitMutation(callId, () => gatewayClient.leaveCall(token, callId), true);
   }
 
   async function endCall() {
@@ -894,19 +936,10 @@ export function useDirectCallSession(
     }
 
     dispatch({ type: "action_started", actionState: "ending" });
-
-    try {
-      await gatewayClient.endCall(token, currentCall.id);
-    } catch (error) {
-      dispatch({
-        type: "failure",
-        message: describeError(error, "Не удалось завершить звонок."),
-      });
-    } finally {
-      dispatch({ type: "action_finished" });
-      disposeLocalRuntime();
-      await runRefreshDirectChatCall(false);
-    }
+    const callId = currentCall.id;
+    disposeLocalRuntime();
+    dispatch({ type: "action_finished" });
+    queueRtcExitMutation(callId, () => gatewayClient.endCall(token, callId), false);
   }
 
   function dismissError() {
@@ -1163,11 +1196,9 @@ export function useDirectCallSession(
       sendRtcLeaveCallKeepalive(token, joinedCallID, directCallGatewayBaseUrl);
     };
 
-    window.addEventListener("beforeunload", leaveOnPageHide);
     window.addEventListener("pagehide", leaveOnPageHide);
 
     return () => {
-      window.removeEventListener("beforeunload", leaveOnPageHide);
       window.removeEventListener("pagehide", leaveOnPageHide);
     };
   }, [enabled, joinedCallID, state.localJoinedCallId, token]);
