@@ -188,6 +188,14 @@ AeroChat должен поддерживать:
 - RTC/calls остаются частичными:
   - `aero-rtc-control` уже даёт signaling и server-backed call control-plane;
   - web 1:1 звонок существует как bounded audio-only bootstrap;
+  - browser direct-call runtime теперь использует voice-oriented audio constraints / sender tuning,
+    bounded peer-recovery backoff после `disconnected` / `failed`, explicit lightweight participant heartbeat
+    и best-effort `pagehide` cleanup,
+    чтобы звонок звучал стабильнее и stale active-participant хвосты после crash/закрытия вкладки сходились обратно в control-plane;
+  - web direct-call awareness теперь сильнее опирается на realtime + deduplicated refresh,
+    а fallback polling ограничен уже известными active direct chats вместо повторного fan-out по всем direct conversations;
+  - `aero-rtc-control` теперь умеет opportunistic stale eviction active participants по bounded timeout,
+    поэтому ложные active-call conflicts после жёстко закрытого браузера больше не должны жить бесконечно;
   - browser direct-call runtime теперь читает ICE servers из `aero-rtc-control` и держит repo-default STUN fallback,
     поэтому operator может задавать TURN/STUN policy без нового frontend build;
   - server/prod-like compose теперь включает repo-managed `turn` runtime с явным public relay IP contract,
