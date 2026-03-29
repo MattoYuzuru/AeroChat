@@ -821,6 +821,13 @@
 .desktopWindowWorkspace {
   height: 100%;
   grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  align-content: stretch;
+}
+
+.desktopThreadPane {
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr);
   align-content: stretch;
 }
 

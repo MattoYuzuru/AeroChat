@@ -309,6 +309,7 @@
   height: 100%;
   min-height: 0;
   grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
   align-content: stretch;
 }
 
@@ -320,6 +321,7 @@
 }
 
 .desktopMainColumn {
+  height: 100%;
   min-height: 100%;
   grid-template-rows: auto minmax(0, 1fr);
   align-content: stretch;
