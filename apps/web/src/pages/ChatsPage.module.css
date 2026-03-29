@@ -824,6 +824,7 @@
   background: transparent;
   box-shadow: none;
   height: 100%;
+  min-height: 0;
 }
 
 .threadHero,
@@ -861,7 +862,9 @@
 
 .messagesPanel {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
+  overflow: hidden;
   padding: 0;
   border: 0;
   background: #ffffff;
