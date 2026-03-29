@@ -251,7 +251,7 @@ orchestration и без device controls. Group call flow сейчас покры
 - [x] Web direct chat polish foundation в `apps/web`
 - [x] Web message search bootstrap через `aero-gateway`
 - [x] Push notifications
-- [ ] PWA
+- [x] Web app install flow
 - [x] Desktop shell XP runtime scaffold
 - [x] Boot/login application model внутри нового shell
 - [x] Canonical self chat shell target
@@ -273,7 +273,7 @@ orchestration и без device controls. Group call flow сейчас покры
 
 Примечание:
 `Self Chat` теперь является реальным backend-supported direct chat текущего пользователя, но не получает отдельную unread/device-relative модель или self-call semantics.
-Mobile adaptation уже реальна, но не означает завершённый PWA/mobile product slice.
+Mobile adaptation и web app install flow уже реальны, но не означают завершённый offline/PWA/mobile product slice.
 
 ---
 

@@ -335,8 +335,8 @@ Realtime сейчас:
 ### PWA / mobile / desktop shell polish
 
 - `implemented`: responsive SPA shell с route-based workspace, real desktop shell на wide screens и dedicated mobile launcher/home surface на narrow screens.
-- `partial/bootstrap/bounded`: mobile launcher уже reuse'ит canonical targets, recent items и folder entry path; web notifications и service worker уже есть, но install/offline/PWA slice и более глубокий mobile productivity polish ещё не доведены.
-- `not implemented yet`: manifest/install flow, desktop wrapper, richer mobile shell/navigation polish beyond current launcher slice.
+- `partial/bootstrap/bounded`: mobile launcher уже reuse'ит canonical targets, recent items и folder entry path; manifest/install flow теперь тоже есть, но offline/PWA model и более глубокий mobile productivity polish ещё не доведены.
+- `not implemented yet`: desktop wrapper, richer mobile shell/navigation polish beyond current launcher slice, offline-safe runtime model.
 
 ## Service ownership and boundaries
 
@@ -470,6 +470,6 @@ Realtime сейчас:
 
 Ограничения:
 
-- есть service worker и web push foundation, но отсутствуют manifest/install flow и offline model;
+- есть service worker, web push foundation и manifest/install flow, но отсутствует offline model;
 - media recording и realtime path не описаны как install/offline-safe;
 - mobile polish как отдельный slice ещё не проведён.

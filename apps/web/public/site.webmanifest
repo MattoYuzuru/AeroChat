@@ -1,6 +1,11 @@
 {
   "name": "AeroChat",
   "short_name": "AeroChat",
+  "description": "Self-hosted приватный чат с desktop-like web shell и mobile launcher.",
+  "id": "/",
+  "start_url": "/app",
+  "scope": "/",
+  "lang": "ru",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
