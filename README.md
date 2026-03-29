@@ -517,9 +517,10 @@ Production rollout и rollback выполняются повторным зап�
 - [x] Backend self-direct thread и canonical `Я` chat surface
 - [x] RTC signaling/control-plane и частичный web audio-only 1:1 bootstrap
 - [x] Web push notifications для direct/group unread и friend requests
+- [x] Web app install flow для desktop/mobile ярлыка без browser chrome
 - [ ] Удаление legacy plaintext из product-critical paths
 - [ ] Production-usable calls, device controls и multiparty media
-- [ ] PWA install/offline flow
+- [ ] Offline-safe PWA/runtime model
 
 Подробный и консервативный статус поддерживается в [docs/roadmap.md](docs/roadmap.md) и
 [docs/audits/2026-03-25-repo-audit.md](docs/audits/2026-03-25-repo-audit.md).

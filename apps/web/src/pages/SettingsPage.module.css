@@ -160,6 +160,12 @@
   color: #7f2a2a;
 }
 
+.inlineStateCard[data-tone="success"] {
+  border-color: rgba(76, 131, 92, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(234, 248, 238, 0.86));
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(18rem, 0.95fr);
@@ -428,6 +434,18 @@
   border-color: rgba(152, 41, 41, 0.22);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 232, 232, 0.78));
+}
+
+.stepList {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.85rem 0 0;
+  padding-left: 1.35rem;
+  color: #153b64;
+}
+
+.stepList li {
+  line-height: 1.45;
 }
 
 @media (max-width: 960px) {

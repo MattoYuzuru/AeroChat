@@ -23,6 +23,7 @@ import {
 } from "../settings/useDevices";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { useWebNotifications } from "../notifications/context";
+import { useWebAppInstall } from "../pwa/install";
 import styles from "./SettingsPage.module.css";
 
 const privacyItems = [
@@ -82,8 +83,10 @@ export function SettingsPage() {
   });
   const cryptoRuntime = useCryptoRuntime();
   const webNotifications = useWebNotifications();
+  const webAppInstall = useWebAppInstall();
   const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const [isWebAppGuideVisible, setIsWebAppGuideVisible] = useState(false);
 
   loadSettingsRef.current = async () => {
     clearNotice();
@@ -418,6 +421,72 @@ export function SettingsPage() {
                   />
                 </label>
               </div>
+            </section>
+
+            <section className={styles.sectionCard}>
+              <div className={styles.sectionHeader}>
+                <div>
+                  <p className={styles.cardLabel}>Веб-приложение</p>
+                  <h2 className={styles.sectionTitle}>Ярлык AeroChat без интерфейса браузера</h2>
+                </div>
+                <p className={styles.sectionDescription}>
+                  Это не отдельный desktop wrapper и не offline mode. Здесь только штатная
+                  установка ярлыка, чтобы AeroChat открывался как standalone web app.
+                </p>
+              </div>
+
+              <section
+                className={styles.inlineStateCard}
+                data-tone={
+                  webAppInstall.guide.tone === "installed" ? "success" : "default"
+                }
+              >
+                <p className={styles.cardLabel}>{webAppInstall.guide.badge}</p>
+                <h3 className={styles.stateTitle}>{webAppInstall.guide.title}</h3>
+                <p className={styles.stateMessage}>{webAppInstall.guide.description}</p>
+
+                <div className={styles.actions}>
+                  {webAppInstall.guide.actionLabel && (
+                    <button
+                      className={styles.primaryButton}
+                      disabled={webAppInstall.isPromptPending}
+                      onClick={() => {
+                        void webAppInstall.requestInstall();
+                      }}
+                      type="button"
+                    >
+                      {webAppInstall.isPromptPending
+                        ? "Открываем системное окно..."
+                        : webAppInstall.guide.actionLabel}
+                    </button>
+                  )}
+
+                  {webAppInstall.guide.secondaryActionLabel && (
+                    <button
+                      className={styles.secondaryButton}
+                      onClick={() => {
+                        setIsWebAppGuideVisible((current) => !current);
+                      }}
+                      type="button"
+                    >
+                      {isWebAppGuideVisible
+                        ? "Скрыть шаги"
+                        : webAppInstall.guide.secondaryActionLabel}
+                    </button>
+                  )}
+                </div>
+              </section>
+
+              {isWebAppGuideVisible && webAppInstall.guide.steps.length > 0 && (
+                <section className={styles.inlineStateCard}>
+                  <p className={styles.cardLabel}>Стандартный путь</p>
+                  <ol className={styles.stepList}>
+                    {webAppInstall.guide.steps.map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ol>
+                </section>
+              )}
             </section>
 
             <section className={styles.sectionCard}>

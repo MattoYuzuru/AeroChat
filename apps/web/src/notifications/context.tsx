@@ -185,6 +185,16 @@ export function WebNotificationsProvider({ children }: PropsWithChildren) {
   }, [syncSubscription]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+
+    void registerNotificationServiceWorker().catch(() => {
+      // Install entry не должен ломать загрузку приложения, если SW сейчас недоступен.
+    });
+  }, []);
+
+  useEffect(() => {
     async function syncAuthSubscription() {
       const previousToken = previousTokenRef.current;
       if (auth.state.status !== "authenticated") {
