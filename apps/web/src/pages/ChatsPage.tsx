@@ -99,6 +99,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     useState<string | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [revealedDirectThreadKey, setRevealedDirectThreadKey] = useState<string | null>(null);
   const [directNotificationsError, setDirectNotificationsError] = useState<string | null>(null);
   const [isUpdatingDirectNotifications, setIsUpdatingDirectNotifications] = useState(false);
   const [encryptedPageSize, setEncryptedPageSize] = useState(encryptedDirectInitialPageSize);
@@ -813,6 +814,53 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     threadKey: selectedThread?.chat.id ?? null,
     viewportRef: messagesViewportRef,
   });
+  const shouldRevealEncryptedDirectTimeline =
+    encryptedLane.status !== "ready" ||
+    revealedDirectThreadKey === (selectedThread?.chat.id ?? null);
+
+  useEffect(() => {
+    const timeoutID = window.setTimeout(() => {
+      setRevealedDirectThreadKey(null);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
+  }, [selectedThread?.chat.id]);
+
+  useEffect(() => {
+    const threadKey = selectedThread?.chat.id ?? null;
+    if (threadKey === null || encryptedLane.status !== "ready") {
+      return;
+    }
+
+    let animationFrameID = 0;
+    let nestedAnimationFrameID = 0;
+    let timeoutID = 0;
+
+    const revealThread = () => {
+      setRevealedDirectThreadKey((current) => (current === threadKey ? current : threadKey));
+    };
+
+    animationFrameID = window.requestAnimationFrame(() => {
+      nestedAnimationFrameID = window.requestAnimationFrame(() => {
+        revealThread();
+      });
+    });
+    timeoutID = window.setTimeout(revealThread, 110);
+
+    return () => {
+      if (animationFrameID !== 0) {
+        window.cancelAnimationFrame(animationFrameID);
+      }
+      if (nestedAnimationFrameID !== 0) {
+        window.cancelAnimationFrame(nestedAnimationFrameID);
+      }
+      if (timeoutID !== 0) {
+        window.clearTimeout(timeoutID);
+      }
+    };
+  }, [directCall.phase, directCall.state.call?.id, encryptedLane.items.length, encryptedLane.status, selectedThread?.chat.id]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -1857,101 +1905,108 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       />
                     )}
 
-                    {encryptedLane.status === "ready" &&
-                      encryptedLane.items.length === 0 && (
-                        <StateCard
-                          title="Сообщений пока нет"
-                          message={describeEncryptedDirectMessageV2LaneEmptyState(0)}
-                        />
-                      )}
+                    {encryptedLane.status === "ready" && (
+                      <div
+                        aria-hidden={shouldRevealEncryptedDirectTimeline ? undefined : "true"}
+                        style={
+                          shouldRevealEncryptedDirectTimeline
+                            ? undefined
+                            : { visibility: "hidden", pointerEvents: "none" }
+                        }
+                      >
+                        {encryptedLane.items.length === 0 && (
+                          <StateCard
+                            title="Сообщений пока нет"
+                            message={describeEncryptedDirectMessageV2LaneEmptyState(0)}
+                          />
+                        )}
 
-                    {encryptedLane.status === "ready" &&
-                      encryptedLane.items.map((item) =>
-                        renderEncryptedDirectMessageV2Entry({
-                          item,
-                          accessToken: sessionToken,
-                          currentUserId: authState.profile.id,
-                          peerNickname: selectedPeer?.nickname ?? "Собеседник",
-                          isSearchTarget:
-                            item.kind === "message" && item.messageId === highlightedMessageId,
-                          peerReadPosition:
-                            item.kind === "message"
-                              ? selectedThread.encryptedReadState?.peerPosition ?? null
-                              : null,
-                          replyTarget:
-                            item.kind === "message"
-                              ? resolveEncryptedDirectReplyTarget(
-                                  encryptedMessageIndex,
-                                  item.replyToMessageId,
-                                  authState.profile.id,
-                                  selectedPeer?.nickname ?? "Собеседник",
-                                )
-                              : null,
-                          isPinned:
-                            item.kind === "message" &&
-                            selectedThread.chat.encryptedPinnedMessageIds.includes(
-                              item.messageId,
-                            ),
-                          onJumpToReplyTarget: (messageId) => {
-                            jumpToThreadMessage(`encrypted-direct-message-${messageId}`);
-                          },
-                          onReply:
-                            item.kind !== "message"
-                              ? undefined
-                              : () => {
-                                  setSelectedEncryptedReplyMessageId(item.messageId);
-                                  setEditingEncryptedMessageId(null);
-                                  setComposerError(null);
-                                  chats.clearFeedback();
-                                },
-                          onEdit:
-                            item.kind !== "message" ||
-                            item.senderUserId !== authState.profile.id ||
-                            item.isTombstone
-                              ? undefined
-                              : () => {
-                                  setEditingEncryptedMessageId(item.messageId);
-                                  setSelectedEncryptedReplyMessageId(item.replyToMessageId);
-                                  setComposerText(item.text ?? "");
-                                  setComposerError(null);
-                                  chats.clearFeedback();
-                                },
-                          onDeleteForEveryone:
-                            item.kind !== "message" ||
-                            item.senderUserId !== authState.profile.id ||
-                            item.isTombstone
-                              ? undefined
-                              : () => {
-                                  void handleDeleteEncryptedDirectMessageV2(item);
-                                },
-                          onTogglePin:
-                            item.kind !== "message"
-                              ? undefined
-                              : () => {
-                                  void handleToggleEncryptedDirectPin(
-                                    item.messageId,
-                                    selectedThread.chat.encryptedPinnedMessageIds.includes(
+                        {encryptedLane.items.map((item) =>
+                          renderEncryptedDirectMessageV2Entry({
+                            item,
+                            accessToken: sessionToken,
+                            currentUserId: authState.profile.id,
+                            peerNickname: selectedPeer?.nickname ?? "Собеседник",
+                            isSearchTarget:
+                              item.kind === "message" && item.messageId === highlightedMessageId,
+                            peerReadPosition:
+                              item.kind === "message"
+                                ? selectedThread.encryptedReadState?.peerPosition ?? null
+                                : null,
+                            replyTarget:
+                              item.kind === "message"
+                                ? resolveEncryptedDirectReplyTarget(
+                                    encryptedMessageIndex,
+                                    item.replyToMessageId,
+                                    authState.profile.id,
+                                    selectedPeer?.nickname ?? "Собеседник",
+                                  )
+                                : null,
+                            isPinned:
+                              item.kind === "message" &&
+                              selectedThread.chat.encryptedPinnedMessageIds.includes(
+                                item.messageId,
+                              ),
+                            onJumpToReplyTarget: (messageId) => {
+                              jumpToThreadMessage(`encrypted-direct-message-${messageId}`);
+                            },
+                            onReply:
+                              item.kind !== "message"
+                                ? undefined
+                                : () => {
+                                    setSelectedEncryptedReplyMessageId(item.messageId);
+                                    setEditingEncryptedMessageId(null);
+                                    setComposerError(null);
+                                    chats.clearFeedback();
+                                  },
+                            onEdit:
+                              item.kind !== "message" ||
+                              item.senderUserId !== authState.profile.id ||
+                              item.isTombstone
+                                ? undefined
+                                : () => {
+                                    setEditingEncryptedMessageId(item.messageId);
+                                    setSelectedEncryptedReplyMessageId(item.replyToMessageId);
+                                    setComposerText(item.text ?? "");
+                                    setComposerError(null);
+                                    chats.clearFeedback();
+                                  },
+                            onDeleteForEveryone:
+                              item.kind !== "message" ||
+                              item.senderUserId !== authState.profile.id ||
+                              item.isTombstone
+                                ? undefined
+                                : () => {
+                                    void handleDeleteEncryptedDirectMessageV2(item);
+                                  },
+                            onTogglePin:
+                              item.kind !== "message"
+                                ? undefined
+                                : () => {
+                                    void handleToggleEncryptedDirectPin(
                                       item.messageId,
-                                    ),
-                                );
-                              },
-                        }),
-                      )}
-                      {!isSelectedSelfChat &&
-                        (directCall.state.call !== null ||
-                          directCall.phase !== "idle" ||
-                          directCall.state.errorMessage !== null ||
-                          directCall.state.remoteAudioState === "blocked") && (
-                          <article
-                            className={styles.messageRow}
-                            data-own={
-                              directCall.state.call?.createdByUserId === authState.profile.id
-                                ? "true"
-                                : undefined
-                            }
-                            data-system="true"
-                          >
-                            <div className={styles.callCard}>
+                                      selectedThread.chat.encryptedPinnedMessageIds.includes(
+                                        item.messageId,
+                                      ),
+                                  );
+                                },
+                          }),
+                        )}
+                        {!isSelectedSelfChat &&
+                          (directCall.state.call !== null ||
+                            directCall.phase !== "idle" ||
+                            directCall.state.errorMessage !== null ||
+                            directCall.state.remoteAudioState === "blocked") && (
+                            <article
+                              className={styles.messageRow}
+                              data-own={
+                                directCall.state.call?.createdByUserId === authState.profile.id
+                                  ? "true"
+                                  : undefined
+                              }
+                              data-system="true"
+                            >
+                              <div className={styles.callCard}>
                               <div className={styles.messageHeader}>
                                 <div>
                                   <p className={styles.messageAuthor}>Звонок</p>
@@ -2058,14 +2113,23 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                                   </button>
                                 </div>
                               )}
-                            </div>
-                          </article>
-                        )}
-                      <div className={styles.historyNotice}>
-                        {canLoadOlderEncryptedMessages
-                          ? "Показан только текущий фрагмент истории. Более ранние сообщения можно догрузить кнопкой выше."
-                          : "Показан текущий доступный фрагмент истории."}
+                              </div>
+                            </article>
+                          )}
+                        <div className={styles.historyNotice}>
+                          {canLoadOlderEncryptedMessages
+                            ? "Показан только текущий фрагмент истории. Более ранние сообщения можно догрузить кнопкой выше."
+                            : "Показан текущий доступный фрагмент истории."}
+                        </div>
                       </div>
+                    )}
+                    {encryptedLane.status === "ready" &&
+                      !shouldRevealEncryptedDirectTimeline && (
+                        <StateCard
+                          title="Открываем последние сообщения"
+                          message="Фиксируем нижнюю границу переписки перед показом ленты."
+                        />
+                      )}
                     </div>
                   </div>
                 </section>

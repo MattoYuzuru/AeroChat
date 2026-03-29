@@ -149,6 +149,7 @@ export function GroupsPage() {
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [revealedGroupThreadKey, setRevealedGroupThreadKey] = useState<string | null>(null);
   const selectedStateRef = useRef(selectedState);
   const groupsRef = useRef(groups);
   const [groupCallAwarenessState, dispatchGroupCallAwareness] = useReducer(
@@ -1209,6 +1210,63 @@ export function GroupsPage() {
     threadKey: selectedGroupId === "" ? null : selectedGroupId,
     viewportRef: messagesViewportRef,
   });
+  const shouldRevealEncryptedGroupTimeline =
+    encryptedGroupLane.status !== "ready" || revealedGroupThreadKey === (selectedGroupId === "" ? null : selectedGroupId);
+
+  useEffect(() => {
+    const timeoutID = window.setTimeout(() => {
+      setRevealedGroupThreadKey(null);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
+  }, [selectedGroupId]);
+
+  useEffect(() => {
+    if (
+      selectedGroupId === "" ||
+      groupWindowContentMode !== "thread" ||
+      searchJumpIntent !== null ||
+      encryptedGroupLane.status !== "ready"
+    ) {
+      return;
+    }
+
+    let animationFrameID = 0;
+    let nestedAnimationFrameID = 0;
+    let timeoutID = 0;
+
+    const revealThread = () => {
+      setRevealedGroupThreadKey((current) => (current === selectedGroupId ? current : selectedGroupId));
+    };
+
+    animationFrameID = window.requestAnimationFrame(() => {
+      nestedAnimationFrameID = window.requestAnimationFrame(() => {
+        revealThread();
+      });
+    });
+    timeoutID = window.setTimeout(revealThread, 110);
+
+    return () => {
+      if (animationFrameID !== 0) {
+        window.cancelAnimationFrame(animationFrameID);
+      }
+      if (nestedAnimationFrameID !== 0) {
+        window.cancelAnimationFrame(nestedAnimationFrameID);
+      }
+      if (timeoutID !== 0) {
+        window.clearTimeout(timeoutID);
+      }
+    };
+  }, [
+    encryptedGroupLane.status,
+    encryptedThreadMessages.length,
+    groupWindowContentMode,
+    searchJumpIntent,
+    selectedGroupCallEntry?.call.id,
+    selectedGroupId,
+  ]);
 
   if (authState.status !== "authenticated") {
     return null;
@@ -2882,6 +2940,14 @@ export function GroupsPage() {
                       ref={messagesViewportRef}
                     >
                       <div className={styles.messagesList} ref={messagesListRef}>
+                      <div
+                        aria-hidden={shouldRevealEncryptedGroupTimeline ? undefined : "true"}
+                        style={
+                          shouldRevealEncryptedGroupTimeline
+                            ? undefined
+                            : { visibility: "hidden", pointerEvents: "none" }
+                        }
+                      >
                       {encryptedThreadMessages.length === 0 ? (
                         <InlineState
                           title="Сообщений пока нет"
@@ -3281,6 +3347,13 @@ export function GroupsPage() {
                         пока не открываются.
                         {typingLabel ? ` ${typingLabel}` : ""}
                       </div>
+                      </div>
+                      {!shouldRevealEncryptedGroupTimeline && (
+                        <InlineState
+                          title="Открываем последние сообщения"
+                          message="Фиксируем нижнюю границу переписки перед показом ленты."
+                        />
+                      )}
                       </div>
                     </div>
                   </>
