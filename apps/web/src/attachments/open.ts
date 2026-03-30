@@ -1,5 +1,18 @@
 import { gatewayClient } from "../gateway/runtime";
 
+export function openUrlInNewTab(url: string): void {
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.target = "_blank";
+  anchor.rel = "noopener noreferrer";
+  anchor.style.display = "none";
+
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
 export async function resolveAttachmentDownloadUrl(
   token: string,
   attachmentId: string,
@@ -17,13 +30,7 @@ export async function openAttachmentInNewTab(
   attachmentId: string,
 ): Promise<void> {
   const downloadUrl = await resolveAttachmentDownloadUrl(token, attachmentId);
-
-  const openedWindow = window.open(downloadUrl, "_blank", "noopener,noreferrer");
-  if (openedWindow !== null) {
-    return;
-  }
-
-  window.location.assign(downloadUrl);
+  openUrlInNewTab(downloadUrl);
 }
 
 export async function downloadAttachment(

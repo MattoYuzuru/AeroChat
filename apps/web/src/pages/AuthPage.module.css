@@ -28,6 +28,9 @@
 
 .formCard {
   width: min(100%, 24rem);
+  min-height: 34.5rem;
+  display: flex;
+  flex-direction: column;
   padding: 1.15rem 1.15rem 1rem;
   border: 1px solid #7b95b8;
   background:
@@ -109,6 +112,8 @@
 
 .form {
   display: grid;
+  flex: 1 1 auto;
+  align-content: start;
   gap: 0.8rem;
   margin-top: 1rem;
 }
@@ -151,7 +156,8 @@
 }
 
 .switchText {
-  margin: 0.85rem 0 0;
+  margin: 0;
+  padding-top: 0.85rem;
   color: #315377;
   text-align: center;
 }
@@ -171,6 +177,10 @@
   .viewport {
     padding-top: 4rem;
     padding-bottom: 3rem;
+  }
+
+  .formCard {
+    min-height: 32.75rem;
   }
 
   .formTitle {

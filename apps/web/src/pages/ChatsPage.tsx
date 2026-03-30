@@ -1521,87 +1521,62 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       </div>
                     </div>
 
-                    <div className={styles.profileHero}>
-                      <div className={styles.threadIdentity}>
-                        <span
-                          className={`${styles.avatarBadge} ${styles.avatarBadgeLarge}`}
-                          aria-hidden="true"
-                        >
-                          {getParticipantInitials(selectedPeer)}
-                        </span>
+                    <div className={styles.profileOverviewGrid}>
+                      <div className={styles.profileHero}>
+                        <div className={styles.threadIdentity}>
+                          <span
+                            className={`${styles.avatarBadge} ${styles.avatarBadgeLarge}`}
+                            aria-hidden="true"
+                          >
+                            {getParticipantInitials(selectedPeer)}
+                          </span>
 
-                        <div>
-                          <p className={styles.threadEyebrow}>Профиль и информация</p>
-                          <h3 className={styles.threadTitle}>
-                            {selectedDirectProfile?.nickname ?? selectedPeer?.nickname ?? "Собеседник"}
-                          </h3>
-                          <p className={styles.threadDescription}>
-                            {describeDirectProfileSummary(selectedDirectProfile)}
-                          </p>
+                          <div className={styles.profileHeroBody}>
+                            <p className={styles.threadEyebrow}>Профиль и информация</p>
+                            <h3 className={styles.threadTitle}>
+                              {selectedDirectProfile?.nickname ?? selectedPeer?.nickname ?? "Собеседник"}
+                            </h3>
+                            <p className={styles.threadDescription}>
+                              {describeDirectProfileSummary(selectedDirectProfile)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className={styles.profileActions}>
+                          <StatusPill
+                            label={describePresenceStatus(selectedThread.presenceState)}
+                            tone={selectedThread.presenceState?.peerPresence ? "success" : "neutral"}
+                          />
+                          <StatusPill
+                            label={activeReadStatusLabel}
+                            tone={activeReadStatusTone}
+                          />
+                          {selectedThread.typingState?.peerTyping && (
+                            <StatusPill
+                              label={describeTypingStatus(selectedThread.typingState)}
+                              tone="accent"
+                            />
+                          )}
+                          {selectedDirectProfile !== null && (
+                            <button
+                              className={styles.secondaryButton}
+                              disabled={pendingRemoveFriendLabel !== null}
+                              onClick={() => {
+                                void people.removeFriend(selectedDirectProfile.login);
+                              }}
+                              type="button"
+                            >
+                              {pendingRemoveFriendLabel ?? "Удалить из друзей"}
+                            </button>
+                          )}
                         </div>
                       </div>
 
-                      <div className={styles.profileActions}>
-                        {selectedDirectProfile !== null && (
-                          <button
-                            className={styles.secondaryButton}
-                            disabled={pendingRemoveFriendLabel !== null}
-                            onClick={() => {
-                              void people.removeFriend(selectedDirectProfile.login);
-                            }}
-                            type="button"
-                          >
-                            {pendingRemoveFriendLabel ?? "Удалить из друзей"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className={styles.threadStatusRow}>
-                      <StatusPill
-                        label={describePresenceStatus(selectedThread.presenceState)}
-                        tone={selectedThread.presenceState?.peerPresence ? "success" : "neutral"}
-                      />
-                      <StatusPill
-                        label={activeReadStatusLabel}
-                        tone={activeReadStatusTone}
-                      />
-                      {selectedThread.typingState?.peerTyping && (
-                        <StatusPill
-                          label={describeTypingStatus(selectedThread.typingState)}
-                          tone="accent"
-                        />
-                      )}
-                    </div>
-
-                    {people.state.status === "loading" && (
-                      <div className={styles.notice}>
-                        Подтягиваем friends/profile snapshot, чтобы показать актуальную карточку
-                        контакта без открытия отдельного окна.
-                      </div>
-                    )}
-
-                    {people.state.status === "error" && (
-                      <div className={styles.error}>
-                        {people.state.screenErrorMessage ??
-                          "Не удалось загрузить данные контакта через people surface."}
-                      </div>
-                    )}
-
-                    {people.state.actionErrorMessage && (
-                      <div className={styles.error}>{people.state.actionErrorMessage}</div>
-                    )}
-
-                    {people.state.notice && <div className={styles.notice}>{people.state.notice}</div>}
-                    {(directNotificationsError || webNotifications.error) && (
-                      <div className={styles.error}>
-                        {directNotificationsError ?? webNotifications.error}
-                      </div>
-                    )}
-
-                    <div className={styles.profileFactsGrid}>
-                      <article className={styles.profileFactCard}>
-                        <p className={styles.cardLabel}>Уведомления</p>
+                      <aside className={styles.profileAsideCard}>
+                        <div className={styles.profileSectionHeader}>
+                          <p className={styles.cardLabel}>Уведомления</p>
+                          <h4 className={styles.profileFactTitle}>Push для этого чата</h4>
+                        </div>
                         <label className={styles.notificationToggleCard}>
                           <div className={styles.notificationToggleCopy}>
                             <strong>Уведомления по этому чату</strong>
@@ -1631,10 +1606,40 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                             webNotifications.subscriptionStatus,
                           )}
                         </p>
-                      </article>
+                      </aside>
+                    </div>
 
+                    {people.state.status === "loading" && (
+                      <div className={styles.notice}>
+                        Подтягиваем friends/profile snapshot, чтобы показать актуальную карточку
+                        контакта без открытия отдельного окна.
+                      </div>
+                    )}
+
+                    {people.state.status === "error" && (
+                      <div className={styles.error}>
+                        {people.state.screenErrorMessage ??
+                          "Не удалось загрузить данные контакта через people surface."}
+                      </div>
+                    )}
+
+                    {people.state.actionErrorMessage && (
+                      <div className={styles.error}>{people.state.actionErrorMessage}</div>
+                    )}
+
+                    {people.state.notice && <div className={styles.notice}>{people.state.notice}</div>}
+                    {(directNotificationsError || webNotifications.error) && (
+                      <div className={styles.error}>
+                        {directNotificationsError ?? webNotifications.error}
+                      </div>
+                    )}
+
+                    <div className={styles.profileFactsGrid}>
                       <article className={styles.profileFactCard}>
-                        <p className={styles.cardLabel}>Контакт</p>
+                        <div className={styles.profileSectionHeader}>
+                          <p className={styles.cardLabel}>Контакт</p>
+                          <h4 className={styles.profileFactTitle}>Чат и контакт</h4>
+                        </div>
                         <dl className={styles.profileFactList}>
                           <div>
                             <dt>Login</dt>
@@ -1660,7 +1665,10 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       </article>
 
                       <article className={styles.profileFactCard}>
-                        <p className={styles.cardLabel}>Публичный профиль</p>
+                        <div className={styles.profileSectionHeader}>
+                          <p className={styles.cardLabel}>Профиль и приватность</p>
+                          <h4 className={styles.profileFactTitle}>Публичные поля и границы</h4>
+                        </div>
                         <dl className={styles.profileFactList}>
                           <div>
                             <dt>Status</dt>
@@ -1678,12 +1686,6 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                             <dt>День рождения</dt>
                             <dd>{selectedDirectProfile?.birthday ?? "не задан"}</dd>
                           </div>
-                        </dl>
-                      </article>
-
-                      <article className={styles.profileFactCard}>
-                        <p className={styles.cardLabel}>Приватность и thread</p>
-                        <dl className={styles.profileFactList}>
                           <div>
                             <dt>Read receipts</dt>
                             <dd>

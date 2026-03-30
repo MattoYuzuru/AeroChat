@@ -2438,11 +2438,13 @@ export function GroupsPage() {
             <>
               <section
                 className={`${styles.panelCard} ${
-                  groupWindowContentMode === "thread" ? styles.threadHeroCard : ""
+                  groupWindowContentMode === "thread"
+                    ? styles.threadHeroCard
+                    : styles.groupInfoHeroCard
                 }`}
               >
-                <div className={styles.splitHeader}>
-                  {groupWindowContentMode === "thread" ? (
+                {groupWindowContentMode === "thread" ? (
+                  <div className={styles.splitHeader}>
                     <button
                       className={`${styles.groupIdentityButton} ${styles.threadIdentityButton}`}
                       onClick={() => {
@@ -2468,50 +2470,29 @@ export function GroupsPage() {
                         </div>
                       </div>
                     </button>
-                  ) : (
-                    <div>
-                      <p className={styles.cardLabel}>Сведения</p>
-                      <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
-                      <p className={styles.description}>
-                        Управление группой остаётся в этом же окне. Текущая роль:{" "}
-                        {roleLabel(selectedState.snapshot.group.selfRole)}.
-                      </p>
-                    </div>
-                  )}
 
-                  <div
-                    className={
-                      groupWindowContentMode === "thread"
-                        ? styles.threadStatusRow
-                        : styles.badgeColumn
-                    }
-                  >
-                    {groupWindowContentMode === "thread" && (
-                      <>
-                        {selectedState.snapshot.group.encryptedUnreadCount > 0 && (
-                          <span className={styles.statusPill}>
-                            Новых: {selectedState.snapshot.group.encryptedUnreadCount}
-                          </span>
-                        )}
-                        <span className={styles.metaTag}>
-                          {encryptedGroupLane.status === "ready"
-                            ? `${encryptedThreadMessages.length} сообщений`
-                            : encryptedGroupLane.status === "unavailable"
-                              ? "Недоступно"
-                              : encryptedGroupLane.status === "error"
-                                ? "Ошибка"
-                                : "Загружаем"}
-                        </span>
+                    <div className={styles.threadStatusRow}>
+                      {selectedState.snapshot.group.encryptedUnreadCount > 0 && (
                         <span className={styles.statusPill}>
-                          {selectedState.snapshot.thread.canSendMessages
-                            ? "Можно писать"
-                            : selectedSelfMember?.isWriteRestricted
-                              ? "Отправка ограничена"
-                              : "Только чтение"}
+                          Новых: {selectedState.snapshot.group.encryptedUnreadCount}
                         </span>
-                      </>
-                    )}
-                    {groupWindowContentMode === "thread" && (
+                      )}
+                      <span className={styles.metaTag}>
+                        {encryptedGroupLane.status === "ready"
+                          ? `${encryptedThreadMessages.length} сообщений`
+                          : encryptedGroupLane.status === "unavailable"
+                            ? "Недоступно"
+                            : encryptedGroupLane.status === "error"
+                              ? "Ошибка"
+                              : "Загружаем"}
+                      </span>
+                      <span className={styles.statusPill}>
+                        {selectedState.snapshot.thread.canSendMessages
+                          ? "Можно писать"
+                          : selectedSelfMember?.isWriteRestricted
+                            ? "Отправка ограничена"
+                            : "Только чтение"}
+                      </span>
                       <button
                         aria-label="Управление звонком"
                         className={styles.iconButton}
@@ -2538,60 +2519,158 @@ export function GroupsPage() {
                       >
                         <ChatGlyph kind="phone" />
                       </button>
-                    )}
-                    {groupWindowContentMode === "thread" && !isDesktopTargetWindow && (
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={clearGroupSelection}
-                        type="button"
-                      >
-                        Назад к списку
-                      </button>
-                    )}
-                    {groupWindowContentMode === "info" && (
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={() => {
-                          setGroupInfoMode("thread");
-                        }}
-                        type="button"
-                      >
-                        Назад к переписке
-                      </button>
-                    )}
-                    {groupWindowContentMode === "info" && (
-                      <span className={styles.statusPill}>
-                        {selectedState.snapshot.thread.canSendMessages
-                          ? "Можно писать"
-                          : selectedSelfMember?.isWriteRestricted
-                            ? "Отправка ограничена"
-                            : "Только чтение"}
-                      </span>
-                    )}
-                    {groupWindowContentMode === "info" &&
-                      selectedState.snapshot.group.permissions.canLeaveGroup && (
-                      <button
-                        className={styles.dangerButton}
-                        disabled={isLeavingGroup}
-                        onClick={() => {
-                          void handleLeaveGroup();
-                        }}
-                        type="button"
-                      >
-                        {isLeavingGroup ? "Выходим..." : "Покинуть группу"}
-                      </button>
-                    )}
-                    {groupWindowContentMode === "info" && (
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={clearGroupSelection}
-                        type="button"
-                      >
-                        Закрыть
-                      </button>
-                    )}
+                      {!isDesktopTargetWindow && (
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={clearGroupSelection}
+                          type="button"
+                        >
+                          Назад к списку
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className={styles.groupInfoHero}>
+                      <div className={styles.threadIdentity}>
+                        <span className={`${styles.avatarBadge} ${styles.avatarBadgeLarge}`} aria-hidden="true">
+                          {getGroupInitials(selectedState.snapshot.group.name)}
+                        </span>
+
+                        <div>
+                          <p className={styles.cardLabel}>Сведения</p>
+                          <h2 className={styles.panelTitle}>{selectedState.snapshot.group.name}</h2>
+                          <p className={styles.description}>
+                            Управление группой остаётся в этом же окне. Текущая роль:{" "}
+                            {roleLabel(selectedState.snapshot.group.selfRole)}.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className={styles.groupInfoHeaderActions}>
+                        <span className={styles.statusPill}>
+                          {selectedState.snapshot.thread.canSendMessages
+                            ? "Можно писать"
+                            : selectedSelfMember?.isWriteRestricted
+                              ? "Отправка ограничена"
+                              : "Только чтение"}
+                        </span>
+                        <button
+                          className={styles.secondaryButton}
+                          onClick={() => {
+                            setGroupInfoMode("thread");
+                          }}
+                          type="button"
+                        >
+                          Назад к переписке
+                        </button>
+                        {selectedState.snapshot.group.permissions.canLeaveGroup && (
+                          <button
+                            className={styles.dangerButton}
+                            disabled={isLeavingGroup}
+                            onClick={() => {
+                              void handleLeaveGroup();
+                            }}
+                            type="button"
+                          >
+                            {isLeavingGroup ? "Выходим..." : "Покинуть группу"}
+                          </button>
+                        )}
+                        <button
+                          className={styles.ghostButton}
+                          onClick={clearGroupSelection}
+                          type="button"
+                        >
+                          Закрыть
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className={styles.groupInfoOverviewGrid}>
+                      <article className={styles.groupInfoOverviewCard}>
+                        <div>
+                          <p className={styles.cardLabel}>Сводка</p>
+                          <h3 className={styles.blockTitle}>Состояние группы</h3>
+                        </div>
+
+                        <dl className={styles.groupInfoMetaGrid}>
+                          <div>
+                            <dt>Роль</dt>
+                            <dd>{roleLabel(selectedState.snapshot.group.selfRole)}</dd>
+                          </div>
+                          <div>
+                            <dt>Участников</dt>
+                            <dd>{selectedState.members.length}</dd>
+                          </div>
+                          <div>
+                            <dt>Создана</dt>
+                            <dd>{formatDateTime(selectedState.snapshot.group.createdAt)}</dd>
+                          </div>
+                          <div>
+                            <dt>Обновлена</dt>
+                            <dd>{formatDateTime(selectedState.snapshot.group.updatedAt)}</dd>
+                          </div>
+                          <div>
+                            <dt>Переписка</dt>
+                            <dd>{formatDateTime(selectedState.snapshot.thread.updatedAt)}</dd>
+                          </div>
+                          <div>
+                            <dt>Ссылки</dt>
+                            <dd>
+                              {selectedState.snapshot.group.permissions.canManageInviteLinks
+                                ? `${selectedState.inviteLinks.length} доступно`
+                                : "без прав управления"}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+
+                      <article className={styles.groupInfoOverviewCard}>
+                        <div>
+                          <p className={styles.cardLabel}>Уведомления</p>
+                          <h3 className={styles.blockTitle}>Push для этой группы</h3>
+                        </div>
+
+                        {(groupNotificationsError || webNotifications.error) && (
+                          <div className={styles.error}>
+                            {groupNotificationsError ?? webNotifications.error}
+                          </div>
+                        )}
+
+                        <label className={styles.notificationToggleCard}>
+                          <div className={styles.notificationToggleCopy}>
+                            <strong>Уведомления по этой группе</strong>
+                            <span>
+                              Отдельный переключатель управляет только этой группой и не меняет
+                              остальные чаты.
+                            </span>
+                          </div>
+                          <input
+                            checked={selectedState.snapshot.group.notificationsEnabled !== false}
+                            className={`${styles.notificationToggleInput} xpCheckbox`}
+                            disabled={
+                              isUpdatingGroupNotifications || webNotifications.isSupported === false
+                            }
+                            onChange={(event) => {
+                              void handleGroupNotificationsToggle(event.target.checked);
+                            }}
+                            type="checkbox"
+                          />
+                        </label>
+
+                        <p className={styles.helperText}>
+                          Browser push:{" "}
+                          {describeInlineBrowserPushState(
+                            webNotifications.isSupported,
+                            webNotifications.permission,
+                            webNotifications.subscriptionStatus,
+                          )}
+                        </p>
+                      </article>
+                    </div>
+                  </>
+                )}
               </section>
 
               {groupWindowContentMode === "thread" && (
@@ -2837,38 +2916,16 @@ export function GroupsPage() {
                             </div>
 
                             {entry.kind === "message" && !entry.isTombstone && (
-                              <div className={styles.actions}>
+                              <div className={styles.messageActions}>
                                 <button
-                                  className={styles.secondaryButton}
-                                  onClick={() => {
-                                    setSelectedEncryptedReplyMessageId(entry.messageId);
-                                    setEditingEncryptedMessageId(null);
-                                    setEncryptedComposerError(null);
-                                    setActionError(null);
-                                    setNotice(null);
-                                  }}
-                                  type="button"
-                                >
-                                  Ответить
-                                </button>
-                                {entry.senderUserId === authState.profile.id && (
-                                  <button
-                                    className={styles.secondaryButton}
-                                    onClick={() => {
-                                      setEditingEncryptedMessageId(entry.messageId);
-                                      setSelectedEncryptedReplyMessageId(entry.replyToMessageId);
-                                      setEncryptedComposerText(entry.text ?? "");
-                                      setEncryptedComposerError(null);
-                                      setActionError(null);
-                                      setNotice(null);
-                                    }}
-                                    type="button"
-                                  >
-                                    Редактировать
-                                  </button>
-                                )}
-                                <button
-                                  className={styles.secondaryButton}
+                                  aria-label={
+                                    selectedState.snapshot.group.encryptedPinnedMessageIds.includes(
+                                      entry.messageId,
+                                    )
+                                      ? "Снять закрепление"
+                                      : "Закрепить"
+                                  }
+                                  className={styles.messageActionButton}
                                   onClick={() => {
                                     void handleToggleEncryptedGroupPin(
                                       entry.messageId,
@@ -2879,21 +2936,57 @@ export function GroupsPage() {
                                   }}
                                   type="button"
                                 >
-                                  {selectedState.snapshot.group.encryptedPinnedMessageIds.includes(
-                                    entry.messageId,
-                                  )
-                                    ? "Снять закрепление"
-                                    : "Закрепить"}
+                                  <ChatGlyph
+                                    kind={
+                                      selectedState.snapshot.group.encryptedPinnedMessageIds.includes(
+                                        entry.messageId,
+                                      )
+                                        ? "unpin"
+                                        : "pin"
+                                    }
+                                  />
+                                </button>
+                                <button
+                                  aria-label="Ответить"
+                                  className={styles.messageActionButton}
+                                  onClick={() => {
+                                    setSelectedEncryptedReplyMessageId(entry.messageId);
+                                    setEditingEncryptedMessageId(null);
+                                    setEncryptedComposerError(null);
+                                    setActionError(null);
+                                    setNotice(null);
+                                  }}
+                                  type="button"
+                                >
+                                  <ChatGlyph kind="reply" />
                                 </button>
                                 {entry.senderUserId === authState.profile.id && (
                                   <button
-                                    className={styles.secondaryButton}
+                                    aria-label="Редактировать"
+                                    className={styles.messageActionButton}
+                                    onClick={() => {
+                                      setEditingEncryptedMessageId(entry.messageId);
+                                      setSelectedEncryptedReplyMessageId(entry.replyToMessageId);
+                                      setEncryptedComposerText(entry.text ?? "");
+                                      setEncryptedComposerError(null);
+                                      setActionError(null);
+                                      setNotice(null);
+                                    }}
+                                    type="button"
+                                  >
+                                    <ChatGlyph kind="edit" />
+                                </button>
+                                )}
+                                {entry.senderUserId === authState.profile.id && (
+                                  <button
+                                    aria-label="Удалить для всех"
+                                    className={styles.messageActionButton}
                                     onClick={() => {
                                       void handleDeleteEncryptedGroupMessage(entry);
                                     }}
                                     type="button"
                                   >
-                                    Удалить для всех
+                                    <ChatGlyph kind="delete" />
                                   </button>
                                 )}
                               </div>
@@ -3447,56 +3540,7 @@ export function GroupsPage() {
 
               {groupWindowContentMode === "info" && (
                 <>
-              <section className={styles.panelCard}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <p className={styles.cardLabel}>Уведомления</p>
-                    <h2 className={styles.panelTitle}>Push для этой группы</h2>
-                  </div>
-                  <p className={styles.panelCopy}>
-                    Новое непрочитанное сообщение может прийти push-уведомлением, если AeroChat не
-                    открыт на активной вкладке.
-                  </p>
-                </div>
-
-                {(groupNotificationsError || webNotifications.error) && (
-                  <div className={styles.error}>
-                    {groupNotificationsError ?? webNotifications.error}
-                  </div>
-                )}
-
-                <label className={styles.notificationToggleCard}>
-                  <div className={styles.notificationToggleCopy}>
-                    <strong>Уведомления по этой группе</strong>
-                    <span>
-                      Отдельный переключатель управляет только этой группой и не меняет остальные
-                      чаты.
-                    </span>
-                  </div>
-                  <input
-                    checked={selectedState.snapshot.group.notificationsEnabled !== false}
-                    className={`${styles.notificationToggleInput} xpCheckbox`}
-                    disabled={
-                      isUpdatingGroupNotifications || webNotifications.isSupported === false
-                    }
-                    onChange={(event) => {
-                      void handleGroupNotificationsToggle(event.target.checked);
-                    }}
-                    type="checkbox"
-                  />
-                </label>
-
-                <p className={styles.helperText}>
-                  Browser push:{" "}
-                  {describeInlineBrowserPushState(
-                    webNotifications.isSupported,
-                    webNotifications.permission,
-                    webNotifications.subscriptionStatus,
-                  )}
-                </p>
-              </section>
-
-              <section className={styles.panelCard}>
+              <section className={`${styles.panelCard} ${styles.groupInfoPanel}`}>
                 <div className={styles.panelHeader}>
                   <div>
                     <p className={styles.cardLabel}>Участники</p>
@@ -3686,7 +3730,7 @@ export function GroupsPage() {
                 )}
               </section>
 
-              <section className={styles.panelCard}>
+              <section className={`${styles.panelCard} ${styles.groupInfoPanel}`}>
                 <div className={styles.panelHeader}>
                   <div>
                     <p className={styles.cardLabel}>Приглашения</p>
