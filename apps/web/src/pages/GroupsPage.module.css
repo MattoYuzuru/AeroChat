@@ -81,6 +81,42 @@
   min-width: 0;
 }
 
+.groupInfoHeroCard {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.groupInfoHero {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.groupInfoHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.groupInfoOverviewGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+
+.groupInfoOverviewCard {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  border: 1px solid var(--xp-note-border);
+  background: var(--xp-panel-surface-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
 .threadIdentity > div {
   min-width: 0;
 }
@@ -263,6 +299,14 @@
   border: 1px solid var(--xp-note-border);
   background: var(--xp-panel-surface-strong);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.groupInfoOverviewCard .notificationToggleCard {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .notificationToggleCopy {
@@ -597,16 +641,24 @@
 
 .composerRow {
   display: grid;
-  grid-template-columns: 2.15rem minmax(0, 1fr) 2.15rem 2.15rem 2.15rem;
-  gap: 0.3rem;
+  grid-template-columns: 2.45rem minmax(0, 1fr) 2.45rem 2.45rem 2.45rem;
+  gap: 0.35rem;
   align-items: stretch;
 }
 
+.messageActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.messageActionButton,
 .iconButton,
 .primaryIconButton {
-  width: 2.15rem;
-  height: 2.15rem;
-  min-height: 2.15rem;
+  width: 2.45rem;
+  height: 2.45rem;
+  min-height: 2.45rem;
   padding: 0;
   border: 1px solid #6f89ae;
   background: var(--xp-button-surface);
@@ -624,12 +676,14 @@
   color: #ffffff;
 }
 
+.messageActionButton svg,
 .iconButton svg,
 .primaryIconButton svg {
   width: 1rem;
   height: 1rem;
 }
 
+.messageActionButton:disabled,
 .iconButton:disabled,
 .primaryIconButton:disabled {
   opacity: 0.6;
@@ -650,9 +704,9 @@
 }
 
 .composerCard .field textarea {
-  min-height: 1.8rem;
+  min-height: 2.45rem;
   max-height: 4.5rem;
-  padding: 0.28rem 0.42rem;
+  padding: 0.42rem 0.55rem;
 }
 
 .attachmentInput {
@@ -834,6 +888,53 @@
   flex-wrap: wrap;
 }
 
+.groupInfoMetaGrid,
+.groupInfoMetaGrid div {
+  display: grid;
+  gap: 0.24rem;
+}
+
+.groupInfoMetaGrid {
+  margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0.8rem 1rem;
+}
+
+.groupInfoMetaGrid dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(34, 77, 118, 0.74);
+}
+
+.groupInfoMetaGrid dd {
+  margin: 0;
+  color: rgba(3, 50, 82, 0.88);
+  overflow-wrap: anywhere;
+}
+
+.groupInfoPanel .memberList,
+.groupInfoPanel .inviteList {
+  gap: 0;
+}
+
+.groupInfoPanel .memberCard,
+.groupInfoPanel .inviteCard {
+  max-width: none;
+  padding: 0.85rem 0;
+  border: 0;
+  border-top: 1px solid rgba(91, 132, 176, 0.18);
+  background: transparent;
+  box-shadow: none;
+}
+
+.groupInfoPanel .memberCard:first-child,
+.groupInfoPanel .inviteCard:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .desktopWindowLayout .primaryButton,
 .desktopWindowLayout .secondaryButton,
 .desktopWindowLayout .dangerButton,
@@ -966,11 +1067,16 @@
     align-items: flex-start;
   }
 
+  .groupInfoHero,
+  .groupInfoHeaderActions {
+    justify-content: flex-start;
+  }
+
   .threadStatusRow {
     justify-content: flex-start;
   }
 
   .composerRow {
-    grid-template-columns: 2.15rem minmax(0, 1fr) 2.15rem 2.15rem 2.15rem;
+    grid-template-columns: 2.45rem minmax(0, 1fr) 2.45rem 2.45rem 2.45rem;
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import type { EncryptedMediaAttachmentDescriptor } from "../crypto/types";
 import { gatewayClient } from "../gateway/runtime";
+import { openUrlInNewTab } from "../attachments/open";
 import {
   formatAttachmentSize,
   getAttachmentDisplayDescriptor,
@@ -308,10 +309,7 @@ async function openEncryptedAttachment(
     existingUrl === undefined
       ? await resolveEncryptedAttachmentObjectUrl(cryptoRuntime, accessToken, attachment)
       : { url: existingUrl, revoke() {} };
-  const openedWindow = window.open(resolved.url, "_blank", "noopener,noreferrer");
-  if (openedWindow === null) {
-    window.location.assign(resolved.url);
-  }
+  openUrlInNewTab(resolved.url);
   if (existingUrl === undefined) {
     window.setTimeout(() => {
       resolved.revoke();
