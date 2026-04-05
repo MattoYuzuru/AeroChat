@@ -49,6 +49,29 @@ AeroChat должен поддерживать:
 - desktop shell на ПК;
 - PWA на мобильных устройствах.
 
+### Примеры на фото
+
+**1. Внешняя оболочка**
+
+<img width="1130" height="764" alt="Screenshot From 2026-04-05 21-51-10" src="https://github.com/user-attachments/assets/2b34e69f-1d95-40fc-8165-583448c8b1f0" />
+
+**2. Login screen**
+
+<img width="862" height="764" alt="Screenshot From 2026-04-05 21-50-44" src="https://github.com/user-attachments/assets/60dc3b5c-069e-42af-97da-0dac2c233eb6" />
+
+**3. Пустой рабочий стол**
+
+<img width="1920" height="1005" alt="Screenshot From 2026-04-05 21-35-09" src="https://github.com/user-attachments/assets/475fbaed-f048-47f6-a34b-9846ac318fa7" />
+
+**4. Открытое меню пуск с окном проводника**
+
+<img width="1920" height="1005" alt="Screenshot From 2026-04-05 21-49-47" src="https://github.com/user-attachments/assets/6756ba01-f6b8-4472-baa0-035029587b37" />
+
+**5. Рабочий стол с открытыми чатами**
+
+<img width="1920" height="1005" alt="Screenshot From 2026-04-05 21-44-34" src="https://github.com/user-attachments/assets/f1b9494e-23f5-4f08-86e7-5e661d27e9be" />
+
+
 ### Текущий alpha snapshot
 
 На текущем этапе web-клиент уже поддерживает:
