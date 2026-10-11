@@ -39,6 +39,7 @@ type session struct {
 	authenticator       Authenticator
 	boundCryptoDeviceID string
 	outbound            chan Envelope
+	revalidation        chan struct{}
 	ctx                 context.Context
 	cancel              context.CancelFunc
 	closeOnce           sync.Once
@@ -82,7 +83,10 @@ func (h *Hub) ServeConnection(conn *websocket.Conn, principal Principal, authTok
 // Решение о действительности каждой сессии по-прежнему принимает identity.
 func (h *Hub) RevalidateUser(userID string) {
 	for _, s := range h.userSessionsByID(userID) {
-		s.revalidate(h.writeTimeout)
+		select {
+		case s.revalidation <- struct{}{}:
+		default:
+		}
 	}
 }
 
@@ -217,6 +221,7 @@ func (h *Hub) register(conn *websocket.Conn, principal Principal, authToken stri
 		authToken:     strings.TrimSpace(authToken),
 		authenticator: authenticator,
 		outbound:      make(chan Envelope, defaultOutboundBuffer),
+		revalidation:  make(chan struct{}, 1),
 		ctx:           ctx,
 		cancel:        cancel,
 	}
@@ -316,6 +321,10 @@ func (s *session) run(h *Hub, pingInterval time.Duration, writeTimeout time.Dura
 			}
 			s.close(websocket.StatusInternalError, "read failed")
 			return err
+		case <-s.revalidation:
+			if !s.revalidate(writeTimeout) {
+				return nil
+			}
 		case envelope := <-s.outbound:
 			if !s.revalidate(writeTimeout) {
 				return nil

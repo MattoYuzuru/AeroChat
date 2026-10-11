@@ -181,11 +181,11 @@ handshake.
 - перед каждым outbound envelope, включая `connection.ready`, gateway заново вызывает `GetCurrentProfile` с исходным bearer token;
 - idle соединение перепроверяется перед каждым ping; максимальная задержка обнаружения отзыва — `AERO_REALTIME_PING_INTERVAL` плюс timeout проверки `AERO_REALTIME_WRITE_TIMEOUT`;
 - ошибка identity, timeout/cancellation или смена user ID закрывает соединение с policy violation, без доставки ожидающего envelope;
-- успешный logout сразу прекращает локальную доставку соединениям с этим token; успешный revoke session/device перепроверяет локальные соединения аккаунта, сохраняя действующие сессии;
+- успешный logout сразу прекращает локальную доставку соединениям с этим token; успешный revoke session/device передаёт coalesced сигнал перепроверки существующему writer loop каждой локальной сессии аккаунта, сохраняя действующие сессии;
 - если вспомогательное чтение профиля перед revoke не удалось, mutation всё равно передаётся identity, а доставка защищена перепроверкой перед write и heartbeat;
 - закрывающееся соединение сразу перестаёт принимать outbound events и новые crypto-device bindings; registry buckets очищаются при завершении connection handler.
 
-GetCurrentProfile не возвращает auth-device/session IDs. Gateway не восстанавливает независимую auth-модель из token или локального списка устройств. Проверка каждого write добавляет identity RPC; недоступность identity намеренно закрывает realtime канал. Envelope, отправка которого уже началась до отзыва, может завершиться в пределах write timeout. Отзыв auth session не отзывает crypto-device registry entry автоматически.
+GetCurrentProfile не возвращает auth-device/session IDs. Gateway не восстанавливает независимую auth-модель из token или локального списка устройств. Проверка каждого write добавляет identity RPC; недоступность identity намеренно закрывает realtime канал. Mutation не ждёт последовательных RPC для всех открытых соединений и не создаёт отдельные goroutines для перепроверки. Сигнал обрабатывается после текущей bounded writer operation; каждый следующий envelope защищён собственной проверкой. Envelope, отправка которого уже началась до отзыва, может завершиться в пределах write timeout. Отзыв auth session не отзывает crypto-device registry entry автоматически.
 
 ## Последствия
 
