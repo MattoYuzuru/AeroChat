@@ -209,19 +209,6 @@ jobs:
             printf '%s\n' "${line#*=}"
           }
 
-          update_env_var() {
-            local file="$1"
-            local key="$2"
-            local value="$3"
-
-            if grep -q "^${key}=" "$file"; then
-              sed -i "s#^${key}=.*#${key}=${value}#" "$file"
-              return
-            fi
-
-            printf '\n%s=%s\n' "$key" "$value" >> "$file"
-          }
-
           require_command bash
           require_command curl
           require_command docker
@@ -294,17 +281,51 @@ jobs:
 
           echo "Выбран immutable release $RELEASE_DIGEST source $SOURCE_SHA"
 
+          # Recovery metadata не содержит env secrets; previous selection сохраняется до mutation.
+          compatibility_args=()
+          if [ -f release-compatibility.json ]; then
+            compatibility_args+=(--compatibility-file release-compatibility.json)
+          fi
+          RECOVERY_RECORD="$(python3 infra/scripts/release_recovery.py begin \
+            --release "release-${SOURCE_SHA}.json" --source-sha "$SOURCE_SHA" \
+            --release-digest "$RELEASE_DIGEST" --namespace "$IMAGE_NAMESPACE" \
+            --env-file .env.server --secret-env-file .env.server.secrets --compose-file "$COMPOSE_FILE" \
+            --recovery-dir .release-recovery "${compatibility_args[@]}")"
+          STAGE=preflight
+          on_failure() {
+            local result=$?
+            trap - ERR
+            python3 infra/scripts/release_recovery.py stage "$RECOVERY_RECORD" --stage "$STAGE" --status failed || true
+            echo "Rollout failed at $STAGE. Recovery record: $RECOVERY_RECORD" >&2
+            case "$STAGE" in
+              config|pull) echo "Runtime ещё не менялся; исправьте configuration/acquisition и повторите preflight." >&2 ;;
+              *) echo "Остановите writers; проверьте schema compatibility перед previous-compose.json. При несовместимости используйте roll-forward или отдельный empty-target data restore; down migrations запрещены." >&2 ;;
+            esac
+            exit "$result"
+          }
+          trap on_failure ERR
+          stage() {
+            STAGE=$1
+            python3 infra/scripts/release_recovery.py stage "$RECOVERY_RECORD" --stage "$STAGE" --status pending
+          }
+
+          stage config
+
           docker compose \
             --env-file .env.server \
             --env-file .env.server.secrets \
             -f "$COMPOSE_FILE" -f "$RELEASE_OVERLAY" \
             config >/dev/null
 
+          stage pull
+
           docker compose \
             --env-file .env.server \
             --env-file .env.server.secrets \
             -f "$COMPOSE_FILE" -f "$RELEASE_OVERLAY" \
             pull --ignore-buildable
+
+          stage runtime
 
           docker compose \
             --env-file .env.server \
@@ -317,6 +338,8 @@ jobs:
             --env-file .env.server.secrets \
             -f "$COMPOSE_FILE" -f "$RELEASE_OVERLAY" \
             ps
+
+          stage health
 
           wait_for_url "Web upstream" "http://${shared_edge_host_ip}:${web_host_port}/"
           python3 infra/scripts/release_manifest.py runtime "release-${SOURCE_SHA}.json" --source-sha "$SOURCE_SHA" --namespace "$IMAGE_NAMESPACE" --compose-file "$COMPOSE_FILE" --overlay "$RELEASE_OVERLAY" --env-file .env.server --env-file .env.server.secrets
@@ -333,9 +356,11 @@ jobs:
             exit 1
           fi
 
-          update_env_var .env.server AERO_RELEASE_DIGEST "$RELEASE_DIGEST"
-          update_env_var .env.server AERO_RELEASE_SOURCE_SHA "$SOURCE_SHA"
-          echo "Rollback: выберите предыдущую пару release digest/source SHA и сохранённый release-compose JSON"
+          stage selection
+          python3 infra/scripts/release_recovery.py select --env-file .env.server --release-digest "$RELEASE_DIGEST" --source-sha "$SOURCE_SHA"
+          python3 infra/scripts/release_recovery.py stage "$RECOVERY_RECORD" --stage complete --status success
+          trap - ERR
+          echo "Recovery record: $RECOVERY_RECORD; предыдущий selection сохранён независимо от env"
           REMOTE
 
       - name: Write job summary

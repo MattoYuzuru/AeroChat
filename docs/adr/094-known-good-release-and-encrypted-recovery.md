@@ -13,7 +13,7 @@
 
 ### Release и schema boundary
 
-До `pull`/`up` workflow сохраняет отдельный recovery record: previous release digest/source SHA, validated пять image digests и overlay, candidate SHA, текущий этап и schema comparison. Секреты и env целиком в record не копируются. Первый запуск имеет explicit `previous = null` только для доказанно пустых durable targets. Если PostgreSQL/S3 уже содержат данные, а previous selection неизвестен, preflight останавливается до явного операторского baseline с inventory/schema evidence: отсутствие metadata не доказывает safe bootstrap.
+До `pull`/`up` workflow сохраняет отдельный recovery record: previous release digest/source SHA, validated пять image digests и overlay, candidate SHA, текущий этап и schema comparison. Секреты и env целиком в record не копируются. Unknown/partial previous selection блокирует automation всегда. Первый manual запуск допускается только на доказанно пустых durable targets, после revision/readiness/user smoke оператор сохраняет явный baseline. Если данные уже существуют, отсутствие metadata не доказывает safe bootstrap; нужны operator baseline и actual schema inventory evidence до mutation.
 
 Compose config и acquisition всех candidate images выполняются до замены runtime. Failure trap всегда сообщает stage и путь к record; failed attempt не обновляет known-good selection. Record для одного attempt не перезаписывает историю. Успешный rollout сохраняет новый selection только после revision/readiness gates. Automatic rollback и down migrations отсутствуют.
 
