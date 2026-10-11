@@ -45,7 +45,6 @@ export function AppRouter() {
 
 function PublicShellRoute({ mode }: { mode: "login" | "register" }) {
   const auth = useAuth();
-  const isDesktopViewport = useDesktopShellViewport();
   const shellEntry = useShellEntryState(auth.state);
 
   if (auth.state.status === "authenticated") {
@@ -55,8 +54,8 @@ function PublicShellRoute({ mode }: { mode: "login" | "register" }) {
   if (shellEntry.surface === "boot") {
     return (
       <ShellEntrySurface
-        eyebrow="Boot"
-        message="Поднимаем gateway-сессию и готовим handoff в auth application."
+        eyebrow="AeroChat"
+        message="Проверяем сессию. Сейчас откроется экран входа."
         surface="boot"
         title="Запуск AeroChat"
       />
@@ -66,54 +65,18 @@ function PublicShellRoute({ mode }: { mode: "login" | "register" }) {
   if (shellEntry.surface === "chooser") {
     return (
       <ShellEntrySurface
-        eyebrow="Boot chooser"
-        message="Выберите preset для текущего запуска. В этом slice тема остаётся одной, но boot model уже различает chooser, fast-entry и reboot path."
+        eyebrow="Оформление"
+        message="Оформление XP Aero готово. Продолжите, чтобы войти в AeroChat."
         surface="chooser"
-        title="System Configuration"
+        title="XP Aero"
         actions={
-          <>
-            <button
-              onClick={shellEntry.completeChooser}
-              style={surfaceButtonStyle}
-              type="button"
-            >
-              XP Aero
-            </button>
-            {isDesktopViewport && (
-              <button
-                onClick={shellEntry.skipChooserForNow}
-                style={surfaceButtonStyle}
-                type="button"
-              >
-                OS2 Aero
-              </button>
-            )}
-            {isDesktopViewport && (
-              <button
-                onClick={shellEntry.skipChooserForNow}
-                style={surfaceButtonStyle}
-                type="button"
-              >
-                OS3 Aero
-              </button>
-            )}
-            <button
-              onClick={shellEntry.completeChooser}
-              style={surfaceGhostButtonStyle}
-              type="button"
-            >
-              Continue to {mode === "login" ? "login" : "register"}
-            </button>
-            {isDesktopViewport && (
-              <button
-                onClick={shellEntry.skipChooserForNow}
-                style={surfaceGhostButtonStyle}
-                type="button"
-              >
-                Random
-              </button>
-            )}
-          </>
+          <button
+            onClick={shellEntry.completeChooser}
+            style={surfaceButtonStyle}
+            type="button"
+          >
+            Продолжить
+          </button>
         }
       />
     );
@@ -122,7 +85,7 @@ function PublicShellRoute({ mode }: { mode: "login" | "register" }) {
   if (shellEntry.surface === "error" && auth.state.status === "error") {
     return (
       <StateScreen
-        eyebrow="Session bootstrap"
+        eyebrow="Вход в AeroChat"
         message={auth.state.message}
         primaryAction={{
           label: "Повторить",
@@ -185,10 +148,10 @@ function ProtectedShellRoute() {
   if (shellEntry.surface === "boot") {
     return (
       <ShellEntrySurface
-        eyebrow="Boot"
-        message="Определяем, нужен ли chooser или можно войти в shell напрямую."
+        eyebrow="AeroChat"
+        message="Проверяем сессию и открываем AeroChat."
         surface="boot"
-        title="Подготовка desktop shell"
+        title="Запуск AeroChat"
       />
     );
   }
@@ -196,27 +159,18 @@ function ProtectedShellRoute() {
   if (shellEntry.surface === "chooser") {
     return (
       <ShellEntrySurface
-        eyebrow="Boot chooser"
-        message="Explicit reboot-to-boot flow требует подтверждения текущего desktop preset перед возвратом в shell."
+        eyebrow="Оформление"
+        message="Оформление XP Aero готово. Продолжите, чтобы вернуться в AeroChat."
         surface="chooser"
-        title="Boot Options"
+        title="XP Aero"
         actions={
-          <>
-            <button
-              onClick={shellEntry.completeChooser}
-              style={surfaceButtonStyle}
-              type="button"
-            >
-              XP Aero
-            </button>
-            <button
-              onClick={shellEntry.completeChooser}
-              style={surfaceGhostButtonStyle}
-              type="button"
-            >
-              Continue to desktop
-            </button>
-          </>
+          <button
+            onClick={shellEntry.completeChooser}
+            style={surfaceButtonStyle}
+            type="button"
+          >
+            Продолжить
+          </button>
         }
       />
     );
@@ -225,7 +179,7 @@ function ProtectedShellRoute() {
   if (shellEntry.surface === "error" && auth.state.status === "error") {
     return (
       <StateScreen
-        eyebrow="Gateway session"
+        eyebrow="Вход в AeroChat"
         message={auth.state.message}
         primaryAction={{
           label: "Повторить",
@@ -277,8 +231,8 @@ function RouteFallback() {
     return (
       <StateScreen
         eyebrow="AeroChat"
-        message="Определяем точку входа для текущей сессии."
-        title="Маршрутизация"
+        message="Проверяем сессию и открываем AeroChat."
+        title="Запуск AeroChat"
       />
     );
   }
@@ -320,10 +274,6 @@ function useShellEntryState(authState: ReturnType<typeof useAuth>["state"]) {
     });
   }
 
-  function skipChooserForNow() {
-    completeChooser();
-  }
-
   function requestRebootToBoot() {
     updatePreferences({
       ...preferences,
@@ -340,7 +290,6 @@ function useShellEntryState(authState: ReturnType<typeof useAuth>["state"]) {
       preferences,
     }),
     completeChooser,
-    skipChooserForNow,
     requestRebootToBoot,
     preferences,
   };
@@ -353,18 +302,6 @@ const surfaceButtonStyle = {
   color: "#edf4ee",
   background: "linear-gradient(180deg, #0f1922, #071017)",
   boxShadow: "inset 1px 1px 0 rgba(255, 255, 255, 0.08)",
-  cursor: "pointer",
-  fontFamily: '"Lucida Console", "Courier New", monospace',
-  textAlign: "left" as const,
-};
-
-const surfaceGhostButtonStyle = {
-  minHeight: "2.6rem",
-  padding: "0.62rem 0.9rem",
-  border: "1px solid #6d7f8f",
-  color: "#c3ceca",
-  background: "linear-gradient(180deg, rgba(20, 31, 41, 0.95), rgba(7, 14, 20, 0.95))",
-  boxShadow: "inset 1px 1px 0 rgba(255, 255, 255, 0.06)",
   cursor: "pointer",
   fontFamily: '"Lucida Console", "Courier New", monospace',
   textAlign: "left" as const,
