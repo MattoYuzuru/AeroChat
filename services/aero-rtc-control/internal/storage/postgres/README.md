@@ -19,9 +19,12 @@ repository; media flag, SDK/JWT, private RTC API, proxy, workers и frontend
 End/Leave/stale eviction с held grants обязаны возвращать pending cleanup.
 
 Store сохраняет opaque binding, tuple session/device revisions и eligibility
- epoch, отдельные room/grant generations, user mutex, source inbox/deny watermarks,
+epoch, отдельные room/grant generations, user mutex, source inbox/deny watermarks,
 operations/targets и cleanup outbox. Reserve+Join атомарны; prepared, active и
-revoking удерживают global user slot. Room mapping не меняется при join другого
+revoking удерживают global user slot. Quota комнаты считает held grants даже
+после legacy participant exit; room/user generation exhaustion возвращает
+unavailable без deny watermark. Ошибка PostgreSQL/cancellation не становится
+permanent authority deny. Room mapping не меняется при join другого
 user. IDs и counters не удостоверяют caller: будущий adapter должен проверять
 свежую Identity/Chat authority, mTLS owner registration и фактический proxy/SFU
 cleanup. Current management role здесь не кешируется. Ни bearer/JWT/hash/jti,

@@ -116,7 +116,7 @@ func (s *MediaStore) Reserve(ctx context.Context, r media.ReserveRequest) (media
 			return media.Grant{}, mediaError(nextErr)
 		}
 		if generation <= 0 || generation == math.MaxInt64 {
-			return media.Grant{}, media.ErrDenied
+			return media.Grant{}, media.ErrUnavailable
 		}
 		room, err = q.CreateMediaRoom(ctx, ql.CreateMediaRoomParams{ID: uuid.New(), CallID: r.CallID, GroupID: r.GroupID, RoomGeneration: generation, RoomName: uuid.New(), CreatedAt: timestamptzValue(r.At)})
 	}
@@ -151,6 +151,13 @@ func (s *MediaStore) Reserve(ctx context.Context, r media.ReserveRequest) (media
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return media.Grant{}, mediaError(err)
 	}
+	held, err := q.CountHeldMediaRoomGrants(ctx, room.ID)
+	if err != nil {
+		return media.Grant{}, mediaError(err)
+	}
+	if held >= 4 {
+		return media.Grant{}, media.ErrConflict
+	}
 	p, err := q.GetActiveParticipantByCallIDAndUserID(ctx, ql.GetActiveParticipantByCallIDAndUserIDParams{CallID: r.CallID, UserID: r.UserID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		count, countErr := q.CountActiveParticipantsByCallID(ctx, r.CallID)
@@ -173,6 +180,9 @@ func (s *MediaStore) Reserve(ctx context.Context, r media.ReserveRequest) (media
 		return media.Grant{}, media.ErrConflict
 	}
 	generation, err := q.AllocateMediaGrantGeneration(ctx, r.UserID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return media.Grant{}, media.ErrUnavailable
+	}
 	if err != nil {
 		return media.Grant{}, mediaError(err)
 	}
@@ -256,7 +266,13 @@ func (s *MediaStore) Activate(ctx context.Context, key media.Key, fresh media.Au
 		return media.Grant{}, media.ErrDenied
 	}
 	p, err := q.GetActiveParticipantByCallIDAndUserID(ctx, ql.GetActiveParticipantByCallIDAndUserIDParams{CallID: g.CallID, UserID: g.UserID})
-	if err != nil || p.ID != g.ParticipantID {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return media.Grant{}, media.ErrDenied
+	}
+	if err != nil {
+		return media.Grant{}, mediaError(err)
+	}
+	if p.ID != g.ParticipantID {
 		return media.Grant{}, media.ErrDenied
 	}
 	n, err := q.ActivateMediaGrant(ctx, ql.ActivateMediaGrantParams{ID: g.GrantID, ActivationIntentAt: timestamptzValue(at)})
@@ -302,7 +318,13 @@ func (s *MediaStore) RegisterLease(ctx context.Context, key media.Key, fresh med
 		return media.Lease{}, media.ErrDenied
 	}
 	p, err := q.GetActiveParticipantByCallIDAndUserID(ctx, ql.GetActiveParticipantByCallIDAndUserIDParams{CallID: g.CallID, UserID: g.UserID})
-	if err != nil || p.ID != g.ParticipantID {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return media.Lease{}, media.ErrDenied
+	}
+	if err != nil {
+		return media.Lease{}, mediaError(err)
+	}
+	if p.ID != g.ParticipantID {
 		return media.Lease{}, media.ErrDenied
 	}
 	lease, err := q.GetHeldMediaLease(ctx, key.GrantID)
@@ -544,6 +566,16 @@ func (s *MediaStore) applySourceEvent(ctx context.Context, e media.SourceEvent) 
 func targetKey(t ql.RtcMediaOperationTarget) media.Key {
 	return media.Key{GrantID: t.GrantID, RoomID: t.RoomID, RoomName: t.RoomName, RoomGeneration: t.RoomGeneration, ParticipantIdentity: t.ParticipantIdentity, GrantGeneration: t.GrantGeneration}
 }
+func matchingMediaClaimTarget(c media.CleanupClaim, t ql.RtcMediaOperationTarget) bool {
+	if targetKey(t) != c.Key {
+		return false
+	}
+	if !t.LeaseID.Valid {
+		return c.LeaseID == uuid.Nil && c.AdmissionOwner.ID == uuid.Nil && c.AdmissionOwner.Fence == 0
+	}
+	return uuid.UUID(t.LeaseID.Bytes) == c.LeaseID && uuid.UUID(t.ExpectedOwnerID.Bytes) == c.AdmissionOwner.ID && t.ExpectedOwnerFence.Int64 == c.AdmissionOwner.Fence
+}
+
 func (s *MediaStore) ClaimCleanup(ctx context.Context, operation uuid.UUID, key media.Key, action string, worker uuid.UUID, at, until time.Time) (media.CleanupClaim, error) {
 	if operation == uuid.Nil || worker == uuid.Nil || at.IsZero() || !until.After(at) || (action != "proxy" && action != "sfu") {
 		return media.CleanupClaim{}, media.ErrDenied
@@ -593,6 +625,13 @@ func (s *MediaStore) RetryCleanup(ctx context.Context, c media.CleanupClaim, ret
 	if g.State != "revoking" || g.OperationID != c.OperationID {
 		return media.ErrDenied
 	}
+	target, err := q.GetMediaOperationTarget(ctx, ql.GetMediaOperationTargetParams{OperationID: c.OperationID, GrantID: c.GrantID})
+	if err != nil {
+		return mediaError(err)
+	}
+	if !matchingMediaClaimTarget(c, target) {
+		return media.ErrDenied
+	}
 	n, err := q.RetryMediaCleanupAction(ctx, ql.RetryMediaCleanupActionParams{OperationID: c.OperationID, GrantID: c.GrantID, Action: c.Action, ClaimOwner: optionalUUID(c.Worker.ID), ClaimFence: c.Worker.Fence, RetryAt: timestamptzValue(retryAt), LastError: reason})
 	if err != nil {
 		return mediaError(err)
@@ -624,7 +663,7 @@ func (s *MediaStore) RecordCleanupAcknowledgement(ctx context.Context, c media.C
 	if targetKey(target) != c.Key {
 		return media.Operation{}, media.ErrDenied
 	}
-	if c.Action == "proxy" && (!target.LeaseID.Valid || uuid.UUID(target.LeaseID.Bytes) != c.LeaseID || uuid.UUID(target.ExpectedOwnerID.Bytes) != c.AdmissionOwner.ID || target.ExpectedOwnerFence.Int64 != c.AdmissionOwner.Fence) {
+	if !matchingMediaClaimTarget(c, target) {
 		return media.Operation{}, media.ErrDenied
 	}
 	stored, err := q.GetMediaCleanupAction(ctx, ql.GetMediaCleanupActionParams{OperationID: c.OperationID, GrantID: c.GrantID, Action: c.Action})

@@ -428,8 +428,18 @@ func TestMediaStoreDurabilityFaultRollbackAndExhaustion(t *testing.T) {
 	if _, err := db.Exec(ctx, "INSERT INTO rtc_media_user_generations(user_id,next_generation) VALUES($1,$2)", anotherUser, int64(math.MaxInt64)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Reserve(ctx, mediaTestRequest(anotherCall, anotherGroup, anotherUser)); !errors.Is(err, media.ErrDenied) {
+	if _, err := s.Reserve(ctx, mediaTestRequest(anotherCall, anotherGroup, anotherUser)); !errors.Is(err, media.ErrUnavailable) {
 		t.Fatal("exhausted generation accepted")
+	}
+	for _, query := range []string{"SELECT count(*) FROM rtc_media_grants WHERE user_id=$1", "SELECT count(*) FROM rtc_media_deny_watermarks WHERE user_id=$1"} {
+		var count int
+		if err := db.QueryRow(ctx, query, anotherUser).Scan(&count); err != nil || count != 0 {
+			t.Fatal("user exhaustion partially persisted grant/deny")
+		}
+	}
+	var next int64
+	if err := db.QueryRow(ctx, "SELECT next_generation FROM rtc_media_user_generations WHERE user_id=$1", anotherUser).Scan(&next); err != nil || next != math.MaxInt64 {
+		t.Fatal("user exhaustion changed generation counter")
 	}
 }
 
@@ -455,5 +465,106 @@ func TestMediaStoreTransientCleanupDoesNotRevokeAuthority(t *testing.T) {
 	var count int
 	if err := db.QueryRow(ctx, "SELECT count(*) FROM rtc_media_deny_watermarks").Scan(&count); err != nil || count != 0 {
 		t.Fatal("transient own cleanup poisoned authority watermark")
+	}
+}
+
+func TestMediaStoreFinalAckRollbackAndImmutableHistory(t *testing.T) {
+	db := mediaTestDatabase(t)
+	s := NewMediaStore(db)
+	call, group, user := mediaTestCall(t, db)
+	g := mustMediaActivate(t, s, mustMediaReserve(t, s, mediaTestRequest(call, group, user)))
+	ctx := context.Background()
+	for _, query := range []string{"UPDATE rtc_media_grants SET device_revision=2 WHERE id=$1", "UPDATE rtc_media_grants SET state='prepared' WHERE id=$1"} {
+		if _, err := db.Exec(ctx, query, g.GrantID); err == nil {
+			t.Fatal("binding/lifecycle rewrite accepted")
+		}
+	}
+	op := mustMediaRevoke(t, s, g)
+	claim := mustMediaClaim(t, s, op, g, "sfu")
+	if _, err := db.Exec(ctx, `CREATE FUNCTION reject_media_call_end() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.status='ended' THEN RAISE EXCEPTION 'owned completion fault'; END IF; RETURN NEW; END $$; CREATE TRIGGER reject_media_call_end BEFORE UPDATE ON rtc_calls FOR EACH ROW EXECUTE FUNCTION reject_media_call_end()`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RecordCleanupAcknowledgement(ctx, claim, time.Now()); err == nil {
+		t.Fatal("terminal call fault succeeded")
+	}
+	current, _ := s.Get(ctx, g.GrantID)
+	if current.State != "revoking" {
+		t.Fatal("failed final ACK released held grant")
+	}
+	var actionState, participantState string
+	if err := db.QueryRow(ctx, "SELECT state FROM rtc_media_cleanup_outbox WHERE operation_id=$1", op.ID).Scan(&actionState); err != nil || actionState != "claimed" {
+		t.Fatal("failed final ACK partially recorded")
+	}
+	if err := db.QueryRow(ctx, "SELECT state FROM rtc_call_participants WHERE id=$1", g.ParticipantID).Scan(&participantState); err != nil || participantState != "active" {
+		t.Fatal("failed final ACK partially left participant")
+	}
+	if _, err := db.Exec(ctx, "DELETE FROM rtc_calls WHERE id=$1", call); err == nil {
+		t.Fatal("pending history cascaded from call deletion")
+	}
+	if _, err := db.Exec(ctx, "DROP TRIGGER reject_media_call_end ON rtc_calls"); err != nil {
+		t.Fatal(err)
+	}
+	done, err := s.RecordCleanupAcknowledgement(ctx, claim, time.Now())
+	if err != nil || done.MediaState != "complete" {
+		t.Fatal("final ACK retry failed")
+	}
+}
+
+func TestMediaStoreHeldQuotaIndependentOfLegacyParticipation(t *testing.T) {
+	db := mediaTestDatabase(t)
+	s := NewMediaStore(db)
+	call, group, user := mediaTestCall(t, db)
+	ctx := context.Background()
+	mustMediaReserve(t, s, mediaTestRequest(call, group, user))
+	for i := 0; i < 3; i++ {
+		u := uuid.New()
+		if _, err := db.Exec(ctx, "INSERT INTO users(id) VALUES($1)", u); err != nil {
+			t.Fatal(err)
+		}
+		mustMediaReserve(t, s, mediaTestRequest(call, group, u))
+	}
+	// Legacy mutation не может освободить media quota до trusted cleanup.
+	if _, err := db.Exec(ctx, "UPDATE rtc_call_participants SET state='left',left_at=now() WHERE call_id=$1", call); err != nil {
+		t.Fatal(err)
+	}
+	fifth := uuid.New()
+	if _, err := db.Exec(ctx, "INSERT INTO users(id) VALUES($1)", fifth); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Reserve(ctx, mediaTestRequest(call, group, fifth)); !errors.Is(err, media.ErrConflict) {
+		t.Fatal("legacy left rows released held media quota")
+	}
+	for _, check := range []struct {
+		query string
+		arg   uuid.UUID
+		want  int
+	}{{"SELECT count(*) FROM rtc_media_grants WHERE call_id=$1 AND state<>'revoked'", call, 4}, {"SELECT count(*) FROM rtc_media_rooms WHERE call_id=$1", call, 1}, {"SELECT count(*) FROM rtc_call_participants WHERE user_id=$1", fifth, 0}, {"SELECT count(*) FROM rtc_media_user_generations WHERE user_id=$1", fifth, 0}} {
+		var count int
+		if err := db.QueryRow(ctx, check.query, check.arg).Scan(&count); err != nil || count != check.want {
+			t.Fatalf("quota rollback count=%d want=%d err=%v", count, check.want, err)
+		}
+	}
+	snapshot, err := NewRepository(db).GetCallByID(ctx, call.String())
+	if err != nil || snapshot.Status != "active" {
+		t.Fatal("quota denial ended call")
+	}
+}
+
+func TestMediaStoreRoomExhaustionUnavailableNoWatermark(t *testing.T) {
+	db := mediaTestDatabase(t)
+	s := NewMediaStore(db)
+	call, group, user := mediaTestCall(t, db)
+	ctx := context.Background()
+	if _, err := db.Exec(ctx, "INSERT INTO rtc_media_rooms(id,call_id,group_id,room_generation,room_name,state,created_at,closed_at) VALUES($1,$2,$3,$4,$5,'closed',now(),now())", uuid.New(), call, group, int64(math.MaxInt64-1), uuid.New()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Reserve(ctx, mediaTestRequest(call, group, user)); !errors.Is(err, media.ErrUnavailable) {
+		t.Fatal("room exhaustion misreported permanent authority deny")
+	}
+	for _, table := range []string{"rtc_media_grants", "rtc_media_user_generations", "rtc_media_deny_watermarks"} {
+		var count int
+		if err := db.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(&count); err != nil || count != 0 {
+			t.Fatal("exhaustion wrote partial authority state")
+		}
 	}
 }
