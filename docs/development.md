@@ -92,6 +92,16 @@ Go unit tests сами по себе не доказывают работу stor
 
 `apps/web/tests/lazy/lazy.mjs` собирает production AppRouter, shell и реальные People/Explorer pages в chunks. Playwright прерывает настоящий запрос JS chunk, проверяет retry, соседнее поле ввода, быстрые повторные нажатия и закрытие окна до позднего завершения загрузки. Перед запуском задаются `PLAYWRIGHT_MODULE`, `CHROMIUM_EXECUTABLE` и внешний собственный `LAZY_BUILD_DIR`; Vite build не очищает этот каталог. Fixture использует bounded localhost25174 и закрывает browser/server в finally. Auth/gateway/RTC/realtime здесь синтетические; actual accounts, общий crypto bootstrap и real-device поведение эта проверка не подтверждает.
 
+### Router maintenance
+
+React Router остаётся в Declarative/BrowserRouter Mode. При обновлении maintained
+7.x проверять official release notes и registry metadata выбранной версии,
+обновлять lockfile через pnpm10.19.0 и сохранять raw production audit вне Git.
+Для каждой advisory отдельно фиксировать reachable/unreachable и необходимые
+предпосылки по code trace; Framework-only advisory нельзя выдавать за доказанный
+RCE static SPA. Текущий [review #175](audits/2026-10-11-router-advisories.md)
+явно различает подготовку, выполненные gates и оставшиеся проверки.
+
 ## Server runtime и публикация
 
 [Bootstrap](deploy/single-server-bootstrap.md) описывает `.env.server`, `.env.server.secrets`, shared `k3s + Traefik`, media origin и repo-managed TURN. [Rollout](deploy/production-rollout.md) содержит production health gates и rollback; это отдельная операционная процедура.
