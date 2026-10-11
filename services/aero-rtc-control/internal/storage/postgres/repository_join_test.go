@@ -11,6 +11,7 @@ import (
 	rtcschema "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/rtc"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -75,25 +76,32 @@ func newTestDatabase(t *testing.T) *pgxpool.Pool {
 		t.Fatal("cannot create RTC test database admin pool")
 	}
 	schema := "rtc_test_" + strings.ReplaceAll(uuid.NewString(), "-", "")
-	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
+	var exists bool
+	if err := admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname=$1)", schema).Scan(&exists); err != nil || exists {
 		admin.Close()
-		t.Fatal(err)
+		t.Fatal("RTC fixture schema must be new")
 	}
+	quoted := pgx.Identifier{schema}.Sanitize()
+	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+quoted); err != nil {
+		admin.Close()
+		t.Fatal("cannot create own RTC schema")
+	}
+	t.Cleanup(func() {
+		cleanup, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		_, err := admin.Exec(cleanup, "DROP SCHEMA "+quoted+" CASCADE")
+		admin.Close()
+		if err != nil {
+			t.Error("RTC test schema cleanup failed")
+		}
+	})
 	cfg.ConnConfig.RuntimeParams["search_path"] = schema
 	cfg.ConnConfig.RuntimeParams["application_name"] = schema
 	db, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
-		admin.Close()
 		t.Fatal("cannot create RTC test pool")
 	}
-	t.Cleanup(func() {
-		db.Close()
-		_, cleanupErr := admin.Exec(context.Background(), "DROP SCHEMA "+schema+" CASCADE")
-		admin.Close()
-		if cleanupErr != nil {
-			t.Error("RTC test schema cleanup failed")
-		}
-	})
+	t.Cleanup(db.Close)
 	if _, err := db.Exec(ctx, "CREATE TABLE users (id uuid PRIMARY KEY)"); err != nil {
 		t.Fatal(err)
 	}

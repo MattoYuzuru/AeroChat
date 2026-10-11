@@ -409,6 +409,114 @@ type RtcCallParticipant struct {
 	LastSignalAt pgtype.Timestamptz `db:"last_signal_at" json:"last_signal_at"`
 }
 
+type RtcMediaCleanupOutbox struct {
+	OperationID uuid.UUID          `db:"operation_id" json:"operation_id"`
+	GrantID     uuid.UUID          `db:"grant_id" json:"grant_id"`
+	Action      string             `db:"action" json:"action"`
+	State       string             `db:"state" json:"state"`
+	ClaimOwner  pgtype.UUID        `db:"claim_owner" json:"claim_owner"`
+	ClaimFence  int64              `db:"claim_fence" json:"claim_fence"`
+	ClaimUntil  pgtype.Timestamptz `db:"claim_until" json:"claim_until"`
+	Attempts    int64              `db:"attempts" json:"attempts"`
+	RetryAt     pgtype.Timestamptz `db:"retry_at" json:"retry_at"`
+	LastError   string             `db:"last_error" json:"last_error"`
+	AckedAt     pgtype.Timestamptz `db:"acked_at" json:"acked_at"`
+}
+
+type RtcMediaConnectionLease struct {
+	ID          uuid.UUID          `db:"id" json:"id"`
+	GrantID     uuid.UUID          `db:"grant_id" json:"grant_id"`
+	OwnerID     uuid.UUID          `db:"owner_id" json:"owner_id"`
+	OwnerFence  int64              `db:"owner_fence" json:"owner_fence"`
+	State       string             `db:"state" json:"state"`
+	ConnectedAt pgtype.Timestamptz `db:"connected_at" json:"connected_at"`
+	ClosedAt    pgtype.Timestamptz `db:"closed_at" json:"closed_at"`
+}
+
+type RtcMediaDenyWatermark struct {
+	Kind           string    `db:"kind" json:"kind"`
+	SubjectID      uuid.UUID `db:"subject_id" json:"subject_id"`
+	UserID         uuid.UUID `db:"user_id" json:"user_id"`
+	DeviceID       uuid.UUID `db:"device_id" json:"device_id"`
+	SourceRevision int64     `db:"source_revision" json:"source_revision"`
+}
+
+type RtcMediaGrant struct {
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	RequestID           uuid.UUID          `db:"request_id" json:"request_id"`
+	RoomID              uuid.UUID          `db:"room_id" json:"room_id"`
+	CallID              uuid.UUID          `db:"call_id" json:"call_id"`
+	ParticipantID       uuid.UUID          `db:"participant_id" json:"participant_id"`
+	GroupID             uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID              uuid.UUID          `db:"user_id" json:"user_id"`
+	SessionID           uuid.UUID          `db:"session_id" json:"session_id"`
+	DeviceID            uuid.UUID          `db:"device_id" json:"device_id"`
+	SessionRevision     int64              `db:"session_revision" json:"session_revision"`
+	DeviceRevision      int64              `db:"device_revision" json:"device_revision"`
+	EligibilityEpoch    int64              `db:"eligibility_epoch" json:"eligibility_epoch"`
+	GrantGeneration     int64              `db:"grant_generation" json:"grant_generation"`
+	ParticipantIdentity uuid.UUID          `db:"participant_identity" json:"participant_identity"`
+	State               string             `db:"state" json:"state"`
+	PreparedAt          pgtype.Timestamptz `db:"prepared_at" json:"prepared_at"`
+	PrepareDeadline     pgtype.Timestamptz `db:"prepare_deadline" json:"prepare_deadline"`
+	ActivationIntentAt  pgtype.Timestamptz `db:"activation_intent_at" json:"activation_intent_at"`
+	RevokedAt           pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	OperationID         pgtype.UUID        `db:"operation_id" json:"operation_id"`
+}
+
+type RtcMediaOperation struct {
+	ID               uuid.UUID          `db:"id" json:"id"`
+	OriginDomain     string             `db:"origin_domain" json:"origin_domain"`
+	OriginID         uuid.UUID          `db:"origin_id" json:"origin_id"`
+	UserID           uuid.UUID          `db:"user_id" json:"user_id"`
+	Reason           string             `db:"reason" json:"reason"`
+	AuthorityOutcome string             `db:"authority_outcome" json:"authority_outcome"`
+	MediaState       string             `db:"media_state" json:"media_state"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CompletedAt      pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
+}
+
+type RtcMediaOperationTarget struct {
+	OperationID         uuid.UUID   `db:"operation_id" json:"operation_id"`
+	GrantID             uuid.UUID   `db:"grant_id" json:"grant_id"`
+	RoomID              uuid.UUID   `db:"room_id" json:"room_id"`
+	RoomName            uuid.UUID   `db:"room_name" json:"room_name"`
+	RoomGeneration      int64       `db:"room_generation" json:"room_generation"`
+	ParticipantIdentity uuid.UUID   `db:"participant_identity" json:"participant_identity"`
+	GrantGeneration     int64       `db:"grant_generation" json:"grant_generation"`
+	LeaseID             pgtype.UUID `db:"lease_id" json:"lease_id"`
+	ExpectedOwnerID     pgtype.UUID `db:"expected_owner_id" json:"expected_owner_id"`
+	ExpectedOwnerFence  pgtype.Int8 `db:"expected_owner_fence" json:"expected_owner_fence"`
+}
+
+type RtcMediaRoom struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	CallID         uuid.UUID          `db:"call_id" json:"call_id"`
+	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
+	RoomGeneration int64              `db:"room_generation" json:"room_generation"`
+	RoomName       uuid.UUID          `db:"room_name" json:"room_name"`
+	State          string             `db:"state" json:"state"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ClosedAt       pgtype.Timestamptz `db:"closed_at" json:"closed_at"`
+}
+
+type RtcMediaSourceInbox struct {
+	OriginDomain   string             `db:"origin_domain" json:"origin_domain"`
+	EventID        uuid.UUID          `db:"event_id" json:"event_id"`
+	Kind           string             `db:"kind" json:"kind"`
+	SubjectID      uuid.UUID          `db:"subject_id" json:"subject_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	DeviceID       uuid.UUID          `db:"device_id" json:"device_id"`
+	SourceRevision int64              `db:"source_revision" json:"source_revision"`
+	OperationID    uuid.UUID          `db:"operation_id" json:"operation_id"`
+	ReceivedAt     pgtype.Timestamptz `db:"received_at" json:"received_at"`
+}
+
+type RtcMediaUserGeneration struct {
+	UserID         uuid.UUID `db:"user_id" json:"user_id"`
+	NextGeneration int64     `db:"next_generation" json:"next_generation"`
+}
+
 type User struct {
 	ID                       uuid.UUID          `db:"id" json:"id"`
 	Login                    string             `db:"login" json:"login"`
