@@ -1201,3 +1201,9 @@
     grid-column: auto;
   }
 }
+
+@media (max-height: 500px) and (max-width: 1179px) {
+  .messagesViewport {
+    padding-block: 0;
+  }
+}

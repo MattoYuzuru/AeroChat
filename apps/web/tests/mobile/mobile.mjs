@@ -40,7 +40,7 @@ try{
     assert.ok(bounds&&bounds.y>=geometry.composer.y-1&&bounds.y+bounds.height<=geometry.composer.bottom+1,JSON.stringify({lane,state,width,height,bounds,composer:geometry.composer}));
    }
    if(state==='call'){
-    for(const label of ['Присоединиться','Скрыть']){const control=page.getByRole('button',{name:label,exact:true});await control.scrollIntoViewIfNeeded();const bounds=await control.boundingBox();assert.ok(bounds&&bounds.height>=31&&bounds.y>=0&&bounds.y+bounds.height<=height,JSON.stringify({lane,state,width,height,label,bounds}));}
+    for(const label of ['Присоединиться','Скрыть']){const control=page.getByRole('button',{name:label,exact:true});await control.scrollIntoViewIfNeeded();const bounds=await control.boundingBox();assert.ok(bounds&&bounds.height>=32&&bounds.y>=0&&bounds.y+bounds.height<=height,JSON.stringify({lane,state,width,height,label,bounds}));}
    }
    const actions=[...(lane==='self'?[]:[lane==='group'?'Управление звонком':'Позвонить']),...(lane==='group'?[]:['Обновить thread']),'Назад к списку'];
    for(const action of actions){
