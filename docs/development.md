@@ -75,6 +75,8 @@ Go unit tests сами по себе не доказывают работу stor
 
 ## Совместная работа агентов
 
+Для регрессии direct composer: `node apps/web/tests/composer/composer.mjs` с `PLAYWRIGHT_MODULE` и `CHROMIUM_EXECUTABLE`. Собственный Vite использует `127.0.0.1:25174` (`COMPOSER_FIXTURE_PORT` меняет порт); параллельно с другими fixtures этот порт не занимать. Проверяются исходные React send/Enter/change handlers, задержка, повторный вход, ошибка/повтор, отмена и смена переписки/reply. Crypto action синтетический: ciphertext и network этим тестом не подтверждаются. `COMPOSER_SOURCE_ROOT` позволяет выполнить те же assertions на другом `apps/web/` без его редактирования.
+
 Пять логических направлений: координатор и Product/Architecture, SDE, Frontend/RTC, SRE/DevOps, Harness/Cleaner. Это роли, а не требование одновременно запустить пять агентов: число активных исполнителей ограничено доступными runtime slots. Специалистов подключать к конкретным вопросам; координатор сверяет выводы и формирует одну очередь задач.
 
 1. Координатор фиксирует scope, исходный HEAD, владельцев файлов, критерии приёмки и список проверок.

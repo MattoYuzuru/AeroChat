@@ -44,6 +44,7 @@
     - viewer-relative unread/read state хранится как control-plane metadata по stable logical `message_id`, без server-side plaintext preview;
     - `ListDirectChats` / `GetDirectChat` и realtime получают отдельный encrypted unread/read slice рядом с legacy plaintext read state;
     - active encrypted DM v2 lane умеет явно продвигать encrypted mark-as-read и сходиться с server-backed unread counters;
+    - composer допускает одну отправку одновременно, сохраняет новый текст во время запроса и не очищает другую переписку при завершении старого запроса; ошибка сохраняет текст, вложение и reply для повторной отправки;
   - encrypted search recovery foundation:
     - `/app/search` сохраняет текущий entrypoint; активный encrypted search работает по локальной projection, а server-side search содержимого legacy direct/group history de-scoped;
     - encrypted direct/group search работает только по локально fetched + decrypted message text внутри browser/runtime boundary;
