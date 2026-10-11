@@ -14,6 +14,24 @@ Existing membership и invite writers сериализуются на group row;
 
 Event resulting denied revision2 применяется только к matching pair/grant с revision≤2; новый eligible grant revision3 его не принимает. Dispatch/ack/retry worker, retention/backpressure, private Chat authorization API, RTC grant/admission/proxy/SFU/browser audio в этот slice не входят. Committed event не означает media_teardown_complete; group audio остаётся выключенным. Позднейший private API обязан проверять fresh membership + retained state/revision и неизвестные значения отвергать.
 
+## Private subject lookup
+
+Следующий отдельный API slice добавляет `chat.authorization.v1.InternalAuthorizationService.CheckGroupSubject`. Exact group/user IDs поступают из registry RTC, а не из browser claims. Одна SQLC query читает snapshot group/membership/retained authority; fresh role возвращается при неизменном eligibility epoch для owner/admin/member. Missing authority при existing membership, mismatch presence/class, unknown role и exhausted eligible epoch возвращают sanitized unavailable. Genuine never-known pair получает NOT_FOUND без fabricated IDs/epoch; tombstone получает REMOVED с persisted epoch. LastSeen/profile/MLS/messages не читаются и не изменяются.
+
+Private listener disabled по умолчанию. Для explicit setup нужны:
+
+| Env | Назначение |
+| --- | --- |
+| `AERO_CHAT_INTERNAL_AUTHORIZATION_ENABLED=true` | Включить отдельный private HTTPS listener |
+| `AERO_CHAT_INTERNAL_AUTHORIZATION_LISTEN_ADDR` | Explicit host:port private сети, без public gateway route |
+| `AERO_CHAT_INTERNAL_AUTHORIZATION_TLS_CERT_FILE` | Valid serverAuth leaf с DNS/IP SAN |
+| `AERO_CHAT_INTERNAL_AUTHORIZATION_TLS_KEY_FILE` | Соответствующий private key, вне repo/logs |
+| `AERO_CHAT_INTERNAL_AUTHORIZATION_CLIENT_CA_FILE` | Dedicated valid client CA certificates |
+
+TLS1.3 и verified client chain обязательны; единственный URI SAN caller — `urn:aerochat:service:rtc-control`. Header/произвольный env principal не авторизуют. Public Chat mux private route не регистрирует. Missing/bad config/CA/keypair закрывают startup без plaintext fallback; fatal public/private server exit останавливает второй listener. Общий request budget5s, body limit4096, static errors/logs без credential/subject payload. Эта конфигурация не открывает grants/SFU и не включает group audio.
+
+Local source preparation не заменяет required exact-HEAD gates: state native checks должны пройти до publication state/API; API требует собственных actual typed Connect/mTLS/PG checks с wrong/no/expired/ambiguous/wrong-EKU certificates, raw HTTP/header spoof/public route denial, same-connection fresh role/epoch transitions и cancellation. Deployment isolation, реальные devices/NAT/TURN/WAN и media ACK остаются отдельными проверками. Runtime/certificate provisioning выполняет согласованный owner, а не API code.
+
 ## Проверки
 
 Go1.25.8; пример unit gate:

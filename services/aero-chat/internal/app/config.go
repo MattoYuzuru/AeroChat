@@ -11,6 +11,7 @@ import (
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
 type Config struct {
+	InternalAuthorization            InternalAuthorizationConfig
 	DatabaseURL                      string
 	RedisAddress                     string
 	HTTPAddress                      string
@@ -41,6 +42,10 @@ type Config struct {
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
 func LoadConfig(defaultHTTPAddress string) (Config, error) {
+	privateAuthorization, err := loadInternalAuthorizationConfig()
+	if err != nil {
+		return Config{}, err
+	}
 	shutdownTimeout, err := lookupDuration("AERO_SHUTDOWN_TIMEOUT", 10*time.Second)
 	if err != nil {
 		return Config{}, err
@@ -97,6 +102,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	}
 
 	cfg := Config{
+		InternalAuthorization:            privateAuthorization,
 		DatabaseURL:                      lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
 		RedisAddress:                     lookupString("AERO_REDIS_ADDR", "localhost:6379"),
 		HTTPAddress:                      lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),

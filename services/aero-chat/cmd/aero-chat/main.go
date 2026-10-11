@@ -168,10 +168,10 @@ func run() error {
 		handler,
 	)
 
-	if err := observability.RunHTTPServer(ctx, logger, observability.HTTPServerConfig{
+	if err := app.RunHTTPServers(ctx, logger, observability.HTTPServerConfig{
 		Address:         cfg.HTTPAddress,
 		ShutdownTimeout: cfg.ShutdownTimeout,
-	}, httpHandler); err != nil && !errors.Is(err, context.Canceled) {
+	}, httpHandler, cfg.InternalAuthorization, chat.NewGroupSubjectAuthorizer(repository)); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 

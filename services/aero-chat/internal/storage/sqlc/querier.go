@@ -71,6 +71,7 @@ type Querier interface {
 	GetGroupMessageByIDAndUserID(ctx context.Context, arg GetGroupMessageByIDAndUserIDParams) (GetGroupMessageByIDAndUserIDRow, error)
 	GetGroupReadStateEntryByGroupIDAndUserID(ctx context.Context, arg GetGroupReadStateEntryByGroupIDAndUserIDParams) (GetGroupReadStateEntryByGroupIDAndUserIDRow, error)
 	GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowByIDAndUserIDParams) (GetGroupRowByIDAndUserIDRow, error)
+	GetGroupSubjectAuthorityFacts(ctx context.Context, arg GetGroupSubjectAuthorityFactsParams) (GetGroupSubjectAuthorityFactsRow, error)
 	GetLegacyCapabilityExpiry(ctx context.Context) (pgtype.Timestamptz, error)
 	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
 	InsertEncryptedGroupRosterDevice(ctx context.Context, arg InsertEncryptedGroupRosterDeviceParams) error

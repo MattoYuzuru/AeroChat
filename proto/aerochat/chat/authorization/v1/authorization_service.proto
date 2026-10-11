@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package aerochat.chat.authorization.v1;
+
+option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/authorization/v1;chatauthorizationv1";
+
+// Private mTLS listener принимает только caller rtc-control, вне public gateway.
+service InternalAuthorizationService {
+  rpc CheckGroupSubject(CheckGroupSubjectRequest) returns (CheckGroupSubjectResponse);
+}
+
+enum GroupAuthorityStatus {
+  GROUP_AUTHORITY_STATUS_UNSPECIFIED = 0;
+  GROUP_AUTHORITY_STATUS_PRESENT = 1;
+  GROUP_AUTHORITY_STATUS_REMOVED = 2;
+  GROUP_AUTHORITY_STATUS_NOT_FOUND = 3;
+}
+
+enum GroupAuthorityRole {
+  GROUP_AUTHORITY_ROLE_UNSPECIFIED = 0;
+  GROUP_AUTHORITY_ROLE_OWNER = 1;
+  GROUP_AUTHORITY_ROLE_ADMIN = 2;
+  GROUP_AUTHORITY_ROLE_MEMBER = 3;
+  GROUP_AUTHORITY_ROLE_READER = 4;
+}
+
+message GroupSubjectAuthority {
+  string group_id = 1;
+  string user_id = 2;
+  int64 eligibility_epoch = 3;
+  GroupAuthorityStatus status = 4;
+  GroupAuthorityRole role = 5;
+}
+
+message CheckGroupSubjectRequest {
+  string group_id = 1;
+  string user_id = 2;
+}
+
+message CheckGroupSubjectResponse {
+  GroupSubjectAuthority authority = 1;
+}
