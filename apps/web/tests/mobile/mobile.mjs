@@ -50,7 +50,7 @@ try{
     let reached=false;for(let i=0;i<30;i++){if(await control.evaluate(element=>element===document.activeElement)){reached=true;break;}await page.keyboard.press('Tab');}
     assert.equal(reached,true,action+' keyboard reachable before rotation');
    }
-   if(screenshotDir&&count===50&&state==='normal'&&[320,390,568].includes(width))await page.screenshot({path:`${screenshotDir}/${lane}-${width}x${height}.png`});
+   if(screenshotDir&&count===50&&['normal','error','call'].includes(state)&&[320,390,568].includes(width))await page.screenshot({path:`${screenshotDir}/${lane}-${width}x${height}${state==='normal'?'':'-'+state}.png`});
    await page.setViewportSize({width:height,height:width});assert.equal(await input.inputValue(),'Черновик сохраняется');
    if(state==='normal'&&count===50){
     await page.getByRole('button',{name:'Переписка',exact:false}).click();const information=page.getByTestId('information');await information.waitFor();
