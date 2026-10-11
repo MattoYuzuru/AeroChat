@@ -80,7 +80,6 @@ func run() error {
 		libauth.NewSessionTokenManager(),
 		app.NewFriendRequestNotificationDispatcher(
 			libnotifications.NewWebPushClient(
-				&http.Client{},
 				cfg.WebPushSubscriber,
 				cfg.WebPushVAPIDPublicKey,
 				cfg.WebPushVAPIDPrivateKey,

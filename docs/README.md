@@ -13,7 +13,7 @@
 | Продуктовый канон оболочки | [Web Shell XP](product/web-shell-xp.md), [ADR-079](adr/079-desktop-shell-primary-desktop-web-surface.md)–[ADR-083](adr/083-mobile-practical-shell-adaptation.md) |
 | Self-host и публичный edge | [Bootstrap](deploy/single-server-bootstrap.md), [Rollout/rollback](deploy/production-rollout.md), [ADR-025](adr/025-k3s-traefik-shared-edge-deployment.md) |
 | TURN и heartbeat звонков | [ADR-085](adr/085-server-turn-runtime-and-public-relay-ip-contract.md), [RTC ADR-086](adr/086-rtc-participant-heartbeat-and-stale-eviction.md) |
-| Push | [Notifications ADR-086](adr/086-web-notifications-and-push-foundation.md) |
+| Push | [Notifications ADR-086](adr/086-web-notifications-and-push-foundation.md), [ADR-095: egress policy](adr/095-web-push-egress-boundary.md) |
 | Команды, runtime и совместная работа агентов | [Development](development.md) |
 | Следующая сессия исправлений | [Промпт координатора](audits/2026-10-11-next-session.md) |
 

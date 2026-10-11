@@ -44,6 +44,8 @@ Root `.env.example` управляет compose. Для запуска из ис�
 
 Push требует secure context: `localhost` или HTTPS-origin для внешнего домена/телефона. UI-тогглы сами по себе не доказывают доставку. Секреты остаются в локальных env-файлах и не входят в Git или отчёты.
 
+Web Push endpoints ограничены [ADR-095](adr/095-web-push-egress-boundary.md): HTTPS/443, `fcm.googleapis.com`, `updates.push.services.mozilla.com` и непустые subdomains `*.push.apple.com`. Sender повторно проверяет старые subscriptions, весь DNS answer и числовой dial; proxy environment и redirects отключены. Custom push providers пока не поддерживаются. Request budget 5s, DNS/dial/TLS/header 2s, весь sequential batch 10s. Private/mixed DNS, TLS и timeout не удаляют допустимый subscription; HTTP 404/410 и структурно запрещённый URL — invalid. Локальные fixtures подтверждают transport boundary, не actual browser/OS delivery.
+
 ## Проверки
 
 Запускать последовательно после установки инструментов и зависимостей. Генерация меняет файлы: проверять её diff и не совмещать с редактированием тех же контрактов. Сейчас unpinned Buf plugins выдают несовместимые Connect v2 imports ([#168](https://github.com/MattoYuzuru/AeroChat/issues/168)); до исправления выполнять проверку generation в отдельном output/worktree, сохраняя committed generated code.

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
+	libnotifications "github.com/MattoYuzuru/AeroChat/libs/go/notifications"
 	identityauth "github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/auth"
 	"github.com/google/uuid"
 )
@@ -336,9 +337,9 @@ func (s *Service) UpsertWebPushSubscription(
 		return err
 	}
 
-	endpoint, err := normalizeRequiredURLString(input.Endpoint, "endpoint")
+	endpoint, err := libnotifications.NormalizeWebPushEndpoint(input.Endpoint)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: web push endpoint is not allowed", ErrInvalidArgument)
 	}
 	p256dhKey, err := normalizeRequiredTokenString(input.P256DHKey, "p256dh_key", 512)
 	if err != nil {
