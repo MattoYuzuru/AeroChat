@@ -123,6 +123,14 @@ rows,err:=conn.Query(ctx,"SELECT id,object_key FROM recovery_items ORDER BY id")
     restore_args = arguments + ["restore", "--project", args.target_project, "--postgres", target_pg, "--minio", target_container, *common]
     run(restore_args + ["--identity", str(wrong_identity)], expected=1)
     assert sql(args.target_project, "SELECT count(*) FROM pg_tables WHERE schemaname='public'") == "0"
+    tampered = root / "tampered.tar.age"
+    content = bytearray(archive.read_bytes())
+    content[len(content) // 2] ^= 1
+    tampered.write_bytes(content)
+    tampered_restore = list(restore_args)
+    tampered_restore[tampered_restore.index("--archive") + 1] = str(tampered)
+    run(tampered_restore + ["--identity", str(identity)], expected=1)
+    assert sql(args.target_project, "SELECT count(*) FROM pg_tables WHERE schemaname='public'") == "0"
     assert not any(scratch.iterdir())
     restore_started = time.monotonic()
     run(restore_args + ["--identity", str(identity)])
@@ -144,7 +152,9 @@ rows,err:=conn.Query(ctx,"SELECT id,object_key FROM recovery_items ORDER BY id")
     restore_seconds = time.monotonic() - restore_started
     assert restore_seconds < 300
     assert not any(scratch.iterdir())
-    print(json.dumps({"result": "PASS", "db_rows": 2, "objects": 2, "private_bucket": True, "restored_iam_and_lifecycle": True, "wrong_identity_and_nonempty_rejected": True, "frozen_synthetic_old_binary_on_nullable_schema": True, "rpo_since_quiesce": 0, "backup_seconds": round(backup_seconds, 3), "restore_and_smoke_seconds": round(restore_seconds, 3), "total_seconds": round(time.monotonic() - started, 3)}))
+    summary = {"result": "PASS", "source_sha": run(["git", "rev-parse", "HEAD"]).decode().strip(), "source_project": args.source_project, "target_project": args.target_project, "db_rows": 2, "objects": 2, "private_bucket": True, "restored_iam_and_lifecycle": True, "wrong_identity_tampered_encryption_and_nonempty_rejected": True, "frozen_synthetic_old_binary_on_nullable_schema": True, "frozen_client_sha256": old_binary_hash, "rpo_since_quiesce": 0, "backup_seconds": round(backup_seconds, 3), "restore_and_smoke_seconds": round(restore_seconds, 3), "total_seconds": round(time.monotonic() - started, 3)}
+    (root / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    print("Recovery drill PASS; timing/count evidence saved to external summary.json")
 finally:
     for project in (args.source_project, args.target_project):
         compose(project, "stop", "--timeout", "10")
