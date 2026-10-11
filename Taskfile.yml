@@ -24,6 +24,11 @@ tasks:
     cmds:
       - sqlc generate
 
+  generated:check:
+    desc: Генерирует Buf/SQLC код и отклоняет drift относительно HEAD
+    cmds:
+      - sh infra/scripts/check-generated.sh
+
   go:fmt:
     desc: Форматирует Go-код во всех workspace-модулях
     cmds:
