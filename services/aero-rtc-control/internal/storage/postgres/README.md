@@ -12,8 +12,11 @@ Suite проверяет reject ended join и восстановление orpha
 
 ## Dormant media journal ADR-097
 
-Migration `000001_dormant_media_grant_store.sql` и отдельный `MediaStore` не
-подключены к RTC service/transport. Lobby/1:1 по-прежнему использует прежний
+Migration `000001_dormant_media_grant_store.sql` зарегистрирована через embedded
+`rtcschema.Files` и автоматически применяется штатным `dbbootstrap.Apply` при
+обычном старте, включая upgrade существующей БД. Условного migrator нет.
+Отдельный `MediaStore` пока не вызывается RTC service/transport handlers.
+Lobby/1:1 по-прежнему использует прежний
 repository; media flag, SDK/JWT, private RTC API, proxy, workers и frontend
 отсутствуют. До их включения нужен отдельный reviewed compatibility slice:
 End/Leave/stale eviction с held grants обязаны возвращать pending cleanup.
@@ -53,6 +56,12 @@ rollback/retry при смене parent. Inbox и denied watermark atomic с pen
 cleanup; delayed deny epoch2 не меняет eligible grant3. Remote source lookup и
 RTC commit не являются distributed transaction: до доставки outbox сохраняется
 cross-domain race, будущий reconcile должен закрывать её.
+
+Native `TestMediaStoreRegisteredBootstrapUpgradeKeepsLegacyLifecycle` проверяет
+штатные embedded bootstrap files/requirements на fresh DB и upgrade с legacy
+call rows, idempotent repeat и настоящие legacy Touch/stale prune/Leave через
+RTC service + PostgreSQL после migration; source auth здесь fixture, не mTLS
+или real-device evidence.
 
 Native `TestMediaStore*` используют только fresh `rtc_test_UUID` в отдельной
 `aerochat_rtc_test`: absence preflight, atomic CREATE, точный search_path, cleanup

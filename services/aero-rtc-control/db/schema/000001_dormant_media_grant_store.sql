@@ -1,4 +1,5 @@
--- Не подключённый к runtime registry ADR-097. Ни JWT, ни media payload здесь нет.
+-- Registered additive migration ADR-097: штатный bootstrap применяет её автоматически.
+-- MediaStore пока не вызывается handlers; JWT/media payload здесь нет.
 CREATE TABLE rtc_media_user_generations (
     user_id UUID PRIMARY KEY,
     next_generation BIGINT NOT NULL DEFAULT 1 CHECK (next_generation > 0)

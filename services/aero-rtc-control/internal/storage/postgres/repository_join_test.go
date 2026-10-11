@@ -48,6 +48,23 @@ func TestPostgresJoinRejectsEndedCallAndRecoversUserSlot(t *testing.T) {
 
 func newTestDatabase(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+	db := newRTCFixturePool(t)
+	ctx := context.Background()
+	if _, err := db.Exec(ctx, "CREATE TABLE users (id uuid PRIMARY KEY)"); err != nil {
+		t.Fatal(err)
+	}
+	content, err := rtcschema.Files.ReadFile("000000_rtc_call_control_foundation.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, string(content)); err != nil {
+		t.Fatal(err)
+	}
+	return db
+}
+
+func newRTCFixturePool(t *testing.T) *pgxpool.Pool {
+	t.Helper()
 	url := os.Getenv("AERO_RTC_TEST_DATABASE_URL")
 	if path := os.Getenv("AERO_RTC_TEST_DATABASE_ENV_FILE"); path != "" {
 		content, err := os.ReadFile(path)
@@ -102,16 +119,7 @@ func newTestDatabase(t *testing.T) *pgxpool.Pool {
 		t.Fatal("cannot create RTC test pool")
 	}
 	t.Cleanup(db.Close)
-	if _, err := db.Exec(ctx, "CREATE TABLE users (id uuid PRIMARY KEY)"); err != nil {
-		t.Fatal(err)
-	}
-	content, err := rtcschema.Files.ReadFile("000000_rtc_call_control_foundation.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(ctx, string(content)); err != nil {
-		t.Fatal(err)
-	}
+
 	return db
 }
 
