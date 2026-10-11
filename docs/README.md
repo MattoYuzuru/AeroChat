@@ -16,7 +16,9 @@
 | Решение для группового аудио; реализация ещё не подтверждена | [ADR-089: trusted self-hosted SFU и admission boundary](adr/089-group-audio-sfu-and-admission-boundary.md) |
 | Принятый внутренний authorization contract для group media; runtime не реализован | [ADR-097: trusted session/subject lookup и revoke state](adr/097-group-media-trusted-authorization-contract.md) |
 | Push | [Notifications ADR-086](adr/086-web-notifications-and-push-foundation.md) |
+| Encrypted ordering/read | [ADR-070](adr/070-encrypted-unread-and-read-state-recovery-foundation.md), [ADR-096](adr/096-encrypted-conversation-server-sequence.md) |
 | Команды, runtime и совместная работа агентов | [Development](development.md) |
+| Порядок encrypted operations и metadata migration | [ADR-096](adr/096-encrypted-conversation-server-sequence.md), [Sequence cutover](deploy/encrypted-sequence-cutover.md) |
 | Следующая сессия исправлений | [Промпт координатора](audits/2026-10-11-next-session.md) |
 
 Номер 086 занят двумя существующими ADR; в задачах использовать полное имя файла. Новые номера проверять по всему каталогу.

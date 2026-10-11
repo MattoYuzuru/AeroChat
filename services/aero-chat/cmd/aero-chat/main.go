@@ -81,6 +81,12 @@ func run() error {
 	}); err != nil {
 		return fmt.Errorf("chat database bootstrap: %w", err)
 	}
+	sequenceCtx, sequenceCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	sequenceErr := repository.CheckEncryptedSequencesReady(sequenceCtx)
+	sequenceCancel()
+	if sequenceErr != nil {
+		return sequenceErr
+	}
 
 	typingStore := redisstate.NewTypingStore(cfg.RedisAddress)
 	defer func() {

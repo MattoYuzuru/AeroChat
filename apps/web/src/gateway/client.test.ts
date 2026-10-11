@@ -764,9 +764,12 @@ describe("createGatewayClient", () => {
               id: "upload-1",
               attachmentId: "attachment-1",
               status: "ATTACHMENT_UPLOAD_SESSION_STATUS_PENDING",
-              uploadUrl: "https://media.example.invalid/put",
-              httpMethod: "PUT",
-              headers: {
+              uploadUrl: "https://media.example.invalid/post",
+              httpMethod: "POST",
+              headers: {},
+              formFields: {
+                key: "staging/fixture.bin",
+                policy: "fixture-policy",
                 "Content-Type": "application/pdf",
               },
               createdAt: "2026-04-14T10:00:00Z",
@@ -851,7 +854,8 @@ describe("createGatewayClient", () => {
     );
     const access = await client.getAttachment("token-1", " attachment-1 ");
 
-    expect(intent.uploadSession.uploadUrl).toBe("https://media.example.invalid/put");
+    expect(intent.uploadSession.uploadUrl).toBe("https://media.example.invalid/post");
+    expect(intent.uploadSession.formFields).toEqual({ key: "staging/fixture.bin", policy: "fixture-policy", "Content-Type": "application/pdf" });
     expect(uploadedAttachment.status).toBe("ATTACHMENT_STATUS_UPLOADED");
     expect(access.downloadUrl).toBe("https://media.example.invalid/get");
     expect(fetchMock).toHaveBeenNthCalledWith(

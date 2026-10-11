@@ -912,6 +912,8 @@ func TestSendEncryptedDirectMessageV2CreatesDeviceScopedDeliveries(t *testing.T)
 
 	directChat := mustCreateDirectChat(t, service, alice.Token, bob.User.ID)
 	messageCreatedAt := time.Date(2026, time.March, 25, 18, 4, 5, 0, time.UTC)
+	serverNow := time.Date(2026, time.March, 18, 12, 0, 0, 0, time.UTC)
+	service.now = func() time.Time { return serverNow }
 	receipt, err := service.SendEncryptedDirectMessageV2(context.Background(), alice.Token, SendEncryptedDirectMessageV2Params{
 		ChatID:               directChat.ID,
 		MessageID:            testUUID(700),
@@ -954,8 +956,8 @@ func TestSendEncryptedDirectMessageV2CreatesDeviceScopedDeliveries(t *testing.T)
 	if !receipt.CreatedAt.Equal(messageCreatedAt) {
 		t.Fatalf("ожидался client-assigned created_at %v, получено %v", messageCreatedAt, receipt.CreatedAt)
 	}
-	if !receipt.StoredAt.Equal(messageCreatedAt) {
-		t.Fatalf("ожидался clamped stored_at %v при clock skew, получено %v", messageCreatedAt, receipt.StoredAt)
+	if !receipt.StoredAt.Equal(serverNow) || receipt.ServerSequence != 1 {
+		t.Fatalf("ожидались server stored_at %v и sequence=1 при clock skew, получено %v sequence=%d", serverNow, receipt.StoredAt, receipt.ServerSequence)
 	}
 
 	aliceSenderView, err := service.ListEncryptedDirectMessageV2(context.Background(), alice.Token, directChat.ID, aliceSender.ID, 0)
@@ -1413,6 +1415,8 @@ func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *tes
 	if err != nil {
 		t.Fatalf("bootstrap encrypted group: %v", err)
 	}
+	serverNow := time.Date(2026, time.March, 18, 12, 0, 0, 0, time.UTC)
+	service.now = func() time.Time { return serverNow }
 
 	receipt, err := service.SendEncryptedGroupMessage(context.Background(), alice.Token, SendEncryptedGroupMessageParams{
 		GroupID:              group.ID,
@@ -1434,8 +1438,8 @@ func TestSendEncryptedGroupMessageCreatesGroupScopedEnvelopeAndDeliveries(t *tes
 	if !receipt.CreatedAt.Equal(time.Date(2026, time.March, 25, 18, 6, 7, 0, time.UTC)) {
 		t.Fatalf("ожидался sender-assigned group created_at, получено %v", receipt.CreatedAt)
 	}
-	if !receipt.StoredAt.Equal(time.Date(2026, time.March, 25, 18, 6, 7, 0, time.UTC)) {
-		t.Fatalf("ожидался clamped group stored_at на sender-assigned created_at, получено %v", receipt.StoredAt)
+	if !receipt.StoredAt.Equal(serverNow) || receipt.ServerSequence != 1 {
+		t.Fatalf("ожидались server group stored_at %v и sequence=1, получено %v sequence=%d", serverNow, receipt.StoredAt, receipt.ServerSequence)
 	}
 
 	bobView, err := service.ListEncryptedGroupMessages(context.Background(), bob.Token, group.ID, bobFirst.ID, 0)
@@ -1775,7 +1779,7 @@ func TestEditDirectChatMessageRejectsNonAuthorAndNonEditableMessages(t *testing.
 	if err != nil {
 		t.Fatalf("create direct attachment intent: %v", err)
 	}
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}
@@ -2299,6 +2303,7 @@ type fakeRepository struct {
 	objectStorage               *fakeObjectStorage
 	attachments                 map[string]Attachment
 	uploadSessions              map[string]AttachmentUploadSession
+	sourceCleanup               map[string]time.Time
 	directNotificationPrefs     map[string]bool
 	groupNotificationPrefs      map[string]bool
 	webPushSubscriptions        map[string]WebPushSubscription
@@ -2335,6 +2340,7 @@ func newFakeRepository() *fakeRepository {
 		objectStorage:               newFakeObjectStorage(),
 		attachments:                 make(map[string]Attachment),
 		uploadSessions:              make(map[string]AttachmentUploadSession),
+		sourceCleanup:               make(map[string]time.Time),
 		directNotificationPrefs:     make(map[string]bool),
 		groupNotificationPrefs:      make(map[string]bool),
 		webPushSubscriptions:        make(map[string]WebPushSubscription),
@@ -2675,18 +2681,14 @@ func (r *fakeRepository) UpsertEncryptedDirectChatReadState(_ context.Context, p
 
 	key := readPositionKey(params.ChatID, params.UserID)
 	position := EncryptedConversationReadPosition{
-		MessageID:        params.LastReadMessageID,
-		MessageCreatedAt: params.LastReadMessageAt,
-		UpdatedAt:        params.UpdatedAt,
+		MessageID:              params.LastReadMessageID,
+		MessageCreatedAt:       params.LastReadMessageAt,
+		LastReadServerSequence: params.LastReadServerSequence,
+		UpdatedAt:              params.UpdatedAt,
 	}
 	current, ok := r.encryptedReadPositions[key]
-	if ok {
-		if current.MessageCreatedAt.After(position.MessageCreatedAt) {
-			return false, nil
-		}
-		if current.MessageCreatedAt.Equal(position.MessageCreatedAt) && strings.Compare(current.MessageID, position.MessageID) >= 0 {
-			return false, nil
-		}
+	if ok && current.LastReadServerSequence >= position.LastReadServerSequence {
+		return false, nil
 	}
 
 	r.encryptedReadPositions[key] = position
@@ -2700,18 +2702,14 @@ func (r *fakeRepository) UpsertEncryptedGroupReadState(_ context.Context, params
 
 	key := groupReadPositionKey(params.GroupID, params.UserID)
 	position := EncryptedConversationReadPosition{
-		MessageID:        params.LastReadMessageID,
-		MessageCreatedAt: params.LastReadMessageAt,
-		UpdatedAt:        params.UpdatedAt,
+		MessageID:              params.LastReadMessageID,
+		MessageCreatedAt:       params.LastReadMessageAt,
+		LastReadServerSequence: params.LastReadServerSequence,
+		UpdatedAt:              params.UpdatedAt,
 	}
 	current, ok := r.encryptedGroupReadPositions[key]
-	if ok {
-		if current.MessageCreatedAt.After(position.MessageCreatedAt) {
-			return false, nil
-		}
-		if current.MessageCreatedAt.Equal(position.MessageCreatedAt) && strings.Compare(current.MessageID, position.MessageID) >= 0 {
-			return false, nil
-		}
+	if ok && current.LastReadServerSequence >= position.LastReadServerSequence {
+		return false, nil
 	}
 
 	r.encryptedGroupReadPositions[key] = position
@@ -2870,16 +2868,18 @@ func (r *fakeRepository) CreateAttachmentUploadIntent(_ context.Context, params 
 		UpdatedAt:    params.CreatedAt,
 	}
 	uploadSession := AttachmentUploadSession{
-		ID:           params.UploadSessionID,
-		AttachmentID: params.AttachmentID,
-		OwnerUserID:  params.OwnerUserID,
-		Status:       AttachmentUploadSessionPending,
-		CreatedAt:    params.CreatedAt,
-		UpdatedAt:    params.CreatedAt,
-		ExpiresAt:    params.ExpiresAt,
+		ID:               params.UploadSessionID,
+		AttachmentID:     params.AttachmentID,
+		OwnerUserID:      params.OwnerUserID,
+		Status:           AttachmentUploadSessionPending,
+		StagingObjectKey: params.StagingObjectKey,
+		CreatedAt:        params.CreatedAt,
+		UpdatedAt:        params.CreatedAt,
+		ExpiresAt:        params.ExpiresAt,
 	}
 	r.attachments[attachment.ID] = attachment
 	r.uploadSessions[uploadSession.ID] = uploadSession
+	r.sourceCleanup[params.StagingObjectKey] = params.ExpiresAt.Add(5 * time.Minute)
 
 	return &AttachmentUploadIntent{
 		Attachment:    attachment,
@@ -3624,6 +3624,13 @@ func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, param
 		return nil, ErrConflict
 	}
 
+	sequence := int64(1)
+	for _, existing := range r.encryptedMessagesV2 {
+		if existing.Envelope.ChatID == params.ChatID && existing.Envelope.ServerSequence >= sequence {
+			sequence = existing.Envelope.ServerSequence + 1
+		}
+	}
+
 	record := fakeEncryptedDirectMessageV2Record{
 		Envelope: EncryptedDirectMessageV2StoredEnvelope{
 			MessageID:            params.MessageID,
@@ -3635,6 +3642,7 @@ func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, param
 			Revision:             params.Revision,
 			CreatedAt:            params.CreatedAt,
 			StoredAt:             params.StoredAt,
+			ServerSequence:       sequence,
 			StoredDeliveryCount:  uint32(len(params.Deliveries)),
 			StoredDeliveries:     make([]EncryptedDirectMessageV2StoredDelivery, 0, len(params.Deliveries)),
 		},
@@ -3645,8 +3653,7 @@ func (r *fakeRepository) CreateEncryptedDirectMessageV2(_ context.Context, param
 			params.ChatID,
 			delivery.RecipientUserID,
 			delivery.RecipientUserID != params.SenderUserID,
-			params.CreatedAt,
-			params.MessageID,
+			sequence,
 			params.OperationKind,
 		)
 		storedDelivery := EncryptedDirectMessageV2Delivery{
@@ -3707,6 +3714,13 @@ func (r *fakeRepository) CreateEncryptedGroupMessage(_ context.Context, params C
 		return nil, ErrConflict
 	}
 
+	sequence := int64(1)
+	for _, existing := range r.encryptedGroupMsgs {
+		if existing.Envelope.GroupID == params.GroupID && existing.Envelope.ServerSequence >= sequence {
+			sequence = existing.Envelope.ServerSequence + 1
+		}
+	}
+
 	storedDeliveries := make([]EncryptedGroupMessageDelivery, 0, len(params.Deliveries))
 	deliveries := make(map[string]EncryptedGroupMessageDelivery, len(params.Deliveries))
 	for _, delivery := range params.Deliveries {
@@ -3714,8 +3728,7 @@ func (r *fakeRepository) CreateEncryptedGroupMessage(_ context.Context, params C
 			params.GroupID,
 			delivery.RecipientUserID,
 			delivery.RecipientUserID != params.SenderUserID,
-			params.CreatedAt,
-			params.MessageID,
+			sequence,
 			params.OperationKind,
 		)
 		storedDelivery := EncryptedGroupMessageDelivery{
@@ -3742,6 +3755,7 @@ func (r *fakeRepository) CreateEncryptedGroupMessage(_ context.Context, params C
 			Revision:             params.Revision,
 			CreatedAt:            params.CreatedAt,
 			StoredAt:             params.StoredAt,
+			ServerSequence:       sequence,
 			StoredDeliveryCount:  uint32(len(storedDeliveries)),
 			StoredDeliveries:     copyEncryptedGroupMessageDeliveriesForTest(storedDeliveries),
 		},
@@ -3885,6 +3899,7 @@ func (r *fakeRepository) ListEncryptedDirectMessageV2(_ context.Context, userID 
 			Revision:             record.Envelope.Revision,
 			CreatedAt:            record.Envelope.CreatedAt,
 			StoredAt:             record.Envelope.StoredAt,
+			ServerSequence:       record.Envelope.ServerSequence,
 			ViewerDelivery: EncryptedDirectMessageV2Delivery{
 				RecipientUserID:         delivery.RecipientUserID,
 				RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
@@ -3898,10 +3913,7 @@ func (r *fakeRepository) ListEncryptedDirectMessageV2(_ context.Context, userID 
 	}
 
 	sort.Slice(result, func(i int, j int) bool {
-		if result[i].CreatedAt.Equal(result[j].CreatedAt) {
-			return result[i].MessageID > result[j].MessageID
-		}
-		return result[i].CreatedAt.After(result[j].CreatedAt)
+		return result[i].ServerSequence > result[j].ServerSequence
 	})
 	if len(result) > int(limit) {
 		result = result[:limit]
@@ -3967,6 +3979,7 @@ func (r *fakeRepository) ListEncryptedGroupMessages(_ context.Context, userID st
 			CiphertextSizeBytes:  int64(len(record.Ciphertext)),
 			CreatedAt:            record.Envelope.CreatedAt,
 			StoredAt:             record.Envelope.StoredAt,
+			ServerSequence:       record.Envelope.ServerSequence,
 			ViewerDelivery: EncryptedGroupMessageDelivery{
 				RecipientUserID:         delivery.RecipientUserID,
 				RecipientCryptoDeviceID: delivery.RecipientCryptoDeviceID,
@@ -3977,10 +3990,7 @@ func (r *fakeRepository) ListEncryptedGroupMessages(_ context.Context, userID st
 	}
 
 	sort.Slice(result, func(i int, j int) bool {
-		if result[i].CreatedAt.Equal(result[j].CreatedAt) {
-			return result[i].MessageID > result[j].MessageID
-		}
-		return result[i].CreatedAt.After(result[j].CreatedAt)
+		return result[i].ServerSequence > result[j].ServerSequence
 	})
 	if len(result) > int(limit) {
 		result = result[:limit]
@@ -4538,7 +4548,7 @@ func (r *fakeRepository) encryptedDirectUnreadCount(chatID string, userID string
 		if !isEncryptedDirectContentOperation(record.Envelope.OperationKind) {
 			continue
 		}
-		if isEncryptedMessageNewerThanReadPosition(record.Envelope.MessageID, record.Envelope.CreatedAt, readPosition) {
+		if isEncryptedMessageNewerThanReadPosition(record.Envelope.ServerSequence, readPosition) {
 			count++
 		}
 	}
@@ -4561,7 +4571,7 @@ func (r *fakeRepository) encryptedGroupUnreadCount(groupID string, userID string
 		if !isEncryptedGroupContentOperation(record.Envelope.OperationKind) {
 			continue
 		}
-		if isEncryptedMessageNewerThanReadPosition(record.Envelope.MessageID, record.Envelope.CreatedAt, readPosition) {
+		if isEncryptedMessageNewerThanReadPosition(record.Envelope.ServerSequence, readPosition) {
 			count++
 		}
 	}
@@ -4591,12 +4601,11 @@ func (r *fakeRepository) encryptedDirectUnreadCountForDelivery(
 	chatID string,
 	userID string,
 	shouldIncrement bool,
-	createdAt time.Time,
-	messageID string,
+	sequence int64,
 	operation string,
 ) int32 {
 	count := r.encryptedDirectUnreadCount(chatID, userID)
-	if shouldIncrement && operation == EncryptedDirectMessageV2OperationContent && isEncryptedMessageNewerThanReadPosition(messageID, createdAt, encryptedReadPositionForTest(r.encryptedReadPositions, readPositionKey(chatID, userID))) {
+	if shouldIncrement && operation == EncryptedDirectMessageV2OperationContent && isEncryptedMessageNewerThanReadPosition(sequence, encryptedReadPositionForTest(r.encryptedReadPositions, readPositionKey(chatID, userID))) {
 		count++
 	}
 
@@ -4607,12 +4616,11 @@ func (r *fakeRepository) encryptedGroupUnreadCountForDelivery(
 	groupID string,
 	userID string,
 	shouldIncrement bool,
-	createdAt time.Time,
-	messageID string,
+	sequence int64,
 	operation string,
 ) int32 {
 	count := r.encryptedGroupUnreadCount(groupID, userID)
-	if shouldIncrement && operation == EncryptedGroupMessageOperationContent && isEncryptedMessageNewerThanReadPosition(messageID, createdAt, encryptedReadPositionForTest(r.encryptedGroupReadPositions, groupReadPositionKey(groupID, userID))) {
+	if shouldIncrement && operation == EncryptedGroupMessageOperationContent && isEncryptedMessageNewerThanReadPosition(sequence, encryptedReadPositionForTest(r.encryptedGroupReadPositions, groupReadPositionKey(groupID, userID))) {
 		count++
 	}
 
@@ -4671,22 +4679,8 @@ func encryptedReadPositionForTest(
 	return &copy
 }
 
-func isEncryptedMessageNewerThanReadPosition(
-	messageID string,
-	createdAt time.Time,
-	readPosition *EncryptedConversationReadPosition,
-) bool {
-	if readPosition == nil {
-		return true
-	}
-	if createdAt.After(readPosition.MessageCreatedAt) {
-		return true
-	}
-	if createdAt.Equal(readPosition.MessageCreatedAt) && strings.Compare(messageID, readPosition.MessageID) > 0 {
-		return true
-	}
-
-	return false
+func isEncryptedMessageNewerThanReadPosition(sequence int64, readPosition *EncryptedConversationReadPosition) bool {
+	return readPosition == nil || sequence > readPosition.LastReadServerSequence
 }
 
 func isEncryptedDirectContentOperation(operation string) bool {
@@ -4805,14 +4799,13 @@ func newFakeObjectStorage() *fakeObjectStorage {
 	}
 }
 
-func (s *fakeObjectStorage) CreateUpload(_ context.Context, objectKey string, mimeType string, expiresAt time.Time) (*PresignedObjectUpload, error) {
+func (s *fakeObjectStorage) CreateUpload(_ context.Context, objectKey string, mimeType string, size int64, expiresAt time.Time) (*PresignedObjectUpload, error) {
 	return &PresignedObjectUpload{
 		URL:        "http://example.invalid/" + objectKey,
-		HTTPMethod: "PUT",
-		Headers: map[string]string{
-			"Content-Type": mimeType,
-		},
-		ExpiresAt: expiresAt,
+		HTTPMethod: "POST",
+		FormFields: map[string]string{"key": objectKey, "Content-Type": mimeType, "policy": "fixture-policy"},
+		Headers:    map[string]string{},
+		ExpiresAt:  expiresAt,
 	}, nil
 }
 
@@ -4832,7 +4825,26 @@ func (s *fakeObjectStorage) StatObject(_ context.Context, objectKey string) (*St
 	if !ok {
 		return nil, ErrNotFound
 	}
+	if info.ETag == "" {
+		info.ETag = "fixture-etag"
+	}
 	return &info, nil
+}
+
+func (s *fakeObjectStorage) PromoteObject(_ context.Context, source, destination, etag, contentType string) error {
+	info, ok := s.objects[source]
+	if !ok {
+		return ErrNotFound
+	}
+	if info.ETag == "" {
+		info.ETag = "fixture-etag"
+	}
+	if info.ETag != etag {
+		return ErrConflict
+	}
+	info.ContentType = contentType
+	s.objects[destination] = info
+	return nil
 }
 
 func (s *fakeObjectStorage) DeleteObject(_ context.Context, objectKey string) error {
