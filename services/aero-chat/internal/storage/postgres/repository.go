@@ -697,19 +697,27 @@ func (r *Repository) TransferGroupOwnership(ctx context.Context, params chat.Tra
 		return false, convertError(err)
 	}
 
-	affected, err := q.TransferGroupOwnership(ctx, chatsqlc.TransferGroupOwnershipParams{
-		GroupID:  mustParseUUID(params.GroupID),
-		UserID:   mustParseUUID(params.CurrentOwnerUserID),
-		UserID_2: mustParseUUID(params.NewOwnerUserID),
+	// Immediate unique owner index требует завершить demotion до promotion.
+	// Обе записи и authority epochs остаются в одной group-first transaction.
+	affected, err := q.DemoteGroupOwnerForTransfer(ctx, chatsqlc.DemoteGroupOwnerForTransferParams{
+		GroupID:            mustParseUUID(params.GroupID),
+		CurrentOwnerUserID: mustParseUUID(params.CurrentOwnerUserID),
+		NewOwnerUserID:     mustParseUUID(params.NewOwnerUserID),
 	})
 	if err != nil {
 		return false, convertError(err)
 	}
-	if affected != 2 {
-		if err := tx.Commit(ctx); err != nil {
-			return false, fmt.Errorf("commit tx: %w", err)
-		}
+	if affected != 1 {
 		return false, nil
+	}
+	affected, err = q.PromoteGroupOwnerForTransfer(ctx, chatsqlc.PromoteGroupOwnerForTransferParams{
+		GroupID: mustParseUUID(params.GroupID), UserID: mustParseUUID(params.NewOwnerUserID),
+	})
+	if err != nil {
+		return false, convertError(err)
+	}
+	if affected != 1 {
+		return false, chat.ErrConflict
 	}
 
 	if err := q.TouchGroupUpdatedAt(ctx, chatsqlc.TouchGroupUpdatedAtParams{
