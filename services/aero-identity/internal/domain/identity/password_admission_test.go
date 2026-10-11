@@ -154,11 +154,25 @@ func TestMissingLoginAndWrongPasswordUseSameErrorAndVerification(t *testing.T) {
 }
 
 func TestMissingLoginNeverAuthorizesDummyVerificationSuccess(t *testing.T) {
-	service := newTestService()
-	service.passwords = &rejectingPasswordHasher{accept: true}
-	if _, err := service.Login(context.Background(), LoginInput{Login: "admission.missing", Password: "synthetic-password"}); !errors.Is(err, ErrInvalidCredentials) {
-		t.Fatalf("dummy success must not authenticate missing account: %v", err)
+	for _, missing := range []error{ErrNotFound, ErrInvalidCredentials} {
+		t.Run(missing.Error(), func(t *testing.T) {
+			service := newTestService()
+			service.repo = missingCredentialFixture{Repository: service.repo, resultError: missing}
+			service.passwords = &rejectingPasswordHasher{accept: true}
+			if _, err := service.Login(context.Background(), LoginInput{Login: "admission.missing", Password: "synthetic-password"}); !errors.Is(err, ErrInvalidCredentials) {
+				t.Fatalf("dummy success must not authenticate missing account: %v", err)
+			}
+		})
 	}
+}
+
+type missingCredentialFixture struct {
+	Repository
+	resultError error
+}
+
+func (r missingCredentialFixture) GetPasswordCredentialByLogin(context.Context, string) (*PasswordCredential, error) {
+	return nil, r.resultError
 }
 
 func TestPublicDummyRecordUsesCurrentPasswordWorkFactor(t *testing.T) {

@@ -54,14 +54,14 @@ func NewLimiter(config Config) *Limiter {
 
 func (l *Limiter) Acquire(ctx context.Context, operation Operation, peer string, headers http.Header, login string) (func(), error) {
 	if operation != Login && operation != Register {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("Неподдерживаемая auth операция."))
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("Неподдерживаемая auth операция"))
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	address, err := l.clientAddress(peer, headers)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("Не удалось подтвердить адрес клиента."))
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("Не удалось подтвердить адрес клиента"))
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -172,7 +172,7 @@ func (b *bucket) wait(now time.Time, maxInFlight int) time.Duration {
 }
 
 func exhausted(wait time.Duration) error {
-	err := connect.NewError(connect.CodeResourceExhausted, errors.New("Слишком много запросов входа или регистрации. Повторите позже."))
+	err := connect.NewError(connect.CodeResourceExhausted, errors.New("Слишком много запросов входа или регистрации. Повторите позже"))
 	seconds := max(int64(1), int64(math.Ceil(wait.Seconds())))
 	err.Meta().Set("Retry-After", strconv.FormatInt(seconds, 10))
 	return err

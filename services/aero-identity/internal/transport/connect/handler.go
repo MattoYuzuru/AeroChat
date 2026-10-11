@@ -632,7 +632,7 @@ func mapError(err error) error {
 	case errors.Is(err, context.DeadlineExceeded):
 		return connect.NewError(connect.CodeDeadlineExceeded, err)
 	case errors.Is(err, identity.ErrResourceExhausted):
-		coded := connect.NewError(connect.CodeResourceExhausted, errors.New("Слишком много запросов входа или регистрации. Повторите позже."))
+		coded := connect.NewError(connect.CodeResourceExhausted, errors.New("Слишком много запросов входа или регистрации. Повторите позже"))
 		coded.Meta().Set("Retry-After", "1")
 		return coded
 	case errors.Is(err, identity.ErrInvalidArgument):
