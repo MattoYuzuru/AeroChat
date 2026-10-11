@@ -12,3 +12,5 @@ apps/web/vite.config.js
 *.tsbuildinfo
 coverage/
 tmp/
+/release-*.json
+/.release-recovery/

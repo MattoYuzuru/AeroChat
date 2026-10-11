@@ -8,7 +8,9 @@ COPY services/aero-rtc-control ./services/aero-rtc-control
 
 WORKDIR /src/services/aero-rtc-control
 
-RUN GOWORK=off go build -o /out/aero-rtc-control ./cmd/aero-rtc-control
+ARG AERO_BUILD_REVISION=dev
+
+RUN GOWORK=off go build -ldflags "-X main.version=${AERO_BUILD_REVISION}" -o /out/aero-rtc-control ./cmd/aero-rtc-control
 
 FROM alpine:3.22
 

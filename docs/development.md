@@ -101,7 +101,7 @@ Go unit tests сами по себе не доказывают работу stor
 
 [Bootstrap](deploy/single-server-bootstrap.md) описывает `.env.server`, `.env.server.secrets`, shared `k3s + Traefik`, media origin и repo-managed TURN. [Rollout](deploy/production-rollout.md) содержит production health gates и rollback; это отдельная операционная процедура.
 
-Application images публикуются в GHCR для `web`, `aero-gateway`, `aero-identity`, `aero-chat`, `aero-rtc-control` на `linux/amd64`. Для точного выбора сборки использовать `sha-<commit>`; `edge` следует default branch, release-теги имеют вид `vX.Y.Z`, `vX.Y`, `vX`. `latest` не используется. В `.env.server` выбирается `AERO_IMAGE_TAG`; секреты хранятся только в `.env.server.secrets`.
+Application images для пяти services проходят reusable CI на точном SHA, затем публикуются в GHCR для `linux/amd64` как один [verified release](deploy/verified-release.md): immutable manifest digest + source SHA + пять image digests. Production workflow выбирает `release_digest` и `source_sha`; application `edge`/semver tags больше не продвигаются. Секреты остаются в `.env.server.secrets`; `.env.server` сохраняет выбранную пару `AERO_RELEASE_DIGEST` / `AERO_RELEASE_SOURCE_SHA` после успешных gates.
 
 ## Клиентский порядок encrypted conversations
 
