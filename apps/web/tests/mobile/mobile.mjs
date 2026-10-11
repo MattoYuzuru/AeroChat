@@ -31,14 +31,19 @@ try{
    assert.ok(geometry.history.bottom<=geometry.composer.y+1,JSON.stringify({lane,count,state,width,height,geometry}));
    assert.ok(geometry.input.y>=geometry.composer.y&&geometry.input.bottom<=geometry.composer.bottom+1,JSON.stringify({lane,count,state,width,height,geometry}));
    assert.ok(geometry.input.width>=140,JSON.stringify({lane,count,width,height,geometry}));
+   if(height<=500)assert.ok(geometry.composer.height>=50,JSON.stringify({lane,count,state,width,height,geometry}));
    if(count===50){
-    assert.ok(geometry.historyScrollHeight>geometry.historyClientHeight);assert.ok(geometry.historyUsableHeight>0,JSON.stringify({lane,count,state,width,height,geometry}));
+    assert.ok(geometry.historyScrollHeight>geometry.historyClientHeight);assert.ok(geometry.historyUsableHeight>=48,JSON.stringify({lane,count,state,width,height,geometry}));
     const scroll=await page.evaluate(()=>{const history=document.querySelector('[data-testid=history]');history.scrollTop=history.scrollHeight;return {top:history.scrollTop,composerBottom:document.querySelector('[data-testid=composer]').getBoundingClientRect().bottom,pageY:scrollY};});
     assert.ok(scroll.top>0);assert.equal(scroll.pageY,0);assert.equal(scroll.composerBottom,geometry.composer.bottom);
    }
    for(const control of await page.getByTestId('composer').getByRole('button').all()){
-    await control.scrollIntoViewIfNeeded();const bounds=await control.boundingBox();
-    assert.ok(bounds&&bounds.y>=geometry.composer.y-1&&bounds.y+bounds.height<=geometry.composer.bottom+1,JSON.stringify({lane,state,width,height,bounds,composer:geometry.composer}));
+    let reached=false;for(let i=0;i<30;i++){if(await control.evaluate(element=>element===document.activeElement)){reached=true;break;}await page.keyboard.press('Tab');}
+    assert.equal(reached,true,'composer action keyboard reachable');
+    for(const reveal of ['focus','touch']){
+     if(reveal==='touch')await control.scrollIntoViewIfNeeded();const bounds=await control.boundingBox();
+     assert.ok(bounds&&bounds.height>=32&&bounds.y>=geometry.composer.y-1&&bounds.y+bounds.height<=geometry.composer.bottom+1,JSON.stringify({lane,state,width,height,reveal,bounds,composer:geometry.composer}));
+    }
    }
    if(state==='call'){
     for(const label of ['Присоединиться','Скрыть']){const control=page.getByRole('button',{name:label,exact:true});await control.scrollIntoViewIfNeeded();const bounds=await control.boundingBox();assert.ok(bounds&&bounds.height>=32&&bounds.y>=0&&bounds.y+bounds.height<=height,JSON.stringify({lane,state,width,height,label,bounds}));}
@@ -47,7 +52,7 @@ try{
    for(const action of actions){
     const control=page.getByRole('button',{name:action,exact:true});const bounds=await control.boundingBox();
     assert.equal(await control.isVisible(),true,action+' visible before rotation');
-    assert.ok(bounds&&bounds.x>=0&&bounds.x+bounds.width<=width+1&&bounds.y>=0&&bounds.y+bounds.height<=height+1,JSON.stringify({lane,action,width,height,bounds}));
+    assert.ok(bounds&&bounds.height>=32&&bounds.x>=0&&bounds.x+bounds.width<=width+1&&bounds.y>=0&&bounds.y+bounds.height<=height+1,JSON.stringify({lane,action,width,height,bounds}));
     let reached=false;for(let i=0;i<30;i++){if(await control.evaluate(element=>element===document.activeElement)){reached=true;break;}await page.keyboard.press('Tab');}
     assert.equal(reached,true,action+' keyboard reachable before rotation');
    }

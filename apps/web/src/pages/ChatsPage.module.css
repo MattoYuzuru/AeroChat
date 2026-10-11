@@ -1366,7 +1366,8 @@
   }
 
   .threadLayout {
-    grid-template-rows: auto auto minmax(3rem, 1fr) minmax(0, auto);
+    --mobile-history-padding: 0.7rem;
+    grid-template-rows: auto auto minmax(calc(3rem + var(--mobile-history-padding) + var(--mobile-history-padding) + 1px), 1fr) minmax(0, auto);
     overflow: hidden;
   }
 
@@ -1389,7 +1390,7 @@
   }
 
   .messagesViewport {
-    padding: 0.7rem 0.65rem;
+    padding: var(--mobile-history-padding) 0.65rem;
   }
 }
 
@@ -1502,6 +1503,30 @@
 }
 
 @media (max-height: 500px) and (max-width: 1179px) {
+  .threadLayout {
+    --mobile-history-padding: 0px;
+    grid-template-rows: auto auto minmax(3rem, 1fr) minmax(3.125rem, auto);
+  }
+
+  .threadPane[data-mobile-hidden="false"] > .sectionCard > .panelHeader {
+    padding-block: 0.125rem;
+  }
+
+  .threadHero,
+  .composerCard {
+    padding-block: 0.25rem;
+  }
+
+  .threadHero .avatarBadgeLarge {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+  }
+
+  .composerCard {
+    min-height: 3.125rem;
+  }
+
   .messagesViewport {
     padding-block: 0;
   }

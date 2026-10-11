@@ -295,6 +295,20 @@
 }
 
 @media (max-height: 500px) {
+  .shell:has([data-mobile-thread-active="true"]) .topBar {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.25rem);
+    padding-bottom: 0.25rem;
+  }
+
+  .shell:has([data-mobile-thread-active="true"]) .navList {
+    padding-top: 0.15rem;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.15rem);
+  }
+
+  .shell:has([data-mobile-thread-active="true"]) .contentArea {
+    padding-block: 0.25rem;
+  }
+
   .shell:has([data-mobile-thread-active="true"]) .eyebrow,
   .shell:has([data-mobile-thread-active="true"]) .subtitle,
   .shell:has([data-mobile-thread-active="true"]) .navList small {
