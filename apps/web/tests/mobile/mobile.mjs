@@ -87,7 +87,7 @@ try{
   const measurement=await page.evaluate(()=>{
    const read=element=>{const r=element.getBoundingClientRect(),s=getComputedStyle(element);return {tag:element.tagName,className:element.className,role:element.getAttribute('role'),testId:element.getAttribute('data-testid'),rect:{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom},clientHeight:element.clientHeight,scrollHeight:element.scrollHeight,scrollTop:element.scrollTop,gridRows:s.gridTemplateRows,paddingTop:s.paddingTop,paddingBottom:s.paddingBottom,gap:s.gap,minHeight:s.minHeight,maxHeight:s.maxHeight,overflowY:s.overflowY};};
    const ancestors=[];for(let element=document.querySelector('textarea');element;element=element.parentElement)ancestors.push(read(element));
-   return {url:location.pathname+location.search,viewport:{width:innerWidth,height:innerHeight},ancestors,controls:Array.from(document.querySelectorAll('button,nav')).map(read)};
+   return {url:location.pathname+location.search,viewport:{width:innerWidth,height:innerHeight},ancestors,surfaces:Array.from(document.querySelectorAll('header,nav,[data-testid=thread-header],[data-testid=history],[class*=callSurface],[class*=panelHeader]')).map(read),controls:Array.from(document.querySelectorAll('button')).map(read)};
   });
   await writeFile(directory+'/failure-layout.json',JSON.stringify(measurement,null,2));
   await page.screenshot({path:directory+'/failure.png'});
