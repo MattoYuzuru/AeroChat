@@ -111,3 +111,4 @@ Pure reference model проверяет exact binding, revoked session/device, r
 
 - [Go 1.25 crypto/tls Config](https://pkg.go.dev/crypto/tls@go1.25.0#Config): verified client chain и дополнительная caller identity policy нужны вместе; service certificate не открывает все внутренние методы автоматически.
 - [LiveKit access tokens и refresh/revocation](https://docs.livekit.io/frontends/reference/tokens-grants/): refreshed token может жить 10 минут, self-host removal не отзывает старый JWT; room/identity должны быть непрозрачными.
+- [PostgreSQL 17 trigger behavior](https://www.postgresql.org/docs/17/trigger-definition.html): trigger работает в source transaction; FK cascade вызывает triggers referencing table. [Explicit locking](https://www.postgresql.org/docs/17/explicit-locking.html): одинаковый порядок locks нужен независимо от trigger atomicity; native concurrency proof остаётся обязательным.
