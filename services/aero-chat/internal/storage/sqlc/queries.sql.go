@@ -431,7 +431,16 @@ type CreateDirectChatParams struct {
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) CreateDirectChat(ctx context.Context, arg CreateDirectChatParams) (DirectChat, error) {
+type CreateDirectChatRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	UserLowID       uuid.UUID          `db:"user_low_id" json:"user_low_id"`
+	UserHighID      uuid.UUID          `db:"user_high_id" json:"user_high_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateDirectChat(ctx context.Context, arg CreateDirectChatParams) (CreateDirectChatRow, error) {
 	row := q.db.QueryRow(ctx, createDirectChat,
 		arg.ID,
 		arg.CreatedByUserID,
@@ -440,7 +449,7 @@ func (q *Queries) CreateDirectChat(ctx context.Context, arg CreateDirectChatPara
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i DirectChat
+	var i CreateDirectChatRow
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedByUserID,
@@ -462,8 +471,9 @@ INSERT INTO direct_chat_encrypted_messages_v2 (
     target_message_id,
     revision,
     created_at,
-    stored_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    stored_at,
+    server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING
     id,
     chat_id,
@@ -473,7 +483,8 @@ RETURNING
     target_message_id,
     revision,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 `
 
 type CreateDirectChatEncryptedMessageV2Params struct {
@@ -486,9 +497,23 @@ type CreateDirectChatEncryptedMessageV2Params struct {
 	Revision             int32              `db:"revision" json:"revision"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       pgtype.Int8        `db:"server_sequence" json:"server_sequence"`
 }
 
-func (q *Queries) CreateDirectChatEncryptedMessageV2(ctx context.Context, arg CreateDirectChatEncryptedMessageV2Params) (DirectChatEncryptedMessagesV2, error) {
+type CreateDirectChatEncryptedMessageV2Row struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       int64              `db:"server_sequence" json:"server_sequence"`
+}
+
+func (q *Queries) CreateDirectChatEncryptedMessageV2(ctx context.Context, arg CreateDirectChatEncryptedMessageV2Params) (CreateDirectChatEncryptedMessageV2Row, error) {
 	row := q.db.QueryRow(ctx, createDirectChatEncryptedMessageV2,
 		arg.ID,
 		arg.ChatID,
@@ -499,8 +524,9 @@ func (q *Queries) CreateDirectChatEncryptedMessageV2(ctx context.Context, arg Cr
 		arg.Revision,
 		arg.CreatedAt,
 		arg.StoredAt,
+		arg.ServerSequence,
 	)
-	var i DirectChatEncryptedMessagesV2
+	var i CreateDirectChatEncryptedMessageV2Row
 	err := row.Scan(
 		&i.ID,
 		&i.ChatID,
@@ -511,6 +537,7 @@ func (q *Queries) CreateDirectChatEncryptedMessageV2(ctx context.Context, arg Cr
 		&i.Revision,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 	)
 	return i, err
 }
@@ -711,8 +738,9 @@ INSERT INTO group_encrypted_messages_v1 (
     ciphertext,
     ciphertext_size_bytes,
     created_at,
-    stored_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    stored_at,
+    server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING
     id,
     group_id,
@@ -726,7 +754,8 @@ RETURNING
     revision,
     ciphertext_size_bytes,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 `
 
 type CreateEncryptedGroupMessageParams struct {
@@ -744,6 +773,7 @@ type CreateEncryptedGroupMessageParams struct {
 	CiphertextSizeBytes  int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       pgtype.Int8        `db:"server_sequence" json:"server_sequence"`
 }
 
 type CreateEncryptedGroupMessageRow struct {
@@ -760,6 +790,7 @@ type CreateEncryptedGroupMessageRow struct {
 	CiphertextSizeBytes  int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       int64              `db:"server_sequence" json:"server_sequence"`
 }
 
 func (q *Queries) CreateEncryptedGroupMessage(ctx context.Context, arg CreateEncryptedGroupMessageParams) (CreateEncryptedGroupMessageRow, error) {
@@ -778,6 +809,7 @@ func (q *Queries) CreateEncryptedGroupMessage(ctx context.Context, arg CreateEnc
 		arg.CiphertextSizeBytes,
 		arg.CreatedAt,
 		arg.StoredAt,
+		arg.ServerSequence,
 	)
 	var i CreateEncryptedGroupMessageRow
 	err := row.Scan(
@@ -794,6 +826,7 @@ func (q *Queries) CreateEncryptedGroupMessage(ctx context.Context, arg CreateEnc
 		&i.CiphertextSizeBytes,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 	)
 	return i, err
 }
@@ -843,7 +876,15 @@ type CreateGroupParams struct {
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error) {
+type CreateGroupRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	Name            string             `db:"name" json:"name"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (CreateGroupRow, error) {
 	row := q.db.QueryRow(ctx, createGroup,
 		arg.ID,
 		arg.Name,
@@ -851,7 +892,7 @@ func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (Group
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i Group
+	var i CreateGroupRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -1573,6 +1614,7 @@ SELECT
     m.revision,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.transport_header,
@@ -1606,6 +1648,7 @@ type GetDirectChatEncryptedMessageV2ByDeviceRow struct {
 	Revision                int32              `db:"revision" json:"revision"`
 	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence          int64              `db:"server_sequence" json:"server_sequence"`
 	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
 	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
 	TransportHeader         []byte             `db:"transport_header" json:"transport_header"`
@@ -1632,6 +1675,7 @@ func (q *Queries) GetDirectChatEncryptedMessageV2ByDevice(ctx context.Context, a
 		&i.Revision,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 		&i.RecipientUserID,
 		&i.RecipientCryptoDeviceID,
 		&i.TransportHeader,
@@ -1652,7 +1696,8 @@ SELECT
     target_message_id,
     revision,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 FROM direct_chat_encrypted_messages_v2
 WHERE chat_id = $1 AND id = $2
 `
@@ -1662,9 +1707,22 @@ type GetDirectChatEncryptedMessageV2StoredParams struct {
 	ID     uuid.UUID `db:"id" json:"id"`
 }
 
-func (q *Queries) GetDirectChatEncryptedMessageV2Stored(ctx context.Context, arg GetDirectChatEncryptedMessageV2StoredParams) (DirectChatEncryptedMessagesV2, error) {
+type GetDirectChatEncryptedMessageV2StoredRow struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       int64              `db:"server_sequence" json:"server_sequence"`
+}
+
+func (q *Queries) GetDirectChatEncryptedMessageV2Stored(ctx context.Context, arg GetDirectChatEncryptedMessageV2StoredParams) (GetDirectChatEncryptedMessageV2StoredRow, error) {
 	row := q.db.QueryRow(ctx, getDirectChatEncryptedMessageV2Stored, arg.ChatID, arg.ID)
-	var i DirectChatEncryptedMessagesV2
+	var i GetDirectChatEncryptedMessageV2StoredRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChatID,
@@ -1675,6 +1733,7 @@ func (q *Queries) GetDirectChatEncryptedMessageV2Stored(ctx context.Context, arg
 		&i.Revision,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 	)
 	return i, err
 }
@@ -1822,11 +1881,7 @@ SELECT
           AND m.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR m.created_at > self_read.last_read_message_created_at
-              OR (
-                  m.created_at = self_read.last_read_message_created_at
-                  AND m.id > self_read.last_read_message_id
-              )
+              OR m.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
@@ -1944,6 +1999,7 @@ SELECT
     m.ciphertext_size_bytes,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.stored_at AS delivery_stored_at
@@ -1979,6 +2035,7 @@ type GetEncryptedGroupMessageByDeviceRow struct {
 	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence          int64              `db:"server_sequence" json:"server_sequence"`
 	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
 	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
 	DeliveryStoredAt        pgtype.Timestamptz `db:"delivery_stored_at" json:"delivery_stored_at"`
@@ -2007,6 +2064,7 @@ func (q *Queries) GetEncryptedGroupMessageByDevice(ctx context.Context, arg GetE
 		&i.CiphertextSizeBytes,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 		&i.RecipientUserID,
 		&i.RecipientCryptoDeviceID,
 		&i.DeliveryStoredAt,
@@ -2020,6 +2078,7 @@ SELECT
     self.user_id,
     r.last_read_message_id,
     r.last_read_message_created_at,
+    COALESCE(r.last_read_server_sequence, 0)::BIGINT AS last_read_server_sequence,
     r.updated_at
 FROM group_memberships AS self
 LEFT JOIN group_encrypted_read_states_v1 AS r
@@ -2037,6 +2096,7 @@ type GetEncryptedGroupReadStateEntryByGroupIDAndUserIDRow struct {
 	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
 	LastReadMessageID        pgtype.UUID        `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
@@ -2048,6 +2108,7 @@ func (q *Queries) GetEncryptedGroupReadStateEntryByGroupIDAndUserID(ctx context.
 		&i.UserID,
 		&i.LastReadMessageID,
 		&i.LastReadMessageCreatedAt,
+		&i.LastReadServerSequence,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -2066,7 +2127,8 @@ SELECT
     target_message_id,
     revision,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 FROM group_encrypted_messages_v1
 WHERE group_id = $1 AND id = $2
 `
@@ -2089,6 +2151,7 @@ type GetEncryptedGroupStoredMessageRow struct {
 	Revision             int32              `db:"revision" json:"revision"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       int64              `db:"server_sequence" json:"server_sequence"`
 }
 
 func (q *Queries) GetEncryptedGroupStoredMessage(ctx context.Context, arg GetEncryptedGroupStoredMessageParams) (GetEncryptedGroupStoredMessageRow, error) {
@@ -2107,6 +2170,7 @@ func (q *Queries) GetEncryptedGroupStoredMessage(ctx context.Context, arg GetEnc
 		&i.Revision,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 	)
 	return i, err
 }
@@ -2446,11 +2510,7 @@ SELECT
           AND gm.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR gm.created_at > self_read.last_read_message_created_at
-              OR (
-                  gm.created_at = self_read.last_read_message_created_at
-                  AND gm.id > self_read.last_read_message_id
-              )
+              OR gm.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE((
@@ -3110,6 +3170,7 @@ SELECT
     m.revision,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.transport_header,
@@ -3123,7 +3184,7 @@ WHERE self.user_id = $1
   AND m.chat_id = $2
   AND d.recipient_user_id = $1
   AND d.recipient_crypto_device_id = $3
-ORDER BY m.created_at DESC, m.id DESC
+ORDER BY m.server_sequence DESC
 LIMIT $4
 `
 
@@ -3144,6 +3205,7 @@ type ListDirectChatEncryptedMessageV2ByDeviceRow struct {
 	Revision                int32              `db:"revision" json:"revision"`
 	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence          int64              `db:"server_sequence" json:"server_sequence"`
 	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
 	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
 	TransportHeader         []byte             `db:"transport_header" json:"transport_header"`
@@ -3176,6 +3238,7 @@ func (q *Queries) ListDirectChatEncryptedMessageV2ByDevice(ctx context.Context, 
 			&i.Revision,
 			&i.CreatedAt,
 			&i.StoredAt,
+			&i.ServerSequence,
 			&i.RecipientUserID,
 			&i.RecipientCryptoDeviceID,
 			&i.TransportHeader,
@@ -3407,11 +3470,7 @@ SELECT
           AND m.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR m.created_at > self_read.last_read_message_created_at
-              OR (
-                  m.created_at = self_read.last_read_message_created_at
-                  AND m.id > self_read.last_read_message_id
-              )
+              OR m.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
@@ -3687,6 +3746,7 @@ SELECT
     u.read_receipts_enabled,
     r.last_read_message_id,
     r.last_read_message_created_at,
+    COALESCE(r.last_read_server_sequence, 0)::BIGINT AS last_read_server_sequence,
     r.updated_at
 FROM direct_chat_participants AS self
 JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
@@ -3706,6 +3766,7 @@ type ListEncryptedDirectChatReadStateEntriesRow struct {
 	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
 	LastReadMessageID        pgtype.UUID        `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
@@ -3723,6 +3784,7 @@ func (q *Queries) ListEncryptedDirectChatReadStateEntries(ctx context.Context, a
 			&i.ReadReceiptsEnabled,
 			&i.LastReadMessageID,
 			&i.LastReadMessageCreatedAt,
+			&i.LastReadServerSequence,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -3751,6 +3813,7 @@ SELECT
     m.ciphertext_size_bytes,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.stored_at AS delivery_stored_at
@@ -3761,7 +3824,7 @@ WHERE self.user_id = $1
   AND m.group_id = $2
   AND d.recipient_user_id = $1
   AND d.recipient_crypto_device_id = $3
-ORDER BY m.created_at DESC, m.id DESC
+ORDER BY m.server_sequence DESC
 LIMIT $4
 `
 
@@ -3787,6 +3850,7 @@ type ListEncryptedGroupMessagesByDeviceRow struct {
 	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence          int64              `db:"server_sequence" json:"server_sequence"`
 	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
 	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
 	DeliveryStoredAt        pgtype.Timestamptz `db:"delivery_stored_at" json:"delivery_stored_at"`
@@ -3821,6 +3885,7 @@ func (q *Queries) ListEncryptedGroupMessagesByDevice(ctx context.Context, arg Li
 			&i.CiphertextSizeBytes,
 			&i.CreatedAt,
 			&i.StoredAt,
+			&i.ServerSequence,
 			&i.RecipientUserID,
 			&i.RecipientCryptoDeviceID,
 			&i.DeliveryStoredAt,
@@ -4371,11 +4436,7 @@ SELECT
           AND gm.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR gm.created_at > self_read.last_read_message_created_at
-              OR (
-                  gm.created_at = self_read.last_read_message_created_at
-                  AND gm.id > self_read.last_read_message_id
-              )
+              OR gm.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE((
@@ -5412,18 +5473,16 @@ INSERT INTO direct_chat_encrypted_read_states_v1 (
     user_id,
     last_read_message_id,
     last_read_message_created_at,
-    updated_at
-) VALUES ($1, $2, $3, $4, $5)
+    updated_at,
+    last_read_server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (chat_id, user_id) DO UPDATE
 SET
     last_read_message_id = EXCLUDED.last_read_message_id,
     last_read_message_created_at = EXCLUDED.last_read_message_created_at,
-    updated_at = EXCLUDED.updated_at
-WHERE direct_chat_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
-   OR (
-        direct_chat_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
-        AND direct_chat_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
-   )
+    updated_at = EXCLUDED.updated_at,
+    last_read_server_sequence = EXCLUDED.last_read_server_sequence
+WHERE direct_chat_encrypted_read_states_v1.last_read_server_sequence < EXCLUDED.last_read_server_sequence
 `
 
 type UpsertEncryptedDirectChatReadStateParams struct {
@@ -5432,6 +5491,7 @@ type UpsertEncryptedDirectChatReadStateParams struct {
 	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 }
 
 func (q *Queries) UpsertEncryptedDirectChatReadState(ctx context.Context, arg UpsertEncryptedDirectChatReadStateParams) (int64, error) {
@@ -5441,6 +5501,7 @@ func (q *Queries) UpsertEncryptedDirectChatReadState(ctx context.Context, arg Up
 		arg.LastReadMessageID,
 		arg.LastReadMessageCreatedAt,
 		arg.UpdatedAt,
+		arg.LastReadServerSequence,
 	)
 	if err != nil {
 		return 0, err
@@ -5454,18 +5515,16 @@ INSERT INTO group_encrypted_read_states_v1 (
     user_id,
     last_read_message_id,
     last_read_message_created_at,
-    updated_at
-) VALUES ($1, $2, $3, $4, $5)
+    updated_at,
+    last_read_server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (group_id, user_id) DO UPDATE
 SET
     last_read_message_id = EXCLUDED.last_read_message_id,
     last_read_message_created_at = EXCLUDED.last_read_message_created_at,
-    updated_at = EXCLUDED.updated_at
-WHERE group_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
-   OR (
-        group_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
-        AND group_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
-   )
+    updated_at = EXCLUDED.updated_at,
+    last_read_server_sequence = EXCLUDED.last_read_server_sequence
+WHERE group_encrypted_read_states_v1.last_read_server_sequence < EXCLUDED.last_read_server_sequence
 `
 
 type UpsertEncryptedGroupReadStateParams struct {
@@ -5474,6 +5533,7 @@ type UpsertEncryptedGroupReadStateParams struct {
 	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 }
 
 func (q *Queries) UpsertEncryptedGroupReadState(ctx context.Context, arg UpsertEncryptedGroupReadStateParams) (int64, error) {
@@ -5483,6 +5543,7 @@ func (q *Queries) UpsertEncryptedGroupReadState(ctx context.Context, arg UpsertE
 		arg.LastReadMessageID,
 		arg.LastReadMessageCreatedAt,
 		arg.UpdatedAt,
+		arg.LastReadServerSequence,
 	)
 	if err != nil {
 		return 0, err

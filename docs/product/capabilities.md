@@ -4,6 +4,8 @@
 
 ## Inventory alpha
 
+Backend ordering encrypted direct/group operations использует per-conversation server sequence по [ADR-096](../adr/096-encrypted-conversation-server-sequence.md). Client `created_at` остаётся display/AAD metadata; read/unread и bounded latest SQL window используют sequence. Existing data требует [opt-in cutover](../deploy/encrypted-sequence-cutover.md). Client adoption и full two-account browser flow — отдельная приёмка; этот backend slice не доказывает full encrypted history или crypto protocol.
+
 На текущем этапе web-клиент уже поддерживает:
 
 - личные чаты и группы через `aero-gateway`;
