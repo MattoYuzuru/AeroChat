@@ -25,14 +25,21 @@ import { RetryableLazyModule } from "./lazy-module";
 import { createLazyModule } from "./lazy-module-loader";
 import { renderShellAppContent } from "./app-content";
 
+import DesktopShellResource from "virtual:aerochat-lazy-url/DesktopShell";
+import AppShellResource from "virtual:aerochat-lazy-url/AppShell";
+import MobileLauncherHomeResource from "virtual:aerochat-lazy-url/MobileLauncherHome";
+
 const desktopModule = createLazyModule<{ onRequestRebootToBoot(): void }>(
   () => import("../shell/DesktopShell").then(({ DesktopShell }) => ({ default: DesktopShell })),
+  DesktopShellResource, "DesktopShell",
 );
 const legacyModule = createLazyModule<{ children: import("react").ReactNode }>(
   () => import("./AppShell").then(({ LegacyAppShell }) => ({ default: LegacyAppShell })),
+  AppShellResource, "LegacyAppShell",
 );
 const launcherModule = createLazyModule<Record<string, never>>(
   () => import("../shell/MobileLauncherHome").then(({ MobileLauncherHome }) => ({ default: MobileLauncherHome })),
+  MobileLauncherHomeResource, "MobileLauncherHome",
 );
 
 export function AppRouter() {
