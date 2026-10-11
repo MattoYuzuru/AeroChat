@@ -297,9 +297,9 @@ func TestMediaStoreParticipantLookupErrorAndCancellation(t *testing.T) {
 				if _, err := db.Exec(ctx, `CREATE TABLE media_owned_probe(id integer PRIMARY KEY); INSERT INTO media_owned_probe VALUES(1)`); err != nil {
 					t.Fatal(err)
 				}
-				body := `BEGIN RAISE EXCEPTION 'owned participant lookup fault'; END`
+				body := `BEGIN IF position('-- name: GetActiveParticipantByCallIDAndUserID :one' IN current_query()) > 0 THEN RAISE EXCEPTION 'owned participant lookup fault'; END IF; RETURN value; END`
 				if failure == "cancel" {
-					body = `BEGIN PERFORM id FROM media_owned_probe WHERE id=1 FOR UPDATE; RETURN value; END`
+					body = `BEGIN IF position('-- name: GetActiveParticipantByCallIDAndUserID :one' IN current_query()) > 0 THEN PERFORM id FROM media_owned_probe WHERE id=1 FOR UPDATE; END IF; RETURN value; END`
 				}
 				if _, err := db.Exec(ctx, "CREATE FUNCTION media_owned_participant_id(value uuid) RETURNS uuid LANGUAGE plpgsql AS $$ "+body+" $$"); err != nil {
 					t.Fatal(err)
@@ -307,7 +307,8 @@ func TestMediaStoreParticipantLookupErrorAndCancellation(t *testing.T) {
 				if _, err := db.Exec(ctx, `CREATE VIEW rtc_call_participants AS SELECT media_owned_participant_id(id) AS id,call_id,user_id,state,joined_at,left_at,updated_at,last_signal_at FROM media_owned_participants`); err != nil {
 					t.Fatal(err)
 				}
-				// COUNT query не вызывает projection id: проверяем stage isolation.
+				// VOLATILE projection может выполняться в COUNT: injection ограничена
+				// конкретным generated lookup, ранний вызов обязан пройти в обоих cases.
 				if _, err := NewRepository(db).GetCallByID(ctx, call.String()); err != nil {
 					t.Fatal("fault affected earlier call lookup")
 				}
@@ -340,6 +341,10 @@ func TestMediaStoreParticipantLookupErrorAndCancellation(t *testing.T) {
 					waitCtx, done := context.WithTimeout(ctx, 5*time.Second)
 					defer done()
 					waitForMediaLock(t, waitCtx, db, fixture.db.Config().ConnConfig.RuntimeParams["application_name"])
+					var correctStage bool
+					if err := db.QueryRow(waitCtx, "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE application_name=$1 AND cardinality(pg_blocking_pids(pid))>0 AND position('-- name: GetActiveParticipantByCallIDAndUserID :one' IN query)>0)", fixture.db.Config().ConnConfig.RuntimeParams["application_name"]).Scan(&correctStage); err != nil || !correctStage {
+						t.Fatal("cancellation did not block the exact participant lookup")
+					}
 					cancel()
 					select {
 					case err := <-result:
