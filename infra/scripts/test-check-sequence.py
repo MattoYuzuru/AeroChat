@@ -55,7 +55,8 @@ with tempfile.TemporaryDirectory() as directory:
     definitions = "version: '3'\ntasks:\n"
     for phase in selected:
         start = text.index(f"\n  {phase}:\n")
-        end = text.find("\n  ", start + 3)
+        next_task = re.search(r"\n  \S", text[start + 3:])
+        end = start + 3 + next_task.start() if next_task else len(text)
         definitions += text[start:end] + "\n"
     (fixture / "Taskfile.yml").write_text(definitions)
     for name in ("buf", "sqlc", "golangci-lint"):
