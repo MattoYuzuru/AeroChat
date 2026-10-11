@@ -33,6 +33,14 @@ try{
     const scroll=await page.evaluate(()=>{const history=document.querySelector('[data-testid=history]');history.scrollTop=history.scrollHeight;return {top:history.scrollTop,composerBottom:document.querySelector('[data-testid=composer]').getBoundingClientRect().bottom,pageY:scrollY};});
     assert.ok(scroll.top>0);assert.equal(scroll.pageY,0);assert.equal(scroll.composerBottom,geometry.composer.bottom);
    }
+   const actions=[...(lane==='self'?[]:[lane==='group'?'Управление звонком':'Позвонить']),...(lane==='group'?[]:['Обновить thread']),'Назад к списку'];
+   for(const action of actions){
+    const control=page.getByRole('button',{name:action,exact:true});const bounds=await control.boundingBox();
+    assert.equal(await control.isVisible(),true,action+' visible before rotation');
+    assert.ok(bounds&&bounds.x>=0&&bounds.x+bounds.width<=width+1&&bounds.y>=0&&bounds.y+bounds.height<=height+1,JSON.stringify({lane,action,width,height,bounds}));
+    let reached=false;for(let i=0;i<30;i++){if(await control.evaluate(element=>element===document.activeElement)){reached=true;break;}await page.keyboard.press('Tab');}
+    assert.equal(reached,true,action+' keyboard reachable before rotation');
+   }
    if(screenshotDir&&count===50&&state==='normal'&&[320,390,568].includes(width))await page.screenshot({path:`${screenshotDir}/${lane}-${width}x${height}.png`});
    await page.setViewportSize({width:height,height:width});assert.equal(await input.inputValue(),'Черновик сохраняется');
    if(state==='normal'&&count===50){
@@ -40,7 +48,7 @@ try{
     assert.equal(await information.evaluate(e=>e.scrollHeight>e.clientHeight),true,'information scrolls');
     await page.getByRole('button',{name:'Назад к переписке',exact:true}).click();assert.equal(await input.inputValue(),'Черновик сохраняется');
    }
-   for(const action of [...(lane==='self'?[]:[lane==='group'?'Управление звонком':'Позвонить']),...(lane==='group'?[]:['Обновить thread']),'Назад к списку']){
+   for(const action of actions){
     const control=page.getByRole('button',{name:action,exact:true});assert.equal(await control.isVisible(),true,action+' visible');
     const bounds=await control.boundingBox();assert.ok(bounds&&bounds.y>=0&&bounds.y+bounds.height<=width+1,JSON.stringify({lane,action,width:height,height:width,bounds}));
     let reached=false;for(let i=0;i<30;i++){if(await control.evaluate(element=>element===document.activeElement)){reached=true;break;}await page.keyboard.press('Tab');}
