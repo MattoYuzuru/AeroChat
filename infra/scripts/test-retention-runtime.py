@@ -48,6 +48,8 @@ def rendered(server, retention):
 def ready(port):
     end = time.monotonic() + 30
     while time.monotonic() < end:
+        if processes and processes[-1].poll() is not None:
+            raise RuntimeError("Native fixture вышел до readiness; private log сохранён в external state")
         try:
             with request.urlopen(f"http://127.0.0.1:{port}/readyz", timeout=2) as response:
                 if response.status == 200:
@@ -113,6 +115,7 @@ try:
             environment["AERO_DATABASE_URL"] = urlunsplit((parsed.scheme, parsed.netloc.rsplit("@", 1)[0] + "@127.0.0.1:25432", "/" + database, parsed.query, parsed.fragment))
             environment["AERO_HTTP_ADDR"] = f"127.0.0.1:{port}"
             environment["AERO_REDIS_ADDR"] = "127.0.0.1:26379"
+            environment.update(AERO_WEB_PUSH_SUBSCRIBER="", AERO_WEB_PUSH_VAPID_PUBLIC_KEY="", AERO_WEB_PUSH_VAPID_PRIVATE_KEY="")
             if service == "chat":
                 assert environment["AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION"] == retention
                 environment.update(AERO_MEDIA_S3_INTERNAL_ENDPOINT="127.0.0.1:29000", AERO_MEDIA_S3_PRESIGN_ENDPOINT="localhost:29000", AERO_MEDIA_S3_BUCKET=bucket, AERO_MEDIA_ATTACHMENT_CLEANUP_INTERVAL="100ms")
