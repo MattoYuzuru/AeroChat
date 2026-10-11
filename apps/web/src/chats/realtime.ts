@@ -1,3 +1,4 @@
+import { hasValidEncryptedReadSequences, requireServerSequence } from "../gateway/server-sequence";
 import type {
   Attachment,
   DirectChat,
@@ -98,6 +99,7 @@ interface DirectChatReadStateWire {
 }
 
 interface EncryptedConversationReadPositionWire {
+  lastReadServerSequence?: string;
   messageId?: string;
   messageCreatedAt?: string;
   updatedAt?: string;
@@ -284,6 +286,9 @@ function normalizeReadUpdatedPayload(
   }
 
   const payload = input as DirectChatReadUpdatedPayloadWire;
+  if (!hasValidEncryptedReadSequences(payload.encryptedReadState)) {
+    return null;
+  }
   const chatId = typeof payload.chatId === "string" ? payload.chatId : "";
   if (chatId === "") {
     return null;
@@ -524,11 +529,13 @@ function normalizeEncryptedReadPosition(
   const messageId = input.messageId ?? "";
   const messageCreatedAt = input.messageCreatedAt ?? "";
   const updatedAt = input.updatedAt ?? "";
-  if (messageId === "" && messageCreatedAt === "" && updatedAt === "") {
+  if (messageId === "" && messageCreatedAt === "" && updatedAt === "" &&
+    (input.lastReadServerSequence === undefined || input.lastReadServerSequence === "0")) {
     return null;
   }
 
   return {
+    lastReadServerSequence: requireServerSequence(input.lastReadServerSequence),
     messageId,
     messageCreatedAt,
     updatedAt,

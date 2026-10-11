@@ -1,3 +1,4 @@
+import { compareServerSequences } from "../gateway/server-sequence";
 import { useEffect, useRef, useState } from "react";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import type { EncryptedDirectMessageV2ProjectionEntry } from "./encrypted-v2-projection";
@@ -407,11 +408,8 @@ function compareOpaqueEnvelopes(
   left: EncryptedDirectMessageV2Envelope,
   right: EncryptedDirectMessageV2Envelope,
 ): number {
-  if (left.createdAt === right.createdAt) {
-    return left.messageId.localeCompare(right.messageId);
-  }
-
-  return left.createdAt.localeCompare(right.createdAt);
+  return compareServerSequences(left.serverSequence, right.serverSequence) ||
+    left.messageId.localeCompare(right.messageId);
 }
 
 export function describeEncryptedDirectMessageV2LaneEmptyState(

@@ -1,3 +1,4 @@
+import { compareServerSequences } from "../gateway/server-sequence";
 import { useEffect, useRef, useState } from "react";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { describeGatewayError, isGatewayErrorCode } from "../gateway/types";
@@ -406,7 +407,7 @@ function deduplicateEncryptedGroupEnvelopes(
   }
 
   return Array.from(unique.values()).sort((left, right) =>
-    left.createdAt.localeCompare(right.createdAt),
+    compareServerSequences(left.serverSequence, right.serverSequence),
   );
 }
 

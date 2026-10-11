@@ -1,3 +1,4 @@
+import { compareServerSequences, requireServerSequence } from "../gateway/server-sequence";
 import type {
   EncryptedDirectMessageV2DecryptFailure,
   EncryptedDirectMessageV2DecryptedEnvelope,
@@ -17,6 +18,7 @@ export interface EncryptedDirectMessageV2ProjectedMessageEntry {
   revision: number;
   replyToMessageId: string | null;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   text: string | null;
   markdownPolicy: string | null;
@@ -35,6 +37,7 @@ export interface EncryptedDirectMessageV2ProjectionFailureEntry {
   senderCryptoDeviceId: string;
   revision: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   failureKind:
     | EncryptedDirectMessageV2DecryptFailure["failureKind"]
@@ -52,10 +55,14 @@ export function mergeEncryptedDirectMessageV2Projection(
 ): EncryptedDirectMessageV2ProjectionEntry[] {
   const nextEntries = new Map<string, EncryptedDirectMessageV2ProjectionEntry>();
   for (const entry of current) {
+    requireServerSequence(entry.serverSequence);
     nextEntries.set(entry.key, entry);
   }
 
-  for (const update of updates) {
+  for (const update of [...updates].sort((left, right) =>
+    compareServerSequences(left.serverSequence, right.serverSequence),
+  )) {
+    requireServerSequence(update.serverSequence);
     if (update.status === "decrypt_failed") {
       nextEntries.set(buildFailureKey(update.messageId, update.revision), {
         kind: "failure",
@@ -66,6 +73,7 @@ export function mergeEncryptedDirectMessageV2Projection(
         senderCryptoDeviceId: update.senderCryptoDeviceId,
         revision: update.revision,
         createdAt: update.createdAt,
+        serverSequence: update.serverSequence,
         storedAt: update.storedAt,
         failureKind: update.failureKind,
       });
@@ -129,6 +137,7 @@ function applyReadyProjection(
       revision: update.revision,
       replyToMessageId: update.replyToMessageId,
       createdAt: update.createdAt,
+      serverSequence: update.serverSequence,
       storedAt: update.storedAt,
       text: update.text,
       markdownPolicy: update.markdownPolicy,
@@ -153,10 +162,15 @@ function applyReadyProjection(
       senderCryptoDeviceId: update.senderCryptoDeviceId,
       revision: update.revision,
       createdAt: update.createdAt,
+      serverSequence: update.serverSequence,
       storedAt: update.storedAt,
       failureKind: "unresolved_target",
     });
     return false;
+  }
+
+  if (update.revision <= target.revision) {
+    return true;
   }
 
   if (update.operationKind === "edit") {
@@ -190,11 +204,8 @@ function compareProjectionEntries(
   left: EncryptedDirectMessageV2ProjectionEntry,
   right: EncryptedDirectMessageV2ProjectionEntry,
 ): number {
-  if (left.createdAt === right.createdAt) {
-    return left.key.localeCompare(right.key);
-  }
-
-  return left.createdAt.localeCompare(right.createdAt);
+  return compareServerSequences(left.serverSequence, right.serverSequence) ||
+    left.key.localeCompare(right.key);
 }
 
 function buildMessageKey(messageId: string): string {
