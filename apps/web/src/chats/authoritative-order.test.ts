@@ -147,7 +147,7 @@ for (const lane of ["direct", "group"] as const) {
       expect(resolveEncryptedLanePageSize(2.9)).toBe(2);
       const small = mergeEncryptedLaneWithPending([], [], updates, 2, mergeEncryptedDirectMessageV2Projection);
       expect(small.pendingMutations).toHaveLength(2);
-      expect(() => mergeEncryptedLaneWithPending([], [], [{ ...updates[0], serverSequence: "0" }], 50, mergeEncryptedDirectMessageV2Projection)).toThrow();
+      expect(() => mergeEncryptedLaneWithPending([], [], [content("invalid", "0", "2000-01-01T00:00:00Z")], 50, mergeEncryptedDirectMessageV2Projection)).toThrow();
     });
     it("keeps pre-origin mutation visibly unresolved until whole-lane recovery replay", () => {
       const first = content("first", "1", "2099-01-01T00:00:00Z");
