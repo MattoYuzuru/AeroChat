@@ -125,6 +125,8 @@
 
 `reader` выбран консервативно как read-only role и для RTC foundation тоже не считается активным speaking/joining участником.
 
+При каждом SendSignal адресат дополнительно проверяется по текущему typed chat roster: GetDirectChat.participants либо ListGroupMembers с bearer отправителя. Bearer адресата не требуется и не подставляется. Group target должен оставаться owner/admin/member; удалённый или reader target не получает envelope, его RTC participant атомарно переводится left. Неопределённый downstream failure отклоняет relay без предположения, что membership уже отозвана. Проверка актуальна на момент downstream read; атомарный distributed revoke между chat membership write и gateway publish этот slice не вводит.
+
 ### 6. Signaling transport model
 
 `RtcControlService` остаётся typed ConnectRPC API для command/read path.

@@ -31,6 +31,7 @@ type Authenticator interface {
 
 type ScopeAuthorizer interface {
 	GetScopeAccess(context.Context, string, ConversationScope) (*ScopeAccess, error)
+	GetParticipantAccess(context.Context, string, ConversationScope, string) (*ScopeAccess, error)
 }
 
 type Service struct {
@@ -508,8 +509,26 @@ func (s *Service) SendSignal(ctx context.Context, token string, callID string, t
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.repo.GetActiveParticipant(ctx, call.ID, targetUserID); err != nil {
+	targetParticipant, err := s.repo.GetActiveParticipant(ctx, call.ID, targetUserID)
+	if err != nil {
 		return nil, err
+	}
+	targetAccess, eligibilityErr := s.scopeAuthorizer.GetParticipantAccess(ctx, token, call.Scope, targetUserID)
+	if eligibilityErr == nil {
+		if targetAccess == nil || targetAccess.Scope != call.Scope {
+			eligibilityErr = ErrPermissionDenied
+		} else if call.Scope.Type == ScopeTypeGroup && targetAccess.GroupRole != GroupRoleOwner && targetAccess.GroupRole != GroupRoleAdmin && targetAccess.GroupRole != GroupRoleMember {
+			eligibilityErr = ErrPermissionDenied
+		}
+	}
+	if eligibilityErr != nil {
+		if errors.Is(eligibilityErr, ErrPermissionDenied) || errors.Is(eligibilityErr, ErrNotFound) {
+			if _, leaveErr := s.repo.LeaveParticipantAndMaybeEndCall(ctx, call.ID, targetParticipant.ID, s.now()); leaveErr != nil {
+				return nil, leaveErr
+			}
+			return nil, fmt.Errorf("%w: signal target is no longer eligible", ErrPermissionDenied)
+		}
+		return nil, eligibilityErr
 	}
 
 	now := s.now()
