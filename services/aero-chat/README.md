@@ -49,3 +49,9 @@ GOTOOLCHAIN=go1.25.8 go test -tags=integration -race -count=1 -timeout=120s -run
 В общий local workflow команды запускаются через shared `agent-dev` resource heavy, source фиксируется committed HEAD/receipt; значения fixture DSN не выводятся. Этот selector не запускает другие integration suites с чужими profiles/schema names и не переносит их старые результаты.
 
 Migration/bootstrap повторяемые и additive. Rollback к старому binary на новой schema сохраняет trigger invariant; drop trigger/schema/events при active media недопустим. Возврат к source без authority schema допускается только при media off/no active grants, без удаления сохранённых pending events. Actual deployment, SFU/media и real-device/NAT/TURN/WAN проверки нужны отдельными этапами.
+
+Передача владельца группы выполняет demotion прежнего owner, затем promotion
+нового owner в одной transaction под group row lock. Это сохраняет immediate
+unique owner index независимо от heap/UUID order. Missing, restricted или уже
+изменившийся target не оставляет группу без owner; ошибка promotion откатывает
+обе роли. Owner/admin/member transitions сохраняют audio eligibility epoch.
