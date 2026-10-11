@@ -13,7 +13,7 @@ try{
  const screenshotDir=process.env.MOBILE_SCREENSHOT_DIR;
  if(screenshotDir)await mkdir(screenshotDir,{recursive:true});
  for(const [width,height] of [[320,568],[390,844],[768,1024],[568,320],[844,390],[1024,768],[640,360]]){
-  for(const lane of ['self','direct','group'])for(const count of [0,2,50])for(const state of count===50?['normal','reply','attachment','error']:['normal']){
+  for(const lane of ['self','direct','group'])for(const count of [0,2,50])for(const state of count===50?['normal','reply','attachment','error','call']:['normal']){
    await page.setViewportSize({width,height});await page.goto(server.resolvedUrls.local[0]+`app/${lane==='self'?'self':lane==='group'?'groups':'chats'}?lane=${lane}&count=${count}&state=${state}`);
    const input=page.getByRole('textbox');await input.waitFor();await page.evaluate(()=>document.fonts.ready);
    for(let i=0;i<16;i++){if(await input.evaluate(e=>document.activeElement===e))break;await page.keyboard.press('Tab');}
@@ -21,15 +21,17 @@ try{
    await page.keyboard.type('Черновик сохраняется');
    const geometry=await page.evaluate(()=>{
     const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom};};
-    const history=document.querySelector('[data-testid=history]');
-    return {input:rect(document.querySelector('textarea')),composer:rect(document.querySelector('[data-testid=composer]')),header:rect(document.querySelector('[data-testid=thread-header]')),history:rect(history),overflow:document.documentElement.scrollWidth>innerWidth,documentHeight:document.documentElement.scrollHeight,historyScrollHeight:history.scrollHeight,historyClientHeight:history.clientHeight};
+    const history=document.querySelector('[data-testid=history]');const historyStyle=getComputedStyle(history);
+    return {input:rect(document.querySelector('textarea')),composer:rect(document.querySelector('[data-testid=composer]')),header:rect(document.querySelector('[data-testid=thread-header]')),history:rect(history),overflow:document.documentElement.scrollWidth>innerWidth,documentHeight:document.documentElement.scrollHeight,historyScrollHeight:history.scrollHeight,historyClientHeight:history.clientHeight,historyUsableHeight:history.clientHeight-parseFloat(historyStyle.paddingTop)-parseFloat(historyStyle.paddingBottom)};
    });
    assert.equal(geometry.overflow,false,JSON.stringify({lane,count,width,height,geometry}));
    assert.ok(geometry.composer.bottom<=height+1,JSON.stringify({lane,count,width,height,geometry}));
    assert.ok(geometry.header.y>=0&&geometry.header.bottom<=geometry.composer.y,JSON.stringify({lane,count,state,width,height,geometry}));
+   assert.ok(geometry.history.bottom<=geometry.composer.y+1,JSON.stringify({lane,count,state,width,height,geometry}));
+   assert.ok(geometry.input.y>=geometry.composer.y&&geometry.input.bottom<=geometry.composer.bottom+1,JSON.stringify({lane,count,state,width,height,geometry}));
    assert.ok(geometry.input.width>=140,JSON.stringify({lane,count,width,height,geometry}));
    if(count===50){
-    assert.ok(geometry.historyScrollHeight>geometry.historyClientHeight);assert.ok(geometry.history.height>0);
+    assert.ok(geometry.historyScrollHeight>geometry.historyClientHeight);assert.ok(geometry.historyUsableHeight>0,JSON.stringify({lane,count,state,width,height,geometry}));
     const scroll=await page.evaluate(()=>{const history=document.querySelector('[data-testid=history]');history.scrollTop=history.scrollHeight;return {top:history.scrollTop,composerBottom:document.querySelector('[data-testid=composer]').getBoundingClientRect().bottom,pageY:scrollY};});
     assert.ok(scroll.top>0);assert.equal(scroll.pageY,0);assert.equal(scroll.composerBottom,geometry.composer.bottom);
    }

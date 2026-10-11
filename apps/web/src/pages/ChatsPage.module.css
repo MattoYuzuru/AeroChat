@@ -1340,6 +1340,7 @@
     min-height: 0;
     grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden;
+    padding: 0;
   }
 
   .threadPane[data-mobile-hidden="false"] > .sectionCard > .panelHeader {
@@ -1437,6 +1438,34 @@
   .threadDescription,
   .threadStatusRow > span {
     display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .threadHeroRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .threadStatusRow > span {
+    display: none;
+  }
+
+  .threadTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 1179px) {
+  .composerCard .field textarea {
+    height: 2.45rem;
+  }
+
+  .composer .error {
+    margin: 0;
+    padding: 0.35rem 0.55rem;
   }
 }
 

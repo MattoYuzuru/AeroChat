@@ -1131,6 +1131,36 @@
   }
 }
 
+@media (max-width: 720px) {
+  .threadHeroCard .splitHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.35rem;
+  }
+
+  .threadStatusRow > span,
+  .threadHeroCard .cardLabel {
+    display: none;
+  }
+
+  .threadTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 1179px) {
+  .composerCard .field textarea {
+    height: 2.45rem;
+  }
+
+  .composer .error {
+    margin: 0;
+    padding: 0.35rem 0.55rem;
+  }
+}
+
 @media (max-height: 500px) and (max-width: 1179px) {
   .threadHeroCard .splitHeader {
     display: grid;
