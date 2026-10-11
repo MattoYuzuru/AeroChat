@@ -257,7 +257,7 @@ jobs:
             --env-file .env.server \
             --env-file .env.server.secrets \
             -f "$COMPOSE_FILE" \
-            pull
+            pull --ignore-buildable
 
           docker compose \
             --env-file .env.server \

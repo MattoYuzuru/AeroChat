@@ -426,8 +426,8 @@ curl -fsS https://media.keykomi.com/minio/health/live
 
 1. Измени `AERO_IMAGE_TAG` в `.env.server`.
 2. Выполни `docker compose ... config`.
-3. Выполни `docker compose ... pull`.
-4. Выполни `docker compose ... up -d`.
+3. Выполни `docker compose ... pull --ignore-buildable`.
+4. Выполни `docker compose ... up -d --build minio minio-bootstrap; docker compose ... up -d`.
 5. Проверь `docker compose ... ps`.
 6. Снова проверь:
    - `http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz`
