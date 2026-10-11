@@ -24,6 +24,12 @@ const input = () => ({
   onProgress: vi.fn(),
 });
 
+function requestAt(index: number): FakeRequest {
+  const request = FakeRequest.instances[index];
+  if (!request) throw new Error("expected an upload request");
+  return request;
+}
+
 describe("bounded attachment upload", () => {
   beforeEach(() => { FakeRequest.instances = []; vi.stubGlobal("XMLHttpRequest", FakeRequest); });
   afterEach(() => vi.unstubAllGlobals());
@@ -31,10 +37,11 @@ describe("bounded attachment upload", () => {
   it("sends every signed field before the ciphertext file without a manual multipart header", async () => {
     const options = input();
     const promise = uploadFileWithProgress(options);
-    const request = FakeRequest.instances[0];
+    const request = requestAt(0);
     expect(request.open).toHaveBeenCalledWith("POST", options.uploadUrl, true);
     expect(request.setRequestHeader).not.toHaveBeenCalled();
-    const form = request.send.mock.calls[0][0] as FormData;
+    const form = request.send.mock.calls[0]?.[0];
+    if (!form) throw new Error("expected a multipart body");
     expect(Array.from(form.keys())).toEqual(["key", "policy", "Content-Type", "file"]);
     expect(form.get("policy")).toBe("signed-policy");
     expect((form.get("file") as Blob).size).toBe(3);
@@ -65,10 +72,10 @@ describe("bounded attachment upload", () => {
     const cancelled = uploadFileWithProgress({ ...input(), signal: controller.signal });
     controller.abort();
     await expect(cancelled).rejects.toBeInstanceOf(AttachmentUploadAbortedError);
-    expect(FakeRequest.instances[0].abort).toHaveBeenCalledOnce();
+    expect(requestAt(0).abort).toHaveBeenCalledOnce();
     const completedController = new AbortController();
     const completed = uploadFileWithProgress({ ...input(), signal: completedController.signal });
-    const request = FakeRequest.instances[1];
+    const request = requestAt(1);
     request.onload?.();
     await completed;
     completedController.abort();
@@ -77,7 +84,7 @@ describe("bounded attachment upload", () => {
 
   it.each([400, 403, 500])("surfaces storage rejection %i", async (status) => {
     const pending = uploadFileWithProgress(input());
-    const request = FakeRequest.instances[0];
+    const request = requestAt(0);
     request.status = status;
     request.onload?.();
     await expect(pending).rejects.toThrow(`status ${status}`);
