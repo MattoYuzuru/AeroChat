@@ -55,6 +55,7 @@ type Querier interface {
 	GetMediaOperationGrantIDs(ctx context.Context, operationID uuid.UUID) ([]uuid.UUID, error)
 	GetMediaOperationTarget(ctx context.Context, arg GetMediaOperationTargetParams) (RtcMediaOperationTarget, error)
 	GetMediaSourceEvent(ctx context.Context, arg GetMediaSourceEventParams) (RtcMediaSourceInbox, error)
+	GetMediaSourceReceipt(ctx context.Context, arg GetMediaSourceReceiptParams) (GetMediaSourceReceiptRow, error)
 	HasPendingMediaCleanup(ctx context.Context, operationID uuid.UUID) (bool, error)
 	LeaveActiveParticipantsByCallID(ctx context.Context, arg LeaveActiveParticipantsByCallIDParams) (int64, error)
 	LeaveParticipant(ctx context.Context, arg LeaveParticipantParams) (int64, error)
