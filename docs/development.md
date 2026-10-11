@@ -74,7 +74,7 @@ gofmt -l $(git ls-files '*.go' ':!:gen/go/**')
 git diff --check
 ```
 
-Текущий `task check` объявляет шаги через parallel `deps`: установка tools/web dependencies и генерация могут конкурировать с lint/tests/build. Для воспроизводимого evidence использовать отдельные шаги выше. Web CI включает Vitest наряду с lint/build; локально запускать `task web:test` и фиксировать его результат отдельно.
+`task check` выполняет последовательные task calls: tools → frozen web install → proto lint → Buf/SQLC generation+drift → Go tests/lint → web lint/tests/build → Compose config. Failed preparation останавливает consumers; generation не меняет outputs одновременно с Go checks. Local/server Compose checks используют те же example env files, что CI, и `config --quiet` не выводит интерполированную модель. Source freeze обязателен для итогового прогона; `check` намеренно отклоняет незакоммиченные generated changes. Отдельные команды выше остаются доступны для узких checks.
 
 Go unit tests сами по себе не доказывают работу storage/runtime. Для integration evidence нужен отдельный стенд и явный setup изменяемого модуля; если соответствующего suite ещё нет, фиксировать этот gap. `pass` с пропущенной integration-веткой не означает, что storage проверен. Evidence каждого прогона должен содержать checkout/HEAD, команду, версии инструментов, runtime/env profile без секретов, exit code и список skipped checks.
 
