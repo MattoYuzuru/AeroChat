@@ -198,7 +198,11 @@ func (r *Repository) CreateSession(ctx context.Context, params identity.CreateSe
 }
 
 func (r *Repository) GetSessionAuthByID(ctx context.Context, sessionID string) (*identity.SessionAuth, error) {
-	row, err := r.queries.GetSessionAuthByID(ctx, mustParseUUID(sessionID))
+	id, err := uuid.Parse(sessionID)
+	if err != nil {
+		return nil, identity.ErrUnauthorized
+	}
+	row, err := r.queries.GetSessionAuthByID(ctx, id)
 	if err != nil {
 		return nil, convertError(err)
 	}
