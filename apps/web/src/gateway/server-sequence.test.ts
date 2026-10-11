@@ -8,7 +8,7 @@ describe("authoritative server sequence", () => {
     expect(compareServerSequences("1", "1")).toBe(0);
     expect(parseServerSequence("9223372036854775807")).toBe("9223372036854775807");
   });
-  it.each([undefined, null, 1, 9007199254740993, "", "0", "01", "-1", "+1", "1.5", "1e3",
+  it.each([undefined, null, 1, Number("9007199254740993"), "", "0", "01", "-1", "+1", "1.5", "1e3",
     " 1", "1 ", "9223372036854775808", "999999999999999999999"])("rejects missing or invalid authoritative value %s", (value) => {
     expect(parseServerSequence(value)).toBeNull();
     expect(() => requireServerSequence(value)).toThrow("порядок сообщений");
