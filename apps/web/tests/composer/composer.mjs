@@ -18,31 +18,42 @@ const state=stateStart<0?'const isComposerSending=false;':source.slice(stateStar
 const textareaStart=source.indexOf('                          onChange={(event) => {',source.indexOf('<textarea'));
 const onChangeEnd=source.indexOf('                          }}',textareaStart);
 const onChange=source.slice(source.indexOf('=> {',textareaStart)+4,onChangeEnd);
+const editStart=source.indexOf('                                    setEditingEncryptedMessageId(item.messageId);',source.indexOf('                            onEdit:'));
+const editEnd=source.indexOf('                                  },',editStart);
+const cancelLabel=source.indexOf('                          Отменить редактирование');
+const cancelStart=source.lastIndexOf('                          onClick={() => {',cancelLabel);
+const cancelEnd=source.indexOf('                          }}',cancelStart);
+const cancelBody=source.slice(source.indexOf('=> {',cancelStart)+4,cancelEnd);
+assert.ok(editStart>0&&editEnd>editStart&&cancelStart>0);
 const virtual=ts.transpileModule(`import {useLayoutEffect,useRef,useState} from 'react';export function useComposer(opts){
  const {selectedThread,uploadedEncryptedAttachmentDraft,editingEncryptedEntry,selectedEncryptedReplyEntry,selectedEncryptedReplyMessageId,editingEncryptedMessageId,setSelectedEncryptedReplyMessageId,setEditingEncryptedMessageId,chats,normalizeComposerMessageText,cryptoRuntime,encryptedMediaAttachmentDraft,publishLocalEncryptedDirectMessageV2Projection}=opts;
  const [composerText,setComposerText]=useState('');const [composerError,setComposerError]=useState(null);
  ${state}\n${complete}\n${source.slice(sendStart,sendEnd)}\n${source.slice(keyStart,keyEnd)}
- return {text:composerText,error:composerError,currentReply:selectedEncryptedReplyMessageId,pending:isComposerSending,send:handleEncryptedDirectMessageV2Send,onKeyDown:handleComposerKeyDown,onChange:event=>{${onChange}}};
+ return {text:composerText,error:composerError,currentReply:selectedEncryptedReplyMessageId,currentEdit:editingEncryptedMessageId,edit:item=>{${source.slice(editStart,editEnd)}},cancelEdit:()=>{${cancelBody}},pending:isComposerSending,send:handleEncryptedDirectMessageV2Send,onKeyDown:handleComposerKeyDown,onChange:event=>{${onChange}}};
 }`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const server=await createServer({configFile:false,root:here,resolve:{alias:[{find:/^react$/,replacement:web+'node_modules/react/index.js'},{find:/^react-dom\/(.*)$/,replacement:web+'node_modules/react-dom/$1'}]},plugins:[{name:'composer-fixture',resolveId(id){if(id==='virtual:composer')return '\0composer';},load(id){if(id==='\0composer')return virtual;}}],server:{host:'127.0.0.1',port:Number(process.env.COMPOSER_FIXTURE_PORT??25174),strictPort:true,fs:{allow:[web,here]}}});
 await server.listen();const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE});
 try{
  const page=await browser.newPage();const evidence=[];
- for(const scenario of ['typing','reentrant','failure','scope','reply','unchanged','cancel']){
+ for(const scenario of ['typing','reentrant','failure','scope','scopeFailure','reply','editReselect','unchanged','cancel']){
   await page.goto(server.resolvedUrls.local[0]);await page.waitForFunction(()=>window.fixture);await page.evaluate(()=>window.fixture.mount());
+  if(scenario==='editReselect'){await page.evaluate(()=>window.fixture.edit('old editable message'));await page.waitForFunction(()=>window.fixture.report().currentEdit==='edit-1');}
   await page.getByRole('textbox').fill('first message');
   if(scenario==='reentrant')await page.evaluate(()=>window.fixture.twice());else await page.getByRole('textbox').press('Enter');
   await page.waitForFunction(()=>window.fixture.report().calls.length>=1);
   assert.equal((await page.evaluate(()=>window.fixture.report())).calls[0].text,'first message');
   if(scenario==='typing'){await page.getByRole('textbox').fill('new unsent draft');await page.getByRole('textbox').press('Enter');}
-  if(scenario==='scope'){await page.evaluate(()=>window.fixture.switchThread());await page.getByRole('textbox').fill('other thread draft');}
+  if(scenario==='scope'||scenario==='scopeFailure'){await page.evaluate(()=>window.fixture.switchThread());await page.getByRole('textbox').fill('other thread draft');}
   if(scenario==='reply'){await page.evaluate(()=>window.fixture.changeReply());await page.waitForFunction(()=>window.fixture.report().currentReply==='reply-2');}
-  if(scenario==='failure')await page.evaluate(()=>window.fixture.fail());else if(scenario==='cancel')await page.evaluate(()=>window.fixture.cancel());else await page.evaluate(()=>window.fixture.succeed());
+  if(scenario==='editReselect'){await page.evaluate(()=>window.fixture.cancelEdit());await page.waitForFunction(()=>window.fixture.report().currentEdit===null);await page.evaluate(()=>window.fixture.edit('new edit draft'));await page.waitForFunction(()=>window.fixture.report().text==='new edit draft');}
+  if(scenario==='failure'||scenario==='scopeFailure')await page.evaluate(()=>window.fixture.fail());else if(scenario==='cancel')await page.evaluate(()=>window.fixture.cancel());else await page.evaluate(()=>window.fixture.succeed());
   await page.waitForTimeout(30);const report=await page.evaluate(()=>window.fixture.report());
   assert.equal(report.calls.length,1,scenario+' exactly one mutation');assert.equal(report.pending,false,scenario+' lock released');
   if(scenario==='typing')assert.equal(report.text,'new unsent draft');
-  if(scenario==='scope'){assert.equal(report.text,'other thread draft');assert.equal(report.clears,0);}
+  if(scenario==='scope'||scenario==='scopeFailure'){assert.equal(report.text,'other thread draft');assert.equal(report.clears,0);}
   if(scenario==='failure'){assert.equal(report.text,'first message');assert.equal(report.clears,0);assert.equal(report.failed,1);assert.equal(report.reply,'reply-1');assert.equal(report.error,'synthetic failure');}
+  if(scenario==='scopeFailure'){assert.equal(report.error,null);assert.equal(report.failed,0);}
+  if(scenario==='editReselect'){assert.equal(report.text,'new edit draft');assert.equal(report.edit,'edit-1');assert.equal(report.reply,'reply-1');}
   if(scenario==='reply'){assert.equal(report.text,'first message');assert.equal(report.reply,'reply-2');}
   if(scenario==='unchanged'){assert.equal(report.text,'');assert.equal(report.clears,1);assert.equal(report.reply,null);}
   if(scenario==='cancel'){assert.equal(report.text,'first message');assert.equal(report.clears,0);}
