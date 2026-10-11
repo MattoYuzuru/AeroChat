@@ -866,6 +866,17 @@ func (r *fakeRepository) CreateCryptoDevice(_ context.Context, params CreateCryp
 	return &deviceCopy, &bundleCopy, nil
 }
 
+func (r *fakeRepository) CreateFirstCryptoDevice(ctx context.Context, params CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error) {
+	total, _, _, err := r.GetCryptoDeviceRegistryStatsByUserID(ctx, params.Device.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if total != 0 {
+		return nil, nil, ErrConflict
+	}
+	return r.CreateCryptoDevice(ctx, params)
+}
+
 func (r *fakeRepository) ListCryptoDevices(_ context.Context, userID string) ([]CryptoDevice, error) {
 	items := make([]CryptoDevice, 0)
 	for _, device := range r.cryptoDevices {
