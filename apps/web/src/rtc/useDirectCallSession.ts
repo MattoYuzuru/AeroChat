@@ -946,26 +946,33 @@ export function useDirectCallSession(
     dispatch({ type: "clear_error" });
   }
 
-  async function retryRemoteAudioPlayback(audioElement: HTMLAudioElement | null) {
-    if (audioElement === null) {
+  const retryRemoteAudioPlayback = useCallback(async (audioElement: HTMLAudioElement | null) => {
+    const stream = audioElement?.srcObject;
+    if (audioElement === null || stream == null) {
       return;
     }
 
     try {
       await audioElement.play();
+      if (audioElement.srcObject !== stream || remoteStreamRef.current !== stream) {
+        return;
+      }
       dispatch({
         type: "remote_audio_state_replaced",
         remoteAudioState: stateRef.current.remoteAudioAvailable ? "ready" : "idle",
         remoteAudioAvailable: stateRef.current.remoteAudioAvailable,
       });
     } catch {
+      if (audioElement.srcObject !== stream || remoteStreamRef.current !== stream) {
+        return;
+      }
       dispatch({
         type: "remote_audio_state_replaced",
         remoteAudioState: "blocked",
         remoteAudioAvailable: stateRef.current.remoteAudioAvailable,
       });
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (!enabled || activeChatID === null || !isDirectChatSupported) {
