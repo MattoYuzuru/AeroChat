@@ -30,7 +30,7 @@ try {
   const results = [];
   for (const action of ["start", "join"]) {
     for (const cleanup of ["unmount", "changeScope"]) {
-      for (const phase of ["capture", "mutation"]) {
+      for (const phase of ["capture", "configuration", "mutation"]) {
         await page.goto(url);
         await page.waitForFunction(()=>window.fixture);
         await page.evaluate(()=>window.fixture.mount());
@@ -39,18 +39,18 @@ try {
           await page.evaluate(()=>window.fixture.sync());
           await page.waitForFunction(()=>window.fixture.report().state.call!==null);
         }
-        await page.evaluate(phase=>window.fixture[phase==="capture"?"deferCapture":"deferMutation"](),phase);
+        await page.evaluate(phase=>window.fixture[{capture:'deferCapture',configuration:'deferConfiguration',mutation:'deferMutation'}[phase]](),phase);
         await page.evaluate(action=>{window.pending=window.fixture[action]();},action);
-        await page.waitForFunction(phase=>phase==="capture"?window.fixture.report().captures===1:window.fixture.report().log.length===1,phase);
+        await page.waitForFunction(phase=>phase==="capture"?window.fixture.report().captures===1:phase==='configuration'?window.fixture.report().configurationPending:window.fixture.report().log.length===1,phase);
         await page.evaluate(cleanup=>window.fixture[cleanup](),cleanup);
         await page.waitForTimeout(50);
-        await page.evaluate(phase=>window.fixture[phase==="capture"?"releaseCapture":"finishMutation"](),phase);
+        await page.evaluate(phase=>window.fixture[{capture:'releaseCapture',configuration:'finishConfiguration',mutation:'finishMutation'}[phase]](),phase);
         await page.evaluate(()=>window.pending);
         await page.waitForTimeout(50);
         const result=await page.evaluate(()=>window.fixture.report());
         assert.equal(result.stops,phase==='capture'?2:1,`${action}/${cleanup}/${phase}: every captured track stopped`);
         assert.equal(result.peers,0,"stale operation must not create peer");
-        assert.deepEqual(result.log,phase==="capture"?[]:[action,"leave"]);
+        assert.deepEqual(result.log,phase!=="mutation"?[]:[action,"leave"]);
         results.push({action,cleanup,phase,stops:result.stops,log:result.log});
         if(cleanup!=="unmount")await page.evaluate(()=>window.fixture.unmount());
       }
@@ -81,5 +81,65 @@ try {
     await page.evaluate(()=>window.fixture.unmount());
   }
   }
-  console.log(JSON.stringify({browser:await browser.version(),results,scope:"Actual React; fake media/PC/RPC; no microphone/network evidence"}));
+  for(const failed of [false,true]){
+    await page.goto(url);
+    await page.waitForFunction(()=>window.fixture);
+    await page.evaluate(()=>window.fixture.mount());
+    await page.waitForFunction(()=>window.fixture.report().state.syncStatus==='ready');
+    await page.evaluate(()=>{window.fixture.deferMutation();window.pending=window.fixture.start();});
+    await page.waitForFunction(()=>window.fixture.report().log.includes('start'));
+    await page.evaluate(()=>{window.fixture.unmount();window.fixture.mount();window.fixture.sync();});
+    await page.waitForFunction(()=>window.fixture.report().state.call!==null);
+    await page.evaluate(()=>window.fixture.join());
+    let current=await page.evaluate(()=>window.fixture.report());
+    assert.equal(current.captures,1,'remounted hook must not overtake old RPC');
+    assert.deepEqual(current.log,['start']);
+    if(failed)await page.evaluate(()=>window.fixture.failLeave(true));
+    else await page.evaluate(()=>window.fixture.deferLeave());
+    await page.evaluate(()=>window.fixture.finishMutation());
+    await page.waitForFunction(()=>window.fixture.report().log.includes('leave'));
+    if(failed){
+      await page.evaluate(()=>window.pending);
+      await page.evaluate(()=>window.fixture.join());
+      await page.waitForTimeout(25);
+      current=await page.evaluate(()=>window.fixture.report());
+      assert.equal(current.captures,1);
+      assert.match(current.state.errorMessage,/Не удалось подтвердить/);
+      await page.evaluate(()=>window.fixture.observeInactive());
+      await page.waitForFunction(()=>window.fixture.report().state.call===null);
+      await page.evaluate(()=>window.fixture.start());
+      current=await page.evaluate(()=>window.fixture.report());
+      assert.equal(current.log.filter(method=>method==='start').length,2);
+    } else {
+      await page.evaluate(()=>window.fixture.join());
+      current=await page.evaluate(()=>window.fixture.report());
+      assert.equal(current.captures,1,'same-call join must wait for prior compensation');
+      assert.deepEqual(current.log,['start','leave']);
+      await page.evaluate(()=>window.fixture.finishLeave());
+      await page.evaluate(()=>window.pending);
+      await page.evaluate(()=>window.fixture.join());
+      current=await page.evaluate(()=>window.fixture.report());
+      assert.equal(current.log.filter(method=>method==='join').length,1);
+    }
+    await page.evaluate(()=>window.fixture.unmount());
+  }
+  await page.goto(url);
+  await page.waitForFunction(()=>window.fixture);
+  await page.evaluate(()=>window.fixture.mount());
+  await page.waitForFunction(()=>window.fixture.report().state.syncStatus==='ready');
+  await page.evaluate(()=>{window.fixture.deferCapture();window.pending=window.fixture.start();});
+  await page.waitForFunction(()=>window.fixture.report().captures===1);
+  await page.evaluate(()=>{window.fixture.unmount();window.fixture.changeAccount();window.fixture.mount();});
+  await page.waitForTimeout(25);
+  await page.evaluate(()=>window.fixture.start());
+  let account=await page.evaluate(()=>window.fixture.report());
+  assert.equal(account.captures,2,'different account has independent admission');
+  assert.equal(account.log.filter(method=>method==='start').length,1);
+  await page.evaluate(()=>window.fixture.releaseCapture());
+  await page.evaluate(()=>window.pending);
+  account=await page.evaluate(()=>window.fixture.report());
+  assert.equal(account.stops,2,'old account capture stops all tracks');
+  assert.equal(account.log.filter(method=>method==='start').length,1,'old account cannot dispatch late mutation');
+  await page.evaluate(()=>window.fixture.unmount());
+  console.log(JSON.stringify({browser:await browser.version(),results,remountCompensation:'pass',accountIsolation:'pass',scope:"Actual React hook and provider-owned lease implementation; fake media/PC/RPC; no microphone/network evidence"}));
 } finally {await browser.close();await server.close();}

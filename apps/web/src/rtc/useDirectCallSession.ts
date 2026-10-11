@@ -15,6 +15,7 @@ import {
   subscribeRealtimeLifecycleEvents,
 } from "../realtime/events";
 import type { DirectCallAwarenessEntry } from "./awareness";
+import type { DirectCallJoinCoordinator, DirectCallJoinLease } from "./join-coordinator";
 import {
   applyDirectCallTrackContentHint,
   buildDirectCallAudioConstraints,
@@ -55,6 +56,7 @@ const directCallParticipantHeartbeatIntervalMs = 20_000;
 const directCallDisconnectRecoveryGraceMs = 8_000;
 
 interface UseDirectCallSessionOptions {
+  joinCoordinator: DirectCallJoinCoordinator;
   enabled: boolean;
   token: string;
   chat: DirectChat | null;
@@ -95,6 +97,7 @@ export function useDirectCallSession(
     chat,
     currentUserId,
     enabled,
+    joinCoordinator,
     onUnauthenticated,
     refreshDirectChatCall,
     token,
@@ -817,16 +820,26 @@ export function useDirectCallSession(
     };
   }, [schedulePeerRecovery]);
 
-  function compensateCancelledJoin(callId: string) {
-    void gatewayClient.leaveCall(token, callId).catch(() => {
-      sendRtcLeaveCallKeepalive(token, callId, directCallGatewayBaseUrl);
-    });
+  async function compensateCancelledJoin(callId: string, chatId: string, lease: DirectCallJoinLease) {
+    try {
+      await gatewayClient.leaveCall(token, callId);
+    } catch {
+      lease.markUncertain(chatId, callId);
+    }
   }
 
   async function startCall() {
     if (!sessionActiveRef.current || !enabled || chat === null || !isDirectChatSupported || pendingJoinGenerationRef.current !== null) {
       return;
     }
+
+    const acquisition = joinCoordinator.acquire(currentUserId, null);
+    if (acquisition.lease === null) {
+      dispatch({ type: "failure", message: acquisition.message });
+      void runRefreshDirectChatCall(false);
+      return;
+    }
+    const lease = acquisition.lease;
 
     const generation = ++runtimeGenerationRef.current;
     pendingJoinGenerationRef.current = generation;
@@ -844,7 +857,7 @@ export function useDirectCallSession(
         directChatId: chat.id,
       });
       if (runtimeGenerationRef.current !== generation) {
-        compensateCancelledJoin(response.call.id);
+        await compensateCancelledJoin(response.call.id, chat.id, lease);
         return;
       }
       dispatch({ type: "action_finished" });
@@ -892,6 +905,7 @@ export function useDirectCallSession(
         message: describeError(error, "Не удалось начать аудиозвонок."),
       });
     } finally {
+      lease.release();
       if (pendingJoinGenerationRef.current === generation) {
         pendingJoinGenerationRef.current = null;
       }
@@ -911,6 +925,14 @@ export function useDirectCallSession(
       return;
     }
 
+    const acquisition = joinCoordinator.acquire(currentUserId, currentCall.id);
+    if (acquisition.lease === null) {
+      dispatch({ type: "failure", message: acquisition.message });
+      void runRefreshDirectChatCall(false);
+      return;
+    }
+    const lease = acquisition.lease;
+
     const generation = ++runtimeGenerationRef.current;
     pendingJoinGenerationRef.current = generation;
     dispatch({ type: "action_started", actionState: "joining" });
@@ -924,7 +946,7 @@ export function useDirectCallSession(
       }
       const response = await gatewayClient.joinCall(token, currentCall.id);
       if (runtimeGenerationRef.current !== generation) {
-        compensateCancelledJoin(response.call.id);
+        await compensateCancelledJoin(response.call.id, chat.id, lease);
         return;
       }
       dispatch({ type: "action_finished" });
@@ -963,6 +985,7 @@ export function useDirectCallSession(
         message: describeError(error, "Не удалось присоединиться к активному звонку."),
       });
     } finally {
+      lease.release();
       if (pendingJoinGenerationRef.current === generation) {
         pendingJoinGenerationRef.current = null;
       }

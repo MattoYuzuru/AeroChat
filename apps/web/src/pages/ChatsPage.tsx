@@ -327,6 +327,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const latestEncryptedMessage = encryptedMessageEntries.at(-1) ?? null;
   const activeEncryptedDirectChatId = selectedThread?.chat.id ?? null;
   const directCall = useDirectCallSession({
+    joinCoordinator: directCallAwareness.joinCoordinator,
     enabled:
       authState.status === "authenticated" &&
       isThreadRouteActive &&

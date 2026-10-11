@@ -129,7 +129,7 @@ navigator.mediaDevices.getUserMedia({ audio: true })
 
 Если это не удалось, UI показывает bounded ошибку и не оставляет server-backed join/start side effects.
 
-Ожидающий capture/start/join принадлежит поколению текущего локального runtime. Смена chat scope, token или unmount инвалидирует это поколение: поздний capture немедленно освобождает все tracks, до RPC/создания peer продолжение проверяет актуальность. Если успешный Start/Join ответ пришёл после teardown, клиент делает один компенсирующий best-effort `LeaveCall` с keepalive fallback. Повторный click во время операции не запускает второй capture/RPC. Для уже joined звонка navigation policy ADR-076 сохраняется.
+Ожидающий capture/start/join принадлежит поколению текущего локального runtime. Смена chat scope, token или unmount инвалидирует это поколение: поздний capture немедленно освобождает все tracks, до RPC/создания peer продолжение проверяет актуальность. Если успешный Start/Join ответ пришёл после teardown, клиент ожидает один компенсирующий `LeaveCall`, удерживая provider-owned lease пользователя. Неопределённый результат выхода блокирует повторный join именно этого call до свежего authoritative snapshot с другим/пустым active call; fire-and-forget fallback после освобождения lease здесь не отправляется. Повторный click во время операции не запускает второй capture/RPC. Для уже joined звонка navigation policy ADR-076 сохраняется.
 
 Явно обрабатываются:
 

@@ -60,6 +60,8 @@ Frontend получает небольшой app-level state только для
 
 Local media session и `RTCPeerConnection` остаются page-scoped внутри открытого direct thread.
 
+Provider дополнительно владеет небольшим per-user lease для ожидающего Start/Join и его компенсации: закрытие thread не позволяет новому hook обогнать старый server mutation/Leave. Lease освобождает только его owner; смена account использует независимый ключ. При неопределённом Leave блокируется повторный join старого call, UI сообщает причину и инициирует refresh. Снять этот block может только authoritative GetActiveCall, начатый после фиксации неопределённого выхода и показавший другой/пустой call. Это координация ожидающих mutations, без общего capture/peer runtime и без межвкладочной/device arbitration.
+
 ### 3. Continuity model меняется: при уходе из direct thread рвётся только local media runtime
 
 Новая консервативная policy:
