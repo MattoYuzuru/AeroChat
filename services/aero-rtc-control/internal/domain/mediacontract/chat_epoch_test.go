@@ -10,6 +10,8 @@ func TestDelayedChatDenyDoesNotRevokeNewEligibleEpoch(t *testing.T) {
 	model, token, authority, now := fixture(t)
 	newBinding := model.binding
 	newBinding.EligibilityEpoch = 3
+	newBinding.Key.Generation++
+	token.Key = newBinding.Key
 	newGrant, err := NewReferenceModel(newBinding)
 	if err != nil {
 		t.Fatal(err)
