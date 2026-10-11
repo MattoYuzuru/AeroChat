@@ -91,3 +91,9 @@ Go unit tests сами по себе не доказывают работу stor
 [Bootstrap](deploy/single-server-bootstrap.md) описывает `.env.server`, `.env.server.secrets`, shared `k3s + Traefik`, media origin и repo-managed TURN. [Rollout](deploy/production-rollout.md) содержит production health gates и rollback; это отдельная операционная процедура.
 
 Application images публикуются в GHCR для `web`, `aero-gateway`, `aero-identity`, `aero-chat`, `aero-rtc-control` на `linux/amd64`. Для точного выбора сборки использовать `sha-<commit>`; `edge` следует default branch, release-теги имеют вид `vX.Y.Z`, `vX.Y`, `vX`. `latest` не используется. В `.env.server` выбирается `AERO_IMAGE_TAG`; секреты хранятся только в `.env.server.secrets`.
+
+## Мобильная геометрия conversation
+
+Mobile LegacyAppShell ограничен `100dvh`: header/call strip/navigation занимают свои grid rows, а content имеет `min-height:0`. Выбранная self/direct/group conversation занимает оставшееся пространство; history scroll не двигает composer и navigation. При ширине ниже desktop breakpoint 1180px layout скрывает неактивный список/повторный panel header; узкий composer выделяет textarea отдельную строку, короткий landscape возвращает одну строку действий. Reply/attachment/error composer ограничен половиной viewport и имеет собственный scroll; info pane скроллится отдельно.
+
+Geometry regression использует настоящий LegacyAppShell и production conversation CSS с representative DOM, synthetic auth/RTC. Проверяются 320/390/768 portrait и landscape, 0/2/50 rows, keyboard/draft/info/scroll и textarea не уже 140 CSS px. Дополнительный CSS viewport640×360 моделирует layout при 200% zoom desktop1280×720; это не native browser zoom. Полные actual pages на integration HEAD, iOS/Android OS keyboard и hardware safe area остаются отдельной наблюдаемой приёмкой.

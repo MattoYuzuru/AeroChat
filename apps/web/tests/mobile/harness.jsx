@@ -1,0 +1,31 @@
+import React,{useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {BrowserRouter} from 'react-router-dom';
+import {LegacyAppShell} from '../../src/app/AppShell.tsx';
+import direct from '../../src/pages/ChatsPage.module.css';
+import group from '../../src/pages/GroupsPage.module.css';
+import '../../src/styles/reset.css';import '../../src/styles/tokens.css';import '../../src/styles/global.css';
+function Conversation(){
+ const params=new URLSearchParams(location.search),isGroup=params.get('lane')==='group',s=isGroup?group:direct,count=Number(params.get('count')??2);
+ const [draft,setDraft]=useState(''),[info,setInfo]=useState(false);
+ const state=params.get('state')??'normal';
+ const header=<section className={isGroup?s.threadHeroCard:s.threadHero} data-testid="thread-header"><div className={isGroup?s.splitHeader:s.threadHeroRow}><button className={s.threadIdentityButton} onClick={()=>setInfo(true)}><h2 className={s.threadTitle}>Переписка</h2><p className={s.threadEyebrow}>@layout.fixture</p></button><div className={s.threadStatusRow}>Прочитано</div></div></section>;
+ const composer=<section className={s.composerCard} data-testid="composer"><form className={s.composer}>
+  {state==='reply'&&<section className={s.replyComposerCard}>Ответ на предыдущее сообщение <button type="button">Отменить ответ</button></section>}
+  {state==='attachment'&&<section className={s.attachmentDraftCard}>Файл готов к отправке <button type="button">Убрать файл</button></section>}
+  {state==='error'&&<p className={s.error}>Не удалось отправить сообщение. Повторите попытку.</p>}
+  <div className={s.composerRow}>
+  <button aria-label="Прикрепить файл" type="button" className={s.iconButton}>+</button>
+  <label className={s.field}><textarea aria-label="Сообщение" rows={2} value={draft} onChange={e=>setDraft(e.target.value)} /></label>
+  <button aria-label="Записать голосовое сообщение" type="button" className={s.iconButton}>A</button>
+  <button aria-label="Записать видео сообщение" type="button" className={s.iconButton}>V</button>
+  <button aria-label="Отправить сообщение" type="button" className={s.primaryIconButton}>↑</button>
+ </div></form></section>;
+ const history=<section className={s.messagesPanel}><div className={s.messagesViewport} data-testid="history"><div className={s.messagesList}>{Array.from({length:count},(_,i)=><article key={i} className={isGroup?s.messageCard:s.messageBubble}>Сообщение {i+1}: достаточно длинный текст для проверки переноса строк.</article>)}</div></div></section>;
+ const information=<section className={isGroup?s.groupInfoHeroCard:s.profilePanel}><button onClick={()=>setInfo(false)}>Назад к переписке</button><h2>Информация о переписке</h2>{Array.from({length:20},(_,i)=><p key={i}>Сведения {i+1}: длинный текст для проверки отдельного скролла информации.</p>)}</section>;
+ return <div className={s.layout}><section className={s.heroCard} data-mobile-hidden="true"/><div className={s.workspace} data-mobile-thread-active="true">
+  {isGroup?<section className={s.mainColumn} data-mobile-thread-active="true" data-testid={info?"information":undefined}>{info?information:<>{header}<section className={s.threadPanel}>{history}{composer}</section></>}</section>:
+  <section className={s.threadPane} data-mobile-hidden="false"><div className={s.sectionCard}><div className={s.panelHeader}><h2>Переписка</h2><button>Назад к списку</button><button>Обновить переписку</button></div><div className={s.threadLayout} data-testid={info?"information":undefined}>{info?information:<>{header}{history}{composer}</>}</div></div></section>}
+ </div></div>;
+}
+createRoot(document.getElementById('root')).render(<BrowserRouter><LegacyAppShell><Conversation/></LegacyAppShell></BrowserRouter>);

@@ -1015,7 +1015,12 @@
   }
 }
 
-@media (max-width: 920px) {
+@media (max-width: 1179px) {
+  .composerCard {
+    max-height: min(50dvh, 22rem);
+    overflow-y: auto;
+  }
+
   .heroCard[data-mobile-hidden="true"] {
     display: none;
   }
@@ -1025,13 +1030,41 @@
   }
 
   .workspace[data-mobile-thread-active="true"] {
-    min-height: calc(100dvh - 12.5rem);
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .layout:has(.workspace[data-mobile-thread-active="true"]) {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
   }
 
   .mainColumn[data-mobile-thread-active="true"] {
-    min-height: inherit;
+    height: 100%;
+    min-height: 0;
     grid-template-rows: auto minmax(0, 1fr);
     align-content: stretch;
+  }
+
+  .mainColumn:has(> .groupInfoHeroCard) {
+    grid-template-rows: auto;
+    overflow-y: auto;
+  }
+
+  .threadPanel > .readOnlyNotice {
+    grid-row: 1;
+  }
+  .threadPanel > .pinnedStrip {
+    grid-row: 2;
+  }
+  .threadPanel > .messagesPanel {
+    grid-row: 3;
+  }
+  .threadPanel > .composerCard {
+    grid-row: 4;
   }
 }
 
@@ -1077,6 +1110,35 @@
   }
 
   .composerRow {
+    grid-template-columns: repeat(4, minmax(2.45rem, 1fr));
+  }
+
+  .composerRow > .field {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+
+  .composerRow > button {
+    grid-row: 2;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 1179px) {
+  .threadEyebrow,
+  .threadDescription,
+  .threadStatusRow {
+    display: none;
+  }
+}
+
+@media (max-height: 500px) and (min-width: 500px) and (max-width: 1179px) {
+  .composerRow {
     grid-template-columns: 2.45rem minmax(0, 1fr) 2.45rem 2.45rem 2.45rem;
+  }
+
+  .composerRow > .field,
+  .composerRow > button {
+    grid-row: auto;
+    grid-column: auto;
   }
 }
