@@ -14,7 +14,7 @@
 | Self-host и публичный edge | [Bootstrap](deploy/single-server-bootstrap.md), [Rollout/rollback](deploy/production-rollout.md), [ADR-025](adr/025-k3s-traefik-shared-edge-deployment.md) |
 | TURN и heartbeat звонков | [ADR-085](adr/085-server-turn-runtime-and-public-relay-ip-contract.md), [RTC ADR-086](adr/086-rtc-participant-heartbeat-and-stale-eviction.md) |
 | Решение для группового аудио; реализация ещё не подтверждена | [ADR-089: trusted self-hosted SFU и admission boundary](adr/089-group-audio-sfu-and-admission-boundary.md) |
-| Предложенный внутренний authorization contract для group media; не реализован | [ADR-097: trusted session/subject lookup и revoke state](adr/097-group-media-trusted-authorization-contract.md) |
+| Принятый внутренний authorization contract для group media; runtime не реализован | [ADR-097: trusted session/subject lookup и revoke state](adr/097-group-media-trusted-authorization-contract.md) |
 | Push | [Notifications ADR-086](adr/086-web-notifications-and-push-foundation.md) |
 | Команды, runtime и совместная работа агентов | [Development](development.md) |
 | Следующая сессия исправлений | [Промпт координатора](audits/2026-10-11-next-session.md) |

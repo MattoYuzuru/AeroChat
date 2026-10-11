@@ -1,6 +1,6 @@
 # ADR-097: Trusted authorization contract для group media admission
 
-- Статус: Proposed — требуется review до implementation публичного media admission
+- Статус: Accepted — architecture/model review координатором 2026-10-11; runtime enforcement ещё не реализован
 - Дата: 2026-10-11
 - Задача: [#176](https://github.com/MattoYuzuru/AeroChat/issues/176)
 - Предпосылка: принятый [ADR-089](089-group-audio-sfu-and-admission-boundary.md)
@@ -11,7 +11,7 @@
 
 ADR-089 требует отзыва initial и refreshed SFU token, ограничения другого tab/device и подтверждённого teardown до успешного terminal результата. Текущие CallStatus ACTIVE/ENDED и синхронный lobby End не моделируют отказ SFU. Этот PR задаёт prerequisite contracts; он не меняет эти production paths.
 
-## Предлагаемое решение
+## Решение
 
 Identity владеет user/device/session source of truth, Chat — текущим membership/role, RTC — call/participant/media generation и revoke state. Выделить proto-first **internal-only** методы проверки:
 
@@ -23,7 +23,7 @@ Identity владеет user/device/session source of truth, Chat — текущ
 
 Внутренние проверки не выдают bearer и не создают target-user session. Caller identity выдаёт deployment authority; browser не может выбирать service identity. Нужны отдельный private listener/network policy и проверяемая service authentication (mTLS service identities с отдельными сертификатами Identity/Chat/RTC/admission). Обычный публичный gateway, browser bearer, SFU JWT и произвольный заголовок caller не открывают эти methods. Ключи/certificates и rotation принадлежат runtime owner. Пока этот transport contract не принят и negative tests публичного доступа не проходят, новые методы, media grants и feature flag не включаются.
 
-Предлагаемые proto service/method names ниже относятся к отдельным internal services, которые не регистрируются в public gateway. Проверки certificate chain/expiry/client-auth usage и точного service principal дополняются **method allowlist**; наличие любого сертификата этой CA не даёт все права.
+Proto service/method names ниже задают будущие отдельные internal services, которые не регистрируются в public gateway. Проверки certificate chain/expiry/client-auth usage и точного service principal дополняются **method allowlist**; наличие любого сертификата этой CA не даёт все права.
 
 | Future method | Единственный разрешённый caller principal | Результат/ограничение |
 | --- | --- | --- |
