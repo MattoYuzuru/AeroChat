@@ -302,3 +302,98 @@ func TestGroupAuthorityRemoveAndRejoinSerialize(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupAuthorityRoleAndRemoveSerialize(t *testing.T) {
+	for _, first := range []string{"role", "remove"} {
+		t.Run(first, func(t *testing.T) {
+			db, ctx := groupAuthorityDatabase(t, false)
+			repo, group, _, member := groupAuthorityOwnedGroup(t, ctx, db)
+			tx := groupAuthorityTx(t, ctx, db)
+			if _, err := repo.queries.WithTx(tx).LockGroupByID(ctx, mustParseUUID(group)); err != nil {
+				t.Fatal(err)
+			}
+			statement := "DELETE FROM group_memberships WHERE group_id=$1 AND user_id=$2"
+			if first == "role" {
+				statement = "UPDATE group_memberships SET role='reader' WHERE group_id=$1 AND user_id=$2"
+			}
+			if _, err := tx.Exec(ctx, statement, mustParseUUID(group), mustParseUUID(member)); err != nil {
+				t.Fatal(err)
+			}
+			result := make(chan error, 1)
+			go func() {
+				var err error
+				var changed bool
+				if first == "role" {
+					changed, err = repo.DeleteGroupMembership(ctx, group, member, time.Now())
+				} else {
+					changed, err = repo.UpdateGroupMemberRole(ctx, chat.UpdateGroupMemberRoleParams{GroupID: group, UserID: member, Role: "reader", UpdatedAt: time.Now()})
+				}
+				if err == nil && changed != (first == "role") {
+					err = errors.New("source absence was not respected after serialization")
+				}
+				result <- err
+			}()
+			waitGroupAuthorityLock(t, ctx, db, tx, result)
+			if err := tx.Commit(ctx); err != nil {
+				t.Fatal(err)
+			}
+			awaitGroupAuthority(t, ctx, result, false)
+			if first == "role" {
+				assertGroupAuthority(t, ctx, db, group, member, 3, false, false, 2)
+			} else {
+				assertGroupAuthority(t, ctx, db, group, member, 2, false, false, 1)
+			}
+		})
+	}
+}
+
+func TestGroupAuthorityTransferAndRoleSerialize(t *testing.T) {
+	for _, first := range []string{"transfer", "role"} {
+		t.Run(first, func(t *testing.T) {
+			db, ctx := groupAuthorityDatabase(t, false)
+			repo, group, owner, member := groupAuthorityOwnedGroup(t, ctx, db)
+			tx := groupAuthorityTx(t, ctx, db)
+			if _, err := repo.queries.WithTx(tx).LockGroupByID(ctx, mustParseUUID(group)); err != nil {
+				t.Fatal(err)
+			}
+			if first == "transfer" {
+				if _, err := tx.Exec(ctx, "UPDATE group_memberships SET role='admin' WHERE group_id=$1 AND user_id=$2", mustParseUUID(group), mustParseUUID(owner)); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := tx.Exec(ctx, "UPDATE group_memberships SET role='owner' WHERE group_id=$1 AND user_id=$2", mustParseUUID(group), mustParseUUID(member)); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if _, err := tx.Exec(ctx, "UPDATE group_memberships SET role='reader' WHERE group_id=$1 AND user_id=$2", mustParseUUID(group), mustParseUUID(member)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			result := make(chan error, 1)
+			go func() {
+				var err error
+				var changed bool
+				if first == "transfer" {
+					changed, err = repo.UpdateGroupMemberRole(ctx, chat.UpdateGroupMemberRoleParams{GroupID: group, UserID: owner, Role: "reader", UpdatedAt: time.Now()})
+				} else {
+					changed, err = repo.TransferGroupOwnership(ctx, chat.TransferGroupOwnershipParams{GroupID: group, CurrentOwnerUserID: owner, NewOwnerUserID: member, UpdatedAt: time.Now()})
+				}
+				if err == nil && !changed {
+					err = errors.New("serialized role/transfer did not commit")
+				}
+				result <- err
+			}()
+			waitGroupAuthorityLock(t, ctx, db, tx, result)
+			if err := tx.Commit(ctx); err != nil {
+				t.Fatal(err)
+			}
+			awaitGroupAuthority(t, ctx, result, false)
+			if first == "transfer" {
+				assertGroupAuthority(t, ctx, db, group, owner, 2, true, false, 1)
+				assertGroupAuthority(t, ctx, db, group, member, 1, true, true, 0)
+			} else {
+				assertGroupAuthority(t, ctx, db, group, owner, 1, true, true, 0)
+				assertGroupAuthority(t, ctx, db, group, member, 3, true, true, 1)
+			}
+		})
+	}
+}

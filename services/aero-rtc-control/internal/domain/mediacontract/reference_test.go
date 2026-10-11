@@ -12,6 +12,7 @@ func fixture(t *testing.T) (*ReferenceModel, VerifiedToken, AuthorityObservation
 	model, err := NewReferenceModel(Binding{
 		Key: key, GrantID: "grant", CallID: "call", ParticipantID: "participant",
 		GroupID: "group", UserID: "user", SessionID: "session", DeviceID: "device",
+		EligibilityEpoch: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -21,6 +22,7 @@ func fixture(t *testing.T) (*ReferenceModel, VerifiedToken, AuthorityObservation
 	authority := AuthorityObservation{
 		Available: true, Fresh: true, UserID: "user", SessionID: "session", DeviceID: "device", GroupID: "group",
 		SessionActive: true, DeviceActive: true, ParticipantActive: true, GroupRole: "member",
+		EligibilityEpoch: 1,
 	}
 	return model, token, authority, now
 }
@@ -55,6 +57,7 @@ func TestReferenceAdmissionRequiresAuthoritativeBinding(t *testing.T) {
 		"wrong device":       func(_ *VerifiedToken, authority *AuthorityObservation) { authority.DeviceID = "foreign" },
 		"wrong user":         func(_ *VerifiedToken, authority *AuthorityObservation) { authority.UserID = "foreign" },
 		"wrong group":        func(_ *VerifiedToken, authority *AuthorityObservation) { authority.GroupID = "foreign" },
+		"wrong epoch":        func(_ *VerifiedToken, authority *AuthorityObservation) { authority.EligibilityEpoch++ },
 		"revoked session":    func(_ *VerifiedToken, authority *AuthorityObservation) { authority.SessionActive = false },
 		"revoked device":     func(_ *VerifiedToken, authority *AuthorityObservation) { authority.DeviceActive = false },
 		"left participant":   func(_ *VerifiedToken, authority *AuthorityObservation) { authority.ParticipantActive = false },
