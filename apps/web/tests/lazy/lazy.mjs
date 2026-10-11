@@ -12,15 +12,15 @@ const source=process.env.LAZY_SOURCE_ROOT??web,baseline=process.env.LAZY_BASELIN
 const output=process.env.LAZY_BUILD_DIR;
 assert.ok(output,'External owned build directory is required');
 const result=await build({configFile:false,root:here,plugins:[{name:'lazy-fixture',enforce:'pre',resolveId(id,importer){
- if(importer?.endsWith('/harness.jsx')&&id.startsWith('../../src/'))return source+'src/'+id.slice('../../src/'.length);
+ if((importer?.endsWith('/harness.jsx')||importer?.endsWith('/pair.jsx'))&&id.startsWith('../../src/'))return source+'src/'+id.slice('../../src/'.length);
  if(id.endsWith('/auth/useAuth')||id==='../auth/useAuth')return here+'auth.js';
  if(id.endsWith('/gateway/runtime')||id==='../gateway/runtime')return here+'gateway.js';
  if(id.endsWith('/rtc/useDirectCallAwareness')||id==='../rtc/useDirectCallAwareness')return here+'rtc.js';
  if(id.endsWith('/realtime/events')||id==='../realtime/events')return here+'realtime.js';
-},transform(code,id){const probe=['/react/index.js','/auth/AuthContext.tsx','/crypto/context.tsx','/notifications/context.tsx','/rtc/context.tsx'].find(suffix=>id.endsWith(suffix));if(probe)return {code:`globalThis.__lazyExecutions??={};globalThis.__lazyExecutions[${JSON.stringify(probe)}]=(globalThis.__lazyExecutions[${JSON.stringify(probe)}]??0)+1;\n`+code,map:null};}},react(),lazyModuleUrls(source+"src/")],resolve:{alias:[{find:/^react$/,replacement:web+'node_modules/react/index.js'},{find:/^react-dom\/(.*)$/,replacement:web+'node_modules/react-dom/$1'}]},build:{outDir:output,emptyOutDir:false,manifest:true}});
+},transform(code,id){const probe=['/react/index.js','/auth/AuthContext.tsx','/crypto/context.tsx','/notifications/context.tsx','/rtc/context.tsx'].find(suffix=>id.endsWith(suffix));if(probe)return {code:`globalThis.__lazyExecutions??={};globalThis.__lazyExecutions[${JSON.stringify(probe)}]=(globalThis.__lazyExecutions[${JSON.stringify(probe)}]??0)+1;\n`+code,map:null};}},react(),lazyModuleUrls(source+"src/")],resolve:{alias:[{find:/^react$/,replacement:web+'node_modules/react/index.js'},{find:/^react-dom\/(.*)$/,replacement:web+'node_modules/react-dom/$1'}]},build:{outDir:output,emptyOutDir:false,manifest:true,rollupOptions:{input:baseline?here+'index.html':{index:here+'index.html',pair:here+'pair.html'}}}});
 const manifest=JSON.parse(await readFile(output+'/.vite/manifest.json','utf8'));
 const chunks=(Array.isArray(result)?result.flatMap(item=>item.output):result.output).filter(item=>item.type==='chunk');
-const entry=chunks.find(item=>item.isEntry);
+const entry=chunks.find(item=>item.isEntry&&item.facadeModuleId.endsWith('/index.html'));
 const closure=new Set();function visit(file){if(closure.has(file))return;closure.add(file);for(const dependency of chunks.find(item=>item.fileName===file)?.imports??[])visit(dependency);}visit(entry.fileName);
 const eagerModules=chunks.filter(item=>closure.has(item.fileName)).flatMap(item=>item.moduleIds);
 const heavyNames=['DesktopShell','AppShell','MobileLauncherHome','PeoplePage','ExplorerPage','ChatsPage','GroupsPage'];
@@ -28,7 +28,7 @@ for(const name of heavyNames)assert.equal(eagerModules.some(id=>id.endsWith('/'+
 const chunk=name=>{const entry=Object.entries(manifest).find(([key])=>key.endsWith('/'+name+'.tsx'));assert.ok(entry,name+' chunk');return '/'+entry[1].file;};
 const server=createServer(async(request,response)=>{
  const pathname=new URL(request.url,'http://127.0.0.1').pathname;
- const path=pathname.startsWith('/assets/')?pathname:'/index.html';
+ const path=pathname.startsWith('/assets/')?pathname:pathname==='/retry-pair'?'/pair.html':'/index.html';
  try{const bytes=await readFile(output+path);response.setHeader('Cache-Control','no-store');response.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':path.endsWith('.woff2')?'font/woff2':path.endsWith('.json')?'application/json':'text/html');response.end(bytes);}catch{response.statusCode=404;response.end();}
 });
 let browser;const diagnostic={stage:'setup',requests:[],failedRequests:[],pageErrors:[],attempts:0};
