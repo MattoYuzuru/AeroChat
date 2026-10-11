@@ -55,7 +55,7 @@ window.fixture = {
   finishLeave,
   failLeave,
   observeInactive(){opts.joinCoordinator.observeChat('chat-1',null,opts.joinCoordinator.observationVersion());opts.awarenessEntry=null;root.render(React.createElement(Harness));},
-  changeAccount(){opts.currentUserId='joiner';opts.token='synthetic-joiner';root.render(React.createElement(Harness));},
+  changeAccount(){opts.currentUserId='joiner';opts.token='synthetic-joiner';},
   changeScope(){opts.chat={id:'chat-2',kind:'direct'};opts.awarenessEntry=null;root.render(React.createElement(Harness));},
   emitTrack(){const event=new Event('track');Object.defineProperties(event,{streams:{value:[stream()]},track:{value:track}});observations.peers.at(-1).dispatchEvent(event);},
   unmount(){root.unmount();},
