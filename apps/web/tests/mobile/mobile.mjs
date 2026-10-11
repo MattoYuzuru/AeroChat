@@ -40,8 +40,8 @@ try{
    for(const control of await page.getByTestId('composer').getByRole('button').all()){
     let reached=false;for(let i=0;i<30;i++){if(await control.evaluate(element=>element===document.activeElement)){reached=true;break;}await page.keyboard.press('Tab');}
     assert.equal(reached,true,'composer action keyboard reachable');
-    for(const reveal of ['focus','touch']){
-     if(reveal==='touch')await control.scrollIntoViewIfNeeded();const bounds=await control.boundingBox();
+    for(const reveal of ['focus','programmatic-reveal']){
+     if(reveal==='programmatic-reveal')await control.scrollIntoViewIfNeeded();const bounds=await control.boundingBox();
      assert.ok(bounds&&bounds.height>=32&&bounds.y>=geometry.composer.y-1&&bounds.y+bounds.height<=geometry.composer.bottom+1,JSON.stringify({lane,state,width,height,reveal,bounds,composer:geometry.composer}));
     }
    }
