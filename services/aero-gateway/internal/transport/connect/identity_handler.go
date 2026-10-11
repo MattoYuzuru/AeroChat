@@ -56,7 +56,11 @@ func (h *IdentityHandler) Login(ctx context.Context, req *connect.Request[identi
 }
 
 func (h *IdentityHandler) LogoutCurrentSession(ctx context.Context, req *connect.Request[identityv1.LogoutCurrentSessionRequest]) (*connect.Response[identityv1.LogoutCurrentSessionResponse], error) {
-	return forwardUnary(ctx, req, h.client.LogoutCurrentSession)
+	response, err := forwardUnary(ctx, req, h.client.LogoutCurrentSession)
+	if err == nil && h.realtimeHub != nil {
+		h.realtimeHub.CloseToken(strings.TrimSpace(strings.TrimPrefix(req.Header().Get("Authorization"), "Bearer ")))
+	}
+	return response, err
 }
 
 func (h *IdentityHandler) GetCurrentProfile(ctx context.Context, req *connect.Request[identityv1.GetCurrentProfileRequest]) (*connect.Response[identityv1.GetCurrentProfileResponse], error) {
@@ -84,7 +88,17 @@ func (h *IdentityHandler) ListDevices(ctx context.Context, req *connect.Request[
 }
 
 func (h *IdentityHandler) RevokeSessionOrDevice(ctx context.Context, req *connect.Request[identityv1.RevokeSessionOrDeviceRequest]) (*connect.Response[identityv1.RevokeSessionOrDeviceResponse], error) {
-	return forwardUnary(ctx, req, h.client.RevokeSessionOrDevice)
+	var userID string
+	if h.realtimeHub != nil {
+		if profile, err := h.fetchCurrentProfile(ctx, req.Header()); err == nil {
+			userID = profile.GetId()
+		}
+	}
+	response, err := forwardUnary(ctx, req, h.client.RevokeSessionOrDevice)
+	if err == nil && userID != "" {
+		h.realtimeHub.RevalidateUser(userID)
+	}
+	return response, err
 }
 
 func (h *IdentityHandler) ListBlockedUsers(ctx context.Context, req *connect.Request[identityv1.ListBlockedUsersRequest]) (*connect.Response[identityv1.ListBlockedUsersResponse], error) {
