@@ -65,7 +65,7 @@ try{
  await retry.evaluate(element=>{element.click();element.click();});
  diagnostic.stage='window-chunk-retry';
  await retriedRequest;const retryStatus=page.getByRole('status');await retryStatus.waitFor();assert.equal(await retryStatus.evaluate(element=>document.activeElement===element),true,'pending retry keeps active-window keyboard focus');assert.equal(await draft.inputValue(),'Непотерянный черновик');releaseRetry();
- await page.getByPlaceholder('Новая папка',{exact:true}).waitFor();assert.equal(attempts,2,'one retry fetch after two immediate clicks');assert.equal(await draft.inputValue(),'Непотерянный черновик');
+ await page.getByRole('heading',{name:'Проводник AeroChat',exact:true}).waitFor();await page.getByRole('button',{name:'Папки Ваши папки и ярлыки.',exact:true}).click();await page.getByPlaceholder('Новая папка',{exact:true}).waitFor();assert.equal(attempts,2,'one retry fetch after two immediate clicks');assert.equal(await draft.inputValue(),'Непотерянный черновик');
  const delayedPath=chunk('CreateGroupPage');let release;
  diagnostic.stage='close-before-late-chunk';
  const delayed=new Promise(resolve=>{release=resolve;});
@@ -108,7 +108,7 @@ try{
     sidecars++;
     if(sidecars===1&&mode==='invalid-sidecar')await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({module:'wrong.js',css:[]})});else if(sidecars===1&&mode==='oversized-sidecar')await route.fulfill({status:200,contentType:'application/json',body:' '.repeat(16385)});else if(sidecars===1&&mode==='external-css')await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({module:explorerPath.split('/').at(-1),css:['http://127.0.0.1:25175/unowned.css']})});else if(sidecars===1&&mode==='sidecar-redirect')await route.fulfill({status:302,headers:{location:'/assets/unexpected.resources.json'}});else await route.continue();
    });
-   await pair.goto('http://127.0.0.1:25174/retry-pair');
+   await pair.goto('http://127.0.0.1:25174/retry-pair?section=folders');
    const errors=pair.getByRole('alert');await errors.nth(1).waitFor();
    const draft=pair.getByRole('textbox',{name:'Соседний черновик',exact:true});await draft.fill('Сохранён при двух ошибках');
    const first=pair.locator('[data-pair="0"]'),second=pair.locator('[data-pair="1"]');
