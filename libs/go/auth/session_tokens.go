@@ -72,7 +72,7 @@ func canonicalSessionID(value string) bool {
 				return false
 			}
 		default:
-			if !(char >= '0' && char <= '9' || char >= 'a' && char <= 'f') {
+			if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
 				return false
 			}
 		}
