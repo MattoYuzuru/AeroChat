@@ -305,6 +305,21 @@ func TestPrivateGroupAuthorityActualTLSAndFreshPostgres(t *testing.T) {
 	if service.calls.Load() != before {
 		t.Fatal("negative TLS reached authoritative domain")
 	}
+	oldTLS := privateGroupClient(t, issuer, &valid)
+	oldConfig := oldTLS.Transport.(*http.Transport).TLSClientConfig
+	oldConfig.MinVersion = tls.VersionTLS12
+	oldConfig.MaxVersion = tls.VersionTLS12
+	oldClient := chatauthorizationv1connect.NewInternalAuthorizationServiceClient(oldTLS, endpoint)
+	if response, err := oldClient.CheckGroupSubject(ctx, connect.NewRequest(&chatauthorizationv1.CheckGroupSubjectRequest{GroupId: group, UserId: user})); response != nil || err == nil {
+		t.Fatal("TLS1.2 admitted to TLS1.3 boundary")
+	}
+	large := connect.NewRequest(&chatauthorizationv1.CheckGroupSubjectRequest{GroupId: strings.Repeat("owned-limit-fixture", 500), UserId: user})
+	if response, err := client.CheckGroupSubject(ctx, large); response != nil || connect.CodeOf(err) != connect.CodeResourceExhausted {
+		t.Fatal("oversized private body admitted")
+	}
+	if service.calls.Load() != before {
+		t.Fatal("protocol or oversized-body denial reached domain")
+	}
 	public := httptest.NewServer(app.NewHTTPHandler(logger, observability.ServiceMeta{Name: "owned-public"}, func(context.Context) error { return nil }, &chatv1connect.UnimplementedChatServiceHandler{}))
 	t.Cleanup(public.Close)
 	publicClient := chatauthorizationv1connect.NewInternalAuthorizationServiceClient(public.Client(), public.URL)
