@@ -1,613 +1,103 @@
 <a id="readme-top"></a>
 
 <div align="center">
-  <img src="./favicon_io/android-chrome-192x192.png" alt="AeroChat icon" width="96" height="96" />
+  <img src="./favicon_io/android-chrome-192x192.png" alt="AeroChat" width="96" height="96" />
   <h1>AeroChat</h1>
-  <p>
-    Самостоятельно разворачиваемый приватный чат с веб-клиентом, группами, realtime и bounded foundation под encrypted lanes.
-  </p>
-  <p>
-    Эстетика Frutiger Aero / Windows Aero / old desktop shell.  
-    Go-first backend. Monorepo. Self-hosted.
-  </p>
+  <p>Self-hosted веб-чат с рабочим столом в эстетике Windows XP / Frutiger Aero.</p>
+  <p>Go · React · PostgreSQL · ConnectRPC · Monorepo</p>
 </div>
 
----
-
-## О проекте
-
-**AeroChat** — это self-hosted чат-приложение с акцентом на:
-
-- **безопасность**: encrypted lanes проектируются так, чтобы сервер не имел доступа к открытому содержимому, при этом legacy plaintext history в репозитории всё ещё существует;
-- **скорость**: стабильная работа даже на старых мобильных устройствах;
-- **удобство**: быстрый вход, живой real-time UX, desktop-like интерфейс на ПК и удобный fullscreen UX на телефонах;
-- **воспроизводимость**: проект должен быть легко разворачиваемым на одном сервере.
-
-Проект строится как **монорепозиторий** с Go-бэкендом и современным веб-фронтендом.
-
-### Ключевые принципы
-
-- Сервер хранит только то, что необходимо для работы системы.
-- Контент сообщений проектируется с расчётом на **end-to-end encryption**.
-- Медиа-контент проектируется как временный relay; для encrypted lanes он уже хранится как ciphertext blob, но legacy plaintext attachment path в репозитории всё ещё существует.
-- Архитектурные решения фиксируются через ADR.
-- Кодовая база должна быть понятной как человеку, так и LLM-агентам.
-
-### Функциональная цель проекта
-
-AeroChat должен поддерживать:
-
-- личные чаты;
-- группы и роли;
-- друзей по неизменяемому логину;
-- markdown в сообщениях;
-- голосовые сообщения;
-- видеосообщения;
-- вложения;
-- звонки 1:1 и групповые звонки;
-- уведомления;
-- desktop shell на ПК;
-- PWA на мобильных устройствах.
-
-### Примеры на фото
-
-**1. Внешняя оболочка**
-
-<img width="1130" height="764" alt="Screenshot From 2026-04-05 21-51-10" src="https://github.com/user-attachments/assets/2b34e69f-1d95-40fc-8165-583448c8b1f0" />
-
-**2. Login screen**
-
-<img width="862" height="764" alt="Screenshot From 2026-04-05 21-50-44" src="https://github.com/user-attachments/assets/60dc3b5c-069e-42af-97da-0dac2c233eb6" />
-
-**3. Пустой рабочий стол**
-
-<img width="1920" height="1005" alt="Screenshot From 2026-04-05 21-35-09" src="https://github.com/user-attachments/assets/475fbaed-f048-47f6-a34b-9846ac318fa7" />
-
-**4. Открытое меню пуск с окном проводника**
-
-<img width="1920" height="1005" alt="Screenshot From 2026-04-05 21-49-47" src="https://github.com/user-attachments/assets/6756ba01-f6b8-4472-baa0-035029587b37" />
-
-**5. Рабочий стол с открытыми чатами**
-
-<img width="1920" height="1005" alt="Screenshot From 2026-04-05 21-44-34" src="https://github.com/user-attachments/assets/f1b9494e-23f5-4f08-86e7-5e661d27e9be" />
-
-
-### Текущий alpha snapshot
-
-На текущем этапе web-клиент уже поддерживает:
-
-- личные чаты и группы через `aero-gateway`;
-- People-first страницу `/app/search`:
-  - точное добавление/поиск контакта по login без публичного каталога;
-  - bounded known-people results с переходом в canonical `person_profile`;
-  - preview группы по invite link до явного join;
-  - вторичный поиск по всем direct chats или группам с compact jump-oriented результатами;
-  - временную подсветку target message, если он уже попал в текущую загруженную историю;
-- bounded realtime для chat/group foundation;
-- backend-first foundation для encrypted direct-message v2:
-  - explicit opaque intake RPC в `aero-chat` и thin proxy через `aero-gateway`;
-  - parallel storage path для logical encrypted envelopes и per-device deliveries;
-  - explicit device-aware realtime binding по active local `crypto_device_id` в `aero-gateway`;
-  - отдельный realtime family для device-scoped opaque encrypted envelope delivery без plaintext snapshot payload;
-  - raw list/get fetch path, worker-side decrypt foundation и bounded local web projection для текущего direct chat;
-  - первый web outbound bootstrap send path для text-only encrypted DM v2:
-    - target roster собирается по active crypto devices собеседника и всех active devices отправителя, включая originating sender device;
-    - per-device opaque envelopes собираются внутри crypto worker/runtime boundary;
-    - originating sender device теперь получает server-backed self-delivery через тот же opaque storage/realtime path, а bounded local optimistic projection остаётся только временным reconciliation layer без plaintext fallback;
-    - newly linked device начинает получать только новые encrypted direct messages после своей активации;
-    - backfill старой encrypted direct history на freshly linked device в текущем slice пока не реализован;
-  - encrypted media relay v1 для direct encrypted lane:
-    - presigned direct-to-object-storage flow сохраняется, но encrypted media upload/download идёт только как ciphertext blob;
-    - relay metadata отделена от encrypted attachment descriptor;
-    - browser шифрует файл до upload, descriptor уходит внутри encrypted DM v2 payload, а ciphertext blob расшифровывается локально после download;
-    - текущий direct encrypted lane умеет bounded text + encrypted attachment и attachment-only send/use path;
-    - storage/lifecycle/quota/retention foundation остаётся общей и future-ready для group E2EE;
-    - encrypted media retention parity для encrypted direct и encrypted group lanes:
-      - explicit encrypted tombstone event теперь так же переводит linked ciphertext attachment из `attached` в `detached`, как и legacy direct tombstone path;
-      - это освобождает active quota budget и переводит object в already-existing detached cleanup flow без нового lifecycle status;
-      - решение остаётся полностью relay/control-plane driven и не требует plaintext media metadata или чтения encrypted descriptor сервером;
-  - encrypted direct-message v2 mutation recovery foundation:
-    - reply reference, edit revision и tombstone/delete-for-everyone больше не зависят от plaintext server projection;
-    - reply preview собирается только client-side после decrypt и честно деградирует, если target message ещё не попал в локальное bounded окно или уже tombstoned;
-    - pin/unpin для encrypted DM v2 живёт как отдельная control-plane ссылка на stable logical `message_id` без доступа сервера к message body;
-  - encrypted direct-message v2 unread/read recovery foundation:
-    - viewer-relative unread/read state хранится как control-plane metadata по stable logical `message_id`, без server-side plaintext preview;
-    - `ListDirectChats` / `GetDirectChat` и realtime получают отдельный encrypted unread/read slice рядом с legacy plaintext read state;
-    - active encrypted DM v2 lane умеет явно продвигать encrypted mark-as-read и сходиться с server-backed unread counters;
-  - encrypted search recovery foundation:
-    - `/app/search` сохраняет текущий entrypoint, но честно разделяет legacy plaintext search и local encrypted search;
-    - encrypted direct/group search работает только по локально fetched + decrypted message text внутри browser/runtime boundary;
-    - local encrypted index остаётся bounded и session-local:
-      - latest decrypted window на lane ограничен;
-      - `all direct` / `all groups` ищут только по recent encrypted lanes в рамках явного local budget;
-      - при logout/reload decrypted search index не сохраняется;
-    - jump/open для encrypted search result работает только если target уже materialized в локальной projection текущего bounded окна;
-  - первый backend-first MLS-compatible foundation для encrypted groups:
-    - отдельный encrypted group control-plane lane в `aero-chat` c явным `mls_group_id` и `roster_version`;
-    - materialized readable roster по active trusted crypto devices current group members, включая `reader` и write-restricted участников;
-    - отдельный opaque storage path для group-scoped encrypted envelopes и explicit per-device deliveries без reuse `group_messages`;
-    - device-aware fetch/bootstrap surface и отдельный realtime family `encrypted_group_message_v1.delivery` без plaintext-style `group.message.updated` snapshots;
-    - первый web runtime/local projection foundation для encrypted groups:
-      - opaque group envelopes читаются через explicit bootstrap/list path для текущего local crypto-device;
-      - decrypt/render остаётся внутри crypto runtime worker boundary;
-      - web держит отдельную bounded local projection и отдельную realtime merge path для encrypted group lane;
-      - первый outbound bootstrap send path для encrypted group text:
-        - worker/runtime сам читает минимальный encrypted group bootstrap и собирает group-scoped ciphertext внутри crypto boundary;
-        - web отправляет только opaque envelope через существующий `SendEncryptedGroupMessage`, а storage/realtime остаются source of truth;
-        - bounded local optimistic projection используется только до server-backed fetch/realtime convergence и не dual-write'ит plaintext timeline;
-      - mutation recovery foundation для encrypted group lane:
-        - replies, edits и tombstones применяются как encrypted events c deterministic local projection convergence;
-        - pin/unpin остаётся server-visible control-plane metadata по stable logical `message_id`, без plaintext preview на сервере;
-        - web рендерит pinned/reply state только из локально разрешённых encrypted entries и честно показывает unresolved/tombstoned состояние, если target пока недоступен;
-      - encrypted group media bootstrap:
-        - web reuse'ит тот же ciphertext-only encrypted media relay v1 из `ADR-065`, без отдельной group-only media architecture;
-        - файл шифруется внутри crypto runtime до upload, ciphertext blob живёт в обычном attachment relay, а encrypted descriptor уходит только внутри encrypted group `content` payload;
-        - attachment linkage к logical encrypted message остаётся минимальным shared relay control-plane, чтобы участники группы могли легально получить ciphertext blob через существующий attachment access path;
-        - локальный decrypt/use path reuse'ит existing encrypted attachment list и даёт bounded open/download/inline preview для file/image/audio/video там, где это уже поддерживается;
-        - attachment-only encrypted media message usable, но encrypted search по-прежнему индексирует только локально расшифрованный text и не обещает media-content parity;
-      - encrypted group unread/read recovery foundation:
-        - viewer-relative unread/read для encrypted group lane считается по opaque control-plane metadata и не зависит от plaintext body;
-        - `ListGroups` / `GetGroupChat`, realtime и active encrypted lane теперь умеют продвигать отдельный encrypted read progression;
-        - legacy group read state и encrypted group read state остаются честно раздельными;
-      - coexistence остаётся честным: encrypted lane не притворяется unified timeline поверх legacy plaintext history;
-    - coexistence остаётся bounded и честной:
-      - legacy plaintext group history не переписывается и не re-encrypt'ится;
-      - encrypted lane forward-only и не dual-write'ит те же сообщения в plaintext path;
-    - текущий slice не объявляет full MLS implementation, full encrypted group media parity во всех сценариях или backup/recovery.
-  - encrypted DM v2 пока показывается отдельно от legacy plaintext history;
-  - без claims о full encrypted DM/group parity, full encrypted search parity, backup/recovery или full MLS client completeness.
-- explicit group moderation/admin policy foundation:
-  - явная policy matrix для `owner` / `admin` / `member` / `reader`;
-  - durable write restriction для участников группы без потери membership;
-  - realtime convergence composer/typing state после restrict/unrestrict;
-- message edit foundation для direct chats и groups с explicit edited marker;
-- reply и compact quoted preview для direct chats и groups;
-- первый attachment upload flow в direct chats и groups:
-  - file picker;
-  - presigned upload;
-  - send text + attachment;
-  - send attachment-only message;
-  - polished file rendering для всех attachment kinds;
-  - lazy inline preview для image/audio/video attachments;
-  - bounded web voice-notes recording через существующий attachment upload/send flow;
-  - безопасное explicit open/download через presigned access.
-- attachment lifecycle hardening:
-  - real expiration для stale upload sessions;
-  - bounded cleanup path для orphaned unattached attachments;
-  - conservative object deletion только по backend state и explicit message linkage.
-- media quota foundation:
-  - deterministic per-user byte quota на `CreateAttachmentUploadIntent`;
-  - quota usage считается только по backend-owned attachment state;
-  - `expired` и `deleted` lifecycle states больше не удерживают active quota budget.
-- attachment retention/delete semantics foundation:
-  - direct message tombstone переводит linked attachment из `attached` в `detached`;
-  - `detached` больше не удерживает active quota budget;
-  - object cleanup для `detached` остаётся staged и выполняется отдельно после retention grace period.
-- encrypted media relay v1:
-  - `attachment` теперь может явно работать как relay entity с `legacy_plaintext` или `encrypted_blob_v1` schema;
-  - для encrypted relay quota и cleanup считают ciphertext-visible bytes;
-  - user-facing filename/MIME/decrypt metadata для encrypted media больше не считаются server-visible source of truth.
-- max groups per user rules foundation:
-  - configurable per-user limit по active group memberships;
-  - limit применяется на `CreateGroup` и `JoinGroupByInviteLink`;
-  - `leave` и `remove` естественно освобождают capacity, потому что учитываются только текущие membership.
-- bounded web video-notes recording через существующий attachment upload/send flow.
-- desktop shell и mobile launcher adaptation:
-  - на viewport от `1180px` web-клиент переходит в XP-style desktop shell с route-backed singleton и singleton-per-target окнами;
-  - route-backed direct/group chat окна на desktop теперь не подменяются пустой фоновой заглушкой:
-    - несколько открытых переписок остаются живыми одновременно;
-    - у каждого окна сохраняется свой target/route context;
-    - можно видеть новые сообщения в нескольких открытых окнах параллельно, даже если в фокусе другое окно;
-  - direct/group thread surface теперь открывается с нижней границы переписки и на desktop, и на mobile, а header/composer остаются видимыми, пока история скроллится отдельно;
-  - на mobile используется launcher home и route-backed app pages без desktop window runtime;
-  - отдельное shell-приложение `Создать группу` теперь является дефолтным desktop entrypoint для group bootstrap:
-    - оно открывается как отдельный singleton app, а не прячется внутри общего group page flow;
-    - entrypoint доступен на рабочем столе, в Start menu и Explorer;
-    - shortcut можно скрыть с рабочего стола и вернуть через Explorer без потери самого app target;
-  - `Self Chat` теперь является каноническим route-backed системным entrypoint и открывает реальный self direct chat:
-    - backend хранит его как специальный single-participant direct chat текущего пользователя;
-    - encrypted media/message flow reuse'ит тот же device-aware path, поэтому self chat работает как честный multi-device handoff между вашими устройствами;
-    - shell не плодит для него отдельный auto-populated direct-chat shortcut поверх системного `Я`.
-- RTC/calls остаются частичными:
-  - `aero-rtc-control` уже даёт signaling и server-backed call control-plane;
-  - web 1:1 звонок существует как bounded audio-only bootstrap;
-  - browser direct-call runtime теперь использует voice-oriented audio constraints / sender tuning,
-    bounded peer-recovery backoff после `disconnected` / `failed`, explicit lightweight participant heartbeat
-    и best-effort `pagehide` cleanup,
-    чтобы звонок звучал стабильнее и stale active-participant хвосты после crash/закрытия вкладки сходились обратно в control-plane;
-  - web direct-call awareness теперь сильнее опирается на realtime + deduplicated refresh,
-    а fallback polling ограничен уже известными active direct chats вместо повторного fan-out по всем direct conversations;
-  - `aero-rtc-control` теперь умеет opportunistic stale eviction active participants по bounded timeout,
-    поэтому ложные active-call conflicts после жёстко закрытого браузера больше не должны жить бесконечно;
-  - browser direct-call runtime теперь читает ICE servers из `aero-rtc-control` и держит repo-default STUN fallback,
-    поэтому operator может задавать TURN/STUN policy без нового frontend build;
-  - server/prod-like compose теперь включает repo-managed `turn` runtime с явным public relay IP contract,
-    чтобы direct-call connectivity не зависела от вне-репозитарного ad-hoc coturn setup;
-  - production-grade connectivity по-прежнему не гарантируется без корректно заданной operator-managed TURN/STUN policy;
-  - group call UI сейчас остаётся lobby/control surface без multiparty browser media transport.
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
----
-
-## Почему этот проект
-
-AeroChat создаётся как проект с сильным фундаментом:
-
-- современный стек;
-- чистая архитектура;
-- воспроизводимый self-host;
-- строгие правила разработки;
-- постепенный итерационный roadmap;
-- публичный монорепозиторий;
-- ориентация на качество, тестируемость и долгую поддержку.
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
----
-
-## Стек
-
-### Backend
-
-- Go
-- ConnectRPC
-- Protocol Buffers
-- PostgreSQL
-- Redis
-- MinIO
-- Nginx (local/dev edge)
-- Docker / Docker Compose
-
-### Frontend
-
-- React
-- TypeScript
-- Vite
-- CSS Modules
-- PostCSS
-
-### Infrastructure / DX
-
-- k3s
-- Traefik
-- cert-manager
-- GitHub Actions
-- GHCR
-- golangci-lint
-- sqlc
-- buf
-- Taskfile
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
----
-
-## Архитектурные ориентиры
-
-На текущем этапе проект ориентируется на следующие решения:
-
-- **monorepo**;
-- **Go-first backend**;
-- разделение на bounded contexts;
-- proto-first контракты;
-- web client с future-facing направлением в сторону PWA;
-- future-ready E2EE;
-- future-ready RTC signaling и SFU media plane;
-- self-host сценарий для одного сервера;
-- строгая документация архитектурных решений.
-
-Подробности находятся в каталоге `docs/adr`.
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
----
-
-## Структура репозитория
-
-```text
-/apps
-  /web
-
-/services
-  /aero-gateway
-  /aero-identity
-  /aero-chat
-  /aero-rtc-control
-  /aero-jobs
-
-/libs
-  /go
-    /auth
-    /crypto
-    /observability
-    /events
-    /testkit
-
-/proto
-  /aerochat
-    /common
-    /identity
-    /chat
-    /rtc
-
-/docs
-  /adr
-
-/infra
-  /compose
-  /k8s
-  /nginx
-  /scripts
-
-/.github
-  /workflows
-```
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
-## Getting Started
-
-### Требования
-
-Перед началом убедись, что у тебя установлены:
-
-* Git
-* Go
-* Node.js
-* pnpm
-* Docker
-* Docker Compose
-
-### Локальный запуск
-
-В репозитории теперь есть два явных режима:
-
-- `local/dev`:
-  - root `.env.example` управляет локальным compose-стеком;
-  - `infra/compose/docker-compose.yml` поднимает локальный full-stack smoke runtime;
-  - `services/*/.env.example` и `apps/web/.env.example` остаются source-mode примерами для запуска сервисов вне compose.
-
-- `server/prod-like`:
-  - `.env.server.example` содержит только versioned non-secret runtime config;
-  - `.env.server.secrets.example` описывает обязательные server-only secret keys без реальных значений;
-  - публичный edge принадлежит существующему `k3s + Traefik`;
-  - TLS выпускается и обновляется через существующий `cert-manager`;
-  - `infra/compose/docker-compose.server.yml` даёт production-oriented single-server topology на предсобранных образах;
-  - `infra/k8s/shared-edge/aero.keykomi.com.example.yaml` показывает минимальные cluster-side ресурсы для маршрутизации в compose runtime;
-  - подготовка сервера описана в `docs/deploy/single-server-bootstrap.md`;
-  - production rollout и first external launch описаны в `docs/deploy/production-rollout.md`.
-
-1. Клонируй репозиторий:
-
-```
+AeroChat объединяет личные переписки, группы, файлы и аудиозвонки с оконным интерфейсом на ПК и полноэкранными страницами на телефоне. Проект развивается как alpha: реализованные возможности и результаты конкретных проверок описаны отдельно от продуктовых целей.
+
+[Документация](docs/README.md) · [Разработка](docs/development.md) · [Возможности и ограничения](docs/product/capabilities.md) · [Аудит 11 октября 2026](docs/audits/2026-10-11-readiness.md)
+
+## Интерфейс
+
+Рабочий стол с окнами переписок:
+
+![AeroChat: рабочий стол с переписками](docs/assets/audit-2026-10-11/desktop-chat.jpg)
+
+Мобильный интерфейс:
+
+![AeroChat: мобильный интерфейс](docs/assets/audit-2026-10-11/mobile.jpg)
+
+Снимки показывают локальный стенд из аудита 11 октября 2026. Они иллюстрируют интерфейс; границы проверки каждого сценария указаны в отчёте.
+
+## Что реализовано
+
+- Регистрация, сессии и устройства, профиль и privacy settings.
+- Друзья по точному неизменяемому login, заявки и block policy без публичного каталога пользователей.
+- Личные чаты, группы и роли, приглашения, realtime, typing/presence, read/unread, replies, edit, tombstone и pin.
+- Encrypted direct-message v2 и отдельная encrypted group lane с локальной расшифровкой и поиском; encrypted media relay для вложений, voice/video notes и preview.
+- Рабочий стол с несколькими окнами, Start, Explorer и локальными папками; launcher и route-backed страницы на узком экране.
+- Канонический чат `Я` с backend self-direct thread и доставкой на активные устройства пользователя.
+- Web Push для новых unread conversations и заявок в друзья; manifest и установка web-приложения.
+- Signaling/control-plane, аудиозвонок 1:1 и group-call lobby; server compose включает TURN runtime.
+
+Реализация не равна полной готовности сценария: актуальные дефекты, результаты тестов и пробелы перечислены в [аудите](docs/audits/2026-10-11-readiness.md). Подробный inventory перенесён в [capabilities](docs/product/capabilities.md).
+
+## Ограничения alpha
+
+- Полная E2EE parity, полноценный MLS client, key backup/recovery и backfill старой encrypted history на новое устройство не завершены. В репозитории сохраняются legacy plaintext storage/model и ограниченные compatibility reads; общий claim «весь контент недоступен серверу» делать нельзя.
+- Encrypted search ищет только по локально загруженному и расшифрованному окну сообщений; индекс ограничен текущей сессией браузера.
+- Group calls дают control-plane/lobby без multiparty media transport. Для 1:1 нужны корректные ICE/TURN, доступ к микрофону и проверка реальной сетевой связности; наличие TURN в compose само по себе не доказывает надёжный звонок.
+- Install и push существуют, но offline model, background sync и повседневная mobile/PWA готовность не завершены.
+- Папки и расположение окон сохраняются локально в браузере; `aero-jobs` пока является runtime scaffold.
+
+Продуктовая спецификация shell: [Web Shell XP](docs/product/web-shell-xp.md). Очередь развития: [roadmap](docs/roadmap.md).
+
+## Локальный запуск
+
+Требования: Git, Docker / Docker Compose. Для разработки из исходников также нужны Go **1.25**, Node.js **22**, pnpm **10.19.0** и инструменты из [development guide](docs/development.md).
+
+> По [аудиту](docs/audits/2026-10-11-readiness.md) чистый запуск сейчас блокируется недоступными storage images ([#163](https://github.com/MattoYuzuru/AeroChat/issues/163)); обычный upload также требует исправления presign region ([#165](https://github.com/MattoYuzuru/AeroChat/issues/165)). Ниже — штатные команды, а не подтверждение успешного cold-cache запуска.
+
+```bash
 git clone https://github.com/MattoYuzuru/AeroChat.git
 cd AeroChat
-```
-
-2. Скопируй пример переменных окружения:
-
-```
 cp .env.example .env
-```
-
-3. Подними локальный stack:
-
-```
 docker compose -f infra/compose/docker-compose.yml up --build -d
 ```
 
-При первом запуске `aero-identity` и `aero-chat` автоматически применяют свою PostgreSQL-схему.
-Штатный `local/dev` flow не требует отдельного ручного `psql`.
-
-Для browser push и web notifications нужны дополнительные параметры:
-
-- `AERO_WEB_PUSH_SUBSCRIBER` для VAPID subject, обычно в формате `mailto:ops@example.com`;
-- `AERO_WEB_PUSH_VAPID_PUBLIC_KEY` и `AERO_WEB_PUSH_VAPID_PRIVATE_KEY` как одна VAPID-пара;
-- без этих значений UI-тогглы остаются видимыми, но реальный background push не активируется.
-- partial-конфигурация `AERO_WEB_PUSH_*` теперь считается ошибкой старта сервисов;
-- production deploy отдельно предупреждает, если весь блок `AERO_WEB_PUSH_*` отсутствует, и прерывается при неполном наборе.
-
-Для dev-проверки push нужен secure context:
-
-- `localhost` подходит для browser push;
-- для телефона или внешнего домена нужен HTTPS-origin.
-
-Media/file foundation использует тот же локальный `minio`, но для `aero-chat` теперь настраиваются два разных адреса:
-
-- внутренний endpoint для service-to-storage доступа;
-- browser-visible endpoint для presigned upload URL.
-
-Для admission control upload intent у `aero-chat` также есть отдельный operator-facing лимит:
-
-- `AERO_MEDIA_USER_QUOTA_BYTES` задаёт общий per-user media budget в байтах;
-- quota проверяется на `CreateAttachmentUploadIntent`;
-- usage считается по attachment metadata в состояниях `pending`, `uploaded`, `attached` и `failed`;
-- `detached`, `expired` и `deleted` больше не считаются частью активного quota budget;
-- `AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION` задаёт grace period перед cleanup для attachment, оставшихся только у tombstoned direct messages.
-
-Для групп у `aero-chat` есть отдельный operator-facing лимит:
-
-- `AERO_MAX_ACTIVE_GROUP_MEMBERSHIPS_PER_USER` задаёт максимум активных group membership на пользователя;
-- лимит проверяется на `CreateGroup` и `JoinGroupByInviteLink`;
-- source of truth остаётся в `group_memberships`, без отдельного counter/caching слоя;
-- удалённые и вышедшие membership не удерживают лимит, потому что больше не существуют в активной SQL-модели.
-
-В `local/dev` шаблоне это уже сведено к `minio:9000` и `MEDIA_S3_PUBLIC_ENDPOINT`.
-Для browser upload compose runtime автоматически bootstrap'ит bucket privacy через `mc`,
-а `minio` применяет allowed origins из `MEDIA_S3_CORS_ALLOWED_ORIGINS`.
-
-4. Открой приложение через `http://127.0.0.1:${NGINX_PORT}` из `.env`.
-
-5. Если нужен source-mode запуск вне compose, используй:
-
-- `services/*/.env.example` для backend-сервисов;
-- `apps/web/.env.example` для web-клиента.
-
-### Single-server foundation
-
-Для server/prod-like bootstrap на одном VPS:
+Открыть `http://127.0.0.1:${NGINX_PORT}` с портом из `.env`. При первом запуске `aero-identity` и `aero-chat` автоматически bootstrap'ят PostgreSQL-схему. Перед использованием проверить состояние контейнеров и gateway health/readiness.
 
 ```bash
-cp .env.server.example .env.server
-cp .env.server.secrets.example .env.server.secrets
-docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml config
-docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml pull
-docker compose --env-file .env.server --env-file .env.server.secrets -f infra/compose/docker-compose.server.yml up -d
+docker compose -f infra/compose/docker-compose.yml ps
+docker compose -f infra/compose/docker-compose.yml logs --tail=100 aero-gateway aero-identity aero-chat
 ```
 
-При первом старте на пустой PostgreSQL БД `aero-identity` и `aero-chat` автоматически bootstrap'ят схему до выхода в
-`ready`.
-Нормальный server bootstrap не требует ручного выполнения SQL через `psql`.
+Для browser uploads важен browser-visible `MEDIA_S3_PUBLIC_ENDPOINT`; для background push нужен полный VAPID-блок и secure context. Настройки media/quota/push, source-mode и последовательность lint/test/build описаны в [разработке](docs/development.md).
 
-Server runtime больше не поднимает отдельный `nginx` контейнер для production VPS.
-Public edge для target VPS принадлежит shared `Traefik` в `k3s`.
-Compose runtime публикует три host upstream'а на `${AERO_SHARED_EDGE_HOST_IP}`:
+## Self-host
 
-- `/` → `web` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}`;
-- `/api`, `/api/realtime`, `/healthz`, `/readyz` → `aero-gateway` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}`.
-- `https://${AERO_MEDIA_EDGE_DOMAIN}` → `minio` на `${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}`.
+Server topology использует image-based Docker Compose и общий `k3s + Traefik` edge с TLS через `cert-manager`. Media публикуется на отдельном browser-visible origin. Repo-managed `coturn` работает как прямой host UDP/TCP service по [ADR-085](docs/adr/085-server-turn-runtime-and-public-relay-ip-contract.md).
 
-`Traefik` получает доступ к ним через Kubernetes `Service` без selector и `EndpointSlice`,
-а TLS выпускается через existing `cert-manager`.
-Для `/api` и `/api/realtime` используется тот же gateway base contract:
-ingress-side strip-prefix остаётся у `/api`, а realtime endpoint публикуется как `/api/realtime`,
-чтобы web bundle продолжал работать с `VITE_GATEWAY_BASE_URL=/api` без второго публичного backend URL.
+Для подготовки сервера читать [single-server bootstrap](docs/deploy/single-server-bootstrap.md); production rollout, health gates и rollback описаны в [runbook](docs/deploy/production-rollout.md). Application images публикуются в GHCR для `linux/amd64`; сборку можно выбрать по точному `sha-<commit>` tag.
 
-Для media/file foundation server runtime также требует:
+## Архитектура и код
 
-- отдельный browser-visible media host в `AERO_MEDIA_EDGE_DOMAIN`;
-- browser-visible S3 endpoint в `MEDIA_S3_PUBLIC_ENDPOINT`;
-- отдельный host upstream `AERO_MEDIA_HOST_PORT`;
-- явный MinIO CORS contract в `MEDIA_S3_CORS_ALLOWED_ORIGINS`.
+| Путь | Ответственность |
+| --- | --- |
+| `apps/web` | React/TypeScript/Vite, shell, product pages, локальный crypto runtime |
+| `services/aero-gateway` | Единый browser-facing ConnectRPC/realtime edge |
+| `services/aero-identity` | Accounts, auth, social graph, crypto-device trust |
+| `services/aero-chat` | Direct/group messages, encrypted lanes, attachments и lifecycle |
+| `services/aero-rtc-control` | Call lifecycle, signaling и ICE credentials |
+| `services/aero-jobs` | Scaffold будущей job-оркестрации |
+| `libs/go` | Общие библиотеки runtime/auth/observability/testkit |
+| `proto`, `gen/go` | Proto-first контракты и generated Go/Connect code |
+| `infra`, `.github/workflows` | Local/server runtime, image delivery и CI |
 
-Presigned upload URL не может безопасно указывать на внутренний compose-host `minio:9000`,
-поэтому production-credible contract фиксируется как отдельный media origin.
-Для текущей shared `Traefik` + Cloudflare topology этот host должен быть sibling-host внутри той же DNS-зоны:
-например `aero.keykomi.com` для приложения и `media.keykomi.com` для object storage edge, а не
-`media.aero.keykomi.com`.
+Архитектурные инварианты: monorepo, Go-first backend, proto-first контракты, явные границы доменов и отдельные ADR для изменения auth/crypto/storage/transport/deployment. Криптографический протокол не импровизируется. [Навигатор](docs/README.md) связывает решения с реализацией и историческими аудитами.
 
-Подробности, TLS/domain contract и ограничения этапа описаны в `docs/deploy/single-server-bootstrap.md`.
-Коррекция hostname-модели описана в `docs/adr/037-media-edge-hostname-normalization.md`.
-Для финального live rollout используется manual workflow `Deploy Production` c GitHub Environment `production`.
-Полный production runbook описан в `docs/deploy/production-rollout.md`.
-Database bootstrap policy описана в `docs/adr/028-first-launch-database-schema-bootstrap.md`.
+## Вклад в проект
 
-### Image release model
+Каждая задача выполняется в отдельной ветке и узком PR. Поведение сопровождается тестами, документация обновляется вместе с кодом, коммиты следуют Conventional Commits. Обязательные правила — [AGENTS.md](AGENTS.md); команды и координация агентов — [development](docs/development.md).
 
-Для текущего externally usable stack публикуются отдельные GHCR-образы:
+Документация и полезные комментарии пишутся на русском языке. Исторические аудиты сохраняются с указанием статуса; завершённый checkbox в roadmap не заменяет проверку текущего HEAD.
 
-- `ghcr.io/<owner>/aerochat-web`
-- `ghcr.io/<owner>/aerochat-aero-gateway`
-- `ghcr.io/<owner>/aerochat-aero-identity`
-- `ghcr.io/<owner>/aerochat-aero-chat`
-- `ghcr.io/<owner>/aerochat-aero-rtc-control`
+## Автор и лицензия
 
-Теги выбираются так:
+Автор: [MattoYuzuru](https://github.com/MattoYuzuru). [Репозиторий AeroChat](https://github.com/MattoYuzuru/AeroChat).
 
-- `edge` — moving tag для default branch;
-- `vX.Y.Z`, `vX.Y`, `vX` — release tags для git tags вида `vX.Y.Z`;
-- `sha-<commit>` — точная привязка к конкретной сборке.
-
-Для server compose оператор обычно меняет только `AERO_IMAGE_TAG` в `.env.server`,
-а секретные значения хранит только в `.env.server.secrets`.
-Production rollout и rollback выполняются повторным запуском workflow `Deploy Production` с выбранным tag.
-`latest` намеренно не используется.
-На текущем этапе опубликованные application images собираются только для `linux/amd64`.
-
-> На раннем этапе точные команды могут меняться. Актуальный набор команд должен поддерживаться через Taskfile.yml.
-
-### Первый приоритет репозитория
-
-До реализации продуктовых фич проект должен:
-
-* воспроизводимо собираться;
-* запускаться локально;
-* проходить CI;
-* иметь чистую архитектурную структуру;
-* быть безопасным для дальнейшей итерационной разработки.
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
-## Roadmap
-
-Верхнеуровневый статус на текущий момент:
-
-- [x] Monorepo foundation, proto/tooling, CI и локальный/server compose runtime
-- [x] Identity, social graph, legacy direct/group chats и media foundation
-- [x] Desktop shell и practical mobile launcher adaptation
-- [x] Encrypted direct-message v2 и encrypted group lane как bounded coexistence slices
-- [x] Backend self-direct thread и canonical `Я` chat surface
-- [x] RTC signaling/control-plane и частичный web audio-only 1:1 bootstrap
-- [x] Web push notifications для direct/group unread и friend requests
-- [x] Web app install flow для desktop/mobile ярлыка без browser chrome
-- [ ] Удаление legacy plaintext из product-critical paths
-- [ ] Production-usable calls, device controls и multiparty media
-- [ ] Offline-safe PWA/runtime model
-
-Подробный и консервативный статус поддерживается в [docs/roadmap.md](docs/roadmap.md) и
-[docs/audits/2026-03-25-repo-audit.md](docs/audits/2026-03-25-repo-audit.md).
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
-## Руководство по разработке
-
-В проекте используется строгий инженерный процесс:
-
-* архитектурные решения фиксируются в ADR;
-* изменения вносятся через отдельные ветки;
-* коммиты оформляются осмысленно и единообразно;
-* обязательны тесты на изменяемый код;
-* изменения не должны ломать сборку, CI и локальный запуск;
-* документация обновляется вместе с кодом.
-
-Подробные правила находятся в `AGENTS.md`.
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
-## Contributing
-
-На текущем этапе основной способ работы — через контролируемые feature-ветки и small PR.
-
-Общий процесс:
-
-1. Создать ветку от `main`
-2. Реализовать одно изолированное изменение
-3. Добавить или обновить тесты
-4. Обновить документацию
-5. Убедиться, что CI проходит
-6. Открыть PR
-
-Принцип проекта:
-
-**один PR = одна завершённая инженерная задача**
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
-## Лицензия
-
-Лицензия будет определена отдельно.
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
-## Контакты
-
-Автор проекта: **MattoYuzuru**
-
-Репозиторий проекта: [AeroChat](https://github.com/MattoYuzuru/AeroChat)
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
-
-## Источники вдохновения
-
-* Эстетика Frutiger Aero / Windows Aero
-
-* Desktop-like интерфейсы старых ОС
-
-* Local-first и privacy-first подходы
-
-* Современные self-hosted communication systems
-
-* Best README Template как структурный референс для оформления README
-
-<p align="right">(<a href="#readme-top">наверх</a>)</p>
+Лицензия пока не определена.
