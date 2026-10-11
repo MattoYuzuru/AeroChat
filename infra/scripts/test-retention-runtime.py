@@ -111,14 +111,16 @@ try:
         model = rendered(server, retention)
         for service, port in (("identity", 28491), ("chat", 28492)):
             environment = dict(os.environ, **model["services"][f"aero-{service}"]["environment"])
-            parsed = urlsplit(environment["AERO_DATABASE_URL"])
+            # Оба rendered TTL потребляются с credentials owned local fixture, не server examples.
+            parsed = urlsplit(database_url)
             environment["AERO_DATABASE_URL"] = urlunsplit((parsed.scheme, parsed.netloc.rsplit("@", 1)[0] + "@127.0.0.1:25432", "/" + database, parsed.query, parsed.fragment))
             environment["AERO_HTTP_ADDR"] = f"127.0.0.1:{port}"
             environment["AERO_REDIS_ADDR"] = "127.0.0.1:26379"
             environment.update(AERO_WEB_PUSH_SUBSCRIBER="", AERO_WEB_PUSH_VAPID_PUBLIC_KEY="", AERO_WEB_PUSH_VAPID_PRIVATE_KEY="")
             if service == "chat":
                 assert environment["AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION"] == retention
-                environment.update(AERO_MEDIA_S3_INTERNAL_ENDPOINT="127.0.0.1:29000", AERO_MEDIA_S3_PRESIGN_ENDPOINT="localhost:29000", AERO_MEDIA_S3_BUCKET=bucket, AERO_MEDIA_ATTACHMENT_CLEANUP_INTERVAL="100ms")
+                fixture_media = bootstrap["services"]["aero-chat"]["environment"]
+                environment.update(AERO_MEDIA_S3_INTERNAL_ENDPOINT="127.0.0.1:29000", AERO_MEDIA_S3_PRESIGN_ENDPOINT="localhost:29000", AERO_MEDIA_S3_BUCKET=bucket, AERO_MEDIA_S3_ACCESS_KEY=fixture_media["AERO_MEDIA_S3_ACCESS_KEY"], AERO_MEDIA_S3_SECRET_KEY=fixture_media["AERO_MEDIA_S3_SECRET_KEY"], AERO_MEDIA_S3_INTERNAL_SECURE="false", AERO_MEDIA_S3_PRESIGN_SECURE="false", AERO_MEDIA_ATTACHMENT_CLEANUP_INTERVAL="100ms")
             log = open(root / f"{tag}-{service}.log", "x")
             logs.append(log)
             process = subprocess.Popen([str(root / service)], env=environment, stdout=log, stderr=log)
