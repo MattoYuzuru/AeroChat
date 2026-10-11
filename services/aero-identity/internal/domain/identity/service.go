@@ -397,7 +397,11 @@ func (s *Service) RevokeSessionOrDevice(ctx context.Context, token string, targe
 	at := s.now()
 	switch {
 	case target.SessionID != nil:
-		ok, revokeErr := s.repo.RevokeSession(ctx, authSession.User.ID, strings.TrimSpace(*target.SessionID), at)
+		targetID, err := normalizeRevocationTargetID(*target.SessionID)
+		if err != nil {
+			return err
+		}
+		ok, revokeErr := s.repo.RevokeSession(ctx, authSession.User.ID, targetID, at)
 		if revokeErr != nil {
 			return revokeErr
 		}
@@ -406,7 +410,11 @@ func (s *Service) RevokeSessionOrDevice(ctx context.Context, token string, targe
 		}
 		return nil
 	case target.DeviceID != nil:
-		ok, revokeErr := s.repo.RevokeDevice(ctx, authSession.User.ID, strings.TrimSpace(*target.DeviceID), at)
+		targetID, err := normalizeRevocationTargetID(*target.DeviceID)
+		if err != nil {
+			return err
+		}
+		ok, revokeErr := s.repo.RevokeDevice(ctx, authSession.User.ID, targetID, at)
 		if revokeErr != nil {
 			return revokeErr
 		}
@@ -417,6 +425,14 @@ func (s *Service) RevokeSessionOrDevice(ctx context.Context, token string, targe
 	default:
 		return fmt.Errorf("%w: revoke target is required", ErrInvalidArgument)
 	}
+}
+
+func normalizeRevocationTargetID(value string) (string, error) {
+	id, err := uuid.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return "", fmt.Errorf("%w: revoke target must be a UUID", ErrInvalidArgument)
+	}
+	return id.String(), nil
 }
 
 func (s *Service) ListBlockedUsers(ctx context.Context, token string) ([]BlockedUser, error) {
