@@ -196,8 +196,15 @@ func TestExpiryWorkerSkipsFinalizationAndCancellationReleasesConnection(t *testi
 		t.Fatal("cancelled waiter acquired held lock")
 	}
 	lock.Close(context.Background())
+	a, session, err := repo.GetAttachment(ctx, intent.Attachment.ID)
+	if err != nil || a.Status != chat.AttachmentStatusPending || session.Status != chat.AttachmentUploadSessionPending {
+		t.Fatalf("before expiry after rollback attachment=%v session=%v err=%v", a, session, err)
+	}
 	if count, err := repo.ExpirePendingAttachmentUploadSessions(ctx, time.Now(), 10); err != nil || count != 1 {
-		t.Fatalf("expiry after rollback count=%d err=%v", count, err)
+		a, session, readErr := repo.GetAttachment(ctx, intent.Attachment.ID)
+		var openTransactions int
+		_ = db.QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE application_name=current_setting('application_name') AND pid<>pg_backend_pid() AND xact_start IS NOT NULL").Scan(&openTransactions)
+		t.Fatalf("expiry after rollback count=%d err=%v status=%s/%s expired=%t openTx=%d readErr=%v", count, err, a.Status, session.Status, session.ExpiresAt.Before(time.Now()), openTransactions, readErr)
 	}
 	if err := repo.Ping(ctx); err != nil {
 		t.Fatal("pool did not recover after cancelled finalizer")

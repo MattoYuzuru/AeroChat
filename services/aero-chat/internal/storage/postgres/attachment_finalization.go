@@ -26,16 +26,16 @@ func (r *Repository) BeginAttachmentFinalization(ctx context.Context, attachment
 	}
 	q := r.queries.WithTx(tx)
 	if _, err := q.LockAttachmentForFinalization(ctx, mustParseUUID(attachmentID)); err != nil {
-		_ = tx.Rollback(ctx)
+		rollbackAttachmentFinalization(tx)
 		return nil, convertError(err)
 	}
 	if _, err := q.LockAttachmentUploadSession(ctx, mustParseUUID(attachmentID)); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		_ = tx.Rollback(ctx)
+		rollbackAttachmentFinalization(tx)
 		return nil, convertError(err)
 	}
 	attachment, session, err := getAttachment(ctx, q, attachmentID)
 	if err != nil {
-		_ = tx.Rollback(ctx)
+		rollbackAttachmentFinalization(tx)
 		return nil, err
 	}
 	return &attachmentFinalization{tx: tx, repo: &Repository{queries: q}, attachment: attachment, session: session}, nil
@@ -47,6 +47,13 @@ func (f *attachmentFinalization) Close(ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	_ = f.tx.Rollback(ctx)
+}
+
+func rollbackAttachmentFinalization(tx pgx.Tx) {
+	// Caller context может быть уже отменён; rollback имеет собственный bounded budget.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = tx.Rollback(ctx)
 }
 
 func (f *attachmentFinalization) Complete(ctx context.Context, params chat.CompleteAttachmentUploadParams) (*chat.Attachment, error) {
