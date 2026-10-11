@@ -299,7 +299,7 @@ export function GroupsPage() {
       } catch (error) {
         const message = resolveProtectedError(
           error,
-          "Не удалось загрузить список групп через gateway.",
+          "Не удалось загрузить список групп. Повторите попытку.",
           expireSession,
         );
         if (!active || message === null) {
@@ -486,7 +486,7 @@ export function GroupsPage() {
       } catch (error) {
         const message = resolveProtectedError(
           error,
-          "Не удалось открыть group chat через gateway.",
+          "Не удалось открыть группу. Повторите попытку.",
           expireSession,
         );
         if (!active || message === null) {
@@ -732,7 +732,7 @@ export function GroupsPage() {
       .catch((error) => {
         resolveProtectedError(
           error,
-          "Не удалось обновить group read state через gateway.",
+          "Не удалось отметить сообщения группы прочитанными.",
           expireSession,
         );
       });
@@ -941,7 +941,7 @@ export function GroupsPage() {
       if (encryptedGroupLane.status !== "ready") {
         setSearchJumpNotice(
           encryptedGroupLane.errorMessage ??
-            "Encrypted search result нельзя открыть: local encrypted group lane недоступен в текущем browser profile.",
+            "Нельзя открыть найденное сообщение: история этой группы недоступна на этом устройстве.",
         );
         setHighlightedMessageId(null);
         setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
@@ -953,7 +953,7 @@ export function GroupsPage() {
         null;
       if (encryptedTarget === null) {
         setSearchJumpNotice(
-          "Найденное encrypted сообщение пока не попало в текущее локально загруженное окно group lane. Deep history backfill в этом slice не реализован.",
+          "Это сообщение ещё не загружено на этом устройстве. Откройте группу и загрузите доступную историю.",
         );
         setHighlightedMessageId(null);
         setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
@@ -970,7 +970,7 @@ export function GroupsPage() {
     const targetMessage = findJumpTarget(selectedState.messages, searchJumpIntent.messageId);
     if (targetMessage === null) {
       setSearchJumpNotice(
-        "Найденное сообщение пока не попало в текущую загруженную историю группы. Переход ограничен последним загруженным окном primary thread.",
+        "Это сообщение ещё не загружено на этом устройстве. Можно перейти только к сообщениям из доступной истории группы.",
       );
       setHighlightedMessageId(null);
       setSearchParams(clearSearchJumpParams(searchParams), { replace: true });
@@ -1044,7 +1044,7 @@ export function GroupsPage() {
       .catch((error) => {
         resolveProtectedError(
           error,
-          "Не удалось обновить encrypted group read state через gateway.",
+          "Не удалось отметить сообщения группы прочитанными.",
           expireSession,
         );
       });
@@ -2163,7 +2163,7 @@ export function GroupsPage() {
     } catch (error) {
       const message = resolveProtectedError(
         error,
-        "Не удалось открыть group chat через gateway.",
+        "Не удалось открыть группу. Повторите попытку.",
         expireSession,
       );
       if (!active || message === null) {
@@ -2360,14 +2360,14 @@ export function GroupsPage() {
                 <h2 className={styles.panelTitle}>Ваши группы</h2>
               </div>
               <p className={styles.panelCopy}>
-                List view остаётся membership-scoped и идёт только через `ChatService` на gateway.
+                Здесь показаны группы, в которых вы состоите.
               </p>
             </div>
 
             {groupsStatus === "loading" && (
               <InlineState
                 title="Подтягиваем группы"
-                message="Запрашиваем membership-scoped список групп через gateway."
+                message="Загружаем группы, в которых вы состоите."
               />
             )}
 
@@ -2686,7 +2686,7 @@ export function GroupsPage() {
                       <article className={styles.groupInfoOverviewCard}>
                         <div>
                           <p className={styles.cardLabel}>Уведомления</p>
-                          <h3 className={styles.blockTitle}>Push для этой группы</h3>
+                          <h3 className={styles.blockTitle}>Уведомления группы</h3>
                         </div>
 
                         {(groupNotificationsError || webNotifications.error) && (
