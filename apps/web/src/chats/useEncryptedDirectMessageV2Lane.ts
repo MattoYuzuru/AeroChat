@@ -116,8 +116,11 @@ export function useEncryptedDirectMessageV2Lane({
           return;
         }
 
-        const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
         setLoadedState((current) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return current;
+          }
+          const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
           const sameScope = current.requestKey === activeLoadRequestKey;
           const merged = mergeEncryptedLaneWithPending(
             sameScope && hasConcurrentUpdates ? current.items : [],
@@ -137,16 +140,21 @@ export function useEncryptedDirectMessageV2Lane({
           return;
         }
 
-        setLoadedState((current) => ({
-          requestKey: activeLoadRequestKey,
-          status: "error",
-          items: current.requestKey === activeLoadRequestKey ? current.items : [],
-          pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
-          errorMessage:
-            error instanceof Error && error.message.trim() !== ""
-              ? error.message
-              : "Не удалось загрузить encrypted DM v2 local projection.",
-        }));
+        setLoadedState((current) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return current;
+          }
+          return {
+            requestKey: activeLoadRequestKey,
+            status: "error",
+            items: current.requestKey === activeLoadRequestKey ? current.items : [],
+            pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+            errorMessage:
+              error instanceof Error && error.message.trim() !== ""
+                ? error.message
+                : "Не удалось загрузить encrypted DM v2 local projection.",
+          };
+        });
       });
   }, [
     cryptoRuntime,
@@ -196,6 +204,9 @@ export function useEncryptedDirectMessageV2Lane({
 
           updateVersionRef.current += 1;
           setLoadedState((current) => {
+            if (cancelled) {
+              return current;
+            }
             const sameScope = current.requestKey === activeLoadRequestKey;
             return {
               requestKey: activeLoadRequestKey,
@@ -213,17 +224,22 @@ export function useEncryptedDirectMessageV2Lane({
             return;
           }
 
-          setLoadedState((current) => ({
-            ...current,
-            items: current.requestKey === activeLoadRequestKey ? current.items : [],
-            pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
-            requestKey: activeLoadRequestKey,
-            status: "error",
-            errorMessage:
-              error instanceof Error && error.message.trim() !== ""
-                ? error.message
-                : "Не удалось локально обработать realtime encrypted envelope.",
-          }));
+          setLoadedState((current) => {
+            if (cancelled) {
+              return current;
+            }
+            return {
+              ...current,
+              items: current.requestKey === activeLoadRequestKey ? current.items : [],
+              pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+              requestKey: activeLoadRequestKey,
+              status: "error",
+              errorMessage:
+                error instanceof Error && error.message.trim() !== ""
+                  ? error.message
+                  : "Не удалось локально обработать realtime encrypted envelope.",
+            };
+          });
         });
     });
 
@@ -274,8 +290,11 @@ export function useEncryptedDirectMessageV2Lane({
             return;
           }
 
-          const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
           setLoadedState((current) => {
+            if (requestVersionRef.current !== requestVersion) {
+              return current;
+            }
+            const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
             const sameScope = current.requestKey === activeLoadRequestKey;
             const merged = mergeEncryptedLaneWithPending(
               sameScope && hasConcurrentUpdates ? current.items : [],
@@ -295,16 +314,21 @@ export function useEncryptedDirectMessageV2Lane({
             return;
           }
 
-          setLoadedState((current) => ({
-            requestKey: activeLoadRequestKey,
-            status: "error",
-            items: current.requestKey === activeLoadRequestKey ? current.items : [],
-            pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
-            errorMessage:
-              error instanceof Error && error.message.trim() !== ""
-                ? error.message
-                : "Не удалось перечитать encrypted DM v2 local projection после reconnect.",
-          }));
+          setLoadedState((current) => {
+            if (requestVersionRef.current !== requestVersion) {
+              return current;
+            }
+            return {
+              requestKey: activeLoadRequestKey,
+              status: "error",
+              items: current.requestKey === activeLoadRequestKey ? current.items : [],
+              pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+              errorMessage:
+                error instanceof Error && error.message.trim() !== ""
+                  ? error.message
+                  : "Не удалось перечитать encrypted DM v2 local projection после reconnect.",
+            };
+          });
         });
     });
   }, [
@@ -321,13 +345,17 @@ export function useEncryptedDirectMessageV2Lane({
       return;
     }
 
-    return subscribeLocalEncryptedDirectMessageV2Projection((event) => {
+    let cancelled = false;
+    const unsubscribe = subscribeLocalEncryptedDirectMessageV2Projection((event) => {
       if (event.projection.chatId !== activeLoadChatId) {
         return;
       }
 
       updateVersionRef.current += 1;
       setLoadedState((current) => {
+        if (cancelled) {
+          return current;
+        }
         const sameScope = current.requestKey === activeLoadRequestKey;
         return {
           requestKey: activeLoadRequestKey,
@@ -340,6 +368,11 @@ export function useEncryptedDirectMessageV2Lane({
         };
       });
     });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [activeLoadChatId, activeLoadRequestKey, pageSize]);
 
   if (loadDescriptor.kind === "idle") {

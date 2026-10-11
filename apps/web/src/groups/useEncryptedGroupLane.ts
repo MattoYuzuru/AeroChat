@@ -121,8 +121,11 @@ export function useEncryptedGroupLane({
           return;
         }
 
-        const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
         setLoadedState((current) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return current;
+          }
+          const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
           const sameScope = current.requestKey === activeLoadRequestKey;
           const merged = mergeEncryptedLaneWithPending(
             sameScope && hasConcurrentUpdates ? current.items : [],
@@ -144,14 +147,19 @@ export function useEncryptedGroupLane({
         }
 
         const resolved = resolveEncryptedGroupLoadError(error);
-        setLoadedState((current) => ({
-          requestKey: activeLoadRequestKey,
-          status: resolved.kind,
-          bootstrap: current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
-          items: current.requestKey === activeLoadRequestKey ? current.items : [],
-          pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
-          errorMessage: resolved.message,
-        }));
+        setLoadedState((current) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return current;
+          }
+          return {
+            requestKey: activeLoadRequestKey,
+            status: resolved.kind,
+            bootstrap: current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
+            items: current.requestKey === activeLoadRequestKey ? current.items : [],
+            pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+            errorMessage: resolved.message,
+          };
+        });
       });
   }, [
     cryptoRuntime,
@@ -201,6 +209,9 @@ export function useEncryptedGroupLane({
 
           updateVersionRef.current += 1;
           setLoadedState((current) => {
+            if (cancelled) {
+              return current;
+            }
             const sameScope = current.requestKey === activeLoadRequestKey;
             return {
               requestKey: activeLoadRequestKey,
@@ -219,18 +230,23 @@ export function useEncryptedGroupLane({
             return;
           }
 
-          setLoadedState((current) => ({
-            ...current,
-            items: current.requestKey === activeLoadRequestKey ? current.items : [],
-            pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
-            bootstrap: current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
-            requestKey: activeLoadRequestKey,
-            status: "error",
-            errorMessage:
-              error instanceof Error && error.message.trim() !== ""
-                ? error.message
-                : "Не удалось локально обработать realtime encrypted group envelope.",
-          }));
+          setLoadedState((current) => {
+            if (cancelled) {
+              return current;
+            }
+            return {
+              ...current,
+              items: current.requestKey === activeLoadRequestKey ? current.items : [],
+              pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+              bootstrap: current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
+              requestKey: activeLoadRequestKey,
+              status: "error",
+              errorMessage:
+                error instanceof Error && error.message.trim() !== ""
+                  ? error.message
+                  : "Не удалось локально обработать realtime encrypted group envelope.",
+            };
+          });
         });
     });
 
@@ -281,8 +297,11 @@ export function useEncryptedGroupLane({
             return;
           }
 
-          const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
           setLoadedState((current) => {
+            if (requestVersionRef.current !== requestVersion) {
+              return current;
+            }
+            const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
             const sameScope = current.requestKey === activeLoadRequestKey;
             const merged = mergeEncryptedLaneWithPending(
               sameScope && hasConcurrentUpdates ? current.items : [],
@@ -303,18 +322,23 @@ export function useEncryptedGroupLane({
             return;
           }
 
-          setLoadedState((current) => ({
-            requestKey: activeLoadRequestKey,
-            status: "error",
-            bootstrap:
-              current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
-            items: current.requestKey === activeLoadRequestKey ? current.items : [],
-            pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
-            errorMessage:
-              error instanceof Error && error.message.trim() !== ""
-                ? error.message
-                : "Не удалось перечитать encrypted group local projection после reconnect.",
-          }));
+          setLoadedState((current) => {
+            if (requestVersionRef.current !== requestVersion) {
+              return current;
+            }
+            return {
+              requestKey: activeLoadRequestKey,
+              status: "error",
+              bootstrap:
+                current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
+              items: current.requestKey === activeLoadRequestKey ? current.items : [],
+              pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+              errorMessage:
+                error instanceof Error && error.message.trim() !== ""
+                  ? error.message
+                  : "Не удалось перечитать encrypted group local projection после reconnect.",
+            };
+          });
         });
     });
   }, [
@@ -331,13 +355,17 @@ export function useEncryptedGroupLane({
       return;
     }
 
-    return subscribeLocalEncryptedGroupProjection((event) => {
+    let cancelled = false;
+    const unsubscribe = subscribeLocalEncryptedGroupProjection((event) => {
       if (event.projection.groupId !== activeLoadGroupId) {
         return;
       }
 
       updateVersionRef.current += 1;
       setLoadedState((current) => {
+        if (cancelled) {
+          return current;
+        }
         const sameScope = current.requestKey === activeLoadRequestKey;
         return {
           requestKey: activeLoadRequestKey,
@@ -351,6 +379,11 @@ export function useEncryptedGroupLane({
         };
       });
     });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [activeLoadGroupId, activeLoadRequestKey, pageSize]);
 
   if (loadDescriptor.kind === "idle") {
