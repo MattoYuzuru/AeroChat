@@ -96,8 +96,8 @@ jobs:
         run: |
           namespace="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
           mkdir -p /tmp/release-images
-          read -r -a build_args <<< "$BUILD_ARGS"
-          docker buildx build "${build_args[@]}" --build-arg AERO_BUILD_REVISION="$EXPECTED_SOURCE_SHA" --label "org.opencontainers.image.revision=$EXPECTED_SOURCE_SHA" --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --platform linux/amd64 -f "$DOCKERFILE" -t "$namespace/aerochat-$SERVICE:sha-$EXPECTED_SOURCE_SHA" --output "type=docker,dest=/tmp/release-images/$SERVICE.tar" .
+          read -r -a image_build_flags <<< "$BUILD_ARGS"
+          docker buildx build "${image_build_flags[@]}" --build-arg AERO_BUILD_REVISION="$EXPECTED_SOURCE_SHA" --label "org.opencontainers.image.revision=$EXPECTED_SOURCE_SHA" --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --platform linux/amd64 -f "$DOCKERFILE" -t "$namespace/aerochat-$SERVICE:sha-$EXPECTED_SOURCE_SHA" --output "type=docker,dest=/tmp/release-images/$SERVICE.tar" .
 
       - name: Preserve exact image for publication
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
