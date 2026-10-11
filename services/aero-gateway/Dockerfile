@@ -8,7 +8,9 @@ COPY services/aero-gateway ./services/aero-gateway
 
 WORKDIR /src/services/aero-gateway
 
-RUN GOWORK=off go build -o /out/aero-gateway ./cmd/aero-gateway
+ARG AERO_BUILD_REVISION=dev
+
+RUN GOWORK=off go build -ldflags "-X main.version=${AERO_BUILD_REVISION}" -o /out/aero-gateway ./cmd/aero-gateway
 
 FROM alpine:3.22
 

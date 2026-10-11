@@ -72,7 +72,7 @@ docker compose -f infra/compose/docker-compose.yml logs --tail=100 aero-gateway 
 
 Server topology использует image-based Docker Compose и общий `k3s + Traefik` edge с TLS через `cert-manager`. Media публикуется на отдельном browser-visible origin. Repo-managed `coturn` работает как прямой host UDP/TCP service по [ADR-085](docs/adr/085-server-turn-runtime-and-public-relay-ip-contract.md).
 
-Для подготовки сервера читать [single-server bootstrap](docs/deploy/single-server-bootstrap.md); production rollout, health gates и rollback описаны в [runbook](docs/deploy/production-rollout.md). Application images публикуются в GHCR для `linux/amd64`; сборку можно выбрать по точному `sha-<commit>` tag.
+Для подготовки сервера читать [single-server bootstrap](docs/deploy/single-server-bootstrap.md); production rollout, health gates и rollback описаны в [runbook](docs/deploy/production-rollout.md). Application images проходят gates точного SHA и выбираются по [immutable release manifest](docs/deploy/verified-release.md) с пятью image digests.
 
 ## Архитектура и код
 
