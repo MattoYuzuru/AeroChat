@@ -46,6 +46,8 @@ Push требует secure context: `localhost` или HTTPS-origin для вн�
 
 Регион media bucket определяется SDK через `AERO_MEDIA_S3_INTERNAL_ENDPOINT` при первом presign и сохраняется в клиенте подписи. У storage principal должно быть право `s3:GetBucketLocation`; пустой location S3 соответствует `us-east-1`. Browser-visible endpoint используется только для URL и подписи, без исходящих запросов к нему из `aero-chat`. После переноса bucket в другой регион сервис нужно перезапустить. При ошибке internal discovery URL не выдаётся; следующий запрос повторяет discovery. Подписи upload/download проверяются отдельно от доступности публичного storage origin в браузере.
 
+Узкая S3 integration проверка `go -C services/aero-chat test -tags integration -run TestPresignUploadDownloadOnDisposableStorage ./internal/storage/minio` требует `AERO_MEDIA_TEST_ENV_FILE` вне Git с ключами `AERO_MEDIA_S3_*`. Она принимает только loopback endpoints с разными internal/public именами, записывает небольшой объект со случайным fixture key, проверяет metadata и точные downloaded bytes, затем удаляет только этот объект. Отсутствующий профиль завершает проверку ошибкой, а не skip. Это доказательство SDK upload/download, не browser decrypt, immutable finalization или полного media flow.
+
 ## Проверки
 
 Запускать последовательно после установки инструментов и зависимостей. Генерация меняет файлы: проверять её diff и не совмещать с редактированием тех же контрактов. Buf remote plugins закреплены version + revision в `buf.gen.yaml`: protobuf Go `1.36.11`, Connect Go `1.19.1`, оба revision `1`. SQLC закреплён на `1.30.0` в installer и CI. Версия Buf CLI — `1.59.0`.
