@@ -17,7 +17,7 @@ const stateStart=source.indexOf('  const [isComposerSending'),stateEnd=source.in
 const state=stateStart<0?'const isComposerSending=false;':source.slice(stateStart,stateEnd);
 const textareaStart=source.indexOf('                          onChange={(event) => {',source.indexOf('<textarea'));
 const onChangeEnd=source.indexOf('                          }}',textareaStart);
-const onChange=source.slice(source.indexOf('{',textareaStart)+1,onChangeEnd);
+const onChange=source.slice(source.indexOf('=> {',textareaStart)+4,onChangeEnd);
 const virtual=ts.transpileModule(`import {useEffectEvent,useRef,useState} from 'react';export function useComposer(opts){
  const {selectedThread,uploadedEncryptedAttachmentDraft,editingEncryptedEntry,selectedEncryptedReplyEntry,selectedEncryptedReplyMessageId,editingEncryptedMessageId,setSelectedEncryptedReplyMessageId,setEditingEncryptedMessageId,chats,normalizeComposerMessageText,cryptoRuntime,encryptedMediaAttachmentDraft,publishLocalEncryptedDirectMessageV2Projection}=opts;
  const [composerText,setComposerText]=useState('');const [composerError,setComposerError]=useState(null);
@@ -33,6 +33,7 @@ try{
   await page.getByRole('textbox').fill('first message');
   if(scenario==='reentrant')await page.evaluate(()=>window.fixture.twice());else await page.getByRole('textbox').press('Enter');
   await page.waitForFunction(()=>window.fixture.report().calls.length>=1);
+  assert.equal((await page.evaluate(()=>window.fixture.report())).calls[0].text,'first message');
   if(scenario==='typing'){await page.getByRole('textbox').fill('new unsent draft');await page.getByRole('textbox').press('Enter');}
   if(scenario==='scope'){await page.evaluate(()=>window.fixture.switchThread());await page.getByRole('textbox').fill('other thread draft');}
   if(scenario==='reply')await page.evaluate(()=>window.fixture.changeReply());
