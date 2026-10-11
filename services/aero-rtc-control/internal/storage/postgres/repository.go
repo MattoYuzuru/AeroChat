@@ -362,14 +362,6 @@ func uuidValue(value string) pgtype.UUID {
 	return pgtype.UUID{Bytes: mustParseUUID(value), Valid: true}
 }
 
-func uuidPointerValue(value *string) pgtype.UUID {
-	if value == nil || strings.TrimSpace(*value) == "" {
-		return pgtype.UUID{}
-	}
-
-	return uuidValue(*value)
-}
-
 func timestamptzValue(value time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: value.UTC(), Valid: true}
 }
