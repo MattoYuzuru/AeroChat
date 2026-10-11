@@ -79,6 +79,11 @@ class VulnerabilityGateTests(unittest.TestCase):
                     (path / "Dockerfile").write_text("FROM " + baseline["go_builder_image"] + " AS builder\n")
             with contextlib.redirect_stdout(io.StringIO()):
                 check(root)
+            jobs_dockerfile = root / "services/aero-jobs/Dockerfile"
+            jobs_dockerfile.unlink()
+            with self.assertRaisesRegex(ValueError, "Отсутствует application Dockerfile: services/aero-jobs"):
+                check(root)
+            jobs_dockerfile.write_text("FROM " + baseline["go_builder_image"] + " AS builder\n")
             target = root / "services/aero-chat/go.mod"
             target.write_text("module fixture\n\ngo 1.25.0\n")
             with self.assertRaises(ValueError):

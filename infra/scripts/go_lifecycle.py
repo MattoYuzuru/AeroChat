@@ -35,8 +35,12 @@ def check(root):
         if not match or match.group(1) != value["go_version"]:
             raise ValueError(f"Go version drift: {file}")
     for module in MODULES:
+        if not module.startswith("services/"):
+            continue
         dockerfile = root / module / "Dockerfile"
-        if dockerfile.exists() and dockerfile.read_text().splitlines()[0] != "FROM " + value["go_builder_image"] + " AS builder":
+        if not dockerfile.is_file():
+            raise ValueError(f"Отсутствует application Dockerfile: {module}")
+        if dockerfile.read_text().splitlines()[0] != "FROM " + value["go_builder_image"] + " AS builder":
             raise ValueError(f"Go builder drift: {module}")
     print("Go workspace/module/application Docker pins согласованы")
 
