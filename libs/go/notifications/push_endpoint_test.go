@@ -87,8 +87,8 @@ func TestPushDialValidatesEntireAnswerBeforeNumericDial(t *testing.T) {
 	}
 	lookups := 0
 	left, right := net.Pipe()
-	defer left.Close()
-	defer right.Close()
+	defer func() { _ = left.Close() }()
+	defer func() { _ = right.Close() }()
 	call := validatedPushDial(func(_ context.Context, network, host string) ([]netip.Addr, error) {
 		lookups++
 		if network != "ip" || host != "fcm.googleapis.com" {
