@@ -77,6 +77,8 @@ import {
   type GroupCallAwarenessEntry,
 } from "../rtc/group-awareness";
 import { parseRTCRealtimeEvent } from "../rtc/realtime";
+import { selectOwnedGroupLobbyCallId, type GroupLobbyOwnership } from "../rtc/group-lobby-heartbeat";
+import { useGroupLobbyHeartbeat } from "../rtc/useGroupLobbyHeartbeat";
 import {
   clearSearchJumpParams,
   findJumpTarget,
@@ -145,6 +147,9 @@ export function GroupsPage() {
   const [groupCallTerminalState, setGroupCallTerminalState] =
     useState<GroupCallTerminalState>("idle");
   const [groupCallError, setGroupCallError] = useState<string | null>(null);
+  const [groupLobbyOwnership, setGroupLobbyOwnership] = useState<GroupLobbyOwnership | null>(null);
+  const [groupCallHeartbeatError, setGroupCallHeartbeatError] = useState<string | null>(null);
+  const groupLobbyGenerationRef = useRef(0);
   const [memberRoleDrafts, setMemberRoleDrafts] = useState<Record<string, GroupMemberRole>>({});
   const [lastCreatedInvite, setLastCreatedInvite] = useState<CreatedGroupInviteLink | null>(null);
   const [searchJumpNotice, setSearchJumpNotice] = useState<string | null>(null);
@@ -226,6 +231,13 @@ export function GroupsPage() {
   useEffect(() => {
     groupCallAwarenessStateRef.current = groupCallAwarenessState;
   }, [groupCallAwarenessState]);
+
+  useEffect(() => {
+    groupLobbyGenerationRef.current += 1;
+    setGroupLobbyOwnership(null);
+    setGroupCallHeartbeatError(null);
+    return () => { groupLobbyGenerationRef.current += 1; };
+  }, [currentUserId, selectedGroupId]);
 
   useEffect(() => {
     setEditingEncryptedMessageId(null);
@@ -1055,6 +1067,31 @@ export function GroupsPage() {
           (participant) =>
             participant.userId === authState.profile.id && participant.state === "active",
         ) ?? null;
+  const ownedGroupLobbyCallId = selectOwnedGroupLobbyCallId({
+    ownership: groupLobbyOwnership,
+    entry: selectedGroupCallEntry,
+    currentUserId,
+    selfRole: selectedState.status === "ready" ? selectedState.snapshot.group.selfRole : null,
+  });
+  useGroupLobbyHeartbeat({
+    token,
+    callId: ownedGroupLobbyCallId,
+    pageVisible: isPageVisible,
+    onSuccess: () => setGroupCallHeartbeatError(null),
+    onFailure(error) {
+      if (isGatewayErrorCode(error, "unauthenticated") || isGatewayErrorCode(error, "permission_denied") || isGatewayErrorCode(error, "not_found") || isGatewayErrorCode(error, "failed_precondition")) {
+        setGroupLobbyOwnership(null);
+      }
+      setGroupCallHeartbeatError(resolveProtectedError(error, "Не удалось подтвердить участие в lobby. Повторите вход, если участие завершилось.", expireSession));
+      void refreshGroupCall(selectedGroupId);
+    },
+  });
+  const visibleGroupCallError = groupCallError ?? groupCallHeartbeatError;
+  useEffect(() => {
+    if (groupLobbyOwnership !== null && groupCallAwarenessState.syncStatus === "ready" && selectedState.status === "ready" && ownedGroupLobbyCallId === null) {
+      setGroupLobbyOwnership(null);
+    }
+  }, [groupLobbyOwnership, groupCallAwarenessState.syncStatus, selectedState.status, ownedGroupLobbyCallId]);
   const selectedGroupCallActions =
     authState.status !== "authenticated" || selectedState.status !== "ready"
       ? null
@@ -1064,6 +1101,7 @@ export function GroupsPage() {
           currentUserId: authState.profile.id,
           selfParticipant: selectedGroupCallSelfParticipant,
           selfRole: selectedState.snapshot.group.selfRole,
+          hasLocalOwnership: ownedGroupLobbyCallId !== null,
         });
   const selectedGroupCallPhase = deriveGroupCallUiPhase({
     actionState: groupCallActionState,
@@ -1390,13 +1428,17 @@ export function GroupsPage() {
     setGroupCallActionState("starting");
     setGroupCallTerminalState("idle");
     setGroupCallError(null);
+    const generation = groupLobbyGenerationRef.current;
 
     try {
-      await gatewayClient.startCall(token, {
+      const response = await gatewayClient.startCall(token, {
         kind: "group",
         groupId: selectedState.snapshot.group.id,
       });
       await refreshGroupCall(selectedState.snapshot.group.id);
+      if (groupLobbyGenerationRef.current === generation && response.selfParticipant?.userId === currentUserId) {
+        setGroupLobbyOwnership({groupId:selectedState.snapshot.group.id,callId:response.call.id,userId:currentUserId});
+      }
     } catch (error) {
       if (isRTCActiveCallConflict(error)) {
         setGroupCallTerminalState("failed");
@@ -1438,10 +1480,14 @@ export function GroupsPage() {
     setGroupCallActionState("joining");
     setGroupCallTerminalState("idle");
     setGroupCallError(null);
+    const generation = groupLobbyGenerationRef.current;
 
     try {
-      await gatewayClient.joinCall(token, selectedGroupCallEntry.call.id);
+      const response = await gatewayClient.joinCall(token, selectedGroupCallEntry.call.id);
       await refreshGroupCall(selectedState.snapshot.group.id);
+      if (groupLobbyGenerationRef.current === generation && response.selfParticipant?.userId === currentUserId) {
+        setGroupLobbyOwnership({groupId:selectedState.snapshot.group.id,callId:response.call.id,userId:currentUserId});
+      }
     } catch (error) {
       if (isRTCActiveCallConflict(error)) {
         setGroupCallTerminalState("failed");
@@ -1473,6 +1519,7 @@ export function GroupsPage() {
     }
 
     setGroupCallActionState("leaving");
+    setGroupLobbyOwnership(null);
     setGroupCallTerminalState("idle");
     setGroupCallError(null);
 
@@ -1504,6 +1551,7 @@ export function GroupsPage() {
     }
 
     setGroupCallActionState("ending");
+    setGroupLobbyOwnership(null);
     setGroupCallTerminalState("idle");
     setGroupCallError(null);
 
@@ -3007,7 +3055,7 @@ export function GroupsPage() {
 
                       {(selectedGroupCallEntry !== null ||
                         groupCallTerminalState !== "idle" ||
-                        groupCallError !== null) && (
+                        visibleGroupCallError !== null) && (
                         <article
                           className={styles.messageCard}
                           data-own={
@@ -3063,14 +3111,15 @@ export function GroupsPage() {
                               </div>
                             )}
 
-                            {groupCallError && (
+                            {visibleGroupCallError && (
                               <div className={styles.error}>
                                 <div className={styles.inlineActionRow}>
-                                  <span>{groupCallError}</span>
+                                  <span>{visibleGroupCallError}</span>
                                   <button
                                     className={styles.ghostButton}
                                     onClick={() => {
                                       setGroupCallError(null);
+                                      setGroupCallHeartbeatError(null);
                                       setGroupCallTerminalState("idle");
                                     }}
                                     type="button"
