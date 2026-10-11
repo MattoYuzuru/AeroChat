@@ -221,7 +221,7 @@ ss -lntup | rg ':3478|:49160|:49200'
 13. При ручном API smoke для `CreateAttachmentUploadIntent` проверить, что presigned URL указывает на
     `https://media.<zone-domain>`,
     а не на внутренний `minio:9000`, основной application domain или nested host вида `media.<application-host>`.
-14. Зафиксировать предыдущий known-good tag и текущий deployed tag в операторском журнале или release notes.
+14. Зафиксировать предыдущие known-good и текущие deployed manifest digest/source SHA в операторском журнале или release notes; сохранить metadata с пятью image digests по [recovery runbook](data-recovery.md).
 
 Если register/login падают после успешного `upstream`- и `HTTPS`-smoke, отдельно проверь логи bootstrap:
 
