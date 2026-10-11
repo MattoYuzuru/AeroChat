@@ -22,7 +22,7 @@ export function containModalFocus(
       items.at(-1)?.focus();
     } else if (!event.shiftKey && (index < 0 || index === items.length - 1)) {
       event.preventDefault();
-      items[0].focus();
+      items[0]?.focus();
     }
   }
 
