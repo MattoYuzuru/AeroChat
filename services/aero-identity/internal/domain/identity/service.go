@@ -62,6 +62,7 @@ type Repository interface {
 	ListWebPushSubscriptions(context.Context, string) ([]WebPushSubscription, error)
 	DeleteWebPushSubscriptionsByIDs(context.Context, []string) (int64, error)
 	GetCryptoDeviceRegistryStatsByUserID(context.Context, string) (int64, int64, int64, error)
+	CreateFirstCryptoDevice(context.Context, CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error)
 	CreateCryptoDevice(context.Context, CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error)
 	ListCryptoDevices(context.Context, string) ([]CryptoDevice, error)
 	GetCryptoDeviceDetails(context.Context, string, string) (*CryptoDeviceDetails, error)
