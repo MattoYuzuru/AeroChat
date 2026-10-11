@@ -5,6 +5,7 @@ package mediacontract
 
 import (
 	"errors"
+	"math"
 	"strings"
 	"time"
 )
@@ -31,14 +32,15 @@ type Key struct {
 }
 
 type Binding struct {
-	Key           Key
-	GrantID       string
-	CallID        string
-	ParticipantID string
-	GroupID       string
-	UserID        string
-	SessionID     string
-	DeviceID      string
+	Key              Key
+	GrantID          string
+	CallID           string
+	ParticipantID    string
+	GroupID          string
+	UserID           string
+	SessionID        string
+	DeviceID         string
+	EligibilityEpoch int64
 }
 
 type VerifiedToken struct {
@@ -59,6 +61,7 @@ type AuthorityObservation struct {
 	DeviceActive      bool
 	ParticipantActive bool
 	GroupRole         string
+	EligibilityEpoch  int64
 }
 
 type TeardownAcknowledgement struct {
@@ -73,7 +76,7 @@ type ReferenceModel struct {
 }
 
 func NewReferenceModel(binding Binding) (*ReferenceModel, error) {
-	if binding.Key.Generation == 0 {
+	if binding.Key.Generation == 0 || binding.EligibilityEpoch <= 0 || binding.EligibilityEpoch == math.MaxInt64 {
 		return nil, ErrDenied
 	}
 	for _, value := range []string{
@@ -109,6 +112,7 @@ func (m *ReferenceModel) CheckAdmission(token VerifiedToken, authority Authority
 	}
 	if authority.UserID != m.binding.UserID || authority.SessionID != m.binding.SessionID ||
 		authority.DeviceID != m.binding.DeviceID || authority.GroupID != m.binding.GroupID ||
+		authority.EligibilityEpoch != m.binding.EligibilityEpoch ||
 		!authority.SessionActive || !authority.DeviceActive || !authority.ParticipantActive {
 		return ErrDenied
 	}
