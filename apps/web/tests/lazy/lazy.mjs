@@ -30,11 +30,11 @@ const server=createServer(async(request,response)=>{
  const path=pathname.startsWith('/assets/')?pathname:'/index.html';
  try{const bytes=await readFile(output+path);response.setHeader('Cache-Control','no-store');response.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':path.endsWith('.woff2')?'font/woff2':'text/html');response.end(bytes);}catch{response.statusCode=404;response.end();}
 });
-let browser;
+let browser;const diagnostic={stage:'setup',requests:[],failedRequests:[],attempts:0};
 try{
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(25174,'127.0.0.1',resolve);});
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE});
- const page=await browser.newPage({viewport:{width:1366,height:900}});const requests=[];page.on('request',request=>requests.push(new URL(request.url()).pathname));
+ const page=await browser.newPage({viewport:{width:1366,height:900}});const requests=diagnostic.requests;page.on('request',request=>requests.push(new URL(request.url()).pathname));page.on('requestfailed',request=>diagnostic.failedRequests.push({path:new URL(request.url()).pathname,error:request.failure()?.errorText}));diagnostic.stage='login';
  await page.goto('http://127.0.0.1:25174/login');await page.getByRole('textbox',{name:'Логин',exact:true}).waitFor();
  if(baseline){
   console.log(JSON.stringify({baseline:true,entryBytes:(await stat(output+'/'+entry.fileName)).size,eagerHeavyModules:heavyNames,requests,scope:'Original production AppRouter static entry closure and login network; synthetic auth/gateway/RTC/realtime'}));
@@ -45,12 +45,15 @@ try{
  const icon=title=>page.locator('[data-desktop-entry=true]').filter({hasText:title});
  await icon('Люди').focus();await page.keyboard.press('Enter');const draft=page.getByRole('textbox',{name:'Точный login',exact:true});await draft.waitFor();await draft.fill('Непотерянный черновик');
  const explorerPath=chunk('ExplorerPage');let attempts=0;
- await page.route('**'+explorerPath,async route=>{attempts++;if(attempts===1)await route.abort('failed');else await route.continue();});
+ await page.route('**'+explorerPath,async route=>{attempts++;diagnostic.attempts=attempts;if(attempts===1)await route.abort('failed');else await route.continue();});
+ diagnostic.stage='window-chunk-failure';
  await icon('Проводник').focus();await page.keyboard.press('Enter');const error=page.getByRole('alert');await error.getByRole('button',{name:'Повторить загрузку',exact:true}).waitFor();assert.equal(await draft.inputValue(),'Непотерянный черновик');
  const retry=error.getByRole('button',{name:'Повторить загрузку',exact:true});assert.equal(await retry.evaluate(element=>document.activeElement===element),true,'failed active window focuses retry');
  await retry.evaluate(element=>{element.click();element.click();});
+ diagnostic.stage='window-chunk-retry';
  await page.getByPlaceholder('Новая папка',{exact:true}).waitFor();assert.equal(attempts,2,'one retry fetch after two immediate clicks');assert.equal(await draft.inputValue(),'Непотерянный черновик');
  const delayedPath=chunk('CreateGroupPage');let release;
+ diagnostic.stage='close-before-late-chunk';
  const delayed=new Promise(resolve=>{release=resolve;});
  await page.route('**'+delayedPath,async route=>{await delayed;await route.continue();});
  const started=page.waitForRequest('**'+delayedPath);
@@ -61,6 +64,7 @@ try{
  assert.equal(await titleBar.count(),0,'late chunk does not reopen closed window');assert.equal(await draft.inputValue(),'Непотерянный черновик');
  const surfaceEvidence=[];
  for(const [width,height,name,target]of [[1366,900,'DesktopShell','Рабочий стол AeroChat'],[390,844,'AppShell','Быстрый вход в AeroChat'],[390,844,'MobileLauncherHome','Быстрый вход в AeroChat']]){
+  diagnostic.stage='surface-retry-'+name;
   const surface=await browser.newPage({viewport:{width,height}});let count=0;const surfacePath=chunk(name);
   await surface.route('**'+surfacePath,async route=>{count++;if(count===1)await route.abort('failed');else await route.continue();});
   await surface.goto('http://127.0.0.1:25174/login');await surface.getByRole('textbox',{name:'Логин',exact:true}).fill('owned.fixture');await surface.getByLabel('Пароль',{exact:true}).fill('owned-fixture-password');await surface.getByRole('button',{name:'Войти',exact:true}).click();
@@ -70,4 +74,4 @@ try{
  const bytes=(await stat(output+'/'+entry.fileName)).size;
  console.log(JSON.stringify({browser:await browser.version(),entryBytes:bytes,requests,attempts,surfaceEvidence,lateChunkClose:true,scope:'Built production AppRouter/DesktopShell/lazy descriptors and real People/Explorer pages; synthetic auth/gateway/RTC/realtime only; no real account/crypto bootstrap claim'}));
  }
-}finally{await browser?.close();if(server.listening)await new Promise(resolve=>server.close(resolve));}
+}catch(error){console.log(JSON.stringify({diagnostic}));throw error;}finally{await browser?.close();if(server.listening)await new Promise(resolve=>server.close(resolve));}
