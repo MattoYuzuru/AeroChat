@@ -1121,6 +1121,32 @@ func (q *Queries) DeleteWebPushSubscriptionsByIDs(ctx context.Context, dollar_1 
 	return result.RowsAffected(), nil
 }
 
+const demoteGroupOwnerForTransfer = `-- name: DemoteGroupOwnerForTransfer :execrows
+UPDATE group_memberships AS current_owner
+SET role = 'admin'
+WHERE current_owner.group_id = $1::uuid AND current_owner.user_id = $2::uuid
+  AND current_owner.role = 'owner' AND $2::uuid <> $3::uuid
+  AND EXISTS (
+      SELECT 1 FROM group_memberships AS target
+      WHERE target.group_id = $1::uuid AND target.user_id = $3::uuid
+        AND target.role <> 'owner' AND NOT target.is_write_restricted
+  )
+`
+
+type DemoteGroupOwnerForTransferParams struct {
+	GroupID            uuid.UUID `db:"group_id" json:"group_id"`
+	CurrentOwnerUserID uuid.UUID `db:"current_owner_user_id" json:"current_owner_user_id"`
+	NewOwnerUserID     uuid.UUID `db:"new_owner_user_id" json:"new_owner_user_id"`
+}
+
+func (q *Queries) DemoteGroupOwnerForTransfer(ctx context.Context, arg DemoteGroupOwnerForTransferParams) (int64, error) {
+	result, err := q.db.Exec(ctx, demoteGroupOwnerForTransfer, arg.GroupID, arg.CurrentOwnerUserID, arg.NewOwnerUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const detachDirectMessageAttachments = `-- name: DetachDirectMessageAttachments :execrows
 UPDATE attachments AS a
 SET
@@ -4819,6 +4845,26 @@ func (q *Queries) PinEncryptedGroupMessage(ctx context.Context, arg PinEncrypted
 	return result.RowsAffected(), nil
 }
 
+const promoteGroupOwnerForTransfer = `-- name: PromoteGroupOwnerForTransfer :execrows
+UPDATE group_memberships
+SET role = 'owner'
+WHERE group_id = $1 AND user_id = $2
+  AND role <> 'owner' AND NOT is_write_restricted
+`
+
+type PromoteGroupOwnerForTransferParams struct {
+	GroupID uuid.UUID `db:"group_id" json:"group_id"`
+	UserID  uuid.UUID `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) PromoteGroupOwnerForTransfer(ctx context.Context, arg PromoteGroupOwnerForTransferParams) (int64, error) {
+	result, err := q.db.Exec(ctx, promoteGroupOwnerForTransfer, arg.GroupID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const publishLegacyAttachmentFinalKey = `-- name: PublishLegacyAttachmentFinalKey :execrows
 UPDATE attachments SET object_key = $2
 WHERE id = $1 AND object_key = $3 AND status IN ('uploaded', 'attached', 'detached')
@@ -5265,31 +5311,6 @@ type TouchSessionAndDeviceParams struct {
 func (q *Queries) TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error {
 	_, err := q.db.Exec(ctx, touchSessionAndDevice, arg.ID, arg.DeviceID, arg.LastSeenAt)
 	return err
-}
-
-const transferGroupOwnership = `-- name: TransferGroupOwnership :execrows
-UPDATE group_memberships
-SET role = CASE
-    WHEN user_id = $2 THEN 'admin'
-    WHEN user_id = $3 THEN 'owner'
-    ELSE role
-END
-WHERE group_id = $1
-  AND user_id IN ($2, $3)
-`
-
-type TransferGroupOwnershipParams struct {
-	GroupID  uuid.UUID `db:"group_id" json:"group_id"`
-	UserID   uuid.UUID `db:"user_id" json:"user_id"`
-	UserID_2 uuid.UUID `db:"user_id_2" json:"user_id_2"`
-}
-
-func (q *Queries) TransferGroupOwnership(ctx context.Context, arg TransferGroupOwnershipParams) (int64, error) {
-	result, err := q.db.Exec(ctx, transferGroupOwnership, arg.GroupID, arg.UserID, arg.UserID_2)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }
 
 const unpinDirectChatMessage = `-- name: UnpinDirectChatMessage :execrows
