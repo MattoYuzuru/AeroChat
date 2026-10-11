@@ -56,11 +56,11 @@ try{
 
   let initial=await joined();
   let button=page.getByRole('button',{name:'Выключить микрофон',exact:true});
-  assert.equal(await button.getAttribute('aria-pressed'),'false');
+  assert.equal(await button.getAttribute('aria-pressed'),null,'Changing action label is an ordinary button');
   await button.focus();await page.keyboard.press('Enter');
   button=page.getByRole('button',{name:'Включить микрофон',exact:true});await button.waitFor();
   let current=await report();assert.equal(current.isMicrophoneMuted,true);assert.equal(current.trackEnabled,false);
-  assert.equal(await button.getAttribute('aria-pressed'),'true');
+  assert.equal(await button.getAttribute('aria-pressed'),null);
   assert.equal(current.captures,initial.captures);assert.equal(current.peers,initial.peers);
   await button.click();await page.waitForFunction(()=>!window.fixture.report().isMicrophoneMuted);
   assert.equal((await report()).trackEnabled,true);
@@ -79,7 +79,7 @@ try{
   assert.equal((await report()).trackEnabled,true);
   await page.evaluate(()=>window.fixture.unmount());evidence.push('keyboard toggle, rapid toggle, same-runtime recovery');
 
-  for(const cleanup of ['leave','end','changeScope','refreshAccount']){
+  for(const cleanup of ['leave','end','changeScope','refreshAccount','changeToken','changeAccountOnly']){
     initial=await joined();await page.getByRole('button',{name:'Выключить микрофон',exact:true}).click();
     await page.waitForFunction(()=>window.fixture.report().isMicrophoneMuted);
     await page.evaluate(cleanup=>window.fixture[cleanup](),cleanup);
@@ -96,6 +96,8 @@ try{
     await page.evaluate(()=>window.fixture.unmount());evidence.push({cleanup,case:'release reset and explicit rejoin'});
   }
   await joined();await page.evaluate(()=>window.fixture.endCapture());
+  await page.waitForFunction(()=>!window.fixture.report().canToggleMicrophone);
+  assert.equal(await page.getByRole('button',{name:'Выключить микрофон',exact:true}).isDisabled(),true,'Ended track disables the action');
   await page.evaluate(()=>window.fixture.toggleMicrophone());
   current=await report();assert.equal(current.isMicrophoneMuted,false,'Ended capture is not toggled');
   await page.evaluate(()=>window.fixture.unmount());evidence.push('ended track guard');

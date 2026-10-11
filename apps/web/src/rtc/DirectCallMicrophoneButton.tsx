@@ -14,7 +14,6 @@ export function DirectCallMicrophoneButton({ session, className }: DirectCallMic
 
   return (
     <button
-      aria-pressed={session.isMicrophoneMuted}
       className={className}
       disabled={!session.canToggleMicrophone}
       onClick={session.toggleMicrophone}
