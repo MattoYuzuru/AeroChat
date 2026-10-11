@@ -50,9 +50,13 @@ def parse_stream(data, expected_go, expected_scanner):
         trace = finding.get("trace")
         if not isinstance(trace, list) or not trace or any(not isinstance(frame, dict) for frame in trace):
             raise ValueError("Finding без typed trace")
-        candidates.add(finding["osv"])
-        if "function" in trace[0] and not isinstance(trace[0]["function"], str):
+        if not isinstance(trace[0].get("module"), str) or not trace[0]["module"]:
+            raise ValueError("Finding без module path")
+        if any("function" in frame and not isinstance(frame["function"], str) for frame in trace):
             raise ValueError("Некорректный symbol trace")
+        if not trace[0].get("function") and len(trace) != 1:
+            raise ValueError("Non-symbol finding должен иметь один frame")
+        candidates.add(finding["osv"])
         if trace[0].get("function"):
             called.add(finding["osv"])
     return {"candidates": sorted(candidates), "called": sorted(called), "db_last_modified": config.get("db_last_modified")}

@@ -55,9 +55,14 @@ class VulnerabilityGateTests(unittest.TestCase):
             changed["config"][key] = wrong
             with self.assertRaises(ValueError):
                 gate.parse_stream(stream(changed, sbom()), "1.27.2", "1.7.0")
-        malformed = {"finding": {"osv": "GO-2026-5004", "trace": [{"function": False}]}}
-        with self.assertRaises(ValueError):
-            gate.parse_stream(stream(config(), sbom(), malformed), "1.27.2", "1.7.0")
+        invalid_traces = ([{}], [{"module": ""}], [{"module": False}],
+                          [{"module": "fixture/module"}, {"function": "Query"}],
+                          [{"module": "fixture/module", "function": False}],
+                          [{"module": "fixture/module", "function": "Vulnerable"}, {"function": False}])
+        for trace in invalid_traces:
+            with self.subTest(trace=trace), self.assertRaises(ValueError):
+                malformed = {"finding": {"osv": "GO-2026-5004", "trace": trace}}
+                gate.parse_stream(stream(config(), sbom(), malformed), "1.27.2", "1.7.0")
 
     def test_source_versions_and_builder_digest_cannot_drift_silently(self):
         with tempfile.TemporaryDirectory() as directory:
