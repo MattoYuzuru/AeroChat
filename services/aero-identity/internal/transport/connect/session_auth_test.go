@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,7 +40,7 @@ func TestMalformedSessionCredentialsReturnUnauthenticated(t *testing.T) {
 type revokeHandlerRepository struct {
 	identity.Repository
 	auth  identity.SessionAuth
-	calls int
+	calls atomic.Int32
 }
 
 func (r *revokeHandlerRepository) GetSessionAuthByID(_ context.Context, id string) (*identity.SessionAuth, error) {
@@ -55,12 +56,12 @@ func (r *revokeHandlerRepository) TouchSession(context.Context, string, string, 
 }
 
 func (r *revokeHandlerRepository) RevokeSession(context.Context, string, string, time.Time) (bool, error) {
-	r.calls++
+	r.calls.Add(1)
 	return false, nil
 }
 
 func (r *revokeHandlerRepository) RevokeDevice(context.Context, string, string, time.Time) (bool, error) {
-	r.calls++
+	r.calls.Add(1)
 	return false, nil
 }
 
@@ -93,7 +94,7 @@ func TestAuthenticatedMalformedRevokeTargetsReturnInvalidArgument(t *testing.T) 
 			req := connect.NewRequest(body)
 			req.Header().Set("Authorization", "Bearer "+token)
 			_, err := client.RevokeSessionOrDevice(ctx, req)
-			if connect.CodeOf(err) != connect.CodeInvalidArgument || repo.calls != 0 {
+			if connect.CodeOf(err) != connect.CodeInvalidArgument || repo.calls.Load() != 0 {
 				t.Fatalf("authenticated malformed %s target must return invalid_argument before revoke storage: %v", kind, err)
 			}
 			if value != "" && strings.Contains(err.Error(), value) {
@@ -107,12 +108,12 @@ func TestAuthenticatedMalformedRevokeTargetsReturnInvalidArgument(t *testing.T) 
 	}
 	unauthenticated := connect.NewRequest(&identityv1.RevokeSessionOrDeviceRequest{Target: &identityv1.RevokeSessionOrDeviceRequest_DeviceId{DeviceId: "private-target-invalid"}})
 	unauthenticated.Header().Set("Authorization", "Bearer invalid-token")
-	if _, err := client.RevokeSessionOrDevice(ctx, unauthenticated); connect.CodeOf(err) != connect.CodeUnauthenticated || repo.calls != 0 {
+	if _, err := client.RevokeSessionOrDevice(ctx, unauthenticated); connect.CodeOf(err) != connect.CodeUnauthenticated || repo.calls.Load() != 0 {
 		t.Fatal("HTTP authentication must precede target validation")
 	}
 	valid := connect.NewRequest(&identityv1.RevokeSessionOrDeviceRequest{Target: &identityv1.RevokeSessionOrDeviceRequest_SessionId{SessionId: sessionID}})
 	valid.Header().Set("Authorization", "Bearer "+token)
-	if _, err := client.RevokeSessionOrDevice(ctx, valid); connect.CodeOf(err) != connect.CodeNotFound || repo.calls != 1 {
+	if _, err := client.RevokeSessionOrDevice(ctx, valid); connect.CodeOf(err) != connect.CodeNotFound || repo.calls.Load() != 1 {
 		t.Fatal("valid target must preserve repository not_found result")
 	}
 }
