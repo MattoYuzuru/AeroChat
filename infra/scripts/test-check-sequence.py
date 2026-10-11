@@ -48,4 +48,26 @@ esac
         expected_trace = phases if failed is None else phases[:phases.index(failed) + 1]
         if actual != expected_trace or (result.returncode == 0) != (failed is None):
             raise RuntimeError(f"Task barrier/failure regression: phase={failed}")
-print("Task sequential preparation and failed-preparation barrier fixtures passed")
+with tempfile.TemporaryDirectory() as directory:
+    fixture = Path(directory)
+    (fixture / "bin").mkdir()
+    selected = ("proto:lint", "proto:generate", "sqlc:generate", "go:lint")
+    definitions = "version: '3'\ntasks:\n"
+    for phase in selected:
+        start = text.index(f"\n  {phase}:\n")
+        end = text.find("\n  ", start + 3)
+        definitions += text[start:end] + "\n"
+    (fixture / "Taskfile.yml").write_text(definitions)
+    for name in ("buf", "sqlc", "golangci-lint"):
+        tool = fixture / "bin" / name
+        tool.write_text(f'#!/bin/sh\nprintf "%s\\n" "{name} $1" >> tools-trace\n')
+        tool.chmod(0o700)
+    environment = dict(os.environ, PATH="/usr/bin:/bin")
+    for phase in selected:
+        result = subprocess.run([task, phase], cwd=fixture, env=environment, capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError(f"Local prepared tool routing failed with inherited PATH: {phase}")
+    actual = (fixture / "tools-trace").read_text().splitlines()
+    if actual != ["buf lint", "buf generate", "sqlc generate", "golangci-lint run"]:
+        raise RuntimeError("Leaf task использует другой tool вместо prepared bin")
+print("Task sequential/failure barrier and prepared-tool routing with inherited PATH passed")
