@@ -63,10 +63,10 @@ func (s *Service) verifyPasswordCredential(ctx context.Context, login, password 
 	}
 	defer release()
 	credential, err := s.repo.GetPasswordCredentialByLogin(ctx, login)
-	if err != nil && !errors.Is(err, ErrNotFound) {
+	if err != nil && !errors.Is(err, ErrNotFound) && !errors.Is(err, ErrInvalidCredentials) {
 		return nil, err
 	}
-	missing := credential == nil || errors.Is(err, ErrNotFound)
+	missing := credential == nil || errors.Is(err, ErrNotFound) || errors.Is(err, ErrInvalidCredentials)
 	encoded := publicDummyPasswordHash
 	if !missing {
 		encoded = credential.PasswordHash
