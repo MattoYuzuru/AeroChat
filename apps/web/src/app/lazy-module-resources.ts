@@ -5,6 +5,7 @@ export interface LazyModuleResource {
 
 const timeoutMs = 10_000;
 const maxBytes = 16_384;
+const loadedStylesheets = new WeakSet<HTMLLinkElement>();
 
 function sameOriginUrl(value: string, base: URL): URL {
   const url = new URL(value, base);
@@ -68,7 +69,7 @@ function ensureStylesheet(url: URL, attempt: number): Promise<void> {
   if (links.some((link) => {
     const current = new URL(link.href);
     current.searchParams.delete("aerochat_retry");
-    return current.href === url.href && link.sheet !== null;
+    return current.href === url.href && loadedStylesheets.has(link) && link.sheet !== null;
   })) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const link = document.createElement("link");
@@ -81,7 +82,7 @@ function ensureStylesheet(url: URL, attempt: number): Promise<void> {
       window.clearTimeout(timer);
       link.onload = null;
       link.onerror = null;
-      if (loaded) resolve();
+      if (loaded) { loadedStylesheets.add(link); resolve(); }
       else { link.remove(); reject(new Error("Lazy stylesheet unavailable")); }
     }
     link.onload = () => settle(true);
