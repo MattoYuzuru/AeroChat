@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package aerochat.chat.v1;
 
-option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/v1;chatv1";
-
 import "aerochat/common/v1/common.proto";
 import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/v1;chatv1";
 
 service ChatService {
   rpc Ping(PingRequest) returns (PingResponse);
