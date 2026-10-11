@@ -1,6 +1,7 @@
 import {
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -695,21 +696,41 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     encryptedPageSize < encryptedDirectMaxPageSize;
   const encryptedAttachmentDraft = encryptedMediaAttachmentDraft.draft;
   const uploadedEncryptedAttachmentDraft = encryptedMediaAttachmentDraft.uploadedDraft;
-  const completeSentComposer = useEffectEvent((
+  const composerCompletionRef = useRef({
+    chatId: null as string | null,
+    replyId: null as string | null,
+    editId: null as string | null,
+    markSendSucceeded: encryptedMediaAttachmentDraft.markSendSucceeded,
+  });
+  useLayoutEffect(() => {
+    composerCompletionRef.current = {
+      chatId: selectedThread?.chat.id ?? null,
+      replyId: selectedEncryptedReplyMessageId,
+      editId: editingEncryptedMessageId,
+      markSendSucceeded: encryptedMediaAttachmentDraft.markSendSucceeded,
+    };
+    return () => {
+      composerCompletionRef.current.chatId = null;
+    };
+  }, [selectedThread?.chat.id, selectedEncryptedReplyMessageId, editingEncryptedMessageId,
+    encryptedMediaAttachmentDraft.markSendSucceeded]);
+
+  function completeSentComposer(
     chatId: string,
     version: number,
     replyId: string | null,
     editId: string | null,
-  ) => {
-    if (selectedThread?.chat.id !== chatId) {
+  ) {
+    const current = composerCompletionRef.current;
+    if (current.chatId !== chatId) {
       return;
     }
 
-    encryptedMediaAttachmentDraft.markSendSucceeded();
+    current.markSendSucceeded();
     if (
       composerVersionRef.current !== version ||
-      selectedEncryptedReplyMessageId !== replyId ||
-      editingEncryptedMessageId !== editId
+      current.replyId !== replyId ||
+      current.editId !== editId
     ) {
       return;
     }
@@ -717,7 +738,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     setComposerText("");
     setSelectedEncryptedReplyMessageId(null);
     setEditingEncryptedMessageId(null);
-  });
+  }
   const activeReadStatusLabel =
     selectedThread === null
       ? "Без видимого read state"

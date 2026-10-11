@@ -9,7 +9,7 @@ const source=await readFile((process.env.COMPOSER_SOURCE_ROOT??web)+'src/pages/C
 const sendStart=source.indexOf('  async function handleEncryptedDirectMessageV2Send()');
 const sendEnd=source.indexOf('  async function handleDeleteEncryptedDirectMessageV2(',sendStart);
 const keyStart=source.indexOf('  function handleComposerKeyDown('),keyEnd=source.indexOf('  function handleBackToChatsList()',keyStart);
-const completeStart=source.indexOf('  const completeSentComposer = useEffectEvent(');
+const completeStart=source.indexOf('  const composerCompletionRef = useRef(');
 const completeEnd=source.indexOf('  const activeReadStatusLabel',completeStart);
 assert.ok(sendStart>0&&sendEnd>sendStart&&keyStart>0);
 const complete=completeStart<0?'':source.slice(completeStart,completeEnd);
@@ -18,7 +18,7 @@ const state=stateStart<0?'const isComposerSending=false;':source.slice(stateStar
 const textareaStart=source.indexOf('                          onChange={(event) => {',source.indexOf('<textarea'));
 const onChangeEnd=source.indexOf('                          }}',textareaStart);
 const onChange=source.slice(source.indexOf('=> {',textareaStart)+4,onChangeEnd);
-const virtual=ts.transpileModule(`import {useEffectEvent,useRef,useState} from 'react';export function useComposer(opts){
+const virtual=ts.transpileModule(`import {useLayoutEffect,useRef,useState} from 'react';export function useComposer(opts){
  const {selectedThread,uploadedEncryptedAttachmentDraft,editingEncryptedEntry,selectedEncryptedReplyEntry,selectedEncryptedReplyMessageId,editingEncryptedMessageId,setSelectedEncryptedReplyMessageId,setEditingEncryptedMessageId,chats,normalizeComposerMessageText,cryptoRuntime,encryptedMediaAttachmentDraft,publishLocalEncryptedDirectMessageV2Projection}=opts;
  const [composerText,setComposerText]=useState('');const [composerError,setComposerError]=useState(null);
  ${state}\n${complete}\n${source.slice(sendStart,sendEnd)}\n${source.slice(keyStart,keyEnd)}
