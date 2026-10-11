@@ -3,6 +3,8 @@
 - Статус: Accepted
 - Дата: 2026-03-16
 
+Persisted session/device authority revisions и atomic source revocation outbox развивают [ADR-097](097-group-media-trusted-authorization-contract.md); scope и проверки — [Identity README](../../services/aero-identity/README.md). Source event persistence не означает media teardown; private authorization/delivery остаются отдельными этапами.
+
 ## Контекст
 
 После завершения Foundation phase проекту нужен следующий изолированный slice:

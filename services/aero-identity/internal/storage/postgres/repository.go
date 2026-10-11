@@ -229,20 +229,22 @@ func (r *Repository) GetSessionAuthByID(ctx context.Context, sessionID string) (
 			UpdatedAt:                timestampPointer(row.UserUpdatedAt),
 		},
 		Device: identity.Device{
-			ID:         row.DeviceID.String(),
-			UserID:     row.DeviceUserID.String(),
-			Label:      row.DeviceLabel,
-			CreatedAt:  timestampPointer(row.DeviceCreatedAt),
-			LastSeenAt: timestampPointer(row.DeviceLastSeenAt),
-			RevokedAt:  timestamptzPointer(row.DeviceRevokedAt),
+			ID:                row.DeviceID.String(),
+			UserID:            row.DeviceUserID.String(),
+			Label:             row.DeviceLabel,
+			CreatedAt:         timestampPointer(row.DeviceCreatedAt),
+			LastSeenAt:        timestampPointer(row.DeviceLastSeenAt),
+			RevokedAt:         timestamptzPointer(row.DeviceRevokedAt),
+			AuthorityRevision: row.DeviceAuthorityRevision,
 		},
 		Session: identity.Session{
-			ID:         row.SessionID.String(),
-			UserID:     row.SessionUserID.String(),
-			DeviceID:   row.SessionDeviceID.String(),
-			CreatedAt:  timestampPointer(row.SessionCreatedAt),
-			LastSeenAt: timestampPointer(row.SessionLastSeenAt),
-			RevokedAt:  timestamptzPointer(row.SessionRevokedAt),
+			ID:                row.SessionID.String(),
+			UserID:            row.SessionUserID.String(),
+			DeviceID:          row.SessionDeviceID.String(),
+			CreatedAt:         timestampPointer(row.SessionCreatedAt),
+			LastSeenAt:        timestampPointer(row.SessionLastSeenAt),
+			RevokedAt:         timestamptzPointer(row.SessionRevokedAt),
+			AuthorityRevision: row.SessionAuthorityRevision,
 		},
 		TokenHash: row.TokenHash,
 	}, nil
@@ -292,7 +294,13 @@ func (r *Repository) UpdateUserProfile(ctx context.Context, user identity.User) 
 }
 
 func (r *Repository) RevokeSession(ctx context.Context, userID string, sessionID string, at time.Time) (bool, error) {
-	affected, err := r.queries.RevokeSession(ctx, identitysqlc.RevokeSessionParams{
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := r.queries.WithTx(tx)
+	row, err := q.RevokeSession(ctx, identitysqlc.RevokeSessionParams{
 		ID:     mustParseUUID(sessionID),
 		UserID: mustParseUUID(userID),
 		RevokedAt: pgtype.Timestamptz{
@@ -300,11 +308,24 @@ func (r *Repository) RevokeSession(ctx context.Context, userID string, sessionID
 			Valid: true,
 		},
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
 	if err != nil {
 		return false, convertError(err)
 	}
-
-	return affected > 0, nil
+	if err := q.CreateAuthorityRevocationEvent(ctx, identitysqlc.CreateAuthorityRevocationEventParams{
+		ID: uuid.New(), SubjectKind: "session", SubjectID: row.ID,
+		UserID: row.UserID, DeviceID: row.DeviceID,
+		SessionID:      pgtype.UUID{Bytes: row.ID, Valid: true},
+		SourceRevision: row.AuthorityRevision, OccurredAt: timestampValue(at), Reason: "session_revoked",
+	}); err != nil {
+		return false, convertError(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("commit tx: %w", err)
+	}
+	return true, nil
 }
 
 func (r *Repository) RevokeDevice(ctx context.Context, userID string, deviceID string, at time.Time) (bool, error) {
@@ -319,22 +340,29 @@ func (r *Repository) RevokeDevice(ctx context.Context, userID string, deviceID s
 	q := r.queries.WithTx(tx)
 	revokedAt := pgtype.Timestamptz{Time: at, Valid: true}
 
-	affected, err := q.RevokeDevice(ctx, identitysqlc.RevokeDeviceParams{
+	row, err := q.RevokeDevice(ctx, identitysqlc.RevokeDeviceParams{
 		ID:        mustParseUUID(deviceID),
 		UserID:    mustParseUUID(userID),
 		RevokedAt: revokedAt,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
 	if err != nil {
 		return false, convertError(err)
-	}
-	if affected == 0 {
-		return false, nil
 	}
 
 	if err := q.RevokeDeviceSessions(ctx, identitysqlc.RevokeDeviceSessionsParams{
 		DeviceID:  mustParseUUID(deviceID),
 		UserID:    mustParseUUID(userID),
 		RevokedAt: revokedAt,
+	}); err != nil {
+		return false, convertError(err)
+	}
+	if err := q.CreateAuthorityRevocationEvent(ctx, identitysqlc.CreateAuthorityRevocationEventParams{
+		ID: uuid.New(), SubjectKind: "device", SubjectID: row.ID,
+		UserID: row.UserID, DeviceID: row.ID,
+		SourceRevision: row.AuthorityRevision, OccurredAt: timestampValue(at), Reason: "device_revoked",
 	}); err != nil {
 		return false, convertError(err)
 	}
@@ -684,23 +712,25 @@ func toDomainWebPushSubscription(row identitysqlc.WebPushSubscription) identity.
 
 func toDomainDevice(row identitysqlc.UserDevice) identity.Device {
 	return identity.Device{
-		ID:         row.ID.String(),
-		UserID:     row.UserID.String(),
-		Label:      row.Label,
-		CreatedAt:  timestampPointer(row.CreatedAt),
-		LastSeenAt: timestampPointer(row.LastSeenAt),
-		RevokedAt:  timestamptzPointer(row.RevokedAt),
+		ID:                row.ID.String(),
+		UserID:            row.UserID.String(),
+		Label:             row.Label,
+		CreatedAt:         timestampPointer(row.CreatedAt),
+		LastSeenAt:        timestampPointer(row.LastSeenAt),
+		RevokedAt:         timestamptzPointer(row.RevokedAt),
+		AuthorityRevision: row.AuthorityRevision,
 	}
 }
 
 func toDomainSession(row identitysqlc.UserSession) identity.Session {
 	return identity.Session{
-		ID:         row.ID.String(),
-		UserID:     row.UserID.String(),
-		DeviceID:   row.DeviceID.String(),
-		CreatedAt:  timestampPointer(row.CreatedAt),
-		LastSeenAt: timestampPointer(row.LastSeenAt),
-		RevokedAt:  timestamptzPointer(row.RevokedAt),
+		ID:                row.ID.String(),
+		UserID:            row.UserID.String(),
+		DeviceID:          row.DeviceID.String(),
+		CreatedAt:         timestampPointer(row.CreatedAt),
+		LastSeenAt:        timestampPointer(row.LastSeenAt),
+		RevokedAt:         timestamptzPointer(row.RevokedAt),
+		AuthorityRevision: row.AuthorityRevision,
 	}
 }
 

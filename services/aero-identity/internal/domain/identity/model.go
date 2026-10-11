@@ -29,21 +29,23 @@ type User struct {
 }
 
 type Device struct {
-	ID         string
-	UserID     string
-	Label      string
-	CreatedAt  time.Time
-	LastSeenAt time.Time
-	RevokedAt  *time.Time
+	ID                string
+	UserID            string
+	Label             string
+	CreatedAt         time.Time
+	LastSeenAt        time.Time
+	RevokedAt         *time.Time
+	AuthorityRevision int64
 }
 
 type Session struct {
-	ID         string
-	UserID     string
-	DeviceID   string
-	CreatedAt  time.Time
-	LastSeenAt time.Time
-	RevokedAt  *time.Time
+	ID                string
+	UserID            string
+	DeviceID          string
+	CreatedAt         time.Time
+	LastSeenAt        time.Time
+	RevokedAt         *time.Time
+	AuthorityRevision int64
 }
 
 type DeviceWithSessions struct {
