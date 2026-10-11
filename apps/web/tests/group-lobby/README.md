@@ -1,6 +1,6 @@
 # Group lobby heartbeat regression
 
-Browser fixture запускает production hook/ownership selector на настоящем React с ускоренными browser clock и fake RTC RPC. Она проверяет 20s cadence, observer/reader/hidden/leave/unmount gating и ноль capture/peer/audio element. Полный GroupsPage/AuthProvider и реальное audio/network она не поднимает.
+Browser fixture запускает production hook/ownership selector на настоящем React с ускоренными browser clock и fake RTC RPC. Она без изменения извлекает Start/Join/Leave/End handlers и ownership lifecycle effect из `GroupsPage`; успешные Start/Join запускают 20s cadence, явный Leave прекращает её. Deferred Start/Join после scope/unmount не записывает ownership и не отправляет Touch. Также проверяются observer/reader/hidden/unmount gating и ноль capture/peer/audio element. Полный GroupsPage/AuthProvider и реальное audio/network она не поднимает.
 
 После frozen pnpm install задать `PLAYWRIGHT_MODULE` (абсолютный ESM путь к внешнему Playwright) и `CHROMIUM_EXECUTABLE`. Запуск из repository root:
 
