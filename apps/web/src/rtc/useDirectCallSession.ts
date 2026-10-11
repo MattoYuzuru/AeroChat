@@ -78,6 +78,8 @@ export interface DirectCallSession {
   canJoin: boolean;
   canLeave: boolean;
   canEnd: boolean;
+  canToggleMicrophone: boolean;
+  isMicrophoneMuted: boolean;
   isLocallyJoined: boolean;
   isDirectChatSupported: boolean;
   dismissError(): void;
@@ -86,6 +88,7 @@ export interface DirectCallSession {
   joinCall(): Promise<void>;
   leaveCall(): Promise<void>;
   endCall(): Promise<void>;
+  toggleMicrophone(): void;
 }
 
 export function useDirectCallSession(
@@ -108,6 +111,8 @@ export function useDirectCallSession(
     createInitialDirectCallState,
   );
   const [remoteAudioStream, setRemoteAudioStream] = useState<MediaStream | null>(null);
+  const [isMicrophoneMuted, setIsMicrophoneMuted] = useState(false);
+  const microphoneMutedRef = useRef(false);
   const stateRef = useRef(state);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -225,6 +230,11 @@ export function useDirectCallSession(
     });
   }, [clearDisconnectRecoveryTimer]);
 
+  const resetMicrophoneMute = useCallback(() => {
+    microphoneMutedRef.current = false;
+    setIsMicrophoneMuted(false);
+  }, []);
+
   const disposeLocalRuntime = useCallback(() => {
     runtimeGenerationRef.current += 1;
     if (pendingJoinGenerationRef.current !== null) {
@@ -239,13 +249,14 @@ export function useDirectCallSession(
       remoteStream: remoteStreamRef.current,
     });
     localStreamRef.current = null;
+    resetMicrophoneMute();
     localJoinedCallIdRef.current = null;
     peerConnectionRef.current = null;
     remoteStreamRef.current = null;
     pendingRemoteICECandidatesRef.current = [];
     setRemoteAudioStream(null);
     dispatch({ type: "local_left" });
-  }, [clearDisconnectRecoveryTimer, clearPeerRecoveryPlan]);
+  }, [clearDisconnectRecoveryTimer, clearPeerRecoveryPlan, resetMicrophoneMute]);
 
   const scheduleDisconnectedPeerRecovery = useCallback(
     (peerConnection: RTCPeerConnection) => {
@@ -352,6 +363,7 @@ export function useDirectCallSession(
       }
 
       stream.getAudioTracks().forEach((track) => {
+        track.enabled = !microphoneMutedRef.current;
         applyDirectCallTrackContentHint(track);
       });
       localStreamRef.current = stream;
@@ -918,6 +930,7 @@ export function useDirectCallSession(
           remoteStream: remoteStreamRef.current,
         });
         localStreamRef.current = null;
+        resetMicrophoneMute();
         localJoinedCallIdRef.current = null;
         peerConnectionRef.current = null;
         remoteStreamRef.current = null;
@@ -1007,6 +1020,7 @@ export function useDirectCallSession(
           remoteStream: remoteStreamRef.current,
         });
         localStreamRef.current = null;
+        resetMicrophoneMute();
         localJoinedCallIdRef.current = null;
         peerConnectionRef.current = null;
         remoteStreamRef.current = null;
@@ -1067,6 +1081,34 @@ export function useDirectCallSession(
     dispatch({ type: "clear_error" });
   }
 
+  function toggleMicrophone() {
+    const currentCall = stateRef.current.call;
+    if (
+      !sessionActiveRef.current ||
+      !enabled ||
+      currentCall === null ||
+      localJoinedCallIdRef.current !== currentCall.id ||
+      stateRef.current.actionState !== "idle" ||
+      stateRef.current.mediaState !== "ready"
+    ) {
+      return;
+    }
+
+    const tracks = localStreamRef.current?.getAudioTracks().filter(
+      (track) => track.readyState === "live",
+    ) ?? [];
+    if (tracks.length === 0) {
+      return;
+    }
+
+    const muted = !microphoneMutedRef.current;
+    microphoneMutedRef.current = muted;
+    for (const track of tracks) {
+      track.enabled = !muted;
+    }
+    setIsMicrophoneMuted(muted);
+  }
+
   const retryRemoteAudioPlayback = useCallback(async (audioElement: HTMLAudioElement | null) => {
     const stream = audioElement?.srcObject;
     if (audioElement === null || stream == null) {
@@ -1112,6 +1154,7 @@ export function useDirectCallSession(
     };
   }, [
     activeChatID,
+    currentUserId,
     disposeLocalRuntime,
     enabled,
     isDirectChatSupported,
@@ -1342,6 +1385,9 @@ export function useDirectCallSession(
     remoteAudioStream,
     selfParticipant,
     remoteParticipant,
+    canToggleMicrophone:
+      enabled && isLocallyJoined && state.mediaState === "ready" && state.actionState === "idle",
+    isMicrophoneMuted,
     canStart:
       isDirectChatSupported &&
       state.call === null &&
@@ -1371,6 +1417,7 @@ export function useDirectCallSession(
     joinCall,
     leaveCall,
     endCall,
+    toggleMicrophone,
   };
 }
 

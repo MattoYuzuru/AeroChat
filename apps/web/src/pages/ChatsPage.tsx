@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { DirectCallMicrophoneButton } from "../rtc/DirectCallMicrophoneButton";
 import {
   normalizeComposerMessageText,
 } from "../attachments/message-content";
@@ -2023,6 +2024,10 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                               </p>
 
                               <div className={styles.callActions}>
+                                <DirectCallMicrophoneButton
+                                  session={directCall}
+                                  className={styles.secondaryButton}
+                                />
                                 {directCall.canJoin && (
                                   <button
                                     className={styles.primaryButton}

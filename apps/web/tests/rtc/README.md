@@ -1,5 +1,12 @@
 # Browser regression для direct RTC
 
+`mute.mjs` исполняет production hook и `DirectCallMicrophoneButton`: microphone
+mute/unmute, быстрые toggles, отсутствие второго capture/peer, сохранение mute
+после peer recovery, guard до join/во время capture/для ended track и reset после
+leave/end/chat/account/unmount. Capture/PC/RPC синтетические; hardware silence,
+NAT/TURN и акустическое качество не доказаны. Запуск через тот же heavy runner:
+`node apps/web/tests/rtc/mute.mjs` с внешними Playwright/Chromium paths.
+
 `recovery.mjs` проверяет сохранение retry после delayed ICE/duplicate answer/malformed payload, отмену после connected negotiation, изоляцию old peer event и late candidate completion от новой ICE queue, exhausted budget с явным return и pending configuration после смены scope. Используется production hook с fake PC/RPC/media; реальный ICE progress/network не доказан.
 
 `playback.mjs` запускает production `useDirectCallSession` на настоящем React и извлекает без изменения playback effect из `ChatsPage`. Audio element, capture, peer connection и RPC заменены ограниченными fixtures: тест проверяет lifecycle управления playback, но не акустику, microphone permissions, NAT/TURN или WAN.
