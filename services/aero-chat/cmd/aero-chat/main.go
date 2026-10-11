@@ -163,7 +163,10 @@ func run() error {
 				return err
 			}
 
-			return typingStore.Ping(ctx)
+			if err := typingStore.Ping(ctx); err != nil {
+				return err
+			}
+			return objectStorage.ReadinessCheck(ctx)
 		},
 		handler,
 	)
