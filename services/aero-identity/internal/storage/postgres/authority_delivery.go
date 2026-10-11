@@ -42,7 +42,7 @@ func (r *DeliveryRepository) Claim(ctx context.Context, owner uuid.UUID) (*deliv
 	if row.SessionID.Valid {
 		session = uuid.UUID(row.SessionID.Bytes)
 	}
-	return &delivery.Claim{Event: delivery.Event{ID: uuid.UUID(row.EventID.Bytes), SubjectID: uuid.UUID(row.SubjectID.Bytes), UserID: uuid.UUID(row.UserID.Bytes), DeviceID: uuid.UUID(row.DeviceID.Bytes), SessionID: session, Kind: row.SubjectKind, Revision: row.SourceRevision}, Owner: owner, Fence: row.ClaimFence, Attempt: row.Attempt}, nil
+	return &delivery.Claim{Event: delivery.Event{ID: row.EventID, SubjectID: row.SubjectID, UserID: row.UserID, DeviceID: row.DeviceID, SessionID: session, Kind: row.SubjectKind, Revision: row.SourceRevision}, Owner: owner, Fence: row.ClaimFence, Attempt: row.Attempt}, nil
 }
 func (r *DeliveryRepository) HasExhausted(ctx context.Context) (bool, error) {
 	result, err := r.queries.HasExhaustedAuthorityDelivery(ctx)
@@ -61,20 +61,20 @@ func (r *DeliveryRepository) Complete(ctx context.Context, c delivery.Claim, rec
 	if !receipt.ValidFor(c.Event) {
 		return delivery.ErrUnavailable
 	}
-	changed, err := r.queries.CompleteAuthorityDelivery(ctx, identitysqlc.CompleteAuthorityDeliveryParams{EventID: deliveryUUID(c.Event.ID), OwnerID: deliveryUUID(c.Owner), Fence: c.Fence, OperationID: deliveryUUID(receipt.OperationID), MediaEffect: pgtype.Text{String: receipt.Effect, Valid: true}, GrantCount: pgtype.Int8{Int64: receipt.Count, Valid: true}})
+	changed, err := r.queries.CompleteAuthorityDelivery(ctx, identitysqlc.CompleteAuthorityDeliveryParams{EventID: c.Event.ID, OwnerID: deliveryUUID(c.Owner), Fence: c.Fence, OperationID: deliveryUUID(receipt.OperationID), MediaEffect: pgtype.Text{String: receipt.Effect, Valid: true}, GrantCount: pgtype.Int8{Int64: receipt.Count, Valid: true}})
 	return changedDelivery(ctx, changed, err)
 }
 func (r *DeliveryRepository) Quarantine(ctx context.Context, c delivery.Claim, reason string) error {
 	if reason != "canonical_conflict" && reason != "source_row_invalid" {
 		return delivery.ErrUnavailable
 	}
-	changed, err := r.queries.QuarantineAuthorityDelivery(ctx, identitysqlc.QuarantineAuthorityDeliveryParams{EventID: deliveryUUID(c.Event.ID), OwnerID: deliveryUUID(c.Owner), Fence: c.Fence, Reason: pgtype.Text{String: reason, Valid: true}})
+	changed, err := r.queries.QuarantineAuthorityDelivery(ctx, identitysqlc.QuarantineAuthorityDeliveryParams{EventID: c.Event.ID, OwnerID: deliveryUUID(c.Owner), Fence: c.Fence, Reason: pgtype.Text{String: reason, Valid: true}})
 	return changedDelivery(ctx, changed, err)
 }
 func (r *DeliveryRepository) Retry(ctx context.Context, c delivery.Claim, seconds int32) error {
 	if seconds < 1 || seconds > 30 {
 		return delivery.ErrUnavailable
 	}
-	changed, err := r.queries.RetryAuthorityDelivery(ctx, identitysqlc.RetryAuthorityDeliveryParams{EventID: deliveryUUID(c.Event.ID), OwnerID: deliveryUUID(c.Owner), Fence: c.Fence, RetrySeconds: float64(seconds)})
+	changed, err := r.queries.RetryAuthorityDelivery(ctx, identitysqlc.RetryAuthorityDeliveryParams{EventID: c.Event.ID, OwnerID: deliveryUUID(c.Owner), Fence: c.Fence, RetrySeconds: float64(seconds)})
 	return changedDelivery(ctx, changed, err)
 }
