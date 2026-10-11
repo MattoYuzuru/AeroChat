@@ -11,7 +11,7 @@ permissions:
 jobs:
   cold-source-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
@@ -19,9 +19,35 @@ jobs:
       - name: Validate local and server storage models
         run: |
           python3 -B infra/storage/test_maintenance.py
+          python3 -B infra/scripts/test_go_vuln.py
+          python3 -B infra/storage/test_vulnerabilities.py
           python3 -B infra/storage/verify-maintenance.py
           docker compose --env-file .env.example -f infra/compose/docker-compose.yml config --quiet
           docker compose --env-file .env.server.example --env-file .env.server.secrets.example -f infra/compose/docker-compose.server.yml config --quiet
+
+      - name: Set up maintained Go compiler
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: false
+
+      - name: Install pinned source scanner
+        run: |
+          scanner_version="$(python3 -B infra/scripts/go_lifecycle.py get govulncheck_version)"
+          GOBIN="$RUNNER_TEMP/storage-tools" go install "golang.org/x/vuln/cmd/govulncheck@v$scanner_version"
+
+      - name: Check both storage source closures before build
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: python3 -B infra/storage/check-vulnerabilities.py --source-sha "$EXPECTED_SOURCE_SHA" --scanner "$RUNNER_TEMP/storage-tools/govulncheck" --output-dir "$RUNNER_TEMP/storage-vuln" --goarch amd64
+
+      - name: Preserve source scan diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: storage-source-scan-${{ github.sha }}
+          path: ${{ runner.temp }}/storage-vuln
+          if-no-files-found: warn
 
       - name: Build pinned storage sources without restored cache
         run: |
