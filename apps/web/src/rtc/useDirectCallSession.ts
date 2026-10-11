@@ -517,7 +517,6 @@ export function useDirectCallSession(
     currentUserId,
     describeError,
     disposeLocalRuntime,
-    resetPeerRuntime,
     scheduleDisconnectedPeerRecovery,
     sendRTCSignal,
   ]);
