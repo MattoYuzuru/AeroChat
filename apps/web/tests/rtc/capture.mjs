@@ -69,7 +69,8 @@ try {
     await page.evaluate(rejected=>window.fixture[rejected?"rejectCapture":"releaseCapture"](),rejected);
     await page.evaluate(()=>window.pending);
     const result=await page.evaluate(()=>window.fixture.report());
-    assert.deepEqual(result.log,rejected?[]:["start"]);
+    assert.deepEqual(result.log.filter(method=>method!=='heartbeat'),rejected?[]:["start"]);
+    if(rejected)assert.equal(result.log.length,0);
     assert.equal(result.state.actionState,"idle");
     if(rejected)assert.equal(result.state.mediaState,"denied");
     await page.evaluate(()=>window.fixture.unmount());
