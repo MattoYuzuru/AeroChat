@@ -1,0 +1,37 @@
+{
+  "compilerImage": "golang:1.27.2-alpine3.24@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d",
+  "components": {
+    "mc": {
+      "effectiveGoFloor": "1.26.0",
+      "effectiveModuleHashes": {
+        "go.mod": "7c2e4d03e4ea5b2f8f65d67fc6b556b48861d0fe19f813fbf8d5720f6ec72922",
+        "go.sum": "3215c3d1b3f09a8a9c639a7a044bcff0afd4ba132928e9e791248028920612a3"
+      },
+      "moduleScope": "upstream sources unchanged; dependency-only overlay",
+      "upstream": {
+        "archiveSha256": "95cd293c7119f16921a6dc515a1fb74a2227f19fd994b9c8b770a154e802ac44",
+        "commit": "7394ce0dd2a80935aded936b09fa12cbb3cb8096",
+        "go.mod": "76dbbad8795627d32a7d1a271d0b6a16a6bd4c0956262467a3b54d36ae67d622",
+        "go.sum": "1592c97fca12c8ccb99f3bf1a3dc3627f4449e3b29ae78c3ff84e33e2acc8bf9"
+      }
+    },
+    "minio": {
+      "effectiveGoFloor": "1.26.0",
+      "effectiveModuleHashes": {
+        "go.mod": "00d36caf8bc6cbb360d90ec5675b926f78bc90889bd9c7295052e23d7ccef6f2",
+        "go.sum": "95b9ad298d6a068dcfdfc0363dd9e15741df63675df626c5e379fab4d5510384"
+      },
+      "moduleScope": "upstream sources unchanged; dependency-only overlay",
+      "upstream": {
+        "archiveSha256": "f31b6997fdb098479ddddfca1267f02518ee0b59cc1d3f9682c3a48e6309f4d0",
+        "commit": "7ced9663e6a791fef9dc6be798ff24cda9c730ac",
+        "go.mod": "1092c21cbe753941b16da2943be699d1517e70ebdd4da6d5c994ca27a85ba430",
+        "go.sum": "bd2c712debe48fa4406c87180609266fb92130fd0120797a29bda477a242f252"
+      }
+    }
+  },
+  "goVersion": "1.27.2",
+  "govulncheckVersion": "1.7.0",
+  "schemaVersion": 1,
+  "scope": "Dependency-only maintenance; upstream service/provider/auth/crypto source unchanged"
+}

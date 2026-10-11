@@ -28,7 +28,7 @@ services:
       retries: 5
 
   minio:
-    image: aerochat-minio:7ced9663
+    image: aerochat-minio:7ced9663-maintenance-aef344f71359
     pull_policy: build
     build:
       context: ../..
@@ -52,7 +52,7 @@ services:
       - "${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}:9000"
 
   minio-bootstrap:
-    image: aerochat-mc:7394ce0d
+    image: aerochat-mc:7394ce0d-maintenance-aef344f71359
     pull_policy: build
     build:
       context: ../..

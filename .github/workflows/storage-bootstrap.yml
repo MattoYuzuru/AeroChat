@@ -18,13 +18,15 @@ jobs:
 
       - name: Validate local and server storage models
         run: |
+          python3 -B infra/storage/test_maintenance.py
+          python3 -B infra/storage/verify-maintenance.py
           docker compose --env-file .env.example -f infra/compose/docker-compose.yml config --quiet
           docker compose --env-file .env.server.example --env-file .env.server.secrets.example -f infra/compose/docker-compose.server.yml config --quiet
 
       - name: Build pinned storage sources without restored cache
         run: |
           docker compose --env-file .env.example -f infra/compose/docker-compose.yml build --pull --no-cache minio minio-bootstrap
-          docker image inspect aerochat-minio:7ced9663 aerochat-mc:7394ce0d --format '{{.Id}} {{json .Config.Labels}}'
+          docker image inspect aerochat-minio:7ced9663-maintenance-aef344f71359 aerochat-mc:7394ce0d-maintenance-aef344f71359 --format '{{.Id}} {{json .Config.Labels}}'
 
       - name: Bootstrap PostgreSQL and private S3 bucket
         run: |
@@ -40,8 +42,10 @@ jobs:
         if: success()
         run: |
           mkdir -p /tmp/storage-provenance
-          docker image inspect aerochat-minio:7ced9663 aerochat-mc:7394ce0d > /tmp/storage-provenance/images.json
+          docker image inspect aerochat-minio:7ced9663-maintenance-aef344f71359 aerochat-mc:7394ce0d-maintenance-aef344f71359 > /tmp/storage-provenance/images.json
           cp infra/storage/Dockerfile /tmp/storage-provenance/Dockerfile
+          cp infra/storage/maintenance.json /tmp/storage-provenance/maintenance.json
+          cp -R infra/storage/deps /tmp/storage-provenance/deps
           printf '%s\n' "$GITHUB_SHA" > /tmp/storage-provenance/source-head
 
       - name: Upload storage provenance
