@@ -109,6 +109,9 @@ export function useDirectCallSession(
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const localJoinedCallIdRef = useRef<string | null>(null);
+  const runtimeGenerationRef = useRef(0);
+  const pendingJoinGenerationRef = useRef<number | null>(null);
+  const sessionActiveRef = useRef(false);
   const peerRecoveryHandlerRef = useRef<(reason: "disconnected" | "failed") => boolean>(
     () => false,
   );
@@ -214,6 +217,11 @@ export function useDirectCallSession(
   }, [clearDisconnectRecoveryTimer]);
 
   const disposeLocalRuntime = useCallback(() => {
+    runtimeGenerationRef.current += 1;
+    if (pendingJoinGenerationRef.current !== null) {
+      pendingJoinGenerationRef.current = null;
+      dispatch({ type: "action_finished" });
+    }
     clearPeerRecoveryPlan();
     clearDisconnectRecoveryTimer();
     teardownDirectCallRuntime({
@@ -266,7 +274,7 @@ export function useDirectCallSession(
     return describeGatewayError(error, fallbackMessage);
   }, [onUnauthenticated]);
 
-  const ensureLocalAudioStream = useCallback(async (): Promise<MediaStream> => {
+  const ensureLocalAudioStream = useCallback(async (generation: number): Promise<MediaStream> => {
     if (localStreamRef.current !== null) {
       return localStreamRef.current;
     }
@@ -315,6 +323,10 @@ export function useDirectCallSession(
           navigator.mediaDevices.getSupportedConstraints?.() ?? {},
         ),
       });
+      if (runtimeGenerationRef.current !== generation) {
+        teardownDirectCallRuntime({ localStream: stream, peerConnection: null, remoteStream: null });
+        throw new Error("Запуск звонка отменён после смены локальной сессии.");
+      }
       if (stream.getAudioTracks().length === 0) {
         teardownDirectCallRuntime({
           localStream: stream,
@@ -337,6 +349,9 @@ export function useDirectCallSession(
       dispatch({ type: "media_ready" });
       return stream;
     } catch (error) {
+      if (runtimeGenerationRef.current !== generation) {
+        throw error;
+      }
       const mediaFailure = resolveMediaFailure(error);
       dispatch({
         type: "media_failed",
@@ -802,25 +817,43 @@ export function useDirectCallSession(
     };
   }, [schedulePeerRecovery]);
 
+  function compensateCancelledJoin(callId: string) {
+    void gatewayClient.leaveCall(token, callId).catch(() => {
+      sendRtcLeaveCallKeepalive(token, callId, directCallGatewayBaseUrl);
+    });
+  }
+
   async function startCall() {
-    if (!enabled || chat === null || !isDirectChatSupported) {
+    if (!sessionActiveRef.current || !enabled || chat === null || !isDirectChatSupported || pendingJoinGenerationRef.current !== null) {
       return;
     }
 
+    const generation = ++runtimeGenerationRef.current;
+    pendingJoinGenerationRef.current = generation;
     dispatch({ type: "action_started", actionState: "starting" });
 
     let localStream: MediaStream | null = null;
     try {
-      localStream = await ensureLocalAudioStream();
+      localStream = await ensureLocalAudioStream(generation);
       await refreshRTCConfiguration();
+      if (runtimeGenerationRef.current !== generation) {
+        return;
+      }
       const response = await gatewayClient.startCall(token, {
         kind: "direct",
         directChatId: chat.id,
       });
+      if (runtimeGenerationRef.current !== generation) {
+        compensateCancelledJoin(response.call.id);
+        return;
+      }
       dispatch({ type: "action_finished" });
       localStreamRef.current = localStream;
       await bootstrapJoinedCall(response.call, response.selfParticipant);
     } catch (error) {
+      if (runtimeGenerationRef.current !== generation) {
+        return;
+      }
       if (localStream !== null) {
         clearPeerRecoveryPlan();
         teardownDirectCallRuntime({
@@ -858,31 +891,49 @@ export function useDirectCallSession(
         type: "failure",
         message: describeError(error, "Не удалось начать аудиозвонок."),
       });
+    } finally {
+      if (pendingJoinGenerationRef.current === generation) {
+        pendingJoinGenerationRef.current = null;
+      }
     }
   }
 
   async function joinCall() {
     const currentCall = stateRef.current.call;
     if (
+      !sessionActiveRef.current ||
       !enabled ||
       chat === null ||
       currentCall === null ||
-      !isDirectChatSupported
+      !isDirectChatSupported ||
+      pendingJoinGenerationRef.current !== null
     ) {
       return;
     }
 
+    const generation = ++runtimeGenerationRef.current;
+    pendingJoinGenerationRef.current = generation;
     dispatch({ type: "action_started", actionState: "joining" });
 
     let localStream: MediaStream | null = null;
     try {
-      localStream = await ensureLocalAudioStream();
+      localStream = await ensureLocalAudioStream(generation);
       await refreshRTCConfiguration();
+      if (runtimeGenerationRef.current !== generation) {
+        return;
+      }
       const response = await gatewayClient.joinCall(token, currentCall.id);
+      if (runtimeGenerationRef.current !== generation) {
+        compensateCancelledJoin(response.call.id);
+        return;
+      }
       dispatch({ type: "action_finished" });
       localStreamRef.current = localStream;
       await bootstrapJoinedCall(response.call, response.selfParticipant);
     } catch (error) {
+      if (runtimeGenerationRef.current !== generation) {
+        return;
+      }
       if (localStream !== null) {
         clearPeerRecoveryPlan();
         teardownDirectCallRuntime({
@@ -911,6 +962,10 @@ export function useDirectCallSession(
         type: "failure",
         message: describeError(error, "Не удалось присоединиться к активному звонку."),
       });
+    } finally {
+      if (pendingJoinGenerationRef.current === generation) {
+        pendingJoinGenerationRef.current = null;
+      }
     }
   }
 
@@ -976,14 +1031,17 @@ export function useDirectCallSession(
 
   useEffect(() => {
     if (!enabled || activeChatID === null || !isDirectChatSupported) {
+      sessionActiveRef.current = false;
       dispatch({ type: "sync_succeeded", call: null, participants: [] });
       return;
     }
 
+    sessionActiveRef.current = true;
     dispatch({ type: "sync_started" });
     void runRefreshDirectChatCall(true);
 
     return () => {
+      sessionActiveRef.current = false;
       disposeLocalRuntime();
     };
   }, [
@@ -992,6 +1050,7 @@ export function useDirectCallSession(
     enabled,
     isDirectChatSupported,
     runRefreshDirectChatCall,
+    token,
   ]);
 
   useEffect(() => {

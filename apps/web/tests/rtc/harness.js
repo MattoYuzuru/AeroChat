@@ -2,14 +2,21 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {useDirectCallSession} from '../../src/rtc/useDirectCallSession';
 import {usePlayback} from 'virtual:playback';
-import {call, participants, log} from './gateway.js';
+import {call, participants, log, deferMutation, finishMutation} from './gateway.js';
 
-const observations = { stops: 0, plays: 0, pauses: 0, peers: [] };
+const observations = { stops: 0, captures: 0, plays: 0, pauses: 0, peers: [] };
 let blocked = false;
 const audio = {srcObject: null, pause(){observations.pauses++;}, play(){observations.plays++;if(observations.plays>3)return new Promise(()=>{});return blocked ? Promise.reject(new Error('blocked')) : Promise.resolve();}};
 const track = {stop:()=>observations.stops++, contentHint:'', kind:'audio'};
 const stream = () => ({getTracks:()=>[track], getAudioTracks:()=>[track]});
-Object.defineProperty(navigator, 'mediaDevices', {configurable:true, value:{getSupportedConstraints:()=>({}), getUserMedia:async()=>stream()}});
+let captureDeferred = false;
+let releaseCapture;
+let rejectCapture;
+Object.defineProperty(navigator, 'mediaDevices', {configurable:true, value:{getSupportedConstraints:()=>({}), getUserMedia:async()=>{
+  observations.captures++;
+  if (captureDeferred) return new Promise((resolve,reject)=>{releaseCapture=()=>resolve(stream());rejectCapture=reject;});
+  return stream();
+}}});
 class FakePeer extends EventTarget {
   connectionState = 'new'; iceConnectionState = 'new'; signalingState = 'stable'; remoteDescription = null;
   constructor(){super();observations.peers.push(this);}
@@ -32,6 +39,13 @@ function Harness(){
 window.fixture = {
   mount(){root=createRoot(document.getElementById('root'));root.render(React.createElement(Harness));},
   start(){return session.startCall();},
+  join(){return session.joinCall();},
+  deferCapture(){captureDeferred=true;},
+  releaseCapture(){releaseCapture();},
+  rejectCapture(){rejectCapture(new DOMException('denied','NotAllowedError'));},
+  deferMutation,
+  finishMutation,
+  changeScope(){opts.chat={id:'chat-2',kind:'direct'};opts.awarenessEntry=null;root.render(React.createElement(Harness));},
   emitTrack(){const event=new Event('track');Object.defineProperties(event,{streams:{value:[stream()]},track:{value:track}});observations.peers.at(-1).dispatchEvent(event);},
   unmount(){root.unmount();},
   sync(){opts.awarenessEntry={call, participants:[...participants], syncStatus:'ready',errorMessage:null};root.render(React.createElement(Harness));},
