@@ -94,6 +94,11 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     [windowLocation.search],
   );
   const [composerText, setComposerText] = useState("");
+  const [mobileWindowContentMode, setMobileWindowContentMode] = useState<"thread" | "info">(
+    "thread",
+  );
+  const directWindowContentMode =
+    desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
   const [composerError, setComposerError] = useState<string | null>(null);
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
   const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
@@ -116,7 +121,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const isThreadVisible = isThreadReadVisible({
     pageVisible: isPageVisible,
     windowVisible: desktopShellHost?.isCurrentWindowVisible ?? true,
-    timelineVisible: true,
+    timelineVisible: directWindowContentMode === "thread",
   });
   const sessionToken =
     authState.status === "authenticated" ? authState.token : "";
@@ -628,11 +633,6 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     selectedThread !== null
       ? getPeerParticipant(selectedThread.chat, currentUserId)
       : null;
-  const [mobileWindowContentMode, setMobileWindowContentMode] = useState<"thread" | "info">(
-    "thread",
-  );
-  const directWindowContentMode =
-    desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
   const isDesktopTargetWindow = desktopShellHost !== null && isThreadRouteActive;
   const people = usePeople({
     enabled:
