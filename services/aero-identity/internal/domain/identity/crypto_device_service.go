@@ -30,18 +30,10 @@ func (s *Service) RegisterFirstCryptoDevice(ctx context.Context, token string, i
 		return nil, err
 	}
 
-	totalCount, activeCount, _, err := s.repo.GetCryptoDeviceRegistryStatsByUserID(ctx, authSession.User.ID)
-	if err != nil {
-		return nil, err
-	}
-	if totalCount > 0 || activeCount > 0 {
-		return nil, fmt.Errorf("%w: first crypto device already exists or registry state is not empty", ErrConflict)
-	}
-
 	lastBundleVersion := int64(1)
 	lastBundlePublishedAt := now
 	activatedAt := now
-	device, currentBundle, err := s.repo.CreateCryptoDevice(ctx, CreateCryptoDeviceParams{
+	device, currentBundle, err := s.repo.CreateFirstCryptoDevice(ctx, CreateCryptoDeviceParams{
 		Device: CryptoDevice{
 			ID:                    s.newID(),
 			UserID:                authSession.User.ID,
