@@ -62,5 +62,33 @@ try {
   current = await page.evaluate(()=>window.fixture.report());
   assert.equal(current.attached,false);
   assert.equal(current.pauses,initial.pauses+2);
+  for(const cleanup of ['unmount','replacement']){
+    for(const rejectResult of [false,true]){
+      await page.goto(server.resolvedUrls.local[0]);
+      await page.waitForFunction(()=>window.fixture);
+      await page.evaluate(()=>window.fixture.mount());
+      await page.waitForFunction(()=>window.fixture.report().state.syncStatus==='ready');
+      await page.evaluate(()=>window.fixture.start());
+      await page.evaluate(()=>window.fixture.sync());
+      await page.waitForTimeout(25);
+      await page.evaluate(()=>{window.fixture.deferPlayback();window.fixture.emitTrack();});
+      await page.waitForFunction(()=>window.fixture.report().plays===1);
+      if(cleanup==='unmount')await page.evaluate(()=>window.fixture.unmount());
+      else {
+        await page.evaluate(()=>window.fixture.emitTrack());
+        await page.waitForFunction(()=>window.fixture.report().plays===2);
+      }
+      await page.waitForTimeout(25);
+      const beforeCompletion=await page.evaluate(()=>window.fixture.report());
+      await page.evaluate(rejectResult=>window.fixture.completePlayback(rejectResult),rejectResult);
+      await page.waitForTimeout(25);
+      const afterCompletion=await page.evaluate(()=>window.fixture.report());
+      assert.equal(afterCompletion.state.remoteAudioState,beforeCompletion.state.remoteAudioState);
+      assert.equal(afterCompletion.attached,cleanup==='replacement');
+      assert.equal(afterCompletion.plays,beforeCompletion.plays);
+      assert.equal(afterCompletion.pauses,beforeCompletion.pauses);
+      if(cleanup==='replacement')await page.evaluate(()=>window.fixture.unmount());
+    }
+  }
   console.log(JSON.stringify({browser:await browser.version(),plays:current.plays,pauses:current.pauses,scope:'Actual React hook and exact ChatsPage playback effect; fake audio/PC/RPC; no real media/network evidence'}));
 } finally {await browser.close();await server.close();}

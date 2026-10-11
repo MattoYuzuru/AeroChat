@@ -6,7 +6,9 @@ import {call, participants, log} from './gateway.js';
 
 const observations = { stops: 0, plays: 0, pauses: 0, peers: [] };
 let blocked = false;
-const audio = {srcObject: null, pause(){observations.pauses++;}, play(){observations.plays++;if(observations.plays>3)return new Promise(()=>{});return blocked ? Promise.reject(new Error('blocked')) : Promise.resolve();}};
+let deferPlayback = false;
+let completePlayback;
+const audio = {srcObject: null, pause(){observations.pauses++;}, play(){observations.plays++;if(deferPlayback){deferPlayback=false;return new Promise((resolve,reject)=>{completePlayback=rejectResult=>rejectResult?reject(new Error('blocked')):resolve();});}if(observations.plays>3)return new Promise(()=>{});return blocked ? Promise.reject(new Error('blocked')) : Promise.resolve();}};
 const track = {stop:()=>observations.stops++, contentHint:'', kind:'audio'};
 const stream = () => ({getTracks:()=>[track], getAudioTracks:()=>[track]});
 Object.defineProperty(navigator, 'mediaDevices', {configurable:true, value:{getSupportedConstraints:()=>({}), getUserMedia:async()=>stream()}});
@@ -36,6 +38,8 @@ window.fixture = {
   unmount(){root.unmount();},
   sync(){opts.awarenessEntry={call, participants:[...participants], syncStatus:'ready',errorMessage:null};root.render(React.createElement(Harness));},
   block(value){blocked=value;},
+  deferPlayback(){deferPlayback=true;},
+  completePlayback(rejectResult){completePlayback(rejectResult);},
   retry(){return session.retryRemoteAudioPlayback(audio);},
   report(){return {...observations, peers:observations.peers.length, attached:audio.srcObject!==null, log, state:session?.state};},
 };
