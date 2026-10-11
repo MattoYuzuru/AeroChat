@@ -24,12 +24,12 @@ func TestPresignUsesInternalBucketRegionWithoutPublicRequests(t *testing.T) {
 					t.Errorf("unexpected internal request: %s %s", r.Method, r.URL.Path)
 				}
 				w.Header().Set("Content-Type", "application/xml")
-				fmt.Fprintf(w, "<LocationConstraint>%s</LocationConstraint>", region)
+				_, _ = fmt.Fprintf(w, "<LocationConstraint>%s</LocationConstraint>", region)
 			}))
 			defer internal.Close()
 			public := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				publicRequests.Add(1)
-				fmt.Fprint(w, "<LocationConstraint>us-west-2</LocationConstraint>")
+				_, _ = fmt.Fprint(w, "<LocationConstraint>us-west-2</LocationConstraint>")
 			}))
 			defer public.Close()
 			client, err := NewClient(internal.URL, false, public.URL, false, "fixture-access", "fixture-secret", "attachments")
@@ -78,10 +78,10 @@ func TestPresignRetriesInternalRegionAfterFailure(t *testing.T) {
 	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		if requests.Add(1) == 1 {
 			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprint(w, "<Error><Code>NoSuchBucket</Code><Message>fixture bucket missing</Message></Error>")
+			_, _ = fmt.Fprint(w, "<Error><Code>NoSuchBucket</Code><Message>fixture bucket missing</Message></Error>")
 			return
 		}
-		fmt.Fprint(w, "<LocationConstraint>eu-west-1</LocationConstraint>")
+		_, _ = fmt.Fprint(w, "<LocationConstraint>eu-west-1</LocationConstraint>")
 	}))
 	defer internal.Close()
 	client, err := NewClient(internal.URL, false, "https://media.example.invalid", true, "fixture-access", "fixture-secret", "attachments")
@@ -100,7 +100,7 @@ func TestPresignConcurrentRegionDiscovery(t *testing.T) {
 	var requests atomic.Int32
 	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requests.Add(1)
-		fmt.Fprint(w, "<LocationConstraint>eu-west-1</LocationConstraint>")
+		_, _ = fmt.Fprint(w, "<LocationConstraint>eu-west-1</LocationConstraint>")
 	}))
 	defer internal.Close()
 	client, err := NewClient(internal.URL, false, "https://media.example.invalid", true, "fixture-access", "fixture-secret", "attachments")
