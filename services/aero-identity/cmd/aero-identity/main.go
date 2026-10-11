@@ -103,10 +103,7 @@ func run() error {
 	}
 	httpHandler := app.NewHTTPHandler(logger, meta, repository.Ping, handler)
 
-	if err := observability.RunHTTPServer(ctx, logger, observability.HTTPServerConfig{
-		Address:         cfg.HTTPAddress,
-		ShutdownTimeout: cfg.ShutdownTimeout,
-	}, httpHandler); err != nil && !errors.Is(err, context.Canceled) {
+	if err := app.RunHTTPServers(ctx, logger, cfg, httpHandler, service); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 
