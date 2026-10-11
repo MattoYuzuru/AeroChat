@@ -94,7 +94,7 @@ try {
   assert.equal(current.canJoin,true,'explicit return remains available');
   const exhaustedPeers=current.peers;
   await page.evaluate(()=>window.fixture.sync());await page.waitForTimeout(50);
-  await page.evaluate(()=>window.fixture.signal("ice_candidate",cases[0][1]));
+  await page.evaluate(payload=>window.fixture.signal("ice_candidate",payload),cases[0][1]);
   await page.waitForTimeout(100);
   current=await page.evaluate(()=>window.fixture.report());
   assert.equal(current.peers,exhaustedPeers,"polling/signals cannot bypass exhausted budget");
