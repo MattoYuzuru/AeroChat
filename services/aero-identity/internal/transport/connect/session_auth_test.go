@@ -16,7 +16,7 @@ import (
 )
 
 func TestMalformedSessionCredentialsReturnUnauthenticated(t *testing.T) {
-	service := identity.NewService(postgres.NewRepository(nil), nil, libauth.NewSessionTokenManager(), nil)
+	service := identity.NewService(postgres.NewRepository(nil), nil, libauth.NewSessionTokenManager(), nil, nil)
 	_, handler := identityv1connect.NewIdentityServiceHandler(NewHandler("identity-fixture", "test", service))
 	server := httptest.NewServer(handler)
 	defer server.Close()

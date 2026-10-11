@@ -9,4 +9,5 @@ var (
 	ErrUnauthorized       = errors.New("unauthorized")
 	ErrNotFound           = errors.New("not found")
 	ErrConflict           = errors.New("conflict")
+	ErrResourceExhausted  = errors.New("password admission capacity exhausted")
 )

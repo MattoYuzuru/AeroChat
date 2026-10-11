@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	libnotifications "github.com/MattoYuzuru/AeroChat/libs/go/notifications"
@@ -18,10 +19,15 @@ type Config struct {
 	WebPushSubscriber        string
 	WebPushVAPIDPublicKey    string
 	WebPushVAPIDPrivateKey   string
+	PasswordHashConcurrency  int
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
 func LoadConfig(defaultHTTPAddress string) (Config, error) {
+	passwordConcurrency, err := strconv.Atoi(lookupString("AERO_AUTH_PASSWORD_CONCURRENCY", "2"))
+	if err != nil || passwordConcurrency < 1 || passwordConcurrency > 8 {
+		return Config{}, fmt.Errorf("переменная AERO_AUTH_PASSWORD_CONCURRENCY: требуется число от 1 до 8")
+	}
 	shutdownTimeout, err := lookupDuration("AERO_SHUTDOWN_TIMEOUT", 10*time.Second)
 	if err != nil {
 		return Config{}, err
@@ -40,6 +46,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		WebPushSubscriber:        lookupString("AERO_WEB_PUSH_SUBSCRIBER", ""),
 		WebPushVAPIDPublicKey:    lookupString("AERO_WEB_PUSH_VAPID_PUBLIC_KEY", ""),
 		WebPushVAPIDPrivateKey:   lookupString("AERO_WEB_PUSH_VAPID_PRIVATE_KEY", ""),
+		PasswordHashConcurrency:  passwordConcurrency,
 	}
 	if err := libnotifications.ValidateWebPushConfig(
 		cfg.WebPushSubscriber,

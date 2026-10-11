@@ -11,6 +11,7 @@ import (
 	commonv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/common/v1"
 	identityv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1"
 	identityv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1/identityv1connect"
+	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/admission"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/realtime"
 )
 
@@ -20,6 +21,7 @@ type IdentityHandler struct {
 	version     string
 	client      identityv1connect.IdentityServiceClient
 	realtimeHub *realtime.Hub
+	admission   *admission.Limiter
 }
 
 func NewIdentityHandler(
@@ -28,6 +30,7 @@ func NewIdentityHandler(
 	version string,
 	client identityv1connect.IdentityServiceClient,
 	realtimeHub *realtime.Hub,
+	authAdmission *admission.Limiter,
 ) *IdentityHandler {
 	return &IdentityHandler{
 		logger:      logger,
@@ -35,6 +38,7 @@ func NewIdentityHandler(
 		version:     version,
 		client:      client,
 		realtimeHub: realtimeHub,
+		admission:   authAdmission,
 	}
 }
 
@@ -48,10 +52,20 @@ func (h *IdentityHandler) Ping(context.Context, *connect.Request[identityv1.Ping
 }
 
 func (h *IdentityHandler) Register(ctx context.Context, req *connect.Request[identityv1.RegisterRequest]) (*connect.Response[identityv1.RegisterResponse], error) {
+	release, err := h.admission.Acquire(ctx, admission.Register, req.Peer().Addr, req.Header(), req.Msg.Login)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return forwardUnary(ctx, req, h.client.Register)
 }
 
 func (h *IdentityHandler) Login(ctx context.Context, req *connect.Request[identityv1.LoginRequest]) (*connect.Response[identityv1.LoginResponse], error) {
+	release, err := h.admission.Acquire(ctx, admission.Login, req.Peer().Addr, req.Header(), req.Msg.Login)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return forwardUnary(ctx, req, h.client.Login)
 }
 

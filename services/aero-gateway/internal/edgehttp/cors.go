@@ -36,6 +36,7 @@ func WrapCORS(next http.Handler, allowedOrigins []string) http.Handler {
 		headers := w.Header()
 		headers.Add("Vary", "Origin")
 		headers.Set("Access-Control-Allow-Origin", allowOrigin)
+		headers.Set("Access-Control-Expose-Headers", "Retry-After")
 
 		if isPreflight(r) {
 			headers.Add("Vary", "Access-Control-Request-Method")
