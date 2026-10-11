@@ -93,7 +93,7 @@ func (s *MediaStore) Get(ctx context.Context, id uuid.UUID) (media.Grant, error)
 }
 
 func (s *MediaStore) Reserve(ctx context.Context, r media.ReserveRequest) (media.Grant, error) {
-	if r.Authority.Validate() != nil || r.RequestID == uuid.Nil || r.CallID == uuid.Nil || r.At.IsZero() {
+	if r.Validate() != nil || r.RequestID == uuid.Nil || r.CallID == uuid.Nil || r.At.IsZero() {
 		return media.Grant{}, media.ErrDenied
 	}
 	tx, err := s.db.Begin(ctx)
@@ -363,11 +363,11 @@ func (s *MediaStore) CloseLease(ctx context.Context, lease media.Lease, at time.
 	if err != nil {
 		return mediaError(err)
 	}
-	if stored.GrantID != lease.GrantID || stored.OwnerID != lease.Owner.ID || stored.OwnerFence != lease.Owner.Fence {
+	if stored.GrantID != lease.GrantID || stored.OwnerID != lease.Owner.ID || stored.OwnerFence != lease.Fence {
 		return media.ErrDenied
 	}
 	if stored.State != "closed" {
-		if _, err := q.CloseMediaLease(ctx, ql.CloseMediaLeaseParams{ID: lease.ID, OwnerID: lease.Owner.ID, OwnerFence: lease.Owner.Fence, ClosedAt: timestamptzValue(at)}); err != nil {
+		if _, err := q.CloseMediaLease(ctx, ql.CloseMediaLeaseParams{ID: lease.ID, OwnerID: lease.Owner.ID, OwnerFence: lease.Fence, ClosedAt: timestamptzValue(at)}); err != nil {
 			return mediaError(err)
 		}
 	}

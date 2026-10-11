@@ -313,7 +313,7 @@ func TestMediaStoreLeaseCloseKeepsBudgetAndReplacesSafely(t *testing.T) {
 		t.Fatal("old close tore down replacement")
 	}
 	wrong := next
-	wrong.Owner.Fence++
+	wrong.Fence++
 	if err := s.CloseLease(ctx, wrong, time.Now()); !errors.Is(err, media.ErrDenied) {
 		t.Fatal("wrong owner fence closed lease")
 	}
