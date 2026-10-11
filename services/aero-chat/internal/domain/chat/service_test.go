@@ -1775,7 +1775,7 @@ func TestEditDirectChatMessageRejectsNonAuthorAndNonEditableMessages(t *testing.
 	if err != nil {
 		t.Fatalf("create direct attachment intent: %v", err)
 	}
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}
@@ -2299,6 +2299,7 @@ type fakeRepository struct {
 	objectStorage               *fakeObjectStorage
 	attachments                 map[string]Attachment
 	uploadSessions              map[string]AttachmentUploadSession
+	sourceCleanup               map[string]time.Time
 	directNotificationPrefs     map[string]bool
 	groupNotificationPrefs      map[string]bool
 	webPushSubscriptions        map[string]WebPushSubscription
@@ -2335,6 +2336,7 @@ func newFakeRepository() *fakeRepository {
 		objectStorage:               newFakeObjectStorage(),
 		attachments:                 make(map[string]Attachment),
 		uploadSessions:              make(map[string]AttachmentUploadSession),
+		sourceCleanup:               make(map[string]time.Time),
 		directNotificationPrefs:     make(map[string]bool),
 		groupNotificationPrefs:      make(map[string]bool),
 		webPushSubscriptions:        make(map[string]WebPushSubscription),
@@ -2870,16 +2872,18 @@ func (r *fakeRepository) CreateAttachmentUploadIntent(_ context.Context, params 
 		UpdatedAt:    params.CreatedAt,
 	}
 	uploadSession := AttachmentUploadSession{
-		ID:           params.UploadSessionID,
-		AttachmentID: params.AttachmentID,
-		OwnerUserID:  params.OwnerUserID,
-		Status:       AttachmentUploadSessionPending,
-		CreatedAt:    params.CreatedAt,
-		UpdatedAt:    params.CreatedAt,
-		ExpiresAt:    params.ExpiresAt,
+		ID:               params.UploadSessionID,
+		AttachmentID:     params.AttachmentID,
+		OwnerUserID:      params.OwnerUserID,
+		Status:           AttachmentUploadSessionPending,
+		StagingObjectKey: params.StagingObjectKey,
+		CreatedAt:        params.CreatedAt,
+		UpdatedAt:        params.CreatedAt,
+		ExpiresAt:        params.ExpiresAt,
 	}
 	r.attachments[attachment.ID] = attachment
 	r.uploadSessions[uploadSession.ID] = uploadSession
+	r.sourceCleanup[params.StagingObjectKey] = params.ExpiresAt.Add(5 * time.Minute)
 
 	return &AttachmentUploadIntent{
 		Attachment:    attachment,
@@ -4805,14 +4809,13 @@ func newFakeObjectStorage() *fakeObjectStorage {
 	}
 }
 
-func (s *fakeObjectStorage) CreateUpload(_ context.Context, objectKey string, mimeType string, expiresAt time.Time) (*PresignedObjectUpload, error) {
+func (s *fakeObjectStorage) CreateUpload(_ context.Context, objectKey string, mimeType string, size int64, expiresAt time.Time) (*PresignedObjectUpload, error) {
 	return &PresignedObjectUpload{
 		URL:        "http://example.invalid/" + objectKey,
-		HTTPMethod: "PUT",
-		Headers: map[string]string{
-			"Content-Type": mimeType,
-		},
-		ExpiresAt: expiresAt,
+		HTTPMethod: "POST",
+		FormFields: map[string]string{"key": objectKey, "Content-Type": mimeType, "policy": "fixture-policy"},
+		Headers:    map[string]string{},
+		ExpiresAt:  expiresAt,
 	}, nil
 }
 
@@ -4832,7 +4835,26 @@ func (s *fakeObjectStorage) StatObject(_ context.Context, objectKey string) (*St
 	if !ok {
 		return nil, ErrNotFound
 	}
+	if info.ETag == "" {
+		info.ETag = "fixture-etag"
+	}
 	return &info, nil
+}
+
+func (s *fakeObjectStorage) PromoteObject(_ context.Context, source, destination, etag, contentType string) error {
+	info, ok := s.objects[source]
+	if !ok {
+		return ErrNotFound
+	}
+	if info.ETag == "" {
+		info.ETag = "fixture-etag"
+	}
+	if info.ETag != etag {
+		return ErrConflict
+	}
+	info.ContentType = contentType
+	s.objects[destination] = info
+	return nil
 }
 
 func (s *fakeObjectStorage) DeleteObject(_ context.Context, objectKey string) error {

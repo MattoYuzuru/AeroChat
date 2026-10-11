@@ -190,6 +190,7 @@ export function useAttachmentComposer({
         uploadUrl: intent.uploadSession.uploadUrl,
         httpMethod: intent.uploadSession.httpMethod || "PUT",
         headers: intent.uploadSession.headers,
+        formFields: intent.uploadSession.formFields,
         signal: abortController.signal,
         onProgress(progress) {
           dispatch({

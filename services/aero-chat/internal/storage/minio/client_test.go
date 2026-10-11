@@ -37,7 +37,7 @@ func TestPresignUsesInternalBucketRegionWithoutPublicRequests(t *testing.T) {
 				t.Fatal(err)
 			}
 			expires := time.Now().Add(time.Minute)
-			upload, err := client.CreateUpload(context.Background(), "fixture.bin", "application/octet-stream", expires)
+			upload, err := client.CreateUpload(context.Background(), "fixture.bin", "application/octet-stream", 1, expires)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -48,7 +48,7 @@ func TestPresignUsesInternalBucketRegionWithoutPublicRequests(t *testing.T) {
 			if region == "" {
 				region = "us-east-1"
 			}
-			for _, raw := range []string{upload.URL, download.URL} {
+			for _, raw := range []string{download.URL} {
 				parsed, err := url.Parse(raw)
 				if err != nil {
 					t.Fatal(err)
@@ -60,7 +60,7 @@ func TestPresignUsesInternalBucketRegionWithoutPublicRequests(t *testing.T) {
 					t.Errorf("unexpected region in credential scope: %s", credential)
 				}
 			}
-			if upload.HTTPMethod != http.MethodPut || upload.Headers["Content-Type"] != "application/octet-stream" {
+			if upload.HTTPMethod != http.MethodPost || upload.FormFields["Content-Type"] != "application/octet-stream" || upload.Headers["Content-Type"] != "" {
 				t.Errorf("upload contract: method=%s headers=%v", upload.HTTPMethod, upload.Headers)
 			}
 			if got := publicRequests.Load(); got != 0 {
@@ -88,7 +88,7 @@ func TestPresignRetriesInternalRegionAfterFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if upload, err := client.CreateUpload(context.Background(), "fixture", "", time.Now().Add(time.Minute)); err == nil || upload != nil {
+	if upload, err := client.CreateUpload(context.Background(), "fixture", "application/octet-stream", 1, time.Now().Add(time.Minute)); err == nil || upload != nil {
 		t.Fatal("missing internal bucket must fail before issuing a URL")
 	}
 	if _, err := client.CreateDownload(context.Background(), "fixture", time.Now().Add(time.Minute)); err != nil {
@@ -133,7 +133,7 @@ func TestPresignCancelledAndExpired(t *testing.T) {
 	if _, err := client.CreateDownload(ctx, "fixture", time.Now().Add(time.Minute)); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled signing: %v", err)
 	}
-	if _, err := client.CreateUpload(context.Background(), "fixture", "", time.Now().Add(-time.Second)); err == nil {
+	if _, err := client.CreateUpload(context.Background(), "fixture", "application/octet-stream", 1, time.Now().Add(-time.Second)); err == nil {
 		t.Fatal("expired upload must fail before region discovery")
 	}
 }

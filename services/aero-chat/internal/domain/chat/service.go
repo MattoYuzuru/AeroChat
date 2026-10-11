@@ -36,14 +36,13 @@ type Repository interface {
 	DeleteWebPushSubscriptionsByIDs(context.Context, []string) (int64, error)
 	CreateAttachmentUploadIntent(context.Context, CreateAttachmentUploadIntentParams) (*AttachmentUploadIntent, error)
 	GetAttachment(context.Context, string) (*Attachment, *AttachmentUploadSession, error)
+	BeginAttachmentFinalization(context.Context, string) (AttachmentFinalization, error)
+	ListAttachmentSourceCleanup(context.Context, time.Time, int32) ([]string, error)
+	RescheduleAttachmentSourceCleanup(context.Context, string, time.Time) error
 	ListAttachments(context.Context, []string) ([]Attachment, error)
-	CompleteAttachmentUpload(context.Context, CompleteAttachmentUploadParams) (*Attachment, error)
-	FailAttachmentUpload(context.Context, FailAttachmentUploadParams) (*Attachment, error)
-	ExpireAttachmentUploadSession(context.Context, ExpireAttachmentUploadSessionParams) (bool, error)
 	ExpirePendingAttachmentUploadSessions(context.Context, time.Time, int32) (int64, error)
 	ExpireOrphanUploadedAttachments(context.Context, time.Time, time.Time, int32) (int64, error)
 	ListAttachmentObjectDeletionCandidates(context.Context, time.Time, time.Time, time.Time, int32) ([]AttachmentObjectCleanupCandidate, error)
-	MarkAttachmentDeleted(context.Context, string, time.Time) (bool, error)
 	CreateGroup(context.Context, CreateGroupParams) (*Group, error)
 	ListGroups(context.Context, string) ([]Group, error)
 	GetGroup(context.Context, string, string) (*Group, error)
@@ -144,9 +143,10 @@ type PresenceStateStore interface {
 }
 
 type ObjectStorage interface {
-	CreateUpload(context.Context, string, string, time.Time) (*PresignedObjectUpload, error)
+	CreateUpload(context.Context, string, string, int64, time.Time) (*PresignedObjectUpload, error)
 	CreateDownload(context.Context, string, time.Time) (*PresignedObjectDownload, error)
 	StatObject(context.Context, string) (*StoredObjectInfo, error)
+	PromoteObject(context.Context, string, string, string, string) error
 	DeleteObject(context.Context, string) error
 }
 
@@ -154,6 +154,7 @@ type PresignedObjectUpload struct {
 	URL        string
 	HTTPMethod string
 	Headers    map[string]string
+	FormFields map[string]string
 	ExpiresAt  time.Time
 }
 

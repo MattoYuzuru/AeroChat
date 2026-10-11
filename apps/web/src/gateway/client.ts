@@ -402,6 +402,7 @@ interface AttachmentUploadSessionWire extends TimestampedWire {
   expiresAt?: string;
   completedAt?: string;
   failedAt?: string;
+  formFields?: Record<string, string>;
 }
 
 interface MessageTombstoneWire {
@@ -3057,6 +3058,7 @@ function normalizeAttachmentUploadSession(
     uploadUrl: input?.uploadUrl ?? "",
     httpMethod: input?.httpMethod ?? "",
     headers: input?.headers ?? {},
+    formFields: input?.formFields ?? {},
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
     expiresAt: input?.expiresAt ?? "",

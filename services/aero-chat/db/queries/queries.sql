@@ -1161,8 +1161,9 @@ INSERT INTO attachment_upload_sessions (
     status,
     expires_at,
     created_at,
-    updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    updated_at,
+    staging_object_key
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING
     id,
     attachment_id,
@@ -1172,7 +1173,41 @@ RETURNING
     created_at,
     updated_at,
     completed_at,
-    failed_at;
+    failed_at,
+    staging_object_key;
+
+-- name: LockAttachmentForFinalization :one
+SELECT id FROM attachments WHERE id = $1 FOR UPDATE;
+
+-- name: LockAttachmentUploadSession :one
+SELECT id FROM attachment_upload_sessions WHERE attachment_id = $1 FOR UPDATE;
+
+-- name: CreateAttachmentSourceCleanup :exec
+INSERT INTO attachment_source_cleanup (object_key, attachment_id, capability_expires_at, next_attempt_at, created_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (object_key) DO NOTHING;
+
+-- name: ListAttachmentSourceCleanup :many
+SELECT object_key FROM attachment_source_cleanup
+WHERE next_attempt_at <= $1
+ORDER BY next_attempt_at, object_key
+LIMIT $2;
+
+-- name: RescheduleAttachmentSourceCleanup :exec
+UPDATE attachment_source_cleanup SET next_attempt_at = $2 WHERE object_key = $1;
+
+-- name: ListLegacyAttachmentIDs :many
+SELECT id FROM attachments
+WHERE object_key NOT LIKE 'final/%' AND status IN ('uploaded', 'attached', 'detached')
+ORDER BY created_at, id LIMIT $1;
+
+-- name: GetLegacyCapabilityExpiry :one
+SELECT MAX(expires_at)::timestamptz AS expires_at
+FROM attachment_upload_sessions WHERE staging_object_key IS NULL;
+
+-- name: PublishLegacyAttachmentFinalKey :execrows
+UPDATE attachments SET object_key = $2
+WHERE id = $1 AND object_key = $3 AND status IN ('uploaded', 'attached', 'detached');
 
 -- name: LockAttachmentQuotaOwner :one
 SELECT id
@@ -1214,6 +1249,7 @@ SELECT
     s.updated_at AS upload_session_updated_at,
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
+    s.staging_object_key AS upload_session_staging_object_key,
     ma.direct_chat_message_id,
     ma.group_message_id,
     ma.encrypted_direct_message_v2_id,
@@ -1251,6 +1287,7 @@ SELECT
     s.updated_at AS upload_session_updated_at,
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
+    s.staging_object_key AS upload_session_staging_object_key,
     ma.direct_chat_message_id,
     ma.group_message_id,
     ma.encrypted_direct_message_v2_id,
@@ -1371,7 +1408,7 @@ WITH candidates AS (
       AND ma.attachment_id IS NULL
     ORDER BY s.expires_at ASC, s.id ASC
     LIMIT $2
-    FOR UPDATE OF s, a SKIP LOCKED
+    FOR UPDATE OF a SKIP LOCKED
 ),
 updated_attachments AS (
     UPDATE attachments AS a

@@ -1947,6 +1947,7 @@ func toProtoAttachmentUploadSession(value chat.AttachmentUploadSession) *chatv1.
 		UploadUrl:    value.UploadURL,
 		HttpMethod:   value.HTTPMethod,
 		Headers:      value.Headers,
+		FormFields:   value.FormFields,
 		CreatedAt:    timestamppb.New(value.CreatedAt),
 		UpdatedAt:    timestamppb.New(value.UpdatedAt),
 		ExpiresAt:    timestamppb.New(value.ExpiresAt),
