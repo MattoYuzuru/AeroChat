@@ -42,10 +42,10 @@ function trackWaterfall(page,label){
 try{
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(25174,'127.0.0.1',resolve);});
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE});
- const page=await browser.newPage({viewport:{width:1366,height:900}});trackWaterfall(page,baseline?'historical-login':'window-retry');const requests=diagnostic.requests;page.on('request',request=>requests.push(new URL(request.url()).pathname));page.on('requestfailed',request=>diagnostic.failedRequests.push({path:new URL(request.url()).pathname,error:request.failure()?.errorText}));diagnostic.stage='login';
+ const page=await browser.newPage({viewport:{width:1366,height:900}});trackWaterfall(page,baseline?'parent-login':'window-retry');const requests=diagnostic.requests;page.on('request',request=>requests.push(new URL(request.url()).pathname));page.on('requestfailed',request=>diagnostic.failedRequests.push({path:new URL(request.url()).pathname,error:request.failure()?.errorText}));diagnostic.stage='login';
  await page.goto('http://127.0.0.1:25174/login');await page.getByRole('textbox',{name:'Логин',exact:true}).waitFor();
  if(baseline){
-  console.log(JSON.stringify({baseline:true,entryBytes:(await stat(output+'/'+entry.fileName)).size,eagerHeavyModules:heavyNames,requests,scope:'Original production AppRouter static entry closure and login network; synthetic auth/gateway/RTC/realtime'}));
+  console.log(JSON.stringify({baseline:true,source,entryBytes:(await stat(output+'/'+entry.fileName)).size,eagerHeavyModules:heavyNames,requests,scope:'Parent production AppRouter static entry closure and login network; synthetic auth/gateway/RTC/realtime'}));
  }else{
  for(const name of ['DesktopShell','AppShell','MobileLauncherHome','PeoplePage','ExplorerPage','ChatsPage','GroupsPage'])assert.equal(requests.includes(chunk(name)),false,'login does not fetch '+name);
  await page.getByRole('textbox',{name:'Логин',exact:true}).fill('owned.fixture');await page.getByLabel('Пароль',{exact:true}).fill('owned-fixture-password');await page.getByRole('button',{name:'Войти',exact:true}).click();await page.getByRole('region',{name:'Рабочий стол AeroChat'}).waitFor();
