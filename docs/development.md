@@ -44,15 +44,26 @@ Root `.env.example` управляет compose. Для запуска из ис�
 
 Push требует secure context: `localhost` или HTTPS-origin для внешнего домена/телефона. UI-тогглы сами по себе не доказывают доставку. Секреты остаются в локальных env-файлах и не входят в Git или отчёты.
 
+Регион media bucket определяется SDK через `AERO_MEDIA_S3_INTERNAL_ENDPOINT` при первом presign и сохраняется в клиенте подписи. У storage principal должно быть право `s3:GetBucketLocation`; пустой location S3 соответствует `us-east-1`. Browser-visible endpoint используется только для URL и подписи, без исходящих запросов к нему из `aero-chat`. После переноса bucket в другой регион сервис нужно перезапустить. При ошибке internal discovery URL не выдаётся; следующий запрос повторяет discovery. Подписи upload/download проверяются отдельно от доступности публичного storage origin в браузере.
+
+Native media integration `go -C services/aero-chat test -tags integration ./internal/storage/minio ./internal/storage/postgres` требует `AERO_MEDIA_TEST_ENV_FILE` вне Git с ключами `AERO_MEDIA_S3_*` и `AERO_DATABASE_URL`. S3 принимает loopback endpoints с разными internal/public именами; PostgreSQL использует только dedicated `aerochat_media_test` и собственные disposable schemas. Fixture пишет небольшие объекты и удаляет свои keys. Отсутствующий профиль завершает проверку ошибкой, а не skip. Проверки охватывают POST policy, conditional staging→final copy, concurrent Complete и metadata rollback; browser decrypt остаётся отдельной приёмкой. [Cutover, legacy backfill, cleanup и rollback](deploy/immutable-media-cutover.md) описывают coordinated POST rollout и требования lifecycle/versioning/CORS.
+
+Encrypted server ordering по [ADR-096](adr/096-encrypted-conversation-server-sequence.md) использует тот же PostgreSQL profile только для собственных disposable schemas. `go test -count=1 -tags integration -run TestEncrypted ./services/aero-chat/internal/storage/postgres` проверяет sender clock/read cutoff, commit serialization, cancellation, duplicate/overflow и bounded metadata backfill; S3 эти tests не трогают. [Sequence cutover](deploy/encrypted-sequence-cutover.md) требует остановки старых writers, verified backup/restore и opt-in CLI до запуска нового chat service на legacy data. Web adoption и full two-account browser acceptance фиксируются отдельно.
+
 ## Проверки
 
-Запускать последовательно после установки инструментов и зависимостей. Генерация меняет файлы: проверять её diff и не совмещать с редактированием тех же контрактов. Сейчас unpinned Buf plugins выдают несовместимые Connect v2 imports ([#168](https://github.com/MattoYuzuru/AeroChat/issues/168)); до исправления выполнять проверку generation в отдельном output/worktree, сохраняя committed generated code.
+Запускать последовательно после установки инструментов и зависимостей. Генерация меняет файлы: проверять её diff и не совмещать с редактированием тех же контрактов. Buf remote plugins закреплены version + revision в `buf.gen.yaml`: protobuf Go `1.36.11`, Connect Go `1.19.1`, оба revision `1`. SQLC закреплён на `1.30.0` в installer и CI. Версия Buf CLI — `1.59.0`.
+
+`task generated:check` удаляет только `.go` files с первой строкой `// Code generated ` в четырёх generated output-каталогах, затем выполняет Buf и SQLC generation и проверяет tracked/staged/untracked drift относительно HEAD. Ручные regression tests, `gen/go/go.mod` и `go.sum` сохраняются. Команда позволяет обнаружить outputs от удалённых proto/SQL inputs, требует чистой согласованной source phase и намеренно возвращает nonzero при незакоммиченных generated changes. После изменения контрактов выполнить обычные generation tasks, проверить diff, закоммитить inputs и outputs вместе, затем повторить `generated:check`.
+
+Обновление generator: проверить [официальный формат version/revision](https://buf.build/docs/configuration/v2/buf-gen-yaml/#type-of-plugin), изменить точные pins отдельным PR, выполнить generation и Go compile/tests против текущего runtime major, проверить полный generated diff. Изменение Connect runtime major требует отдельного решения; pin не должен автоматически переходить на latest. CI выполняет Buf + SQLC drift gate и negative fixtures (`sh infra/scripts/test-generated-drift.sh`).
 
 | Scope | Команда |
 | --- | --- |
 | Proto style | `task proto:lint` |
 | Proto generation | `task proto:generate` |
 | SQL generation | `task sqlc:generate` |
+| Generated drift | `task generated:check` |
 | Go tests | `task go:test` |
 | Go lint | `task go:lint` |
 | Web unit tests | `task web:test` |
@@ -91,3 +102,13 @@ Go unit tests сами по себе не доказывают работу stor
 [Bootstrap](deploy/single-server-bootstrap.md) описывает `.env.server`, `.env.server.secrets`, shared `k3s + Traefik`, media origin и repo-managed TURN. [Rollout](deploy/production-rollout.md) содержит production health gates и rollback; это отдельная операционная процедура.
 
 Application images публикуются в GHCR для `web`, `aero-gateway`, `aero-identity`, `aero-chat`, `aero-rtc-control` на `linux/amd64`. Для точного выбора сборки использовать `sha-<commit>`; `edge` следует default branch, release-теги имеют вид `vX.Y.Z`, `vX.Y`, `vX`. `latest` не используется. В `.env.server` выбирается `AERO_IMAGE_TAG`; секреты хранятся только в `.env.server.secrets`.
+
+## Клиентский порядок encrypted conversations
+
+Encrypted web после ADR-096 требует серверный `serverSequence` как положительную decimal int64 строку; read position использует `lastReadServerSequence`. Sender `createdAt` остаётся display/AAD metadata. HTTP без корректного порядка показывает ошибку, некорректные realtime events не применяются. Обновление backend и web согласуется при cutover; старый backend без sequence с новым web несовместим. Переиндексация локального поиска меняет только memory cache, сохраняя pending outbound и локальный ключевой материал.
+
+Local content projection хранит origin `serverSequence` для history/read и `lastAppliedServerSequence` для convergence. Accepted operation sequence определяет выбранную mutation; `revision` остаётся ciphertext metadata и не считается backend CAS. Reverse/split realtime, fetch и send result должны давать одну projection даже при одинаковых или уменьшающихся revisions.
+
+Terminal tombstone остаётся terminal по ADR-069: независимые локальные `lastEditServerSequence` и `tombstoneServerSequence` делают edit/delete arrival-order независимым. Late old edit или accepted edit после удаления не возвращает body/attachments; display metadata последнего edit и delete выбирается по sequence каждой категории. Group partial edit с `attachments: null` сохраняет последнее explicit attachment значение через локальный `lastAttachmentsServerSequence`. Эти поля не передаются в ciphertext/AAD или API.
+
+Если mutation расшифрована до origin content, projection показывает `unresolved_target`, а текущая lane хранит pending payload только в памяти (min(valid page size, 64)). Поздний content запускает повтор соответствующих operations; applied/duplicate payload удаляется, scope change/unmount очищает pending. Overflow не скрывает unresolved failure. При reopen/reload или crypto-device rebind/reconnect hook объединяет fetch и scoped opaque realtime buffer (64 events), сортирует по sequence. Без concurrent updates snapshot заменяется; при concurrent updates он объединяется только с тем же requestKey, а request generation отсекает старые загрузки. Recovery вне окна зависит от наличия origin/mutation в bounded fetch/buffer; full historical backfill этим не реализован.

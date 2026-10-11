@@ -148,4 +148,7 @@ jobs:
         run: buf lint
 
       - name: Buf generate
-        run: buf generate
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
+          sh infra/scripts/test-generated-drift.sh
+          sh infra/scripts/check-generated.sh

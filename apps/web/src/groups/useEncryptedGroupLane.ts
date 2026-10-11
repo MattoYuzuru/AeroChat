@@ -1,3 +1,6 @@
+import type { EncryptedGroupDecryptedEnvelope } from "../crypto/types";
+import { mergeEncryptedLaneWithPending, resolveEncryptedLanePageSize } from "../chats/encrypted-lane-pending";
+import { compareServerSequences } from "../gateway/server-sequence";
 import { useEffect, useRef, useState } from "react";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
 import { describeGatewayError, isGatewayErrorCode } from "../gateway/types";
@@ -44,6 +47,7 @@ interface LoadedEncryptedGroupLaneState {
   status: "ready" | "error" | "unavailable";
   bootstrap: EncryptedGroupBootstrap | null;
   items: EncryptedGroupProjectionEntry[];
+  pendingMutations: EncryptedGroupDecryptedEnvelope[];
   errorMessage: string | null;
 }
 
@@ -51,8 +55,9 @@ export function useEncryptedGroupLane({
   enabled,
   token,
   groupId,
-  pageSize = encryptedGroupProjectionLimit,
+  pageSize: requestedPageSize = encryptedGroupProjectionLimit,
 }: UseEncryptedGroupLaneOptions): EncryptedGroupLaneState {
+  const pageSize = resolveEncryptedLanePageSize(requestedPageSize);
   const cryptoRuntime = useCryptoRuntime();
   const activeCryptoDeviceId = resolveActiveRealtimeCryptoDeviceId(cryptoRuntime.state);
   const activeGroupId = groupId?.trim() ?? "";
@@ -61,9 +66,11 @@ export function useEncryptedGroupLane({
     status: "ready",
     bootstrap: null,
     items: [],
+    pendingMutations: [],
     errorMessage: null,
   });
   const requestVersionRef = useRef(0);
+  const updateVersionRef = useRef(0);
   const loadDescriptor = resolveEncryptedGroupLoadDescriptor({
     enabled,
     activeGroupId,
@@ -78,6 +85,12 @@ export function useEncryptedGroupLane({
   const activeLoadGroupId = loadDescriptor.kind === "load" ? loadDescriptor.groupId : null;
   const activeLoadCryptoDeviceId =
     loadDescriptor.kind === "load" ? loadDescriptor.activeCryptoDeviceId : null;
+
+  useEffect(() => () => {
+    requestVersionRef.current += 1;
+    setLoadedState((current) => current.requestKey === activeLoadRequestKey
+      ? { ...current, pendingMutations: [] } : current);
+  }, [activeLoadRequestKey]);
 
   useEffect(() => {
     if (
@@ -94,6 +107,7 @@ export function useEncryptedGroupLane({
 
     const requestVersion = requestVersionRef.current + 1;
     requestVersionRef.current = requestVersion;
+    const startedUpdateVersion = updateVersionRef.current;
 
     void loadEncryptedGroupLane({
       token: activeLoadToken,
@@ -107,12 +121,24 @@ export function useEncryptedGroupLane({
           return;
         }
 
-        setLoadedState({
-          requestKey: activeLoadRequestKey,
-          status: "ready",
-          bootstrap: result.bootstrap,
-          items: result.items,
-          errorMessage: null,
+        setLoadedState((current) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return current;
+          }
+          const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
+          const sameScope = current.requestKey === activeLoadRequestKey;
+          const merged = mergeEncryptedLaneWithPending(
+            sameScope && hasConcurrentUpdates ? current.items : [],
+            sameScope ? current.pendingMutations : [],
+            result.updates, pageSize, mergeEncryptedGroupProjection,
+          );
+          return {
+            requestKey: activeLoadRequestKey,
+            status: "ready",
+            bootstrap: result.bootstrap,
+            ...merged,
+            errorMessage: null,
+          };
         });
       })
       .catch((error) => {
@@ -121,12 +147,18 @@ export function useEncryptedGroupLane({
         }
 
         const resolved = resolveEncryptedGroupLoadError(error);
-        setLoadedState({
-          requestKey: activeLoadRequestKey,
-          status: resolved.kind,
-          bootstrap: null,
-          items: [],
-          errorMessage: resolved.message,
+        setLoadedState((current) => {
+          if (requestVersionRef.current !== requestVersion) {
+            return current;
+          }
+          return {
+            requestKey: activeLoadRequestKey,
+            status: resolved.kind,
+            bootstrap: current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
+            items: current.requestKey === activeLoadRequestKey ? current.items : [],
+            pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+            errorMessage: resolved.message,
+          };
         });
       });
   }, [
@@ -175,28 +207,46 @@ export function useEncryptedGroupLane({
             return;
           }
 
-          setLoadedState((current) => ({
-            requestKey: activeLoadRequestKey,
-            status: "ready",
-            bootstrap: current.bootstrap,
-            items: mergeEncryptedGroupProjection(current.items, updates),
-            errorMessage: current.errorMessage,
-          }));
+          updateVersionRef.current += 1;
+          setLoadedState((current) => {
+            if (cancelled) {
+              return current;
+            }
+            const sameScope = current.requestKey === activeLoadRequestKey;
+            return {
+              requestKey: activeLoadRequestKey,
+              status: "ready",
+              bootstrap: sameScope ? current.bootstrap : null,
+              ...mergeEncryptedLaneWithPending(
+                sameScope ? current.items : [], sameScope ? current.pendingMutations : [],
+                updates, pageSize, mergeEncryptedGroupProjection,
+              ),
+              errorMessage: sameScope ? current.errorMessage : null,
+            };
+          });
         })
         .catch((error) => {
           if (cancelled) {
             return;
           }
 
-          setLoadedState((current) => ({
-            ...current,
-            requestKey: activeLoadRequestKey,
-            status: "error",
-            errorMessage:
-              error instanceof Error && error.message.trim() !== ""
-                ? error.message
-                : "Не удалось локально обработать realtime encrypted group envelope.",
-          }));
+          setLoadedState((current) => {
+            if (cancelled) {
+              return current;
+            }
+            return {
+              ...current,
+              items: current.requestKey === activeLoadRequestKey ? current.items : [],
+              pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+              bootstrap: current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
+              requestKey: activeLoadRequestKey,
+              status: "error",
+              errorMessage:
+                error instanceof Error && error.message.trim() !== ""
+                  ? error.message
+                  : "Не удалось локально обработать realtime encrypted group envelope.",
+            };
+          });
         });
     });
 
@@ -209,6 +259,7 @@ export function useEncryptedGroupLane({
     activeLoadCryptoDeviceId,
     activeLoadGroupId,
     activeLoadRequestKey,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -232,6 +283,7 @@ export function useEncryptedGroupLane({
 
       const requestVersion = requestVersionRef.current + 1;
       requestVersionRef.current = requestVersion;
+      const startedUpdateVersion = updateVersionRef.current;
 
       void loadEncryptedGroupLane({
         token: activeLoadToken,
@@ -245,12 +297,24 @@ export function useEncryptedGroupLane({
             return;
           }
 
-          setLoadedState({
-            requestKey: activeLoadRequestKey,
-            status: "ready",
-            bootstrap: result.bootstrap,
-            items: result.items,
-            errorMessage: null,
+          setLoadedState((current) => {
+            if (requestVersionRef.current !== requestVersion) {
+              return current;
+            }
+            const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
+            const sameScope = current.requestKey === activeLoadRequestKey;
+            const merged = mergeEncryptedLaneWithPending(
+              sameScope && hasConcurrentUpdates ? current.items : [],
+              sameScope ? current.pendingMutations : [],
+              result.updates, pageSize, mergeEncryptedGroupProjection,
+            );
+            return {
+              requestKey: activeLoadRequestKey,
+              status: "ready",
+              bootstrap: result.bootstrap,
+              ...merged,
+              errorMessage: null,
+            };
           });
         })
         .catch((error) => {
@@ -258,17 +322,23 @@ export function useEncryptedGroupLane({
             return;
           }
 
-          setLoadedState((current) => ({
-            requestKey: activeLoadRequestKey,
-            status: "error",
-            bootstrap:
-              current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
-            items: current.requestKey === activeLoadRequestKey ? current.items : [],
-            errorMessage:
-              error instanceof Error && error.message.trim() !== ""
-                ? error.message
-                : "Не удалось перечитать encrypted group local projection после reconnect.",
-          }));
+          setLoadedState((current) => {
+            if (requestVersionRef.current !== requestVersion) {
+              return current;
+            }
+            return {
+              requestKey: activeLoadRequestKey,
+              status: "error",
+              bootstrap:
+                current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
+              items: current.requestKey === activeLoadRequestKey ? current.items : [],
+              pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+              errorMessage:
+                error instanceof Error && error.message.trim() !== ""
+                  ? error.message
+                  : "Не удалось перечитать encrypted group local projection после reconnect.",
+            };
+          });
         });
     });
   }, [
@@ -285,20 +355,36 @@ export function useEncryptedGroupLane({
       return;
     }
 
-    return subscribeLocalEncryptedGroupProjection((event) => {
+    let cancelled = false;
+    const unsubscribe = subscribeLocalEncryptedGroupProjection((event) => {
       if (event.projection.groupId !== activeLoadGroupId) {
         return;
       }
 
-      setLoadedState((current) => ({
-        requestKey: activeLoadRequestKey,
-        status: "ready",
-        bootstrap: current.bootstrap,
-        items: mergeEncryptedGroupProjection(current.items, [event.projection]),
-        errorMessage: current.errorMessage,
-      }));
+      updateVersionRef.current += 1;
+      setLoadedState((current) => {
+        if (cancelled) {
+          return current;
+        }
+        const sameScope = current.requestKey === activeLoadRequestKey;
+        return {
+          requestKey: activeLoadRequestKey,
+          status: "ready",
+          bootstrap: sameScope ? current.bootstrap : null,
+          ...mergeEncryptedLaneWithPending(
+            sameScope ? current.items : [], sameScope ? current.pendingMutations : [],
+            [event.projection], pageSize, mergeEncryptedGroupProjection,
+          ),
+          errorMessage: sameScope ? current.errorMessage : null,
+        };
+      });
     });
-  }, [activeLoadGroupId, activeLoadRequestKey]);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [activeLoadGroupId, activeLoadRequestKey, pageSize]);
 
   if (loadDescriptor.kind === "idle") {
     return {
@@ -352,7 +438,7 @@ async function loadEncryptedGroupLane(input: {
   pageSize: number;
 }): Promise<{
   bootstrap: EncryptedGroupBootstrap;
-  items: EncryptedGroupProjectionEntry[];
+  updates: EncryptedGroupDecryptedEnvelope[];
 }> {
   const bootstrap = await gatewayClient.getEncryptedGroupBootstrap(
     input.token,
@@ -390,7 +476,7 @@ async function loadEncryptedGroupLane(input: {
 
   return {
     bootstrap,
-    items: mergeEncryptedGroupProjection([], [...updates, ...localOutbound], input.pageSize),
+    updates: [...updates, ...localOutbound],
   };
 }
 
@@ -406,7 +492,7 @@ function deduplicateEncryptedGroupEnvelopes(
   }
 
   return Array.from(unique.values()).sort((left, right) =>
-    left.createdAt.localeCompare(right.createdAt),
+    compareServerSequences(left.serverSequence, right.serverSequence),
   );
 }
 
@@ -457,7 +543,7 @@ export function resolveEncryptedGroupLoadDescriptor(input: {
       input.token,
       input.activeGroupId,
       input.activeCryptoDeviceId,
-      Math.max(1, Math.trunc(input.pageSize ?? encryptedGroupProjectionLimit)),
+      resolveEncryptedLanePageSize(input.pageSize ?? encryptedGroupProjectionLimit),
     ].join(":"),
     token: input.token,
     groupId: input.activeGroupId,
