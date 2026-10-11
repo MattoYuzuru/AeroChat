@@ -28,9 +28,10 @@ jobs:
 
       - name: Bootstrap PostgreSQL and private S3 bucket
         run: |
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml pull postgres
           docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml up -d --no-build --pull never --wait postgres minio
-          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml run --rm minio-bootstrap
-          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml run --rm --entrypoint /bin/sh -v "$PWD/infra/scripts/smoke-media-storage.sh:/smoke.sh:ro" minio-bootstrap /smoke.sh
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml run --rm --pull never minio-bootstrap
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml run --rm --pull never --entrypoint /bin/sh -v "$PWD/infra/scripts/smoke-media-storage.sh:/smoke.sh:ro" minio-bootstrap /smoke.sh
           test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:9000/aerochat-attachments/)" = 403
           curl --fail --silent --show-error -D /tmp/cors-headers -o /dev/null -X OPTIONS -H 'Origin: http://127.0.0.1:8088' -H 'Access-Control-Request-Method: PUT' http://127.0.0.1:9000/aerochat-attachments/cors-smoke
           grep -iq '^access-control-allow-origin: http://127.0.0.1:8088' /tmp/cors-headers
