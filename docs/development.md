@@ -33,6 +33,8 @@ docker compose -f infra/compose/docker-compose.yml down
 
 Root `.env.example` управляет compose. Для запуска из исходников использовать `services/*/.env.example`, `apps/web/.env.example` и `pnpm --filter @aerochat/web dev`. Source-mode приложениям нужны доступные инфраструктурные зависимости; Vite сам их не поднимает.
 
+MinIO и bootstrap client собираются из pinned upstream sources по [ADR-087](adr/087-pinned-storage-source-build-lifecycle.md), включая checksum архивов и base image digests. Первый запуск скачивает Go modules и компилирует storage; старые binary image tags не используются. Для проверки acquisition без shared build cache создать отдельный BuildKit builder (`docker buildx create --driver docker-container --name <unique-name>`) и выполнить `docker buildx build --builder <unique-name> --pull --no-cache --load --target minio -t aerochat-minio:7ced9663 -f infra/storage/Dockerfile .`, затем аналогично target `mc` с tag `aerochat-mc:7394ce0d`. Не удалять чужие builders, caches и volumes. Обычный повторный `compose up --build` сам по себе не доказывает cold-cache bootstrap.
+
 | Конфигурация | Назначение и ограничение |
 | --- | --- |
 | `AERO_MEDIA_S3_INTERNAL_ENDPOINT`, `AERO_MEDIA_S3_PRESIGN_ENDPOINT` (source-mode); `MEDIA_S3_PUBLIC_ENDPOINT` (compose) | Внутренний service-to-storage endpoint и отдельный browser-visible endpoint для presigned URL; браузеру нельзя отдавать compose-host `minio:9000`. |

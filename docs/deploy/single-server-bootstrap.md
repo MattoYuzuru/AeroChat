@@ -412,7 +412,7 @@ curl -fsS https://media.keykomi.com/minio/health/live
 
 1. Выбери release manifest digest/source SHA и соответствующий checkout.
 2. Валидируй metadata и создай Compose overlay по [verified release flow](verified-release.md).
-3. Выполни Compose config/pull/up с этим overlay.
+3. Выполни Compose config/pull --ignore-buildable/up с этим overlay; storage собирается из выбранных pinned sources.
 4. Подтверди пять runtime image digests/revision labels.
 5. Проверь `docker compose ... ps`.
 6. Снова проверь:
