@@ -118,6 +118,24 @@ Go unit tests сами по себе не доказывают работу stor
 
 `apps/web/tests/lazy/lazy.mjs` собирает production AppRouter, shell и реальные People/Explorer pages в chunks. Playwright прерывает настоящий запрос JS chunk и CSS, проверяет retry, соседнее поле ввода, быстрые повторные нажатия, одновременные failed instances, close/reopen identity, lifetime exhaustion и закрытие окна до позднего завершения загрузки. Неверный module path, oversized JSON, внешний CSS и sidecar redirect проверяются реальными bounded HTTP responses. Счётчики evaluation shared React/provider modules и fixture root дополняют анализ единственности emitted module identity; они не доказывают actual auth/crypto provider lifecycle. Перед запуском задаются `PLAYWRIGHT_MODULE`, `CHROMIUM_EXECUTABLE` и внешний собственный `LAZY_BUILD_DIR`; Vite build не очищает этот каталог. Fixture использует bounded localhost25174 и закрывает browser/server в finally. Auth/gateway/RTC/realtime здесь синтетические; actual accounts, общий crypto bootstrap и real-device поведение эта проверка не подтверждает.
 
+### Router maintenance
+
+React Router остаётся в Declarative/BrowserRouter Mode. При обновлении maintained
+7.x проверять official release notes и registry metadata выбранной версии,
+обновлять lockfile через pnpm10.19.0 и сохранять raw production audit вне Git.
+Для каждой advisory отдельно фиксировать reachable/unreachable и необходимые
+предпосылки по code trace; Framework-only advisory нельзя выдавать за доказанный
+RCE static SPA. Текущий [review #175](audits/2026-10-11-router-advisories.md)
+явно различает подготовку, выполненные gates и оставшиеся проверки.
+
+`apps/web/tests/router/router.mjs` использует actual AppRouter/DesktopShell и
+window-scoped location/path builders для deep-link/refresh, back/forward,
+повторного открытия conversation singleton и encoded query IDs. Auth/gateway/
+RTC/realtime и тела страниц здесь синтетические, поэтому это не message-page или
+backend acceptance. Перед запуском задать `PLAYWRIGHT_MODULE` и
+`CHROMIUM_EXECUTABLE`; fixture использует bounded localhost25174 и освобождает
+browser/server в finally. Source наличие fixture само по себе не означает PASS.
+
 ## Server runtime и публикация
 
 [Bootstrap](deploy/single-server-bootstrap.md) описывает `.env.server`, `.env.server.secrets`, shared `k3s + Traefik`, media origin и repo-managed TURN. [Rollout](deploy/production-rollout.md) содержит production health gates и rollback; это отдельная операционная процедура.
