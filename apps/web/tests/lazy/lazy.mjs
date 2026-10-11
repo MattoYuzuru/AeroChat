@@ -16,7 +16,7 @@ const result=await build({configFile:false,root:here,plugins:[{name:'lazy-fixtur
  if(id.endsWith('/gateway/runtime')||id==='../gateway/runtime')return here+'gateway.js';
  if(id.endsWith('/rtc/useDirectCallAwareness')||id==='../rtc/useDirectCallAwareness')return here+'rtc.js';
  if(id.endsWith('/realtime/events')||id==='../realtime/events')return here+'realtime.js';
-}},react()],build:{outDir:output,emptyOutDir:false,manifest:true}});
+}},react()],resolve:{alias:[{find:/^react$/,replacement:web+'node_modules/react/index.js'},{find:/^react-dom\/(.*)$/,replacement:web+'node_modules/react-dom/$1'}]},build:{outDir:output,emptyOutDir:false,manifest:true}});
 const manifest=JSON.parse(await readFile(output+'/.vite/manifest.json','utf8'));
 const chunks=(Array.isArray(result)?result.flatMap(item=>item.output):result.output).filter(item=>item.type==='chunk');
 const entry=chunks.find(item=>item.isEntry);
