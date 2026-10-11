@@ -6,7 +6,7 @@ const server=await createServer({configFile:false,root:here,plugins:[{name:'mobi
  if(importer?.endsWith('/AppShell.tsx')&&id==='../auth/useAuth')return here+'auth.js';
  if(importer?.endsWith('/AppShell.tsx')&&id==='../rtc/useDirectCallAwareness')return here+'rtc.js';
  if(importer?.endsWith('/harness.jsx')&&id.startsWith('../../src/'))return sourceRoot+'src/'+id.slice('../../src/'.length);
-}},react()],resolve:{alias:[{find:/^react$/,replacement:web+'node_modules/react/index.js'},{find:/^react-dom\/(.*)$/,replacement:web+'node_modules/react-dom/$1'}]},server:{host:'127.0.0.1',port:Number(process.env.MOBILE_FIXTURE_PORT??25174),strictPort:true,fs:{allow:[here,web,sourceRoot]}}});
+}},react()],resolve:{alias:[{find:/^react$/,replacement:web+'node_modules/react/index.js'},{find:/^react-dom\/(.*)$/,replacement:web+'node_modules/react-dom/$1'}]},server:{host:'127.0.0.1',port:Number(process.env.MOBILE_FIXTURE_PORT??25174),strictPort:true,fs:{allow:[here,web,sourceRoot,fileURLToPath(new URL("../../../../node_modules/",import.meta.url))]}}});
 await server.listen();const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE});
 try{
  const page=await browser.newPage();const evidence=[];
@@ -26,7 +26,7 @@ try{
    });
    assert.equal(geometry.overflow,false,JSON.stringify({lane,count,width,height,geometry}));
    assert.ok(geometry.composer.bottom<=height+1,JSON.stringify({lane,count,width,height,geometry}));
-   assert.ok(geometry.header.y>=0&&geometry.header.bottom<geometry.composer.y);
+   assert.ok(geometry.header.y>=0&&geometry.header.bottom<=geometry.composer.y,JSON.stringify({lane,count,state,width,height,geometry}));
    assert.ok(geometry.input.width>=140,JSON.stringify({lane,count,width,height,geometry}));
    if(count===50){
     assert.ok(geometry.historyScrollHeight>geometry.historyClientHeight);assert.ok(geometry.history.height>0);
@@ -39,6 +39,15 @@ try{
     await page.getByRole('button',{name:'Переписка',exact:false}).click();const information=page.getByTestId('information');await information.waitFor();
     assert.equal(await information.evaluate(e=>e.scrollHeight>e.clientHeight),true,'information scrolls');
     await page.getByRole('button',{name:'Назад к переписке',exact:true}).click();assert.equal(await input.inputValue(),'Черновик сохраняется');
+   }
+   for(const action of [...(lane==='self'?[]:[lane==='group'?'Управление звонком':'Позвонить']),...(lane==='group'?[]:['Обновить thread']),'Назад к списку']){
+    const control=page.getByRole('button',{name:action,exact:true});assert.equal(await control.isVisible(),true,action+' visible');
+    const bounds=await control.boundingBox();assert.ok(bounds&&bounds.y>=0&&bounds.y+bounds.height<=width+1,JSON.stringify({lane,action,width:height,height:width,bounds}));
+    let reached=false;for(let i=0;i<30;i++){if(await control.evaluate(element=>element===document.activeElement)){reached=true;break;}await page.keyboard.press('Tab');}
+    assert.equal(reached,true,action+' keyboard reachable');await page.keyboard.press('Enter');
+    if(action==='Назад к списку'){await page.getByRole('button',{name:'Открыть переписку',exact:true}).click();assert.equal(await input.inputValue(),'Черновик сохраняется');}
+    if(action==='Обновить thread')assert.equal(await page.locator('[data-fixture-refreshes]').getAttribute('data-fixture-refreshes'),'1');
+    if(action==='Позвонить'||action==='Управление звонком')assert.equal(await page.locator('[data-fixture-calls]').getAttribute('data-fixture-calls'),'1');
    }
    evidence.push({lane,count,state,width,height,zoomModel:width===640&&height===360?'200% desktop layout equivalent: CSS viewport640x360 for1280x720; not native browser zoom':'100% CSS viewport',...geometry});
   }

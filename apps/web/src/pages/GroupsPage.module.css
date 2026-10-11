@@ -1126,8 +1126,30 @@
 @media (max-height: 500px) and (max-width: 1179px) {
   .threadEyebrow,
   .threadDescription,
-  .threadStatusRow {
+  .threadStatusRow > span {
     display: none;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 1179px) {
+  .threadHeroCard .splitHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.35rem;
+  }
+
+  .threadHeroCard .cardLabel {
+    display: none;
+  }
+
+  .threadTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .threadIdentity > div {
+    min-width: 0;
   }
 }
 
