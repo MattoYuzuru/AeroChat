@@ -103,7 +103,7 @@ func run() error {
 	}
 	httpHandler := app.NewHTTPHandler(logger, meta, repository.Ping, handler)
 
-	if err := app.RunHTTPServers(ctx, logger, cfg, httpHandler, service); err != nil && !errors.Is(err, context.Canceled) {
+	if err := app.RunServersWithSourceDelivery(ctx, logger, cfg, httpHandler, service, postgres.NewDeliveryRepository(db)); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 
