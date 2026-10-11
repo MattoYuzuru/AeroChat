@@ -124,6 +124,7 @@ export function DesktopShell({
   onRequestRebootToBoot(): void;
 }) {
   const location = useLocation();
+  const lastCommittedLocationKeyRef = useRef(location.key);
   const navigate = useNavigate();
   const { state, logout } = useAuth();
   const directCallAwareness = useDirectCallAwareness();
@@ -414,6 +415,8 @@ export function DesktopShell({
   );
 
   useEffect(() => {
+    const previousLocationKey = lastCommittedLocationKeyRef.current;
+    lastCommittedLocationKeyRef.current = location.key;
     const desiredPath = activeWindow?.routePath ?? "/app";
     const currentPath = `${location.pathname}${location.search}`;
     const routeLaunchKey =
@@ -426,6 +429,8 @@ export function DesktopShell({
         activeWindowRoutePath: desiredPath,
         currentPath,
         routeLaunchKey,
+        previousLocationKey,
+        currentLocationKey: location.key,
       })
     ) {
       return;
@@ -435,6 +440,7 @@ export function DesktopShell({
   }, [
     activeWindow?.launchKey,
     activeWindow?.routePath,
+    location.key,
     location.pathname,
     location.search,
     navigate,

@@ -25,6 +25,19 @@ lockfile; это **не frozen validation PASS**. Raw audit и registry evidence
 хранятся вне Git, итоговые receipts привязываются к точному HEAD в PR.
 Severity counts не равны 12 доказанным уязвимостям AeroChat.
 
+Первый frozen gate `check-fyeltope` на `465245e` подтвердил installed7.18.4/SRI
+и новый production audit с нулём advisory, но whole gate завершился FAIL на
+desktop Back/Forward. Диагностика `check-h3wpp4p3` на `1440dd4` сохранила
+`Maximum update depth exceeded`: новый URL конкурировал с обратной
+синхронизацией старого active window. Baseline-only `check-e9i6qg9e` с explicit
+aliases к installed Router/DOM7.13.1 родителя218 и равными SHA actual routing
+sources воспроизвёл тот же JS failure после успешных deep-link/refresh. External
+baseline имел дополнительный font-only403 из fs allow; это не visual proof.
+Отказ считается существовавшей route/window ошибкой, а не доказанной регрессией
+patch7.18.4. Узкая совместимость по ADR080 отдаёт новому browser location
+приоритет до window launch commit, сохраняя focus-only обратную синхронизацию.
+Новые frozen gates обязательны; partial passes прежних HEAD не переносятся.
+
 ## Применимость по текущему коду
 
 [`AppRouter`](../../apps/web/src/app/AppRouter.tsx) использует BrowserRouter и
@@ -75,7 +88,9 @@ policy или расширение trust boundary.
 - Проверить в owned browser fixture настоящие AppRouter/DesktopShell:
   deep-link/refresh, back/forward, повторное открытие route-backed singleton,
   protected anonymous redirect и authenticated login redirect, query IDs с
-  зарезервированными символами через URLSearchParams.
+  зарезервированными символами через URLSearchParams, keyboard focus inactive
+  окна → URL при сохранении обоих drafts и отсутствие pageerrors. Fixture
+  выполняется под StrictMode, включая initial deep-link mount effects.
 - Synthetic auth/gateway fixture не заменяет actual backend login, crypto или
   реальную двухаккаунтную приёмку. Публикация отдельного PR требует завершённых
   gates и опубликованного prerequisite #173; issue остаётся открытым до общей
