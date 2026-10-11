@@ -74,6 +74,25 @@ Own Logout останавливает local tracks немедленно неза
 
 Будущие proto-first операции отделяют request/status teardown от legacy lobby result и содержат operation ID + эти два outcome. Existing End/Leave с active media grants не возвращают успешный terminal lobby response до cleanup; старый client получает pending/error с fail-closed compatibility behavior. Call/participant terminal state и unique-user slot не освобождаются обходным legacy RPC. Пока обязательные negative tests этого поведения, durable crash replay, caller status authorization и trusted acknowledgements не проходят, media flag выключен. Эти API, persistence и workers сейчас **не реализованы**.
 
+## Chat eligibility epoch
+
+Chat хранит монотонную revision для допуска exact `(group_id, user_id)` к audio, отдельно от физически удаляемой membership row. Retained tombstone сохраняет счётчик после remove/leave; rejoin не возвращает revision к начальному значению. Это **eligibility epoch**, а не версия любой смены роли или timestamp. Источник текущей role остаётся Chat membership. Private lookup всегда возвращает свежую role; RTC не кеширует management privileges по одному eligibility epoch.
+
+| Переход | Epoch | Source revoke event |
+| --- | --- | --- |
+| Первый membership, включая reader | 1 | Нет; reader admission запрещён |
+| Owner/admin/member между собой, включая ownership transfer | Без изменения | Нет; текущий audio admission сохраняется |
+| Owner/admin/member → reader | +1 | Да, resulting denied revision |
+| Reader → owner/admin/member | +1 | Нет |
+| Physical remove/leave | +1, retained removed tombstone | Да, resulting denied revision |
+| Removed → rejoin с любой допустимой ролью | +1 | Нет; reader остаётся не eligible |
+| Повтор того же state либо неуспешная операция | Без изменения | Нет |
+| Message-only write restriction/unrestriction | Без изменения | Нет; отдельный audio ban потребует contract decision |
+
+Source transition, epoch и ID-only outbox event записываются атомарно. Event применяется только к matching pair и grant на соответствующей либо более ранней revision. После denied epoch2 новый eligible grant epoch3 не отзывается задержанным event2. Переход eligible→eligible не создаёт event с текущей eligible revision: такой event неоднозначно отзывал бы уже новый допустимый grant. Unknown/missing/mismatching authority state и exhausted revision fail closed; overflow откатывает всю source transaction.
+
+Narrow schema invariant может использовать membership trigger, чтобы событие пережило physical group/user cascade и future SQL writer не пропустил source transition. Это не переносит domain permissions в trigger и не доказывает lock order: FK cascade может взять child lock до AFTER trigger. Перед подключением нужны bounded native concurrent cascade/transfer/remove cases с наблюдаемыми locks; новый membership writer не должен инвертировать existing quota-user → group и group → thread ordering. Delivery/ack/retention worker и media enforcement остаются отдельными implementation slices.
+
 ## Проверки и границы slice
 
 Private Identity implementation slice регистрирует отдельный `identity.authorization.v1.InternalAuthorizationService` на optional mTLS HTTPS listener с fixed rtc-control URI principal. Fresh session/device tuple lookup и exact binding проверяются отдельно от source outbox; [Identity README](../../services/aero-identity/README.md) содержит config и границы actual TLS/PG fixture. Public gateway/new grants/dispatch/SFU/browser audio этот slice не подключает. Literal `internal` segment в proto/gen Go path не используется из-за Go import rules; private доступ обеспечивает transport/caller enforcement.
