@@ -4,12 +4,13 @@ import {BrowserRouter} from 'react-router-dom';
 import {LegacyAppShell} from '../../src/app/AppShell.tsx';
 import direct from '../../src/pages/ChatsPage.module.css';
 import group from '../../src/pages/GroupsPage.module.css';
+import '@fontsource/pt-sans/400.css';import '@fontsource/pt-sans/700.css';import '@fontsource/ibm-plex-mono/400.css';
 import '../../src/styles/reset.css';import '../../src/styles/tokens.css';import '../../src/styles/global.css';
 function Conversation(){
  const params=new URLSearchParams(location.search),isGroup=params.get('lane')==='group',s=isGroup?group:direct,count=Number(params.get('count')??2);
  const [draft,setDraft]=useState(''),[info,setInfo]=useState(false);
  const state=params.get('state')??'normal';
- const header=<section className={isGroup?s.threadHeroCard:s.threadHero} data-testid="thread-header"><div className={isGroup?s.splitHeader:s.threadHeroRow}><button className={s.threadIdentityButton} onClick={()=>setInfo(true)}><h2 className={s.threadTitle}>Переписка</h2><p className={s.threadEyebrow}>@layout.fixture</p></button><div className={s.threadStatusRow}>Прочитано</div></div></section>;
+ const header=<section className={isGroup?s.threadHeroCard:s.threadHero} data-testid="thread-header"><div className={isGroup?s.splitHeader:s.threadHeroRow}><button className={s.threadIdentityButton} onClick={()=>setInfo(true)}><h2 className={s.threadTitle}>{state==='error'?'Переписка с очень длинным именем собеседника или группы':'Переписка'}</h2><p className={s.threadEyebrow}>@layout.fixture</p></button><div className={s.threadStatusRow}>Прочитано</div></div></section>;
  const composer=<section className={s.composerCard} data-testid="composer"><form className={s.composer}>
   {state==='reply'&&<section className={s.replyComposerCard}>Ответ на предыдущее сообщение <button type="button">Отменить ответ</button></section>}
   {state==='attachment'&&<section className={s.attachmentDraftCard}>Файл готов к отправке <button type="button">Убрать файл</button></section>}

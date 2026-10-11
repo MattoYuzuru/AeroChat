@@ -14,8 +14,8 @@ try{
  if(screenshotDir)await mkdir(screenshotDir,{recursive:true});
  for(const [width,height] of [[320,568],[390,844],[768,1024],[568,320],[844,390],[1024,768],[640,360]]){
   for(const lane of ['self','direct','group'])for(const count of [0,2,50])for(const state of count===50?['normal','reply','attachment','error']:['normal']){
-   await page.setViewportSize({width,height});await page.goto(server.resolvedUrls.local[0]+`?lane=${lane}&count=${count}&state=${state}`);
-   const input=page.getByRole('textbox');await input.waitFor();
+   await page.setViewportSize({width,height});await page.goto(server.resolvedUrls.local[0]+`app/${lane==='self'?'self':lane==='group'?'groups':'chats'}?lane=${lane}&count=${count}&state=${state}`);
+   const input=page.getByRole('textbox');await input.waitFor();await page.evaluate(()=>document.fonts.ready);
    for(let i=0;i<16;i++){if(await input.evaluate(e=>document.activeElement===e))break;await page.keyboard.press('Tab');}
    assert.equal(await input.evaluate(e=>document.activeElement===e),true,'keyboard reaches composer');
    await page.keyboard.type('Черновик сохраняется');
