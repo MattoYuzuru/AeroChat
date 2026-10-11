@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';import {mkdir} from 'node:fs/promises';import {fileURLToPath} from 'node:url';import {createServer} from 'vite';import react from '@vitejs/plugin-react-swc';
+import assert from 'node:assert/strict';import {mkdir,writeFile} from 'node:fs/promises';import {fileURLToPath} from 'node:url';import {createServer} from 'vite';import react from '@vitejs/plugin-react-swc';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE);
 const here=fileURLToPath(new URL('.',import.meta.url)),web=fileURLToPath(new URL('../../',import.meta.url));
 const sourceRoot=process.env.MOBILE_SOURCE_ROOT??web;
@@ -8,8 +8,9 @@ const server=await createServer({configFile:false,root:here,plugins:[{name:'mobi
  if(importer?.endsWith('/harness.jsx')&&id.startsWith('../../src/'))return sourceRoot+'src/'+id.slice('../../src/'.length);
 }},react()],resolve:{alias:[{find:/^react$/,replacement:web+'node_modules/react/index.js'},{find:/^react-dom\/(.*)$/,replacement:web+'node_modules/react-dom/$1'}]},server:{host:'127.0.0.1',port:Number(process.env.MOBILE_FIXTURE_PORT??25174),strictPort:true,fs:{allow:[here,web,sourceRoot,fileURLToPath(new URL("../../../../node_modules/",import.meta.url))]}}});
 await server.listen();const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE});
+let page;
 try{
- const page=await browser.newPage();const evidence=[];
+ page=await browser.newPage();const evidence=[];
  const screenshotDir=process.env.MOBILE_SCREENSHOT_DIR;
  if(screenshotDir)await mkdir(screenshotDir,{recursive:true});
  for(const [width,height] of [[320,568],[390,844],[768,1024],[568,320],[844,390],[1024,768],[640,360]]){
@@ -79,4 +80,18 @@ try{
   }
  }
  console.log(JSON.stringify({browser:await browser.version(),cases:evidence.length,evidence,scope:'Production LegacyAppShell and conversation CSS with representative 0/2/50-message DOM; synthetic auth/RTC; actual iOS/Android OS keyboard and full chat pages unverified'}));
+}catch(error){
+ const directory=process.env.MOBILE_SCREENSHOT_DIR;
+ if(page&&directory){
+  await mkdir(directory,{recursive:true});
+  const measurement=await page.evaluate(()=>{
+   const read=element=>{const r=element.getBoundingClientRect(),s=getComputedStyle(element);return {tag:element.tagName,className:element.className,role:element.getAttribute('role'),testId:element.getAttribute('data-testid'),rect:{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom},clientHeight:element.clientHeight,scrollHeight:element.scrollHeight,scrollTop:element.scrollTop,gridRows:s.gridTemplateRows,paddingTop:s.paddingTop,paddingBottom:s.paddingBottom,gap:s.gap,minHeight:s.minHeight,maxHeight:s.maxHeight,overflowY:s.overflowY};};
+   const ancestors=[];for(let element=document.querySelector('textarea');element;element=element.parentElement)ancestors.push(read(element));
+   return {url:location.pathname+location.search,viewport:{width:innerWidth,height:innerHeight},ancestors,controls:Array.from(document.querySelectorAll('button,nav')).map(read)};
+  });
+  await writeFile(directory+'/failure-layout.json',JSON.stringify(measurement,null,2));
+  await page.screenshot({path:directory+'/failure.png'});
+  console.log(JSON.stringify({failureArtifacts:{screenshot:directory+'/failure.png',measurement:directory+'/failure-layout.json'}}));
+ }
+ throw error;
 }finally{await browser.close();await server.close();}
