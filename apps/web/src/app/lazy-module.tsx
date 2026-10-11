@@ -84,7 +84,7 @@ function ModuleStatus({ title, isActive, onRetry, canRetry = true, onFocus }: {
     if (isActive) {
       (statusRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)") ?? statusRef.current)?.focus();
     }
-  }, [isActive]);
+  }, [isActive, canRetry]);
   return (
     <section className={styles.status} ref={statusRef} tabIndex={-1} onFocusCapture={onFocus} role={onRetry ? "alert" : "status"} aria-live={onRetry ? "assertive" : "polite"}>
       <h2>{onRetry ? `Не удалось загрузить: ${title}` : `Загрузка: ${title}`}</h2>
