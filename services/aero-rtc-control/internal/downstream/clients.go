@@ -115,6 +115,41 @@ func setBearerAuthorization(header http.Header, token string) {
 	header.Set("Authorization", "Bearer "+trimmed)
 }
 
+func (a *ChatScopeAuthorizer) GetParticipantAccess(ctx context.Context, token string, scope rtc.ConversationScope, userID string) (*rtc.ScopeAccess, error) {
+	// Проверяем текущий roster с bearer отправителя, не impersonate адресата.
+	switch scope.Type {
+	case rtc.ScopeTypeDirect:
+		request := connect.NewRequest(&chatv1.GetDirectChatRequest{ChatId: scope.DirectChatID})
+		setBearerAuthorization(request.Header(), token)
+		response, err := a.client.GetDirectChat(ctx, request)
+		if err != nil {
+			return nil, mapDownstreamError(err)
+		}
+		if response.Msg.Chat != nil {
+			for _, participant := range response.Msg.Chat.Participants {
+				if participant.GetId() == userID {
+					return &rtc.ScopeAccess{Scope: scope}, nil
+				}
+			}
+		}
+	case rtc.ScopeTypeGroup:
+		request := connect.NewRequest(&chatv1.ListGroupMembersRequest{GroupId: scope.GroupID})
+		setBearerAuthorization(request.Header(), token)
+		response, err := a.client.ListGroupMembers(ctx, request)
+		if err != nil {
+			return nil, mapDownstreamError(err)
+		}
+		for _, member := range response.Msg.Members {
+			if member.GetUser().GetId() == userID {
+				return &rtc.ScopeAccess{Scope: scope, GroupRole: normalizeGroupRole(member.GetRole())}, nil
+			}
+		}
+	default:
+		return nil, rtc.ErrInvalidArgument
+	}
+	return nil, rtc.ErrPermissionDenied
+}
+
 func normalizeGroupRole(role chatv1.GroupMemberRole) string {
 	switch role {
 	case chatv1.GroupMemberRole_GROUP_MEMBER_ROLE_OWNER:
