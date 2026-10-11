@@ -1,6 +1,6 @@
 # ADR-096: Серверный порядок encrypted conversations и read position
 
-- Статус: Proposed — contract review до implementation
+- Статус: Accepted — координатор и frontend reviewer проверили contract до implementation
 - Дата: 2026-10-11
 - Задача: [#156](https://github.com/MattoYuzuru/AeroChat/issues/156)
 - Уточняет ADR-060, ADR-066, ADR-070. Не меняет crypto/AAD или plaintext legacy lane.
@@ -25,7 +25,7 @@ Bounded latest history и replay opaque operations сортируются по s
 
 ### Совместимость и восстановление существующих данных
 
-Schema migration добавляет nullable sequence/counter и index; она не выполняет полный data rewrite на старте. Fresh empty database сразу пригодна для новых writes. Если есть legacy encrypted rows без sequence, новый service не принимает traffic до opt-in backfill; diagnostic failure называет необходимость migration без payload/endpoint/credentials. Старые binaries при cutover должны быть остановлены: они не умеют назначать sequence. Совместная запись старого и нового binary не поддерживается.
+Schema migration добавляет nullable sequence, counter с default zero и index; она не выполняет полный data rewrite на старте. Fresh empty database сразу пригодна для новых writes. Если есть legacy encrypted rows без sequence, новый chat service завершается до открытия listener до opt-in backfill; diagnostic failure называет необходимость migration без payload/endpoint/credentials. Старые binaries при cutover должны быть остановлены: они не умеют назначать sequence. Совместная запись старого и нового binary не поддерживается.
 
 Отдельный backfill CLI с dry-run по умолчанию и explicit execute:
 
@@ -36,7 +36,7 @@ Schema migration добавляет nullable sequence/counter и index; она �
 
 Backfill — maintenance operation: нагрузка ограничивается batch size и одной transaction, но время на большой production history в этом PR не измерено. Сначала owned disposable fixture с interruption/retry и read repair. Сам факт наличия backup не считается rollback proof.
 
-Новый web требует server sequence на authoritative rows; отсутствие/некорректная строка не нормализуется молча в zero ordering. Cache schema/version или явный rebuild обновляет старую projection после backfill; pending outbox/draft и local crypto keys не удаляются. Старый web сохраняет возможность decrypt благодаря неизменному AAD, но его ordering/read UI не считается исправленным; cutover включает обновление web. Rollback старого backend может вернуть client-clock defect и требует отдельного reviewed backup/schema plan, не обычного переключения image.
+Новый web требует server sequence на authoritative rows; отсутствие/некорректная строка не нормализуется молча в zero ordering. Existing localOutbound возникает после send result и сразу получает реальную sequence; новая zero-sequence optimistic row не вводится. Cache schema/version или явный rebuild обновляет старую projection после backfill; сравнения только entity `updated_at` недостаточно, поскольку backfill его не обязан менять. Pending outbox/draft и local crypto keys не удаляются. Старый web сохраняет возможность decrypt благодаря неизменному AAD, но его ordering/read UI не считается исправленным; cutover включает обновление web. Rollback старого backend может вернуть client-clock defect и требует отдельного reviewed backup/schema plan, не обычного переключения image.
 
 ## Проверка
 
