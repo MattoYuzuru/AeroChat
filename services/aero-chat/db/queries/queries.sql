@@ -502,15 +502,22 @@ WHERE group_id = $1
       OR write_restricted_at IS DISTINCT FROM CASE WHEN $3 THEN $4 ELSE NULL END
   );
 
--- name: TransferGroupOwnership :execrows
+-- name: DemoteGroupOwnerForTransfer :execrows
+UPDATE group_memberships AS current_owner
+SET role = 'admin'
+WHERE current_owner.group_id = sqlc.arg(group_id)::uuid AND current_owner.user_id = sqlc.arg(current_owner_user_id)::uuid
+  AND current_owner.role = 'owner' AND sqlc.arg(current_owner_user_id)::uuid <> sqlc.arg(new_owner_user_id)::uuid
+  AND EXISTS (
+      SELECT 1 FROM group_memberships AS target
+      WHERE target.group_id = sqlc.arg(group_id)::uuid AND target.user_id = sqlc.arg(new_owner_user_id)::uuid
+        AND target.role <> 'owner' AND NOT target.is_write_restricted
+  );
+
+-- name: PromoteGroupOwnerForTransfer :execrows
 UPDATE group_memberships
-SET role = CASE
-    WHEN user_id = $2 THEN 'admin'
-    WHEN user_id = $3 THEN 'owner'
-    ELSE role
-END
-WHERE group_id = $1
-  AND user_id IN ($2, $3);
+SET role = 'owner'
+WHERE group_id = $1 AND user_id = $2
+  AND role <> 'owner' AND NOT is_write_restricted;
 
 -- name: DeleteGroupMembership :execrows
 DELETE FROM group_memberships
