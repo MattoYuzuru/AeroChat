@@ -51,6 +51,9 @@ jobs:
       - name: Verify release metadata negative fixtures
         run: python3 -B infra/scripts/test_release_manifest.py
 
+      - name: Verify recovery policy negative fixtures
+        run: python3 -B infra/scripts/test_recovery.py
+
       - name: Validate local compose
         run: docker compose --env-file .env.example -f infra/compose/docker-compose.yml config >/dev/null
 
