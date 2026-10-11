@@ -145,3 +145,16 @@ UPDATE rtc_media_operations SET authority_outcome='revoked' WHERE id=$1;
 
 -- name: LockMediaRoom :one
 SELECT * FROM rtc_media_rooms WHERE id=$1 FOR UPDATE;
+
+-- name: GetMediaSourceReceipt :one
+SELECT i.*,
+    (SELECT COUNT(DISTINCT (t.grant_id,t.room_id,t.room_name,t.room_generation,
+        t.participant_identity,t.grant_generation,g.call_id,g.participant_id,
+        g.user_id,g.session_id,g.device_id,g.session_revision,g.device_revision,g.eligibility_epoch))::bigint
+     FROM rtc_media_operation_targets t JOIN rtc_media_grants g ON g.id=t.grant_id
+     WHERE t.operation_id=i.operation_id AND g.user_id=i.user_id AND (
+       (i.kind='session' AND g.session_id=i.subject_id AND g.device_id=i.device_id AND g.session_revision<=i.source_revision) OR
+       (i.kind='device' AND g.device_id=i.subject_id AND g.device_revision<=i.source_revision) OR
+       (i.kind='group' AND g.group_id=i.subject_id AND g.eligibility_epoch<=i.source_revision)
+     ))::bigint AS affected_registry_grants
+FROM rtc_media_source_inbox i WHERE i.origin_domain=$1 AND i.event_id=$2;
