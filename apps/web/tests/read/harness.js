@@ -13,7 +13,7 @@ window.fixture={
   const markRead=async()=>{readCount++;return {readState:position,unreadCount:0};};
   const group={id:'group-1',unreadCount:1,encryptedUnreadCount:1};
   opts={lane,enabled:true,authState:{status:'authenticated',profile:{id:'self'}},
-   desktopShellHost:{isCurrentWindowVisible:false},groupWindowContentMode:'thread',
+   desktopShellHost:{isCurrentWindowVisible:false,isCurrentWindowActive:false},groupWindowContentMode:'thread',directWindowContentMode:'thread',
    isPageVisible:true,isThreadRouteActive:true,selectedThread:{encryptedReadState:position},encryptedLane:{status:'ready'},
    latestEncryptedMessage:incoming,selectedState:{status:'ready',snapshot:{group,readState:position,encryptedReadState:position}},
    latestSelectedMessage:incoming,encryptedGroupLane:{status:'ready'},latestEncryptedGroupMessage:incoming,

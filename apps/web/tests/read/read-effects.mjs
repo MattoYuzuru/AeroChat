@@ -13,7 +13,7 @@ const lanes=[
  {file:'chats/useChats.ts',predicate:'shouldAutoMarkRead',name:'useDirectRead',lane:'direct'},
 ];
 // Явный список binding сохраняет исходный predicate/effect без переписывания тела.
-const locals='enabled,authState,desktopShellHost,groupWindowContentMode,isPageVisible,isThreadRouteActive,selectedThread,encryptedLane,latestEncryptedMessage,selectedState,latestSelectedMessage,encryptedGroupLane,latestEncryptedGroupMessage,activeEncryptedDirectChatId,activeEncryptedGroupId,state,activeThreadChatId,latestThreadMessage,latestThreadMessageId,currentUserId,sessionToken,token,mountedRef,selectedStateRef,setGroups,gatewayClient,applyEncryptedReadState,dispatch,setSelectedState,setComposerError,expireSession,describeGatewayError,isGatewayErrorCode,resolveProtectedError,setActionError';
+const locals='enabled,authState,desktopShellHost,groupWindowContentMode,directWindowContentMode,isPageVisible,isThreadRouteActive,selectedThread,encryptedLane,latestEncryptedMessage,selectedState,latestSelectedMessage,encryptedGroupLane,latestEncryptedGroupMessage,activeEncryptedDirectChatId,activeEncryptedGroupId,state,activeThreadChatId,latestThreadMessage,latestThreadMessageId,currentUserId,sessionToken,token,mountedRef,selectedStateRef,setGroups,gatewayClient,applyEncryptedReadState,dispatch,setSelectedState,setComposerError,expireSession,describeGatewayError,isGatewayErrorCode,resolveProtectedError,setActionError';
 let moduleSource=`import {useEffect} from 'react';import {isThreadReadVisible} from '${web}src/chats/read-visibility.ts';\n`;
 for(const lane of lanes){
  const source=await readFile(sourceRoot+'src/'+lane.file,'utf8');
@@ -23,7 +23,9 @@ for(const lane of lanes){
  const effectStart=source.lastIndexOf('  useEffect(() => {',guard);
  const effectEnd=source.indexOf(']);',guard)+3;
  assert.ok(start>=0&&effectStart>=predicateEnd&&effectEnd>effectStart);
- moduleSource+=`export function ${lane.name}(opts){const {${locals}}=opts;const isThreadVisible=isThreadReadVisible({pageVisible:isPageVisible,windowVisible:desktopShellHost.isCurrentWindowVisible,timelineVisible:true});const threadVisible=isThreadVisible;${source.slice(start,predicateEnd)}\n${source.slice(effectStart,effectEnd)}\n}\n`;
+ const visibilityStart=source.indexOf('  const isThreadVisible = isThreadReadVisible(');
+ const visibility=visibilityStart<0?'const isThreadVisible=isThreadReadVisible({pageVisible:isPageVisible,windowVisible:desktopShellHost.isCurrentWindowVisible,timelineVisible:directWindowContentMode===\'thread\'});':source.slice(visibilityStart,source.indexOf(';',visibilityStart)+1);
+ moduleSource+=`export function ${lane.name}(opts){const {${locals}}=opts;${visibility}const threadVisible=isThreadVisible;${source.slice(start,predicateEnd)}\n${source.slice(effectStart,effectEnd)}\n}\n`;
 }
 const server=await createServer({configFile:false,root:here,resolve:{alias:[
  {find:/^react$/,replacement:web+'node_modules/react/index.js'},
@@ -41,11 +43,11 @@ try{
   assert.deepEqual(report,{readCount:0,unread:1},lane.lane+' minimized retains unread');
   await page.evaluate(()=>window.fixture.render({isPageVisible:false}));await page.evaluate(()=>window.fixture.restore());await page.waitForTimeout(50);
   report=await page.evaluate(()=>window.fixture.report());assert.equal(report.readCount,0,lane.lane+' hidden tab retains unread');
-  if(lane.lane.startsWith('group')){
-   await page.evaluate(()=>window.fixture.render({isPageVisible:true,groupWindowContentMode:'info'}));await page.waitForTimeout(50);
+  {
+   await page.evaluate(()=>window.fixture.render({isPageVisible:true,groupWindowContentMode:'info',directWindowContentMode:'info'}));await page.waitForTimeout(50);
    report=await page.evaluate(()=>window.fixture.report());assert.equal(report.readCount,0,lane.lane+' info view retains unread');
   }
-  await page.evaluate(()=>window.fixture.render({isPageVisible:true,groupWindowContentMode:'thread'}));
+  await page.evaluate(()=>window.fixture.render({isPageVisible:true,groupWindowContentMode:'thread',directWindowContentMode:'thread'}));
   await page.waitForFunction(()=>window.fixture.report().readCount===1);
   report=await page.evaluate(()=>window.fixture.report());assert.deepEqual(report,{readCount:1,unread:0},lane.lane+' restored reads');
   await page.evaluate(()=>window.fixture.unmount());evidence.push({lane:lane.lane,...report});
