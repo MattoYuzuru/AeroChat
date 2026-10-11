@@ -122,6 +122,9 @@ jobs:
       - name: Lint web
         run: pnpm --filter @aerochat/web lint
 
+      - name: Test web
+        run: pnpm --filter @aerochat/web test
+
       - name: Build web
         run: pnpm --filter @aerochat/web build
 

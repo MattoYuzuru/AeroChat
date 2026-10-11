@@ -16,7 +16,7 @@ describe("useEncryptedGroupLane helpers", () => {
       }),
     ).toEqual({
       kind: "load",
-      requestKey: "token-a:group-1:crypto-1",
+      requestKey: "token-a:group-1:crypto-1:50",
       token: "token-a",
       groupId: "group-1",
       activeCryptoDeviceId: "crypto-1",
@@ -32,11 +32,31 @@ describe("useEncryptedGroupLane helpers", () => {
       }),
     ).toEqual({
       kind: "load",
-      requestKey: "token-b:group-1:crypto-1",
+      requestKey: "token-b:group-1:crypto-1:50",
       token: "token-b",
       groupId: "group-1",
       activeCryptoDeviceId: "crypto-1",
     });
+  });
+
+  it("invalidates the load request when the requested history window grows", () => {
+    const input = {
+      enabled: true,
+      activeGroupId: "group-1",
+      activeCryptoDeviceId: "crypto-1",
+      cryptoRuntimeState: createReadyCryptoState("crypto-1"),
+      token: "token-a",
+    };
+    const initial = resolveEncryptedGroupLoadDescriptor(input);
+    const expanded = resolveEncryptedGroupLoadDescriptor({ ...input, pageSize: 100 });
+
+    expect(initial.kind).toBe("load");
+    expect(expanded.kind).toBe("load");
+    if (initial.kind !== "load" || expanded.kind !== "load") {
+      throw new Error("Expected load descriptors for a ready group lane");
+    }
+    expect(expanded.requestKey).not.toBe(initial.requestKey);
+    expect(expanded.requestKey).toBe("token-a:group-1:crypto-1:100");
   });
 
   it("marks lane unavailable when active crypto-device is missing after runtime bootstrap", () => {

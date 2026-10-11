@@ -54,6 +54,11 @@ tasks:
     cmds:
       - npx pnpm@10.19.0 --filter @aerochat/web build
 
+  web:test:
+    desc: Запускает тесты web-приложения
+    cmds:
+      - npx pnpm@10.19.0 --filter @aerochat/web test
+
   compose:config:
     desc: Проверяет docker compose-конфигурацию
     cmds:
