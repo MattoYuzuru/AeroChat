@@ -79,11 +79,12 @@ func (r *Repository) backfillEncryptedConversation(parent context.Context, kind 
 		}
 		defer rollbackEncryptedMessageTx(tx)
 		q = q.WithTx(tx)
-		if kind == "direct" {
+		switch kind {
+		case "direct":
 			_, err = q.LockDirectEncryptedConversation(ctx, id)
-		} else if kind == "group" {
+		case "group":
 			_, err = q.LockGroupEncryptedConversation(ctx, id)
-		} else {
+		default:
 			return 0, chat.ErrInvalidArgument
 		}
 		if err != nil {
@@ -92,11 +93,12 @@ func (r *Repository) backfillEncryptedConversation(parent context.Context, kind 
 	}
 	var rows []uuid.UUID
 	var err error
-	if kind == "direct" {
+	switch kind {
+	case "direct":
 		rows, err = q.ListDirectEncryptedSequenceBackfillRows(ctx, chatsqlc.ListDirectEncryptedSequenceBackfillRowsParams{ChatID: id, Limit: batchSize})
-	} else if kind == "group" {
+	case "group":
 		rows, err = q.ListGroupEncryptedSequenceBackfillRows(ctx, chatsqlc.ListGroupEncryptedSequenceBackfillRowsParams{GroupID: id, Limit: batchSize})
-	} else {
+	default:
 		return 0, chat.ErrInvalidArgument
 	}
 	if err != nil || !execute {
