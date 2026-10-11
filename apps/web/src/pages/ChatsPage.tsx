@@ -58,6 +58,7 @@ import { useWebNotifications } from "../notifications/context";
 import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import { useDirectCallSession } from "../rtc/useDirectCallSession";
 import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
+import { isThreadReadVisible } from "../chats/read-visibility";
 import {
   isViewportPinnedToBottom,
   scheduleThreadViewportBottomAlignment,
@@ -112,6 +113,11 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const keepScrollPinnedToBottomRef = useRef(true);
   const olderHistoryAnchorRef = useRef<ThreadViewportOlderHistoryAnchor | null>(null);
   const isPageVisible = usePageVisibility();
+  const isThreadVisible = isThreadReadVisible({
+    pageVisible: isPageVisible,
+    windowVisible: desktopShellHost?.isCurrentWindowVisible ?? true,
+    timelineVisible: true,
+  });
   const sessionToken =
     authState.status === "authenticated" ? authState.token : "";
   const currentUserId =
@@ -123,6 +129,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     token: sessionToken,
     currentUserId,
     composerText,
+    threadVisible: isThreadVisible,
     onUnauthenticated: () => expireSession(),
   });
   const encryptedMediaAttachmentDraft = useEncryptedMediaAttachmentDraft({
@@ -356,7 +363,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const shouldAutoMarkEncryptedRead =
     authState.status === "authenticated" &&
     isThreadRouteActive &&
-    isPageVisible &&
+    isThreadVisible &&
     selectedThread !== null &&
     encryptedLane.status === "ready" &&
     latestEncryptedMessage !== null &&

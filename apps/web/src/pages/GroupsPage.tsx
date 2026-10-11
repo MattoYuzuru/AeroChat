@@ -84,6 +84,7 @@ import {
 } from "../search/jump";
 import { primeEncryptedGroupLocalSearchIndex } from "../search/encrypted-local-search";
 import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
+import { isThreadReadVisible } from "../chats/read-visibility";
 import {
   isViewportPinnedToBottom,
   scheduleThreadViewportBottomAlignment,
@@ -112,6 +113,8 @@ export function GroupsPage() {
   const [mobileWindowContentMode, setMobileWindowContentMode] = useState<"thread" | "info">(
     "thread",
   );
+  const groupWindowContentMode =
+    desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupsStatus, setGroupsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [groupsError, setGroupsError] = useState<string | null>(null);
@@ -665,7 +668,11 @@ export function GroupsPage() {
     selectedState.status === "ready" ? selectedState.messages[0] ?? null : null;
   const shouldAutoMarkGroupRead =
     authState.status === "authenticated" &&
-    isPageVisible &&
+    isThreadReadVisible({
+      pageVisible: isPageVisible,
+      windowVisible: desktopShellHost?.isCurrentWindowVisible ?? true,
+      timelineVisible: groupWindowContentMode === "thread",
+    }) &&
     selectedState.status === "ready" &&
     latestSelectedMessage !== null &&
     latestSelectedMessage.senderUserId !== authState.profile.id &&
@@ -881,7 +888,11 @@ export function GroupsPage() {
     selectedState.status === "ready" ? selectedState.snapshot.group.id : null;
   const shouldAutoMarkEncryptedGroupRead =
     authState.status === "authenticated" &&
-    isPageVisible &&
+    isThreadReadVisible({
+      pageVisible: isPageVisible,
+      windowVisible: desktopShellHost?.isCurrentWindowVisible ?? true,
+      timelineVisible: groupWindowContentMode === "thread",
+    }) &&
     selectedState.status === "ready" &&
     encryptedGroupLane.status === "ready" &&
     latestEncryptedGroupMessage !== null &&
@@ -1107,8 +1118,6 @@ export function GroupsPage() {
     selectedState.status === "ready"
       ? selectedState.snapshot.group.name
       : "Группа";
-  const groupWindowContentMode =
-    desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
   const isDesktopTargetWindow = desktopShellHost !== null && selectedGroupId !== "";
 
   useEffect(() => {
