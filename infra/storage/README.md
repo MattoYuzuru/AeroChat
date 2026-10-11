@@ -25,3 +25,5 @@ Historical tags `aerochat-minio:7ced9663` и `aerochat-mc:7394ce0d` не пер�
 Cold acquisition проверяется в новом owned BuildKit state с явным `--builder`, без смены global default, удаления cache/volumes или вмешательства в чужие builders. `--no-cache` на shared builder сам по себе не означает clean builder.
 
 Тяжёлые проверки используют shared `heavy`; runtime mutations — отдельный exact project lock. Env, credentials, raw scanner logs и receipts остаются вне Git. Останавливаются только собственные fixture processes/containers; данные, архивы и builder state сохраняются до отдельного согласованного cleanup.
+
+Effective overlay включает gRPC1.83.2 — fixed patch для GO-2026-6443 (missing authority/Host server panic). Previous source/compiler receipt относится к overlay с1.83.1; после patch нужна свежая проверка. No-fixed GO-2026-5932 остаётся только module inventory неиспользуемого OpenPGP, без ID/package исключений.

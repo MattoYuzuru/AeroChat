@@ -4,8 +4,8 @@
     "mc": {
       "effectiveGoFloor": "1.26.0",
       "effectiveModuleHashes": {
-        "go.mod": "7c2e4d03e4ea5b2f8f65d67fc6b556b48861d0fe19f813fbf8d5720f6ec72922",
-        "go.sum": "3215c3d1b3f09a8a9c639a7a044bcff0afd4ba132928e9e791248028920612a3"
+        "go.mod": "a7f8f0845bb55e75c4ac3b2d6c72690608b8968ea7222746c9a196404d7f1659",
+        "go.sum": "33644c1abb8151426a3a8793d1f9824564eebc87869028c16d096f9912d4a742"
       },
       "moduleScope": "upstream sources unchanged; dependency-only overlay",
       "upstream": {
@@ -18,8 +18,8 @@
     "minio": {
       "effectiveGoFloor": "1.26.0",
       "effectiveModuleHashes": {
-        "go.mod": "00d36caf8bc6cbb360d90ec5675b926f78bc90889bd9c7295052e23d7ccef6f2",
-        "go.sum": "95b9ad298d6a068dcfdfc0363dd9e15741df63675df626c5e379fab4d5510384"
+        "go.mod": "fefc8b5b75e88cdfafbf9ab7c346bc968b5716b4a3641a32ca74b6edd04ea778",
+        "go.sum": "2a9ad430e3d67ace2fdb00725faf24d21f934b15b2241ee8016913f799797c83"
       },
       "moduleScope": "upstream sources unchanged; dependency-only overlay",
       "upstream": {
