@@ -607,6 +607,10 @@ func (r *Repository) UpdateGroupMemberRole(ctx context.Context, params chat.Upda
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupByID(ctx, mustParseUUID(params.GroupID)); err != nil {
+		return false, convertError(err)
+	}
+
 	affected, err := q.UpdateGroupMembershipRole(ctx, chatsqlc.UpdateGroupMembershipRoleParams{
 		GroupID: mustParseUUID(params.GroupID),
 		UserID:  mustParseUUID(params.UserID),
@@ -645,6 +649,10 @@ func (r *Repository) SetGroupMemberWriteRestriction(ctx context.Context, params 
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupByID(ctx, mustParseUUID(params.GroupID)); err != nil {
+		return false, convertError(err)
+	}
+
 	affected, err := q.SetGroupMembershipWriteRestriction(ctx, chatsqlc.SetGroupMembershipWriteRestrictionParams{
 		GroupID:           mustParseUUID(params.GroupID),
 		UserID:            mustParseUUID(params.UserID),
@@ -685,6 +693,10 @@ func (r *Repository) TransferGroupOwnership(ctx context.Context, params chat.Tra
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupByID(ctx, mustParseUUID(params.GroupID)); err != nil {
+		return false, convertError(err)
+	}
+
 	affected, err := q.TransferGroupOwnership(ctx, chatsqlc.TransferGroupOwnershipParams{
 		GroupID:  mustParseUUID(params.GroupID),
 		UserID:   mustParseUUID(params.CurrentOwnerUserID),
@@ -727,6 +739,10 @@ func (r *Repository) DeleteGroupMembership(ctx context.Context, groupID string, 
 		return false, convertError(err)
 	}
 
+	if _, err := q.LockGroupByID(ctx, mustParseUUID(groupID)); err != nil {
+		return false, convertError(err)
+	}
+
 	affected, err := q.DeleteGroupMembership(ctx, chatsqlc.DeleteGroupMembershipParams{
 		GroupID: mustParseUUID(groupID),
 		UserID:  mustParseUUID(userID),
@@ -764,6 +780,10 @@ func (r *Repository) CreateGroupInviteLink(ctx context.Context, params chat.Crea
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupByID(ctx, mustParseUUID(params.GroupID)); err != nil {
+		return nil, convertError(err)
+	}
+
 	row, err := q.CreateGroupInviteLink(ctx, chatsqlc.CreateGroupInviteLinkParams{
 		ID:              mustParseUUID(params.InviteLinkID),
 		GroupID:         mustParseUUID(params.GroupID),
@@ -858,6 +878,10 @@ func (r *Repository) DisableGroupInviteLink(ctx context.Context, groupID string,
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupByID(ctx, mustParseUUID(groupID)); err != nil {
+		return false, convertError(err)
+	}
+
 	affected, err := q.DisableGroupInviteLink(ctx, chatsqlc.DisableGroupInviteLinkParams{
 		GroupID:    mustParseUUID(groupID),
 		ID:         mustParseUUID(inviteLinkID),
@@ -927,6 +951,10 @@ func (r *Repository) JoinGroupByInviteLink(ctx context.Context, params chat.Join
 
 	q := r.queries.WithTx(tx)
 	if _, err := q.LockGroupMembershipQuotaOwner(ctx, mustParseUUID(params.UserID)); err != nil {
+		return false, convertError(err)
+	}
+
+	if _, err := q.LockGroupByID(ctx, mustParseUUID(params.GroupID)); err != nil {
 		return false, convertError(err)
 	}
 
