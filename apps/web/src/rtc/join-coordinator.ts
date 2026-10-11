@@ -8,6 +8,7 @@ export interface DirectCallJoinCoordinator {
     | { lease: DirectCallJoinLease; message: null }
     | { lease: null; message: string };
   observationVersion(): number;
+  describeUncertainCall(userId: string, callId: string | null): string | null;
   observeChat(chatId: string, activeCallId: string | null, version: number): void;
 }
 
@@ -16,14 +17,19 @@ export function createDirectCallJoinCoordinator(): DirectCallJoinCoordinator {
   const pendingByUser = new Map<string, symbol>();
   const uncertainByUser = new Map<string, Map<string, string>>();
   let observationVersion = 0;
+  const describeUncertainCall = (userId: string, callId: string | null) =>
+    callId !== null && [...(uncertainByUser.get(userId)?.values() ?? [])].includes(callId)
+      ? "Не удалось подтвердить выход из предыдущей попытки. Обновляем состояние звонка; повторите вход после его завершения."
+      : null;
 
   return {
     acquire(userId, callId) {
       if (pendingByUser.has(userId)) {
         return { lease: null, message: "Предыдущая попытка звонка ещё завершается. Дождитесь её окончания и повторите." };
       }
-      if (callId !== null && [...(uncertainByUser.get(userId)?.values() ?? [])].includes(callId)) {
-        return { lease: null, message: "Не удалось подтвердить выход из предыдущей попытки. Обновляем состояние звонка; повторите вход после его завершения." };
+      const uncertainMessage = describeUncertainCall(userId, callId);
+      if (uncertainMessage !== null) {
+        return { lease: null, message: uncertainMessage };
       }
       const owner = Symbol();
       pendingByUser.set(userId, owner);
@@ -45,6 +51,7 @@ export function createDirectCallJoinCoordinator(): DirectCallJoinCoordinator {
       };
     },
     observationVersion() { return observationVersion; },
+    describeUncertainCall,
     observeChat(chatId, activeCallId, version) {
       if (version !== observationVersion) return;
       for (const [userId, calls] of uncertainByUser) {

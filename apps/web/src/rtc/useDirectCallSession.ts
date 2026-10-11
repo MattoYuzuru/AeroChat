@@ -1336,8 +1336,9 @@ export function useDirectCallSession(
     };
   }, [enabled, joinedCallID, state.localJoinedCallId, token]);
 
+  const visibleErrorMessage = joinCoordinator.describeUncertainCall(currentUserId, state.call?.id ?? null) ?? state.errorMessage;
   return {
-    state,
+    state: visibleErrorMessage === state.errorMessage ? state : {...state,errorMessage:visibleErrorMessage},
     phase,
     remoteAudioStream,
     selfParticipant,

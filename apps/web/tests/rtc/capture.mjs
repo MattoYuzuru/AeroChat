@@ -105,6 +105,10 @@ try {
       current=await page.evaluate(()=>window.fixture.report());
       assert.equal(current.captures,1);
       assert.match(current.state.errorMessage,/Не удалось подтвердить/);
+      await page.evaluate(()=>window.fixture.sync());
+      await page.waitForTimeout(25);
+      current=await page.evaluate(()=>window.fixture.report());
+      assert.match(current.state.errorMessage,/Не удалось подтвердить/,'active snapshot must preserve explicit blocked reason');
       await page.evaluate(()=>window.fixture.observeInactive());
       await page.waitForFunction(()=>window.fixture.report().state.call===null);
       await page.evaluate(()=>window.fixture.start());

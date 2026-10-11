@@ -23,6 +23,7 @@ describe("provider-owned direct call join leases", () => {
     const lease = coordinator.acquire("a", "call-1").lease;
     const staleObservation = coordinator.observationVersion();
     lease?.markUncertain("chat-1", "call-1");
+    expect(coordinator.describeUncertainCall("a", "call-1")).toContain("Не удалось подтвердить");
     lease?.release();
     expect(coordinator.acquire("a", "call-1").lease).toBeNull();
     coordinator.observeChat("chat-1", null, staleObservation);
@@ -33,6 +34,7 @@ describe("provider-owned direct call join leases", () => {
     expect(differentCall).not.toBeNull();
     differentCall?.release();
     coordinator.observeChat("chat-1", null, coordinator.observationVersion());
+    expect(coordinator.describeUncertainCall("a", "call-1")).toBeNull();
     expect(coordinator.acquire("a", "call-1").lease).not.toBeNull();
   });
 });
