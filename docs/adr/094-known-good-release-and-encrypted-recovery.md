@@ -1,6 +1,6 @@
 # ADR-094: Known-good release, schema preflight и зашифрованное восстановление
 
-- Статус: Proposed
+- Статус: Accepted
 - Дата: 2026-10-11
 - Задача: [#169](https://github.com/MattoYuzuru/AeroChat/issues/169)
 - Зависимость: ADR-090 / #164; уточняет recovery sections ADR-021, ADR-023 и ADR-028.
@@ -13,7 +13,7 @@
 
 ### Release и schema boundary
 
-До `pull`/`up` workflow сохраняет отдельный recovery record: previous release digest/source SHA, validated пять image digests и overlay, candidate SHA, текущий этап и schema comparison. Секреты и env целиком в record не копируются. Первый запуск имеет explicit `previous = null`: прежний working release не выдумывается.
+До `pull`/`up` workflow сохраняет отдельный recovery record: previous release digest/source SHA, validated пять image digests и overlay, candidate SHA, текущий этап и schema comparison. Секреты и env целиком в record не копируются. Первый запуск имеет explicit `previous = null` только для доказанно пустых durable targets. Если PostgreSQL/S3 уже содержат данные, а previous selection неизвестен, preflight останавливается до явного операторского baseline с inventory/schema evidence: отсутствие metadata не доказывает safe bootstrap.
 
 Compose config и acquisition всех candidate images выполняются до замены runtime. Failure trap всегда сообщает stage и путь к record; failed attempt не обновляет known-good selection. Record для одного attempt не перезаписывает историю. Успешный rollout сохраняет новый selection только после revision/readiness gates. Automatic rollback и down migrations отсутствуют.
 
@@ -23,7 +23,7 @@ Preflight сравнивает SQL inventory предыдущего source SHA �
 
 Оператор явно задаёт owned Compose project, exact PostgreSQL container/database, MinIO container и единственный named volume. Helper проверяет project labels и mount ownership; не принимает произвольные host directories. Source application writers, background cleanup и object-storage writers должны быть остановлены, а native/external writers исключены оператором. Helper не считает работающий `pg_dump` доказательством согласованности DB + S3.
 
-После quiesce MinIO останавливается: это исключает lifecycle deletions во время снимка. PostgreSQL сохраняется через `pg_dump --format=custom --no-owner --no-acl`; S3 сохраняется физическим архивом остановленного volume, включая object metadata и lifecycle state. Backup manifest содержит SHA-256/size каждого payload, время quiesce/snapshot, DB major, exact MinIO image ID/source metadata, release selection и schema inventory. Redis presence/typing не входит в durable backup; роли, credentials, TLS и server env остаются отдельными operator secrets, не печатаются и не включаются в архив.
+После quiesce MinIO останавливается: это исключает lifecycle deletions во время снимка. PostgreSQL сохраняется через `pg_dump --format=custom --no-owner --no-acl`; S3 сохраняется физическим архивом остановленного volume, включая object metadata и lifecycle state. Backup manifest содержит SHA-256/size каждого payload, время quiesce/snapshot, DB major, exact MinIO image ID/source metadata, release selection и schema inventory. Redis presence/typing и PostgreSQL cluster roles не входят в durable backup. Внешние root env credentials, TLS, server env и operator age identity не копируются и не печатаются. **Физический MinIO volume содержит чувствительное внутреннее IAM/config state** в `.minio.sys/config/iam`, включая users, service accounts и policies; оно может попасть в encrypted archive и восстановиться вместе с объектами. Archive целиком считается sensitive storage state, не только media bytes. После restore отдельно проверяется доступ intended target identities/policies; несовместимый root env нельзя маскировать успешным object hash comparison.
 
 Готовый bundle шифруется официальным **age v1.3.2** для operator-owned recipient. Identity хранится отдельно, только в защищённом внешнем файле; key material не попадает в Git, argv или logs. Временные plaintext файлы создаются в приватном каталоге с mode 0700/0600 и удаляются в `finally`; отсутствие forensic восстановления удалённых bytes не обещается. Для production оператор выбирает защищённый scratch filesystem и off-host storage; текущая проверка только на disposable локальных данных. Final archive публикуется атомарно после успешного encryption, partial output не считается backup.
 
@@ -50,7 +50,7 @@ Fixture измеряет длительность quiesce/backup/restore/smoke �
 
 Rollout получает durable recovery record и fail-closed schema policy. Согласованный snapshot требует maintenance window; физический S3 backup привязан к exact storage image/layout. Полный restore выполняется в отдельные пустые цели, а переключение на восстановленные данные требует самостоятельного разрешения и пользовательского smoke. Потеря operator age identity делает archive невосстановимым; ключ и encrypted archive должны иметь независимые копии и проверку доступности.
 
-При текущем Proposed статусе ADR описывает план: backup/restore и migration drill ещё не выполнены. Никакой production rollout, SSH operation, реальных secrets или восстановления retained volumes в задачу не входит.
+ADR принят до implementation; backup/restore и migration drill ещё не выполнены. Никакой production rollout, SSH operation, реальных secrets или восстановления retained volumes в задачу не входит.
 
 ## Альтернативы
 
@@ -64,3 +64,4 @@ Rollout получает durable recovery record и fail-closed schema policy. �
 - [age CLI и recipients/identities](https://github.com/FiloSottile/age/tree/v1.3.2)
 - [PostgreSQL 17 pg_dump](https://www.postgresql.org/docs/17/app-pgdump.html)
 - [PostgreSQL 17 pg_restore](https://www.postgresql.org/docs/17/app-pgrestore.html)
+- [Pinned MinIO IAM paths](https://github.com/minio/minio/blob/7ced9663e6a791fef9dc6be798ff24cda9c730ac/cmd/iam-store.go) и [internal config bucket](https://github.com/minio/minio/blob/7ced9663e6a791fef9dc6be798ff24cda9c730ac/cmd/config.go): проверены в official archive с SHA-256 `f31b6997fdb098479ddddfca1267f02518ee0b59cc1d3f9682c3a48e6309f4d0`.
