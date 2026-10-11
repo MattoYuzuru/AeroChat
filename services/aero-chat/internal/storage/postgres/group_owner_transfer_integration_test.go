@@ -93,3 +93,21 @@ func TestGroupAuthorityOwnerTransferRejectsChangedTarget(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupAuthorityOwnerTransferPromotesReader(t *testing.T) {
+	db, ctx := groupAuthorityDatabase(t, false)
+	group, owner := groupAuthorityPair(t, ctx, db, "owner")
+	target := groupAuthorityUser(t, ctx, db)
+	groupAuthorityExec(t, ctx, db, "INSERT INTO group_memberships(group_id,user_id,role,joined_at) VALUES($1,$2,'reader',now())", mustParseUUID(group), mustParseUUID(target))
+	assertGroupAuthority(t, ctx, db, group, target, 1, true, false, 0)
+	changed, err := NewRepository(db).TransferGroupOwnership(ctx, chat.TransferGroupOwnershipParams{GroupID: group, CurrentOwnerUserID: owner, NewOwnerUserID: target, UpdatedAt: time.Now().UTC()})
+	if err != nil || !changed {
+		t.Fatalf("reader promotion=%t err=%v", changed, err)
+	}
+	var role string
+	if err := db.QueryRow(ctx, "SELECT role FROM group_memberships WHERE group_id=$1 AND user_id=$2", mustParseUUID(group), mustParseUUID(target)).Scan(&role); err != nil || role != "owner" {
+		t.Fatal("reader was not promoted")
+	}
+	assertGroupAuthority(t, ctx, db, group, target, 2, true, true, 0)
+	assertGroupAuthority(t, ctx, db, group, owner, 1, true, true, 0)
+}
