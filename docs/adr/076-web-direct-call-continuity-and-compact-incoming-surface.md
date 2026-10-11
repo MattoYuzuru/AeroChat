@@ -114,6 +114,8 @@ Provider дополнительно владеет небольшим per-user l
 
 `rtc.signal.received` остаётся bounded ephemeral signaling path и не получает durable replay semantics.
 
+Pending peer recovery не отменяется только из-за входящего ICE, duplicate answer или malformed payload. Его завершает connected/ICE-connected текущего peer либо teardown текущего runtime. События и await completions прежнего peer/поколения не меняют новую ICE queue, RTC configuration и UI. Если bounded retry budget исчерпан, локальные tracks/peer освобождаются, UI показывает terminal failure и предлагает явный «Вернуться»; polling и поздний signal не запускают новый budget сами.
+
 ### 7. Что сознательно остаётся отложенным
 
 Этот slice по-прежнему не объявляет реализованными:
