@@ -66,6 +66,15 @@ try{
     if(action==='Обновить thread')assert.equal(await page.locator('[data-fixture-refreshes]').getAttribute('data-fixture-refreshes'),'1');
     if(action==='Позвонить'||action==='Управление звонком')assert.equal(await page.locator('[data-fixture-calls]').getAttribute('data-fixture-calls'),'1');
    }
+   if(state==='call'){
+    for(const label of ['Скрыть','Присоединиться']){
+     const control=page.getByRole('button',{name:label,exact:true});let reached=false;
+     for(let i=0;i<30;i++){if(await control.evaluate(element=>element===document.activeElement)){reached=true;break;}await page.keyboard.press('Tab');}
+     assert.equal(reached,true,label+' call strip keyboard reachable');await page.keyboard.press('Enter');
+     if(label==='Скрыть')assert.equal(await page.evaluate(()=>window.__mobileCallDismissed),1);
+     else{const url=new URL(page.url());assert.equal(url.searchParams.get('chat'),'other-fixture-chat');assert.equal(url.searchParams.get('call'),'join');}
+    }
+   }
    evidence.push({lane,count,state,width,height,zoomModel:width===640&&height===360?'200% desktop layout equivalent: CSS viewport640x360 for1280x720; not native browser zoom':'100% CSS viewport',...geometry});
   }
  }

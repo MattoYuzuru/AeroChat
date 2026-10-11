@@ -1,2 +1,2 @@
 const entry={chat:{id:'other-fixture-chat',participants:[{id:'fixture-peer',nickname:'Fixture call'}]},call:{id:'fixture-call',scope:{kind:'direct'},updatedAt:'2026-10-11T00:00:00Z'},participants:[],syncStatus:'ready'};
-export function useDirectCallAwareness(){return {state:{syncStatus:'ready',activeCallsByChatId:new URLSearchParams(location.search).get('state')==='call'?{'other-fixture-chat':entry}:{},dismissedCallIdsByChatId:{}},dismissSurface(){}};}
+export function useDirectCallAwareness(){return {state:{syncStatus:'ready',activeCallsByChatId:new URLSearchParams(location.search).get('state')==='call'?{'other-fixture-chat':entry}:{},dismissedCallIdsByChatId:{}},dismissSurface(){window.__mobileCallDismissed=(window.__mobileCallDismissed??0)+1;}};}
