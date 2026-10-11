@@ -2272,6 +2272,7 @@ export function GroupsPage() {
               <label className={styles.field}>
                 <span>Ссылка или token</span>
                 <textarea
+                            aria-label="Сообщение"
                   onChange={(event) => setJoinInput(event.target.value)}
                   placeholder="https://aerochat.local/app/groups?join=ginv_..."
                   value={joinInput}

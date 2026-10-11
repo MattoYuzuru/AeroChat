@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -114,6 +115,7 @@ import {
   type ShellWindowViewport,
 } from "./window-placement";
 import { shouldSyncDesktopRouteToActiveWindow } from "./route-sync";
+import { containModalFocus } from "./modal-focus";
 import styles from "./DesktopShell.module.css";
 
 export function DesktopShell({
@@ -181,7 +183,10 @@ export function DesktopShell({
     initialBounds: ShellWindow["bounds"];
   } | null>(null);
   const startMenuAnchorRef = useRef<HTMLDivElement | null>(null);
+  const folderDialogRef = useRef<HTMLElement | null>(null);
+  const folderDialogOpenerRef = useRef<HTMLElement | null>(null);
   const desktopContextMenuRef = useRef<HTMLDivElement | null>(null);
+  const desktopContextMenuOpenerRef = useRef<HTMLElement | null>(null);
   const desktopSurfaceRef = useRef<HTMLElement | null>(null);
   const windowLayerRef = useRef<HTMLElement | null>(null);
   const previousRuntimeWindowsRef = useRef(runtimeState.windows);
@@ -483,6 +488,12 @@ export function DesktopShell({
     };
   }, [startMenuState.isOpen]);
 
+  useLayoutEffect(() => {
+    if (desktopContextMenuState.kind !== "closed") {
+      desktopContextMenuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    }
+  }, [desktopContextMenuState.kind]);
+
   useEffect(() => {
     if (desktopContextMenuState.kind === "closed") {
       return;
@@ -507,6 +518,12 @@ export function DesktopShell({
       }
 
       dispatchDesktopContextMenu({ type: "close" });
+      const opener = desktopContextMenuOpenerRef.current;
+      if (opener?.isConnected) {
+        opener.focus();
+      } else {
+        desktopSurfaceRef.current?.focus();
+      }
     }
 
     document.addEventListener("mousedown", handleDocumentMouseDown);
@@ -517,6 +534,20 @@ export function DesktopShell({
       document.removeEventListener("keydown", handleDocumentKeyDown);
     };
   }, [desktopContextMenuState.kind]);
+
+  const folderDialogKind = folderRenameDialogState !== null
+    ? "rename"
+    : folderDeleteDialogState !== null ? "delete" : null;
+  useLayoutEffect(() => {
+    if (folderDialogKind === null || folderDialogRef.current === null) {
+      return;
+    }
+    return containModalFocus(
+      folderDialogRef.current,
+      folderDialogOpenerRef.current,
+      desktopSurfaceRef.current,
+    );
+  }, [folderDialogKind]);
 
   useEffect(() => {
     if (folderRenameDialogState === null && folderDeleteDialogState === null) {
@@ -837,6 +868,8 @@ export function DesktopShell({
       y: number;
     },
   ) {
+    desktopContextMenuOpenerRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement : null;
     setSelectedDesktopEntryId(entry.id);
     dispatchDesktopContextMenu({
       type: "open_entry",
@@ -852,6 +885,7 @@ export function DesktopShell({
     targetIndex: number | null;
   }) {
     setSelectedDesktopEntryId(null);
+    desktopContextMenuOpenerRef.current = desktopSurfaceRef.current;
     dispatchDesktopContextMenu({
       type: "open_background",
       x: position.x,
@@ -1393,6 +1427,7 @@ export function DesktopShell({
     }
 
     if (commandId === "rename_folder") {
+      folderDialogOpenerRef.current = desktopContextMenuOpenerRef.current;
       setFolderRenameDialogState({
         folderId: entry.folderId,
         name: entry.title,
@@ -1401,6 +1436,7 @@ export function DesktopShell({
     }
 
     if (commandId === "delete_folder") {
+      folderDialogOpenerRef.current = desktopContextMenuOpenerRef.current;
       setFolderDeleteDialogState({
         folderId: entry.folderId,
         title: entry.title,
@@ -1428,6 +1464,7 @@ export function DesktopShell({
     );
     setDesktopRegistryState(createdFolder.registryState);
     setSelectedDesktopEntryId(createdFolder.entryId);
+    folderDialogOpenerRef.current = desktopContextMenuOpenerRef.current;
     setFolderRenameDialogState({
       folderId: createdFolder.folderId,
       name: createdFolder.name,
@@ -1784,6 +1821,7 @@ export function DesktopShell({
                     }}
                     onContextMenu={(event) => {
                       event.preventDefault();
+                      event.currentTarget.focus();
                       openDesktopContextMenu(entry, {
                         x: clampDesktopContextMenuCoordinate(
                           event.clientX,
@@ -1922,6 +1960,11 @@ export function DesktopShell({
                   data-active={runtimeState.activeWindowId === window.windowId || undefined}
                   data-dragging={dragState?.windowId === window.windowId || undefined}
                   data-resizing={resizeState?.windowId === window.windowId || undefined}
+                  onFocusCapture={() => {
+                    if (window.state !== "minimized" && runtimeState.activeWindowId !== window.windowId) {
+                      focusWindow(window);
+                    }
+                  }}
                   onMouseDown={() => {
                     if (window.state === "minimized") {
                       return;
@@ -2068,6 +2111,11 @@ export function DesktopShell({
           >
             <form
               aria-label="Переименовать папку"
+              aria-modal="true"
+              ref={(element) => {
+                folderDialogRef.current = element;
+              }}
+              tabIndex={-1}
               className={styles.dialogCard}
               onSubmit={(event) => {
                 event.preventDefault();
@@ -2131,6 +2179,11 @@ export function DesktopShell({
           >
             <section
               aria-label="Удалить папку"
+              aria-modal="true"
+              ref={(element) => {
+                folderDialogRef.current = element;
+              }}
+              tabIndex={-1}
               className={styles.dialogCard}
               role="dialog"
             >
@@ -2494,7 +2547,7 @@ function DesktopContextMenuPanel({
       className={styles.contextMenu}
       data-desktop-background-blocker="true"
       ref={menuRef}
-      role="menu"
+      role="group"
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -2519,7 +2572,6 @@ function DesktopContextMenuPanel({
                 onClick={() => {
                   onCommand(item.id);
                 }}
-                role="menuitem"
                 type="button"
               >
                 {item.label}
@@ -2531,12 +2583,10 @@ function DesktopContextMenuPanel({
             <div key={item.id} className={styles.contextMenuFolderGroup}>
               <button
                 aria-expanded={isAddToFolderExpanded}
-                aria-haspopup="true"
                 className={styles.contextMenuButton}
                 onClick={() => {
                   onAddToFolderToggle?.();
                 }}
-                role="menuitem"
                 type="button"
               >
                 {item.label}

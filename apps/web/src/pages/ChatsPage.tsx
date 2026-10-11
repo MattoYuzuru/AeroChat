@@ -2363,6 +2363,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
 
                       <label className={styles.field}>
                         <textarea
+                            aria-label="Сообщение"
                           disabled={
                             chats.state.isSendingMessage ||
                             encryptedMediaAttachmentDraft.isUploading
