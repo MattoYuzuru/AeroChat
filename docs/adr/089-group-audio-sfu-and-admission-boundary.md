@@ -1,6 +1,6 @@
 # ADR-089: Group audio через отдельный SFU и проверяемую admission boundary
 
-- Статус: Proposed — требуется принятие владельцем до implementation
+- Статус: Accepted — владелец принял trusted self-hosted SFU с явным уведомлением в UI 2026-10-11
 - Дата: 2026-10-11
 - Задача: [#176](https://github.com/MattoYuzuru/AeroChat/issues/176)
 - Развивает ADR-003; заменяет ограничение lobby-only ADR-078 только после реализации и приёмки.
@@ -9,7 +9,7 @@
 
 Group lobby сегодня не передаёт звук. ADR-003 предусматривает отдельный SFU media plane. Реальные устройства в текущей сессии недоступны: пользователь подтвердил только Mac; даже будущий synthetic media test не завершает трёхпользовательскую device/NAT/TURN приёмку.
 
-## Предлагаемое решение
+## Решение
 
 ### Topology и privacy
 
@@ -47,7 +47,7 @@ Mute/unmute принадлежит пользователю, remote unmute за�
 
 Mesh для маленькой группы проще по server privacy, но меняет SFU направление ADR-003, требует N−1 upload streams на слабом устройстве и отдельного mesh peer lifecycle. Он остаётся реальной альтернативой, если владелец не принимает доверенный SFU. Собственный SFU на Pion требует значительно больше protocol/operational work. Managed cloud меняет self-host/privacy boundary и не выбран.
 
-LiveKit добавляет фундаментальную зависимость и media edge. Без admission proxy self-host token replay после remove остаётся блокером. Transport-only privacy требует явного принятия владельцем; если E2EE обязательна уже для первого group audio, implementation откладывается до утверждённой спецификации, а lobby не выдаётся за завершённую цель.
+LiveKit добавляет фундаментальную зависимость и media edge. Без admission proxy self-host token replay после remove остаётся блокером. Владелец явно принял transport-only privacy для первого этапа с уведомлением перед join; E2EE остаётся отдельным этапом после утверждённой спецификации. Принятие ADR не подтверждает реализованный звук или приёмку устройств; lobby не выдаётся за завершённую цель.
 
 ## Первичные источники
 
