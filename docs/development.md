@@ -4,9 +4,9 @@
 
 ## Инструменты
 
-- Git, Go **1.25** по `go.work`, Node.js **22** по CI, pnpm **10.19.0** по `package.json`.
+- Git, Go **1.27.2** по `go.work` / `infra/go-toolchain.json`, Node.js **22** по CI, pnpm **10.19.0** по `package.json`. Для source checks задать `GOTOOLCHAIN=go1.27.2`; глобальные Go настройки менять не требуется.
 - Docker Engine / Docker Compose для полного локального стенда.
-- Task, Buf, sqlc и golangci-lint устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`; версии зафиксированы в скрипте. Перед запуском: `export PATH="$PWD/bin:$PATH"`.
+- Task, Buf, sqlc, golangci-lint и govulncheck устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`. Go/linter/scanner pins — `infra/go-toolchain.json`; Buf/Task/sqlc pins сохраняются в installer. Перед прямым CLI вызовом: `export PATH="$PWD/bin:$PATH"`.
 
 Установка инструментов и зависимостей:
 
@@ -48,15 +48,21 @@ Push требует secure context: `localhost` или HTTPS-origin для вн�
 
 ## Проверки
 
-Запускать последовательно после установки инструментов и зависимостей. Генерация меняет файлы: проверять её diff и не совмещать с редактированием тех же контрактов. Сейчас unpinned Buf plugins выдают несовместимые Connect v2 imports ([#168](https://github.com/MattoYuzuru/AeroChat/issues/168)); до исправления выполнять проверку generation в отдельном output/worktree, сохраняя committed generated code.
+Запускать последовательно после установки инструментов и зависимостей. Генерация меняет файлы: проверять её diff и не совмещать с редактированием тех же контрактов. Buf remote plugins закреплены version + revision в `buf.gen.yaml`: protobuf Go `1.36.11`, Connect Go `1.19.1`, оба revision `1`. SQLC закреплён на `1.30.0` в installer и CI. Версия Buf CLI — `1.59.0`.
+
+`task generated:check` удаляет только `.go` files с первой строкой `// Code generated ` в четырёх generated output-каталогах, затем выполняет Buf и SQLC generation и проверяет tracked/staged/untracked drift относительно HEAD. Ручные regression tests, `gen/go/go.mod` и `go.sum` сохраняются. Команда позволяет обнаружить outputs от удалённых proto/SQL inputs, требует чистой согласованной source phase и намеренно возвращает nonzero при незакоммиченных generated changes. После изменения контрактов выполнить обычные generation tasks, проверить diff, закоммитить inputs и outputs вместе, затем повторить `generated:check`.
+
+Обновление generator: проверить [официальный формат version/revision](https://buf.build/docs/configuration/v2/buf-gen-yaml/#type-of-plugin), изменить точные pins отдельным PR, выполнить generation и Go compile/tests против текущего runtime major, проверить полный generated diff. Изменение Connect runtime major требует отдельного решения; pin не должен автоматически переходить на latest. CI выполняет Buf + SQLC drift gate и negative fixtures (`sh infra/scripts/test-generated-drift.sh`).
 
 | Scope | Команда |
 | --- | --- |
 | Proto style | `task proto:lint` |
 | Proto generation | `task proto:generate` |
 | SQL generation | `task sqlc:generate` |
+| Generated drift | `task generated:check` |
 | Go tests | `task go:test` |
 | Go lint | `task go:lint` |
+| Go pins / actual toolchain | `python3 -B infra/scripts/go_lifecycle.py check --runtime` |
 | Web unit tests | `task web:test` |
 | Web lint | `task web:lint` |
 | Web typecheck/build | `task web:build` |
@@ -92,4 +98,4 @@ Go unit tests сами по себе не доказывают работу stor
 
 [Bootstrap](deploy/single-server-bootstrap.md) описывает `.env.server`, `.env.server.secrets`, shared `k3s + Traefik`, media origin и repo-managed TURN. [Rollout](deploy/production-rollout.md) содержит production health gates и rollback; это отдельная операционная процедура.
 
-Application images публикуются в GHCR для `web`, `aero-gateway`, `aero-identity`, `aero-chat`, `aero-rtc-control` на `linux/amd64`. Для точного выбора сборки использовать `sha-<commit>`; `edge` следует default branch, release-теги имеют вид `vX.Y.Z`, `vX.Y`, `vX`. `latest` не используется. В `.env.server` выбирается `AERO_IMAGE_TAG`; секреты хранятся только в `.env.server.secrets`.
+Application images для пяти services проходят reusable CI на точном SHA, затем публикуются в GHCR для `linux/amd64` как один [verified release](deploy/verified-release.md): immutable manifest digest + source SHA + пять image digests. Production workflow выбирает `release_digest` и `source_sha`; application `edge`/semver tags больше не продвигаются. Секреты остаются в `.env.server.secrets`; `.env.server` сохраняет выбранную пару `AERO_RELEASE_DIGEST` / `AERO_RELEASE_SOURCE_SHA` после успешных gates.
