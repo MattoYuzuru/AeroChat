@@ -30,9 +30,10 @@ const server=createServer(async(request,response)=>{
  const path=pathname.startsWith('/assets/')?pathname:'/index.html';
  try{const bytes=await readFile(output+path);response.setHeader('Cache-Control','no-store');response.setHeader('Content-Type',path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':path.endsWith('.woff2')?'font/woff2':'text/html');response.end(bytes);}catch{response.statusCode=404;response.end();}
 });
-let browser;const diagnostic={stage:'setup',requests:[],failedRequests:[],attempts:0};
+let browser;const diagnostic={stage:'setup',requests:[],failedRequests:[],pageErrors:[],attempts:0};
 const waterfall=[],sizeTasks=[];
 function trackWaterfall(page,label){
+ page.on('pageerror',error=>diagnostic.pageErrors.push({label,name:error.name,message:error.message.slice(0,300)}));
  const records=new Map();
  page.on('request',request=>{const record={label,stage:diagnostic.stage,path:new URL(request.url()).pathname,type:request.resourceType(),issuedAt:Date.now()};records.set(request,record);waterfall.push(record);});
  page.on('response',response=>{const record=records.get(response.request());if(record)record.status=response.status();});
@@ -87,7 +88,7 @@ try{
  const bytes=(await stat(output+'/'+entry.fileName)).size;
  console.log(JSON.stringify({browser:await browser.version(),entryBytes:bytes,requests,attempts,surfaceEvidence,lateChunkClose:true,scope:'Built production AppRouter/DesktopShell/lazy descriptors and real People/Explorer pages; synthetic auth/gateway/RTC/realtime only; no real account/crypto bootstrap claim'}));
  }
-}catch(error){console.log(JSON.stringify({diagnostic}));throw error;}finally{
+}catch(error){for(const [index,page]of (browser?.contexts().flatMap(context=>context.pages())??[]).entries())try{await page.screenshot({path:output+'/failure-'+index+'.png'});}catch{}console.log(JSON.stringify({diagnostic}));throw error;}finally{
  try{await Promise.all(sizeTasks);await writeFile(output+'/network-waterfall.json',JSON.stringify({diagnostic,waterfall,scope:'Owned compiled fixture requests/timing/response sizes only; synthetic dependencies; no startup/device/crypto claim'},null,2)+'\n');}
  finally{await browser?.close();if(server.listening)await new Promise(resolve=>server.close(resolve));}
 }
