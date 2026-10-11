@@ -230,6 +230,12 @@ func TestPrivateAuthorityTLSCallerAndPublicRoute(t *testing.T) {
 			if _, err := rpc.CheckBoundSession(context.Background(), request); err == nil {
 				t.Fatal("untrusted TLS caller admitted")
 			}
+			resolve := connect.NewRequest(&identityauthorizationv1.ResolveSessionBearerRequest{})
+			resolve.Header().Set("Authorization", "Bearer public-synthetic-fixture")
+			resolve.Header().Set("X-Service-Principal", authorization.CallerURI)
+			if _, err := rpc.ResolveSessionBearer(context.Background(), resolve); err == nil {
+				t.Fatal("untrusted TLS caller resolved bearer")
+			}
 			if spy.calls.Load() != before {
 				t.Fatal("untrusted TLS caller reached domain")
 			}
@@ -241,10 +247,26 @@ func TestPrivateAuthorityTLSCallerAndPublicRoute(t *testing.T) {
 	if _, err := publicClient.CheckBoundSession(context.Background(), connect.NewRequest(&identityauthorizationv1.CheckBoundSessionRequest{})); err == nil {
 		t.Fatal("public route exposed internal authority")
 	}
+	publicResolve := connect.NewRequest(&identityauthorizationv1.ResolveSessionBearerRequest{})
+	publicResolve.Header().Set("Authorization", "Bearer public-synthetic-fixture")
+	if _, err := publicClient.ResolveSessionBearer(context.Background(), publicResolve); err == nil {
+		t.Fatal("public route exposed private bearer resolution")
+	}
+	raw := httptest.NewServer(authorization.NewHTTPHandler(logger, spy))
+	defer raw.Close()
+	rawClient := identityauthorizationv1connect.NewInternalAuthorizationServiceClient(raw.Client(), raw.URL)
+	rawCheck := connect.NewRequest(&identityauthorizationv1.CheckBoundSessionRequest{})
+	rawCheck.Header().Set("X-Service-Principal", authorization.CallerURI)
+	if _, err := rawClient.CheckBoundSession(context.Background(), rawCheck); err == nil {
+		t.Fatal("plain HTTP spoofed caller admitted")
+	}
+	if _, err := rawClient.ResolveSessionBearer(context.Background(), publicResolve); err == nil {
+		t.Fatal("plain HTTP caller resolved bearer")
+	}
 	if spy.calls.Load() != 1 {
 		t.Fatal("public route reached private authority service")
 	}
-	if strings.Contains(logs.String(), "fixture-user") || strings.Contains(logs.String(), "fixture-session") || strings.Contains(logs.String(), "X-Service-Principal") {
+	if strings.Contains(logs.String(), "fixture-user") || strings.Contains(logs.String(), "fixture-session") || strings.Contains(logs.String(), "X-Service-Principal") || strings.Contains(logs.String(), "public-synthetic-fixture") {
 		t.Fatal("private subject/request data was logged")
 	}
 }

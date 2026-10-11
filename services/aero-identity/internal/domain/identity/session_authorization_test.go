@@ -92,6 +92,9 @@ func TestSessionAuthorityRejectsForeignUnknownMalformedAndBadState(t *testing.T)
 		if _, err := service.CheckBoundSession(ctx, snapshot.User.ID, snapshot.Session.ID, snapshot.Device.ID); !errors.Is(err, ErrAuthorityUnavailable) {
 			t.Fatal("unsupported or broken authority returned active")
 		}
+		if _, err := service.ResolveSessionBearer(ctx, token); !errors.Is(err, ErrAuthorityUnavailable) {
+			t.Fatal("bearer resolved unsupported or broken authority")
+		}
 	}
 }
 
