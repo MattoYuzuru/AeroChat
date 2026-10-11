@@ -27,6 +27,6 @@ window.fixture={
  twice(){void session.send();void session.send();},send(){void session.send();},
  switchThread(){opts={...opts,selectedThread:{chat:{id:'chat-2'}}};root.render(React.createElement(Harness));},
  changeReply(){reply='reply-2';opts={...opts,selectedEncryptedReplyMessageId:reply};root.render(React.createElement(Harness));},
- report(){return {calls:calls.map(args=>({chatId:args[0],text:args[1]})),text:session.text,pending:session.pending,error:session.error,clears,failed,reply,edit};},
+ report(){return {calls:calls.map(args=>({chatId:args[0],text:args[1]})),text:session.text,currentReply:session.currentReply,pending:session.pending,error:session.error,clears,failed,reply,edit};},
  unmount(){root.unmount();}
 };

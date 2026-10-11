@@ -22,7 +22,7 @@ const virtual=ts.transpileModule(`import {useEffectEvent,useRef,useState} from '
  const {selectedThread,uploadedEncryptedAttachmentDraft,editingEncryptedEntry,selectedEncryptedReplyEntry,selectedEncryptedReplyMessageId,editingEncryptedMessageId,setSelectedEncryptedReplyMessageId,setEditingEncryptedMessageId,chats,normalizeComposerMessageText,cryptoRuntime,encryptedMediaAttachmentDraft,publishLocalEncryptedDirectMessageV2Projection}=opts;
  const [composerText,setComposerText]=useState('');const [composerError,setComposerError]=useState(null);
  ${state}\n${complete}\n${source.slice(sendStart,sendEnd)}\n${source.slice(keyStart,keyEnd)}
- return {text:composerText,error:composerError,pending:isComposerSending,send:handleEncryptedDirectMessageV2Send,onKeyDown:handleComposerKeyDown,onChange:event=>{${onChange}}};
+ return {text:composerText,error:composerError,currentReply:selectedEncryptedReplyMessageId,pending:isComposerSending,send:handleEncryptedDirectMessageV2Send,onKeyDown:handleComposerKeyDown,onChange:event=>{${onChange}}};
 }`,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const server=await createServer({configFile:false,root:here,resolve:{alias:[{find:/^react$/,replacement:web+'node_modules/react/index.js'},{find:/^react-dom\/(.*)$/,replacement:web+'node_modules/react-dom/$1'}]},plugins:[{name:'composer-fixture',resolveId(id){if(id==='virtual:composer')return '\0composer';},load(id){if(id==='\0composer')return virtual;}}],server:{host:'127.0.0.1',port:Number(process.env.COMPOSER_FIXTURE_PORT??25174),strictPort:true,fs:{allow:[web,here]}}});
 await server.listen();const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE});
@@ -36,7 +36,7 @@ try{
   assert.equal((await page.evaluate(()=>window.fixture.report())).calls[0].text,'first message');
   if(scenario==='typing'){await page.getByRole('textbox').fill('new unsent draft');await page.getByRole('textbox').press('Enter');}
   if(scenario==='scope'){await page.evaluate(()=>window.fixture.switchThread());await page.getByRole('textbox').fill('other thread draft');}
-  if(scenario==='reply')await page.evaluate(()=>window.fixture.changeReply());
+  if(scenario==='reply'){await page.evaluate(()=>window.fixture.changeReply());await page.waitForFunction(()=>window.fixture.report().currentReply==='reply-2');}
   if(scenario==='failure')await page.evaluate(()=>window.fixture.fail());else if(scenario==='cancel')await page.evaluate(()=>window.fixture.cancel());else await page.evaluate(()=>window.fixture.succeed());
   await page.waitForTimeout(30);const report=await page.evaluate(()=>window.fixture.report());
   assert.equal(report.calls.length,1,scenario+' exactly one mutation');assert.equal(report.pending,false,scenario+' lock released');
