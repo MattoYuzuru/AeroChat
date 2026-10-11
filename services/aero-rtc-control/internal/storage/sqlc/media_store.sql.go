@@ -250,7 +250,7 @@ type CreateMediaGrantParams struct {
 	EligibilityEpoch    int64              `db:"eligibility_epoch" json:"eligibility_epoch"`
 	GrantGeneration     int64              `db:"grant_generation" json:"grant_generation"`
 	ParticipantIdentity uuid.UUID          `db:"participant_identity" json:"participant_identity"`
-	Column15            pgtype.Timestamptz `db:"column_15" json:"column_15"`
+	PreparedAt          pgtype.Timestamptz `db:"prepared_at" json:"prepared_at"`
 }
 
 func (q *Queries) CreateMediaGrant(ctx context.Context, arg CreateMediaGrantParams) (RtcMediaGrant, error) {
@@ -269,7 +269,7 @@ func (q *Queries) CreateMediaGrant(ctx context.Context, arg CreateMediaGrantPara
 		arg.EligibilityEpoch,
 		arg.GrantGeneration,
 		arg.ParticipantIdentity,
-		arg.Column15,
+		arg.PreparedAt,
 	)
 	var i RtcMediaGrant
 	err := row.Scan(
