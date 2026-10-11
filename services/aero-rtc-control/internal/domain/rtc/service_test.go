@@ -574,6 +574,7 @@ func (r *fakeRepository) GetActiveCallByScope(_ context.Context, scope Conversat
 }
 
 func (r *fakeRepository) CreateCallWithParticipant(_ context.Context, call Call, participant CallParticipant) (*Call, *CallParticipant, error) {
+	r.releaseEndedParticipation(participant.UserID, participant.UpdatedAt)
 	for _, existing := range r.calls {
 		if existing.Scope == call.Scope && existing.Status == CallStatusActive {
 			return nil, nil, ErrConflict
@@ -590,6 +591,69 @@ func (r *fakeRepository) CreateCallWithParticipant(_ context.Context, call Call,
 	r.participants[participant.ID] = cloneParticipant(&participant)
 
 	return cloneCall(&call), cloneParticipant(&participant), nil
+}
+
+func (r *fakeRepository) releaseEndedParticipation(userID string, at time.Time) {
+	for _, participant := range r.participants {
+		call := r.calls[participant.CallID]
+		if participant.UserID == userID && participant.State == ParticipantStateActive && call.Status == CallStatusEnded {
+			participant.State, participant.LeftAt, participant.UpdatedAt = ParticipantStateLeft, &at, at
+		}
+	}
+}
+
+func (r *fakeRepository) JoinParticipant(ctx context.Context, participant CallParticipant) (*Call, *CallParticipant, error) {
+	call := r.calls[participant.CallID]
+	if call == nil {
+		return nil, nil, ErrNotFound
+	}
+	if call.Status != CallStatusActive {
+		return nil, nil, ErrConflict
+	}
+	if existing, err := r.GetActiveParticipant(ctx, call.ID, participant.UserID); err == nil {
+		return cloneCall(call), existing, nil
+	}
+	r.releaseEndedParticipation(participant.UserID, participant.UpdatedAt)
+	joined, err := r.CreateParticipant(ctx, participant)
+	if err != nil {
+		return nil, nil, err
+	}
+	return cloneCall(call), joined, nil
+}
+
+func (r *fakeRepository) LeaveParticipantAndMaybeEndCall(ctx context.Context, callID, participantID string, at time.Time) (bool, error) {
+	participant := r.participants[participantID]
+	if participant == nil || participant.CallID != callID {
+		return false, nil
+	}
+	updated, err := r.LeaveParticipant(ctx, participantID, at)
+	if err != nil || !updated {
+		return updated, err
+	}
+	if count, _ := r.CountActiveParticipants(ctx, callID); count == 0 {
+		_, err = r.EndCall(ctx, callID, nil, CallEndReasonLastParticipant, at)
+	}
+	return updated, err
+}
+
+func (r *fakeRepository) EndCallWithParticipants(ctx context.Context, callID, userID string, at time.Time) (*Call, []CallParticipant, error) {
+	call := r.calls[callID]
+	if call == nil {
+		return nil, nil, ErrNotFound
+	}
+	if call.Status != CallStatusActive {
+		return nil, nil, ErrConflict
+	}
+	if call.CreatedByUserID != userID {
+		return nil, nil, ErrPermissionDenied
+	}
+	affected, _ := r.ListActiveParticipants(ctx, callID)
+	_ = r.LeaveActiveParticipantsByCallID(ctx, callID, at)
+	_, _ = r.EndCall(ctx, callID, &userID, CallEndReasonManual, at)
+	for index := range affected {
+		affected[index].State, affected[index].LeftAt, affected[index].UpdatedAt = ParticipantStateLeft, &at, at
+	}
+	return cloneCall(call), affected, nil
 }
 
 func (r *fakeRepository) CreateParticipant(_ context.Context, participant CallParticipant) (*CallParticipant, error) {

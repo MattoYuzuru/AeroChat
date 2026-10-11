@@ -159,6 +159,12 @@ Realtime delivery reuse'ит существующий gateway websocket transpor
 
 Active call и participant lifecycle хранятся авторитетно в БД.
 
+Join/rejoin, leave с возможным завершением последнего participant и manual end выполняются одной repository transaction с общей row lock `rtc_calls FOR UPDATE`. Проверка active status, participant mutation и count/termination используют этот lock; manual end освобождает всех участников и меняет call status атомарно. Ошибка любого statement откатывает весь переход. Repository возвращает locked snapshot для join/end, а service не собирает эти переходы из отдельных write calls.
+
+Перед insert нового active participant repository идемпотентно освобождает его старые active rows, если связанный call уже ended. Это восстанавливает slot после исторической гонки, сохраняя partial unique index one-active-user. Массовый repair существующей БД и изменение deployment model в этот fix не входят.
+
+Используются [row-level locks PostgreSQL](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS) и [sqlc WithTx](https://docs.sqlc.dev/en/v1.30.0/howto/transactions.html).
+
 Signaling delivery остаётся честно ephemeral:
 
 - сервер не полагается на process memory для `call` или `participant`;

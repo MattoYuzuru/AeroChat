@@ -109,6 +109,11 @@ func (r *Repository) CreateCallWithParticipant(ctx context.Context, call rtc.Cal
 	}()
 
 	q := r.queries.WithTx(tx)
+	if err := q.ReleaseEndedParticipationByUserID(ctx, rtcsqlc.ReleaseEndedParticipationByUserIDParams{
+		UserID: mustParseUUID(participant.UserID), At: timestamptzValue(participant.UpdatedAt),
+	}); err != nil {
+		return nil, nil, convertError(err)
+	}
 	callRow, err := q.CreateCall(ctx, rtcsqlc.CreateCallParams{
 		ID:              mustParseUUID(call.ID),
 		ScopeType:       call.Scope.Type,
@@ -148,20 +153,141 @@ func (r *Repository) CreateCallWithParticipant(ctx context.Context, call rtc.Cal
 }
 
 func (r *Repository) CreateParticipant(ctx context.Context, participant rtc.CallParticipant) (*rtc.CallParticipant, error) {
-	row, err := r.queries.CreateParticipant(ctx, rtcsqlc.CreateParticipantParams{
-		ID:        mustParseUUID(participant.ID),
-		CallID:    mustParseUUID(participant.CallID),
-		UserID:    mustParseUUID(participant.UserID),
-		State:     participant.State,
-		JoinedAt:  timestamptzValue(participant.JoinedAt),
-		UpdatedAt: timestamptzValue(participant.UpdatedAt),
-	})
-	if err != nil {
-		return nil, convertError(err)
-	}
+	_, joined, err := r.JoinParticipant(ctx, participant)
+	return joined, err
+}
 
+func (r *Repository) JoinParticipant(ctx context.Context, participant rtc.CallParticipant) (*rtc.Call, *rtc.CallParticipant, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := r.queries.WithTx(tx)
+	locked, err := q.LockCallByID(ctx, mustParseUUID(participant.CallID))
+	if err != nil {
+		return nil, nil, convertError(err)
+	}
+	if locked.Status != rtc.CallStatusActive {
+		return nil, nil, rtc.ErrConflict
+	}
+	row, err := q.GetActiveParticipantByCallIDAndUserID(ctx, rtcsqlc.GetActiveParticipantByCallIDAndUserIDParams{
+		CallID: mustParseUUID(participant.CallID), UserID: mustParseUUID(participant.UserID),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		if err := q.ReleaseEndedParticipationByUserID(ctx, rtcsqlc.ReleaseEndedParticipationByUserIDParams{
+			UserID: mustParseUUID(participant.UserID), At: timestamptzValue(participant.UpdatedAt),
+		}); err != nil {
+			return nil, nil, convertError(err)
+		}
+		row, err = q.CreateParticipant(ctx, rtcsqlc.CreateParticipantParams{
+			ID:        mustParseUUID(participant.ID),
+			CallID:    mustParseUUID(participant.CallID),
+			UserID:    mustParseUUID(participant.UserID),
+			State:     participant.State,
+			JoinedAt:  timestamptzValue(participant.JoinedAt),
+			UpdatedAt: timestamptzValue(participant.UpdatedAt),
+		})
+	}
+	if err != nil {
+		return nil, nil, convertError(err)
+	}
+	count, err := q.CountActiveParticipantsByCallID(ctx, locked.ID)
+	if err != nil {
+		return nil, nil, convertError(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, err
+	}
+	call := toDomainCallFromBase(locked)
+	call.ActiveParticipantCount = uint32(count)
 	result := toDomainParticipant(row)
-	return &result, nil
+	return call, &result, nil
+}
+
+func (r *Repository) LeaveParticipantAndMaybeEndCall(ctx context.Context, callID, participantID string, at time.Time) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := r.queries.WithTx(tx)
+	call, err := q.LockCallByID(ctx, mustParseUUID(callID))
+	if err != nil {
+		return false, convertError(err)
+	}
+	rows, err := q.ListActiveParticipantsByCallID(ctx, call.ID)
+	if err != nil {
+		return false, convertError(err)
+	}
+	found := false
+	for _, row := range rows {
+		if row.ID.String() == participantID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false, nil
+	}
+	if _, err := q.LeaveParticipant(ctx, rtcsqlc.LeaveParticipantParams{ID: mustParseUUID(participantID), LeftAt: timestamptzValue(at), UpdatedAt: timestamptzValue(at)}); err != nil {
+		return false, convertError(err)
+	}
+	count, err := q.CountActiveParticipantsByCallID(ctx, call.ID)
+	if err != nil {
+		return false, convertError(err)
+	}
+	if count == 0 {
+		if _, err := q.EndCall(ctx, rtcsqlc.EndCallParams{ID: call.ID, UpdatedAt: timestamptzValue(at), EndedAt: timestamptzValue(at), EndReason: textPointerValue(stringPointer(rtc.CallEndReasonLastParticipant))}); err != nil {
+			return false, convertError(err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *Repository) EndCallWithParticipants(ctx context.Context, callID, userID string, at time.Time) (*rtc.Call, []rtc.CallParticipant, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := r.queries.WithTx(tx)
+	call, err := q.LockCallByID(ctx, mustParseUUID(callID))
+	if err != nil {
+		return nil, nil, convertError(err)
+	}
+	if call.Status != rtc.CallStatusActive {
+		return nil, nil, rtc.ErrConflict
+	}
+	if call.CreatedByUserID.String() != userID {
+		return nil, nil, rtc.ErrPermissionDenied
+	}
+	rows, err := q.ListActiveParticipantsByCallID(ctx, call.ID)
+	if err != nil {
+		return nil, nil, convertError(err)
+	}
+	if _, err := q.LeaveActiveParticipantsByCallID(ctx, rtcsqlc.LeaveActiveParticipantsByCallIDParams{CallID: call.ID, LeftAt: timestamptzValue(at), UpdatedAt: timestamptzValue(at)}); err != nil {
+		return nil, nil, convertError(err)
+	}
+	if _, err := q.EndCall(ctx, rtcsqlc.EndCallParams{ID: call.ID, UpdatedAt: timestamptzValue(at), EndedAt: timestamptzValue(at), EndedByUserID: uuidValue(userID), EndReason: textPointerValue(stringPointer(rtc.CallEndReasonManual))}); err != nil {
+		return nil, nil, convertError(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, err
+	}
+	result := toDomainCallFromBase(call)
+	result.Status = rtc.CallStatusEnded
+	result.UpdatedAt, result.EndedAt, result.EndedByUserID, result.EndReason = at, &at, &userID, rtc.CallEndReasonManual
+	affected := make([]rtc.CallParticipant, 0, len(rows))
+	for _, row := range rows {
+		participant := toDomainParticipant(row)
+		participant.State, participant.LeftAt, participant.UpdatedAt = rtc.ParticipantStateLeft, &at, at
+		affected = append(affected, participant)
+	}
+	return result, affected, nil
 }
 
 func (r *Repository) GetActiveParticipant(ctx context.Context, callID string, userID string) (*rtc.CallParticipant, error) {
@@ -191,29 +317,6 @@ func (r *Repository) ListActiveParticipants(ctx context.Context, callID string) 
 	return result, nil
 }
 
-func (r *Repository) LeaveParticipant(ctx context.Context, participantID string, at time.Time) (bool, error) {
-	affected, err := r.queries.LeaveParticipant(ctx, rtcsqlc.LeaveParticipantParams{
-		LeftAt:    timestamptzValue(at),
-		UpdatedAt: timestamptzValue(at),
-		ID:        mustParseUUID(participantID),
-	})
-	if err != nil {
-		return false, convertError(err)
-	}
-
-	return affected > 0, nil
-}
-
-func (r *Repository) LeaveActiveParticipantsByCallID(ctx context.Context, callID string, at time.Time) error {
-	_, err := r.queries.LeaveActiveParticipantsByCallID(ctx, rtcsqlc.LeaveActiveParticipantsByCallIDParams{
-		LeftAt:    timestamptzValue(at),
-		UpdatedAt: timestamptzValue(at),
-		CallID:    mustParseUUID(callID),
-	})
-
-	return convertError(err)
-}
-
 func (r *Repository) TouchParticipantSignal(ctx context.Context, participantID string, at time.Time) error {
 	_, err := r.queries.TouchParticipantSignal(ctx, rtcsqlc.TouchParticipantSignalParams{
 		LastSignalAt: timestamptzValue(at),
@@ -222,30 +325,6 @@ func (r *Repository) TouchParticipantSignal(ctx context.Context, participantID s
 	})
 
 	return convertError(err)
-}
-
-func (r *Repository) CountActiveParticipants(ctx context.Context, callID string) (int64, error) {
-	count, err := r.queries.CountActiveParticipantsByCallID(ctx, mustParseUUID(callID))
-	if err != nil {
-		return 0, convertError(err)
-	}
-
-	return count, nil
-}
-
-func (r *Repository) EndCall(ctx context.Context, callID string, endedByUserID *string, endReason string, at time.Time) (bool, error) {
-	affected, err := r.queries.EndCall(ctx, rtcsqlc.EndCallParams{
-		UpdatedAt:     timestamptzValue(at),
-		EndedAt:       timestamptzValue(at),
-		EndedByUserID: uuidPointerValue(endedByUserID),
-		EndReason:     textPointerValue(stringPointer(endReason)),
-		ID:            mustParseUUID(callID),
-	})
-	if err != nil {
-		return false, convertError(err)
-	}
-
-	return affected > 0, nil
 }
 
 func convertError(err error) error {
