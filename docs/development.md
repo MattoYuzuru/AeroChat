@@ -33,6 +33,8 @@ docker compose -f infra/compose/docker-compose.yml down
 
 Root `.env.example` управляет compose. Для запуска из исходников использовать `services/*/.env.example`, `apps/web/.env.example` и `pnpm --filter @aerochat/web dev`. Source-mode приложениям нужны доступные инфраструктурные зависимости; Vite сам их не поднимает.
 
+По [ADR-093](adr/093-full-readiness-storage-and-downstream-propagation.md), `/healthz` проверяет процесс, `/readyz` — full dependencies. Chat дополнительно выполняет read-only S3 bucket check под service credentials, gateway читает downstream `/readyz`. Missing/denied/unreachable storage даёт chat/gateway/edge 503 при доступном process health; восстановление storage возвращает 200 без перезапуска. RPC Ping остаётся transport diagnostics и не доказывает readiness. S3 и gateway network probe budget — 3 секунды либо более ранний caller deadline. Metadata readiness не заменяет authenticated write/read/private-policy smoke.
+
 | Конфигурация | Назначение и ограничение |
 | --- | --- |
 | `AERO_MEDIA_S3_INTERNAL_ENDPOINT`, `AERO_MEDIA_S3_PRESIGN_ENDPOINT` (source-mode); `MEDIA_S3_PUBLIC_ENDPOINT` (compose) | Внутренний service-to-storage endpoint и отдельный browser-visible endpoint для presigned URL; браузеру нельзя отдавать compose-host `minio:9000`. |
