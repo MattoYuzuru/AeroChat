@@ -76,7 +76,7 @@ type ReferenceModel struct {
 }
 
 func NewReferenceModel(binding Binding) (*ReferenceModel, error) {
-	if binding.Key.Generation == 0 || binding.EligibilityEpoch <= 0 || binding.EligibilityEpoch >= math.MaxInt64 {
+	if binding.Key.Generation == 0 || binding.EligibilityEpoch <= 0 || binding.EligibilityEpoch == math.MaxInt64 {
 		return nil, ErrDenied
 	}
 	for _, value := range []string{
