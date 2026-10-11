@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { mergeEncryptedLaneWithPending, resolveEncryptedLanePageSize } from "./encrypted-lane-pending";
 import type { EncryptedDirectMessageV2ReadyProjection, EncryptedGroupReadyProjection } from "../crypto/types";
 import { mergeEncryptedGroupProjection } from "../groups/encrypted-group-projection";
 import { mergeEncryptedDirectMessageV2Projection } from "./encrypted-v2-projection";
@@ -101,6 +102,52 @@ for (const lane of ["direct", "group"] as const) {
         expect(result).toEqual(expected);
         expect([first, edit, remove, lateEdit].reduce((current, update) => apply(current, update), result)).toEqual(expected);
       }
+    });
+    it("retries pre-origin edit/delete only when its content arrives and discards applied/duplicate payload", () => {
+      const first = content("first", "1", "2099-01-01T00:00:00Z");
+      for (const operationKind of ["edit", "tombstone"] as const) {
+        const mutation: EncryptedDirectMessageV2ReadyProjection = { ...content("mutation", "2", "2000-01-01T00:00:00Z"),
+          operationKind, targetMessageId: "first", revision: 2, text: operationKind === "edit" ? "edited" : null,
+          editedAt: operationKind === "edit" ? "2000-01-01T00:00:00Z" : null,
+          deletedAt: operationKind === "tombstone" ? "2000-01-01T00:00:00Z" : null };
+        if (lane === "direct") {
+          const unresolved = mergeEncryptedLaneWithPending([], [], [mutation, mutation], 50, mergeEncryptedDirectMessageV2Projection);
+          expect(unresolved.items[0]).toMatchObject({ kind: "failure", failureKind: "unresolved_target" });
+          expect(unresolved.pendingMutations).toEqual([mutation]);
+          const unrelated = mergeEncryptedLaneWithPending(unresolved.items, unresolved.pendingMutations, [content("other", "3", first.createdAt)], 50, mergeEncryptedDirectMessageV2Projection);
+          expect(unrelated.pendingMutations).toEqual([mutation]);
+          const resolved = mergeEncryptedLaneWithPending(unrelated.items, unrelated.pendingMutations, [first], 50, mergeEncryptedDirectMessageV2Projection);
+          expect(resolved.pendingMutations).toEqual([]);
+          expect(resolved.items.some((item) => item.kind === "failure")).toBe(false);
+          expect(resolved.items.find((item) => item.messageId === "first")).toMatchObject({ text: mutation.text, isTombstone: operationKind === "tombstone", serverSequence: "1" });
+          expect(mergeEncryptedLaneWithPending(resolved.items, [], [mutation], 50, mergeEncryptedDirectMessageV2Projection)).toEqual(resolved);
+        } else {
+          const unresolved = mergeEncryptedLaneWithPending([], [], [group(mutation), group(mutation)], 50, mergeEncryptedGroupProjection);
+          expect(unresolved.pendingMutations).toHaveLength(1);
+          const resolved = mergeEncryptedLaneWithPending(unresolved.items, unresolved.pendingMutations, [group(first)], 50, mergeEncryptedGroupProjection);
+          expect(resolved.pendingMutations).toEqual([]);
+          expect(resolved.items).toEqual(merge([mutation, first]));
+        }
+      }
+    });
+    it("caps pending payload at min(page size,64) without hiding overflow failures", () => {
+      const updates = Array.from({ length: 70 }, (_, index): EncryptedDirectMessageV2ReadyProjection => ({
+        ...content(`mutation-${index}`, String(index + 2), "2000-01-01T00:00:00Z"),
+        operationKind: "edit", targetMessageId: `missing-${index}`, revision: 2,
+      }));
+      const result = lane === "direct"
+        ? mergeEncryptedLaneWithPending([], [], updates, 100, mergeEncryptedDirectMessageV2Projection)
+        : mergeEncryptedLaneWithPending([], [], updates.map(group), 100, mergeEncryptedGroupProjection);
+      expect(result.items).toHaveLength(70);
+      expect(result.pendingMutations).toHaveLength(64);
+      expect(result.items.every((entry) => entry.kind === "failure")).toBe(true);
+      expect(resolveEncryptedLanePageSize(Number.NaN)).toBe(50);
+      expect(resolveEncryptedLanePageSize(Infinity)).toBe(50);
+      expect(resolveEncryptedLanePageSize(0)).toBe(50);
+      expect(resolveEncryptedLanePageSize(2.9)).toBe(2);
+      const small = mergeEncryptedLaneWithPending([], [], updates, 2, mergeEncryptedDirectMessageV2Projection);
+      expect(small.pendingMutations).toHaveLength(2);
+      expect(() => mergeEncryptedLaneWithPending([], [], [{ ...updates[0], serverSequence: "0" }], 50, mergeEncryptedDirectMessageV2Projection)).toThrow();
     });
     it("keeps pre-origin mutation visibly unresolved until whole-lane recovery replay", () => {
       const first = content("first", "1", "2099-01-01T00:00:00Z");

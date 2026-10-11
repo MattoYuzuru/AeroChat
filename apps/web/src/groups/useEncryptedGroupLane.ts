@@ -1,3 +1,5 @@
+import type { EncryptedGroupDecryptedEnvelope } from "../crypto/types";
+import { mergeEncryptedLaneWithPending, resolveEncryptedLanePageSize } from "../chats/encrypted-lane-pending";
 import { compareServerSequences } from "../gateway/server-sequence";
 import { useEffect, useRef, useState } from "react";
 import { useCryptoRuntime } from "../crypto/useCryptoRuntime";
@@ -45,6 +47,7 @@ interface LoadedEncryptedGroupLaneState {
   status: "ready" | "error" | "unavailable";
   bootstrap: EncryptedGroupBootstrap | null;
   items: EncryptedGroupProjectionEntry[];
+  pendingMutations: EncryptedGroupDecryptedEnvelope[];
   errorMessage: string | null;
 }
 
@@ -52,8 +55,9 @@ export function useEncryptedGroupLane({
   enabled,
   token,
   groupId,
-  pageSize = encryptedGroupProjectionLimit,
+  pageSize: requestedPageSize = encryptedGroupProjectionLimit,
 }: UseEncryptedGroupLaneOptions): EncryptedGroupLaneState {
+  const pageSize = resolveEncryptedLanePageSize(requestedPageSize);
   const cryptoRuntime = useCryptoRuntime();
   const activeCryptoDeviceId = resolveActiveRealtimeCryptoDeviceId(cryptoRuntime.state);
   const activeGroupId = groupId?.trim() ?? "";
@@ -62,9 +66,11 @@ export function useEncryptedGroupLane({
     status: "ready",
     bootstrap: null,
     items: [],
+    pendingMutations: [],
     errorMessage: null,
   });
   const requestVersionRef = useRef(0);
+  const updateVersionRef = useRef(0);
   const loadDescriptor = resolveEncryptedGroupLoadDescriptor({
     enabled,
     activeGroupId,
@@ -79,6 +85,12 @@ export function useEncryptedGroupLane({
   const activeLoadGroupId = loadDescriptor.kind === "load" ? loadDescriptor.groupId : null;
   const activeLoadCryptoDeviceId =
     loadDescriptor.kind === "load" ? loadDescriptor.activeCryptoDeviceId : null;
+
+  useEffect(() => () => {
+    requestVersionRef.current += 1;
+    setLoadedState((current) => current.requestKey === activeLoadRequestKey
+      ? { ...current, pendingMutations: [] } : current);
+  }, [activeLoadRequestKey]);
 
   useEffect(() => {
     if (
@@ -95,6 +107,7 @@ export function useEncryptedGroupLane({
 
     const requestVersion = requestVersionRef.current + 1;
     requestVersionRef.current = requestVersion;
+    const startedUpdateVersion = updateVersionRef.current;
 
     void loadEncryptedGroupLane({
       token: activeLoadToken,
@@ -108,12 +121,21 @@ export function useEncryptedGroupLane({
           return;
         }
 
-        setLoadedState({
-          requestKey: activeLoadRequestKey,
-          status: "ready",
-          bootstrap: result.bootstrap,
-          items: result.items,
-          errorMessage: null,
+        const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
+        setLoadedState((current) => {
+          const sameScope = current.requestKey === activeLoadRequestKey;
+          const merged = mergeEncryptedLaneWithPending(
+            sameScope && hasConcurrentUpdates ? current.items : [],
+            sameScope ? current.pendingMutations : [],
+            result.updates, pageSize, mergeEncryptedGroupProjection,
+          );
+          return {
+            requestKey: activeLoadRequestKey,
+            status: "ready",
+            bootstrap: result.bootstrap,
+            ...merged,
+            errorMessage: null,
+          };
         });
       })
       .catch((error) => {
@@ -122,13 +144,14 @@ export function useEncryptedGroupLane({
         }
 
         const resolved = resolveEncryptedGroupLoadError(error);
-        setLoadedState({
+        setLoadedState((current) => ({
           requestKey: activeLoadRequestKey,
           status: resolved.kind,
-          bootstrap: null,
-          items: [],
+          bootstrap: current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
+          items: current.requestKey === activeLoadRequestKey ? current.items : [],
+          pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
           errorMessage: resolved.message,
-        });
+        }));
       });
   }, [
     cryptoRuntime,
@@ -176,13 +199,20 @@ export function useEncryptedGroupLane({
             return;
           }
 
-          setLoadedState((current) => ({
-            requestKey: activeLoadRequestKey,
-            status: "ready",
-            bootstrap: current.bootstrap,
-            items: mergeEncryptedGroupProjection(current.items, updates),
-            errorMessage: current.errorMessage,
-          }));
+          updateVersionRef.current += 1;
+          setLoadedState((current) => {
+            const sameScope = current.requestKey === activeLoadRequestKey;
+            return {
+              requestKey: activeLoadRequestKey,
+              status: "ready",
+              bootstrap: sameScope ? current.bootstrap : null,
+              ...mergeEncryptedLaneWithPending(
+                sameScope ? current.items : [], sameScope ? current.pendingMutations : [],
+                updates, pageSize, mergeEncryptedGroupProjection,
+              ),
+              errorMessage: sameScope ? current.errorMessage : null,
+            };
+          });
         })
         .catch((error) => {
           if (cancelled) {
@@ -191,6 +221,9 @@ export function useEncryptedGroupLane({
 
           setLoadedState((current) => ({
             ...current,
+            items: current.requestKey === activeLoadRequestKey ? current.items : [],
+            pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
+            bootstrap: current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
             requestKey: activeLoadRequestKey,
             status: "error",
             errorMessage:
@@ -210,6 +243,7 @@ export function useEncryptedGroupLane({
     activeLoadCryptoDeviceId,
     activeLoadGroupId,
     activeLoadRequestKey,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -233,6 +267,7 @@ export function useEncryptedGroupLane({
 
       const requestVersion = requestVersionRef.current + 1;
       requestVersionRef.current = requestVersion;
+      const startedUpdateVersion = updateVersionRef.current;
 
       void loadEncryptedGroupLane({
         token: activeLoadToken,
@@ -246,12 +281,21 @@ export function useEncryptedGroupLane({
             return;
           }
 
-          setLoadedState({
-            requestKey: activeLoadRequestKey,
-            status: "ready",
-            bootstrap: result.bootstrap,
-            items: result.items,
-            errorMessage: null,
+          const hasConcurrentUpdates = updateVersionRef.current !== startedUpdateVersion;
+          setLoadedState((current) => {
+            const sameScope = current.requestKey === activeLoadRequestKey;
+            const merged = mergeEncryptedLaneWithPending(
+              sameScope && hasConcurrentUpdates ? current.items : [],
+              sameScope ? current.pendingMutations : [],
+              result.updates, pageSize, mergeEncryptedGroupProjection,
+            );
+            return {
+              requestKey: activeLoadRequestKey,
+              status: "ready",
+              bootstrap: result.bootstrap,
+              ...merged,
+              errorMessage: null,
+            };
           });
         })
         .catch((error) => {
@@ -265,6 +309,7 @@ export function useEncryptedGroupLane({
             bootstrap:
               current.requestKey === activeLoadRequestKey ? current.bootstrap : null,
             items: current.requestKey === activeLoadRequestKey ? current.items : [],
+            pendingMutations: current.requestKey === activeLoadRequestKey ? current.pendingMutations : [],
             errorMessage:
               error instanceof Error && error.message.trim() !== ""
                 ? error.message
@@ -291,15 +336,22 @@ export function useEncryptedGroupLane({
         return;
       }
 
-      setLoadedState((current) => ({
-        requestKey: activeLoadRequestKey,
-        status: "ready",
-        bootstrap: current.bootstrap,
-        items: mergeEncryptedGroupProjection(current.items, [event.projection]),
-        errorMessage: current.errorMessage,
-      }));
+      updateVersionRef.current += 1;
+      setLoadedState((current) => {
+        const sameScope = current.requestKey === activeLoadRequestKey;
+        return {
+          requestKey: activeLoadRequestKey,
+          status: "ready",
+          bootstrap: sameScope ? current.bootstrap : null,
+          ...mergeEncryptedLaneWithPending(
+            sameScope ? current.items : [], sameScope ? current.pendingMutations : [],
+            [event.projection], pageSize, mergeEncryptedGroupProjection,
+          ),
+          errorMessage: sameScope ? current.errorMessage : null,
+        };
+      });
     });
-  }, [activeLoadGroupId, activeLoadRequestKey]);
+  }, [activeLoadGroupId, activeLoadRequestKey, pageSize]);
 
   if (loadDescriptor.kind === "idle") {
     return {
@@ -353,7 +405,7 @@ async function loadEncryptedGroupLane(input: {
   pageSize: number;
 }): Promise<{
   bootstrap: EncryptedGroupBootstrap;
-  items: EncryptedGroupProjectionEntry[];
+  updates: EncryptedGroupDecryptedEnvelope[];
 }> {
   const bootstrap = await gatewayClient.getEncryptedGroupBootstrap(
     input.token,
@@ -391,7 +443,7 @@ async function loadEncryptedGroupLane(input: {
 
   return {
     bootstrap,
-    items: mergeEncryptedGroupProjection([], [...updates, ...localOutbound], input.pageSize),
+    updates: [...updates, ...localOutbound],
   };
 }
 
@@ -458,7 +510,7 @@ export function resolveEncryptedGroupLoadDescriptor(input: {
       input.token,
       input.activeGroupId,
       input.activeCryptoDeviceId,
-      Math.max(1, Math.trunc(input.pageSize ?? encryptedGroupProjectionLimit)),
+      resolveEncryptedLanePageSize(input.pageSize ?? encryptedGroupProjectionLimit),
     ].join(":"),
     token: input.token,
     groupId: input.activeGroupId,
