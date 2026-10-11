@@ -104,3 +104,7 @@ Application images публикуются в GHCR для `web`, `aero-gateway`, 
 ## Клиентский порядок encrypted conversations
 
 Encrypted web после ADR-096 требует серверный `serverSequence` как положительную decimal int64 строку; read position использует `lastReadServerSequence`. Sender `createdAt` остаётся display/AAD metadata. HTTP без корректного порядка показывает ошибку, некорректные realtime events не применяются. Обновление backend и web согласуется при cutover; старый backend без sequence с новым web несовместим. Переиндексация локального поиска меняет только memory cache, сохраняя pending outbound и локальный ключевой материал.
+
+Local content projection хранит origin `serverSequence` для history/read и `lastAppliedServerSequence` для convergence. Accepted operation sequence определяет выбранную mutation; `revision` остаётся ciphertext metadata и не считается backend CAS. Reverse/split realtime, fetch и send result должны давать одну projection даже при одинаковых или уменьшающихся revisions.
+
+Terminal tombstone остаётся terminal по ADR-069: независимые локальные `lastEditServerSequence` и `tombstoneServerSequence` делают edit/delete arrival-order независимым. Late old edit или accepted edit после удаления не возвращает body/attachments; display metadata последнего edit и delete выбирается по sequence каждой категории. Group partial edit с `attachments: null` сохраняет последнее explicit attachment значение через локальный `lastAttachmentsServerSequence`. Эти поля не передаются в ciphertext/AAD или API.

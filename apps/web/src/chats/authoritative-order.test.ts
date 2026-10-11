@@ -39,8 +39,93 @@ for (const lane of ["direct", "group"] as const) {
       expect(replay).toEqual(result);
       expect(merge([first, edit, second, tombstone])).toEqual(result);
     });
+    it("converges equal/lower revision accepted edits across reverse/split arrival, content retry and reload", () => {
+      const first = content("first", "1", "2099-01-01T00:00:00Z");
+      const second = content("second", "2", "2000-01-01T00:00:00Z");
+      const editA: EncryptedDirectMessageV2ReadyProjection = {
+        ...content("device-a-edit", "3", "1999-01-01T00:00:00Z"),
+        operationKind: "edit", targetMessageId: "first", revision: 2,
+        text: "device A", editedAt: "1999-01-01T00:00:00Z",
+      };
+      const editB: EncryptedDirectMessageV2ReadyProjection = {
+        ...editA, messageId: "device-b-edit", serverSequence: "4", text: "device B",
+        createdAt: "1998-01-01T00:00:00Z", editedAt: "1998-01-01T00:00:00Z",
+      };
+      const laterLowRevision: EncryptedDirectMessageV2ReadyProjection = {
+        ...editB, messageId: "later-low-revision", serverSequence: "5", revision: 1,
+        text: "later accepted", editedAt: "1997-01-01T00:00:00Z",
+      };
+      const apply = (current: ReturnType<typeof merge>, updates: EncryptedDirectMessageV2ReadyProjection[]) =>
+        lane === "direct"
+          ? mergeEncryptedDirectMessageV2Projection(current as ReturnType<typeof mergeEncryptedDirectMessageV2Projection>, updates)
+          : mergeEncryptedGroupProjection(current as ReturnType<typeof mergeEncryptedGroupProjection>, updates.map(group));
+      const seed = merge([first, second]);
+      const ordered = apply(apply(seed, [editA]), [editB]);
+      const reversed = apply(apply(seed, [editB]), [editA]);
+      expect(ordered).toEqual(reversed);
+      expect(reversed).toEqual(merge([second, editA, first, editB]));
+      expect(reversed[0]).toMatchObject({ text: "device B", revision: 2, serverSequence: "1", lastAppliedServerSequence: "4" });
+      expect(apply(reversed, [editA, editB, first])).toEqual(reversed);
+      const latest = apply(reversed, [laterLowRevision]);
+      expect(latest[0]).toMatchObject({ text: "later accepted", revision: 1, serverSequence: "1", lastAppliedServerSequence: "5" });
+      expect(latest).toEqual(merge([laterLowRevision, editB, second, first, editA]));
+      expect(apply(latest, [first, editA, editB])).toEqual(latest);
+    });
+    it("keeps tombstone terminal across all edit/delete arrival permutations and old duplicate replay", () => {
+      const first = content("first", "1", "2099-01-01T00:00:00Z");
+      const edit: EncryptedDirectMessageV2ReadyProjection = {
+        ...content("edit", "2", "1999-01-01T00:00:00Z"), operationKind: "edit",
+        targetMessageId: "first", revision: 2, text: "edited", editedAt: "1999-01-01T00:00:00Z",
+      };
+      const remove: EncryptedDirectMessageV2ReadyProjection = {
+        ...content("delete", "3", "1998-01-01T00:00:00Z"), operationKind: "tombstone",
+        targetMessageId: "first", revision: 2, text: null, deletedAt: "1998-01-01T00:00:00Z",
+      };
+      const lateEdit: EncryptedDirectMessageV2ReadyProjection = {
+        ...edit, messageId: "accepted-late-edit", serverSequence: "4", revision: 1,
+        text: "must stay hidden", editedAt: "1997-01-01T00:00:00Z", replyToMessageId: "quoted",
+      };
+      const apply = (current: ReturnType<typeof merge>, update: EncryptedDirectMessageV2ReadyProjection) =>
+        lane === "direct"
+          ? mergeEncryptedDirectMessageV2Projection(current as ReturnType<typeof mergeEncryptedDirectMessageV2Projection>, [update])
+          : mergeEncryptedGroupProjection(current as ReturnType<typeof mergeEncryptedGroupProjection>, [group(update)]);
+      const expected = merge([first, edit, remove, lateEdit]);
+      expect(expected[0]).toMatchObject({ text: null, attachments: [], isTombstone: true,
+        serverSequence: "1", lastAppliedServerSequence: "4", lastEditServerSequence: "4",
+        tombstoneServerSequence: "3", revision: 1, deletedAt: remove.deletedAt,
+        editedAt: lateEdit.editedAt, replyToMessageId: "quoted" });
+      const orders = [[edit, remove, lateEdit], [edit, lateEdit, remove], [remove, edit, lateEdit],
+        [remove, lateEdit, edit], [lateEdit, edit, remove], [lateEdit, remove, edit]];
+      for (const order of orders) {
+        const result = order.reduce((current, update) => apply(current, update), merge([first]));
+        expect(result).toEqual(expected);
+        expect([first, edit, remove, lateEdit].reduce((current, update) => apply(current, update), result)).toEqual(expected);
+      }
+    });
     it("rejects an unassigned sequence rather than sorting a fabricated zero", () => {
       expect(() => merge([content("legacy", "", "2026-10-11T00:00:00Z")])).toThrow("порядок сообщений");
     });
   });
 }
+
+
+it("converges group null attachment edits without erasing the last explicit attachment update", () => {
+  const first = group(content("first", "1", "2099-01-01T00:00:00Z"));
+  const editA: EncryptedGroupReadyProjection = {
+    ...first, messageId: "attachment-edit", serverSequence: "2", operationKind: "edit",
+    targetMessageId: "first", revision: 2, text: "older text", attachments: [{
+      attachmentId: "attachment", relaySchema: "ATTACHMENT_RELAY_SCHEMA_ENCRYPTED_BLOB_V1",
+      fileName: "fixture.txt", mimeType: "text/plain", plaintextSizeBytes: 1, ciphertextSizeBytes: 17,
+    }],
+  };
+  const editB: EncryptedGroupReadyProjection = {
+    ...editA, messageId: "text-only-edit", serverSequence: "3", text: "newer text", attachments: null,
+  };
+  const seed = mergeEncryptedGroupProjection([], [first]);
+  const ordered = mergeEncryptedGroupProjection(mergeEncryptedGroupProjection(seed, [editA]), [editB]);
+  const reversed = mergeEncryptedGroupProjection(mergeEncryptedGroupProjection(seed, [editB]), [editA]);
+  expect(reversed).toEqual(ordered);
+  expect(reversed).toEqual(mergeEncryptedGroupProjection([], [editB, first, editA]));
+  expect(reversed[0]).toMatchObject({ text: "newer text", attachments: editA.attachments,
+    lastAppliedServerSequence: "3", lastEditServerSequence: "3", lastAttachmentsServerSequence: "2" });
+});

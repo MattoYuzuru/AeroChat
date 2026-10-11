@@ -22,6 +22,10 @@ export interface EncryptedGroupProjectedMessageEntry {
   replyToMessageId: string | null;
   createdAt: string;
   serverSequence: string;
+  lastAppliedServerSequence: string;
+  lastEditServerSequence: string | null;
+  lastAttachmentsServerSequence: string;
+  tombstoneServerSequence: string | null;
   storedAt: string;
   text: string | null;
   markdownPolicy: string | null;
@@ -62,6 +66,16 @@ export function mergeEncryptedGroupProjection(
   const nextEntries = new Map<string, EncryptedGroupProjectionEntry>();
   for (const entry of current) {
     requireServerSequence(entry.serverSequence);
+    if (entry.kind === "message") {
+      requireServerSequence(entry.lastAppliedServerSequence);
+      if (entry.lastEditServerSequence !== null) {
+        requireServerSequence(entry.lastEditServerSequence);
+      }
+      if (entry.tombstoneServerSequence !== null) {
+        requireServerSequence(entry.tombstoneServerSequence);
+      }
+      requireServerSequence(entry.lastAttachmentsServerSequence);
+    }
     nextEntries.set(entry.key, entry);
   }
 
@@ -132,8 +146,9 @@ function applyReadyProjection(
 ): boolean {
   if (update.operationKind === "content") {
     const current = entries.get(buildMessageKey(update.messageId));
-    if (current?.kind === "message" && current.revision > update.revision) {
-      return false;
+    if (current?.kind === "message" &&
+      compareServerSequences(current.lastAppliedServerSequence, update.serverSequence) >= 0) {
+      return true;
     }
 
     entries.set(buildMessageKey(update.messageId), {
@@ -150,6 +165,10 @@ function applyReadyProjection(
       replyToMessageId: update.replyToMessageId,
       createdAt: update.createdAt,
       serverSequence: update.serverSequence,
+      lastAppliedServerSequence: update.serverSequence,
+      lastEditServerSequence: null,
+      lastAttachmentsServerSequence: update.serverSequence,
+      tombstoneServerSequence: null,
       storedAt: update.storedAt,
       text: update.text,
       markdownPolicy: update.markdownPolicy,
@@ -184,34 +203,45 @@ function applyReadyProjection(
     return false;
   }
 
-  if (update.revision <= target.revision) {
-    return true;
-  }
+  const isLatestOperation = compareServerSequences(update.serverSequence, target.lastAppliedServerSequence) > 0;
+  const next: EncryptedGroupProjectedMessageEntry = {
+    ...target,
+    lastAppliedServerSequence: isLatestOperation ? update.serverSequence : target.lastAppliedServerSequence,
+    revision: isLatestOperation ? update.revision : target.revision,
+    storedAt: maxTimestamp(target.storedAt, update.storedAt),
+  };
 
   if (update.operationKind === "edit") {
-    entries.set(targetKey, {
-      ...target,
-      revision: Math.max(target.revision, update.revision),
-      replyToMessageId: update.replyToMessageId,
-      storedAt: maxTimestamp(target.storedAt, update.storedAt),
-      text: update.text,
-      markdownPolicy: update.markdownPolicy,
-      attachments: update.attachments ?? target.attachments,
-      editedAt: update.editedAt ?? update.storedAt,
-    });
-    return true;
+    if (target.lastEditServerSequence === null ||
+      compareServerSequences(update.serverSequence, target.lastEditServerSequence) > 0) {
+      next.lastEditServerSequence = update.serverSequence;
+      next.replyToMessageId = update.replyToMessageId;
+      next.editedAt = update.editedAt ?? update.storedAt;
+      if (!target.isTombstone) {
+        next.text = update.text;
+        next.markdownPolicy = update.markdownPolicy;
+      }
+    }
+    if (update.attachments !== null &&
+      compareServerSequences(update.serverSequence, target.lastAttachmentsServerSequence) > 0) {
+      next.lastAttachmentsServerSequence = update.serverSequence;
+      if (!target.isTombstone) {
+        next.attachments = update.attachments;
+      }
+    }
+  } else {
+    if (target.tombstoneServerSequence === null ||
+      compareServerSequences(update.serverSequence, target.tombstoneServerSequence) > 0) {
+      next.tombstoneServerSequence = update.serverSequence;
+      next.deletedAt = update.deletedAt ?? update.storedAt;
+    }
+    next.text = null;
+    next.markdownPolicy = null;
+    next.attachments = [];
+    next.isTombstone = true;
   }
 
-  entries.set(targetKey, {
-    ...target,
-    revision: Math.max(target.revision, update.revision),
-    storedAt: maxTimestamp(target.storedAt, update.storedAt),
-    text: null,
-    markdownPolicy: null,
-    attachments: [],
-    deletedAt: update.deletedAt ?? update.storedAt,
-    isTombstone: true,
-  });
+  entries.set(targetKey, next);
   return true;
 }
 
