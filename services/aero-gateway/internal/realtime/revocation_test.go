@@ -130,7 +130,7 @@ func TestRealtimeIdentityFailureClosesWithoutDelivery(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer conn.CloseNow()
+			defer func() { _ = conn.CloseNow() }()
 			var ready Envelope
 			if err := wsjson.Read(ctx, conn, &ready); err != nil {
 				t.Fatal(err)
@@ -176,7 +176,7 @@ func TestRealtimeRechecksAuthorizationBeforeReady(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer conn.CloseNow()
+			defer func() { _ = conn.CloseNow() }()
 			var event Envelope
 			if err := wsjson.Read(ctx, conn, &event); websocket.CloseStatus(err) != websocket.StatusPolicyViolation {
 				t.Fatalf("invalid upgrade must close before ready: %v, event=%s", err, event.Type)
