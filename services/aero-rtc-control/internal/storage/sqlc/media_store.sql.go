@@ -232,7 +232,7 @@ func (q *Queries) CreateMediaCleanupAction(ctx context.Context, arg CreateMediaC
 
 const createMediaGrant = `-- name: CreateMediaGrant :one
 INSERT INTO rtc_media_grants(id,request_id,room_id,call_id,participant_id,group_id,user_id,session_id,device_id,session_revision,device_revision,eligibility_epoch,grant_generation,participant_identity,state,prepared_at,prepare_deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'prepared',$15,$15+interval '20 seconds') RETURNING id, request_id, room_id, call_id, participant_id, group_id, user_id, session_id, device_id, session_revision, device_revision, eligibility_epoch, grant_generation, participant_identity, state, prepared_at, prepare_deadline, activation_intent_at, revoked_at, operation_id
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'prepared',$15::timestamptz,$15::timestamptz+interval '20 seconds') RETURNING id, request_id, room_id, call_id, participant_id, group_id, user_id, session_id, device_id, session_revision, device_revision, eligibility_epoch, grant_generation, participant_identity, state, prepared_at, prepare_deadline, activation_intent_at, revoked_at, operation_id
 `
 
 type CreateMediaGrantParams struct {
@@ -250,7 +250,7 @@ type CreateMediaGrantParams struct {
 	EligibilityEpoch    int64              `db:"eligibility_epoch" json:"eligibility_epoch"`
 	GrantGeneration     int64              `db:"grant_generation" json:"grant_generation"`
 	ParticipantIdentity uuid.UUID          `db:"participant_identity" json:"participant_identity"`
-	PreparedAt          pgtype.Timestamptz `db:"prepared_at" json:"prepared_at"`
+	Column15            pgtype.Timestamptz `db:"column_15" json:"column_15"`
 }
 
 func (q *Queries) CreateMediaGrant(ctx context.Context, arg CreateMediaGrantParams) (RtcMediaGrant, error) {
@@ -269,7 +269,7 @@ func (q *Queries) CreateMediaGrant(ctx context.Context, arg CreateMediaGrantPara
 		arg.EligibilityEpoch,
 		arg.GrantGeneration,
 		arg.ParticipantIdentity,
-		arg.PreparedAt,
+		arg.Column15,
 	)
 	var i RtcMediaGrant
 	err := row.Scan(

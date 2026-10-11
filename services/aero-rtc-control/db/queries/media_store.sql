@@ -39,7 +39,7 @@ SELECT EXISTS (
 
 -- name: CreateMediaGrant :one
 INSERT INTO rtc_media_grants(id,request_id,room_id,call_id,participant_id,group_id,user_id,session_id,device_id,session_revision,device_revision,eligibility_epoch,grant_generation,participant_identity,state,prepared_at,prepare_deadline)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'prepared',$15,$15+interval '20 seconds') RETURNING *;
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'prepared',$15::timestamptz,$15::timestamptz+interval '20 seconds') RETURNING *;
 
 -- name: ActivateMediaGrant :execrows
 UPDATE rtc_media_grants SET state='active',activation_intent_at=COALESCE(activation_intent_at,$2)
