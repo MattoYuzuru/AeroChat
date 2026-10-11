@@ -23,6 +23,20 @@ Identity владеет user/device/session source of truth, Chat — текущ
 
 Внутренние проверки не выдают bearer и не создают target-user session. Caller identity выдаёт deployment authority; browser не может выбирать service identity. Нужны отдельный private listener/network policy и проверяемая service authentication (mTLS service identities с отдельными сертификатами Identity/Chat/RTC/admission). Обычный публичный gateway, browser bearer, SFU JWT и произвольный заголовок caller не открывают эти methods. Ключи/certificates и rotation принадлежат runtime owner. Пока этот transport contract не принят и negative tests публичного доступа не проходят, новые методы, media grants и feature flag не включаются.
 
+Предлагаемые proto service/method names ниже относятся к отдельным internal services, которые не регистрируются в public gateway. Проверки certificate chain/expiry/client-auth usage и точного service principal дополняются **method allowlist**; наличие любого сертификата этой CA не даёт все права.
+
+| Future method | Единственный разрешённый caller principal | Результат/ограничение |
+| --- | --- | --- |
+| IdentityInternalAuthorization.ResolveSessionBearer | rtc-control | Bearer только в protected request header; user/session/device IDs + active state + authorization revision, без profile/key/token в result |
+| IdentityInternalAuthorization.CheckBoundSession | rtc-control | Lookup exact registry user/session/device binding; active/revoked/not-found + revision |
+| ChatInternalAuthorization.CheckGroupSubject | rtc-control | Exact group/user binding; current eligible role/state + membership revision |
+| RtcMediaAdmission.ValidateAndRegisterConnection | media-admission | Проверенный SDK token key → atomic grant/connection lease + fresh Identity/Chat checks; subject IDs не выбирает proxy |
+| RtcMediaAdmission.CloseConnection | media-admission | Только owner connection ID и matching grant key; stale close не снимает replacement lease |
+| RtcMediaRevocation.ApplyIdentityEvent | identity | Только Identity outbox domain, собственная session/device revision и subject binding |
+| RtcMediaRevocation.ApplyChatEvent | chat | Только Chat outbox domain, membership revision и group/user binding |
+
+Admission proxy не получает broad subject lookup в Identity/Chat; все authority checks выполняет RTC. Identity/Chat caller не может mint/activate grant, а admission caller не может выдавать authoritative revoke event от их имени. Private SFU management API доступен только RTC с отдельной server credential; browser/admin grant его не получает. Internal service principal не подменяет пользовательскую авторизацию публичных RPC или operation status. Implementation negative fixtures должны отвергать absent/wrong certificate, сертификат допустимой CA с wrong principal, public route/browser credential, cross-domain event и spoofed caller header.
+
 Оба lookup выполняются свежими на каждом upgrade, включая reconnect/validate routes; permission cache не разрешает доступ. Ошибка/timeout authority означает deny/degraded, но не false permanent eviction. Definitive revoke/removal вызывает RTC revoke/teardown. Между отдельными Identity/Chat lookup и фактическим upgrade остаётся race: future integration обязана сериализовать RTC grant state с admission registration, закрывать уже зарегистрированные connections по событию revoke и иметь 5s reconcile как recovery. Это не распределённая atomic transaction и не обещание мгновенной глобальной revocation при недоступной authority.
 
 ## Registry и состояния
