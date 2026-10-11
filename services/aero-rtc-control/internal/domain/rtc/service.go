@@ -17,14 +17,12 @@ type Repository interface {
 	GetActiveCallByScope(context.Context, ConversationScope) (*Call, error)
 	GetActiveParticipationByUserID(context.Context, string) (*ActiveParticipation, error)
 	CreateCallWithParticipant(context.Context, Call, CallParticipant) (*Call, *CallParticipant, error)
-	CreateParticipant(context.Context, CallParticipant) (*CallParticipant, error)
+	JoinParticipant(context.Context, CallParticipant) (*Call, *CallParticipant, error)
 	GetActiveParticipant(context.Context, string, string) (*CallParticipant, error)
 	ListActiveParticipants(context.Context, string) ([]CallParticipant, error)
-	LeaveParticipant(context.Context, string, time.Time) (bool, error)
-	LeaveActiveParticipantsByCallID(context.Context, string, time.Time) error
+	LeaveParticipantAndMaybeEndCall(context.Context, string, string, time.Time) (bool, error)
 	TouchParticipantSignal(context.Context, string, time.Time) error
-	CountActiveParticipants(context.Context, string) (int64, error)
-	EndCall(context.Context, string, *string, string, time.Time) (bool, error)
+	EndCallWithParticipants(context.Context, string, string, time.Time) (*Call, []CallParticipant, error)
 }
 
 type Authenticator interface {
@@ -33,6 +31,7 @@ type Authenticator interface {
 
 type ScopeAuthorizer interface {
 	GetScopeAccess(context.Context, string, ConversationScope) (*ScopeAccess, error)
+	GetParticipantAccess(context.Context, string, ConversationScope, string) (*ScopeAccess, error)
 }
 
 type Service struct {
@@ -213,25 +212,13 @@ func (s *Service) JoinCall(ctx context.Context, token string, callID string) (*C
 		return nil, nil, fmt.Errorf("%w: call is not active", ErrConflict)
 	}
 
-	existing, err := s.repo.GetActiveParticipant(ctx, call.ID, user.ID)
-	if err == nil {
-		updatedCall, getErr := s.repo.GetCallByID(ctx, call.ID)
-		if getErr != nil {
-			return nil, nil, getErr
-		}
-
-		return updatedCall, existing, nil
-	}
-	if !errors.Is(err, ErrNotFound) {
-		return nil, nil, err
-	}
-
 	if err := s.ensureNoOtherActiveParticipation(ctx, user.ID, call.ID); err != nil {
 		return nil, nil, err
 	}
 
 	now := s.now()
-	participant, err := s.repo.CreateParticipant(ctx, CallParticipant{
+	joiningCallID := call.ID
+	call, participant, err := s.repo.JoinParticipant(ctx, CallParticipant{
 		ID:        s.newID(),
 		CallID:    call.ID,
 		UserID:    user.ID,
@@ -241,27 +228,11 @@ func (s *Service) JoinCall(ctx context.Context, token string, callID string) (*C
 	})
 	if err != nil {
 		if errors.Is(err, ErrConflict) {
-			if conflictErr := s.resolveActiveParticipationConflict(ctx, user.ID, call.ID); conflictErr != nil {
+			if conflictErr := s.resolveActiveParticipationConflict(ctx, user.ID, joiningCallID); conflictErr != nil {
 				return nil, nil, conflictErr
 			}
-
-			participant, retryErr := s.repo.GetActiveParticipant(ctx, call.ID, user.ID)
-			if retryErr != nil {
-				return nil, nil, retryErr
-			}
-			call, retryErr = s.repo.GetCallByID(ctx, call.ID)
-			if retryErr != nil {
-				return nil, nil, retryErr
-			}
-
-			return call, participant, nil
 		}
 
-		return nil, nil, err
-	}
-
-	call, err = s.repo.GetCallByID(ctx, call.ID)
-	if err != nil {
 		return nil, nil, err
 	}
 
@@ -276,6 +247,9 @@ func (s *Service) ensureNoOtherActiveParticipation(ctx context.Context, userID s
 	if err != nil {
 		return err
 	}
+	if allowedCallID != "" && participation.Call.ID == allowedCallID {
+		return nil
+	}
 	if s.isParticipantStale(participation.Participant, s.now()) {
 		if _, err := s.leaveParticipantAndMaybeEndCall(
 			ctx,
@@ -286,9 +260,6 @@ func (s *Service) ensureNoOtherActiveParticipation(ctx context.Context, userID s
 			return err
 		}
 
-		return nil
-	}
-	if allowedCallID != "" && participation.Call.ID == allowedCallID {
 		return nil
 	}
 
@@ -388,25 +359,7 @@ func (s *Service) leaveParticipantAndMaybeEndCall(
 	participantID string,
 	at time.Time,
 ) (bool, error) {
-	updated, err := s.repo.LeaveParticipant(ctx, participantID, at)
-	if err != nil {
-		return false, err
-	}
-	if !updated {
-		return false, nil
-	}
-
-	activeCount, err := s.repo.CountActiveParticipants(ctx, callID)
-	if err != nil {
-		return false, err
-	}
-	if activeCount == 0 {
-		if _, err := s.repo.EndCall(ctx, callID, nil, CallEndReasonLastParticipant, at); err != nil {
-			return false, err
-		}
-	}
-
-	return true, nil
+	return s.repo.LeaveParticipantAndMaybeEndCall(ctx, callID, participantID, at)
 }
 
 func (s *Service) isParticipantStale(participant CallParticipant, now time.Time) bool {
@@ -472,31 +425,7 @@ func (s *Service) EndCall(ctx context.Context, token string, callID string) (*Ca
 		return nil, nil, fmt.Errorf("%w: only call creator can end call", ErrPermissionDenied)
 	}
 
-	affected, err := s.repo.ListActiveParticipants(ctx, call.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	now := s.now()
-	if err := s.repo.LeaveActiveParticipantsByCallID(ctx, call.ID, now); err != nil {
-		return nil, nil, err
-	}
-	if _, err := s.repo.EndCall(ctx, call.ID, &user.ID, CallEndReasonManual, now); err != nil {
-		return nil, nil, err
-	}
-
-	for index := range affected {
-		affected[index].State = ParticipantStateLeft
-		affected[index].LeftAt = &now
-		affected[index].UpdatedAt = now
-	}
-
-	call, err = s.repo.GetCallByID(ctx, call.ID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return call, affected, nil
+	return s.repo.EndCallWithParticipants(ctx, call.ID, user.ID, s.now())
 }
 
 func (s *Service) ListCallParticipants(ctx context.Context, token string, callID string) ([]CallParticipant, error) {
@@ -580,8 +509,26 @@ func (s *Service) SendSignal(ctx context.Context, token string, callID string, t
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.repo.GetActiveParticipant(ctx, call.ID, targetUserID); err != nil {
+	targetParticipant, err := s.repo.GetActiveParticipant(ctx, call.ID, targetUserID)
+	if err != nil {
 		return nil, err
+	}
+	targetAccess, eligibilityErr := s.scopeAuthorizer.GetParticipantAccess(ctx, token, call.Scope, targetUserID)
+	if eligibilityErr == nil {
+		if targetAccess == nil || targetAccess.Scope != call.Scope {
+			eligibilityErr = ErrPermissionDenied
+		} else if call.Scope.Type == ScopeTypeGroup && targetAccess.GroupRole != GroupRoleOwner && targetAccess.GroupRole != GroupRoleAdmin && targetAccess.GroupRole != GroupRoleMember {
+			eligibilityErr = ErrPermissionDenied
+		}
+	}
+	if eligibilityErr != nil {
+		if errors.Is(eligibilityErr, ErrPermissionDenied) || errors.Is(eligibilityErr, ErrNotFound) {
+			if _, leaveErr := s.repo.LeaveParticipantAndMaybeEndCall(ctx, call.ID, targetParticipant.ID, s.now()); leaveErr != nil {
+				return nil, leaveErr
+			}
+			return nil, fmt.Errorf("%w: signal target is no longer eligible", ErrPermissionDenied)
+		}
+		return nil, eligibilityErr
 	}
 
 	now := s.now()
