@@ -24,6 +24,7 @@ namespace=ghcr.io/mattoyuzuru
 oras manifest fetch "$namespace/aerochat-release@$AERO_RELEASE_DIGEST" --output release-oci.json
 layer="$(python3 infra/scripts/release_manifest.py artifact release-oci.json --source-sha "$AERO_RELEASE_SOURCE_SHA")"
 oras blob fetch "$namespace/aerochat-release@$layer" --output "release-$AERO_RELEASE_SOURCE_SHA.json"
+python3 infra/scripts/release_manifest.py blob release-oci.json --source-sha "$AERO_RELEASE_SOURCE_SHA" --blob "release-$AERO_RELEASE_SOURCE_SHA.json"
 python3 infra/scripts/release_manifest.py validate "release-$AERO_RELEASE_SOURCE_SHA.json" \
   --source-sha "$AERO_RELEASE_SOURCE_SHA" --namespace "$namespace" \
   --overlay "release-compose-$AERO_RELEASE_SOURCE_SHA.json"

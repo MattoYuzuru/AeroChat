@@ -21,6 +21,8 @@ Publication failure после некоторых immutable image pushes мож�
 
 Deploy Production принимает `release_digest` + `source_sha`. Перед SSH он проверяет OCI artifact type/revision/единственный bounded JSON layer и release schema. Arbitrary registry namespaces, чужие repository names, tags, неполный набор services и несовпадающий SHA отклоняются. Layer скачивается по digest без распаковки архивов. На сервер передаётся только JSON metadata; секреты остаются в прежних server env files.
 
+Скачанный JSON дополнительно сверяется с OCI layer digest и declared size до передачи по SSH. Malformed annotations/layer fields, boolean/float вместо integer schema/size отклоняются с явной validation error.
+
 Server checkout обязан уже соответствовать выбранному source SHA. Helper повторно валидирует JSON и создаёт Compose overlay для пяти application image digests. Go Dockerfiles получают `main.version` через build revision; gateway readiness должен подтвердить выбранный source SHA до сохранения release selection в `.env.server`. Rollback выбирает предыдущую пару release digest/source SHA и сохранённый overlay; volumes не удаляются. Storage acquisition/provenance описаны отдельно в ADR-087.
 
 ## Последствия

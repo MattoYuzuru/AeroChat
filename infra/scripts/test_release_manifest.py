@@ -1,8 +1,9 @@
 import copy
+import hashlib
 import json
 import unittest
 
-from release_manifest import ARTIFACT_TYPE, SERVICES, validate, validate_artifact, verify_runtime
+from release_manifest import ARTIFACT_TYPE, SERVICES, validate, validate_artifact, verify_blob, verify_runtime
 
 
 class ReleaseManifestTest(unittest.TestCase):
@@ -51,7 +52,7 @@ class ReleaseManifestTest(unittest.TestCase):
             "layers": [{"mediaType": ARTIFACT_TYPE, "digest": f"sha256:{'b' * 64}", "size": 100}],
         }
         self.assertEqual(validate_artifact(manifest, self.sha), f"sha256:{'b' * 64}")
-        for mutation in ("source", "type", "layer", "size"):
+        for mutation in ("source", "type", "layer", "size", "schema_float", "size_bool", "annotations_list", "digest_int", "media_type_list"):
             invalid = copy.deepcopy(manifest)
             if mutation == "source":
                 invalid["annotations"]["org.opencontainers.image.revision"] = "c" * 40
@@ -59,10 +60,34 @@ class ReleaseManifestTest(unittest.TestCase):
                 invalid["artifactType"] = "foreign"
             elif mutation == "layer":
                 invalid["layers"].append(copy.deepcopy(invalid["layers"][0]))
-            else:
+            elif mutation == "size":
                 invalid["layers"][0]["size"] = 65537
+            elif mutation == "schema_float":
+                invalid["schemaVersion"] = 2.0
+            elif mutation == "size_bool":
+                invalid["layers"][0]["size"] = True
+            elif mutation == "annotations_list":
+                invalid["annotations"] = []
+            elif mutation == "digest_int":
+                invalid["layers"][0]["digest"] = 123
+            else:
+                invalid["layers"][0]["mediaType"] = []
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 validate_artifact(invalid, self.sha)
+
+    def test_blob_digest_and_size_must_match_before_selection(self):
+        data = json.dumps(self.release).encode()
+        manifest = {
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "artifactType": ARTIFACT_TYPE,
+            "annotations": {"org.opencontainers.image.revision": self.sha},
+            "layers": [{"mediaType": ARTIFACT_TYPE, "digest": f"sha256:{hashlib.sha256(data).hexdigest()}", "size": len(data)}],
+        }
+        verify_blob(manifest, data, self.sha)
+        for changed in (data + b" ", data[:-1] + b" "):
+            with self.assertRaises(ValueError):
+                verify_blob(manifest, changed, self.sha)
 
     def test_runtime_rejects_wrong_source_digest_and_stopped_container(self):
         for mutation in (None, "source", "digest", "stopped"):

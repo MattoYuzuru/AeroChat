@@ -2,6 +2,7 @@
 """Проверяет полный immutable release перед публикацией или выбором deployment."""
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -41,22 +42,30 @@ def validate(release, source_sha, namespace):
 
 
 def validate_artifact(manifest, source_sha):
-    if not isinstance(manifest, dict) or manifest.get("schemaVersion") != 2 or manifest.get("mediaType") != "application/vnd.oci.image.manifest.v1+json":
+    if not isinstance(manifest, dict) or type(manifest.get("schemaVersion")) is not int or manifest.get("schemaVersion") != 2 or manifest.get("mediaType") != "application/vnd.oci.image.manifest.v1+json":
         raise ValueError("Некорректная OCI manifest schema")
     if not SHA.fullmatch(source_sha) or manifest.get("artifactType") != ARTIFACT_TYPE:
         raise ValueError("Некорректный OCI artifact type/source SHA")
-    if manifest.get("annotations", {}).get("org.opencontainers.image.revision") != source_sha:
+    annotations = manifest.get("annotations", {})
+    if not isinstance(annotations, dict) or annotations.get("org.opencontainers.image.revision") != source_sha:
         raise ValueError("OCI artifact не соответствует выбранному source SHA")
     layers = manifest.get("layers", [])
     if not isinstance(layers, list) or len(layers) != 1 or not isinstance(layers[0], dict):
         raise ValueError("Release artifact должен содержать один JSON layer")
     layer = layers[0]
-    if layer.get("mediaType") != ARTIFACT_TYPE or not DIGEST.fullmatch(layer.get("digest", "")):
+    digest = layer.get("digest", "")
+    if layer.get("mediaType") != ARTIFACT_TYPE or not isinstance(digest, str) or not DIGEST.fullmatch(digest):
         raise ValueError("Некорректный release JSON layer")
     size = layer.get("size", -1)
-    if not isinstance(size, int) or not 0 <= size <= 65536:
+    if type(size) is not int or not 0 <= size <= 65536:
         raise ValueError("Некорректный размер release JSON layer")
     return layer["digest"]
+
+
+def verify_blob(manifest, data, source_sha):
+    digest = validate_artifact(manifest, source_sha)
+    if len(data) != manifest["layers"][0]["size"] or f"sha256:{hashlib.sha256(data).hexdigest()}" != digest:
+        raise ValueError("Release JSON blob не соответствует OCI digest/size")
 
 
 def verify_runtime(release, compose_command, run_command=subprocess.check_output):
@@ -74,16 +83,23 @@ def verify_runtime(release, compose_command, run_command=subprocess.check_output
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("assemble", "validate", "artifact", "runtime"))
+    parser.add_argument("mode", choices=("assemble", "validate", "artifact", "blob", "runtime"))
     parser.add_argument("path")
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--namespace", default="")
     parser.add_argument("--overlay")
     parser.add_argument("--compose-file")
     parser.add_argument("--env-file", action="append", default=[])
+    parser.add_argument("--blob")
     args = parser.parse_args()
     if args.mode == "artifact":
         print(validate_artifact(read_json(args.path), args.source_sha))
+        return
+    if args.mode == "blob":
+        if not args.blob or Path(args.blob).stat().st_size > 65536:
+            raise ValueError("Нужен bounded release JSON blob")
+        verify_blob(read_json(args.path), Path(args.blob).read_bytes(), args.source_sha)
+        print("Release JSON blob digest/size подтверждены")
         return
     if args.mode == "assemble":
         release = {"schema_version": 1, "source_sha": args.source_sha, "images": {}}

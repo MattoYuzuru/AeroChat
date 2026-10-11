@@ -103,6 +103,7 @@ jobs:
           oras manifest fetch "$release_repo@$RELEASE_DIGEST" --output "$RUNNER_TEMP/release-oci.json"
           layer="$(python3 infra/scripts/release_manifest.py artifact "$RUNNER_TEMP/release-oci.json" --source-sha "$SOURCE_SHA")"
           oras blob fetch "$release_repo@$layer" --output "$RUNNER_TEMP/release.json"
+          python3 infra/scripts/release_manifest.py blob "$RUNNER_TEMP/release-oci.json" --source-sha "$SOURCE_SHA" --blob "$RUNNER_TEMP/release.json"
           python3 infra/scripts/release_manifest.py validate "$RUNNER_TEMP/release.json" --source-sha "$SOURCE_SHA" --namespace "$namespace" --overlay "$RUNNER_TEMP/release-compose.json"
 
       - name: Prepare SSH material
@@ -342,7 +343,8 @@ jobs:
           {
             echo "## Production rollout"
             echo
-            echo "- image_tag: \`$IMAGE_TAG\`"
+            echo "- release_digest: \`$RELEASE_DIGEST\`"
+            echo "- source_sha: \`$SOURCE_SHA\`"
             echo "- deploy dir: \`$DEPLOY_DIR\`"
             echo "- domain: \`$EDGE_DOMAIN\`"
             echo "- media domain: \`$MEDIA_EDGE_DOMAIN\`"
