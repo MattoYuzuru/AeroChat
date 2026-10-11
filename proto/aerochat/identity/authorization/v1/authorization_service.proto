@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package aerochat.identity.authorization.v1;
+
+option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/authorization/v1;identityauthorizationv1";
+
+// Сервис регистрируется только на private mTLS listener, вне public gateway.
+service InternalAuthorizationService {
+  rpc ResolveSessionBearer(ResolveSessionBearerRequest) returns (ResolveSessionBearerResponse);
+  rpc CheckBoundSession(CheckBoundSessionRequest) returns (CheckBoundSessionResponse);
+}
+
+enum AuthorityStatus {
+  AUTHORITY_STATUS_UNSPECIFIED = 0;
+  AUTHORITY_STATUS_ACTIVE = 1;
+  AUTHORITY_STATUS_REVOKED = 2;
+  AUTHORITY_STATUS_NOT_FOUND = 3;
+}
+
+message SessionAuthority {
+  string user_id = 1;
+  string session_id = 2;
+  string device_id = 3;
+  int64 session_authority_revision = 4;
+  int64 device_authority_revision = 5;
+  AuthorityStatus status = 6;
+}
+
+message ResolveSessionBearerRequest {}
+
+message ResolveSessionBearerResponse {
+  SessionAuthority authority = 1;
+}
+
+message CheckBoundSessionRequest {
+  string user_id = 1;
+  string session_id = 2;
+  string device_id = 3;
+}
+
+message CheckBoundSessionResponse {
+  SessionAuthority authority = 1;
+}

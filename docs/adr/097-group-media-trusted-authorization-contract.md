@@ -76,6 +76,8 @@ Own Logout останавливает local tracks немедленно неза
 
 ## Проверки и границы slice
 
+Private Identity implementation slice регистрирует отдельный `identity.authorization.v1.InternalAuthorizationService` на optional mTLS HTTPS listener с fixed rtc-control URI principal. Fresh session/device tuple lookup и exact binding проверяются отдельно от source outbox; [Identity README](../../services/aero-identity/README.md) содержит config и границы actual TLS/PG fixture. Public gateway/new grants/dispatch/SFU/browser audio этот slice не подключает. Literal `internal` segment в proto/gen Go path не используется из-за Go import rules; private доступ обеспечивает transport/caller enforcement.
+
 Первый state implementation slice добавляет Identity persisted session/device revisions и source outbox в existing revoke transaction; [Identity README](../../services/aero-identity/README.md) описывает migration, tuple, retry и native storage checks. Доставка/ack/outbox retention, private authorization RPC и все media adapters в этот slice не входят. Implementation наличие кода и passed native source checks не заменяет future actual admission/SFU proof.
 
 Pure reference model проверяет exact binding, revoked session/device, reader/removed, authority failure, initial/refreshed identity после revoke, old-generation acknowledgement и pending failed teardown. Это model evidence, а не proof JWT, mTLS, proxy, SFU track limits или сети. Production RTC lobby, contracts/generated code, Identity/Chat handlers, dependencies, runtime и UI в этом slice не меняются; group audio остаётся отсутствующим.
