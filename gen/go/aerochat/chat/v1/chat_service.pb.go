@@ -2334,6 +2334,7 @@ type EncryptedDirectMessageV2Envelope struct {
 	CreatedAt            *timestamppb.Timestamp                `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	StoredAt             *timestamppb.Timestamp                `protobuf:"bytes,9,opt,name=stored_at,json=storedAt,proto3" json:"stored_at,omitempty"`
 	ViewerDelivery       *EncryptedDirectMessageV2Delivery     `protobuf:"bytes,10,opt,name=viewer_delivery,json=viewerDelivery,proto3" json:"viewer_delivery,omitempty"`
+	ServerSequence       int64                                 `protobuf:"varint,11,opt,name=server_sequence,json=serverSequence,proto3" json:"server_sequence,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -2438,6 +2439,13 @@ func (x *EncryptedDirectMessageV2Envelope) GetViewerDelivery() *EncryptedDirectM
 	return nil
 }
 
+func (x *EncryptedDirectMessageV2Envelope) GetServerSequence() int64 {
+	if x != nil {
+		return x.ServerSequence
+	}
+	return 0
+}
+
 type EncryptedDirectMessageV2StoredEnvelope struct {
 	state                protoimpl.MessageState                    `protogen:"open.v1"`
 	MessageId            string                                    `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
@@ -2451,6 +2459,7 @@ type EncryptedDirectMessageV2StoredEnvelope struct {
 	StoredAt             *timestamppb.Timestamp                    `protobuf:"bytes,9,opt,name=stored_at,json=storedAt,proto3" json:"stored_at,omitempty"`
 	StoredDeliveryCount  uint32                                    `protobuf:"varint,10,opt,name=stored_delivery_count,json=storedDeliveryCount,proto3" json:"stored_delivery_count,omitempty"`
 	StoredDeliveries     []*EncryptedDirectMessageV2StoredDelivery `protobuf:"bytes,11,rep,name=stored_deliveries,json=storedDeliveries,proto3" json:"stored_deliveries,omitempty"`
+	ServerSequence       int64                                     `protobuf:"varint,12,opt,name=server_sequence,json=serverSequence,proto3" json:"server_sequence,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -2560,6 +2569,13 @@ func (x *EncryptedDirectMessageV2StoredEnvelope) GetStoredDeliveries() []*Encryp
 		return x.StoredDeliveries
 	}
 	return nil
+}
+
+func (x *EncryptedDirectMessageV2StoredEnvelope) GetServerSequence() int64 {
+	if x != nil {
+		return x.ServerSequence
+	}
+	return 0
 }
 
 type EncryptedGroupLane struct {
@@ -2979,6 +2995,7 @@ type EncryptedGroupEnvelope struct {
 	CreatedAt            *timestamppb.Timestamp             `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	StoredAt             *timestamppb.Timestamp             `protobuf:"bytes,14,opt,name=stored_at,json=storedAt,proto3" json:"stored_at,omitempty"`
 	ViewerDelivery       *EncryptedGroupMessageDelivery     `protobuf:"bytes,15,opt,name=viewer_delivery,json=viewerDelivery,proto3" json:"viewer_delivery,omitempty"`
+	ServerSequence       int64                              `protobuf:"varint,16,opt,name=server_sequence,json=serverSequence,proto3" json:"server_sequence,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -3118,6 +3135,13 @@ func (x *EncryptedGroupEnvelope) GetViewerDelivery() *EncryptedGroupMessageDeliv
 	return nil
 }
 
+func (x *EncryptedGroupEnvelope) GetServerSequence() int64 {
+	if x != nil {
+		return x.ServerSequence
+	}
+	return 0
+}
+
 type EncryptedGroupStoredEnvelope struct {
 	state                protoimpl.MessageState             `protogen:"open.v1"`
 	MessageId            string                             `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
@@ -3134,6 +3158,7 @@ type EncryptedGroupStoredEnvelope struct {
 	StoredAt             *timestamppb.Timestamp             `protobuf:"bytes,12,opt,name=stored_at,json=storedAt,proto3" json:"stored_at,omitempty"`
 	StoredDeliveryCount  uint32                             `protobuf:"varint,13,opt,name=stored_delivery_count,json=storedDeliveryCount,proto3" json:"stored_delivery_count,omitempty"`
 	StoredDeliveries     []*EncryptedGroupMessageDelivery   `protobuf:"bytes,14,rep,name=stored_deliveries,json=storedDeliveries,proto3" json:"stored_deliveries,omitempty"`
+	ServerSequence       int64                              `protobuf:"varint,15,opt,name=server_sequence,json=serverSequence,proto3" json:"server_sequence,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -3264,6 +3289,13 @@ func (x *EncryptedGroupStoredEnvelope) GetStoredDeliveries() []*EncryptedGroupMe
 		return x.StoredDeliveries
 	}
 	return nil
+}
+
+func (x *EncryptedGroupStoredEnvelope) GetServerSequence() int64 {
+	if x != nil {
+		return x.ServerSequence
+	}
+	return 0
 }
 
 type EncryptedDirectMessageV2SendTargetDevice struct {
@@ -3675,12 +3707,13 @@ func (x *GroupReadPosition) GetUpdatedAt() *timestamppb.Timestamp {
 }
 
 type EncryptedConversationReadPosition struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	MessageId        string                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	MessageCreatedAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=message_created_at,json=messageCreatedAt,proto3" json:"message_created_at,omitempty"`
-	UpdatedAt        *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	MessageId              string                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	MessageCreatedAt       *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=message_created_at,json=messageCreatedAt,proto3" json:"message_created_at,omitempty"`
+	UpdatedAt              *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	LastReadServerSequence int64                  `protobuf:"varint,4,opt,name=last_read_server_sequence,json=lastReadServerSequence,proto3" json:"last_read_server_sequence,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *EncryptedConversationReadPosition) Reset() {
@@ -3732,6 +3765,13 @@ func (x *EncryptedConversationReadPosition) GetUpdatedAt() *timestamppb.Timestam
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *EncryptedConversationReadPosition) GetLastReadServerSequence() int64 {
+	if x != nil {
+		return x.LastReadServerSequence
+	}
+	return 0
 }
 
 type DirectChatUnreadState struct {
@@ -10732,7 +10772,7 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"ciphertext\x122\n" +
 	"\x15ciphertext_size_bytes\x18\x05 \x01(\x04R\x13ciphertextSizeBytes\x127\n" +
 	"\tstored_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bstoredAt\x12I\n" +
-	"\funread_state\x18\a \x01(\v2&.aerochat.chat.v1.EncryptedUnreadStateR\vunreadState\"\xcb\x04\n" +
+	"\funread_state\x18\a \x01(\v2&.aerochat.chat.v1.EncryptedUnreadStateR\vunreadState\"\xf4\x04\n" +
 	" EncryptedDirectMessageV2Envelope\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x17\n" +
@@ -10746,8 +10786,9 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x127\n" +
 	"\tstored_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\bstoredAt\x12[\n" +
 	"\x0fviewer_delivery\x18\n" +
-	" \x01(\v22.aerochat.chat.v1.EncryptedDirectMessageV2DeliveryR\x0eviewerDeliveryB\x14\n" +
-	"\x12_target_message_id\"\x8f\x05\n" +
+	" \x01(\v22.aerochat.chat.v1.EncryptedDirectMessageV2DeliveryR\x0eviewerDelivery\x12'\n" +
+	"\x0fserver_sequence\x18\v \x01(\x03R\x0eserverSequenceB\x14\n" +
+	"\x12_target_message_id\"\xb8\x05\n" +
 	"&EncryptedDirectMessageV2StoredEnvelope\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x17\n" +
@@ -10762,7 +10803,8 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\tstored_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\bstoredAt\x122\n" +
 	"\x15stored_delivery_count\x18\n" +
 	" \x01(\rR\x13storedDeliveryCount\x12e\n" +
-	"\x11stored_deliveries\x18\v \x03(\v28.aerochat.chat.v1.EncryptedDirectMessageV2StoredDeliveryR\x10storedDeliveriesB\x14\n" +
+	"\x11stored_deliveries\x18\v \x03(\v28.aerochat.chat.v1.EncryptedDirectMessageV2StoredDeliveryR\x10storedDeliveries\x12'\n" +
+	"\x0fserver_sequence\x18\f \x01(\x03R\x0eserverSequenceB\x14\n" +
 	"\x12_target_message_id\"\x8f\x02\n" +
 	"\x12EncryptedGroupLane\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12\x1b\n" +
@@ -10805,7 +10847,7 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\x11recipient_user_id\x18\x01 \x01(\tR\x0frecipientUserId\x12;\n" +
 	"\x1arecipient_crypto_device_id\x18\x02 \x01(\tR\x17recipientCryptoDeviceId\x127\n" +
 	"\tstored_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\bstoredAt\x12I\n" +
-	"\funread_state\x18\x04 \x01(\v2&.aerochat.chat.v1.EncryptedUnreadStateR\vunreadState\"\xf7\x05\n" +
+	"\funread_state\x18\x04 \x01(\v2&.aerochat.chat.v1.EncryptedUnreadStateR\vunreadState\"\xa0\x06\n" +
 	"\x16EncryptedGroupEnvelope\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x19\n" +
@@ -10827,8 +10869,9 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x127\n" +
 	"\tstored_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\bstoredAt\x12X\n" +
-	"\x0fviewer_delivery\x18\x0f \x01(\v2/.aerochat.chat.v1.EncryptedGroupMessageDeliveryR\x0eviewerDeliveryB\x14\n" +
-	"\x12_target_message_id\"\xe1\x05\n" +
+	"\x0fviewer_delivery\x18\x0f \x01(\v2/.aerochat.chat.v1.EncryptedGroupMessageDeliveryR\x0eviewerDelivery\x12'\n" +
+	"\x0fserver_sequence\x18\x10 \x01(\x03R\x0eserverSequenceB\x14\n" +
+	"\x12_target_message_id\"\x8a\x06\n" +
 	"\x1cEncryptedGroupStoredEnvelope\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x19\n" +
@@ -10847,7 +10890,8 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x127\n" +
 	"\tstored_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\bstoredAt\x122\n" +
 	"\x15stored_delivery_count\x18\r \x01(\rR\x13storedDeliveryCount\x12\\\n" +
-	"\x11stored_deliveries\x18\x0e \x03(\v2/.aerochat.chat.v1.EncryptedGroupMessageDeliveryR\x10storedDeliveriesB\x14\n" +
+	"\x11stored_deliveries\x18\x0e \x03(\v2/.aerochat.chat.v1.EncryptedGroupMessageDeliveryR\x10storedDeliveries\x12'\n" +
+	"\x0fserver_sequence\x18\x0f \x01(\x03R\x0eserverSequenceB\x14\n" +
 	"\x12_target_message_id\"\xf5\x05\n" +
 	"(EncryptedDirectMessageV2SendTargetDevice\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12(\n" +
@@ -10888,13 +10932,14 @@ const file_aerochat_chat_v1_chat_service_proto_rawDesc = "" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12H\n" +
 	"\x12message_created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x10messageCreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xc7\x01\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x82\x02\n" +
 	"!EncryptedConversationReadPosition\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12H\n" +
 	"\x12message_created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x10messageCreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\":\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
+	"\x19last_read_server_sequence\x18\x04 \x01(\x03R\x16lastReadServerSequence\":\n" +
 	"\x15DirectChatUnreadState\x12!\n" +
 	"\funread_count\x18\x01 \x01(\rR\vunreadCount\"5\n" +
 	"\x10GroupUnreadState\x12!\n" +

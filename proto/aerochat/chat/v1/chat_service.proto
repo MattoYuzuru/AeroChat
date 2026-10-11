@@ -346,6 +346,7 @@ message EncryptedDirectMessageV2Envelope {
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp stored_at = 9;
   EncryptedDirectMessageV2Delivery viewer_delivery = 10;
+  int64 server_sequence = 11;
 }
 
 message EncryptedDirectMessageV2StoredEnvelope {
@@ -360,6 +361,7 @@ message EncryptedDirectMessageV2StoredEnvelope {
   google.protobuf.Timestamp stored_at = 9;
   uint32 stored_delivery_count = 10;
   repeated EncryptedDirectMessageV2StoredDelivery stored_deliveries = 11;
+  int64 server_sequence = 12;
 }
 
 message EncryptedGroupLane {
@@ -422,6 +424,7 @@ message EncryptedGroupEnvelope {
   google.protobuf.Timestamp created_at = 13;
   google.protobuf.Timestamp stored_at = 14;
   EncryptedGroupMessageDelivery viewer_delivery = 15;
+  int64 server_sequence = 16;
 }
 
 message EncryptedGroupStoredEnvelope {
@@ -439,6 +442,7 @@ message EncryptedGroupStoredEnvelope {
   google.protobuf.Timestamp stored_at = 12;
   uint32 stored_delivery_count = 13;
   repeated EncryptedGroupMessageDelivery stored_deliveries = 14;
+  int64 server_sequence = 15;
 }
 
 message EncryptedDirectMessageV2SendTargetDevice {
@@ -492,6 +496,7 @@ message EncryptedConversationReadPosition {
   string message_id = 1;
   google.protobuf.Timestamp message_created_at = 2;
   google.protobuf.Timestamp updated_at = 3;
+  int64 last_read_server_sequence = 4;
 }
 
 message DirectChatUnreadState {

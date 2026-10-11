@@ -1280,7 +1280,7 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 		return nil, err
 	}
 
-	storedAt := normalizeStoredMessageTimestamp(s.now(), normalizedMessageCreatedAt)
+	storedAt := s.now().UTC()
 	storedEnvelope, err := s.repo.CreateEncryptedDirectMessageV2(ctx, CreateEncryptedDirectMessageV2Params{
 		MessageID:            normalizedMessageID,
 		ChatID:               normalizedChatID,
@@ -1528,7 +1528,7 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 		return nil, err
 	}
 
-	storedAt := normalizeStoredMessageTimestamp(s.now(), normalizedMessageCreatedAt)
+	storedAt := s.now().UTC()
 	storedEnvelope, err := s.repo.CreateEncryptedGroupMessage(ctx, CreateEncryptedGroupMessageParams{
 		MessageID:            normalizedMessageID,
 		GroupID:              group.ID,
@@ -2073,12 +2073,17 @@ func (s *Service) MarkEncryptedDirectChatRead(ctx context.Context, token string,
 		return nil, 0, err
 	}
 
+	if message.OperationKind != EncryptedDirectMessageV2OperationContent || message.ServerSequence <= 0 {
+		return nil, 0, fmt.Errorf("%w: read position must reference sequenced content", ErrInvalidArgument)
+	}
+
 	if _, err := s.repo.UpsertEncryptedDirectChatReadState(ctx, UpsertEncryptedDirectChatReadStateParams{
-		ChatID:            normalizedChatID,
-		UserID:            authSession.User.ID,
-		LastReadMessageID: message.MessageID,
-		LastReadMessageAt: message.CreatedAt,
-		UpdatedAt:         s.now(),
+		ChatID:                 normalizedChatID,
+		UserID:                 authSession.User.ID,
+		LastReadMessageID:      message.MessageID,
+		LastReadMessageAt:      message.CreatedAt,
+		LastReadServerSequence: message.ServerSequence,
+		UpdatedAt:              s.now(),
 	}); err != nil {
 		return nil, 0, err
 	}
@@ -2163,12 +2168,17 @@ func (s *Service) MarkEncryptedGroupChatRead(ctx context.Context, token string, 
 		return nil, 0, err
 	}
 
+	if message.OperationKind != EncryptedGroupMessageOperationContent || message.ServerSequence <= 0 {
+		return nil, 0, fmt.Errorf("%w: read position must reference sequenced content", ErrInvalidArgument)
+	}
+
 	if _, err := s.repo.UpsertEncryptedGroupReadState(ctx, UpsertEncryptedGroupReadStateParams{
-		GroupID:           normalizedGroupID,
-		UserID:            authSession.User.ID,
-		LastReadMessageID: message.MessageID,
-		LastReadMessageAt: message.CreatedAt,
-		UpdatedAt:         s.now(),
+		GroupID:                normalizedGroupID,
+		UserID:                 authSession.User.ID,
+		LastReadMessageID:      message.MessageID,
+		LastReadMessageAt:      message.CreatedAt,
+		LastReadServerSequence: message.ServerSequence,
+		UpdatedAt:              s.now(),
 	}); err != nil {
 		return nil, 0, err
 	}
@@ -3427,15 +3437,6 @@ func normalizeRequiredTimestamp(value time.Time, field string) (time.Time, error
 	}
 
 	return value.UTC(), nil
-}
-
-func normalizeStoredMessageTimestamp(serverNow time.Time, messageCreatedAt time.Time) time.Time {
-	serverNow = serverNow.UTC()
-	if serverNow.Before(messageCreatedAt) {
-		return messageCreatedAt
-	}
-
-	return serverNow
 }
 
 func normalizeOptionalScopeID(value *string, field string) (*string, error) {
