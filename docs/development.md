@@ -44,6 +44,8 @@ Root `.env.example` управляет compose. Для запуска из ис�
 
 Push требует secure context: `localhost` или HTTPS-origin для внешнего домена/телефона. UI-тогглы сами по себе не доказывают доставку. Секреты остаются в локальных env-файлах и не входят в Git или отчёты.
 
+Регион media bucket определяется SDK через `AERO_MEDIA_S3_INTERNAL_ENDPOINT` при первом presign и сохраняется в клиенте подписи. У storage principal должно быть право `s3:GetBucketLocation`; пустой location S3 соответствует `us-east-1`. Browser-visible endpoint используется только для URL и подписи, без исходящих запросов к нему из `aero-chat`. После переноса bucket в другой регион сервис нужно перезапустить. При ошибке internal discovery URL не выдаётся; следующий запрос повторяет discovery. Подписи upload/download проверяются отдельно от доступности публичного storage origin в браузере.
+
 ## Проверки
 
 Запускать последовательно после установки инструментов и зависимостей. Генерация меняет файлы: проверять её diff и не совмещать с редактированием тех же контрактов. Buf remote plugins закреплены version + revision в `buf.gen.yaml`: protobuf Go `1.36.11`, Connect Go `1.19.1`, оба revision `1`. SQLC закреплён на `1.30.0` в installer и CI. Версия Buf CLI — `1.59.0`.
