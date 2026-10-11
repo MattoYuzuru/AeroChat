@@ -1,6 +1,7 @@
 import {
   useEffect,
   useEffectEvent,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -26,6 +27,7 @@ import { publishLocalEncryptedDirectMessageV2Projection } from "../chats/encrypt
 import { resolveChatsRouteSyncAction } from "../chats/route-sync";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
 import { ChatGlyph } from "../chats/ChatGlyph";
+import { DirectComposerFeedback } from "../chats/DirectComposerFeedback";
 import { getDirectChatPeerOrSelf, isSelfDirectChat } from "../chats/self-chat";
 import { useEncryptedMediaAttachmentDraft } from "../chats/useEncryptedMediaAttachmentDraft";
 import {
@@ -94,6 +96,8 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   );
   const [composerText, setComposerText] = useState("");
   const [composerError, setComposerError] = useState<string | null>(null);
+  const composerFeedbackId = useId();
+  const composerViewportRef = useRef<HTMLElement | null>(null);
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
   const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
     useState<string | null>(null);
@@ -626,6 +630,11 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   );
   const directWindowContentMode =
     desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
+  const hasActiveComposer =
+    selectedThread !== null &&
+    chats.state.threadStatus === "ready" &&
+    directWindowContentMode === "thread";
+  const composerFeedbackMessage = composerError ?? chats.state.actionErrorMessage;
   const isDesktopTargetWindow = desktopShellHost !== null && isThreadRouteActive;
   const people = usePeople({
     enabled:
@@ -1221,9 +1230,9 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
 
         {chats.state.notice && <div className={styles.notice}>{chats.state.notice}</div>}
         {searchJumpNotice && <div className={styles.notice}>{searchJumpNotice}</div>}
-        {(composerError || chats.state.actionErrorMessage) && (
+        {!hasActiveComposer && composerFeedbackMessage && (
           <div className={styles.error}>
-            {composerError ?? chats.state.actionErrorMessage}
+            {composerFeedbackMessage}
           </div>
         )}
         </section>
@@ -1435,9 +1444,9 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
             {isDesktopTargetWindow && searchJumpNotice && (
               <div className={styles.notice}>{searchJumpNotice}</div>
             )}
-            {isDesktopTargetWindow && (composerError || chats.state.actionErrorMessage) && (
+            {isDesktopTargetWindow && !hasActiveComposer && composerFeedbackMessage && (
               <div className={styles.error}>
-                {composerError ?? chats.state.actionErrorMessage}
+                {composerFeedbackMessage}
               </div>
             )}
 
@@ -2120,8 +2129,15 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                   </div>
                 </section>
 
-                <section className={styles.composerCard}>
+                <section className={styles.composerCard} ref={composerViewportRef}>
                   <form className={styles.composer} onSubmit={handleComposerSubmit}>
+                    <DirectComposerFeedback
+                      id={composerFeedbackId}
+                      message={composerFeedbackMessage}
+                      className={`${styles.error} ${styles.composerFeedback}`}
+                      visible={isPageVisible}
+                      viewportRef={composerViewportRef}
+                    />
                     {selectedEncryptedReplyEntry && (
                       <div className={styles.replyComposerCard}>
                         <div>
@@ -2363,6 +2379,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
 
                       <label className={styles.field}>
                         <textarea
+                          aria-describedby={composerFeedbackMessage ? composerFeedbackId : undefined}
                           disabled={
                             chats.state.isSendingMessage ||
                             encryptedMediaAttachmentDraft.isUploading

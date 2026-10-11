@@ -1181,6 +1181,14 @@
   gap: 0.3rem;
 }
 
+.composer .composerFeedback {
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  max-height: 4rem;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
 .composerRow {
   display: grid;
   grid-template-columns: 2.45rem minmax(0, 1fr) 2.45rem 2.45rem 2.45rem;
@@ -1470,6 +1478,10 @@
   .composer .error {
     margin: 0;
     padding: 0.35rem 0.55rem;
+  }
+
+  .composer .composerFeedback {
+    max-height: 2rem;
   }
 }
 
