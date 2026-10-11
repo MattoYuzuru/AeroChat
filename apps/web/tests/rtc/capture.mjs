@@ -48,7 +48,7 @@ try {
         await page.evaluate(()=>window.pending);
         await page.waitForTimeout(50);
         const result=await page.evaluate(()=>window.fixture.report());
-        assert.equal(result.stops,1,`${action}/${cleanup}/${phase}: captured track stopped`);
+        assert.equal(result.stops,phase==='capture'?2:1,`${action}/${cleanup}/${phase}: every captured track stopped`);
         assert.equal(result.peers,0,"stale operation must not create peer");
         assert.deepEqual(result.log,phase==="capture"?[]:[action,"leave"]);
         results.push({action,cleanup,phase,stops:result.stops,log:result.log});
@@ -56,24 +56,30 @@ try {
       }
     }
   }
+  for(const action of ['start','join']){
   for(const rejected of [true,false]){
     await page.goto(url);
     await page.waitForFunction(()=>window.fixture);
     await page.evaluate(()=>window.fixture.mount());
     await page.waitForFunction(()=>window.fixture.report().state.syncStatus==="ready");
+    if(action==='join'){
+      await page.evaluate(()=>window.fixture.sync());
+      await page.waitForFunction(()=>window.fixture.report().state.call!==null);
+    }
     await page.evaluate(()=>window.fixture.deferCapture());
-    await page.evaluate(()=>{window.pending=Promise.all([window.fixture.start(),window.fixture.start()]);});
+    await page.evaluate(action=>{window.pending=Promise.all([window.fixture[action](),window.fixture[action]()]);},action);
     await page.waitForTimeout(25);
     const pending=await page.evaluate(()=>window.fixture.report());
     assert.equal(pending.captures,1,"double click captures once");
     await page.evaluate(rejected=>window.fixture[rejected?"rejectCapture":"releaseCapture"](),rejected);
     await page.evaluate(()=>window.pending);
     const result=await page.evaluate(()=>window.fixture.report());
-    assert.deepEqual(result.log.filter(method=>method!=='heartbeat'),rejected?[]:["start"]);
+    assert.deepEqual(result.log.filter(method=>method!=='heartbeat'),rejected?[]:[action]);
     if(rejected)assert.equal(result.log.length,0);
     assert.equal(result.state.actionState,"idle");
     if(rejected)assert.equal(result.state.mediaState,"denied");
     await page.evaluate(()=>window.fixture.unmount());
+  }
   }
   console.log(JSON.stringify({browser:await browser.version(),results,scope:"Actual React; fake media/PC/RPC; no microphone/network evidence"}));
 } finally {await browser.close();await server.close();}

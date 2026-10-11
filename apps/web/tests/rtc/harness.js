@@ -11,12 +11,13 @@ let completePlayback;
 const audio = {srcObject: null, pause(){observations.pauses++;}, play(){observations.plays++;if(deferPlayback){deferPlayback=false;return new Promise((resolve,reject)=>{completePlayback=rejectResult=>rejectResult?reject(new Error('blocked')):resolve();});}if(observations.plays>3)return new Promise(()=>{});return blocked ? Promise.reject(new Error('blocked')) : Promise.resolve();}};
 const track = {stop:()=>observations.stops++, contentHint:'', kind:'audio'};
 const stream = () => ({getTracks:()=>[track], getAudioTracks:()=>[track]});
+const capturedStream = () => ({getTracks:()=>[track,{...track}],getAudioTracks:()=>[track]});
 let captureDeferred = false;
 let releaseCapture;
 let rejectCapture;
 Object.defineProperty(navigator, 'mediaDevices', {configurable:true, value:{getSupportedConstraints:()=>({}), getUserMedia:async()=>{
   observations.captures++;
-  if (captureDeferred) return new Promise((resolve,reject)=>{releaseCapture=()=>resolve(stream());rejectCapture=reject;});
+  if (captureDeferred) return new Promise((resolve,reject)=>{releaseCapture=()=>resolve(capturedStream());rejectCapture=reject;});
   return stream();
 }}});
 class FakePeer extends EventTarget {
