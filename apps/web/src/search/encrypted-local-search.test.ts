@@ -355,7 +355,7 @@ describe("authoritative local search convergence", () => {
       groups: [], directChatId: chat.id, groupId: "", token: "token", cryptoRuntime: runtime };
     const result = await searchEncryptedLocalMessages(input);
     expect(decrypt.mock.calls[0]?.[0].map((value) => value.messageId)).toEqual(["content", "edit"]);
-    expect(result.results.map((value) => value.matchFragment)).toEqual(["needle edited", "needle sent"]);
+    expect(result.results.map((value) => value.matchFragment)).toEqual(["needle sent", "needle edited"]);
     expect(listBufferedLocalEncryptedDirectMessageV2Projection(chat.id)).toEqual([pending]);
     const cached = await searchEncryptedLocalMessages(input);
     expect(cached.results).toEqual(result.results);
