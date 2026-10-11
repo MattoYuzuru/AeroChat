@@ -3510,6 +3510,7 @@ export function GroupsPage() {
 
                             <label className={styles.field}>
                               <textarea
+                                aria-label="Сообщение"
                                 disabled={
                                   cryptoRuntime.state.isActionPending ||
                                   encryptedMediaAttachmentDraft.isUploading ||
