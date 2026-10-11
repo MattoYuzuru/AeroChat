@@ -35,6 +35,13 @@ try{
     const scroll=await page.evaluate(()=>{const history=document.querySelector('[data-testid=history]');history.scrollTop=history.scrollHeight;return {top:history.scrollTop,composerBottom:document.querySelector('[data-testid=composer]').getBoundingClientRect().bottom,pageY:scrollY};});
     assert.ok(scroll.top>0);assert.equal(scroll.pageY,0);assert.equal(scroll.composerBottom,geometry.composer.bottom);
    }
+   for(const control of await page.getByTestId('composer').getByRole('button').all()){
+    await control.scrollIntoViewIfNeeded();const bounds=await control.boundingBox();
+    assert.ok(bounds&&bounds.y>=geometry.composer.y-1&&bounds.y+bounds.height<=geometry.composer.bottom+1,JSON.stringify({lane,state,width,height,bounds,composer:geometry.composer}));
+   }
+   if(state==='call'){
+    for(const label of ['Присоединиться','Скрыть']){const control=page.getByRole('button',{name:label,exact:true});await control.scrollIntoViewIfNeeded();const bounds=await control.boundingBox();assert.ok(bounds&&bounds.height>=31&&bounds.y>=0&&bounds.y+bounds.height<=height,JSON.stringify({lane,state,width,height,label,bounds}));}
+   }
    const actions=[...(lane==='self'?[]:[lane==='group'?'Управление звонком':'Позвонить']),...(lane==='group'?[]:['Обновить thread']),'Назад к списку'];
    for(const action of actions){
     const control=page.getByRole('button',{name:action,exact:true});const bounds=await control.boundingBox();

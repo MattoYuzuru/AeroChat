@@ -1306,6 +1306,7 @@
 
 @media (max-width: 1179px) {
   .composerCard {
+    min-height: 0;
     max-height: min(50dvh, 22rem);
     overflow-y: auto;
   }
@@ -1365,7 +1366,7 @@
   }
 
   .threadLayout {
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(3rem, 1fr) minmax(0, auto);
     overflow: hidden;
   }
 
@@ -1447,7 +1448,9 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .threadStatusRow > span {
+  .threadStatusRow > span,
+  .threadDescription,
+  .threadEyebrow {
     display: none;
   }
 

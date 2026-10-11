@@ -1017,6 +1017,7 @@
 
 @media (max-width: 1179px) {
   .composerCard {
+    min-height: 0;
     max-height: min(50dvh, 22rem);
     overflow-y: auto;
   }
@@ -1052,6 +1053,10 @@
   .mainColumn:has(> .groupInfoHeroCard) {
     grid-template-rows: auto;
     overflow-y: auto;
+  }
+
+  .threadPanel {
+    grid-template-rows: auto auto minmax(3rem, 1fr) minmax(0, auto);
   }
 
   .threadPanel > .readOnlyNotice {
@@ -1139,7 +1144,9 @@
   }
 
   .threadStatusRow > span,
-  .threadHeroCard .cardLabel {
+  .threadHeroCard .cardLabel,
+  .threadDescription,
+  .threadEyebrow {
     display: none;
   }
 

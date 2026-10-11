@@ -18,8 +18,8 @@ function Conversation(){
    {isGroup&&<button className={s.secondaryButton} onClick={()=>setShowList(true)} type="button">Назад к списку</button>}
   </div></div></section>;
  const composer=<section className={s.composerCard} data-testid="composer"><form className={s.composer}>
-  {state==='reply'&&<section className={s.replyComposerCard}>Ответ на предыдущее сообщение <button type="button">Отменить ответ</button></section>}
-  {state==='attachment'&&<section className={s.attachmentDraftCard}>Файл готов к отправке <button type="button">Убрать файл</button></section>}
+  {state==='reply'&&<section className={s.replyComposerCard}><div><p className={s.replyPreviewAuthor}>Ответ на сообщение собеседника</p><p className={s.replyPreviewText}>Предыдущее сообщение в переписке</p></div><button className={s.ghostButton} type="button">Отменить ответ</button></section>}
+  {state==='attachment'&&<section className={s.attachmentDraftCard}><div><p className={s.attachmentDraftTitle}>fixture-document.txt</p><p className={s.attachmentDraftMeta}>1 КБ • текстовый файл</p><p className={s.attachmentDraftStatus}>Файл готов к отправке.</p></div><div className={s.attachmentDraftActions}><button className={s.ghostButton} type="button">Убрать файл</button></div></section>}
   {state==='error'&&<p className={s.error}>Не удалось отправить сообщение. Повторите попытку.</p>}
   <div className={s.composerRow}>
   <button aria-label="Прикрепить файл" type="button" className={s.iconButton}>+</button>
