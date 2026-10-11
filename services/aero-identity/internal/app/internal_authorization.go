@@ -145,7 +145,7 @@ func RunHTTPServers(ctx context.Context, logger *slog.Logger, cfg Config, public
 	if err != nil {
 		return errors.New("private authorization listener unavailable")
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	child, cancel := context.WithCancel(ctx)
 	defer cancel()
 	results := make(chan error, 2)

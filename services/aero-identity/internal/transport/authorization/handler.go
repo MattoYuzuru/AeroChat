@@ -121,7 +121,7 @@ func toProto(authority *identity.SessionAuthority) (*identityauthorizationv1.Ses
 	if authority == nil {
 		return nil, identity.ErrAuthorityUnavailable
 	}
-	status := identityauthorizationv1.AuthorityStatus_AUTHORITY_STATUS_UNSPECIFIED
+	var status identityauthorizationv1.AuthorityStatus
 	switch authority.Status {
 	case identity.AuthorityActive:
 		status = identityauthorizationv1.AuthorityStatus_AUTHORITY_STATUS_ACTIVE
