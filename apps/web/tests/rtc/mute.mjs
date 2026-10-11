@@ -103,7 +103,10 @@ try{
   await page.evaluate(()=>window.fixture.unmount());evidence.push('ended track guard');
   await joined();await page.getByRole('button',{name:'Выключить микрофон',exact:true}).click();
   await page.waitForFunction(()=>window.fixture.report().isMicrophoneMuted);
-  await page.evaluate(()=>{window.fixture.unmount();window.fixture.mount();});
+  await page.evaluate(()=>window.fixture.unmount());
+  await page.locator('#root pre').waitFor({state:'detached'});
+  await page.evaluate(()=>window.fixture.mount());
+  await page.locator('#root pre').waitFor({state:'attached'});
   await page.waitForFunction(()=>window.fixture.report().state.syncStatus==='ready');
   assert.equal((await report()).isMicrophoneMuted,false,'Remount does not inherit old microphone preference');
   await page.evaluate(()=>window.fixture.unmount());evidence.push('unmount/remount reset');
