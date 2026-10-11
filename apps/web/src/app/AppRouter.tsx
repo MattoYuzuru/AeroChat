@@ -2,9 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-route
 import { useAuth } from "../auth/useAuth";
 import { AuthPage } from "../pages/AuthPage";
 import { StateScreen } from "../ui/StateScreen";
-import { LegacyAppShell } from "./AppShell";
 import {
-  renderShellAppContent,
   resolveShellRouteEntry,
   routeBackedShellApps,
 } from "./app-routes";
@@ -22,9 +20,20 @@ import {
 } from "../shell/start-menu";
 import { resolveShellEntrySurface } from "../shell/entry";
 import { ShellEntrySurface } from "../shell/ShellEntrySurface";
-import { DesktopShell } from "../shell/DesktopShell";
-import { MobileLauncherHome } from "../shell/MobileLauncherHome";
 import { useEffect, useState } from "react";
+import { RetryableLazyModule } from "./lazy-module";
+import { createLazyModule } from "./lazy-module-loader";
+import { renderShellAppContent } from "./app-content";
+
+const desktopModule = createLazyModule<{ onRequestRebootToBoot(): void }>(
+  () => import("../shell/DesktopShell").then(({ DesktopShell }) => ({ default: DesktopShell })),
+);
+const legacyModule = createLazyModule<{ children: import("react").ReactNode }>(
+  () => import("./AppShell").then(({ LegacyAppShell }) => ({ default: LegacyAppShell })),
+);
+const launcherModule = createLazyModule<Record<string, never>>(
+  () => import("../shell/MobileLauncherHome").then(({ MobileLauncherHome }) => ({ default: MobileLauncherHome })),
+);
 
 export function AppRouter() {
   return (
@@ -248,14 +257,16 @@ function ProtectedShellRoute() {
   }
 
   if (isDesktopViewport) {
-    return <DesktopShell onRequestRebootToBoot={shellEntry.requestRebootToBoot} />;
+    return <RetryableLazyModule descriptor={desktopModule} title="Рабочий стол" moduleProps={{ onRequestRebootToBoot: shellEntry.requestRebootToBoot }} />;
   }
 
   if (location.pathname === "/app") {
     return (
-      <LegacyAppShell>
-        <MobileLauncherHome />
-      </LegacyAppShell>
+      <RetryableLazyModule
+        descriptor={legacyModule}
+        title="Мобильное приложение"
+        moduleProps={{ children: <RetryableLazyModule descriptor={launcherModule} title="Приложения" moduleProps={{}} /> }}
+      />
     );
   }
 
@@ -263,7 +274,7 @@ function ProtectedShellRoute() {
     return <Navigate replace to="/app" />;
   }
 
-  return <LegacyAppShell>{renderShellAppContent(routeEntry.app.appId)}</LegacyAppShell>;
+  return <RetryableLazyModule descriptor={legacyModule} title="Мобильное приложение" moduleProps={{ children: renderShellAppContent(routeEntry.app.appId) }} />;
 }
 
 function RouteFallback() {

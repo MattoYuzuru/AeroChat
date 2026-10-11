@@ -86,6 +86,12 @@ Go unit tests сами по себе не доказывают работу stor
 
 Для личной инфраструктуры сначала читать `/Users/yuzuru/AGENTS.md` и его navigator; при local Docker discovery, runtime version mismatch или конкурирующих/пропущенных checks применять `workstation-dev`. По умолчанию проверяется текущая машина. SSH/VPN/другие хосты входят в scope только по явному заданию.
 
+### Lazy UI regression
+
+`app-routes` содержит только metadata/path builders; содержимое приложений находится в `app-content`. Lazy declarations стабильны вне render, retry создаёт новый loader только для неудавшегося экземпляра. Это учитывает кеширование promise/result в [React lazy](https://react.dev/reference/react/lazy); повторный fetch после network failure проверяется в браузере, а не предполагается по сбросу error boundary. Общие auth/crypto/notifications/RTC providers остаются в bootstrap.
+
+`apps/web/tests/lazy/lazy.mjs` собирает production AppRouter, shell и реальные People/Explorer pages в chunks. Playwright прерывает настоящий запрос JS chunk, проверяет retry, соседнее поле ввода, быстрые повторные нажатия и закрытие окна до позднего завершения загрузки. Перед запуском задаются `PLAYWRIGHT_MODULE`, `CHROMIUM_EXECUTABLE` и внешний собственный `LAZY_BUILD_DIR`; Vite build не очищает этот каталог. Fixture использует bounded localhost25174 и закрывает browser/server в finally. Auth/gateway/RTC/realtime здесь синтетические; actual accounts, общий crypto bootstrap и real-device поведение эта проверка не подтверждает.
+
 ## Server runtime и публикация
 
 [Bootstrap](deploy/single-server-bootstrap.md) описывает `.env.server`, `.env.server.secrets`, shared `k3s + Traefik`, media origin и repo-managed TURN. [Rollout](deploy/production-rollout.md) содержит production health gates и rollback; это отдельная операционная процедура.
