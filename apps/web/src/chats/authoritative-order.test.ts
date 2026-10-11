@@ -102,6 +102,22 @@ for (const lane of ["direct", "group"] as const) {
         expect([first, edit, remove, lateEdit].reduce((current, update) => apply(current, update), result)).toEqual(expected);
       }
     });
+    it("keeps pre-origin mutation visibly unresolved until whole-lane recovery replay", () => {
+      const first = content("first", "1", "2099-01-01T00:00:00Z");
+      const edit: EncryptedDirectMessageV2ReadyProjection = {
+        ...content("edit", "2", "1999-01-01T00:00:00Z"), operationKind: "edit",
+        targetMessageId: "first", revision: 2, text: "accepted edit", editedAt: "1999-01-01T00:00:00Z",
+      };
+      const unresolved = merge([edit]);
+      expect(unresolved).toMatchObject([{ kind: "failure", failureKind: "unresolved_target", messageId: "edit" }]);
+      const lateOrigin = lane === "direct"
+        ? mergeEncryptedDirectMessageV2Projection(unresolved as ReturnType<typeof mergeEncryptedDirectMessageV2Projection>, [first])
+        : mergeEncryptedGroupProjection(unresolved as ReturnType<typeof mergeEncryptedGroupProjection>, [group(first)]);
+      expect(lateOrigin.some((entry) => entry.kind === "failure" && entry.failureKind === "unresolved_target")).toBe(true);
+      const recovered = merge([edit, first]);
+      expect(recovered).toHaveLength(1);
+      expect(recovered[0]).toMatchObject({ kind: "message", text: "accepted edit", serverSequence: "1", lastAppliedServerSequence: "2" });
+    });
     it("rejects an unassigned sequence rather than sorting a fabricated zero", () => {
       expect(() => merge([content("legacy", "", "2026-10-11T00:00:00Z")])).toThrow("порядок сообщений");
     });
