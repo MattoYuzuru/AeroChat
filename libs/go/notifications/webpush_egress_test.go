@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"errors"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -202,6 +203,8 @@ func TestWebPushRequestAndBatchCancellation(t *testing.T) {
 			var calls atomic.Int32
 			server, roots := ownedPushTLS(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				attempt := calls.Add(1)
+				_, _ = io.Copy(io.Discard, io.LimitReader(r.Body, 16384))
+				_ = r.Body.Close()
 				if batch && attempt == 1 {
 					w.WriteHeader(201)
 					return

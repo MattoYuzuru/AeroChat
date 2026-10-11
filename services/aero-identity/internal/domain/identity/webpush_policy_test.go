@@ -31,6 +31,12 @@ func TestWebPushRegistrationPolicyAndLegacyDelete(t *testing.T) {
 			t.Fatal("opaque capability changed")
 		}
 	}
+	if err := service.DeleteWebPushSubscription(context.Background(), auth.Token, "https://FCM.GOOGLEAPIS.COM:443/opaque%2Fpath?q=a%2Fb"); err != nil {
+		t.Fatal(err)
+	}
+	if len(repository.webPushSubscriptions) != 0 {
+		t.Fatal("the accepted raw capability could not delete its canonical subscription")
+	}
 	legacy := WebPushSubscription{ID: "legacy", UserID: auth.User.ID, Endpoint: "http://localhost/legacy"}
 	repository.webPushSubscriptions[legacy.ID] = legacy
 	if err := service.DeleteWebPushSubscription(context.Background(), auth.Token, legacy.Endpoint); err != nil {

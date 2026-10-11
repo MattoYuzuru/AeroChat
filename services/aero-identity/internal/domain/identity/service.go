@@ -378,6 +378,12 @@ func (s *Service) DeleteWebPushSubscription(ctx context.Context, token string, e
 	if err != nil {
 		return err
 	}
+	canonicalEndpoint, policyErr := libnotifications.NormalizeWebPushEndpoint(normalizedEndpoint)
+	if policyErr == nil && canonicalEndpoint != normalizedEndpoint {
+		if _, err := s.repo.DeleteWebPushSubscription(ctx, authSession.User.ID, canonicalEndpoint); err != nil {
+			return err
+		}
+	}
 
 	_, err = s.repo.DeleteWebPushSubscription(ctx, authSession.User.ID, normalizedEndpoint)
 	return err
