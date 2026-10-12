@@ -100,12 +100,17 @@ group sound remain UNVERIFIED.
 
 ## План guard foundation для legacy mic-slot
 
-Следующий отдельный slice по ADR097 — dormant constructor policy, default off,
-без env activation. Он сериализует legacy Create/Join и group Reserve под общим
+Source preparation отдельного slice по ADR097 — dormant constructor policy,
+default off, без env activation. `NewRepositoryWithMediaSlotGuard` и
+`NewMediaStoreWithMediaSlotGuard` явно выбирают policy; обычные constructors,
+main и config её не включают. Она сериализует legacy Create/Join и group Reserve под общим
 user mutex. Parent discovery включает old active participation ended-call и
 held grant; sorted calls → rooms → users locks и повторная проверка binding
 исключают child→parent inversion. Изменившийся parent set требует rollback и
-bounded retry; exhaustion/DB error означает unavailable, не revoked.
+не более трёх полных transaction attempts в исходном context; exhaustion/DB
+error означает unavailable, не revoked. Same-call legacy Join возвращает
+только уже существующий matching participant и не выдаёт media grant/token;
+repository не получает session/device и не заявляет проверку этого tuple.
 
 Guard охватывает legacy Leave/End, ended-orphan repair, stale conflict/pruning
 и ineligible signal-target exit. Matching held prepared/active/revoking grant
