@@ -67,7 +67,7 @@ func TestMediaStoreRegisteredBootstrapUpgradeKeepsLegacyLifecycle(t *testing.T) 
 				t.Fatal("repeat registered bootstrap failed", err)
 			}
 			var migrations, grants int
-			if err := db.QueryRow(ctx, "SELECT count(*) FROM schema_migrations WHERE service_name='aero-rtc-control'").Scan(&migrations); err != nil || migrations != 2 {
+			if err := db.QueryRow(ctx, "SELECT count(*) FROM schema_migrations WHERE service_name='aero-rtc-control'").Scan(&migrations); err != nil || migrations != 3 {
 				t.Fatalf("registered RTC migrations=%d err=%v", migrations, err)
 			}
 			if err := db.QueryRow(ctx, "SELECT count(*) FROM rtc_media_grants").Scan(&grants); err != nil || grants != 0 {
