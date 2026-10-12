@@ -367,6 +367,33 @@ source-only gateway evidence явно static, не actual404.
 header/constructor boolean не включает COMPLETE. SDK/proxy/admission token/
 cleanup workers/UI/runtime и реальный group audio остаются отдельными slices.
 
+#### Границы native-проверки адаптера
+
+Уточнение Accepted координатором 2026-10-12 до добавления тестового хоста Chat.
+Максимум три одновременных участника этой проверки: production Identity main,
+Chat в отдельном test host и RTC test. Identity выдаёт настоящие opaque sessions;
+Chat использует production PostgreSQL repository, domain service, публичные
+group writers и private mTLS authorization listener. Роли, membership epoch и
+auth facts не подменяются. Обычный запуск tests остаётся прежним; режим хоста
+выбирает только явный private fixture profile, без пустых или skipped tests.
+
+Test host допускает лишь Ping, CreateGroup, CreateGroupInviteLink,
+JoinGroupByInviteLink, UpdateGroupMemberRole, TransferGroupOwnership и
+RemoveGroupMember. Reader transition и remove вызывают очистку typing: для
+отсутствующих в этой проверке typing entries используется отдельное пустое
+in-memory test storage. Оно не участвует в авторизации; остальные typing методы
+недоступны. Media, presence и notifications не используются и не открываются
+через allowlist. Chat production/main/dependencies не меняются, Redis/S3 clients
+и cleanup workers не запускаются. Fixture использует только собственную свежую
+UUID schema, настоящие migrations, PG и TLS; source binding, лимиты и cleanup
+проверяются отдельно до запуска.
+
+Такой результат подтверждает production Chat domain/listener в тестовом хосте,
+а не полный Chat main, Compose или readiness медиа. Полный production Chat с
+owned Redis/S3 входит в отдельную сквозную браузерную приёмку. Счётчик вызовов
+может делегировать реальному source и сохранять только числа для ZEROChat
+assertions; bearer, subject IDs и source facts в артефакт счётчика не попадают.
+
 ### Identity source delivery journal
 
 Identity sender — отдельный default-disabled implementation slice. Migration

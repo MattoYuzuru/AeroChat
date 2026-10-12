@@ -218,3 +218,12 @@ body cap 4KiB и отдельные server limits для raw headers/cleanup. О
 заблокирована ответом 403 account suspended; новые локальные проверки отдельно
 фиксируют exact source, сохраняя внешний publication gate BLOCKED. Существующие
 production stubs/feature flag остаются прежними; SDK, SFU и UI относятся к следующим slices.
+
+Native scope адаптера отдельно использует production Identity main и Chat
+test host с production PG repository/domain/group writers/private TLS listener,
+при максимуме трёх одновременных участников вместе с RTC test. Test-only typing
+storage очищает только отсутствующие entries при reader/remove; auth facts и
+roles остаются настоящими. Проверка не запускает Redis/S3 и не подтверждает
+полный Chat main/Compose; полный стек проверяется отдельной браузерной приёмкой.
+Accepted границы и allowlist зафиксированы в ADR-097 до fixture code. Этот новый
+native scope пока UNRUN.
