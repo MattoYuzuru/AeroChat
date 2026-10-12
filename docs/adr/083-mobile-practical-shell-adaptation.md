@@ -105,6 +105,28 @@ bounded собственный scroll и доступна через Tab; textar
 textarea сохраняют принятые минимальные размеры, даже если composer требуется
 прокрутить для следующего действия.
 
+### Уточнение 13 октября 2026: pinned summary и бюджет composer (Accepted)
+
+В выбранной mobile direct/self conversation optional pinned summary не получает
+неограниченную высоту за счёт history или composer. History сохраняет минимум
+48 CSS px полезного viewport без padding. Composer резервирует видимую высоту
+текущего textarea в пределах существующего max-height вместе со своим padding;
+после обычного Tab-фокуса textarea целиком виден, имеет ширину не меньше 140 CSS px
+и высоту не меньше 39 CSS px. Reply/attachment/error остаются в собственном scroll
+composer и не прокручивают страницу или history.
+
+При нехватке высоты pinned summary получает bounded presentation: ordinal и
+действия перехода остаются доступны, preview/metadata могут иметь собственный
+scroll или визуальное сокращение с сохранением доступного текста и существующего
+перехода к сообщению. Кнопки не меньше 32 CSS px целиком видны после Tab-фокуса;
+нельзя скрывать сам pin или менять tombstone/read/crypto semantics ради geometry
+PASS. Desktop presentation и backend contracts этим не меняются.
+
+Representative fixture обязан включать actual production DOM pinned row:
+ordinal, timestamp, длинный preview и tombstone. Synthetic DOM/CSS проверка
+дополняет actual owned message-page geometry; она не заменяет iOS/Android OS
+keyboard/touch или native browser zoom.
+
 ## Последствия
 
 ### Положительные
