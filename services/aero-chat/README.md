@@ -56,6 +56,18 @@ unique owner index независимо от heap/UUID order. Missing, restricte
 изменившийся target не оставляет группу без owner; ошибка promotion откатывает
 обе роли. Owner/admin/member transitions сохраняют audio eligibility epoch.
 
+Write restriction явно типизирует timestamp parameter как `timestamptz` в обоих
+CASE expressions, включая idempotency predicate. Именованный nullable
+[sqlc.narg](https://docs.sqlc.dev/en/latest/howto/named_parameters.html#nullable-parameters)
+сохраняет поле `WriteRestrictedAt` с типом `pgtype.Timestamptz`. Это сохраняет nullable time и
+повторный unchanged result при установке/снятии ограничения; message-only
+restriction не меняет audio eligibility epoch. Native
+`TestGroupAuthorityWriteRestrictionTimestampRoundTrip` проверяет реальный
+repository writer, persisted timestamp, повтор и NULL при снятии ограничения на
+owned PostgreSQL. Установка ограничения без timestamp по-прежнему отклоняется
+constraint `group_memberships_write_restriction_consistency`, сохраняя прежнюю
+дату и authority epoch; native regression проверяет и этот rollback.
+
 ## Chat revocation sender
 
 Migration025 добавляет chat_revocation_delivery journal, backfill существующего
