@@ -95,27 +95,27 @@ func readRTCAuthHostProfile(path string) (rtcAuthHostProfile, error) {
 }
 
 // Fixture не создаёт typing. Clear отсутствующей записи не подменяет auth facts.
-var rtcAuthTypingUnavailable = errors.New("owned typing method unavailable")
+var errRTCAuthTypingUnavailable = errors.New("owned typing method unavailable")
 
 type rtcAuthEmptyTyping struct{}
 
 func (rtcAuthEmptyTyping) PutDirectChatTypingIndicator(context.Context, chat.PutDirectChatTypingIndicatorParams) error {
-	return rtcAuthTypingUnavailable
+	return errRTCAuthTypingUnavailable
 }
 func (rtcAuthEmptyTyping) ClearDirectChatTypingIndicator(context.Context, string, string) error {
-	return rtcAuthTypingUnavailable
+	return errRTCAuthTypingUnavailable
 }
 func (rtcAuthEmptyTyping) ListDirectChatTypingIndicators(context.Context, string, []string, time.Time) (map[string]chat.DirectChatTypingIndicator, error) {
-	return nil, rtcAuthTypingUnavailable
+	return nil, errRTCAuthTypingUnavailable
 }
 func (rtcAuthEmptyTyping) PutGroupTypingIndicator(context.Context, chat.PutGroupTypingIndicatorParams) error {
-	return rtcAuthTypingUnavailable
+	return errRTCAuthTypingUnavailable
 }
 func (rtcAuthEmptyTyping) ClearGroupTypingIndicator(context.Context, string, string, string) error {
 	return nil
 }
 func (rtcAuthEmptyTyping) ListGroupTypingIndicators(context.Context, string, string, []string, time.Time) (map[string]chat.DirectChatTypingIndicator, error) {
-	return nil, rtcAuthTypingUnavailable
+	return nil, errRTCAuthTypingUnavailable
 }
 
 type rtcAuthChatSource struct {
@@ -200,12 +200,12 @@ func runRTCAuthChatHost(path string) error {
 	if err != nil {
 		return errors.New("owned public bind failed")
 	}
-	defer pubListener.Close()
+	defer func() { _ = pubListener.Close() }()
 	privateListener, err := net.Listen("tcp", private.Addr)
 	if err != nil {
 		return errors.New("owned private bind failed")
 	}
-	defer privateListener.Close()
+	defer func() { _ = privateListener.Close() }()
 	results := make(chan error, 2)
 	go func() { results <- public.Serve(pubListener) }()
 	go func() { results <- private.ServeTLS(privateListener, "", "") }()
