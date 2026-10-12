@@ -1,4 +1,5 @@
 import type { EncryptedGroupEnvelope } from "../gateway/types";
+import { historicalWebTimestampAADCandidate } from "./encrypted-aad-timestamp";
 import type {
   EncryptedGroupDecryptedEnvelope,
   EncryptedGroupDecryptFailure,
@@ -112,8 +113,9 @@ export async function decryptEncryptedGroupEnvelope(
   }
 
   try {
-    const contentKey = await unwrapContentKey(material, envelope, keyBox);
-    const plaintext = await decryptPayload(contentKey, envelope, transport);
+    const plaintext = await decryptPayloadWithTimestampCompatibility(
+      material, envelope, transport, keyBox,
+    );
     const payload = parsePayload(plaintext);
     if (payload === null) {
       return buildFailure(envelope, "invalid_payload");
@@ -294,6 +296,40 @@ async function encryptEncryptedGroupPayloadWithImportedKeys(input: {
     ciphertext: toBase64(transport),
     ciphertextSizeBytes: transport.byteLength,
   };
+}
+
+async function decryptPayloadWithTimestampCompatibility(
+  material: LocalCryptoDeviceMaterial,
+  envelope: EncryptedGroupEnvelope,
+  transport: EncryptedGroupTransportEnvelopeV1,
+  keyBox: EncryptedGroupRecipientKeyBoxV1,
+): Promise<string> {
+  try {
+    return await decryptAuthenticatedPayload(material, envelope, transport, keyBox);
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== "OperationError") {
+      throw error;
+    }
+    const createdAt = historicalWebTimestampAADCandidate(envelope.createdAt);
+    if (createdAt === null) {
+      throw error;
+    }
+
+    // Оба слоя используют одну representation; parsing/callback не повторяются.
+    return decryptAuthenticatedPayload(
+      material, { ...envelope, createdAt }, transport, keyBox,
+    );
+  }
+}
+
+async function decryptAuthenticatedPayload(
+  material: LocalCryptoDeviceMaterial,
+  envelope: EncryptedGroupEnvelope,
+  transport: EncryptedGroupTransportEnvelopeV1,
+  keyBox: EncryptedGroupRecipientKeyBoxV1,
+): Promise<string> {
+  const contentKey = await unwrapContentKey(material, envelope, keyBox);
+  return decryptPayload(contentKey, envelope, transport);
 }
 
 async function unwrapContentKey(
