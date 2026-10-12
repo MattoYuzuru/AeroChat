@@ -75,7 +75,7 @@ func readRTCAuthHostProfile(path string) (rtcAuthHostProfile, error) {
 		return p, errors.New("owned binary changed")
 	}
 	build, ok := debug.ReadBuildInfo()
-	if !ok || build.GoVersion != "go1.25.8" {
+	if !ok || build.GoVersion != "go1.27.2" {
 		return p, errors.New("owned Go toolchain mismatch")
 	}
 	values := map[string]string{}
