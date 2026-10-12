@@ -31,6 +31,9 @@ import (
 	"time"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
+	"github.com/MattoYuzuru/AeroChat/libs/go/dbbootstrap"
+	chatschema "github.com/MattoYuzuru/AeroChat/services/aero-chat/db/schema"
+	identityschema "github.com/MattoYuzuru/AeroChat/services/aero-identity/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/domain/delivery"
 	"github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/domain/identity"
 	"github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/storage/postgres"
@@ -84,9 +87,13 @@ func senderRTCFixture(t *testing.T, ctx context.Context) (*pgxpool.Pool, string)
 		t.Fatal("owned RTC pool unavailable")
 	}
 	t.Cleanup(db.Close)
-	// Штатная RTC foundation использует ID users; fixture не вызывает shared Identity.
-	if _, err := db.Exec(ctx, "CREATE TABLE users(id UUID PRIMARY KEY)"); err != nil {
-		t.Fatal(err)
+	// Production RTC bootstrap проверяет реальные registered prerequisite ledgers.
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if err := dbbootstrap.Apply(ctx, db, dbbootstrap.Options{ServiceName: "aero-identity", Files: identityschema.Files, Logger: logger}); err != nil {
+		t.Fatal("owned Identity prerequisite bootstrap failed")
+	}
+	if err := dbbootstrap.Apply(ctx, db, dbbootstrap.Options{ServiceName: "aero-chat", Files: chatschema.Files, Logger: logger}); err != nil {
+		t.Fatal("owned Chat prerequisite bootstrap failed")
 	}
 	return db, config.ConnConfig.ConnString()
 }
@@ -198,7 +205,7 @@ func senderReceiverProcess(t *testing.T, dsn string, cfg InternalAuthorizationCo
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		response, err := client.Get("http://" + public + "/readyz")
+		response, err := client.Get("http://" + public + "/healthz")
 		if err == nil {
 			_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 			_ = response.Body.Close()
@@ -208,7 +215,7 @@ func senderReceiverProcess(t *testing.T, dsn string, cfg InternalAuthorizationCo
 		}
 		select {
 		case <-done:
-			t.Fatal("owned receiver exited before readiness")
+			t.Fatal("owned receiver exited before liveness")
 		case <-deadline.C:
 			t.Fatal("owned receiver startup deadline")
 		case <-ticker.C:
