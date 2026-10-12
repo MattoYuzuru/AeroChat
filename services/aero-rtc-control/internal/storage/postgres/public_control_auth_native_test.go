@@ -421,13 +421,13 @@ func TestPublicMediaControlUnknownProviderNeverComplete(t *testing.T) {
 	if guardCount(t, f.db, "SELECT count(*) FROM rtc_media_control_intents WHERE id=$1 AND resolution='unknown'", uuid.MustParse(empty.Msg.Operation.OperationId)) != 1 {
 		t.Fatal("empty UNKNOWN fixture not exercised")
 	}
-	group, err := f.chat.CreateGroup(context.Background(), controlNativeRequest(&cpb.CreateGroupRequest{Name: "Owned model completion group"}, f.a.token))
+	group, err := f.chat.CreateGroup(context.Background(), controlNativeRequest(&cpb.CreateGroupRequest{Name: "Owned model completion group"}, f.b.token))
 	if err != nil {
 		t.Fatal("actual completion group")
 	}
 	f.group = uuid.MustParse(group.Msg.Group.Id)
-	call, g := f.held(t, f.a)
-	response, err := f.client.RequestGroupMediaLeave(context.Background(), controlNativeRequest(&rpb.RequestGroupMediaLeaveRequest{CallId: call.String(), RequestId: uuid.NewString()}, f.a.token))
+	call, g := f.held(t, f.b)
+	response, err := f.client.RequestGroupMediaLeave(context.Background(), controlNativeRequest(&rpb.RequestGroupMediaLeaveRequest{CallId: call.String(), RequestId: uuid.NewString()}, f.b.token))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,7 +435,7 @@ func TestPublicMediaControlUnknownProviderNeverComplete(t *testing.T) {
 	if _, err := f.coordinator.Finalize(context.Background(), uuid.MustParse(response.Msg.Operation.OperationId), time.Now()); err != nil {
 		t.Fatal("owned model complete fixture")
 	}
-	statusRequest := controlNativeRequest(&rpb.GetGroupMediaOperationRequest{OperationId: response.Msg.Operation.OperationId}, f.a.token)
+	statusRequest := controlNativeRequest(&rpb.GetGroupMediaOperationRequest{OperationId: response.Msg.Operation.OperationId}, f.b.token)
 	statusRequest.Header().Set("X-Aero-Media-Outcome", "complete")
 	status, err := f.client.GetGroupMediaOperation(context.Background(), statusRequest)
 	if err != nil {
