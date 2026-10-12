@@ -56,6 +56,18 @@ unique owner index независимо от heap/UUID order. Missing, restricte
 изменившийся target не оставляет группу без owner; ошибка promotion откатывает
 обе роли. Owner/admin/member transitions сохраняют audio eligibility epoch.
 
+Write restriction явно типизирует timestamp parameter как `timestamptz` в обоих
+CASE expressions, включая idempotency predicate. Именованный nullable
+[sqlc.narg](https://docs.sqlc.dev/en/latest/howto/named_parameters.html#nullable-parameters)
+сохраняет поле `WriteRestrictedAt` с типом `pgtype.Timestamptz`. Это сохраняет nullable time и
+повторный unchanged result при установке/снятии ограничения; message-only
+restriction не меняет audio eligibility epoch. Native
+`TestGroupAuthorityWriteRestrictionTimestampRoundTrip` проверяет реальный
+repository writer, persisted timestamp, повтор и NULL при снятии ограничения на
+owned PostgreSQL. Установка ограничения без timestamp по-прежнему отклоняется
+constraint `group_memberships_write_restriction_consistency`, сохраняя прежнюю
+дату и authority epoch; native regression проверяет и этот rollback.
+
 ## Chat revocation sender
 
 Migration025 добавляет chat_revocation_delivery journal, backfill существующего
@@ -102,3 +114,14 @@ WT. До fullgates/publication обязательно ordinary merge generated/v
 published Identity parent и fresh clean whole run; parent receipts не переносятся.
 No manualgeneratedcode, no media flag/runtimeenable. Actual group sound, trusted
 SDK/proxy cleanup, real devices/NAT/TURN остаются UNVERIFIED.
+
+Sender integration также требует `AERO_RTC_TEST_DATABASE_ENV_FILE` с PostgreSQL
+URL и `AERO_RTC_RECEIVER_TEST_BINARY`, `AERO_RTC_RECEIVER_TEST_HEAD`,
+`AERO_RTC_RECEIVER_TEST_BINARY_SHA256`. Перед subprocess launch fixture явно
+записывает собственные `search_path`/`application_name` в URL и проверяет их
+повторным parse: изменение `pgx.ConnConfig.RuntimeParams` не обновляет исходный
+`ConnString()` ([pgx v5.8.0](https://pkg.go.dev/github.com/jackc/pgx/v5@v5.8.0#ConnConfig.ConnString)).
+Профили и URL не выводятся. Правила full-clone сборки Go 1.25.8 и проверки
+реальных VCS settings перечислены в [Identity native gate](../aero-identity/README.md#identity-revocation-sender).
+Отсутствие metadata не принимается за PASS; новые fixtures не ослабляют native
+assertions, а ordinary verified published Identity parent нужен до codegen/gates.

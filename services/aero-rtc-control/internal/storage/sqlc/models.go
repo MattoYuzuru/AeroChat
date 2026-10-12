@@ -60,6 +60,21 @@ type ChatAuthorityRevocationOutbox struct {
 	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
 }
 
+type ChatRevocationDelivery struct {
+	EventID                uuid.UUID          `db:"event_id" json:"event_id"`
+	State                  string             `db:"state" json:"state"`
+	Attempt                int64              `db:"attempt" json:"attempt"`
+	ClaimFence             int64              `db:"claim_fence" json:"claim_fence"`
+	ClaimOwner             pgtype.UUID        `db:"claim_owner" json:"claim_owner"`
+	ClaimUntil             pgtype.Timestamptz `db:"claim_until" json:"claim_until"`
+	NextAttemptAt          pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	OperationID            pgtype.UUID        `db:"operation_id" json:"operation_id"`
+	RegistryMediaEffect    pgtype.Text        `db:"registry_media_effect" json:"registry_media_effect"`
+	AffectedRegistryGrants pgtype.Int8        `db:"affected_registry_grants" json:"affected_registry_grants"`
+	ReceivedAt             pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	QuarantineReason       pgtype.Text        `db:"quarantine_reason" json:"quarantine_reason"`
+}
+
 type CryptoDevice struct {
 	ID                     uuid.UUID          `db:"id" json:"id"`
 	UserID                 uuid.UUID          `db:"user_id" json:"user_id"`
@@ -373,6 +388,21 @@ type IdentityAuthorityRevocationOutbox struct {
 	Reason         string             `db:"reason" json:"reason"`
 }
 
+type IdentityRevocationDelivery struct {
+	EventID                uuid.UUID          `db:"event_id" json:"event_id"`
+	State                  string             `db:"state" json:"state"`
+	Attempt                int64              `db:"attempt" json:"attempt"`
+	ClaimFence             int64              `db:"claim_fence" json:"claim_fence"`
+	ClaimOwner             pgtype.UUID        `db:"claim_owner" json:"claim_owner"`
+	ClaimUntil             pgtype.Timestamptz `db:"claim_until" json:"claim_until"`
+	NextAttemptAt          pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	OperationID            pgtype.UUID        `db:"operation_id" json:"operation_id"`
+	RegistryMediaEffect    pgtype.Text        `db:"registry_media_effect" json:"registry_media_effect"`
+	AffectedRegistryGrants pgtype.Int8        `db:"affected_registry_grants" json:"affected_registry_grants"`
+	ReceivedAt             pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	QuarantineReason       pgtype.Text        `db:"quarantine_reason" json:"quarantine_reason"`
+}
+
 type MessageAttachment struct {
 	AttachmentID               uuid.UUID          `db:"attachment_id" json:"attachment_id"`
 	DirectChatMessageID        pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
@@ -381,6 +411,20 @@ type MessageAttachment struct {
 	CreatedAt                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	EncryptedDirectMessageV2ID pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
 	EncryptedGroupMessageV1ID  pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
+}
+
+type RtcAdmissionFence struct {
+	Singleton bool  `db:"singleton" json:"singleton"`
+	LastFence int64 `db:"last_fence" json:"last_fence"`
+}
+
+type RtcAdmissionInstance struct {
+	LeafFingerprint   []byte             `db:"leaf_fingerprint" json:"leaf_fingerprint"`
+	InstanceID        uuid.UUID          `db:"instance_id" json:"instance_id"`
+	RequestID         uuid.UUID          `db:"request_id" json:"request_id"`
+	RegistrationFence int64              `db:"registration_fence" json:"registration_fence"`
+	State             string             `db:"state" json:"state"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type RtcCall struct {

@@ -15,11 +15,11 @@ const (
 )
 
 var (
-	ErrUnavailable = errors.New("Chat source delivery unavailable")
-	ErrExhausted   = errors.New("Chat source delivery counter exhausted")
-	ErrStaleClaim  = errors.New("Chat source delivery claim stale")
-	ErrNotFound    = errors.New("Chat source receipt not found")
-	ErrConflict    = errors.New("Chat source canonical conflict")
+	ErrUnavailable = errors.New("chat source delivery unavailable")
+	ErrExhausted   = errors.New("chat source delivery counter exhausted")
+	ErrStaleClaim  = errors.New("chat source delivery claim stale")
+	ErrNotFound    = errors.New("chat source receipt not found")
+	ErrConflict    = errors.New("chat source canonical conflict")
 )
 
 type Event struct {
