@@ -589,7 +589,7 @@ func controlNativeBodyBudgets(t *testing.T, f *publicControlNativeFixture) {
 		t.Fatal("owned gzip response")
 	}
 	_ = compressedResponse.Body.Close()
-	if compressedResponse.StatusCode != http.StatusRequestEntityTooLarge || f.authority.resolve.Load() != before {
+	if compressedResponse.StatusCode != http.StatusTooManyRequests || f.authority.resolve.Load() != before {
 		t.Fatal("oversized decoded gzip reached source/domain")
 	}
 }
