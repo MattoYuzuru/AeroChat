@@ -363,7 +363,7 @@ func TestMediaSlotGuardFlagOffAndAllActionCompletionBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Новый held lease той же generation нужен, чтобы оба cleanup actions были required.
-	lease, err = store.RegisterLease(ctx, g.Key, g.Authority, uuid.New(), media.Owner{ID: uuid.New(), Fence: 2}, time.Now())
+	_, err = store.RegisterLease(ctx, g.Key, g.Authority, uuid.New(), media.Owner{ID: uuid.New(), Fence: 2}, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

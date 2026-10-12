@@ -121,3 +121,10 @@ actual test SKIP; это partial evidence, не whole PASS. Ended setups зад�
 `end_reason='manual'`, active reset очищает `ended_at`, `ended_by_user_id` и
 `end_reason`; schema, production и assertions сохранены. Исправленные setups
 и новый exact-source whole gate пока UNRUN.
+
+Whole `check-_9yf9a74` на `811fd73` прошёл все восемь guard groups и 216 RTC test
+PASS events без failures/skips, но завершился FAIL на RTC lint: fixture сохраняла
+неиспользуемый результат второго `RegisterLease`. Сам вызов, проверка ошибки,
+partial/final ACK и new-call assertions сохраняются; ненужное присвоение заменено
+на `_`. Later dedicated native cohorts, generation и builds в этом whole UNRUN;
+новый exact-source gate после lint fix пока UNRUN.
