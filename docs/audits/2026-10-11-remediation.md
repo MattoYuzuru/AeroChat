@@ -177,15 +177,35 @@ VCS actual application binaries этого стенда остаётся UNVERIF
 bearer через private Identity/Chat, scoped own Leave/status, creator-only End,
 guard до mutation/commit и общий deadline 5s. Model ACK не выдаётся за provider
 cleanup: публичный результат пока PENDING. Полный source review завершён;
-отдельный небольшой finding требует отклонять casing-alias Authorization map
-key даже с пустым списком values. Generation/compile/native tests нового adapter
-ещё UNRUN. Native scope использует real Identity main и production Chat
+отдельный небольшой finding исправлен: casing-alias Authorization map key
+отклоняется даже с пустым списком values. Первый affected-unit запуск
+`check-6tbkgume` FAILED на неиспользуемом import в downstream; исходный FAIL
+сохранён. После удаления только import свежий `check-6e_f4hml` PASS:
+16 test events в трёх packages, все десять новых top-level tests, без TestSkip.
+Root независимо сверил фактический Go JSON, шесть frozen source/test files,
+private clone binding и live verify. Это affected-unit evidence;
+SQLC generation, whole gate и восемь native scenarios ещё UNRUN.
+Native scope использует real Identity main и production Chat
 repository/domain/private TLS listener в test host; это не полный Chat main/Compose.
 
 Browser05 source и privacy correction просмотрены полностью. Выбраны core v2
 и wrapper v2, входные invite tokens маскируются на screenshots. Actual browser05
-ещё UNRUN: сначала нужны свежие backend gates на integration261, production web
-build, source-bound native binaries/profiles/helpers и отдельный owned runtime.
+ещё UNRUN. Свежий `check-_2sqs3ga` на clean integration261 прошёл 15 stages:
+758 JUnit tests, без failures/errors/skips, включая native PostgreSQL/S3/private
+TLS scenarios, vet/lint и двукратную generation. Root отдельно сверил XML,
+обязательные test names, source/receipt pins и live verify. Семь symbol scans
+с официальной vulnerability DB не нашли Called findings; module-only
+GO-2026-5932 в x/crypto сохранён как residual, общего security approval нет.
+
+`check-36c6u8l3` PASS: offline frozen install и production web build на261,
+root проверил все 107 dist files. `check-tl2_hxdg` PASS: шесть свежих native
+binaries/helpers, actual SHA/build metadata сверены root; четыре сервиса
+имеют Go1.27.2/VCS261/modified=false. Это сборка, не browser/audio acceptance.
+Source-only drivers подготовки отдельной DB05/bucket05/private profiles
+и bounded runtime05 просмотрены полностью. Разрешена одна попытка fixture
+preparation; запуск native services/timer зависит от её actual receipt и
+независимого подтверждения cleanup. Runtime05 использует одну runner-owned
+process group и фиксированные 45 минут после readiness, без autoextension.
 Исторический core04 FAIL и его частичные результаты остаются неизменными.
 
 До общей готовности остаются:
