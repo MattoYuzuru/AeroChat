@@ -40,3 +40,14 @@ agent-dev run --cwd "$PWD" --node 22 --resource heavy -- node apps/web/tests/rtc
 ```
 
 Наличие source фикстуры не означает её PASS; exact-source receipts фиксируются отдельно.
+
+
+Owner fixture использует actual awareness reducer и immutable per-render refresh
+callbacks. Token/account/scope boundaries отдельно утверждают current opaque
+callback/context identity и actual React loading commit до fresh ready commit;
+credential values не логируются. Ready/closing/stopped-track assertions и timeout
+сохраняются. `optimizeDeps.entries=['owner-index.html']` ограничивает поддерживаемый
+Vite scan собственным entry ([официальная опция](https://vite.dev/config/dep-optimization-options.html#optimizedeps-entries));
+installed Vite7.3.1 types/computeEntries подтверждают тот же contract. Это не
+отключает optimizer и не скрывает dependency errors. Historical whole1a4 FAIL
+на token boundary сохранён отдельно; fixture/source correction требует нового gate.

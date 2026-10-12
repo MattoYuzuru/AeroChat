@@ -160,7 +160,7 @@ export function useDirectCallSession(
     onUnauthenticatedRef.current = onUnauthenticated;
   }, [onUnauthenticated]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     refreshDirectChatCallRef.current = refreshDirectChatCall;
   }, [refreshDirectChatCall]);
 
