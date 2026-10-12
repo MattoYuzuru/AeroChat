@@ -86,3 +86,23 @@ TLS receiver, replay/crash/takeover/quarantine/counters/migration/rollback и
 no payload logs. Source prep/generation не являются passed gate; публикация
 требует clean committed exactHEAD full receipts/actualtestSKIP0. Physical audio,
 NAT/TURN и SDK/proxy teardown остаются UNVERIFIED.
+
+Для sender integration нужны `AERO_RTC_TEST_DATABASE_ENV_FILE` с PostgreSQL URL,
+`AERO_RTC_RECEIVER_TEST_BINARY`, `AERO_RTC_RECEIVER_TEST_HEAD` и
+`AERO_RTC_RECEIVER_TEST_BINARY_SHA256`. Отдельный RTC-процесс получает URL с
+явными `search_path` и `application_name` собственной fixture. Изменение
+`pgx.ConnConfig.RuntimeParams` не меняет результат `ConnString()`: этот метод
+возвращает исходный DSN ([pgx v5.8.0](https://pkg.go.dev/github.com/jackc/pgx/v5@v5.8.0#ConnConfig.ConnString)).
+Перед запуском fixture повторно разбирает передаваемый URL и проверяет привязку
+к своей схеме. Значения профиля и URL в вывод не попадают.
+
+Go 1.25.8 не записывает VCS settings при сборке из checkout с `.git`-файлом
+([Go #58218](https://go.dev/issue/58218)). Для такого native gate создаётся новый
+private clone через `git clone --no-local --no-hardlinks --no-checkout`, затем
+`git checkout --detach` на проверенный SHA. До и после сборки проверяются SHA,
+Git tree, clean status и отсутствие object alternates. `GOWORK` явно указывает
+на `go.work` этого clone, `go env GOMOD` — на его RTC-модуль. Бинарник собирается
+тем же Go 1.25.8 с `-buildvcs=true` вне clone; `go version -m` должен показать
+точный package path, `vcs.revision` и `vcs.modified=false`. Исходный worktree
+тоже остаётся чистым на том же SHA. Отсутствие VCS metadata не принимается как
+успешная проверка происхождения бинарника.
