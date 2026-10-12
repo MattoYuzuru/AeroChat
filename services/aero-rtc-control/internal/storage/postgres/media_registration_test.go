@@ -194,7 +194,7 @@ func registrationLockWitness(nodes []registrationLockNode, paths map[int32][]int
 	return string(encoded)
 }
 
-func registrationWait(t *testing.T, ctx context.Context, db *pgxpool.Pool, locker int32, actors ...registrationLockActor) {
+func registrationConcurrentWait(t *testing.T, ctx context.Context, db *pgxpool.Pool, locker int32, actors ...registrationLockActor) {
 	t.Helper()
 	root := registrationLockActor{locker, db.Config().ConnConfig.RuntimeParams["application_name"]}
 	pids := []int32{locker}
@@ -256,6 +256,29 @@ FROM pg_stat_activity a WHERE a.pid=ANY($1::int[]) ORDER BY a.pid`, pids)
 		}
 	}
 }
+func registrationWait(t *testing.T, ctx context.Context, db *pgxpool.Pool, locker int32, pids ...int32) {
+	t.Helper()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	deadline := time.NewTimer(3 * time.Second)
+	defer deadline.Stop()
+	for {
+		var blocked int
+		if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM pg_stat_activity WHERE pid=ANY($1::int[]) AND $2=ANY(pg_blocking_pids(pid))", pids, locker).Scan(&blocked); err != nil {
+			t.Fatal(err)
+		}
+		if blocked == len(pids) {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("registration lock context canceled")
+		case <-deadline.C:
+			t.Fatal("owned registration locks not observed")
+		case <-ticker.C:
+		}
+	}
+}
 func TestAdmissionRegistrationConcurrentReplayAndDistinctNonce(t *testing.T) {
 	db := registrationDatabase(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -294,7 +317,7 @@ func TestAdmissionRegistrationConcurrentReplayAndDistinctNonce(t *testing.T) {
 			results <- result{i, e}
 		}(actor)
 	}
-	registrationWait(t, ctx, db, locker, registrationLockActor{pidA, a.Config().ConnConfig.RuntimeParams["application_name"]}, registrationLockActor{pidB, b.Config().ConnConfig.RuntimeParams["application_name"]})
+	registrationConcurrentWait(t, ctx, db, locker, registrationLockActor{pidA, a.Config().ConnConfig.RuntimeParams["application_name"]}, registrationLockActor{pidB, b.Config().ConnConfig.RuntimeParams["application_name"]})
 	if err := lock.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +365,7 @@ func TestAdmissionRegistrationConcurrentReplayAndDistinctNonce(t *testing.T) {
 			results <- result{i, e}
 		}(actor)
 	}
-	registrationWait(t, ctx, db, locker, registrationLockActor{pidA, a.Config().ConnConfig.RuntimeParams["application_name"]}, registrationLockActor{pidB, b.Config().ConnConfig.RuntimeParams["application_name"]})
+	registrationConcurrentWait(t, ctx, db, locker, registrationLockActor{pidA, a.Config().ConnConfig.RuntimeParams["application_name"]}, registrationLockActor{pidB, b.Config().ConnConfig.RuntimeParams["application_name"]})
 	if err := lock2.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}

@@ -91,3 +91,9 @@ transaction lock ([pg_blocking_pids](https://www.postgresql.org/docs/current/fun
 не является actual observed graph; новый native witness и fresh exact-source
 whole gate обязательны. Pure graph tests не заменяют native concurrent replay,
 distinct nonce/fence/allocation assertions и не доказывают registration/media enable.
+
+
+Strong graph helper `registrationConcurrentWait` обслуживает только две barriers
+concurrent replay/distinct-nonce test. Shared `registrationWait` для двух inherited
+TLS single-worker barriers сохраняет исходные signature и body; TLS source не
+изменяется. Изменение helper API требует inventory всех callers до нового gate.
