@@ -160,3 +160,14 @@ Mobile LegacyAppShell ограничен `100dvh`: header/call strip/navigation 
 Geometry regression использует настоящий LegacyAppShell и production conversation CSS с representative DOM, synthetic auth/RTC. Проверяются 320/390/768 portrait и landscape, 0/2/50 rows, active call strip, keyboard/draft/info/scroll и textarea не уже 140 CSS px, минимум 48 CSS px полезной истории без padding и отсутствие перекрытия composer. В коротком viewport composer получает минимум 50 CSS px; кнопки не меньше 32 CSS px полностью видимы после обычного Tab-фокуса и programmatic scroll reveal. Это не тест touch-жестов. Дополнительный CSS viewport640×360 моделирует layout при 200% zoom desktop1280×720; это не native browser zoom. Полные actual pages на integration HEAD, iOS/Android OS keyboard, touch-жесты и hardware safe area остаются отдельной наблюдаемой приёмкой.
 
 Send feedback выбранного direct/self thread размещается внутри собственного scroll composer, отдельно от скрываемого mobile overview. Длинный alert ограничен собственной высотой и доступен через Tab; reveal меняет только composer scroll, сохраняя draft/focus/history. `apps/web/tests/composer-feedback/feedback.mjs` связывает regression с production JSX-site/компонентом и точными send/change handlers, использует настоящий LegacyAppShell/CSS и synthetic HTTP503 adapter. Это дополняет geometry fixture; реальный отказ gateway в полной message page проверяется в отдельном owned runtime.
+
+
+## Local call-capture owner: подготовленный browser regression
+
+`apps/web/tests/rtc/owner.mjs` проверяет actual direct hook/local slot на React с
+bounded synthetic media/PC/RPC и новым private external `LOCAL_CALL_OWNER_ARTIFACT_DIR`.
+Запуск: `agent-dev run --cwd "$PWD" --node 22 --resource heavy -- node apps/web/tests/rtc/owner.mjs`,
+с согласованным `RTC_FIXTURE_PORT` и внешними Playwright/Chromium paths из RTC README.
+Контракт [call-only owner](product/local-call-capture-owner-plan.md) не включает notes,
+не заменяет backend admission/ACK и не подтверждает SDK/group audio или physical devices.
+Новый source gate/receipt обязателен; preparation не является выполненным PASS.

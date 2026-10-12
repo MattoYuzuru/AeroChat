@@ -350,6 +350,8 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const activeEncryptedDirectChatId = selectedThread?.chat.id ?? null;
   const directCall = useDirectCallSession({
     joinCoordinator: directCallAwareness.joinCoordinator,
+    localCaptureOwner: directCallAwareness.localCaptureOwner,
+    captureAuthEpoch: directCallAwareness.captureAuthEpoch,
     enabled:
       authState.status === "authenticated" &&
       isThreadRouteActive &&

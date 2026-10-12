@@ -137,13 +137,19 @@ try {
   await page.waitForTimeout(25);
   await page.evaluate(()=>window.fixture.start());
   let account=await page.evaluate(()=>window.fixture.report());
-  assert.equal(account.captures,2,'different account has independent admission');
-  assert.equal(account.log.filter(method=>method==='start').length,1);
+  assert.equal(account.captures,1,'new account waits for old pending app-local capture');
+  assert.equal(account.log.filter(method=>method==='start').length,0);
+  assert.equal(account.localCapture.phase,'closing');
   await page.evaluate(()=>window.fixture.releaseCapture());
   await page.evaluate(()=>window.pending);
   account=await page.evaluate(()=>window.fixture.report());
   assert.equal(account.stops,2,'old account capture stops all tracks');
-  assert.equal(account.log.filter(method=>method==='start').length,1,'old account cannot dispatch late mutation');
+  assert.equal(account.log.filter(method=>method==='start').length,0,'old account cannot dispatch late mutation');
+  assert.equal(account.localCapture,null,'settled cancelled capture releases the local slot');
+  await page.evaluate(()=>window.fixture.start());
+  account=await page.evaluate(()=>window.fixture.report());
+  assert.equal(account.captures,2,'new account may capture after exact old cleanup');
+  assert.equal(account.log.filter(method=>method==='start').length,1);
   await page.evaluate(()=>window.fixture.unmount());
   console.log(JSON.stringify({browser:await browser.version(),results,remountCompensation:'pass',accountIsolation:'pass',scope:"Actual React hook and provider-owned lease implementation; fake media/PC/RPC; no microphone/network evidence"}));
 } finally {await browser.close();await server.close();}

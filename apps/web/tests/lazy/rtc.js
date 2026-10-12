@@ -1,3 +1,6 @@
 import {createInitialDirectCallAwarenessState} from '../../src/rtc/awareness';
+import {createDirectCallJoinCoordinator} from '../../src/rtc/join-coordinator';
+import {createLocalCallCaptureOwner} from '../../src/rtc/local-call-capture-owner';
 const state=createInitialDirectCallAwarenessState();
-export function useDirectCallAwareness(){return {state,refreshAllActiveDirectCalls:async()=>{},refreshDirectChatCall:async()=>{},dismissSurface(){},getEntry:()=>null};}
+const joinCoordinator=createDirectCallJoinCoordinator(),localCaptureOwner=createLocalCallCaptureOwner(),captureAuthEpoch=Symbol();
+export function useDirectCallAwareness(){return {state,joinCoordinator,localCaptureOwner,captureAuthEpoch,refreshAllActiveDirectCalls:async()=>{},refreshDirectChatCall:async()=>{},dismissSurface(){},getEntry:()=>null};}
