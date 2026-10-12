@@ -227,3 +227,19 @@ media acceptance нужны на новой frozen revision. Уточнение 
 Не выбрано, потому что тогда уже реализованные backend control-plane/storage/realtime foundations
 оставались бы без реального web send consumption
 и следующий PR снова решал бы слишком много задач одновременно.
+
+## Уточнение 12 октября 2026: pending state и authoritative group copy
+
+Статус уточнения: Accepted — координатор проверил lifetime и границы scope до реализации.
+
+Смена `isActionPending` не меняет область token/group/device/page size и не должна
+отбрасывать уже начатый authoritative decrypt. Latest runtime ref применяется
+только к lifetime трёх group lane effects; раздел5 о вытеснении local optimistic
+buffer сохраняется. Поздний send-result publish при resolved key остаётся
+подавленным; authoritative AAD/decrypt failure не подменяется optimistic body.
+
+Обязательная отдельная group регрессия: server copy с отложенным decrypt,
+pendingtrue/false context identity, подавленный late local publish, затем ровно
+одна authoritative ready строка либо ровно один AAD failure без optimistic body.
+Пять scope cases (group/token/device/retired/disabled) должны отбросить старый
+результат. Current `9f5c9ac` и прошлые direct/browser proofs не объявляют это PASS.
