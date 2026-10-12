@@ -4,7 +4,7 @@
 
 Подготовлен и проверен отдельный feature scope для 29 из 30 remediation issues; #176 остаётся в работе. Это количество пунктов, а не процент общей готовности: group audio и combined acceptance ещё не завершены.
 
-Ниже зафиксированы отдельные draft PR и их проверенный feature scope. Они не merged; issues остаются открытыми. Feature receipts не переносятся на будущий integration HEAD. Изменения auth, crypto registry, storage, RTC и shell не объединяются в один feature PR. На проверенном GitHub-срезе открыты 52 draft PR, #180–#231: одна задача может требовать нескольких узких PR, поэтому число PR не равно числу завершённых issues.
+Ниже зафиксированы отдельные draft PR и их проверенный feature scope. Они не merged; issues остаются открытыми. Feature receipts не переносятся на будущий integration HEAD. Изменения auth, crypto registry, storage, RTC и shell не объединяются в один feature PR. Подтверждено создание 52 draft PR, #180–#231: последний полный readback содержал 50, затем созданы #230/#231. Свежий полный список после блокировки недоступен. Одна задача может требовать нескольких узких PR, поэтому число PR не равно числу завершённых issues.
 
 12 октября в 00:41 UTC root независимо прочитал все 433 completed SUCCESS checks этих 43 опубликованных HEAD. Это датированный срез: локальные sender/registration/feedback revisions и последующие commits документации в него не входят. Для каждого нового HEAD требуется свежий CI readback; общий runtime и device-приёмка этим срезом не подтверждаются.
 
@@ -156,3 +156,48 @@ Timestamp fix опубликован как stacked draft [PR231](https://github
 Отдельный actual Go→WebCrypto consumer `check-bwoq5oxi` PASS10/53 JUnit/0 failure-error-skip на clean26131, независимо verified root/Frontend:16 direct/group×WS/HTTP authenticated projections из actual source9e formatter/ProtoJSON fixture и37 negatives. Источник/producer pins сохранены; это interop regression, не actual full core/audio.
 
 Внешний блокер 12 октября08:26UTC: после successful creation PR231 GitHub API на pr-read231/pr-list вернул HTTP403 permission, «Sorry. Your account was suspended», retryable=false. Все GitHub/gitnetwork/API обращения остановлены, alternative credentials/connector обход не выполнялся. PR231 creation response сохранён, fresh readback/CI и публикация обновления evidence205 недоступны. Новый PR не прикрепился к Codex из-за thread attachment identity count>100; call выполнен, ссылка сохранена. Main merge/deploy не выполнялись; последний remote main snapshot eab87dd. Локальные commits/источники/receipts сохранены; локальная работа продолжается.
+
+## Локальное продолжение 12 октября, после блокировки GitHub
+
+Пользователь поручил продолжать работу локально, пока рассматривается апелляция.
+Восстановлен clean local Git checkout integration на `26131ccefc98e0c9edafc3236193525ae16fdfb8`,
+tree `fd9ea2df3517242a16b972206f2ba8813126951b`. Предварительный merge-tree с
+coordinator `64c0251` не содержит конфликтов: 88 отдельных входящих files совпали
+побайтно, обе общие правки main просмотрены полностью. Это только preview;
+integration merge commit и merge в `main` не выполнялись.
+
+Каталог исходной конфигурации main9 восстановлен на clean detached `a912541`.
+Actual `check-toklv7t_` PASS и независимая root-проверка подтверждают четыре
+source SHA, совпадение всех десяти Compose config hashes с существующими
+контейнерами и отсутствие изменения их IDs/data. Контейнеры не перезапускали;
+VCS actual application binaries этого стенда остаётся UNVERIFIED.
+
+В отдельной local ветке `codex/feat-176-public-control-auth` до кода приняты
+уточнения ADR-097: `8a3afc8` и `bdf91fd`. Подготовлен adapter настоящего opaque
+bearer через private Identity/Chat, scoped own Leave/status, creator-only End,
+guard до mutation/commit и общий deadline 5s. Model ACK не выдаётся за provider
+cleanup: публичный результат пока PENDING. Полный source review завершён;
+отдельный небольшой finding требует отклонять casing-alias Authorization map
+key даже с пустым списком values. Generation/compile/native tests нового adapter
+ещё UNRUN. Native scope использует real Identity main и production Chat
+repository/domain/private TLS listener в test host; это не полный Chat main/Compose.
+
+Browser05 source и privacy correction просмотрены полностью. Выбраны core v2
+и wrapper v2, входные invite tokens маскируются на screenshots. Actual browser05
+ещё UNRUN: сначала нужны свежие backend gates на integration261, production web
+build, source-bound native binaries/profiles/helpers и отдельный owned runtime.
+Исторический core04 FAIL и его частичные результаты остаются неизменными.
+
+До общей готовности остаются:
+
+- Сквозная приёмка двух аккаунтов и всех четырёх типов вложений в direct/self/group,
+  затем unread/minimized, responsive/focus, native 200% zoom и actual 1:1 RTP.
+- Завершение #176: проверенный public authorization adapter, pinned SFU/SDK,
+  admission/revocation/cleanup, lazy UI с privacy warning и actual three-client audio.
+- Итоговый integration SHA, release/restore/security gates, актуальные screenshots
+  и честное demo. После восстановления GitHub — fresh exact-SHA CI/readback и
+  конкретный parent-first merge candidate для отдельного решения пользователя.
+
+Real devices, physical audibility, NAT/forced TURN/Wi-Fi↔cellular и iOS/Android
+OS keyboard остаются UNVERIFIED по принятому Mac-only ограничению. Число PR и
+29 отдельных исправленных scopes не является процентом общей готовности.
