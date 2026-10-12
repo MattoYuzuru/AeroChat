@@ -183,6 +183,38 @@ Source revoke/public auth outcome сохраняется; sender success не я
 successful media completion. Chat sender/registration/SFU/proxy ACK/media flag
 остаются отдельными slices.
 
+### Chat source delivery journal
+
+Chat sender — отдельный default-disabled slice после source outbox024. Новая
+migration создаёт pending journal для уже committed events и qualified SECURITY
+INVOKER AFTER INSERT outbox trigger для journal в той же membership/source TX.
+Исторический capture trigger024 не переписывается; новый trigger не берёт
+group/user parent locks. FK RESTRICT только к immutable event, без cascade из
+group/user/membership. Journal fault откатывает source transition/epoch/outbox.
+
+Producer читает canonical tuple из claimed source row: event/group/user IDs,
+source_revision→eligibility_epoch. eligibility_denied/member_removed оба
+отображаются в fixed group-denied RPC. Source reason/time остаются audit и не
+передаются; из отсутствующих role/removal/present/eligible fields receiver не
+выводит authority. Sender не отменяет old denied event по current rejoin/role:
+late epoch2/newgrant3 изолирует RTC registry.
+
+Claim/canonical replay/CAS/quarantine и retention повторяют Identity contract:
+общий5s claim→lookup/apply→CAS, lease15s, wake1s, capped1–30s backoff/singleinflight,
+не benchmark. Lookup-success обязательно canonical Apply replay/same event+op;
+AlreadyExists→guarded quarantine. Exhausted counters unchanged/excluded before
+next eligible selection; static diagnosis и прогресс другого event. Pending/
+claimed/quarantined/mapping neverdelete, no payload repair/false media complete.
+
+Default-off typed client использует только ApplyChatEvent/GetChatEventReceipt,
+sole verified URI urn:aerochat:service:chat, TLS1.3/CA/clientAuth/hostname checks,
+без redirects/envproxy/caller override. Worker связан с app HTTP context и
+awaited bounded shutdown; attachment cleanup/crypto/public Chat auth не меняются.
+Source prep может начинаться от reviewed UNVERIFIED Identity checkout в отдельном
+worktree, но full Chat gates/publication требуют ordinary merge verified
+generated/published Identity parent, новый clean freeze и fresh whole receipts.
+Никакого переноса parent PASS либо enable media/runtime из source prep.
+
 ## Chat eligibility epoch
 
 Chat хранит монотонную revision для допуска exact `(group_id, user_id)` к audio, отдельно от физически удаляемой membership row. Retained tombstone сохраняет счётчик после remove/leave; rejoin не возвращает revision к начальному значению. Это **eligibility epoch**, а не версия любой смены роли или timestamp. Источник текущей role остаётся Chat membership. Private lookup всегда возвращает свежую role; RTC не кеширует management privileges по одному eligibility epoch.
