@@ -5,7 +5,9 @@ package postgres
 import (
 	"context"
 	"errors"
+	"io"
 	"io/fs"
+	"log/slog"
 	"math"
 	"strconv"
 	"testing"
@@ -172,34 +174,66 @@ func TestAuthorityDeliveryObservedClaimTakeoverAndCAS(t *testing.T) {
 	}
 }
 func TestAuthorityDeliveryQuarantineExhaustionAndOtherProgress(t *testing.T) {
+	for _, counter := range []string{"attempt", "claim_fence"} {
+		t.Run(counter, func(t *testing.T) {
+			db, ctx := authorityDatabase(t, false)
+			old := deliverySourceEvent(t, ctx, db)
+			next := deliverySourceEvent(t, ctx, db)
+			if _, err := db.Exec(ctx, "UPDATE identity_revocation_delivery SET "+counter+"=$2 WHERE event_id=$1", old, int64(math.MaxInt64)); err != nil {
+				t.Fatal(err)
+			}
+			var before, after string
+			if err := db.QueryRow(ctx, "SELECT to_jsonb(d)::text FROM identity_revocation_delivery d WHERE event_id=$1", old).Scan(&before); err != nil {
+				t.Fatal(err)
+			}
+			repo := NewDeliveryRepository(db)
+			if yes, err := repo.HasExhausted(ctx); err != nil || !yes {
+				t.Fatal("exhaustion not diagnosed")
+			}
+			c, err := repo.Claim(ctx, uuid.New())
+			if err != nil || c == nil || c.Event.ID != next {
+				t.Fatal("exhausted oldest event starved eligible event")
+			}
+			if err := repo.Quarantine(ctx, *c, "canonical_conflict"); err != nil {
+				t.Fatal(err)
+			}
+			if c, err := repo.Claim(ctx, uuid.New()); err != nil || c != nil {
+				t.Fatal("quarantined row auto-retried")
+			}
+			var count int
+			if err := db.QueryRow(ctx, "SELECT to_jsonb(d)::text FROM identity_revocation_delivery d WHERE event_id=$1", old).Scan(&after); err != nil || before != after {
+				t.Fatal("exhausted row changed")
+			}
+			if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM identity_revocation_delivery d JOIN identity_authority_revocation_outbox e ON e.id=d.event_id WHERE d.event_id=$1 AND state='quarantined' AND quarantine_reason='canonical_conflict' AND claim_fence=1", next).Scan(&count); err != nil || count != 1 {
+				t.Fatal("quarantine lost event/fence")
+			}
+			if _, err := db.Exec(ctx, "DELETE FROM identity_authority_revocation_outbox WHERE id=$1", next); err == nil {
+				t.Fatal("journal history allowed source event deletion")
+			}
+		})
+	}
+}
+
+type neverDeliveryClient struct{}
+
+func (neverDeliveryClient) Apply(context.Context, delivery.Event) (delivery.Receipt, error) {
+	return delivery.Receipt{}, errors.New("client must not be reached")
+}
+func (neverDeliveryClient) Lookup(context.Context, uuid.UUID) (delivery.Receipt, error) {
+	return delivery.Receipt{}, errors.New("client must not be reached")
+}
+func TestAuthorityDeliveryMalformedRowQuarantine(t *testing.T) {
 	db, ctx := authorityDatabase(t, false)
-	old := deliverySourceEvent(t, ctx, db)
-	next := deliverySourceEvent(t, ctx, db)
-	if _, err := db.Exec(ctx, "UPDATE identity_revocation_delivery SET attempt=$2,claim_fence=$2 WHERE event_id=$1", old, int64(math.MaxInt64)); err != nil {
+	id, subject, device := uuid.New(), uuid.New(), uuid.New()
+	if _, err := db.Exec(ctx, "WITH e AS (INSERT INTO identity_authority_revocation_outbox(id,subject_kind,subject_id,user_id,device_id,session_id,source_revision,occurred_at,reason) VALUES($1,'session',$2,$3,$4,$2,2,clock_timestamp(),'session_revoked') RETURNING id) INSERT INTO identity_revocation_delivery(event_id) SELECT id FROM e", id, subject, uuid.Nil, device); err != nil {
 		t.Fatal(err)
 	}
-	repo := NewDeliveryRepository(db)
-	if yes, err := repo.HasExhausted(ctx); err != nil || !yes {
-		t.Fatal("exhaustion not diagnosed")
-	}
-	c, err := repo.Claim(ctx, uuid.New())
-	if err != nil || c == nil || c.Event.ID != next {
-		t.Fatal("exhausted oldest event starved eligible event")
-	}
-	if err := repo.Quarantine(ctx, *c, "canonical_conflict"); err != nil {
-		t.Fatal(err)
-	}
-	if c, err := repo.Claim(ctx, uuid.New()); err != nil || c != nil {
-		t.Fatal("quarantined row auto-retried")
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if err := delivery.NewWorker(NewDeliveryRepository(db), neverDeliveryClient{}, logger).Step(ctx); err != nil {
+		t.Fatal("malformed source row not quarantined")
 	}
 	var count int
-	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM identity_revocation_delivery WHERE event_id=$1 AND state='pending' AND attempt=$2 AND claim_fence=$2 AND claim_owner IS NULL", old, int64(math.MaxInt64)).Scan(&count); err != nil || count != 1 {
-		t.Fatal("exhausted row changed")
-	}
-	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM identity_revocation_delivery d JOIN identity_authority_revocation_outbox e ON e.id=d.event_id WHERE d.event_id=$1 AND state='quarantined' AND quarantine_reason='canonical_conflict' AND claim_fence=1", next).Scan(&count); err != nil || count != 1 {
-		t.Fatal("quarantine lost event/fence")
-	}
-	if _, err := db.Exec(ctx, "DELETE FROM identity_authority_revocation_outbox WHERE id=$1", next); err == nil {
-		t.Fatal("journal history allowed source event deletion")
+	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM identity_revocation_delivery d JOIN identity_authority_revocation_outbox e ON e.id=d.event_id WHERE d.event_id=$1 AND d.state='quarantined' AND quarantine_reason='source_row_invalid' AND d.operation_id IS NULL AND claim_fence=1", id).Scan(&count); err != nil || count != 1 {
+		t.Fatal("malformed source quarantine missing")
 	}
 }

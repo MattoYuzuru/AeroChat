@@ -157,7 +157,7 @@ func senderReceiverProcess(t *testing.T, dsn string, cfg InternalAuthorizationCo
 	}
 	logs := &authorityLogBuffer{}
 	cmd := exec.Command(binary)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Receiver наследует owned gate process group для аварийного cleanup внешнего driver.
 	cmd.Env = []string{"LANG=C.UTF-8", "AERO_DATABASE_URL=" + dsn, "AERO_HTTP_ADDR=" + public, "AERO_LOG_LEVEL=debug", "AERO_SHUTDOWN_TIMEOUT=1s", "AERO_DATABASE_BOOTSTRAP_TIMEOUT=3s", "AERO_IDENTITY_URL=http://" + public, "AERO_CHAT_URL=http://" + public, "AERO_RTC_INTERNAL_REVOCATION_ENABLED=true", "AERO_RTC_INTERNAL_REVOCATION_LISTEN_ADDR=" + private, "AERO_RTC_INTERNAL_REVOCATION_TLS_CERT_FILE=" + cfg.TLSCertFile, "AERO_RTC_INTERNAL_REVOCATION_TLS_KEY_FILE=" + cfg.TLSKeyFile, "AERO_RTC_INTERNAL_REVOCATION_CLIENT_CA_FILE=" + cfg.ClientCAFile}
 	cmd.Stdout = logs
 	cmd.Stderr = logs
@@ -174,13 +174,13 @@ func senderReceiverProcess(t *testing.T, dsn string, cfg InternalAuthorizationCo
 				return
 			default:
 			}
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+			_ = cmd.Process.Signal(syscall.SIGTERM)
 			select {
 			case <-done:
 				return
 			case <-time.After(3 * time.Second):
 			}
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			_ = cmd.Process.Kill()
 			select {
 			case <-done:
 			case <-time.After(3 * time.Second):
