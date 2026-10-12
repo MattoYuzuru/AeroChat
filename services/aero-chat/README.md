@@ -63,4 +63,7 @@ CASE expressions, включая idempotency predicate. Именованный n
 повторный unchanged result при установке/снятии ограничения; message-only
 restriction не меняет audio eligibility epoch. Native
 `TestGroupAuthorityWriteRestrictionTimestampRoundTrip` проверяет реальный
-repository writer, persisted timestamp, повтор и NULL на owned PostgreSQL.
+repository writer, persisted timestamp, повтор и NULL при снятии ограничения на
+owned PostgreSQL. Установка ограничения без timestamp по-прежнему отклоняется
+constraint `group_memberships_write_restriction_consistency`, сохраняя прежнюю
+дату и authority epoch; native regression проверяет и этот rollback.
