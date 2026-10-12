@@ -162,6 +162,11 @@ lifetime. Fence/attempt монотонны; CAS требует event, current ow
 pending state и nonexpired DB-clock lease. Network вызов не удерживает TX lock.
 Потеря ответа/crash до CAS восстанавливаются own receipt lookup и canonical
 replay; RTC DURABLY_APPLIED завершает только delivery journal, не media teardown.
+Own receipt lookup по event ID не доказывает canonical tuple. Recovery после
+successful lookup обязательно делает canonical Apply replay в том же общем5s
+context: valid receipt должен сохранить event/operation ID. AlreadyExists
+quarantined guarded CAS; transient/invalid/different operation остаются pending.
+Новый proto digest или произвольное восстановление source payload не вводятся.
 
 Permanent canonical conflict либо malformed claimed row переводится guarded
 CAS в **quarantined**, static reason canonical_conflict/source_row_invalid.
