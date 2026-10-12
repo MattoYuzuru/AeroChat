@@ -7,6 +7,7 @@ import (
 	"time"
 
 	libnotifications "github.com/MattoYuzuru/AeroChat/libs/go/notifications"
+	"github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/transport/rtcrevocation"
 )
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
@@ -21,6 +22,7 @@ type Config struct {
 	WebPushVAPIDPrivateKey   string
 	PasswordHashConcurrency  int
 	InternalAuthorization    InternalAuthorizationConfig
+	RevocationDelivery       rtcrevocation.Config
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -42,6 +44,10 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		return Config{}, err
 	}
 
+	deliveryConfig, err := loadRevocationDeliveryConfig()
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
 		DatabaseURL:              lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
 		HTTPAddress:              lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),
@@ -53,6 +59,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		WebPushVAPIDPrivateKey:   lookupString("AERO_WEB_PUSH_VAPID_PRIVATE_KEY", ""),
 		PasswordHashConcurrency:  passwordConcurrency,
 		InternalAuthorization:    internalAuthorization,
+		RevocationDelivery:       deliveryConfig,
 	}
 	if err := libnotifications.ValidateWebPushConfig(
 		cfg.WebPushSubscriber,

@@ -146,6 +146,362 @@ Start/Join/Leave/End/liveness paths: heldmedia prepared/active/revoking блок
 ACK. Flagoff legacy unchanged. Cleanup claim busy/notyet/fence exhaustion —
 transient/pending или unavailable, не authorityrevoked/deny watermark.
 
+### Guard foundation для legacy mic-slot
+
+Следующий отдельный slice ограничен transactional guard. Он не инициирует
+cleanup и не реализует готовый media End/Leave. Policy передаётся явно через
+constructor; default off. Env activation, media flag, public operation/status
+API, SDK/proxy/cleanup workers сюда не входят. Пока production policy выключена,
+обычный lobby/direct lifecycle и stale eviction ADR086 сохраняются.
+
+При opt-in policy один user mutex сериализует legacy active participation и
+held media grant во всех calls/tabs/devices. Prepared/active/revoking удерживают
+slot даже при уже left legacy participant или ended call. Legacy Start/Join
+другого call отклоняются до mutation; group Reserve не обходит active legacy
+participation другого call. Same-call Join не захватывает grant иной auth
+session/device. Same-request Reserve replay сохраняет exact authority/call
+binding; revoked/revoking generation не активируется повторно.
+
+Обязательные guarded writers: CreateCallWithParticipant и JoinParticipant,
+включая ended-orphan repair; LeaveParticipantAndMaybeEndCall и
+EndCallWithParticipants; все callers stale conflict resolution/pruning,
+public Leave/End и direct repository exit ineligible SendSignal target.
+Наличие held grant не позволяет этим exits записать successful left/ended
+или освободить unique user slot. Guard возвращает typed pending; public RPC
+отображает его как sanitized FailedPrecondition, без fabricated terminal
+response или media-complete receipt. Signal target с definitive eligibility
+deny не получает сигнал даже при pending cleanup. Это не permanent source
+revocation и не основание повышать deny watermark.
+
+Lock protocol: до TX определить target и old legacy/held call/room parents,
+включая active participant ended-call; затем sorted call parents → sorted
+room parents → sorted user mutexes → grant/lease → operation/outbox. Для
+End после target call lock повторно проверить participant/user set. Под user
+mutex заново проверить parent set и full binding. Новый parent/user, которого
+нет в locked set, означает rollback и bounded retry всей transaction;
+добавлять parent lock после user mutex запрещено. Исчерпание retry/DB failure
+возвращает unavailable, не authority revoked. Сетевых authority checks под
+DB locks нет; uniqueness constraints дополняют, а не заменяют protocol.
+
+Guard-only refusal не создаёт cleanup operation и не обещает, что Leave/End
+принят к исполнению. Он лишь сохраняет slot и прежнее состояние. Existing
+matching operation/ACK продолжает жить по своему immutable binding. WS close
+закрывает только exact lease; mute, JWT/certificate expiry и heartbeat stale
+не являются authoritative SFU ACK и не освобождают publication budget/slot.
+Never-activated expiry допускается только после20s при persisted отсутствии
+activation intent и любого lease; это отдельный storage fact, не media teardown.
+
+Durable call-wide End/Leave intent, запрет новых Join и per-grant child
+operations требуют отдельного accepted contract и узкого coordinator PR.
+Текущий one-grant ACK finalizer нельзя скрыто расширять в multi-target End.
+Только future trusted matching proxy/SFU ACK завершает media; guards и
+NoMatching/empty journal completion этого не доказывают. До coordinator,
+trusted admission/cleanup adapters и общей compatibility приёмки production
+media policy/flag не включаются. Source preparation в отдельном worktree
+допустима после review; generation/full gates/publication требуют обычного
+merge generated, verified и published Identity→Chat→registration parents,
+нового clean freeze и собственных fresh receipts.
+
+### Public group Leave / End: parent control intent
+
+Уточнение Accepted координатором 2026-10-12 для отдельного coordinator
+slice; implementation ещё не начата. Docs commit предшествует коду.
+
+Public media Leave/End вводятся как additive proto-first commands
+RequestGroupMediaLeave/RequestGroupMediaEnd с call_id и canonical request_id,
+а GetGroupMediaOperation читает authorized status. Контракт выделен в отдельный
+unmounted GroupMediaControlService: existing RtcControlService не расширяет
+gateway interface. Typed stubs возвращают Unimplemented до отдельного adapter
+slice; body/model tuple не становится public capability. Старые LeaveCall/EndCall не
+получают successful left/ended response с pending внутри. Request ID служит
+лишь idempotency correlation; body не выбирает user/session/device, grant,
+room/generation, owner/fence, child actions, authority outcome или ACK.
+
+Own Leave допускается только для held grant exact resolved active auth
+user/session/device binding, включая reader/removed Chat subject: прекращение
+собственного media не даёт нового admission. End actor — immutable call
+creator с active Identity и свежей eligible Chat role owner/admin/member.
+Текущий GroupOwner/admin не получает End privilege автоматически; смена
+eligible роли сохраняет epoch, поэтому management privilege не кешируется
+по epoch. Own minimal Leave status доступен новой active session того же user
+без roster/чужих bindings. End aggregate status требует свежего current End
+права. Revoked bearer/anonymous status запрещён; own logout оставляет pending
+до следующей authorized session либо отдельного approved admin reconcile.
+
+Уточнение Accepted координатором 2026-10-12 до adapter implementation:
+own minimal status использует отдельный typed identity-only OwnStatusSubject /
+read, полученный после fresh active ResolveSessionBearer. Его разрешение —
+exact persisted actor user, не current Chat role или roster. Новая active
+session того же user может читать только original minimal own receipt.
+Chat NOT_FOUND/unavailable не превращается в выдуманный RoleRemoved/Reader
+для прохождения model Actor validator. End aggregate status сохраняет fresh
+active Identity +immutable call creator +current eligible Chat role; own
+identity-only read не открывает этот путь. Revoked/anonymous bearer запрещён.
+
+Saved same-user Leave request replay из НОВОЙ active session может вернуть
+original scoped minimal receipt без новых targets или mutation. Это recovery
+прежнего command, не Leave текущей replacement generation. Новый Leave всё ещё
+требует exact current resolved session/device held binding. Request/kind/call
+изменение конфликтует, operation/request ID не является capability. Adapter
+берёт auth subject из verified remote result, не body/header boolean.
+Public mapping остаётся media_PENDING при UNKNOWN provider proof, даже если
+model leave journal complete; model ACK/status не пересекает trusted media
+completion boundary. Admission signature/proxy/ACK — отдельный SDK contract
+и slice, service/runtime/media flag этим уточнением не включаются.
+
+Coordinator сохраняет immutable parent intent/request mapping, exact per-grant
+child operations и отдельные room-generation cleanup targets с guarded claims.
+Leave выбирает один own exact grant; replay прежнего request не выбирает
+replacement generation. End под call lock выбирает все prepared/active/revoking
+grants и active legacy participant IDs этого call, все non-closed rooms этого
+call и проверяет referenced rooms. Snapshot включает full grant/room/call/
+participant/auth revision/eligibility epoch binding, stored lease и expected
+server registration owner/fence. Browser и новый leaf не выбирают targets.
+Already-revoking source child сохраняет свою operation/reason/authority outcome;
+его immutable binding не переприсваивается. Один child остаётся one-grant
+operation, а не скрытая multi-target замена существующего ACK finalizer.
+
+OPEN END INTENT — durable admission И terminal barrier. Он блокирует legacy
+End, last-Leave, stale prune/conflict/orphan repair от successful call ENDED /
+room CLOSED даже после ВСЕХ grant REVOKED при0held/0participants, пока room ACK
+pending. Start той же group не создаёт replacement call; Join/Reserve/Activate/
+RegisterLease и future initial/reconnect admission закрыты. Барьер нельзя
+считать исчезнувшим по отсутствию held grant, activity или истечению JWT.
+Child может release свой participant/user slot лишь после полного собственного
+matching ACK; parent End и selected rooms остаются pending/closing. Только
+parent finalizer может завершить call/room при открытом End intent.
+
+Parent completion требует ALL exact child actions и ALL selected room-generation
+trusted teardown/absence ACK. Final transaction повторно проверяет immutable
+targets, child proof/state, room proof и отсутствие неожиданных participants /
+held grants/leases; затем атомарно terminal call/rooms и parent receipt.
+Empty/UNKNOWN registry set не становится media complete, synthetic room ACK не
+создаётся. Provider facts остаются UNKNOWN/PENDING без trusted adapter. WS close,
+local tracks stop/mute/Leave action, provider HTTP200 и token/certificate expiry
+не являются ACK. New leaf/same service URI не наследует predecessor targets;
+rotation/takeover остаются unsupported, pending old targets neverdelete.
+
+Fresh Identity/Chat lookup выполняется вне DB TX в общем5s budget. Внутри —
+sorted call parents → rooms → users → grants/leases → intent/children/outbox,
+recheck full binding/watermarks/target set; новый parent/user требует rollback
+и bounded retry, не поздний parent lock. Pending group intent входит в parent
+discovery даже при отсутствии participants/grants. Нет distributed atomicity
+между authority lookup и RTC commit: source events и5s recovery закрывают race,
+transient failure не объявляет permanent revoked и не повышает watermark.
+
+Same authenticated actor/request/kind/call возвращает тот же durable receipt
+после response loss/crash, changed duplicate конфликтует. Command/status
+каждый раз заново авторизуется; operation ID не capability. Pending intents,
+full targets и mappings удерживаются. Worker lease/claim owner/fence и DB clock
+защищают stale CAS; busy/not-due остаётся pending, exhaustion unavailable.
+Реальные sender/admission/SDK/proxy cleanup workers, public wiring/UI и media
+enable — отдельные slices. Dormant coordinator preparation требует review;
+generation/full gates/publication — ordinary merge generated, verified и
+published parents, новый clean freeze и собственные receipts. До actual
+trusted ACK acceptance public media complete не заявляется.
+
+### Авторизация публичного media control и свежесть запроса
+
+Уточнение Accepted координатором 2026-10-12 после review source и Go 1.25
+для отдельного unmounted adapter slice. Этот docs commit предшествует коду.
+
+Existing RTC не имеет AuthContext/JWT middleware: public handler читает bearer
+из request Header, legacy GetCurrentProfile возвращает лишь user ID. Existing
+opaque sessionv1 остаётся прежним; adapter принимает ровно один nonempty Bearer
+через EqualFold scan ВСЕХ Header map keys/values (без Get/Values-only selector),
+отвергает duplicate/casing aliases/comma/control и вызывает ResolveSessionBearer. Body
+содержит только existing call/request/operation IDs, не Actor/auth/group facts.
+Full active user/session/device tuple и revisions проверяются actual private
+Identity; source DTO не содержит exp/crypto-device trust/source expiry timestamp.
+SFU JWT/token policy и Go27/pinned SDK остаются отдельным следующим контрактом.
+
+Typed identity-only OwnStatusSubject/read и saved same-user LEAVE replay из
+новой active session используют только текущую Identity subject, без Chat calls,
+без fabricated RoleRemoved/Reader и без old-target/replacement mutation. Final
+CheckBoundSession проверяет текущую resolved session, не session из old receipt.
+Новый LEAVE требует exact held tuple и genuine Chat PRESENT/reader или REMOVED
+со своим validated group/user/epoch. NOT_FOUND/unavailable не превращаются в
+REMOVED. END command/replay/status каждый раз требует immutable creator и
+fresh PRESENT eligible role; GroupOwner/admin другого user это право не даёт.
+
+Outer HTTP wrapper создаёт один child context min(incoming deadline,5s) в начале
+ServeHTTP ДО Connect body decode. Actual ResponseController.SetReadDeadline(D),
+SetWriteDeadline(D) и MaxBytesReader4KiB/bounded read ограничивают body/decode;
+unsupported/error не допускает Connect/source/domain work. Raw header phase
+уже прошла: отдельный server ReadHeaderTimeout<=5s/MaxHeaderBytes8192, без claim
+охвата raw headers request D или exact8192wirecutoff с Go bufio slack. D общий
+для source calls, DB wait/recheck/commit/final snapshot и response. Facts
+request-local и истекают в D;
+никакого source expiry/JWT поля или per-hop renewal не вводится. Последние
+сетевые source checks выполняются до RTC TX/locks. Guarded writer получает
+required local func(context.Context)error, сформированный AuthorizedService:
+только ctx/deadline/time/immutable tuple validation, без network/DB callbacks.
+Он проверяется до TX, после sorted binding recheck, до первой journal mutation
+и перед ОБОИМИ commit paths (new intent/saved replay); nil/expired evidence
+запрещает mutation/replay. Сетевые source callbacks под locks отсутствуют. Unguarded
+model Request не становится public adapter entry. Это local freshness, не
+atomic auth transaction между сервисами: source-event recovery закрывает race
+после последнего lookup, а postcommit timeout/response loss остаётся uncertainty.
+
+Constructor-only typed HTTPS clients принимают dedicated verified CA и sole RTC
+leaf/clientAuth/expiry/TLS1.3/standard hostname checks; redirects/envproxy/plaintext/
+caller override запрещены, exact2Identity/1Chat methods only. Секреты/body/IDs не
+пишутся в logs/errors; static method/status/duration. Existing app/gateway не
+mount отдельный service, oldthree typed stubs остаются Unimplemented; только
+own native fixture создаёт explicit authorized factory. DTO/proto/schema и
+production media flag не расширяются. Request5s inherited private caps и
+bounded body/header policy подтверждаются actual owned3domain TLS/PG fixtures.
+OWN read deadline очищается только full body EOF+live ctx до ServeHTTP return;
+unread/error/expired body не продлевается, connection/stream не переиспользуется.
+OWN write deadline сохраняется через net/http finish flush; buffered write
+не доказывает delivery за5s. OWN server finite ReadTimeout/WriteTimeout<=5s
+ограничивает cleanup unsupported writer/early auth reject. До error response
+HTTP1 получает close-after-error; wrapper не вызывает blocking Body.Close или
+unbounded drain, net/http finishRequest завершает original body под D/fallback.
+HTTP2 завершает лишь own stream; Connect/source work не вызывается. Slow raw header/body/cancel/keepalive проверяются
+отдельно. Gateway404 native phase только после остановки Id/Chat, max3native;
+source-only gateway evidence явно static, не actual404.
+
+До actual trusted provider proof public outcome ВСЕГДА PENDING с fixed reason,
+даже если local/model journal complete/known или fixture RoomClaim ACK. Body/
+header/constructor boolean не включает COMPLETE. SDK/proxy/admission token/
+cleanup workers/UI/runtime и реальный group audio остаются отдельными slices.
+
+#### Границы native-проверки адаптера
+
+Уточнение Accepted координатором 2026-10-12 до добавления тестового хоста Chat.
+Максимум три одновременных участника этой проверки: production Identity main,
+Chat в отдельном test host и RTC test. Identity выдаёт настоящие opaque sessions;
+Chat использует production PostgreSQL repository, domain service, публичные
+group writers и private mTLS authorization listener. Роли, membership epoch и
+auth facts не подменяются. Обычный запуск tests остаётся прежним; режим хоста
+выбирает только явный private fixture profile, без пустых или skipped tests.
+
+Test host допускает лишь Ping, CreateGroup, CreateGroupInviteLink,
+JoinGroupByInviteLink, UpdateGroupMemberRole, TransferGroupOwnership и
+RemoveGroupMember. Reader transition и remove вызывают очистку typing: для
+отсутствующих в этой проверке typing entries используется отдельное пустое
+in-memory test storage. Оно не участвует в авторизации; остальные typing методы
+недоступны. Media, presence и notifications не используются и не открываются
+через allowlist. Chat production/main/dependencies не меняются, Redis/S3 clients
+и cleanup workers не запускаются. Fixture использует только собственную свежую
+UUID schema, настоящие migrations, PG и TLS; source binding, лимиты и cleanup
+проверяются отдельно до запуска.
+
+Такой результат подтверждает production Chat domain/listener в тестовом хосте,
+а не полный Chat main, Compose или readiness медиа. Полный production Chat с
+owned Redis/S3 входит в отдельную сквозную браузерную приёмку. Счётчик вызовов
+может делегировать реальному source и сохранять только числа для ZEROChat
+assertions; bearer, subject IDs и source facts в артефакт счётчика не попадают.
+
+### Identity source delivery journal
+
+Identity sender — отдельный default-disabled implementation slice. Migration
+добавляет delivery journal на committed source event; backfill создаёт pending
+rows только для существующего outbox. Новый revoke записывает outbox и journal
+в той же source transaction. Immutable outbox и receipt mapping удерживаются:
+pending/claimed/quarantined rows не удаляются. DTO формируется только из claimed
+outbox row; browser/body не создаёт producer authority facts.
+
+Single-inflight worker использует общий attempt deadline **5s** для
+claim→receipt lookup/apply→CAS, claim lease **15s**, recovery wake **1s** и bounded
+backoff **1–30s**. Это начальные constants без capacity benchmark, не media
+lifetime. Fence/attempt монотонны; CAS требует event, current owner/fence,
+pending state и nonexpired DB-clock lease. Network вызов не удерживает TX lock.
+Потеря ответа/crash до CAS восстанавливаются own receipt lookup и canonical
+replay; RTC DURABLY_APPLIED завершает только delivery journal, не media teardown.
+Own receipt lookup по event ID не доказывает canonical tuple. Recovery после
+successful lookup обязательно делает canonical Apply replay в том же общем5s
+context: valid receipt должен сохранить event/operation ID. AlreadyExists
+quarantined guarded CAS; transient/invalid/different operation остаются pending.
+Новый proto digest или произвольное восстановление source payload не вводятся.
+
+Permanent canonical conflict либо malformed claimed row переводится guarded
+CAS в **quarantined**, static reason canonical_conflict/source_row_invalid.
+Immutable row/mapping/fence сохраняются, automatic retry исключён; payload
+repair/requeue не выдумывается. Stale worker не может quarantined/delivered
+новый claim. Operator recovery — отдельная авторизованная процедура.
+
+Exhausted fence/attempt row остаётся неизменной и fail closed. Claim selection
+исключает exhausted counters до выбора следующего eligible due event;
+bounded operator diagnosis сообщает только static exhausted_counter, без
+payload IDs. Такой event не блокирует прогресс других due rows. Counter/retry
+math guarded: никакого shift от unbounded attempt и timestamp из source audit.
+Source revoke/public auth outcome сохраняется; sender success не является
+successful media completion. Chat sender/registration/SFU/proxy ACK/media flag
+остаются отдельными slices.
+
+### Chat source delivery journal
+
+Chat sender — отдельный default-disabled slice после source outbox024. Новая
+migration создаёт pending journal для уже committed events и qualified SECURITY
+INVOKER AFTER INSERT outbox trigger для journal в той же membership/source TX.
+Исторический capture trigger024 не переписывается; новый trigger не берёт
+group/user parent locks. FK RESTRICT только к immutable event, без cascade из
+group/user/membership. Journal fault откатывает source transition/epoch/outbox.
+
+Producer читает canonical tuple из claimed source row: event/group/user IDs,
+source_revision→eligibility_epoch. eligibility_denied/member_removed оба
+отображаются в fixed group-denied RPC. Source reason/time остаются audit и не
+передаются; из отсутствующих role/removal/present/eligible fields receiver не
+выводит authority. Sender не отменяет old denied event по current rejoin/role:
+late epoch2/newgrant3 изолирует RTC registry.
+
+Claim/canonical replay/CAS/quarantine и retention повторяют Identity contract:
+общий5s claim→lookup/apply→CAS, lease15s, wake1s, capped1–30s backoff/singleinflight,
+не benchmark. Lookup-success обязательно canonical Apply replay/same event+op;
+AlreadyExists→guarded quarantine. Exhausted counters unchanged/excluded before
+next eligible selection; static diagnosis и прогресс другого event. Pending/
+claimed/quarantined/mapping neverdelete, no payload repair/false media complete.
+
+Default-off typed client использует только ApplyChatEvent/GetChatEventReceipt,
+sole verified URI urn:aerochat:service:chat, TLS1.3/CA/clientAuth/hostname checks,
+без redirects/envproxy/caller override. Worker связан с app HTTP context и
+awaited bounded shutdown; attachment cleanup/crypto/public Chat auth не меняются.
+Source prep может начинаться от reviewed UNVERIFIED Identity checkout в отдельном
+worktree, но full Chat gates/publication требуют ordinary merge verified
+generated/published Identity parent, новый clean freeze и fresh whole receipts.
+Никакого переноса parent PASS либо enable media/runtime из source prep.
+
+### Регистрация экземпляра admission
+
+Уточнение принято координатором 2026-10-12 до implementation этого отдельного
+slice. Private `rtc.admission.v1.AdmissionRegistrationService.RegisterInstance`
+принимает только canonical UUID `request_id` для идемпотентности. Verified
+single URI `urn:aerochat:service:media-admission`, dedicated client CA,
+chain/expiry/clientAuth/TLS1.3 и fixed method ACL обязательны. Fingerprint —
+стандартный SHA256 DER фактически проверенного leaf certificate; он поступает
+из trusted transport context. Body/header не выбирают fingerprint, instance
+UUID или fence. Listener отдельный и default-disabled; source receiver не
+расширяет Identity/Chat allowlist. Public mux/gateway этот метод не открывает.
+
+RTC в одной PostgreSQL transaction выдаёт opaque instance UUID и положительный
+server-global monotonic fence, сохраняя unique leaf fingerprint. Это sequence
+регистраций, не election term: регистрация другого leaf не инвалидирует ранее
+выданные instances. Overflow прекращает новую allocation без mutation; уже
+сохранённый own retry остаётся доступен. Request ID scoped к verified leaf;
+одинаковый request ID у другого leaf не даёт доступ к первой регистрации.
+
+Same leaf + same request ID возвращает прежние instance/fence/state после
+потери ответа или RTC restart, без повторной allocation. Same leaf + distinct
+request ID конфликтует, включая draining/retired history. Retry retired state
+не активирует его заново. Регистрация не освобождает grants/leases/publication
+budgets и не подтверждает media cleanup; JWT/certificate expiry и WS close
+не являются ACK. Новый leaf с тем же service URI не получает predecessor
+ownership или права завершить old targets. Rotation/takeover/recovery old
+owner — отдельный contract до media enable; pending old bindings сохраняются.
+
+Deployment authority выдаёт unique leaf на instance. Копии одного certificate
+и request ID не различают физические процессы: mTLS fingerprint не является
+новым proof-of-possession протоколом. Native fixtures проверяют concurrent
+identical replay/duplicate-leaf conflict, global fence/overflow, durable
+response-loss/restart и retained inactive state, actual TLS/method isolation,
+body/header overrides и default-off/coupled shutdown. Source-only preparation
+может идти в отдельном worktree до parent gates; generation/full gates/PR
+publication требуют ordinary merge verified generated/published Identity и
+Chat sender parents, fresh clean freeze и собственные receipts. SDK/JWT/grant
+issuance, connection admission, cleanup ACK и media flag сюда не входят.
+
 ## Chat eligibility epoch
 
 Chat хранит монотонную revision для допуска exact `(group_id, user_id)` к audio, отдельно от физически удаляемой membership row. Retained tombstone сохраняет счётчик после remove/leave; rejoin не возвращает revision к начальному значению. Это **eligibility epoch**, а не версия любой смены роли или timestamp. Источник текущей role остаётся Chat membership. Private lookup всегда возвращает свежую role; RTC не кеширует management privileges по одному eligibility epoch.

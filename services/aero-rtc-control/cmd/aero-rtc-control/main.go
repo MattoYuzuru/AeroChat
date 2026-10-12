@@ -13,6 +13,7 @@ import (
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
 	rtcschema "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/app"
+	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/admission"
 	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/revocation"
 	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/rtc"
 	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/downstream"
@@ -113,10 +114,10 @@ func run() error {
 		handler,
 	)
 
-	if err := app.RunHTTPServers(ctx, logger, observability.HTTPServerConfig{
+	if err := app.RunHTTPServersWithRegistration(ctx, logger, observability.HTTPServerConfig{
 		Address:         cfg.HTTPAddress,
 		ShutdownTimeout: cfg.ShutdownTimeout,
-	}, httpHandler, cfg.InternalRevocation, revocation.NewService(postgres.NewMediaStore(db))); err != nil && !errors.Is(err, context.Canceled) {
+	}, httpHandler, cfg.InternalRevocation, revocation.NewService(postgres.NewMediaStore(db)), cfg.InternalAdmissionRegistration, admission.NewService(postgres.NewRegistrationStore(db))); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 
