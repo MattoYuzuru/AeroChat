@@ -32,12 +32,12 @@ func (c Config) Validate() error {
 	}
 	u, err := url.Parse(c.BaseURL)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.RawPath != "" || u.Fragment != "" || u.Opaque != "" || u.Path != "" && u.Path != "/" || c.ServerCAFile == "" || c.TLSCertFile == "" || c.TLSKeyFile == "" {
-		return errors.New("Chat delivery requires private HTTPS authority and TLS material")
+		return errors.New("chat delivery requires private HTTPS authority and TLS material")
 	}
 	if u.Port() != "" {
 		port, err := strconv.Atoi(u.Port())
 		if err != nil || port < 1 || port > 65535 {
-			return errors.New("Chat delivery HTTPS port invalid")
+			return errors.New("chat delivery HTTPS port invalid")
 		}
 	}
 	return nil
@@ -57,11 +57,11 @@ func NewClient(cfg Config) (*Client, error) {
 	}
 	pair, err := tls.LoadX509KeyPair(cfg.TLSCertFile, cfg.TLSKeyFile)
 	if err != nil {
-		return nil, errors.New("Chat delivery client TLS material invalid")
+		return nil, errors.New("chat delivery client TLS material invalid")
 	}
 	leaf, err := x509.ParseCertificate(pair.Certificate[0])
 	if err != nil || leaf.IsCA || time.Now().Before(leaf.NotBefore) || !time.Now().Before(leaf.NotAfter) || len(leaf.URIs) != 1 || leaf.URIs[0].String() != "urn:aerochat:service:chat" {
-		return nil, errors.New("Chat delivery requires sole Chat client identity")
+		return nil, errors.New("chat delivery requires sole Chat client identity")
 	}
 	usage := false
 	for _, u := range leaf.ExtKeyUsage {
@@ -70,32 +70,32 @@ func NewClient(cfg Config) (*Client, error) {
 		}
 	}
 	if !usage {
-		return nil, errors.New("Chat delivery requires client usage")
+		return nil, errors.New("chat delivery requires client usage")
 	}
 	data, err := os.ReadFile(cfg.ServerCAFile)
 	if err != nil {
-		return nil, errors.New("Chat delivery server CA unavailable")
+		return nil, errors.New("chat delivery server CA unavailable")
 	}
 	roots := x509.NewCertPool()
 	count := 0
 	for len(bytes.TrimSpace(data)) > 0 {
 		block, rest := pem.Decode(data)
 		if block == nil || block.Type != "CERTIFICATE" {
-			return nil, errors.New("Chat delivery server CA invalid")
+			return nil, errors.New("chat delivery server CA invalid")
 		}
 		cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil || !cert.IsCA || cert.KeyUsage&x509.KeyUsageCertSign == 0 || time.Now().Before(cert.NotBefore) || !time.Now().Before(cert.NotAfter) {
-			return nil, errors.New("Chat delivery server CA invalid")
+			return nil, errors.New("chat delivery server CA invalid")
 		}
 		roots.AddCert(cert)
 		count++
 		data = rest
 	}
 	if count == 0 {
-		return nil, errors.New("Chat delivery server CA required")
+		return nil, errors.New("chat delivery server CA required")
 	}
 	transport := &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: delivery.AttemptBudget}).DialContext, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots, Certificates: []tls.Certificate{pair}}, TLSHandshakeTimeout: delivery.AttemptBudget, ResponseHeaderTimeout: delivery.AttemptBudget, IdleConnTimeout: 30 * time.Second, MaxConnsPerHost: 1, MaxIdleConnsPerHost: 1, MaxResponseHeaderBytes: 8192}
-	httpClient := &http.Client{Transport: transport, Timeout: delivery.AttemptBudget, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("Chat delivery redirect denied") }}
+	httpClient := &http.Client{Transport: transport, Timeout: delivery.AttemptBudget, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("chat delivery redirect denied") }}
 	return &Client{client: rtcconnect.NewSourceRevocationServiceClient(httpClient, cfg.BaseURL, connect.WithReadMaxBytes(4096), connect.WithSendMaxBytes(4096)), transport: transport}, nil
 }
 func (c *Client) Close() { c.transport.CloseIdleConnections() }
