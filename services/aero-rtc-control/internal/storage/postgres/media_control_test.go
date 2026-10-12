@@ -12,7 +12,6 @@ import (
 	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/rtc"
 	ql "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/storage/sqlc"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func controlActor(g media.Grant) control.Actor {

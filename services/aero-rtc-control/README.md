@@ -184,6 +184,13 @@ room action обойти children barrier. Generated SQL/proto не редакт
 Исторический FAIL сохраняется; native/provider completion не подтверждена
 и требует нового whole check на clean исправленном HEAD.
 
+Следующий whole check `check-ad__pjcv` на `fe1bbb7` собрал production
+RTC binary с exact-source VCS, но test package PostgreSQL не скомпилировался:
+в `media_control_test.go` остался неиспользуемый `pgxpool` import. Он удалён
+без изменения assertions. Остальные выполненные tests не принимают этот
+package: native coordinator и inherited PostgreSQL cases ещё UNRUN; полный
+результат требует нового clean-source whole check.
+
 Accepted adapter refinement 2026-10-12: own minimal status использует отдельный
 identity-only OwnStatusSubject/read после fresh active Identity, без требования
 Chat role/roster и без fabricated RoleRemoved/Reader при NOT_FOUND/unavailable.
