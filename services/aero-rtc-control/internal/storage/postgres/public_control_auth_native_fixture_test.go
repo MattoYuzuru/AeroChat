@@ -111,7 +111,7 @@ func controlNativeBinary(t *testing.T, key, packagePath string) string {
 		t.Fatal("owned native binary changed")
 	}
 	info, err := buildinfo.ReadFile(path)
-	if err != nil || info.GoVersion != "go1.25.8" || info.Path != packagePath {
+	if err != nil || info.GoVersion != "go1.27.2" || info.Path != packagePath {
 		t.Fatal("owned native package/toolchain mismatch")
 	}
 	settings := map[string]string{}
