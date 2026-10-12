@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -214,7 +215,7 @@ func registrationConcurrentWait(t *testing.T, ctx context.Context, db *pgxpool.P
 		rows, err := db.Query(ctx, `SELECT a.pid,a.application_name,a.datname,a.state,
 COALESCE(a.wait_event_type,''),COALESCE(a.wait_event,''),pg_blocking_pids(a.pid),
 COALESCE((SELECT jsonb_agg(jsonb_build_object('type',l.locktype,'mode',l.mode,
-'relation',l.relation,'transaction_id',COALESCE(l.transactionid::text,''),
+'relation',l.relation::bigint,'transaction_id',COALESCE(l.transactionid::text,''),
 'virtual_xid',COALESCE(l.virtualxid,''),'granted',l.granted))
 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype IN ('relation','tuple','transactionid','virtualxid')), '[]'::jsonb)
 FROM pg_stat_activity a WHERE a.pid=ANY($1::int[]) ORDER BY a.pid`, pids)
@@ -231,6 +232,19 @@ FROM pg_stat_activity a WHERE a.pid=ANY($1::int[]) ORDER BY a.pid`, pids)
 			}
 			if err := json.Unmarshal(locksJSON, &node.Locks); err != nil {
 				rows.Close()
+				var typeError *json.UnmarshalTypeError
+				if errors.As(err, &typeError) {
+					kind := "unknown"
+					switch typeError.Value {
+					case "string", "bool", "array", "object", "null":
+						kind = typeError.Value
+					default:
+						if strings.HasPrefix(typeError.Value, "number ") {
+							kind = "number"
+						}
+					}
+					t.Fatalf("registration lock metadata decode failed; field=%s json_kind=%s go_type=%s", typeError.Field, kind, typeError.Type)
+				}
 				t.Fatal("registration lock metadata decode failed")
 			}
 			sort.Slice(node.Blockers, func(i, j int) bool { return node.Blockers[i] < node.Blockers[j] })

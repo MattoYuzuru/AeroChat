@@ -97,3 +97,11 @@ Strong graph helper `registrationConcurrentWait` обслуживает толь
 concurrent replay/distinct-nonce test. Shared `registrationWait` для двух inherited
 TLS single-worker barriers сохраняет исходные signature и body; TLS source не
 изменяется. Изменение helper API требует inventory всех callers до нового gate.
+
+Whole `check-43x2s13s` на `2a94bdf` завершился FAIL при декодировании lock metadata,
+до успешного graph witness; 21 pure graph cases и остальные пять native registration
+cases прошли, но не заменяют whole gate. Source review выявил несовместимость:
+`pg_locks.relation` имеет тип OID, который PostgreSQL преобразует в JSON string,
+а fixture ожидает числовой `uint32`. Тестовый query явно приводит OID к `bigint`;
+диагностика type error содержит только имя поля, категорию JSON и Go type,
+без исходного JSON/value. Новый observed graph и whole result пока не получены.
