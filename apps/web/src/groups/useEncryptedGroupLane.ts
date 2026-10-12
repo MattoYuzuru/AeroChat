@@ -59,6 +59,11 @@ export function useEncryptedGroupLane({
 }: UseEncryptedGroupLaneOptions): EncryptedGroupLaneState {
   const pageSize = resolveEncryptedLanePageSize(requestedPageSize);
   const cryptoRuntime = useCryptoRuntime();
+  // Состояние действия меняет объект контекста; отмену определяет область группы.
+  const cryptoRuntimeRef = useRef(cryptoRuntime);
+  useEffect(() => {
+    cryptoRuntimeRef.current = cryptoRuntime;
+  }, [cryptoRuntime]);
   const activeCryptoDeviceId = resolveActiveRealtimeCryptoDeviceId(cryptoRuntime.state);
   const activeGroupId = groupId?.trim() ?? "";
   const [loadedState, setLoadedState] = useState<LoadedEncryptedGroupLaneState>({
@@ -113,7 +118,7 @@ export function useEncryptedGroupLane({
       token: activeLoadToken,
       groupId: activeLoadGroupId,
       activeCryptoDeviceId: activeLoadCryptoDeviceId,
-      cryptoRuntime,
+      cryptoRuntime: cryptoRuntimeRef.current,
       pageSize,
     })
       .then((result) => {
@@ -162,7 +167,6 @@ export function useEncryptedGroupLane({
         });
       });
   }, [
-    cryptoRuntime,
     activeLoadCryptoDeviceId,
     activeLoadGroupId,
     activeLoadRequestKey,
@@ -200,7 +204,7 @@ export function useEncryptedGroupLane({
         },
       ]);
 
-      void cryptoRuntime
+      void cryptoRuntimeRef.current
         .decryptEncryptedGroupEnvelopes([event.envelope])
         .then((updates) => {
           if (cancelled) {
@@ -255,7 +259,6 @@ export function useEncryptedGroupLane({
       unsubscribe();
     };
   }, [
-    cryptoRuntime,
     activeLoadCryptoDeviceId,
     activeLoadGroupId,
     activeLoadRequestKey,
@@ -289,7 +292,7 @@ export function useEncryptedGroupLane({
         token: activeLoadToken,
         groupId: activeLoadGroupId,
         activeCryptoDeviceId: activeLoadCryptoDeviceId,
-        cryptoRuntime,
+        cryptoRuntime: cryptoRuntimeRef.current,
         pageSize,
       })
         .then((result) => {
@@ -342,7 +345,6 @@ export function useEncryptedGroupLane({
         });
     });
   }, [
-    cryptoRuntime,
     activeLoadCryptoDeviceId,
     activeLoadGroupId,
     activeLoadRequestKey,
