@@ -55,6 +55,11 @@ export function useEncryptedDirectMessageV2Lane({
 }: UseEncryptedDirectMessageV2LaneOptions): EncryptedDirectMessageV2LaneState {
   const pageSize = resolveEncryptedLanePageSize(requestedPageSize);
   const cryptoRuntime = useCryptoRuntime();
+  // Состояние действия меняет объект контекста; отмену определяет область переписки.
+  const cryptoRuntimeRef = useRef(cryptoRuntime);
+  useEffect(() => {
+    cryptoRuntimeRef.current = cryptoRuntime;
+  }, [cryptoRuntime]);
   const activeCryptoDeviceId = resolveActiveRealtimeCryptoDeviceId(cryptoRuntime.state);
   const activeChatId = chatId?.trim() ?? "";
   const [loadedState, setLoadedState] = useState<LoadedEncryptedDirectMessageV2LaneState>({
@@ -108,7 +113,7 @@ export function useEncryptedDirectMessageV2Lane({
       token: activeLoadToken,
       chatId: activeLoadChatId,
       activeCryptoDeviceId: activeLoadCryptoDeviceId,
-      cryptoRuntime,
+      cryptoRuntime: cryptoRuntimeRef.current,
       pageSize,
     })
       .then((updates) => {
@@ -157,7 +162,6 @@ export function useEncryptedDirectMessageV2Lane({
         });
       });
   }, [
-    cryptoRuntime,
     activeLoadChatId,
     activeLoadCryptoDeviceId,
     activeLoadRequestKey,
@@ -195,7 +199,7 @@ export function useEncryptedDirectMessageV2Lane({
         },
       ]);
 
-      void cryptoRuntime
+      void cryptoRuntimeRef.current
         .decryptEncryptedDirectMessageV2Envelopes([event.envelope])
         .then((updates) => {
           if (cancelled) {
@@ -248,7 +252,6 @@ export function useEncryptedDirectMessageV2Lane({
       unsubscribe();
     };
   }, [
-    cryptoRuntime,
     activeLoadChatId,
     activeLoadCryptoDeviceId,
     activeLoadRequestKey,
@@ -282,7 +285,7 @@ export function useEncryptedDirectMessageV2Lane({
         token: activeLoadToken,
         chatId: activeLoadChatId,
         activeCryptoDeviceId: activeLoadCryptoDeviceId,
-        cryptoRuntime,
+        cryptoRuntime: cryptoRuntimeRef.current,
         pageSize,
       })
         .then((updates) => {
@@ -332,7 +335,6 @@ export function useEncryptedDirectMessageV2Lane({
         });
     });
   }, [
-    cryptoRuntime,
     activeLoadChatId,
     activeLoadCryptoDeviceId,
     activeLoadRequestKey,
