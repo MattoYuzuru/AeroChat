@@ -188,9 +188,16 @@ SQLC generation, whole gate и восемь native scenarios ещё UNRUN.
 Native scope использует real Identity main и production Chat
 repository/domain/private TLS listener в test host; это не полный Chat main/Compose.
 
+После полного просмотра native fixtures source сохранён в `aef60813`.
+Одна SQLC generation `check-arvmtlk1` завершила child с exit0 и изменила
+ровно два ожидаемых outputs: source_changed=true/reusable=false, это не test PASS.
+Root полностью просмотрел actual 64-line patch, сверил current bytes и
+неизменность 13 inputs. Generated files сохранены отдельным local commit
+`2e2fe09b`; whole/native gate ещё UNRUN, adapter остаётся unmounted.
+
 Browser05 source и privacy correction просмотрены полностью. Выбраны core v2
-и wrapper v2, входные invite tokens маскируются на screenshots. Actual browser05
-ещё UNRUN. Свежий `check-_2sqs3ga` на clean integration261 прошёл 15 stages:
+и wrapper v3 с ограниченной очисткой дочернего процесса; входные invite tokens
+маскируются на screenshots. Свежий `check-_2sqs3ga` на clean integration261 прошёл 15 stages:
 758 JUnit tests, без failures/errors/skips, включая native PostgreSQL/S3/private
 TLS scenarios, vet/lint и двукратную generation. Root отдельно сверил XML,
 обязательные test names, source/receipt pins и live verify. Семь symbol scans
@@ -207,6 +214,23 @@ preparation; запуск native services/timer зависит от её actual 
 независимого подтверждения cleanup. Runtime05 использует одну runner-owned
 process group и фиксированные 45 минут после readiness, без autoextension.
 Исторический core04 FAIL и его частичные результаты остаются неизменными.
+
+Подготовка fixture05 `check-le1olsfe` PASS: отдельные DB05/private bucket05,
+четыре приватных profile. После exit root независимо подтвердил отсутствие
+временного MC-container, неизменность десяти main9 container rows и закрытые
+native/preview ports. Actual runtime05 READY в17:01:52UTC, fixed deadline
+17:46:52UTC. Все четыре health/readiness versions равны261, пять процессов
+имеют одну runner-owned group; final runner receipt требует остановки/cleanup.
+
+Первый core05 `check-3q6u5puo` FAILED на `self-message-reload` с TimeoutError.
+Сохранены 18 partial PASS, включая все четыре direct media round trips:
+actual upload/finalize/ciphertext GET/decrypt/download SHA, inline image/audio/video.
+Root независимо сверил actual receipt, четыре download SHA и отсутствие
+двух owned profile browser PIDs/закрытый preview25173 после exit. Self/group,
+logout/revoke и postcore phases не считаются пройденными. Read-only DB05
+показала один self chat и ноль encrypted messages/deliveries для actual A:
+сообщение не persisted. Client readiness/locator/HTTP rejection ещё различаются
+bounded diagnostic; причина не объявлена product defect без evidence.
 
 До общей готовности остаются:
 
