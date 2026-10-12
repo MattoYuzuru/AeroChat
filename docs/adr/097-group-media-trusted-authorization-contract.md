@@ -228,6 +228,27 @@ eligible роли сохраняет epoch, поэтому management privilege 
 права. Revoked bearer/anonymous status запрещён; own logout оставляет pending
 до следующей authorized session либо отдельного approved admin reconcile.
 
+Уточнение Accepted координатором 2026-10-12 до adapter implementation:
+own minimal status использует отдельный typed identity-only OwnStatusSubject /
+read, полученный после fresh active ResolveSessionBearer. Его разрешение —
+exact persisted actor user, не current Chat role или roster. Новая active
+session того же user может читать только original minimal own receipt.
+Chat NOT_FOUND/unavailable не превращается в выдуманный RoleRemoved/Reader
+для прохождения model Actor validator. End aggregate status сохраняет fresh
+active Identity +immutable call creator +current eligible Chat role; own
+identity-only read не открывает этот путь. Revoked/anonymous bearer запрещён.
+
+Saved same-user Leave request replay из НОВОЙ active session может вернуть
+original scoped minimal receipt без новых targets или mutation. Это recovery
+прежнего command, не Leave текущей replacement generation. Новый Leave всё ещё
+требует exact current resolved session/device held binding. Request/kind/call
+изменение конфликтует, operation/request ID не является capability. Adapter
+берёт auth subject из verified remote result, не body/header boolean.
+Public mapping остаётся media_PENDING при UNKNOWN provider proof, даже если
+model leave journal complete; model ACK/status не пересекает trusted media
+completion boundary. Admission signature/proxy/ACK — отдельный SDK contract
+и slice, service/runtime/media flag этим уточнением не включаются.
+
 Coordinator сохраняет immutable parent intent/request mapping, exact per-grant
 child operations и отдельные room-generation cleanup targets с guarded claims.
 Leave выбирает один own exact grant; replay прежнего request не выбирает

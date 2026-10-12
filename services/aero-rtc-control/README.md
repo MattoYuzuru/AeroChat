@@ -175,3 +175,14 @@ other-room progress и actual registered003 upgrade/repeat retained history.
 schema; current writers вызываются после registered bootstrap, без42P01 bypass.
 Native profiles/schema ownership/heavy queue прежние; до запуска — verified
 published Identity→Chat→registration→guard ordinary merges и fresh freeze.
+
+Accepted adapter refinement 2026-10-12: own minimal status использует отдельный
+identity-only OwnStatusSubject/read после fresh active Identity, без требования
+Chat role/roster и без fabricated RoleRemoved/Reader при NOT_FOUND/unavailable.
+Saved same-user Leave replay из новой active session возвращает original
+minimal scoped receipt, не создаёт target и не меняет replacement generation;
+новый Leave требует exact current session/device held binding. End status
+по-прежнему fresh creator +eligible Chat role. Revoked/anonymous bearer denied.
+Model-complete Leave не становится public media COMPLETE: при UNKNOWN provider
+facts adapter возвращает media_PENDING. Уточнение пока docs-only, actual
+authorization/read adapters и SDK/admission/proxy ACK не реализованы.
