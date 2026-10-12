@@ -1548,12 +1548,13 @@
   .threadLayout:has(> .pinnedStrip) {
     --mobile-pin-padding-total: 0.9rem;
     --mobile-composer-padding-total: 0.65rem;
+    --mobile-composer-controls-total: 0rem;
     /* Резерв учитывает max-height textarea и существующий mobile padding. */
     grid-template-rows:
       auto
       minmax(calc(2.45rem + var(--mobile-pin-padding-total) + 1px), auto)
       minmax(calc(3rem + var(--mobile-history-padding) + var(--mobile-history-padding) + 1px), 1fr)
-      minmax(calc(4.5rem + var(--mobile-composer-padding-total)), auto);
+      minmax(calc(4.5rem + var(--mobile-composer-controls-total) + var(--mobile-composer-padding-total)), auto);
   }
 
   .threadLayout > .pinnedStrip,
@@ -1587,7 +1588,19 @@
 
 @media (min-height: 501px) and (max-width: 720px) {
   .threadLayout:has(> .pinnedStrip) {
-    --mobile-pin-padding-total: 1.3rem;
+    --mobile-pin-padding-total: 0.5rem;
     --mobile-composer-padding-total: 1.3rem;
+    --mobile-composer-controls-total: calc(2.45rem + 0.35rem);
+  }
+
+  .threadLayout:has(> .pinnedStrip) > .threadHero,
+  .threadLayout:has(> .pinnedStrip) > .pinnedStrip {
+    padding-block: 0.25rem;
+  }
+
+  .threadLayout:has(> .pinnedStrip) > .threadHero .avatarBadgeLarge {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
   }
 }
