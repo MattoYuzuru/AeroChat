@@ -319,8 +319,36 @@ ledger SHA/Wait/return codes, отсутствие их PID/PG и owned MC conta
 runtime owner запустил native06: readiness20:38:36UTC, фиксированное окончание
 21:23:36UTC без продления. Root проверил пять owned PID/common process group,
 восемь health/readiness/version responses и текущие binary SHA. Full core21+
-12 media разрешён отдельно; его результат, layout/unread/native zoom/RTP и
-итоговая приёмка ещё не заявляются. Основной compose stack не перезапускался.
+12 media разрешён отдельно. Основной compose stack не перезапускался.
+
+Первые core06 результаты сохранены отдельно: `check-710qire8` остановился до
+browser/preflight из-за отсутствующего HEAD argument; `check-30y8qt77` FAILED
+после 29 stages и всех12 media из-за ошибочного ожидания `/Logout` вместо
+`/LogoutCurrentSession`. После исправления selector `check-8taow7nx` FAILED
+на logout assertion: last-socket observer сохранялся через full navigation.
+Pinned Playwright1.62.1 очищает WebSocket map при new document, не посылая
+closed старому observer. Это source mechanism, а не доказательство открытого
+реального соединения после logout. Отдельный actual child witness подтвердил
+Login200/finished, новый connection.ready socket и Logout200/finished с
+закрытием того же socket до protected navigation/cleanup. Его внешний
+`check-yjncm58x` сохраняет teardown probe FAIL: immediate bind встретил
+AddrInUse; независимая проверка подтвердила no LISTEN/profile/Node и закрытый
+port. Child4 PASS не объявляется whole gate PASS.
+
+Новый immutable core v3 требует matching main-frame commit, затем новый
+realtime socket и actual connection.ready для logout и revoke target.
+Same-current socket close20s/HTTP200/finished/история/revoke assertions сохранены;
+wrapper проверяет закрытый listener через ECONNREFUSED, сохраняя independent
+PID/PG/profile cleanup. Продукт и frozen runtime source не менялись.
+`check-ozh5zmum` PASS на clean3f63: все21 basic stages и12 media roundtrips,
+всего33 actual PASS, без cleanup errors. Подтверждены logout idle socket,
+повторный UI login с историей, revoke session socket до protected navigation
+и revoke device. Root независимо сверил receipt/live verify0, actual downloaded
+SHA всех12 файлов и оба fresh-document socket witnesses; четыре owned
+wrapper/Node/CFT PID, три process groups и profiles отсутствуют, preview
+возвращает ECONNREFUSED. Из actual core/media metadata создан private handoff
+для отдельного layout/unread прогона. Native zoom/RTP и итоговая приёмка
+остаются отдельными checks.
 
 Owner штатно остановил runtime05: `check-_zlznsfr` PASS подтверждает setup/teardown
 и неизменность source261. Независимо проверены отсутствие пяти owned PID и
@@ -353,8 +381,8 @@ source checkout возвращает0. Это отдельный local authoriza
 
 До общей готовности остаются:
 
-- Сквозная приёмка двух аккаунтов и всех четырёх типов вложений в direct/self/group,
-  затем unread/minimized, responsive/focus, native 200% zoom и actual 1:1 RTP.
+- Unread/minimized, responsive/focus, native 200% zoom и actual 1:1 RTP;
+  двухаккаунтный core21 и все12 direct/self/group media roundtrips прошли.
 - Завершение #176: проверенный public authorization adapter, pinned SFU/SDK,
   admission/revocation/cleanup, lazy UI с privacy warning и actual three-client audio.
 - Итоговый integration SHA, release/restore/security gates, актуальные screenshots
