@@ -30,9 +30,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MattoYuzuru/AeroChat/libs/go/dbbootstrap"
+	chatschema "github.com/MattoYuzuru/AeroChat/services/aero-chat/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/app"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/domain/delivery"
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/transport/rtcrevocation"
+	identityschema "github.com/MattoYuzuru/AeroChat/services/aero-identity/db/schema"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -98,8 +101,13 @@ func chatSenderReceiverDB(t *testing.T, ctx context.Context) (*pgxpool.Pool, str
 		t.Fatal("own RTC pool failed")
 	}
 	t.Cleanup(db.Close)
-	if _, err := db.Exec(ctx, "CREATE TABLE users(id UUID PRIMARY KEY)"); err != nil {
-		t.Fatal(err)
+	// Штатный запуск RTC проверяет реальные реестры миграций зависимых сервисов.
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if err := dbbootstrap.Apply(ctx, db, dbbootstrap.Options{ServiceName: "aero-identity", Files: identityschema.Files, Logger: logger}); err != nil {
+		t.Fatal("owned Identity prerequisite bootstrap failed")
+	}
+	if err := dbbootstrap.Apply(ctx, db, dbbootstrap.Options{ServiceName: "aero-chat", Files: chatschema.Files, Logger: logger}); err != nil {
+		t.Fatal("owned Chat prerequisite bootstrap failed")
 	}
 	return db, cfg.ConnConfig.ConnString()
 }
@@ -196,7 +204,7 @@ func chatSenderReceiverProcess(t *testing.T, dsn string, m chatSenderMaterial) *
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		response, err := client.Get("http://" + public + "/readyz")
+		response, err := client.Get("http://" + public + "/healthz")
 		if err == nil {
 			_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 			_ = response.Body.Close()
@@ -206,7 +214,7 @@ func chatSenderReceiverProcess(t *testing.T, dsn string, m chatSenderMaterial) *
 		}
 		select {
 		case <-done:
-			t.Fatal("own RTC process exited before readiness")
+			t.Fatal("own RTC process exited before liveness")
 		case <-deadline.C:
 			t.Fatal("own RTC process startup deadline")
 		case <-ticker.C:
