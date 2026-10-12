@@ -87,7 +87,7 @@ func senderRTCFixture(t *testing.T, ctx context.Context) (*pgxpool.Pool, string)
 		t.Fatal("owned RTC pool unavailable")
 	}
 	t.Cleanup(db.Close)
-	// Production RTC bootstrap проверяет реальные registered prerequisite ledgers.
+	// Штатный запуск RTC проверяет реальные реестры миграций зависимых сервисов.
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if err := dbbootstrap.Apply(ctx, db, dbbootstrap.Options{ServiceName: "aero-identity", Files: identityschema.Files, Logger: logger}); err != nil {
 		t.Fatal("owned Identity prerequisite bootstrap failed")
