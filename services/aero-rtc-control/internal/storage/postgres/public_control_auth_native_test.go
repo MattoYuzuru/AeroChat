@@ -530,7 +530,7 @@ func controlNativeBodyBudgets(t *testing.T, f *publicControlNativeFixture) {
 			if err != nil {
 				t.Fatal("owned raw client")
 			}
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			_ = conn.SetDeadline(time.Now().Add(7 * time.Second))
 			started := time.Now()
 			if kind == "raw_header" {
@@ -603,7 +603,7 @@ func controlNativeKeepalive(t *testing.T, f *publicControlNativeFixture, operati
 	if err != nil {
 		t.Fatal("owned keepalive dial")
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(12 * time.Second))
 	reader := bufio.NewReader(conn)
 	for i := 0; i < 2; i++ {
@@ -650,12 +650,12 @@ func controlNativeOpaqueWriter(t *testing.T, f *publicControlNativeFixture) {
 	}
 	server := &http.Server{ReadHeaderTimeout: time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, MaxHeaderBytes: 8192, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(controlOpaqueWriter{inner: w}, r) })}
 	go func() { _ = server.Serve(listener) }()
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 	conn, err := net.DialTimeout("tcp", listener.Addr().String(), time.Second)
 	if err != nil {
 		t.Fatal("owned opaque connection")
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(6 * time.Second))
 	before := f.authority.resolve.Load()
 	started := time.Now()
@@ -882,7 +882,7 @@ func controlNativeRedirect(t *testing.T, f *publicControlNativeFixture) {
 		http.Redirect(w, r, f.identityURL+"/blocked-redirect", http.StatusTemporaryRedirect)
 	})}
 	go func() { _ = server.ServeTLS(listener, "", "") }()
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 	cfg := f.config
 	cfg.IdentityBaseURL = "https://" + listener.Addr().String()
 	client, err := downstream.NewPrivateAuthorityClient(cfg)
@@ -935,7 +935,7 @@ func controlNativeFinalSourceDeadline(t *testing.T, f *publicControlNativeFixtur
 	}
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, MaxHeaderBytes: 8192}
 	go func() { _ = server.Serve(listener) }()
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 	client := rc.NewGroupMediaControlServiceClient(controlNativeHTTPClient(t, 6*time.Second), "http://"+listener.Addr().String())
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
