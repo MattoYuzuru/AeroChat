@@ -103,7 +103,7 @@ func (h *handler) RegisterInstance(ctx context.Context, request *connect.Request
 	if parseErr != nil || result == nil || !result.ValidFor(parsed) {
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("registration unavailable"))
 	}
-	state := rtcadmissionv1.AdmissionInstanceState_ADMISSION_INSTANCE_STATE_UNSPECIFIED
+	var state rtcadmissionv1.AdmissionInstanceState
 	switch result.State {
 	case "active":
 		state = rtcadmissionv1.AdmissionInstanceState_ADMISSION_INSTANCE_STATE_ACTIVE
