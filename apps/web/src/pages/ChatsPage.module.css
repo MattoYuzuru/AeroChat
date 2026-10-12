@@ -1543,3 +1543,51 @@
     padding-block: 0;
   }
 }
+
+@media (min-height: 501px) and (max-width: 1179px) {
+  .threadLayout:has(> .pinnedStrip) {
+    --mobile-pin-padding-total: 0.9rem;
+    --mobile-composer-padding-total: 0.65rem;
+    /* Резерв учитывает max-height textarea и существующий mobile padding. */
+    grid-template-rows:
+      auto
+      minmax(calc(2.45rem + var(--mobile-pin-padding-total) + 1px), auto)
+      minmax(calc(3rem + var(--mobile-history-padding) + var(--mobile-history-padding) + 1px), 1fr)
+      minmax(calc(4.5rem + var(--mobile-composer-padding-total)), auto);
+  }
+
+  .threadLayout > .pinnedStrip,
+  .pinnedStrip > .pinnedRow {
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .pinnedStrip .pinnedCard {
+    height: 100%;
+    min-height: 2.45rem;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  .pinnedStrip .pinnedHeader {
+    gap: 0.25rem;
+  }
+
+  .pinnedStrip .pinnedHeader > strong {
+    white-space: nowrap;
+  }
+
+  .pinnedStrip .pinnedMeta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (min-height: 501px) and (max-width: 720px) {
+  .threadLayout:has(> .pinnedStrip) {
+    --mobile-pin-padding-total: 1.3rem;
+    --mobile-composer-padding-total: 1.3rem;
+  }
+}
