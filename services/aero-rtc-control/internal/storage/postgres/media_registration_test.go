@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	rtcschema "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/db/schema"
 	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/admission"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,15 +14,7 @@ import (
 
 func registrationDatabase(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	db := mediaTestDatabase(t)
-	schema, err := rtcschema.Files.ReadFile("000002_media_admission_instances.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(context.Background(), string(schema)); err != nil {
-		t.Fatal(err)
-	}
-	return db
+	return mediaTestDatabase(t)
 }
 func registrationActor(t *testing.T, ctx context.Context, db *pgxpool.Pool, suffix string) (*pgxpool.Pool, int32) {
 	t.Helper()
