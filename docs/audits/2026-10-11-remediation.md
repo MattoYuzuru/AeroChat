@@ -396,8 +396,8 @@ Actual320×568: pinned row166.984px, composer card20.797px, textarea63.438px;
 thread306.086px распределён на hero67.391/pin166.984/history71.398/composer0.3125.
 Полезная history48.6px сохраняется, focused textarea обрезан. Root независимо
 прочитал измерения/screenshot/receipt и проверил after-exit PID/PG/profile/port.
-Новый isolated mobile170 candidate готовит docs-first уточнение и faithful
-pinned/tombstone fixture; production CSS ещё не изменён, baseline RED впереди.
+После этого создан isolated mobile170 candidate с docs-first уточнением и
+faithful pinned/tombstone fixture; его результаты приведены ниже отдельно.
 
 `check-t2cc65xe` FAILED с четырьмя partial PASS, precise substep
 `peer-explicit-return-click`. Actual LeaveCall200/finished, ended tracks B,
@@ -420,10 +420,42 @@ Verified LiveKit/JWT source review подтвердил API/license и выяв�
 declared dependency bounds,61 отсутствующий exact go.mod и65 отсутствующих
 quartets. Это input/cache inventory, полный MVS graph ещё UNKNOWN. Root0135
 проверил compact109 rows, primary SHA и шесть retained byte comparisons;
-новых transitives/Go/ZIP/code не исполняли. Token profile остаётся Proposed:
+на этом этапе новые transitives/Go/ZIP/code не исполняли. Token profile остаётся Proposed:
 нужны явные JSON empty/null правила перед permissive RoomConfig decoder,
 deadline по actual TLS leaf.NotAfter и отказ от пустого configured secret.
-Следующий metadata-only graph plan готовится отдельно от двух seed assets.
+Metadata-only graph проверяется отдельно от двух seed assets.
+
+Mobile170 получил accepted ADR083 уточнение и семь faithful cases на том же
+production DOM/CSS: direct/self320, direct390/568/768/844, tombstone/long pin,
+обычный Tab, draft и rotation. До CSS baseline `check-labihil1` FAILED:
+7 cases,5 FAIL/2 PASS. Первый CSS candidate `ede8702` в `check-f73sj1ki`
+FAILED:3 FAIL/4 PASS; длинный pin уже помещался, но на320 textarea оставалась
+обрезанной сверху. Отдельный observer `check-73in56p6` сохранил те же7/3 FAIL:
+до Tab composer scrollTop0, после Tab19. Кнопка вложений первая в DOM,
+визуально находится во второй строке; для формы было99.578px вместо129px.
+Это объясняет смещение textarea на19px и обрезание её верхних8.609px.
+
+Узкий CSS commit `5516f8b` резервирует всю двухстрочную форму и уменьшает
+hero/pin padding и декоративный avatar только в narrow pinned conversation.
+Исходные семь cases, Tab-порядок и пороги не изменены. `check-wzninkn8` PASS:
+7/7,0 failures/errors/skips/page/cleanup errors, две измеренные ориентации
+каждого case. Actual320: composer137.594px, textarea281.219×67.734px полностью
+видима, полезная history48.6px сохранена. Root0152 независимо проверил XML,
+измерения, receipt SHA, clean5516, отсутствие11 known/observed PID и observed
+CFT PG, нулевые live exact-profile matches и закрытый25174. Каталог профиля
+сохранён; отсутствие живых процессов не означает удаление каталога. Это
+локальный faithful fixture PASS, whole WEB нового HEAD и native acceptance
+проверяются отдельно; historical FAIL не заменяются новым PASS.
+
+Metadata v1 `check-qqzltld1` остановился на exact baseline protobuf1.36.11,
+которого не было в109 max-bound inventory. После добавления только этой пары
+v2 `check-2tvprlzf` остановился на jwt/v5 v5.2.2: Go graph ещё требует lower
+require metadata. Root0153 подтвердил25 Go Wait/exit1, отсутствие всех PID/PG,
+неизменные8 scratch inputs/100 cache inputs/cleanA619 и отсутствие ZIP.
+Четыре official SumDB lookup и20 tiles получены; selected-module phase UNRUN.
+Это ограничение текущего read frontier, полный module/import graph пока не
+подтверждён. Дальнейший concrete require-edge inventory, Accepted token profile,
+package loading/build и provider integration остаются отдельными шагами.
 
 Owner штатно остановил runtime05: `check-_zlznsfr` PASS подтверждает setup/teardown
 и неизменность source261. Независимо проверены отсутствие пяти owned PID и
@@ -456,8 +488,9 @@ source checkout возвращает0. Это отдельный local authoriza
 
 До общей готовности остаются:
 
-- Разбор mobile320 geometry с pinned strip, затем unread/minimized и native200%
-  zoom; завершение actual 1:1 leave/rejoin/End/permission matrix. Двухаккаунтный
+- Whole WEB/mobile matrix после исправления mobile320 pinned composer, затем
+  fresh native geometry, unread/minimized и native200% zoom; завершение actual
+  1:1 leave/rejoin/End/permission matrix. Двухаккаунтный
   core21 и все12 media прошли, native two-way RTP/mute — отдельный partial PASS.
 - Завершение #176: проверенный public authorization adapter, pinned SFU/SDK,
   admission/revocation/cleanup, lazy UI с privacy warning и actual three-client audio.
