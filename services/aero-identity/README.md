@@ -72,7 +72,10 @@ headers8192; errors/logs static без source IDs/URL/keys.
 
 Single-inflight worker: общий5s claim→lookup/apply→CAS, recovery wake1s,
 capped1–30s backoff; constants начальные, без capacity benchmark. Crash/response
-loss доCAS восстанавливает own receipt lookup/replay, не меняет source revoke.
+loss доCAS восстанавливает own receipt lookup + обязательный canonical Apply
+replay под тем же5s: совпадают event/operation, conflict quarantine, invalid или
+different operation pending. Lookup по одному event ID не доказывает tuple.
+Source revoke не меняется.
 Shutdown cancels owned attempt; expired lease остаётся для durable takeover.
 Runtime enable/cert provisioning назначает owner отдельно, media flag нет.
 

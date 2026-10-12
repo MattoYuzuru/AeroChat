@@ -104,8 +104,14 @@ func (w *Worker) Step(parent context.Context) error {
 		return w.repository.Quarantine(ctx, *claim, "source_row_invalid")
 	}
 	var receipt Receipt
+	var recovered *Receipt
 	if claim.Attempt > 1 {
 		receipt, err = w.client.Lookup(ctx, claim.Event.ID)
+		if err == nil && receipt.ValidFor(claim.Event) {
+			copy := receipt
+			recovered = &copy
+			receipt, err = w.client.Apply(ctx, claim.Event)
+		}
 	} else {
 		err = ErrNotFound
 	}
@@ -115,7 +121,7 @@ func (w *Worker) Step(parent context.Context) error {
 	if errors.Is(err, ErrConflict) {
 		return w.repository.Quarantine(ctx, *claim, "canonical_conflict")
 	}
-	if err != nil || !receipt.ValidFor(claim.Event) {
+	if err != nil || !receipt.ValidFor(claim.Event) || recovered != nil && recovered.OperationID != receipt.OperationID {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

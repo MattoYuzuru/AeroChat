@@ -40,6 +40,7 @@ func (r *fakeRepository) Retry(_ context.Context, _ Claim, seconds int32) error 
 }
 
 type fakeClient struct {
+	lookupResult        *Receipt
 	result              Receipt
 	applyErr, lookupErr error
 	apply, lookup       int
@@ -56,6 +57,9 @@ func (c *fakeClient) Apply(ctx context.Context, _ Event) (Receipt, error) {
 }
 func (c *fakeClient) Lookup(context.Context, uuid.UUID) (Receipt, error) {
 	c.lookup++
+	if c.lookupResult != nil {
+		return *c.lookupResult, c.lookupErr
+	}
 	return c.result, c.lookupErr
 }
 func goodClaim() *Claim {
@@ -79,7 +83,7 @@ func TestDeliveryFirstAttemptAndRecoveredReceipt(t *testing.T) {
 		if r.completed != 1 || r.retry != 0 || r.reason != "" {
 			t.Fatal("durable receipt did not complete only journal")
 		}
-		if attempt == 1 && (c.apply != 1 || c.lookup != 0) || attempt == 2 && (c.apply != 0 || c.lookup != 1) {
+		if attempt == 1 && (c.apply != 1 || c.lookup != 0) || attempt == 2 && (c.apply != 1 || c.lookup != 1) {
 			t.Fatal("recovery did not use own receipt first")
 		}
 	}
@@ -161,5 +165,28 @@ func TestDeliveryExhaustionAndBackoff(t *testing.T) {
 		if attempt == math.MaxInt64 && value != 30 {
 			t.Fatal("retry must cap without shifting")
 		}
+	}
+}
+
+func TestDeliveryRecoveryRequiresMatchingCanonicalReplay(t *testing.T) {
+	r := &fakeRepository{claim: goodClaim()}
+	r.claim.Attempt = 2
+	found := goodReceipt(r.claim)
+	applied := found
+	applied.OperationID = uuid.New()
+	c := &fakeClient{result: applied, lookupResult: &found}
+	if err := workerFor(r, c).Step(context.Background()); !errors.Is(err, ErrUnavailable) {
+		t.Fatal("changed operation accepted")
+	}
+	if c.apply != 1 || c.lookup != 1 || r.completed != 0 || r.retry != 2 {
+		t.Fatal("lookup bypassed canonical replay")
+	}
+	c.applyErr = ErrConflict
+	r.retry = 0
+	if err := workerFor(r, c).Step(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if r.reason != "canonical_conflict" || r.completed != 0 || r.retry != 0 {
+		t.Fatal("recovered canonical conflict not quarantined")
 	}
 }

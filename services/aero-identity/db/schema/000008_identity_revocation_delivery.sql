@@ -28,6 +28,6 @@ CREATE TABLE identity_revocation_delivery (
 CREATE INDEX idx_identity_revocation_delivery_pending
     ON identity_revocation_delivery(next_attempt_at, event_id) WHERE state = 'pending';
 
--- Existing committed events не теряются при upgrade; producer payload не меняется.
+-- Уже сохранённые события не теряются при обновлении; исходные поля не меняются.
 INSERT INTO identity_revocation_delivery(event_id)
 SELECT id FROM identity_authority_revocation_outbox;
