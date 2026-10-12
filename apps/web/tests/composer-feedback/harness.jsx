@@ -13,8 +13,9 @@ import '../../src/styles/global.css';
 
 let calls = 0, failures = 0;
 const noop = () => {};
-const chats = {state: {actionErrorMessage: null}, clearFeedback: noop};
+const chats = {state: {actionErrorMessage: null, isSendingMessage: false}, clearFeedback: noop};
 const cryptoRuntime = {
+  state: {isActionPending: false},
   async sendEncryptedDirectMessageV2Content() {
     calls++;
     const mode = new URLSearchParams(location.search).get('mode');
@@ -23,12 +24,12 @@ const cryptoRuntime = {
     throw new Error('Fixture must return an actual 503');
   },
 };
-const encryptedMediaAttachmentDraft = {markSendFailed() {failures++;}, markSendSucceeded: noop};
+const encryptedMediaAttachmentDraft = {isUploading: false, markSendFailed() {failures++;}, markSendSucceeded: noop};
 
 function Conversation() {
   const session = useProductionComposer({chats, cryptoRuntime, encryptedMediaAttachmentDraft});
   const [actions, setActions] = useState(0);
-  window.feedback = {report: () => ({calls, failures, text: session.composerText, error: session.composerError, actions})};
+  window.feedback = {report: () => ({calls, failures, text: session.composerText, error: session.composerError, pending: session.pending, actions})};
   return <div className={s.layout}>
     <section className={s.heroCard} data-mobile-hidden="true" />
     <div className={s.workspace} data-mobile-thread-active="true">

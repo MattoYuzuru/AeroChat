@@ -17,6 +17,8 @@ function slice(startText, endText) {
 }
 const send = slice('  async function handleEncryptedDirectMessageV2Send()', '  async function handleDeleteEncryptedDirectMessageV2(');
 const submit = slice('  async function handleComposerSubmit(', '  function handleBackToChatsList()');
+const sendingState = slice('  const [isComposerSending', '  const [composerError');
+const completion = slice('  const composerCompletionRef = useRef(', '  const activeReadStatusLabel');
 const textarea = source.indexOf('<textarea', source.indexOf('<DirectComposerFeedback'));
 const changeStart = source.indexOf('                          onChange={(event) => {', textarea);
 const changeEnd = source.indexOf('                          }}', changeStart);
@@ -30,20 +32,23 @@ assert.equal((source.match(/!hasActiveComposer && composerFeedbackMessage/g) ?? 
 assert.match(source, /const hasActiveComposer =\s*selectedThread !== null &&\s*chats.state.threadStatus === "ready" &&\s*directWindowContentMode === "thread";/);
 
 const virtual = ts.transpileModule(`
-import {useId,useRef,useState} from 'react';
+import {useId,useLayoutEffect,useRef,useState} from 'react';
 import {DirectComposerFeedback} from '${web}src/chats/DirectComposerFeedback.tsx';
 import {normalizeComposerMessageText} from '${web}src/attachments/message-content.ts';
 export function useProductionComposer({chats,cryptoRuntime,encryptedMediaAttachmentDraft}) {
  const [composerText,setComposerText]=useState('');
+ ${sendingState}
  const [composerError,setComposerError]=useState(null);
  const composerFeedbackId=useId(),composerViewportRef=useRef(null);
  const selectedThread={chat:{id:'fixture-chat'}}, uploadedEncryptedAttachmentDraft=null;
  const editingEncryptedEntry=null,selectedEncryptedReplyEntry=null;
+ const selectedEncryptedReplyMessageId=null,editingEncryptedMessageId=null;
  const setSelectedEncryptedReplyMessageId=()=>{},setEditingEncryptedMessageId=()=>{};
  const publishLocalEncryptedDirectMessageV2Projection=()=>{};
+ ${completion}
  ${send}\n${submit}
  const composerFeedbackMessage=composerError ?? chats.state.actionErrorMessage;
- return {composerText,composerError,composerFeedbackMessage,composerFeedbackId,composerViewportRef,isPageVisible:true,
+ return {composerText,composerError,composerFeedbackMessage,composerFeedbackId,composerViewportRef,isPageVisible:true,pending:isComposerSending,
    handleComposerSubmit,handleComposerKeyDown,onChange:event=>{${changeBody}}};
 }
 export function FeedbackSite({composerFeedbackId,composerFeedbackMessage,composerViewportRef,isPageVisible,styles}) {
@@ -158,6 +163,7 @@ try {
       assert.equal(await input.inputValue(), draft + '!');
       assert.equal((await page.evaluate(() => window.feedback.report())).calls, 1);
       assert.equal((await page.evaluate(() => window.feedback.report())).failures, 1);
+      assert.equal((await page.evaluate(() => window.feedback.report())).pending, false, 'versioned send lock released after refusal');
       assert.deepEqual(errors, [], 'no actual browser errors');
       evidence.push({width,height,lane,mode,status:503,shown,naturalTab:true,draftRetained:true,errorCleared:true});
     }
