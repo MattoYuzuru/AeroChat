@@ -350,6 +350,43 @@ wrapper/Node/CFT PID, три process groups и profiles отсутствуют, 
 для отдельного layout/unread прогона. Native zoom/RTP и итоговая приёмка
 остаются отдельными checks.
 
+Первый отдельный layout/unread `check-l2gu7qj_` FAILED на
+`layout-direct-320x568`: AssertionError до сохранения первой geometry,
+stages0/cleanupErrors0. На actual screenshot composer частично обрезан;
+точная неудачная проверка и размеры пока неизвестны. Ни одного WM request
+не было, unread/minimized не заявляются. Source audit выявил пробел покрытия:
+historical mobile fixture не содержит pinned strip, который присутствовал
+в actual UI как tombstone закреплённого сообщения. Новый private diagnostic
+source сохраняет geometry до assertions; production fix ещё не выбирался.
+
+Native 1:1 `check-wghgj4yc` FAILED на remote leave/rejoin timeout. Сохранены
+четыре actual partial PASS: call strip layout/keyboard, start/join,
+двустороннее native RTP и mute/unmute. Actual UDP own-host pair передал
+14460/14701 bytes и57600/57120 samples в обоих направлениях. Это synthetic
+WAV capture, не слышимость реальных устройств и не group audio. Повторное
+присоединение, audio после return, creator End и permission denial ещё не
+прошли. Root проверил actual JSON; source/screenshot показывают кандидат
+ошибки locator: после authoritative Leave UI предлагает «Присоединиться»,
+а driver ждёт «Вернуться». Перед этим есть другие waits, поэтому точный
+failed await требует отдельного безопасного witness. Source diagnostic
+сохраняет все assertions и добавляет substeps. Native 200% zoom остаётся
+UNRUN: необходимый360s reserve в фиксированном runtime06 закончился.
+
+Owner STOP runtime06 `check-joyw54gc` PASS подтверждает только setup/teardown.
+Root независимо проверил отсутствие всех пяти native PID/common group,
+закрытые28890–93/25173 и неизменность десяти объектов main9. DB06/bucket06,
+profiles и все FAIL/PASS сохранены. Следующий diagnostic07 пока SOURCE ONLY;
+он использует тот же verified3f63 bundle/binaries и retained fixtures, не
+переносит core33 PASS на новый runtime и не продлевает runtime06.
+
+Отдельный artifact acquisition `check-e8nky7bo` PASS проверил только exact
+LiveKit protocol `v1.52.2-0.20261007103317-a935cd67c29a` и JWT/v5 `v5.3.1`
+штатным Go1.27 signed SumDB/h1 verifier. Двадцать official direct HTTP200,
+12 tiles/10 bounded verifier starts, последний exit0; Go Wait/PID/PG и
+actual info/mod/zip/ziphash SHA независимо сверены root. Closure, API/MVS,
+provider build и group audio ещё не проверены; GitHub403 publication guard
+сохраняется. Transitives автоматически не скачивались.
+
 Owner штатно остановил runtime05: `check-_zlznsfr` PASS подтверждает setup/teardown
 и неизменность source261. Независимо проверены отсутствие пяти owned PID и
 их process group, закрытые native/preview ports и неизменность main9. DB05,
@@ -381,8 +418,9 @@ source checkout возвращает0. Это отдельный local authoriza
 
 До общей готовности остаются:
 
-- Unread/minimized, responsive/focus, native 200% zoom и actual 1:1 RTP;
-  двухаккаунтный core21 и все12 direct/self/group media roundtrips прошли.
+- Разбор mobile320 geometry с pinned strip, затем unread/minimized и native200%
+  zoom; завершение actual 1:1 leave/rejoin/End/permission matrix. Двухаккаунтный
+  core21 и все12 media прошли, native two-way RTP/mute — отдельный partial PASS.
 - Завершение #176: проверенный public authorization adapter, pinned SFU/SDK,
   admission/revocation/cleanup, lazy UI с privacy warning и actual three-client audio.
 - Итоговый integration SHA, release/restore/security gates, актуальные screenshots
