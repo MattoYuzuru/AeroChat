@@ -16,7 +16,7 @@ import (
 func loadRevocationDeliveryConfig() (rtcrevocation.Config, error) {
 	enabled, err := strconv.ParseBool(lookupString("AERO_CHAT_RTC_REVOCATION_DELIVERY_ENABLED", "false"))
 	if err != nil {
-		return rtcrevocation.Config{}, errors.New("Chat source delivery enabled flag invalid")
+		return rtcrevocation.Config{}, errors.New("chat source delivery enabled flag invalid")
 	}
 	cfg := rtcrevocation.Config{Enabled: enabled, BaseURL: lookupString("AERO_CHAT_RTC_REVOCATION_DELIVERY_BASE_URL", ""), ServerCAFile: lookupString("AERO_CHAT_RTC_REVOCATION_DELIVERY_SERVER_CA_FILE", ""), TLSCertFile: lookupString("AERO_CHAT_RTC_REVOCATION_DELIVERY_TLS_CERT_FILE", ""), TLSKeyFile: lookupString("AERO_CHAT_RTC_REVOCATION_DELIVERY_TLS_KEY_FILE", "")}
 	return cfg, cfg.Validate()

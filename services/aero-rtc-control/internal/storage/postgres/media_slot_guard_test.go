@@ -93,7 +93,7 @@ func TestMediaSlotGuardBothDirectionsAndOrphanRepair(t *testing.T) {
 			store := NewMediaStoreWithMediaSlotGuard(db)
 			g := mustMediaReserve(t, store, mediaTestRequest(call, group, user))
 			if ended {
-				if _, err := db.Exec(context.Background(), "UPDATE rtc_calls SET status='ended',ended_at=now() WHERE id=$1", call); err != nil {
+				if _, err := db.Exec(context.Background(), "UPDATE rtc_calls SET status='ended',ended_at=now(),end_reason='manual' WHERE id=$1", call); err != nil {
 					t.Fatal(err)
 				}
 			} else {
@@ -306,7 +306,7 @@ func TestMediaSlotGuardDatabaseFaultAtomicOrphanRollback(t *testing.T) {
 	old, _, user := mediaTestCall(t, db)
 	next := uuid.New()
 	ctx := context.Background()
-	if _, err := db.Exec(ctx, "UPDATE rtc_calls SET status='ended',ended_at=now() WHERE id=$1", old); err != nil {
+	if _, err := db.Exec(ctx, "UPDATE rtc_calls SET status='ended',ended_at=now(),end_reason='manual' WHERE id=$1", old); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, "CREATE FUNCTION guard_fault() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'private-fixture-marker'; END$$; CREATE TRIGGER guard_fault AFTER INSERT ON rtc_call_participants FOR EACH ROW EXECUTE FUNCTION guard_fault()"); err != nil {
@@ -356,14 +356,14 @@ func TestMediaSlotGuardFlagOffAndAllActionCompletionBoundary(t *testing.T) {
 		t.Fatal("legacy leave hid held grant", err)
 	}
 	// Fixture создаёт новый active source binding для проверки storage ACK, не real SFU proof.
-	if _, err := db.Exec(ctx, "UPDATE rtc_calls SET status='active',ended_at=NULL WHERE id=$1;", call); err != nil {
+	if _, err := db.Exec(ctx, "UPDATE rtc_calls SET status='active',ended_at=NULL,ended_by_user_id=NULL,end_reason=NULL WHERE id=$1;", call); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, "UPDATE rtc_call_participants SET state='active',left_at=NULL WHERE id=$1", g.ParticipantID); err != nil {
 		t.Fatal(err)
 	}
 	// Новый held lease той же generation нужен, чтобы оба cleanup actions были required.
-	lease, err = store.RegisterLease(ctx, g.Key, g.Authority, uuid.New(), media.Owner{ID: uuid.New(), Fence: 2}, time.Now())
+	_, err = store.RegisterLease(ctx, g.Key, g.Authority, uuid.New(), media.Owner{ID: uuid.New(), Fence: 2}, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

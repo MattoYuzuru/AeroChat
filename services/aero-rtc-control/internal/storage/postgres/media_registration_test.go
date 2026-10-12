@@ -2,8 +2,11 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,6 +34,232 @@ func registrationActor(t *testing.T, ctx context.Context, db *pgxpool.Pool, suff
 		t.Fatal(err)
 	}
 	return actor, pid
+}
+
+type registrationLockActor struct {
+	pid         int32
+	application string
+}
+
+type registrationObservedLock struct {
+	Type          string `json:"type"`
+	Mode          string `json:"mode"`
+	Relation      uint32 `json:"relation"`
+	TransactionID string `json:"transaction_id"`
+	VirtualXID    string `json:"virtual_xid"`
+	Granted       bool   `json:"granted"`
+}
+
+type registrationLockNode struct {
+	PID         int32
+	Application string
+	Database    string
+	State       string
+	WaitType    string
+	WaitEvent   string
+	Blockers    []int32
+	Locks       []registrationObservedLock
+}
+
+// Direct blocker не обязан быть locker: worker может ждать другого owned worker.
+func registrationLockPaths(nodes []registrationLockNode, locker registrationLockActor, actors []registrationLockActor, database string, fenceOID uint32) (map[int32][]int32, string) {
+	if len(actors) != 2 || len(nodes) != 3 || fenceOID == 0 {
+		return nil, "exact owned root and two workers required"
+	}
+	expected := map[int32]string{locker.pid: locker.application}
+	if locker.pid <= 0 || locker.application == "" || database == "" {
+		return nil, "invalid root identity"
+	}
+	for _, actor := range actors {
+		if actor.pid <= 0 || actor.application == "" {
+			return nil, "invalid worker identity"
+		}
+		if _, exists := expected[actor.pid]; exists {
+			return nil, "duplicate owned pid"
+		}
+		expected[actor.pid] = actor.application
+	}
+	byPID := make(map[int32]registrationLockNode, 3)
+	for _, node := range nodes {
+		application, exists := expected[node.PID]
+		if !exists || node.Application != application || node.Database != database {
+			return nil, "database/application identity mismatch"
+		}
+		if _, duplicate := byPID[node.PID]; duplicate {
+			return nil, "duplicate observed pid"
+		}
+		byPID[node.PID] = node
+	}
+	root := byPID[locker.pid]
+	if len(root.Blockers) != 0 {
+		return nil, "root locker is not terminal"
+	}
+	rootFence := false
+	for _, lock := range root.Locks {
+		if lock.Granted && lock.Type == "relation" && lock.Relation == fenceOID && lock.Mode == "RowShareLock" {
+			rootFence = true
+		}
+	}
+	if !rootFence {
+		return nil, "root fence relation lock not observed"
+	}
+	for _, actor := range actors {
+		node := byPID[actor.pid]
+		if node.State != "active" || node.WaitType != "Lock" || len(node.Blockers) == 0 {
+			return nil, "worker is not executing a blocked lock request"
+		}
+		waitingLock := false
+		for _, lock := range node.Locks {
+			if lock.Granted {
+				continue
+			}
+			if (lock.Type == "tuple" && lock.Relation == fenceOID) ||
+				(lock.Type == "transactionid" && lock.TransactionID != "") ||
+				(lock.Type == "virtualxid" && lock.VirtualXID != "") {
+				waitingLock = true
+			}
+		}
+		if !waitingLock {
+			return nil, "worker ungranted fence row/transaction lock not observed"
+		}
+		for _, blocker := range node.Blockers {
+			if _, owned := expected[blocker]; !owned || blocker == node.PID {
+				return nil, "zero/foreign/self blocker rejected"
+			}
+		}
+	}
+	paths := make(map[int32][]int32, 2)
+	var walk func(int32, map[int32]bool) ([]int32, bool)
+	walk = func(pid int32, visited map[int32]bool) ([]int32, bool) {
+		if pid == locker.pid {
+			return []int32{pid}, true
+		}
+		if visited[pid] {
+			return nil, false
+		}
+		visited[pid] = true
+		defer delete(visited, pid)
+		var witness []int32
+		for _, blocker := range byPID[pid].Blockers {
+			path, reachesRoot := walk(blocker, visited)
+			if !reachesRoot {
+				return nil, false
+			}
+			if witness == nil {
+				witness = append([]int32{pid}, path...)
+			}
+		}
+		return witness, witness != nil
+	}
+	for _, actor := range actors {
+		path, reachesRoot := walk(actor.pid, make(map[int32]bool, 3))
+		if !reachesRoot {
+			return nil, "cycle or disconnected worker path"
+		}
+		paths[actor.pid] = path
+	}
+	return paths, ""
+}
+
+func registrationLockWitness(nodes []registrationLockNode, paths map[int32][]int32, reason string) string {
+	// Исключаем query text, credentials и domain payload: только PID/lock metadata.
+	type nodeWitness struct {
+		PID       int32                      `json:"pid"`
+		State     string                     `json:"state"`
+		WaitType  string                     `json:"wait_type"`
+		WaitEvent string                     `json:"wait_event"`
+		Blockers  []int32                    `json:"blockers"`
+		Locks     []registrationObservedLock `json:"locks"`
+	}
+	witness := make([]nodeWitness, 0, len(nodes))
+	for _, node := range nodes {
+		witness = append(witness, nodeWitness{node.PID, node.State, node.WaitType, node.WaitEvent, node.Blockers, node.Locks})
+	}
+	encoded, err := json.Marshal(struct {
+		Nodes  []nodeWitness     `json:"nodes"`
+		Paths  map[int32][]int32 `json:"paths"`
+		Reason string            `json:"reason"`
+	}{witness, paths, reason})
+	if err != nil {
+		return "lock metadata encoding failed"
+	}
+	return string(encoded)
+}
+
+func registrationConcurrentWait(t *testing.T, ctx context.Context, db *pgxpool.Pool, locker int32, actors ...registrationLockActor) {
+	t.Helper()
+	root := registrationLockActor{locker, db.Config().ConnConfig.RuntimeParams["application_name"]}
+	pids := []int32{locker}
+	for _, actor := range actors {
+		pids = append(pids, actor.pid)
+	}
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	deadline := time.NewTimer(3 * time.Second)
+	defer deadline.Stop()
+	var fenceOID uint32
+	if err := db.QueryRow(ctx, "SELECT 'rtc_admission_fence'::regclass::oid").Scan(&fenceOID); err != nil {
+		t.Fatal("registration fence relation identity unavailable")
+	}
+	last := "no lock sample"
+	for {
+		rows, err := db.Query(ctx, `SELECT a.pid,a.application_name,a.datname,a.state,
+COALESCE(a.wait_event_type,''),COALESCE(a.wait_event,''),pg_blocking_pids(a.pid),
+COALESCE((SELECT jsonb_agg(jsonb_build_object('type',l.locktype,'mode',l.mode,
+'relation',l.relation::bigint,'transaction_id',COALESCE(l.transactionid::text,''),
+'virtual_xid',COALESCE(l.virtualxid,''),'granted',l.granted))
+FROM pg_locks l WHERE l.pid=a.pid AND l.locktype IN ('relation','tuple','transactionid','virtualxid')), '[]'::jsonb)
+FROM pg_stat_activity a WHERE a.pid=ANY($1::int[]) ORDER BY a.pid`, pids)
+		if err != nil {
+			t.Fatalf("registration lock sample failed; last=%s", last)
+		}
+		nodes := make([]registrationLockNode, 0, 3)
+		for rows.Next() {
+			var node registrationLockNode
+			var locksJSON []byte
+			if err := rows.Scan(&node.PID, &node.Application, &node.Database, &node.State, &node.WaitType, &node.WaitEvent, &node.Blockers, &locksJSON); err != nil {
+				rows.Close()
+				t.Fatal("registration lock sample decode failed")
+			}
+			if err := json.Unmarshal(locksJSON, &node.Locks); err != nil {
+				rows.Close()
+				var typeError *json.UnmarshalTypeError
+				if errors.As(err, &typeError) {
+					kind := "unknown"
+					switch typeError.Value {
+					case "string", "bool", "array", "object", "null":
+						kind = typeError.Value
+					default:
+						if strings.HasPrefix(typeError.Value, "number ") {
+							kind = "number"
+						}
+					}
+					t.Fatalf("registration lock metadata decode failed; field=%s json_kind=%s go_type=%s", typeError.Field, kind, typeError.Type)
+				}
+				t.Fatal("registration lock metadata decode failed")
+			}
+			sort.Slice(node.Blockers, func(i, j int) bool { return node.Blockers[i] < node.Blockers[j] })
+			nodes = append(nodes, node)
+		}
+		readErr := rows.Err()
+		rows.Close()
+		if readErr != nil {
+			t.Fatal("registration lock sample read failed")
+		}
+		paths, reason := registrationLockPaths(nodes, root, actors, db.Config().ConnConfig.Database, fenceOID)
+		last = registrationLockWitness(nodes, paths, reason)
+		if reason == "" {
+			t.Logf("owned registration lock graph: %s", last)
+			return
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("registration lock context canceled; last=%s", last)
+		case <-deadline.C:
+			t.Fatalf("owned registration locks not observed; last=%s", last)
+		case <-ticker.C:
+		}
+	}
 }
 func registrationWait(t *testing.T, ctx context.Context, db *pgxpool.Pool, locker int32, pids ...int32) {
 	t.Helper()
@@ -93,7 +322,7 @@ func TestAdmissionRegistrationConcurrentReplayAndDistinctNonce(t *testing.T) {
 			results <- result{i, e}
 		}(actor)
 	}
-	registrationWait(t, ctx, db, locker, pidA, pidB)
+	registrationConcurrentWait(t, ctx, db, locker, registrationLockActor{pidA, a.Config().ConnConfig.RuntimeParams["application_name"]}, registrationLockActor{pidB, b.Config().ConnConfig.RuntimeParams["application_name"]})
 	if err := lock.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +370,7 @@ func TestAdmissionRegistrationConcurrentReplayAndDistinctNonce(t *testing.T) {
 			results <- result{i, e}
 		}(actor)
 	}
-	registrationWait(t, ctx, db, locker, pidA, pidB)
+	registrationConcurrentWait(t, ctx, db, locker, registrationLockActor{pidA, a.Config().ConnConfig.RuntimeParams["application_name"]}, registrationLockActor{pidB, b.Config().ConnConfig.RuntimeParams["application_name"]})
 	if err := lock2.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
