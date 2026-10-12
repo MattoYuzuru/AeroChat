@@ -3,7 +3,7 @@
 - Статус: Accepted scope — coordinator разрешил source-only реализацию 2026-10-12 по уточнению [ADR-089](../adr/089-group-audio-sfu-and-admission-boundary.md#local-call-capture-ownership--accepted-clarification); выполнение checks и публикация требуют отдельного exact-source review/window.
 - Задача: [#176](https://github.com/MattoYuzuru/AeroChat/issues/176), отдельный frontend foundation slice.
 - Исходный pin: `dc46673c6aeb0527ae1cd67ebe7d3aca1ca0cdbf`, local integration assembly. Этот whole candidate ещё UNVERIFIED; receipts прежних source pins на новый scope не переносятся.
-- Нет source implementation, SDK/group media activation или выполненных проверок в этом planning checkpoint.
+- Source-only foundation candidate подготовлен после отдельного Accepted docs commit; unit/browser fixtures не исполнялись. SDK/group media activation отсутствует, checks/publication остаются отдельным exact-source checkpoint.
 
 ## Цель и границы
 
@@ -29,7 +29,7 @@ Paths без префикса в таблице относительно `apps/w
 ## Local contract
 
 1. Один stable coordinator у app provider, без module-global singleton и per-user occupied map. Один old pending capture блокирует новый account до own cleanup/settlement.
-2. Scope: direct/group, opaque user ID, локальная opaque auth epoch, opaque hook/window owner, chat/group ID, runtime generation. Call ID до Start ответа nullable; actual response связывается с той же lease, а не создаёт новую. Browser epoch не server session/grant generation. Bearer/JWT не сохранять в coordinator, snapshots, logs или storage.
+2. Scope: direct/group, opaque user ID, локальная opaque auth epoch, opaque hook/window owner, chat/group ID, runtime generation. Call ID до Start ответа nullable и остаётся в existing runtime refs/state; actual response использует ту же lease, а не создаёт новую. Browser epoch не server session/grant generation. Bearer/JWT не сохранять в coordinator, snapshots, logs или storage.
 3. Synchronous acquire перед getUserMedia/SDK factory. Owner token уникален per attempt; phase/release compare-and-match только своего token. Busy result использует существующую failure surface и не вызывает capture/RPC/auto-leave чужого owner.
 4. Состояния `capture_pending → retained → closing → released`. Retained только после actual matching stream adoption. Stable subscription уведомляет другие окна о truthful availability; coordinator хранит arbitration metadata, сами MediaStream/PC/SDK handles остаются у runtime.
 5. Auth epoch меняется при account/token boundary как existing direct cleanup; старый owner становится closing, не стирается без track stop/late settlement. Stale finally/onended/StrictMode cleanup не выпускает новый owner.
@@ -38,13 +38,13 @@ Paths без префикса в таблице относительно `apps/w
 
 Existing pending join acquisition и generation guards сохраняются. Local lease берётся между `joinCoordinator.acquire` и `ensureLocalAudioStream`; при busy pending lease освобождается existing finally. Успешный start/join finally продолжает release **pending** lease, а local lease остаётся retained. Повторное использование своего stream требует matching retained owner.
 
-Добавить один identity-safe cleanup path для local lease в existing full disposal и start/join error branches: generation invalidate → own stop → release после settlement. Leave/end уже вызывают own teardown до queued backend mutation; этот порядок сохранить. Account/token/chat/unmount/disabled используют existing cleanup. Peer reset/remote departure/mute/minimize не выпускают local lease. Track ended сам по себе не означает completed call/backend cleanup; освобождение проходит full runtime teardown с учётом pending continuations.
+Добавить один identity-safe cleanup path для local lease в existing full disposal и start/join error branches: generation invalidate → own stop → release после settlement. Leave/end уже вызывают own teardown до queued backend mutation; этот порядок сохранить. Account/token/chat/unmount/disabled используют тот же cleanup effect с layout timing: invalidation происходит при committed scope boundary до late promise continuation. Peer reset/remote departure/mute/minimize не выпускают local lease. Track ended сам по себе не означает completed call/backend cleanup; освобождение проходит full runtime teardown с учётом pending continuations.
 
 Capture promise не имеет existing abort API. Cancel/unmount запрещают adoption, останавливают уже полученные tracks; slot остаётся closing до settlement. Late resolved tracks останавливаются немедленно, затем release matching owner. Не сбрасывать slot по timer или отсутствию stream ref. Permission prompt может долго не завершиться: это truthful closing, не fake successful cleanup. Pending join/late RPC compensation завершаются отдельно; local free не является authoritative operation-complete.
 
 Будущий group adapter отдельно: privacy до join/capture, acquire до любых SDK capture helpers, собственные tracks.stop **до** async disconnect/leave, cleanup поздних factory/publication results. Reconnect/mute/track replacement не создают новый local call owner. Matching persistent publication budget и server ACK — отдельные prerequisites; никакие SDK интерфейсы здесь не угадываются.
 
-## Предполагаемые файлы после code authorization
+## Области source candidate после code authorization
 
 - Новый `apps/web/src/rtc/local-call-capture-owner.ts` и pure unit tests.
 - Узкие context property, hook option/ref/cleanup в `rtc/context.tsx`, `rtc/useDirectCallSession.ts` и wiring `pages/ChatsPage.tsx`.

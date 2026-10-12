@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { resolveGatewayBaseUrl } from "../gateway/client";
 import { gatewayClient } from "../gateway/runtime";
 import {
@@ -16,6 +16,12 @@ import {
 } from "../realtime/events";
 import type { DirectCallAwarenessEntry } from "./awareness";
 import type { DirectCallJoinCoordinator, DirectCallJoinLease } from "./join-coordinator";
+import {
+  describeLocalCallCaptureConflict,
+  type LocalCallCaptureLease,
+  type LocalCallCaptureOwner,
+  type LocalCallCaptureSnapshot,
+} from "./local-call-capture-owner";
 import {
   applyDirectCallTrackContentHint,
   buildDirectCallAudioConstraints,
@@ -57,6 +63,8 @@ const directCallDisconnectRecoveryGraceMs = 8_000;
 
 interface UseDirectCallSessionOptions {
   joinCoordinator: DirectCallJoinCoordinator;
+  localCaptureOwner: LocalCallCaptureOwner;
+  captureAuthEpoch: symbol | null;
   enabled: boolean;
   token: string;
   chat: DirectChat | null;
@@ -101,6 +109,8 @@ export function useDirectCallSession(
     currentUserId,
     enabled,
     joinCoordinator,
+    localCaptureOwner,
+    captureAuthEpoch,
     onUnauthenticated,
     refreshDirectChatCall,
     token,
@@ -117,6 +127,14 @@ export function useDirectCallSession(
   const stateRef = useRef(state);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const localCaptureLeaseRef = useRef<LocalCallCaptureLease | null>(null);
+  const [dismissedCaptureSnapshot, setDismissedCaptureSnapshot] =
+    useState<LocalCallCaptureSnapshot | null>(null);
+  const captureSnapshot = useSyncExternalStore(
+    localCaptureOwner.subscribe,
+    localCaptureOwner.getSnapshot,
+    localCaptureOwner.getSnapshot,
+  );
   const localJoinedCallIdRef = useRef<string | null>(null);
   const runtimeGenerationRef = useRef(0);
   const pendingJoinGenerationRef = useRef<number | null>(null);
@@ -237,8 +255,15 @@ export function useDirectCallSession(
     setHasLiveMicrophone(false);
   }, []);
 
+  const releaseLocalCapture = useCallback((lease: LocalCallCaptureLease) => {
+    if (localCaptureLeaseRef.current === lease) localCaptureLeaseRef.current = null;
+    lease.release();
+  }, []);
+
   const disposeLocalRuntime = useCallback(() => {
     runtimeGenerationRef.current += 1;
+    const captureLease = localCaptureLeaseRef.current;
+    captureLease?.close();
     if (pendingJoinGenerationRef.current !== null) {
       pendingJoinGenerationRef.current = null;
       dispatch({ type: "action_finished" });
@@ -257,8 +282,9 @@ export function useDirectCallSession(
     remoteStreamRef.current = null;
     pendingRemoteICECandidatesRef.current = [];
     setRemoteAudioStream(null);
+    if (captureLease !== null) releaseLocalCapture(captureLease);
     dispatch({ type: "local_left" });
-  }, [clearDisconnectRecoveryTimer, clearPeerRecoveryPlan, resetMicrophoneMute]);
+  }, [clearDisconnectRecoveryTimer, clearPeerRecoveryPlan, releaseLocalCapture, resetMicrophoneMute]);
 
   const scheduleDisconnectedPeerRecovery = useCallback(
     (peerConnection: RTCPeerConnection) => {
@@ -296,8 +322,14 @@ export function useDirectCallSession(
     return describeGatewayError(error, fallbackMessage);
   }, [onUnauthenticated]);
 
-  const ensureLocalAudioStream = useCallback(async (generation: number): Promise<MediaStream> => {
+  const ensureLocalAudioStream = useCallback(async (
+    generation: number,
+    captureLease: LocalCallCaptureLease,
+  ): Promise<MediaStream> => {
     if (localStreamRef.current !== null) {
+      if (localCaptureLeaseRef.current !== captureLease || !captureLease.retain()) {
+        throw new Error("Локальное владение микрофоном звонка изменилось.");
+      }
       return localStreamRef.current;
     }
 
@@ -345,7 +377,8 @@ export function useDirectCallSession(
           navigator.mediaDevices.getSupportedConstraints?.() ?? {},
         ),
       });
-      if (runtimeGenerationRef.current !== generation) {
+      if (runtimeGenerationRef.current !== generation ||
+        localCaptureLeaseRef.current !== captureLease || !captureLease.retain()) {
         teardownDirectCallRuntime({ localStream: stream, peerConnection: null, remoteStream: null });
         throw new Error("Запуск звонка отменён после смены локальной сессии.");
       }
@@ -892,7 +925,7 @@ export function useDirectCallSession(
   }
 
   async function startCall() {
-    if (!sessionActiveRef.current || !enabled || chat === null || !isDirectChatSupported || pendingJoinGenerationRef.current !== null) {
+    if (!sessionActiveRef.current || !enabled || captureAuthEpoch === null || chat === null || !isDirectChatSupported || pendingJoinGenerationRef.current !== null) {
       return;
     }
 
@@ -903,14 +936,33 @@ export function useDirectCallSession(
       return;
     }
     const lease = acquisition.lease;
-
-    const generation = ++runtimeGenerationRef.current;
+    const generation = runtimeGenerationRef.current + 1;
+    const captureAcquisition = localCaptureOwner.acquire({
+      kind: "direct",
+      userId: currentUserId,
+      authEpoch: captureAuthEpoch,
+      scopeId: chat.id,
+      generation,
+    });
+    if (captureAcquisition.lease === null) {
+      lease.release();
+      if (localCaptureOwner.getSnapshot() === null) {
+        dispatch({ type: "failure", message: captureAcquisition.message });
+      } else {
+        setDismissedCaptureSnapshot(null);
+      }
+      return;
+    }
+    const captureLease = captureAcquisition.lease;
+    localCaptureLeaseRef.current = captureLease;
+    runtimeGenerationRef.current = generation;
     pendingJoinGenerationRef.current = generation;
     dispatch({ type: "action_started", actionState: "starting" });
 
     let localStream: MediaStream | null = null;
+    let keepLocalCapture = false;
     try {
-      localStream = await ensureLocalAudioStream(generation);
+      localStream = await ensureLocalAudioStream(generation, captureLease);
       await refreshRTCConfiguration();
       if (runtimeGenerationRef.current !== generation) {
         return;
@@ -926,11 +978,14 @@ export function useDirectCallSession(
       dispatch({ type: "action_finished" });
       localStreamRef.current = localStream;
       await bootstrapJoinedCall(response.call, response.selfParticipant);
+      keepLocalCapture = runtimeGenerationRef.current === generation &&
+        localCaptureLeaseRef.current === captureLease && captureLease.isCurrent();
     } catch (error) {
       if (runtimeGenerationRef.current !== generation) {
         return;
       }
       if (localStream !== null) {
+        captureLease.close();
         clearPeerRecoveryPlan();
         teardownDirectCallRuntime({
           localStream: localStreamRef.current ?? localStream,
@@ -969,10 +1024,12 @@ export function useDirectCallSession(
         message: describeError(error, "Не удалось начать аудиозвонок."),
       });
     } finally {
+      if (!keepLocalCapture) releaseLocalCapture(captureLease);
       lease.release();
       if (pendingJoinGenerationRef.current === generation) {
         pendingJoinGenerationRef.current = null;
       }
+      captureLease.settle();
     }
   }
 
@@ -981,6 +1038,7 @@ export function useDirectCallSession(
     if (
       !sessionActiveRef.current ||
       !enabled ||
+      captureAuthEpoch === null ||
       chat === null ||
       currentCall === null ||
       !isDirectChatSupported ||
@@ -996,14 +1054,33 @@ export function useDirectCallSession(
       return;
     }
     const lease = acquisition.lease;
-
-    const generation = ++runtimeGenerationRef.current;
+    const generation = runtimeGenerationRef.current + 1;
+    const captureAcquisition = localCaptureOwner.acquire({
+      kind: "direct",
+      userId: currentUserId,
+      authEpoch: captureAuthEpoch,
+      scopeId: chat.id,
+      generation,
+    });
+    if (captureAcquisition.lease === null) {
+      lease.release();
+      if (localCaptureOwner.getSnapshot() === null) {
+        dispatch({ type: "failure", message: captureAcquisition.message });
+      } else {
+        setDismissedCaptureSnapshot(null);
+      }
+      return;
+    }
+    const captureLease = captureAcquisition.lease;
+    localCaptureLeaseRef.current = captureLease;
+    runtimeGenerationRef.current = generation;
     pendingJoinGenerationRef.current = generation;
     dispatch({ type: "action_started", actionState: "joining" });
 
     let localStream: MediaStream | null = null;
+    let keepLocalCapture = false;
     try {
-      localStream = await ensureLocalAudioStream(generation);
+      localStream = await ensureLocalAudioStream(generation, captureLease);
       await refreshRTCConfiguration();
       if (runtimeGenerationRef.current !== generation) {
         return;
@@ -1016,11 +1093,14 @@ export function useDirectCallSession(
       dispatch({ type: "action_finished" });
       localStreamRef.current = localStream;
       await bootstrapJoinedCall(response.call, response.selfParticipant);
+      keepLocalCapture = runtimeGenerationRef.current === generation &&
+        localCaptureLeaseRef.current === captureLease && captureLease.isCurrent();
     } catch (error) {
       if (runtimeGenerationRef.current !== generation) {
         return;
       }
       if (localStream !== null) {
+        captureLease.close();
         clearPeerRecoveryPlan();
         teardownDirectCallRuntime({
           localStream: localStreamRef.current ?? localStream,
@@ -1050,10 +1130,12 @@ export function useDirectCallSession(
         message: describeError(error, "Не удалось присоединиться к активному звонку."),
       });
     } finally {
+      if (!keepLocalCapture) releaseLocalCapture(captureLease);
       lease.release();
       if (pendingJoinGenerationRef.current === generation) {
         pendingJoinGenerationRef.current = null;
       }
+      captureLease.settle();
     }
   }
 
@@ -1086,6 +1168,7 @@ export function useDirectCallSession(
   }
 
   function dismissError() {
+    setDismissedCaptureSnapshot(captureSnapshot);
     dispatch({ type: "clear_error" });
   }
 
@@ -1145,7 +1228,7 @@ export function useDirectCallSession(
     }
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!enabled || activeChatID === null || !isDirectChatSupported) {
       sessionActiveRef.current = false;
       dispatch({ type: "sync_succeeded", call: null, participants: [] });
@@ -1162,10 +1245,12 @@ export function useDirectCallSession(
     };
   }, [
     activeChatID,
+    captureAuthEpoch,
     currentUserId,
     disposeLocalRuntime,
     enabled,
     isDirectChatSupported,
+    localCaptureOwner,
     runRefreshDirectChatCall,
     token,
   ]);
@@ -1386,7 +1471,14 @@ export function useDirectCallSession(
     };
   }, [enabled, joinedCallID, state.localJoinedCallId, token]);
 
-  const visibleErrorMessage = joinCoordinator.describeUncertainCall(currentUserId, state.call?.id ?? null) ?? state.errorMessage;
+  const captureSlotAvailable = captureSnapshot === null ||
+    (localCaptureLeaseRef.current?.isCurrent() === true && captureSnapshot.phase !== "closing");
+  const captureConflict = enabled && isDirectChatSupported && captureSnapshot !== null &&
+    captureSnapshot !== dismissedCaptureSnapshot && !captureSlotAvailable
+    ? describeLocalCallCaptureConflict(captureSnapshot)
+    : null;
+  const visibleErrorMessage = joinCoordinator.describeUncertainCall(currentUserId, state.call?.id ?? null) ??
+    captureConflict ?? state.errorMessage;
   return {
     state: visibleErrorMessage === state.errorMessage ? state : {...state,errorMessage:visibleErrorMessage},
     phase,
@@ -1400,12 +1492,16 @@ export function useDirectCallSession(
       isDirectChatSupported &&
       state.call === null &&
       state.actionState === "idle" &&
+      captureSlotAvailable &&
+      captureAuthEpoch !== null &&
       enabled,
     canJoin:
       isDirectChatSupported &&
       state.call !== null &&
       state.localJoinedCallId === null &&
       state.actionState === "idle" &&
+      captureSlotAvailable &&
+      captureAuthEpoch !== null &&
       enabled,
     canLeave:
       isDirectChatSupported &&
