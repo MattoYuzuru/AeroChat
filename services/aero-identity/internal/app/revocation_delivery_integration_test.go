@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -451,5 +452,154 @@ func TestIdentitySenderClientOwnedTLSBoundary(t *testing.T) {
 	}
 	if requests.Load() != 1 {
 		t.Fatal("hostname mismatch reached HTTP handler")
+	}
+}
+
+func TestIdentitySenderEnabledWrapperCancelsClaimAndRecovers(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	source := privateAuthorityDatabase(t, ctx)
+	receiver, dsn := senderRTCFixture(t, ctx)
+	ca := authorityCA(t)
+	serverConfig := authorityTLSConfig(t, ca)
+	leaf := authorityLeaf(t, ca, x509.ExtKeyUsageClientAuth, []string{"urn:aerochat:service:identity"}, false)
+	cert, key := senderCertificateFiles(t, leaf)
+	process := senderReceiverProcess(t, dsn, serverConfig)
+	auth := senderAccount(t, ctx, source)
+	if changed, err := postgres.NewRepository(source).RevokeSession(ctx, auth.User.ID, auth.Session.ID, time.Now()); err != nil || !changed {
+		t.Fatal("actual source revoke failed")
+	}
+	var event uuid.UUID
+	if err := source.QueryRow(ctx, "SELECT id FROM identity_authority_revocation_outbox WHERE subject_id=$1", auth.Session.ID).Scan(&event); err != nil {
+		t.Fatal(err)
+	}
+	actorConfig := source.Config().Copy()
+	actorConfig.MaxConns = 1
+	actorConfig.ConnConfig.RuntimeParams["application_name"] += "_sender_wrapper"
+	actor, err := pgxpool.NewWithConfig(ctx, actorConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(actor.Close)
+	var actorPID int32
+	if err := actor.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&actorPID); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := source.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		cleanup, done := context.WithTimeout(context.Background(), 5*time.Second)
+		defer done()
+		_ = lock.Rollback(cleanup)
+	}()
+	var lockerPID int32
+	if err := lock.QueryRow(ctx, "SELECT pg_backend_pid()").Scan(&lockerPID); err != nil {
+		t.Fatal(err)
+	}
+	barrier := time.Now().UnixNano()
+	if _, err := lock.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", barrier); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := source.Exec(ctx, "CREATE FUNCTION block_wrapper_claim() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock("+strconv.FormatInt(barrier, 10)+"); RETURN NEW; END $$; CREATE TRIGGER block_wrapper_claim BEFORE UPDATE ON identity_revocation_delivery FOR EACH ROW EXECUTE FUNCTION block_wrapper_claim()"); err != nil {
+		t.Fatal(err)
+	}
+	port, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	public := port.Addr().String()
+	_ = port.Close()
+	clientConfig := rtcrevocation.Config{Enabled: true, BaseURL: process.baseURL, ServerCAFile: serverConfig.ClientCAFile, TLSCertFile: cert, TLSKeyFile: key}
+	cfg := Config{HTTPAddress: public, ShutdownTimeout: time.Second, RevocationDelivery: clientConfig}
+	logs := &authorityLogBuffer{}
+	logger := slog.New(slog.NewTextHandler(logs, nil))
+	appContext, stopApp := context.WithCancel(ctx)
+	defer stopApp()
+	result := make(chan error, 1)
+	go func() {
+		result <- RunServersWithSourceDelivery(appContext, logger, cfg, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) }), nil, postgres.NewDeliveryRepository(actor))
+		close(result)
+	}()
+	var waited sync.Once
+	waitStopped := func() {
+		waited.Do(func() {
+			stopApp()
+			select {
+			case err := <-result:
+				if err != nil && !errors.Is(err, context.Canceled) {
+					t.Error("app/worker shutdown failed")
+				}
+			case <-time.After(3 * time.Second):
+				t.Error("app/worker shutdown exceeded bound")
+			}
+		})
+	}
+	t.Cleanup(waitStopped)
+	httpTransport := &http.Transport{Proxy: nil}
+	httpClient := &http.Client{Transport: httpTransport, Timeout: 200 * time.Millisecond}
+	defer httpTransport.CloseIdleConnections()
+	deadline := time.Now().Add(3 * time.Second)
+	ready, blocked := false, false
+	for time.Now().Before(deadline) {
+		if !ready {
+			response, err := httpClient.Get("http://" + public + "/")
+			if err == nil {
+				_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+				_ = response.Body.Close()
+				ready = response.StatusCode == 200
+			}
+		}
+		if err := source.QueryRow(ctx, "SELECT $1=ANY(pg_blocking_pids($2)) AND position('-- name: ClaimAuthorityDelivery' in query)>0 FROM pg_stat_activity WHERE pid=$2", lockerPID, actorPID).Scan(&blocked); err != nil {
+			t.Fatal("cannot observe owned Claim barrier")
+		}
+		if ready && blocked {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("wrapper observation context expired")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if !ready || !blocked {
+		t.Fatal("enabled HTTP/Worker.Run Claim barrier not observed")
+	}
+	stopApp()
+	waitStopped()
+	response, err := httpClient.Get("http://" + public + "/")
+	if err == nil {
+		_ = response.Body.Close()
+		t.Fatal("HTTP server survived wrapper cancellation")
+	}
+	var count int
+	if err := source.QueryRow(ctx, "SELECT COUNT(*) FROM identity_revocation_delivery WHERE event_id=$1 AND state='pending' AND attempt=0 AND claim_fence=0 AND claim_owner IS NULL AND operation_id IS NULL", event).Scan(&count); err != nil || count != 1 {
+		t.Fatal("canceled blocked claim fabricated journal delivery")
+	}
+	if err := receiver.QueryRow(ctx, "SELECT COUNT(*) FROM rtc_media_source_inbox WHERE event_id=$1", event).Scan(&count); err != nil || count != 0 {
+		t.Fatal("canceled claim reached RTC")
+	}
+	if err := lock.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := source.Exec(ctx, "DROP TRIGGER block_wrapper_claim ON identity_revocation_delivery"); err != nil {
+		t.Fatal(err)
+	}
+	client, err := rtcrevocation.NewClient(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(client.Close)
+	if err := delivery.NewWorker(postgres.NewDeliveryRepository(actor), client, logger).Step(ctx); err != nil {
+		t.Fatal("fresh worker failed after canceled wrapper")
+	}
+	if err := source.QueryRow(ctx, "SELECT COUNT(*) FROM identity_revocation_delivery WHERE event_id=$1 AND state='delivered' AND attempt=1 AND claim_fence=1 AND registry_media_effect='no_matching_registry_grants'", event).Scan(&count); err != nil || count != 1 {
+		t.Fatal("fresh worker did not deliver retained event")
+	}
+	for _, marker := range []string{event.String(), auth.User.ID, auth.Session.ID, auth.Device.ID, "PRIVATE KEY"} {
+		if strings.Contains(logs.String()+process.logs.String(), marker) {
+			t.Fatal("worker/app logs exposed payload")
+		}
 	}
 }
