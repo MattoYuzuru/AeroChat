@@ -217,7 +217,7 @@ func (s *MediaControlStore) ClaimRoom(ctx context.Context, parent uuid.UUID, key
 	}
 	if ready, err := slot.q.MediaControlChildrenReady(ctx, parent); err != nil {
 		return control.RoomClaim{}, controlError(err)
-	} else if !ready {
+	} else if !ready.Valid || !ready.Bool {
 		return control.RoomClaim{}, control.ErrPending
 	}
 	row, err := slot.q.GetMediaControlRoom(ctx, ql.GetMediaControlRoomParams{ParentID: parent, RoomID: key.ID})

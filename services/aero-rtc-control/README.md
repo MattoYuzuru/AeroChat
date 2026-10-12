@@ -128,8 +128,8 @@ ordinary merge generated+verified+published Identity→Chat→registration paren
 
 ## Accepted план public media Leave / End coordinator
 
-План принят координатором 2026-10-12 по ADR097; foundation подготовлен только
-как source, без generation/compile/native/runtime validation. Additive commands с call_id/request_id и
+План принят координатором 2026-10-12 по ADR097; additive контракты сгенерированы
+и reviewed, но compile/native/runtime acceptance ещё не завершена. Additive commands с call_id/request_id и
 fresh-authorized operation status, immutable parent intent + one-grant children
 и room-generation cleanup journal. Live authority/provider adapters не реализованы.
 Own Leave требует exact active auth session/device binding, включая own
@@ -175,6 +175,14 @@ other-room progress и actual registered003 upgrade/repeat retained history.
 schema; current writers вызываются после registered bootstrap, без42P01 bypass.
 Native profiles/schema ownership/heavy queue прежние; до запуска — verified
 published Identity→Chat→registration→guard ordinary merges и fresh freeze.
+
+Первый whole check `check-wtqqnh9q` на generated HEAD `4e6ff3e` завершился
+compile FAIL до native tests: SQLC возвращает nullable `pgtype.Bool` для
+`MediaControlChildrenReady`, а source ожидал `bool`. Исправление учитывает
+`Valid` и `Bool`: неизвестный/false result сохраняет pending и не позволяет
+room action обойти children barrier. Generated SQL/proto не редактируются.
+Исторический FAIL сохраняется; native/provider completion не подтверждена
+и требует нового whole check на clean исправленном HEAD.
 
 Accepted adapter refinement 2026-10-12: own minimal status использует отдельный
 identity-only OwnStatusSubject/read после fresh active Identity, без требования
