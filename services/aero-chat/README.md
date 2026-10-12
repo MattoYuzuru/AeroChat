@@ -57,7 +57,9 @@ unique owner index независимо от heap/UUID order. Missing, restricte
 обе роли. Owner/admin/member transitions сохраняют audio eligibility epoch.
 
 Write restriction явно типизирует timestamp parameter как `timestamptz` в обоих
-CASE expressions, включая idempotency predicate. Это сохраняет nullable time и
+CASE expressions, включая idempotency predicate. Именованный nullable
+[sqlc.narg](https://docs.sqlc.dev/en/latest/howto/named_parameters.html#nullable-parameters)
+сохраняет поле `WriteRestrictedAt` с типом `pgtype.Timestamptz`. Это сохраняет nullable time и
 повторный unchanged result при установке/снятии ограничения; message-only
 restriction не меняет audio eligibility epoch. Native
 `TestGroupAuthorityWriteRestrictionTimestampRoundTrip` проверяет реальный
