@@ -263,7 +263,7 @@ func (s *AuthorizedService) GetOperation(ctx context.Context, bearer string, ope
 	if facts.Validate() != nil || facts.Status == "not_found" || facts.GroupID != scope.GroupID || facts.UserID != sub.UserID {
 		return Intent{}, ErrUnavailable
 	}
-	if facts.Status != "present" || !(facts.Role == "owner" || facts.Role == "admin" || facts.Role == "member") {
+	if facts.Status != "present" || (facts.Role != "owner" && facts.Role != "admin" && facts.Role != "member") {
 		return Intent{}, ErrDenied
 	}
 	if err := s.finalSubject(ctx, sub, d); err != nil {
