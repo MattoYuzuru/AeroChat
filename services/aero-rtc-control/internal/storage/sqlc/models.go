@@ -60,6 +60,21 @@ type ChatAuthorityRevocationOutbox struct {
 	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
 }
 
+type ChatRevocationDelivery struct {
+	EventID                uuid.UUID          `db:"event_id" json:"event_id"`
+	State                  string             `db:"state" json:"state"`
+	Attempt                int64              `db:"attempt" json:"attempt"`
+	ClaimFence             int64              `db:"claim_fence" json:"claim_fence"`
+	ClaimOwner             pgtype.UUID        `db:"claim_owner" json:"claim_owner"`
+	ClaimUntil             pgtype.Timestamptz `db:"claim_until" json:"claim_until"`
+	NextAttemptAt          pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	OperationID            pgtype.UUID        `db:"operation_id" json:"operation_id"`
+	RegistryMediaEffect    pgtype.Text        `db:"registry_media_effect" json:"registry_media_effect"`
+	AffectedRegistryGrants pgtype.Int8        `db:"affected_registry_grants" json:"affected_registry_grants"`
+	ReceivedAt             pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	QuarantineReason       pgtype.Text        `db:"quarantine_reason" json:"quarantine_reason"`
+}
+
 type CryptoDevice struct {
 	ID                     uuid.UUID          `db:"id" json:"id"`
 	UserID                 uuid.UUID          `db:"user_id" json:"user_id"`
@@ -371,6 +386,21 @@ type IdentityAuthorityRevocationOutbox struct {
 	SourceRevision int64              `db:"source_revision" json:"source_revision"`
 	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
 	Reason         string             `db:"reason" json:"reason"`
+}
+
+type IdentityRevocationDelivery struct {
+	EventID                uuid.UUID          `db:"event_id" json:"event_id"`
+	State                  string             `db:"state" json:"state"`
+	Attempt                int64              `db:"attempt" json:"attempt"`
+	ClaimFence             int64              `db:"claim_fence" json:"claim_fence"`
+	ClaimOwner             pgtype.UUID        `db:"claim_owner" json:"claim_owner"`
+	ClaimUntil             pgtype.Timestamptz `db:"claim_until" json:"claim_until"`
+	NextAttemptAt          pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	OperationID            pgtype.UUID        `db:"operation_id" json:"operation_id"`
+	RegistryMediaEffect    pgtype.Text        `db:"registry_media_effect" json:"registry_media_effect"`
+	AffectedRegistryGrants pgtype.Int8        `db:"affected_registry_grants" json:"affected_registry_grants"`
+	ReceivedAt             pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	QuarantineReason       pgtype.Text        `db:"quarantine_reason" json:"quarantine_reason"`
 }
 
 type MessageAttachment struct {
