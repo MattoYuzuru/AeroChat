@@ -74,6 +74,8 @@ type Querier interface {
 	GetOpenMediaEndByCall(ctx context.Context, callID uuid.UUID) (RtcMediaControlIntent, error)
 	GetOpenMediaEndByGroup(ctx context.Context, groupID uuid.UUID) (RtcMediaControlIntent, error)
 	GetOpenMediaEndForActiveUser(ctx context.Context, userID uuid.UUID) (RtcMediaControlIntent, error)
+	GetOwnMediaControlRequestProjection(ctx context.Context, arg GetOwnMediaControlRequestProjectionParams) (GetOwnMediaControlRequestProjectionRow, error)
+	GetOwnMediaLeaveProjection(ctx context.Context, arg GetOwnMediaLeaveProjectionParams) (GetOwnMediaLeaveProjectionRow, error)
 	GetSlotParticipant(ctx context.Context, id uuid.UUID) (RtcCallParticipant, error)
 	HasHeldMediaLeasesByCall(ctx context.Context, callID uuid.UUID) (bool, error)
 	HasPendingMediaCleanup(ctx context.Context, operationID uuid.UUID) (bool, error)

@@ -386,6 +386,68 @@ func (q *Queries) GetOpenMediaEndForActiveUser(ctx context.Context, userID uuid.
 	return i, err
 }
 
+const getOwnMediaControlRequestProjection = `-- name: GetOwnMediaControlRequestProjection :one
+SELECT id,request_id,call_id,kind,created_at FROM rtc_media_control_intents
+WHERE request_id=$1 AND actor_user_id=$2
+`
+
+type GetOwnMediaControlRequestProjectionParams struct {
+	RequestID   uuid.UUID `db:"request_id" json:"request_id"`
+	ActorUserID uuid.UUID `db:"actor_user_id" json:"actor_user_id"`
+}
+
+type GetOwnMediaControlRequestProjectionRow struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	RequestID uuid.UUID          `db:"request_id" json:"request_id"`
+	CallID    uuid.UUID          `db:"call_id" json:"call_id"`
+	Kind      string             `db:"kind" json:"kind"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) GetOwnMediaControlRequestProjection(ctx context.Context, arg GetOwnMediaControlRequestProjectionParams) (GetOwnMediaControlRequestProjectionRow, error) {
+	row := q.db.QueryRow(ctx, getOwnMediaControlRequestProjection, arg.RequestID, arg.ActorUserID)
+	var i GetOwnMediaControlRequestProjectionRow
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.CallID,
+		&i.Kind,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getOwnMediaLeaveProjection = `-- name: GetOwnMediaLeaveProjection :one
+SELECT id,request_id,call_id,kind,created_at FROM rtc_media_control_intents
+WHERE id=$1 AND actor_user_id=$2 AND kind='leave'
+`
+
+type GetOwnMediaLeaveProjectionParams struct {
+	OperationID uuid.UUID `db:"operation_id" json:"operation_id"`
+	ActorUserID uuid.UUID `db:"actor_user_id" json:"actor_user_id"`
+}
+
+type GetOwnMediaLeaveProjectionRow struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	RequestID uuid.UUID          `db:"request_id" json:"request_id"`
+	CallID    uuid.UUID          `db:"call_id" json:"call_id"`
+	Kind      string             `db:"kind" json:"kind"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) GetOwnMediaLeaveProjection(ctx context.Context, arg GetOwnMediaLeaveProjectionParams) (GetOwnMediaLeaveProjectionRow, error) {
+	row := q.db.QueryRow(ctx, getOwnMediaLeaveProjection, arg.OperationID, arg.ActorUserID)
+	var i GetOwnMediaLeaveProjectionRow
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.CallID,
+		&i.Kind,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const hasHeldMediaLeasesByCall = `-- name: HasHeldMediaLeasesByCall :one
 SELECT EXISTS(SELECT 1 FROM rtc_media_connection_leases l JOIN rtc_media_grants g ON g.id=l.grant_id WHERE g.call_id=$1 AND l.state<>'closed')::boolean
 `
