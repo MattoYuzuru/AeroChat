@@ -486,10 +486,50 @@ children завершены через Wait и отсутствуют после
 source checkout возвращает0. Это отдельный local authorization adapter;
 он остаётся unmounted, Gateway/provider/audio/публичная готовность не заявляются.
 
+Текущий mobile HEAD `1de95227` содержит только уточнение инструкции запуска
+после проверенного CSS `5516f8b`; root0154 подтвердил равенство code bytes.
+Новый whole WEB `check-6qa234sy` на clean `1de95227` PASS: все 18 stages и
+620 JUnit tests, без failures/errors/skips. Отдельный `check-dwpz_ro6` PASS:
+исходные 147 сценариев раскладки, без failures/errors/skips. Root0163/0164
+сверил raw XML, stage ledger и exact viewport/conversation/state tuples,
+current source и отсутствие owned PID/PG после exit. Таким образом, whole
+WEB и исходная mobile matrix завершены; они используют synthetic auth/RTC
+и representative DOM, а native browser zoom и реальные OS keyboards отдельно.
+Успешные семь faithful pinned cases остаются receipt на `5516f8b` с явным
+docs-only code equivalence, а не новым receipt на другой HEAD.
+
+Для продолжения #176 выполнен локальный ordinary merge текущего `1de95227`
+и frozen authorization `a619981`: `ce19159`. Root0155/0156 проверил все
+894 file origins; auth/backend bytes сохранены, изменились только пять
+рассмотренных mobile files. В `cd62024` принят технический профиль readonly
+token admission в ADR097: strict JSON перед стандартной JWT verification,
+общий deadline с actual TLS leaf.NotAfter, свежие Identity/Chat проверки и
+финальный coherent registry/fence read. Это уточнение принятой privacy-модели
+с trusted self-hosted SFU; реализации token/provider оно не заменяет.
+Текущий clean combined HEAD `0a28de4` меняет только два native test pins
+Go1.25.8→Go1.27.2. Root сверил exact diff и 19 source/8 module hashes.
+Свежий whole foundation gate для этого HEAD ещё UNRUN; исторический
+authorization PASS53/826 на `a619981` сюда не переносится.
+
+Metadata v3 использует конечные 188 exact declared pairs и 187 cache inputs.
+`check-qc9e8ww8` FAILED после 127 Go starts: узкий parser не распознал
+stock Go verification wrapper после requires chain. Tiny v4 исправляет
+только эту форму; отдельные семь pure parser tests прошли. Actual v4
+`check-0tpahl6b` FAILED после 174 Go starts на новом declared dependency
+`github.com/bsm/ginkgo/v2@v2.12.0` из redis go.mod. Новая пара не загружалась.
+Root0166 подтвердил actual Wait/exit1 всех 174 children, отсутствие PID/PG,
+неизменные 187 cache inputs и восемь source metadata inputs с точным
+экспериментальным добавлением двух seeds только в scratch RTC go.mod,
+clean frozen `a619981` и отсутствие ZIP. Получены 173 official HTTP200
+metadata events/985305 bytes. Graph не завершён, selected-module phase
+UNRUN; package import/build/provider/audio readiness не подтверждены.
+Все ранние FAIL сохранены. Следующий finite declared-edge inventory и
+проверка compiled import closure готовятся отдельно от foundation gate.
+
 До общей готовности остаются:
 
-- Whole WEB/mobile matrix после исправления mobile320 pinned composer, затем
-  fresh native geometry, unread/minimized и native200% zoom; завершение actual
+- Fresh native geometry текущего mobile исправления, unread/minimized и
+  native200% zoom; завершение actual
   1:1 leave/rejoin/End/permission matrix. Двухаккаунтный
   core21 и все12 media прошли, native two-way RTP/mute — отдельный partial PASS.
 - Завершение #176: проверенный public authorization adapter, pinned SFU/SDK,
