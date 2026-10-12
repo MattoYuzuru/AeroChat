@@ -193,7 +193,7 @@ repository/domain/private TLS listener в test host; это не полный Ch
 ровно два ожидаемых outputs: source_changed=true/reusable=false, это не test PASS.
 Root полностью просмотрел actual 64-line patch, сверил current bytes и
 неизменность 13 inputs. Generated files сохранены отдельным local commit
-`2e2fe09b`; whole/native gate ещё UNRUN, adapter остаётся unmounted.
+`2e2fe09b`; на этом этапе whole/native gate ещё UNRUN, adapter остаётся unmounted.
 
 Browser05 source и privacy correction просмотрены полностью. Выбраны core v2
 и wrapper v3 с ограниченной очисткой дочернего процесса; входные invite tokens
@@ -229,8 +229,103 @@ Root независимо сверил actual receipt, четыре download SHA
 двух owned profile browser PIDs/закрытый preview25173 после exit. Self/group,
 logout/revoke и postcore phases не считаются пройденными. Read-only DB05
 показала один self chat и ноль encrypted messages/deliveries для actual A:
-сообщение не persisted. Client readiness/locator/HTTP rejection ещё различаются
-bounded diagnostic; причина не объявлена product defect без evidence.
+сообщение не persisted. Последующий bounded diagnostic `check-bzwlyk5y`
+подтвердил ошибку ожидания в тесте: locator находил draft в textarea при нуле
+message rows и нуле Send requests, после чего ранний reload отменял подготовку.
+Это не доказательство потери self-message в продукте. В новой версии core
+ожидаются actual message article и завершённый Send HTTP перед reload.
+
+Исправленный whole core `check-hlq_mbez` FAILED раньше, на direct delivery:
+четыре начальных stages прошли, recipient B показывает сообщение, sender A —
+пустую историю и очищенный composer. Read-only DB metadata отдельно подтвердили
+по одной persisted encrypted delivery для A и B. Source review выявил возможную
+гонку: смена action-state identity crypto context отменяет deferred decrypt,
+а поздний optimistic publish уже подавлен authoritative resolved key. Для
+проверки подготовлены семь случаев с настоящим production React hook и
+synthetic gateway/decrypt adapters. В отдельной ветке до production change
+принято уточнение ADR-064, commit `6cb3eb7`: lifetime задаётся session/chat/device/
+page size/availability, server-backed failure нельзя скрывать optimistic copy.
+Базовая регрессия `check-nuwxr82q` сохранила настоящий FAIL: семь cases,
+два failures в фазе authoritative-visible, пять scope cancellations PASS,
+без bootstrap/page/cleanup errors. При deferred decrypt и уже resolved key
+теряются и ready projection, и authoritative failure. После отдельного
+узкого hook fix `9f5c9ac` те же неизменные семь cases в `check-ozc6zevj` PASS:
+ready даёт одну строку, failure остаётся видимым без optimistic fallback,
+смена chat/token/device и retirement/disabled отменяют прежний результат.
+Root независимо сверил JSON/XML, quiet source и отсутствие owned CFT PID/
+process groups/profile matches/fixture port после обоих запусков; live verify
+исправленного source возвращает0. Это actual production React hook с
+synthetic gateway/decrypt, не новый whole browser core. Full web и native06
+проверяются отдельно. Исходные FAIL сохраняются.
+
+На том же frozen `9f5c9ac` полный web gate `check-j052_zr0` PASS: 18 stages,
+620 JUnit cases без failures/errors/skips, lint и build. В raw browser output
+подтверждены capture/playback, восстановление звонка, composer/keyboard/router
+и отсутствие page errors. Отдельные семь sender cases не повторялись и не
+прибавляются к620. Root сверил XML/stage ledger/current source и независимо
+подтвердил отсутствие восьми новых owned headless main processes, их групп,
+private profile matches и fixture listener; чужие исходные процессы сохранены.
+
+Новый собственный source clone `check-77b47m14` PASS содержит весь Git object
+pack без shared alternates/shallow и clean `9f5c9ac` tree. Backend gate этого
+source `check-vq55ft2u` PASS: 15 stages и758 actual JUnit cases без failures/
+errors/skips, PostgreSQL/private TLS/S3, race/vet/lint и generation дважды без
+drift. Семь raw official symbol vulnerability scans не нашли called symbols.
+`GO-2026-5932` остаётся module-only finding для `x/crypto v0.57.0`, fixed version
+не опубликована в полученной базе; blanket security PASS не заявляется.
+Root независимо сверил raw XML/семь scan outputs/current clone/source и live
+verify. Native06 app binaries, новая DB/bucket и runtime ещё не созданы.
+
+Для encrypted groups тот же source watchpoint проверен отдельной регрессией
+настоящего group hook с synthetic adapters. Уточнения ADR-067/068 приняты до
+реализации, commit `f913b13`; fixture-only baseline `0b39679` сохраняет исходный
+hook. Настоящий child XML содержит семь cases: два failures в authoritative-visible,
+пять scope cancellations PASS, bootstrap/list/decrypt counters1 и zero page/
+cleanup errors. Внешний `check-18q2rdf7` отдельно сохраняет ошибку оператора:
+`--reports` указывает на другой каталог, поэтому receipt имеет missing report
+и tests0. Child XML по правильному pinned пути не переносился, receipt не
+переписывался и baseline повторно не запускался. Root проверил actual child
+JSON/XML/stages и независимо подтвердил отсутствие owned PID/PG/profile/25174.
+
+После узкого one-file hook fix `3f63bb2` (8+/6−) SAME7 `check-xygykyz3` PASS:
+ready показывает одну строку, authoritative failure остаётся видимым без
+optimistic body, все пять scope cancellations сохраняются. Fixture bytes не
+менялись; остальные production modules, worker/provider/AAD/bookkeeping
+сохранены. Root сверил настоящий receipt/XML/JSON, current live verify0,
+clean frozen source и independent process/profile/listener absence. Это
+отдельная Group React lifetime проверка, не actual backend/WebCrypto/group audio.
+Full web на новом `3f63bb2` и native06 app/runtime/core остаются отдельными
+ожидаемыми outcomes. Core06 дополнительно ожидает actual group send HTTP200/
+finished и ready article у A, сохраняя прежние B-delivery/reload assertions.
+
+Owner штатно остановил runtime05: `check-_zlznsfr` PASS подтверждает setup/teardown
+и неизменность source261. Независимо проверены отсутствие пяти owned PID и
+их process group, закрытые native/preview ports и неизменность main9. DB05,
+bucket05, profiles и артефакты сохранены. Это не whole browser acceptance PASS.
+
+Первый authorization whole `check-ywvmm3t2` FAILED на lint test host, сохранив
+341 partial Go PASS; новые native cases тогда не исполнялись. После узкой
+fixture correction `check-5cv2_ils` также FAILED: 611 actual Go PASS,
+11 новых unit и семь из восьми native scenarios прошли, без TestSkip.
+Оставшийся scenario пытался создать второй активный звонок для A при pending
+cleanup первого; policy guard корректно отказал. Тест исправлен через настоящий
+отдельный аккаунт B, а результаты deferred fixture Close обработаны для lint:
+commits `e226f48`/`ee11be4`. Root просмотрел весь actual test delta, current pins
+и неизменность whole driver кроме manifest literals. V3 `check-t94k8s46`
+подтвердил все восемь native cases и 11 новых unit, но общий gate FAILED на
+единственном замечании QF1001 к записи role predicate. Эквивалентная замена
+по закону де Моргана сохранена в `a619981` после полного просмотра diff.
+
+Свежий v4 `check-eo68aned` PASS: все 53 stages, 826 actual Go PASS events,
+без GoFail/TestSkip, race/coverage/vet/lint пяти modules, dedicated native8,
+унаследованные PostgreSQL/private TLS cases, pinned Buf/SQLC generation дважды
+без drift. Root независимо сверил raw Go JSON: все восемь новых native cases
+прошли в обоих phases, все 11 новых unit прошли. Current четыре binaries имеют
+Go1.25.8/VCS `a619981`/modified=false; SHA проверены независимо. WT и clone
+чистые; 16 созданных schemas имеют post-DROP absence evidence, все 32 native
+children завершены через Wait и отсутствуют после exit. Live verify из exact
+source checkout возвращает0. Это отдельный local authorization adapter;
+он остаётся unmounted, Gateway/provider/audio/публичная готовность не заявляются.
 
 До общей готовности остаются:
 
