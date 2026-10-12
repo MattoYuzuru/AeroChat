@@ -494,12 +494,12 @@ WHERE group_id = $1 AND user_id = $2 AND role <> $3;
 UPDATE group_memberships
 SET
     is_write_restricted = $3,
-    write_restricted_at = CASE WHEN $3 THEN $4 ELSE NULL END
+    write_restricted_at = CASE WHEN $3 THEN $4::timestamptz ELSE NULL END
 WHERE group_id = $1
   AND user_id = $2
   AND (
       is_write_restricted IS DISTINCT FROM $3
-      OR write_restricted_at IS DISTINCT FROM CASE WHEN $3 THEN $4 ELSE NULL END
+      OR write_restricted_at IS DISTINCT FROM CASE WHEN $3 THEN $4::timestamptz ELSE NULL END
   );
 
 -- name: DemoteGroupOwnerForTransfer :execrows

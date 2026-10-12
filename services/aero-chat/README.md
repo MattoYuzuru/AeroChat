@@ -55,3 +55,10 @@ Migration/bootstrap повторяемые и additive. Rollback к старом
 unique owner index независимо от heap/UUID order. Missing, restricted или уже
 изменившийся target не оставляет группу без owner; ошибка promotion откатывает
 обе роли. Owner/admin/member transitions сохраняют audio eligibility epoch.
+
+Write restriction явно типизирует timestamp parameter как `timestamptz` в обоих
+CASE expressions, включая idempotency predicate. Это сохраняет nullable time и
+повторный unchanged result при установке/снятии ограничения; message-only
+restriction не меняет audio eligibility epoch. Native
+`TestGroupAuthorityWriteRestrictionTimestampRoundTrip` проверяет реальный
+repository writer, persisted timestamp, повтор и NULL на owned PostgreSQL.
