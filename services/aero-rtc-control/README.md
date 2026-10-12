@@ -125,3 +125,27 @@ proxy/SFU acknowledgement и отдельный durable call-wide End/Leave coor
 SDK/proxy/worker/UI/audio исключены. До generation/full checks/publication —
 ordinary merge generated+verified+published Identity→Chat→registration parents,
 новый clean freeze и собственные receipts; прежние PASS не переносятся.
+
+## Accepted план public media Leave / End coordinator
+
+План принят координатором 2026-10-12 по ADR097; implementation ещё нет: additive commands с call_id/request_id и
+fresh-authorized operation status, immutable parent intent + one-grant children
+и room-generation cleanup journal. Implementation/generation/native ещё UNRUN.
+Own Leave требует exact active auth session/device binding, включая own
+reader/removed subject. End разрешён call creator +fresh eligible Chat role;
+GroupOwner/admin не получает это право автоматически. Новая active own session
+может читать minimal own Leave status без roster; revoked/anonymous bearer нет.
+
+OPEN END INTENT удерживает admission/terminal barrier даже при0held/0participants
+и всех grants REVOKED, пока selected room ACK pending. Legacy End/last-Leave/
+stale/orphan paths не пишут premature ENDED/CLOSED; same-group Start и все
+Join/Reserve/Activate/RegisterLease/reconnect закрыты. Child release допустим
+только после full own ACK, parent End завершается лишь после ALL exact child
+и room-generation trusted ACK в atomic finalizer. Empty UNKNOWN не complete.
+
+Fresh lookup вне TX и sorted parents→rooms→users/recheck внутри не обещают
+distributed auth atomicity. Local Leave/mute/WS close/providerHTTP200/expiry не
+ACK; new leaf не наследует old targets, rotation unsupported. Pending history
+neverdelete. Existing lobby/direct off-mode неизменен; SDK/proxy/workers/UI/
+public enable не входят в coordinator foundation. Code только после Accepted
+ADR review/commit, own fresh gates и verified generated published parent merges.
