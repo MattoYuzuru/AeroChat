@@ -159,6 +159,36 @@ Reconciliation фиксируется явно через локальный out
 - push/PWA;
 - malicious origin threat.
 
+## Уточнение 12 октября 2026: совместимость timestamp в AAD
+
+Статус уточнения: Accepted — координатор проверил границы совместимости до реализации
+по [#178](https://github.com/MattoYuzuru/AeroChat/issues/178).
+Для group local projection из [ADR-067](067-web-encrypted-group-local-projection-bootstrap.md)
+применяется точный bounded timestamp contract из
+[уточнения ADR-063](063-web-encrypted-direct-message-v2-outbound-bootstrap-send-foundation.md#уточнение-12-октября-2026-совместимость-timestamp-в-aad).
+
+Raw attempt выполняет существующие matching-recipient key-box unwrap и payload
+authentication. Только `DOMException` с именем `OperationError` допускает второй
+attempt с единственным distinct strict same-instant UTC ISO-ms3 candidate.
+Во втором attempt key-box unwrap и payload authentication используют один и тот
+же candidate `createdAt`: смешивать raw unwrap и candidate payload либо наоборот
+запрещено. Validation failure и ошибка другого вида retry не запускают.
+
+Group/thread/MLS/roster, sender/device/recipient, operation/target/revision и
+остальные AAD bindings сохраняются. Schema, algorithms, keys, sender encoding,
+backend/storage и [sequence](096-encrypted-conversation-server-sequence.md) не
+меняются. Received envelope остаётся неизменным; projection использует его
+metadata, descriptor callback выполняется только после полного success и один
+раз. Никакого plaintext fallback или alternate key/device search нет.
+
+До приёмки production group codec tests должны доказать оба слоя authentication,
+raw whole-second/sub-millisecond success, historical shortened fraction и
+whole-second compatibility, rejection при несовпадении слоя/instant/context и
+ограничение attempts. Direct controlled witness `check-maef1px9` не является
+group browser PASS; core04 остаётся FAIL. Fresh web gates и actual group/self/direct
+media acceptance нужны на новой frozen revision. Уточнение принято до source,
+а implementation и выполненные проверки фиксируются отдельно.
+
 ## Последствия
 
 ### Положительные
