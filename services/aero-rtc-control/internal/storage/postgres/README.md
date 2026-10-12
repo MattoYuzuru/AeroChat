@@ -76,3 +76,18 @@ GOTOOLCHAIN=go1.25.8 agent-dev run --cwd "$PWD" --resource heavy -- go test -jso
 не считаются native evidence. Отдельно проверяются unit/race, vet/lint, touched
 formatting, frozen source и два pinned SQLC/Buf generations без drift. Future
 Go27 combined candidate проверяется заново и не наследует Go1.25.8 receipt.
+
+
+Registration concurrency fixture сохраняет3s/10ms wait и два concurrent workers.
+Наблюдение ограничено exact root locker и двумя owned PID, application/database
+binding, active Lock waits и real ungranted fence-row/transaction locks; каждый
+worker должен достигать того же root через только owned blockers без cycle,
+foreign/zero/self PID. Success и last-failure witness содержат только PID/lock
+metadata, без query text, credentials или domain payload. Прямой blocker не всегда
+root: PostgreSQL допускает hard/soft очередь, а row waits могут отражаться через
+transaction lock ([pg_blocking_pids](https://www.postgresql.org/docs/current/functions-info.html#FUNCTIONS-INFO-SESSION),
+[pg_locks](https://www.postgresql.org/docs/current/view-pg-locks.html)).
+Гипотеза о worker→worker→locker для исторического direct-only predicate failure
+не является actual observed graph; новый native witness и fresh exact-source
+whole gate обязательны. Pure graph tests не заменяют native concurrent replay,
+distinct nonce/fence/allocation assertions и не доказывают registration/media enable.
