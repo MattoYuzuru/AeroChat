@@ -8,6 +8,11 @@ textarea связан с его уникальным ID, а прежние ко�
 auth/RTC, 50-message DOM и HTTP503 crypto-action adapter синтетические. Fixture
 не проверяет ciphertext, backend или взаимодействие настоящих аккаунтов.
 
+Versioned send state/ref, completion layout effect и programmatic draft helpers
+также извлекаются из production source, как в отдельной composer regression.
+Fixture предоставляет только контракт dependencies; send algorithm не заменяется
+упрощённой копией. После503 проверяется освобождение versioned send lock.
+
 Для direct/self проверяются 320/390/768 portrait и landscape, короткая/длинная
 ошибка, ровно один отказ503, сохранение draft/focus, видимый alert внутри composer,
 его отдельный bounded scroll, обычный Shift+Tab/Tab к feedback/textarea/actions,
