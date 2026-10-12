@@ -294,9 +294,33 @@ optimistic body, все пять scope cancellations сохраняются. Fix
 сохранены. Root сверил настоящий receipt/XML/JSON, current live verify0,
 clean frozen source и independent process/profile/listener absence. Это
 отдельная Group React lifetime проверка, не actual backend/WebCrypto/group audio.
-Full web на новом `3f63bb2` и native06 app/runtime/core остаются отдельными
-ожидаемыми outcomes. Core06 дополнительно ожидает actual group send HTTP200/
+Full web на новом `3f63bb2` подтверждён отдельным `check-axdzk0as` PASS:
+18 stages, 620 JUnit cases без failures/errors/skips, lint/build и восемь
+browser cohorts. Root независимо сверил raw XML/stages, current live verify0
+и отсутствие девяти owned PID/PG, восьми profiles и listener25174. Чужие
+процессы сохранены. SAME7 Group не повторялись и не прибавляются к620.
+Core06 дополнительно ожидает actual group send HTTP200/
 finished и ready article у A, сохраняя прежние B-delivery/reload assertions.
+
+Для source `3f63bb2` создан новый независимый clone: `check-j8yroo8g` PASS,
+9251 собственных Git objects, один pack, без alternates/shallow/shared hardlinks.
+Production web build `check-kl_0hzir` PASS содержит 107 проверенных dist files,
+Node22.23.2/pnpm10.19 и `/api` на gateway28890. `check-k8mo5csl` PASS собрал
+четыре свежих app binaries с Go1.27.2/VCS3f63/modified=false и два helpers;
+helper VCS не заявляется. Root независимо сверил шесть binary SHA/buildInfo,
+107 dist files и завершение всех 95 owned command PID/PG через actual Wait.
+Backend758 receipt выше относится к9f5; между9f5 и3f63 менялись только семь
+web/docs files, это сохранённая backend prerequisite, не fresh3f63 Go gate.
+
+`check-hi0c87a0` PASS подготовил отдельные DB06 и private bucket06, четыре
+private profiles и fixture ledger. Root независимо сверил все 86 command
+ledger SHA/Wait/return codes, отсутствие их PID/PG и owned MC container,
+неизменность десяти объектов main9 и profile hashes/permissions. Единственный
+runtime owner запустил native06: readiness20:38:36UTC, фиксированное окончание
+21:23:36UTC без продления. Root проверил пять owned PID/common process group,
+восемь health/readiness/version responses и текущие binary SHA. Full core21+
+12 media разрешён отдельно; его результат, layout/unread/native zoom/RTP и
+итоговая приёмка ещё не заявляются. Основной compose stack не перезапускался.
 
 Owner штатно остановил runtime05: `check-_zlznsfr` PASS подтверждает setup/teardown
 и неизменность source261. Независимо проверены отсутствие пяти owned PID и
