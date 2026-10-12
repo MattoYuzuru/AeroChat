@@ -18,6 +18,7 @@ var errSlotParentsChanged = errors.New("media slot parents changed")
 type slotSpec struct {
 	call, user, participant uuid.UUID
 	create, end             bool
+	extraUsers, extraRooms  []uuid.UUID
 }
 
 type slotSnapshot struct {
@@ -31,6 +32,7 @@ type slotTransaction struct {
 	q        *ql.Queries
 	snapshot slotSnapshot
 	calls    map[uuid.UUID]ql.RtcCall
+	rooms    map[uuid.UUID]ql.RtcMediaRoom
 }
 
 func sortedSlotIDs(ids map[uuid.UUID]bool) []uuid.UUID {
@@ -46,6 +48,12 @@ func sortedSlotIDs(ids map[uuid.UUID]bool) []uuid.UUID {
 // Все reads повторяются под parent locks и user mutex до какого-либо write.
 func discoverSlot(ctx context.Context, q *ql.Queries, s slotSpec) (slotSnapshot, error) {
 	calls, rooms, users := map[uuid.UUID]bool{}, map[uuid.UUID]bool{}, map[uuid.UUID]bool{}
+	for _, user := range s.extraUsers {
+		users[user] = true
+	}
+	for _, room := range s.extraRooms {
+		rooms[room] = true
+	}
 	if !s.create {
 		calls[s.call] = true
 	}
@@ -121,7 +129,7 @@ func beginSlotTransaction(ctx context.Context, db *pgxpool.Pool, q *ql.Queries, 
 	if err != nil {
 		return nil, err
 	}
-	t := &slotTransaction{tx: tx, q: q.WithTx(tx), calls: map[uuid.UUID]ql.RtcCall{}}
+	t := &slotTransaction{tx: tx, q: q.WithTx(tx), calls: map[uuid.UUID]ql.RtcCall{}, rooms: map[uuid.UUID]ql.RtcMediaRoom{}}
 	fail := func(err error) (*slotTransaction, error) { rollbackMedia(tx); return nil, err }
 	for _, id := range before.calls {
 		call, err := t.q.LockCallByID(ctx, id)
@@ -131,9 +139,11 @@ func beginSlotTransaction(ctx context.Context, db *pgxpool.Pool, q *ql.Queries, 
 		t.calls[id] = call
 	}
 	for _, id := range before.rooms {
-		if _, err := t.q.LockMediaRoom(ctx, id); err != nil {
+		room, err := t.q.LockMediaRoom(ctx, id)
+		if err != nil {
 			return fail(err)
 		}
+		t.rooms[id] = room
 	}
 	for _, user := range before.users {
 		if err := lockMediaUser(ctx, t.q, user); err != nil {

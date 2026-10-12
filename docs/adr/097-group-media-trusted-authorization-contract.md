@@ -209,7 +209,10 @@ slice; implementation ещё не начата. Docs commit предшеству
 
 Public media Leave/End вводятся как additive proto-first commands
 RequestGroupMediaLeave/RequestGroupMediaEnd с call_id и canonical request_id,
-а GetGroupMediaOperation читает authorized status. Старые LeaveCall/EndCall не
+а GetGroupMediaOperation читает authorized status. Контракт выделен в отдельный
+unmounted GroupMediaControlService: existing RtcControlService не расширяет
+gateway interface. Typed stubs возвращают Unimplemented до отдельного adapter
+slice; body/model tuple не становится public capability. Старые LeaveCall/EndCall не
 получают successful left/ended response с pending внутри. Request ID служит
 лишь idempotency correlation; body не выбирает user/session/device, grant,
 room/generation, owner/fence, child actions, authority outcome или ACK.

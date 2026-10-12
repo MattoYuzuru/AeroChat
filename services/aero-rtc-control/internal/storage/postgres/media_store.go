@@ -136,6 +136,11 @@ func (s *MediaStore) Reserve(ctx context.Context, r media.ReserveRequest) (media
 	if err != nil {
 		return media.Grant{}, mediaError(err)
 	}
+	if pending, err := mediaEndPending(ctx, q, call.ID); err != nil {
+		return media.Grant{}, mediaError(err)
+	} else if pending {
+		return media.Grant{}, media.ErrPending
+	}
 	if call.Status != rtc.CallStatusActive || call.ScopeType != rtc.ScopeTypeGroup || !call.GroupID.Valid || uuid.UUID(call.GroupID.Bytes) != r.GroupID {
 		return media.Grant{}, media.ErrDenied
 	}
@@ -287,6 +292,11 @@ func (s *MediaStore) Activate(ctx context.Context, key media.Key, fresh media.Au
 		return media.Grant{}, err
 	}
 	defer rollbackMedia(tx)
+	if pending, err := mediaEndPending(ctx, q, g.CallID); err != nil {
+		return media.Grant{}, mediaError(err)
+	} else if pending {
+		return media.Grant{}, media.ErrPending
+	}
 	if g.Authority != fresh {
 		return media.Grant{}, media.ErrDenied
 	}
@@ -339,6 +349,11 @@ func (s *MediaStore) RegisterLease(ctx context.Context, key media.Key, fresh med
 		return media.Lease{}, err
 	}
 	defer rollbackMedia(tx)
+	if pending, err := mediaEndPending(ctx, q, g.CallID); err != nil {
+		return media.Lease{}, mediaError(err)
+	} else if pending {
+		return media.Lease{}, media.ErrPending
+	}
 	if g.State != "active" || g.Authority != fresh {
 		return media.Lease{}, media.ErrDenied
 	}
@@ -754,6 +769,12 @@ func (s *MediaStore) RecordCleanupAcknowledgement(ctx context.Context, c media.C
 func finishMediaParticipation(ctx context.Context, q *ql.Queries, g media.Grant, at time.Time) error {
 	if _, err := q.LeaveParticipant(ctx, ql.LeaveParticipantParams{ID: g.ParticipantID, LeftAt: timestamptzValue(at), UpdatedAt: timestamptzValue(at)}); err != nil {
 		return err
+	}
+	// Даже zero-held parent intent удерживает terminal barrier до room ACK.
+	if pending, err := mediaEndPending(ctx, q, g.CallID); err != nil {
+		return err
+	} else if pending {
+		return nil
 	}
 	count, err := q.CountActiveParticipantsByCallID(ctx, g.CallID)
 	if err != nil {

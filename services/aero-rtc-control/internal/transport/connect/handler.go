@@ -456,3 +456,14 @@ func stringValue(value *string) string {
 
 	return *value
 }
+
+// Эти DTO не открывают capability: fresh-authorized adapter является следующим slice.
+func (h *Handler) RequestGroupMediaLeave(context.Context, *connect.Request[rtcv1.RequestGroupMediaLeaveRequest]) (*connect.Response[rtcv1.RequestGroupMediaLeaveResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("media control adapter unavailable"))
+}
+func (h *Handler) RequestGroupMediaEnd(context.Context, *connect.Request[rtcv1.RequestGroupMediaEndRequest]) (*connect.Response[rtcv1.RequestGroupMediaEndResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("media control adapter unavailable"))
+}
+func (h *Handler) GetGroupMediaOperation(context.Context, *connect.Request[rtcv1.GetGroupMediaOperationRequest]) (*connect.Response[rtcv1.GetGroupMediaOperationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("media control adapter unavailable"))
+}

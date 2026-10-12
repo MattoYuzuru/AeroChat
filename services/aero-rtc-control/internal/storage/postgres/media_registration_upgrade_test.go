@@ -12,7 +12,6 @@ import (
 	chatschema "github.com/MattoYuzuru/AeroChat/services/aero-chat/db/schema"
 	identityschema "github.com/MattoYuzuru/AeroChat/services/aero-identity/db/schema"
 	rtcschema "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/db/schema"
-	media "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/mediastore"
 	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/rtc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -57,15 +56,11 @@ func TestAdmissionRegistrationRegisteredUpgradeRetainsMediaJournal(t *testing.T)
 	if _, err := db.Exec(ctx, "INSERT INTO users(id,login,nickname,created_at,updated_at) VALUES($1,$2,'Registration upgrade fixture',now(),now())", user, "registration."+user.String()[:8]); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := NewRepository(db).CreateCallWithParticipant(ctx, rtc.Call{ID: call.String(), Scope: rtc.ConversationScope{Type: rtc.ScopeTypeGroup, GroupID: group.String()}, CreatedByUserID: user.String(), Status: rtc.CallStatusActive, CreatedAt: now, StartedAt: now, UpdatedAt: now}, rtc.CallParticipant{ID: uuid.NewString(), CallID: call.String(), UserID: user.String(), State: rtc.ParticipantStateActive, JoinedAt: now, UpdatedAt: now}); err != nil {
+	if _, _, err := createLegacyControlFixtureCall(t, db, rtc.Call{ID: call.String(), Scope: rtc.ConversationScope{Type: rtc.ScopeTypeGroup, GroupID: group.String()}, CreatedByUserID: user.String(), Status: rtc.CallStatusActive, CreatedAt: now, StartedAt: now, UpdatedAt: now}, rtc.CallParticipant{ID: uuid.NewString(), CallID: call.String(), UserID: user.String(), State: rtc.ParticipantStateActive, JoinedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
 	store := NewMediaStore(db)
-	grant := mustMediaReserve(t, store, mediaTestRequest(call, group, user))
-	grant = mustMediaActivate(t, store, grant)
-	if _, err := store.RegisterLease(ctx, grant.Key, grant.Authority, uuid.New(), media.Owner{ID: uuid.New(), Fence: 1}, time.Now()); err != nil {
-		t.Fatal(err)
-	}
+	grant := createLegacyControlFixtureGrant(t, db, call, group, user)
 	operation := mustMediaRevoke(t, store, grant)
 	before := registrationMediaSnapshot(t, ctx, db)
 	options.Files = rtcschema.Files
@@ -82,8 +77,8 @@ func TestAdmissionRegistrationRegisteredUpgradeRetainsMediaJournal(t *testing.T)
 		}
 	}
 	var migrations, instances, pending int
-	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM schema_migrations WHERE service_name='aero-rtc-control'").Scan(&migrations); err != nil || migrations != 3 {
-		t.Fatal("registered migration ledger not3")
+	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM schema_migrations WHERE service_name='aero-rtc-control'").Scan(&migrations); err != nil || migrations != 4 {
+		t.Fatal("registered migration ledger not4")
 	}
 	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM rtc_admission_instances").Scan(&instances); err != nil || instances != 0 {
 		t.Fatal("upgrade fabricated registrations")

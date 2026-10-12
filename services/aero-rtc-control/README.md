@@ -128,9 +128,10 @@ ordinary merge generated+verified+published Identity→Chat→registration paren
 
 ## Accepted план public media Leave / End coordinator
 
-План принят координатором 2026-10-12 по ADR097; implementation ещё нет: additive commands с call_id/request_id и
+План принят координатором 2026-10-12 по ADR097; foundation подготовлен только
+как source, без generation/compile/native/runtime validation. Additive commands с call_id/request_id и
 fresh-authorized operation status, immutable parent intent + one-grant children
-и room-generation cleanup journal. Implementation/generation/native ещё UNRUN.
+и room-generation cleanup journal. Live authority/provider adapters не реализованы.
 Own Leave требует exact active auth session/device binding, включая own
 reader/removed subject. End разрешён call creator +fresh eligible Chat role;
 GroupOwner/admin не получает это право автоматически. Новая active own session
@@ -149,3 +150,28 @@ ACK; new leaf не наследует old targets, rotation unsupported. Pending
 neverdelete. Existing lobby/direct off-mode неизменен; SDK/proxy/workers/UI/
 public enable не входят в coordinator foundation. Code только после Accepted
 ADR review/commit, own fresh gates и verified generated published parent merges.
+
+GroupMediaControlService proto расположен в `proto/aerochat/rtc/v1/
+group_media_control_service.proto`. Он не регистрируется app/gateway; все три
+typed stubs — Unimplemented. Existing RtcControlService и gateway interface
+не меняются. `MediaControlStore` принимает validated model Actor/RoomClaim facts,
+а не live Identity/Chat response или trusted SFU/proxy ACK. Reference journal
+complete в native fixture не подтверждает звук/provider absence и не отдаётся
+public клиенту. Authorization/SDK/private ACK adapters — отдельные узкие slices.
+
+Registered additive migration000003 применяется обычным embedded bootstrap;
+ledger теперь содержит четыре RTC migrations. Она удерживает immutable
+intent/children/participants/room targets и pending history. Persisted open End
+barrier действует независимо от constructor policy, включая zero-held phase.
+Own child finalizer освобождает собственный slot после full model action ACK,
+но call/room завершает только parent после всех child и room journals. Empty
+unknown intent не становится complete. Room claim использует DB clock,15s lease
+и guarded monotonic owner/fence/attempt CAS; это не benchmark и не worker loop.
+
+Source tests подготовлены для exact targets/replay/status, observed End↔Join/
+lease barriers, zero-held pending End, rollback/cancel/fence expiry/exhaustion,
+other-room progress и actual registered003 upgrade/repeat retained history.
+Они ещё UNRUN. Старые pre-upgrade fixtures seed primitive SQLC queries под old
+schema; current writers вызываются после registered bootstrap, без42P01 bypass.
+Native profiles/schema ownership/heavy queue прежние; до запуска — verified
+published Identity→Chat→registration→guard ordinary merges и fresh freeze.
