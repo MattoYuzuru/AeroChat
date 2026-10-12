@@ -300,6 +300,73 @@ generation/full gates/publication — ordinary merge generated, verified и
 published parents, новый clean freeze и собственные receipts. До actual
 trusted ACK acceptance public media complete не заявляется.
 
+### Авторизация публичного media control и свежесть запроса
+
+Уточнение Accepted координатором 2026-10-12 после review source и Go 1.25
+для отдельного unmounted adapter slice. Этот docs commit предшествует коду.
+
+Existing RTC не имеет AuthContext/JWT middleware: public handler читает bearer
+из request Header, legacy GetCurrentProfile возвращает лишь user ID. Existing
+opaque sessionv1 остаётся прежним; adapter принимает ровно один nonempty Bearer
+через EqualFold scan ВСЕХ Header map keys/values (без Get/Values-only selector),
+отвергает duplicate/casing aliases/comma/control и вызывает ResolveSessionBearer. Body
+содержит только existing call/request/operation IDs, не Actor/auth/group facts.
+Full active user/session/device tuple и revisions проверяются actual private
+Identity; source DTO не содержит exp/crypto-device trust/source expiry timestamp.
+SFU JWT/token policy и Go27/pinned SDK остаются отдельным следующим контрактом.
+
+Typed identity-only OwnStatusSubject/read и saved same-user LEAVE replay из
+новой active session используют только текущую Identity subject, без Chat calls,
+без fabricated RoleRemoved/Reader и без old-target/replacement mutation. Final
+CheckBoundSession проверяет текущую resolved session, не session из old receipt.
+Новый LEAVE требует exact held tuple и genuine Chat PRESENT/reader или REMOVED
+со своим validated group/user/epoch. NOT_FOUND/unavailable не превращаются в
+REMOVED. END command/replay/status каждый раз требует immutable creator и
+fresh PRESENT eligible role; GroupOwner/admin другого user это право не даёт.
+
+Outer HTTP wrapper создаёт один child context min(incoming deadline,5s) в начале
+ServeHTTP ДО Connect body decode. Actual ResponseController.SetReadDeadline(D),
+SetWriteDeadline(D) и MaxBytesReader4KiB/bounded read ограничивают body/decode;
+unsupported/error не допускает Connect/source/domain work. Raw header phase
+уже прошла: отдельный server ReadHeaderTimeout<=5s/MaxHeaderBytes8192, без claim
+охвата raw headers request D или exact8192wirecutoff с Go bufio slack. D общий
+для source calls, DB wait/recheck/commit/final snapshot и response. Facts
+request-local и истекают в D;
+никакого source expiry/JWT поля или per-hop renewal не вводится. Последние
+сетевые source checks выполняются до RTC TX/locks. Guarded writer получает
+required local func(context.Context)error, сформированный AuthorizedService:
+только ctx/deadline/time/immutable tuple validation, без network/DB callbacks.
+Он проверяется до TX, после sorted binding recheck, до первой journal mutation
+и перед ОБОИМИ commit paths (new intent/saved replay); nil/expired evidence
+запрещает mutation/replay. Сетевые source callbacks под locks отсутствуют. Unguarded
+model Request не становится public adapter entry. Это local freshness, не
+atomic auth transaction между сервисами: source-event recovery закрывает race
+после последнего lookup, а postcommit timeout/response loss остаётся uncertainty.
+
+Constructor-only typed HTTPS clients принимают dedicated verified CA и sole RTC
+leaf/clientAuth/expiry/TLS1.3/standard hostname checks; redirects/envproxy/plaintext/
+caller override запрещены, exact2Identity/1Chat methods only. Секреты/body/IDs не
+пишутся в logs/errors; static method/status/duration. Existing app/gateway не
+mount отдельный service, oldthree typed stubs остаются Unimplemented; только
+own native fixture создаёт explicit authorized factory. DTO/proto/schema и
+production media flag не расширяются. Request5s inherited private caps и
+bounded body/header policy подтверждаются actual owned3domain TLS/PG fixtures.
+OWN read deadline очищается только full body EOF+live ctx до ServeHTTP return;
+unread/error/expired body не продлевается, connection/stream не переиспользуется.
+OWN write deadline сохраняется через net/http finish flush; buffered write
+не доказывает delivery за5s. OWN server finite ReadTimeout/WriteTimeout<=5s
+ограничивает cleanup unsupported writer/early auth reject. До error response
+HTTP1 получает close-after-error; wrapper не вызывает blocking Body.Close или
+unbounded drain, net/http finishRequest завершает original body под D/fallback.
+HTTP2 завершает лишь own stream; Connect/source work не вызывается. Slow raw header/body/cancel/keepalive проверяются
+отдельно. Gateway404 native phase только после остановки Id/Chat, max3native;
+source-only gateway evidence явно static, не actual404.
+
+До actual trusted provider proof public outcome ВСЕГДА PENDING с fixed reason,
+даже если local/model journal complete/known или fixture RoomClaim ACK. Body/
+header/constructor boolean не включает COMPLETE. SDK/proxy/admission token/
+cleanup workers/UI/runtime и реальный group audio остаются отдельными slices.
+
 ### Identity source delivery journal
 
 Identity sender — отдельный default-disabled implementation slice. Migration
