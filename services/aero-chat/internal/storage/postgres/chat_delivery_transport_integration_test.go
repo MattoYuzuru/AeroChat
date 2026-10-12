@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -109,7 +110,22 @@ func chatSenderReceiverDB(t *testing.T, ctx context.Context) (*pgxpool.Pool, str
 	if err := dbbootstrap.Apply(ctx, db, dbbootstrap.Options{ServiceName: "aero-chat", Files: chatschema.Files, Logger: logger}); err != nil {
 		t.Fatal("owned Chat prerequisite bootstrap failed")
 	}
-	return db, cfg.ConnConfig.ConnString()
+	// ConnString возвращает исходный DSN без изменённых RuntimeParams.
+	// Отдельному процессу передаём те же owned search_path/application_name явно.
+	connectionURL, err := url.Parse(dsn)
+	if err != nil || (connectionURL.Scheme != "postgres" && connectionURL.Scheme != "postgresql") {
+		t.Fatal("owned RTC profile requires PostgreSQL URL")
+	}
+	query := connectionURL.Query()
+	query.Set("search_path", name)
+	query.Set("application_name", name)
+	connectionURL.RawQuery = query.Encode()
+	receiverDSN := connectionURL.String()
+	receiverConfig, err := pgxpool.ParseConfig(receiverDSN)
+	if err != nil || receiverConfig.ConnConfig.RuntimeParams["search_path"] != name || receiverConfig.ConnConfig.RuntimeParams["application_name"] != name {
+		t.Fatal("native receiver schema binding missing")
+	}
+	return db, receiverDSN
 }
 
 type chatSenderProcess struct {
