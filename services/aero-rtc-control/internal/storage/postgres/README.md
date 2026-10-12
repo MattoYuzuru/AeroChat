@@ -113,3 +113,11 @@ worker→worker→root и PASS всех шести native registration cases, 21
 Все три допустимые ветви присваивают значение, default возвращает ошибку;
 объявление без инициализации сохраняет mapping. Fresh exact-source whole gate
 после исправления ещё не выполнялся; partial native PASS его не заменяет.
+
+Guard whole `check-xvgt19vx` на `855df3d` завершился FAIL в трёх fixture setups
+с SQLSTATE23514 (`rtc_calls_end_fields_check`), до соответствующих guard assertions.
+Остальные пять guard groups и все шесть native registration cases прошли без
+actual test SKIP; это partial evidence, не whole PASS. Ended setups задают допустимый
+`end_reason='manual'`, active reset очищает `ended_at`, `ended_by_user_id` и
+`end_reason`; schema, production и assertions сохранены. Исправленные setups
+и новый exact-source whole gate пока UNRUN.
