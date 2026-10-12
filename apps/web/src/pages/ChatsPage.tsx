@@ -1,6 +1,7 @@
 import {
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -93,6 +94,9 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     [windowLocation.search],
   );
   const [composerText, setComposerText] = useState("");
+  const [isComposerSending, setIsComposerSending] = useState(false);
+  const composerSendInFlightRef = useRef(false);
+  const composerVersionRef = useRef(0);
   const [composerError, setComposerError] = useState<string | null>(null);
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
   const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
@@ -692,6 +696,54 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     encryptedPageSize < encryptedDirectMaxPageSize;
   const encryptedAttachmentDraft = encryptedMediaAttachmentDraft.draft;
   const uploadedEncryptedAttachmentDraft = encryptedMediaAttachmentDraft.uploadedDraft;
+  const composerCompletionRef = useRef({
+    chatId: null as string | null,
+    replyId: null as string | null,
+    editId: null as string | null,
+    markSendSucceeded: encryptedMediaAttachmentDraft.markSendSucceeded,
+  });
+  useLayoutEffect(() => {
+    composerCompletionRef.current = {
+      chatId: selectedThread?.chat.id ?? null,
+      replyId: selectedEncryptedReplyMessageId,
+      editId: editingEncryptedMessageId,
+      markSendSucceeded: encryptedMediaAttachmentDraft.markSendSucceeded,
+    };
+    return () => {
+      composerCompletionRef.current.chatId = null;
+    };
+  }, [selectedThread?.chat.id, selectedEncryptedReplyMessageId, editingEncryptedMessageId,
+    encryptedMediaAttachmentDraft.markSendSucceeded]);
+
+  function replaceComposerText(text: string) {
+    composerVersionRef.current += 1;
+    setComposerText(text);
+  }
+
+  function completeSentComposer(
+    chatId: string,
+    version: number,
+    replyId: string | null,
+    editId: string | null,
+  ) {
+    const current = composerCompletionRef.current;
+    if (current.chatId !== chatId) {
+      return;
+    }
+
+    current.markSendSucceeded();
+    if (
+      composerVersionRef.current !== version ||
+      current.replyId !== replyId ||
+      current.editId !== editId
+    ) {
+      return;
+    }
+
+    replaceComposerText("");
+    setSelectedEncryptedReplyMessageId(null);
+    setEditingEncryptedMessageId(null);
+  }
   const activeReadStatusLabel =
     selectedThread === null
       ? "Без видимого read state"
@@ -714,11 +766,13 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
           ? "accent"
           : "neutral";
   const canPickEncryptedAttachment =
+    !isComposerSending &&
     !chats.state.isSendingMessage &&
     !encryptedMediaAttachmentDraft.isUploading &&
     editingEncryptedEntry === null;
   const canUseEncryptedMediaNoteEntry =
     selectedThread !== null &&
+    !isComposerSending &&
     !chats.state.isSendingMessage &&
     !cryptoRuntime.state.isActionPending &&
     !encryptedMediaAttachmentDraft.isUploading &&
@@ -737,6 +791,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     voiceNoteRecorder.state.status === "recorded";
   const canSendEncryptedDirectMessageV2 =
     selectedThread !== null &&
+    !isComposerSending &&
     !chats.state.isSendingMessage &&
     !cryptoRuntime.state.isActionPending &&
     !encryptedMediaAttachmentDraft.isUploading &&
@@ -854,7 +909,13 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   }
 
   async function handleEncryptedDirectMessageV2Send() {
-    if (selectedThread === null) {
+    if (
+      selectedThread === null ||
+      composerSendInFlightRef.current ||
+      chats.state.isSendingMessage ||
+      cryptoRuntime.state.isActionPending ||
+      encryptedMediaAttachmentDraft.isUploading
+    ) {
       return;
     }
 
@@ -869,6 +930,12 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
 
     setComposerError(null);
     chats.clearFeedback();
+    composerSendInFlightRef.current = true;
+    setIsComposerSending(true);
+    const submittedVersion = composerVersionRef.current;
+    const submittedChatId = selectedThread.chat.id;
+    const submittedReplyId = selectedEncryptedReplyMessageId;
+    const submittedEditId = editingEncryptedMessageId;
 
     try {
       const attachmentDrafts =
@@ -894,17 +961,20 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
       }
 
       publishLocalEncryptedDirectMessageV2Projection(result.localProjection);
-      setComposerText("");
-      setSelectedEncryptedReplyMessageId(null);
-      setEditingEncryptedMessageId(null);
-      encryptedMediaAttachmentDraft.markSendSucceeded();
+      completeSentComposer(submittedChatId, submittedVersion, submittedReplyId, submittedEditId);
     } catch (error) {
+      if (composerCompletionRef.current.chatId !== submittedChatId) {
+        return;
+      }
       encryptedMediaAttachmentDraft.markSendFailed();
       setComposerError(
         error instanceof Error && error.message.trim() !== ""
           ? error.message
           : "Не удалось отправить сообщение.",
       );
+    } finally {
+      composerSendInFlightRef.current = false;
+      setIsComposerSending(false);
     }
   }
 
@@ -931,7 +1001,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
       publishLocalEncryptedDirectMessageV2Projection(result.localProjection);
       if (editingEncryptedMessageId === message.messageId) {
         setEditingEncryptedMessageId(null);
-        setComposerText("");
+        replaceComposerText("");
       }
       if (selectedEncryptedReplyMessageId === message.messageId) {
         setSelectedEncryptedReplyMessageId(null);
@@ -1953,7 +2023,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                                 : () => {
                                     setEditingEncryptedMessageId(item.messageId);
                                     setSelectedEncryptedReplyMessageId(item.replyToMessageId);
-                                    setComposerText(item.text ?? "");
+                                    replaceComposerText(item.text ?? "");
                                     setComposerError(null);
                                     chats.clearFeedback();
                                   },
@@ -2164,7 +2234,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                           onClick={() => {
                             setEditingEncryptedMessageId(null);
                             setSelectedEncryptedReplyMessageId(null);
-                            setComposerText("");
+                            replaceComposerText("");
                           }}
                           type="button"
                         >
@@ -2369,7 +2439,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                           }
                           maxLength={4000}
                           onChange={(event) => {
-                            setComposerText(event.target.value);
+                            replaceComposerText(event.target.value);
                             setComposerError(null);
                             chats.clearFeedback();
                           }}
