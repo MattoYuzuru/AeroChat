@@ -387,6 +387,44 @@ actual info/mod/zip/ziphash SHA независимо сверены root. Closur
 provider build и group audio ещё не проверены; GitHub403 publication guard
 сохраняется. Transitives автоматически не скачивались.
 
+Focused diagnostic07 использовал retained DB06/bucket06 и те же проверенные
+3f63 binaries/bundle, с новым current5PID/commonPG/8health proof и фиксированным
+900s окном. Исторический core33 служил только происхождением test profiles и
+идентификаторов, его PASS не переносился на diagnostic07. `check-oef_b3sw`
+FAILED на точной проверке `textarea-fully-visible`, без cleanup errors.
+Actual320×568: pinned row166.984px, composer card20.797px, textarea63.438px;
+thread306.086px распределён на hero67.391/pin166.984/history71.398/composer0.3125.
+Полезная history48.6px сохраняется, focused textarea обрезан. Root независимо
+прочитал измерения/screenshot/receipt и проверил after-exit PID/PG/profile/port.
+Новый isolated mobile170 candidate готовит docs-first уточнение и faithful
+pinned/tombstone fixture; production CSS ещё не изменён, baseline RED впереди.
+
+`check-t2cc65xe` FAILED с четырьмя partial PASS, precise substep
+`peer-explicit-return-click`. Actual LeaveCall200/finished, ended tracks B,
+закрытие всех старых peers A и его один живой muted capture подтверждены.
+После authoritative Leave UI B показывает «Присоединиться», «Вернуться»
+отсутствует; исходный locator теста ошибочен. Root независимо проверил witness,
+receipt/source и after-exit ownership. Узкая source correction ждёт exact Join
+и Returncount0, сохраняя capture/mute/newpeer/audio/End/permission assertions.
+Её `check-dhnzvf0_` FAILED до запуска браузера: при старте осталось277s вместо
+обязательных300s. Corrected scenarios остаются UNRUN, срок не продлевался.
+Отдельное actual UI «Сбой» при connected RTP пока не объяснено полностью:
+source сохраняет failed terminal state, но исходное failure событие неизвестно.
+
+Owner STOP07 `check-zbg8ea7l` PASS — только setup/teardown. Root0137 независимо
+подтвердил отсутствие всех пяти PID/commonPG, ECONNREFUSED native4/preview,
+неизменные exact десять main9 объектов и live verify0. Все данные, historical
+FAIL и source packets сохранены; старый runtime не перезапускается ради retry.
+
+Verified LiveKit/JWT source review подтвердил API/license и выявил109 известных
+declared dependency bounds,61 отсутствующий exact go.mod и65 отсутствующих
+quartets. Это input/cache inventory, полный MVS graph ещё UNKNOWN. Root0135
+проверил compact109 rows, primary SHA и шесть retained byte comparisons;
+новых transitives/Go/ZIP/code не исполняли. Token profile остаётся Proposed:
+нужны явные JSON empty/null правила перед permissive RoomConfig decoder,
+deadline по actual TLS leaf.NotAfter и отказ от пустого configured secret.
+Следующий metadata-only graph plan готовится отдельно от двух seed assets.
+
 Owner штатно остановил runtime05: `check-_zlznsfr` PASS подтверждает setup/teardown
 и неизменность source261. Независимо проверены отсутствие пяти owned PID и
 их process group, закрытые native/preview ports и неизменность main9. DB05,
