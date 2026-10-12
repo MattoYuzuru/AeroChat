@@ -35,9 +35,9 @@ Mute/unmute принадлежит пользователю, remote unmute за�
 
 Для четырёх участников при плановом Opus payload 32 kbit/s SFU получает около 128 kbit/s и отправляет около 384 kbit/s до transport overhead; это арифметический budget, не benchmark. До увеличения лимита измерить CPU, actual bitrate/loss/jitter, packet retransmit и overhead на согласованном стенде. SFU host ports/TLS/public IP и TURN credentials отделены от существующего 1:1 coturn contract; collision и forced relay проверяются runtime owner. SDK грузится lazy при первом group call.
 
-### Local call capture ownership — Proposed clarification
+### Local call capture ownership — Accepted clarification
 
-Статус уточнения: **Proposed**, требуется отдельный review перед реализацией; основной ADR остаётся Accepted. Этот раздел не означает, что browser owner уже реализован или group media включён. [План узкого slice](../product/local-call-capture-owner-plan.md) отделяет local capture от authoritative admission.
+Статус уточнения: **Accepted** — coordinator принял call-only foundation scope 2026-10-12. Этот раздел не означает, что browser owner уже реализован или group media включён. [План узкого slice](../product/local-call-capture-owner-plan.md) отделяет local capture от authoritative admission.
 
 Для direct и будущего group runtime предлагается один local **call-capture slot на app instance**, а не отдельный slot на user. Его lifetime: `capture_pending → retained → closing → released`. Synchronous acquire выполняется до capture; успешный join сохраняет lease до собственного полного teardown. Mute, peer recovery, потеря focus и minimized desktop окно не освобождают lease. Conflict виден пользователю; auto-switch и остановка чужого owner запрещены.
 

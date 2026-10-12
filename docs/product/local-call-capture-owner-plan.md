@@ -1,6 +1,6 @@
 # План реализации local call capture owner
 
-- Статус: Proposed; code начинается только после review уточнения [ADR-089](../adr/089-group-audio-sfu-and-admission-boundary.md#local-call-capture-ownership--proposed-clarification).
+- Статус: Accepted scope — coordinator разрешил source-only реализацию 2026-10-12 по уточнению [ADR-089](../adr/089-group-audio-sfu-and-admission-boundary.md#local-call-capture-ownership--accepted-clarification); выполнение checks и публикация требуют отдельного exact-source review/window.
 - Задача: [#176](https://github.com/MattoYuzuru/AeroChat/issues/176), отдельный frontend foundation slice.
 - Исходный pin: `dc46673c6aeb0527ae1cd67ebe7d3aca1ca0cdbf`, local integration assembly. Этот whole candidate ещё UNVERIFIED; receipts прежних source pins на новый scope не переносятся.
 - Нет source implementation, SDK/group media activation или выполненных проверок в этом planning checkpoint.
@@ -72,6 +72,6 @@ Capture promise не имеет existing abort API. Cancel/unmount запрещ�
 
 ## Review, publication и rollback
 
-Текущий checkpoint меняет только Proposed ADR clarification и этот plan; root review нужен до code. Parent local integration содержит опубликованные feature histories, но ordinary feature-parent lineage/base должны быть проверены отдельно **до публикации**; не пушить assembly как проверенный main и не использовать main base с широким unrelated diff. После выбора parent обычный merge/rebase локально и fresh exact-head receipts; no force push. Старые77df/de09 passes не подтверждают новый capture-owner scope.
+Docs-only clarification принят до code; source implementation и fresh exact-head проверки остаются отдельными checkpoints. Parent local integration содержит опубликованные feature histories, но ordinary feature-parent lineage/base должны быть проверены отдельно **до публикации**; не пушить assembly как проверенный main и не использовать main base с широким unrelated diff. После выбора parent ordinary merge локально и fresh exact-head receipts; no force push. Старые77df/de09 passes не подтверждают новый capture-owner scope.
 
 Риски: indefinite closing permission, неверный auth epoch reset, stale finally, capture вне gate. Rollback — отдельный feature commit, без data migration/сброса drafts/keys; group flag остаётся выключенным. Local arbitration не security boundary. First slice внедряет direct coordination и future group kind contract; дальнейшая группа требует exact SDK/backend DTO/admission/operation-status/ACK handoff и отдельной actual приёмки.
