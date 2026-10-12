@@ -83,7 +83,7 @@ func groupAuthorityDatabase(t *testing.T, legacy bool) (*pgxpool.Pool, context.C
 			t.Fatal(err)
 		}
 		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") || entry.Name() == groupAuthorityMigration {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") || entry.Name() >= groupAuthorityMigration {
 				continue
 			}
 			data, err := chatschema.Files.ReadFile(entry.Name())
