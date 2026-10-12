@@ -413,6 +413,20 @@ type MessageAttachment struct {
 	EncryptedGroupMessageV1ID  pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
 }
 
+type RtcAdmissionFence struct {
+	Singleton bool  `db:"singleton" json:"singleton"`
+	LastFence int64 `db:"last_fence" json:"last_fence"`
+}
+
+type RtcAdmissionInstance struct {
+	LeafFingerprint   []byte             `db:"leaf_fingerprint" json:"leaf_fingerprint"`
+	InstanceID        uuid.UUID          `db:"instance_id" json:"instance_id"`
+	RequestID         uuid.UUID          `db:"request_id" json:"request_id"`
+	RegistrationFence int64              `db:"registration_fence" json:"registration_fence"`
+	State             string             `db:"state" json:"state"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type RtcCall struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	ScopeType       string             `db:"scope_type" json:"scope_type"`
