@@ -506,10 +506,42 @@ token admission в ADR097: strict JSON перед стандартной JWT ver
 общий deadline с actual TLS leaf.NotAfter, свежие Identity/Chat проверки и
 финальный coherent registry/fence read. Это уточнение принятой privacy-модели
 с trusted self-hosted SFU; реализации token/provider оно не заменяет.
-Текущий clean combined HEAD `0a28de4` меняет только два native test pins
-Go1.25.8→Go1.27.2. Root сверил exact diff и 19 source/8 module hashes.
-Свежий whole foundation gate для этого HEAD ещё UNRUN; исторический
-authorization PASS53/826 на `a619981` сюда не переносится.
+Combined HEAD `0a28de4` меняет только два native test pins Go1.25.8→Go1.27.2.
+Его первый fresh whole foundation `check-j5l3nnhr` FAILED на этапе36:
+`TestPostgresGroupLobbyHeartbeatAndCrashEviction` получил `rtc unavailable`
+при начальном StartCall, до heartbeat/crash loop. Actual PostgreSQL log
+подтвердил отсутствие `rtc_media_control_intents`: тест применял только
+начальную миграцию, а production bootstrap уже применяет все зарегистрированные.
+Root0186 подтвердил raw639 TestPASS/0 TestSKIP, отдельные шесть package events
+«no test files», закрытие16 children/PG и отсутствие восьми native schemas.
+Этот FAIL сохранён, оставшиеся этапы на `0a28de4` не считаются выполненными.
+
+Узкий fixture-only commit `c8fec9d` в отдельной ветке применяет полный набор
+зарегистрированных RTC SQL migrations в этом тесте. Production code, assertions
+и тайминги не менялись. Fresh `check-y2m9y5gg` на clean `c8fec9d` PASS:
+57 stages, 854 actual TestPASS, без TestFAIL/TestSKIP; шесть package-only
+«no test files» отдельно. Все обязательные cohorts подтверждены raw Go JSON,
+восемь новых native cases прошли в обоих phases, все11 unit cases прошли.
+Две генерации Buf/SQLC и обе drift checks прошли. Root0188 независимо сверил
+current source/tool/profile hashes, четыре live Go1.27.2 binary metadata с
+VCS `c8fec9d`/modified=false, закрытие32 native children/PG,16 create→absence
+schema records и отдельный read-only PostgreSQL count0. Main9 exact10 не
+изменился; source-bound live verify вернул0. Все семь strict source vulnerability
+scans имеют zero called; module-only GO-2026-5932 в libs/Identity/Chat сохранён
+как ограничение. Это приёмка foundation, authorization adapter остаётся
+unmounted; token/provider/group audio здесь не реализованы.
+
+Fresh native08 на ordinary mobile `1de95227` подготовлен отдельно:
+`check-k_gftemr` PASS — независимый полный local clone; `check-4ty9tjtp`
+PASS — offline frontend install/build и107 dist files; `check-29c07hh8`
+PASS — шесть Go1.27.2 binaries,95 завершённых commands. Root0169/0171/0174
+сверил actual source/build inputs, metadata и отсутствие owned PID/PG.
+Root0185 и отдельный Frontend source review проверили финальные helpers,
+literal-only template bindings и journal4467. Журнал фиксирует только
+закрытые UI/native enums и counts; устойчивый UI «Сбой» при verified RTP
+должен дать отдельный consistency FAIL, исходный dispatch остаётся UNKNOWN.
+Production bundle не менялся. Fresh DB/bucket08 fixture и весь browser flow
+ещё не приняты; подготовка sources/builds не является новым browser PASS.
 
 Metadata v3 использует конечные 188 exact declared pairs и 187 cache inputs.
 `check-qc9e8ww8` FAILED после 127 Go starts: узкий parser не распознал
@@ -523,8 +555,16 @@ Root0166 подтвердил actual Wait/exit1 всех 174 children, отсу�
 clean frozen `a619981` и отсутствие ZIP. Получены 173 official HTTP200
 metadata events/985305 bytes. Graph не завершён, selected-module phase
 UNRUN; package import/build/provider/audio readiness не подтверждены.
-Все ранние FAIL сохранены. Следующий finite declared-edge inventory и
-проверка compiled import closure готовятся отдельно от foundation gate.
+Все ранние FAIL сохранены. Actual metadata v5 `check-zjca2awh` остановился
+на declared go-cmp0.5.5 после216 Go starts, actual v6 `check-nju0l4a4` —
+на declared xerrors20191204190536 после235 Go starts. Неизвестные pairs не
+загружались. Root0177/0183 независимо подтвердил Wait/exit1/PIDPG absence,
+неизменность199/201 cache inputs, exact source8 с двумя scratch seeds и
+отсутствие ZIP. V6 получил234 official HTTP200/1279996 bytes; graph остаётся
+неполным. SOURCE-only V7 выводит девять точных pairs из67 actual stock-written
+go.mod с mirror/stock SumDB lookup h1; Root0187 сверил200 literal require lines
+и три явно указанные quoted Go paths. V7 execution, selected modules и compiled
+import closure ещё UNRUN; token/provider readiness не заявляется.
 
 До общей готовности остаются:
 
