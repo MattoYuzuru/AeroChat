@@ -139,6 +139,19 @@ metadata и preview с сохранением всего текста, tombstone
 Уточнение применяется только к direct/self с pin при высоте до 500 CSS px и
 ширине 500–1179 CSS px; portrait, group и desktop presentation не меняются.
 
+### Уточнение: combined state group composer (Accepted)
+
+В group composer reply, подготовленное вложение и длинная ошибка отправки могут
+сосуществовать. После отказа draft и оба выбранных состояния сохраняются; textarea
+целиком виден после фокуса, в том числе при переходе320×568→568×320 без reload.
+Ширина140 CSS px, высота39 CSS px, полезная history48 CSS px и действия32 CSS px
+сохраняются. Ошибка имеет bounded presentation и доступный текст; overflow reply,
+attachment и feedback остаётся внутри composer без scroll страницы/history.
+Проверка использует production DOM order и длинную ошибку одновременно с reply и
+attachment, а не три отдельных state. Crypto, send/read, auth и backend semantics
+не меняются. Synthetic fixture дополняет свежую native page приёмку и не заменяет
+OS keyboard/touch или физические устройства.
+
 ## Последствия
 
 ### Положительные
