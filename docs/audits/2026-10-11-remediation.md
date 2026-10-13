@@ -742,6 +742,29 @@ Owner сверил203 командных Wait/exit0 и отсутствие203 P
 Root readback этого leaf ещё выполняется. Новые DB/bucket, runtime READY и browser geometry/unread/
 native200%/RTP приёмка пока не выполнялись, подготовка не является их PASS.
 
+Следующий SDK V7 `check-f6k88y9c` прошёл:63 distinct source modules проверены
+штатным Go/SumDB;475 selected packages не имеют Error/DepsError/ForTest,
+98 literal import witnesses связаны с actual GoFiles и SHA исходников.
+Последний `go build -mod=readonly ./tokencompileprobe` завершился exit0
+с пустым stderr. Root0250 независимо сверил235 durable Wait,69 exit0 и166
+промежуточных owned metadata MISS/exit1, отсутствие238 известных PID/двух PG,
+ZIP/proxy byte binding, stock h1/ziphash/signed lookup. Это сборка одного exported
+API package, без исполнения token policy, provider или media runtime.
+
+Один pinned SFU source archive `livekit-server v1.13.9` получен отдельно:
+`check-cmquqjay` прошёл exact Origin commit/module bytes и штатную SumDB-проверку,
+ZIP 1 568 067 bytes. Root0253 сверил9 Wait с последним exit0, отсутствие owned
+Go PID/PG, h1/lookup/ziphash/source Dir. Полная сборка SFU, его transitives и
+runtime не выполнялись. Full source нужен для физического one-AUDIO/MIC gate:
+stock source grants не ограничивают cardinality и не являются такой защитой.
+
+Native11 fixture `check-0dxhspwp` подготовил fresh database/bucket и четыре
+private profiles, services/timer ещё не запускал. Root сверил86 durable Wait,
+отсутствие86 PID/PG, profile SHA/mode0600 и пять закрытых портов. Независимый
+полный review12 выбранных drivers и argv/namespace/version-origin/reserve
+contract не нашёл functional blockers. Запуск fixed runtime2700s и actual
+browser-приёмка разрешены отдельным Root0254; их результат пока не заявляется.
+
 До общей готовности остаются:
 
 - Fresh native geometry, unread/minimized и native200% zoom; завершение actual
