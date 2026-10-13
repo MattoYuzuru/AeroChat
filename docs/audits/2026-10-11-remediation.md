@@ -590,8 +590,27 @@ UNRUN; package import/build/provider/audio readiness не подтвержден
 отсутствие ZIP. V6 получил234 official HTTP200/1279996 bytes; graph остаётся
 неполным. SOURCE-only V7 выводит девять точных pairs из67 actual stock-written
 go.mod с mirror/stock SumDB lookup h1; Root0187 сверил200 literal require lines
-и три явно указанные quoted Go paths. V7 execution, selected modules и compiled
-import closure ещё UNRUN; token/provider readiness не заявляется.
+и три явно указанные quoted Go paths. Actual V7 `check-4pu33toy` остановился
+на следующем declared pair `golang.org/x/net v0.10.0`, который не загружался.
+Root0199 подтвердил 259 завершённых Go children, отсутствие owned PID/PG,
+неизменные 201 cache inputs и восемь metadata inputs с двумя scratch seeds,
+отсутствие ZIP и 258 official HTTP200 / 1341358 bytes. Из 76 проверенных
+actual `.mod` подготовлен следующий конечный frontier V8: 217 literal requires,
+12 новых pairs, всего 224. Root0201 проверил source; graph/list и compiled import
+closure ещё не завершены, token/provider readiness не заявляется.
+
+Отдельный landscape regression на clean `2d2d57c` воспроизвёл обрезание поля
+сообщения: `check-wgd7mjpl`, один тест, один failure, ноль errors/skips.
+Траектория 320×568 → 390×844 → 768×1024 → 568×320 использует production CSS,
+SVG и LegacyAppShell, закреплённое удалённое сообщение и тот же порядок
+заполнения/focus. На 568×320 первым не прошёл `textarea-fully-visible`:
+низ editor 285.921875 px превышает границу clip 276.59375 px. История сохраняет
+48 px, но сумма строк grid превышает доступную высоту thread. Дополнительная
+footer-проверка ещё не выполнялась. Это подтверждает clipping в представительном
+fixture; точные метрики исходного native failure не были сохранены.
+Root0202 независимо сверил receipt, geometry, quiet source и завершение
+наблюдавшихся owned PID/PG, отсутствие profile processes и закрытый порт.
+Первый FAIL сохранён; CSS-исправление и его проверка ещё впереди.
 
 До общей готовности остаются:
 
