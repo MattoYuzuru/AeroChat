@@ -2557,6 +2557,7 @@ export function GroupsPage() {
                       <button
                         aria-label="Управление звонком"
                         className={styles.iconButton}
+                        title="Групповое лобби: аудио пока недоступно"
                         disabled={
                           (selectedGroupCallActions?.canJoin !== true &&
                             selectedGroupCallActions?.canStart !== true &&
@@ -3080,7 +3081,7 @@ export function GroupsPage() {
                         >
                           <div className={styles.messageHeader}>
                             <div>
-                              <p className={styles.messageAuthor}>Звонок</p>
+                              <p className={styles.messageAuthor}>Лобби звонка · без аудио</p>
                               <p className={styles.messageMeta}>
                                 {describeGroupCallPhaseLabel(selectedGroupCallPhase)}
                               </p>
@@ -3094,7 +3095,7 @@ export function GroupsPage() {
                                 </span>
                               )}
                               {selectedGroupCallSelfParticipant !== null && (
-                                <span className={styles.statusPill}>Вы в звонке</span>
+                                <span className={styles.statusPill}>Вы в лобби</span>
                               )}
                             </div>
                           </div>
@@ -3104,7 +3105,7 @@ export function GroupsPage() {
                               {selectedGroupCallEntry === null
                                 ? "Активный звонок завершён."
                                 : selectedGroupCallSelfParticipant !== null
-                                  ? "Вы уже подключены. Можно вернуться, выйти или завершить звонок."
+                                  ? "Вы в лобби. Аудио пока недоступно. Можно вернуться, выйти или завершить звонок."
                                   : selectedGroupCallActions?.isReadOnly
                                     ? "Текущая роль может только видеть состояние звонка."
                                     : "Можно присоединиться к звонку или завершить его по текущим правам."}
@@ -4122,7 +4123,7 @@ function describeGroupCallPhaseLabel(phase: ReturnType<typeof deriveGroupCallUiP
     case "starting":
       return "запуск";
     case "joined":
-      return "в звонке";
+      return "в лобби";
     case "observing":
       return "наблюдение";
     case "ending":
