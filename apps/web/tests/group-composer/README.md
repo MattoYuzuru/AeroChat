@@ -1,0 +1,7 @@
+# Regression group composer
+
+Один сценарий использует production `GroupsPage.module.css`, `ChatGlyph`, attachment metadata formatting и `LegacyAppShell`. Auth/RTC — прежние synthetic adapters `mobile`, без backend и настоящей подготовки ciphertext. Выбор reply и файла93 bytes, заполнение draft и одна локальная неуспешная отправка создают combined reply + uploaded attachment + тот же длинный synthetic error, что native10. DOM order соответствует GroupsPage: reply → attachment → toolbar → error. Предполагаемый дефект заранее не форсируется.
+
+Отправка при320×568 и дальнейшее320×568→568×320 без reload повторяют отдельную combined-state часть native helper. `measure` фокусирует editor, проверяет140/39/48/32, самостоятельный history scroll, natural Tab всех enabled composer/header actions, отсутствие overlap и сохранённый draft. До assertions сохраняются только geometry, scroll и tag-only computed styles; payload/токены/идентификаторы не пишутся. Никаких style injection, ручного reveal/scroll коррекции, retry или изменения старых7/147 fixture.
+
+Запуск только через reviewed agent-dev managed wrapper и Delivery на current Mac, Node22/pnpm10.19/CFT153, offline frozen install, private profile/artifact/JUnit и независимый after-exit PID/PG/profile/port readback. Baseline PASS является невоспроизведением; его нельзя превращать в искусственный FAIL. Fixture не доказывает native page, настоящий transport/crypto, OS keyboard, native zoom или физические устройства.
