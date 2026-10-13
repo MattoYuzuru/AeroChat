@@ -540,8 +540,35 @@ Root0185 и отдельный Frontend source review проверили фин�
 literal-only template bindings и journal4467. Журнал фиксирует только
 закрытые UI/native enums и counts; устойчивый UI «Сбой» при verified RTP
 должен дать отдельный consistency FAIL, исходный dispatch остаётся UNKNOWN.
-Production bundle не менялся. Fresh DB/bucket08 fixture и весь browser flow
-ещё не приняты; подготовка sources/builds не является новым browser PASS.
+Production bundle не менялся. Fresh DB/bucket08/private profiles подготовлены
+`check-fentbxhh` PASS; Root0191 сверил86 actual Wait/expected exits,
+четыре0600 profiles, source/build hashes, отсутствие MC/owned PIDPG и
+main9 exact10. Native08 supervisor запущен с fixed2700s после READY;
+Root0193 подтвердил пять current PID/commonPG и восемь health/readiness200
+с version `1de95227`, current6 binary SHA,107 dist files и profile hashes.
+
+Fresh whole core `check-7rb_4pcb` PASS: все33 stages (21 core +12 media),
+без cleanup errors. Root0195 независимо сверил три lanes × четыре kinds,
+actual ciphertext upload/fetch, decrypt/download SHA и inline image/audio/video
+decode, logout/revoke-session current-document socket witnesses после mutation
+и HTTP200 completion. Failed-send503 — Playwright route.fulfill, не outage
+Gateway. После exit оба owned profile process отсутствуют, preview25173
+закрыт; profile directories сохранены. Live observer выполнился уже после
+36s execution, поэтому отдельные observed PID/PG для core не заявляются.
+
+Fresh layout `check-9kvnmlfa` FIRSTFAIL на `layout-direct-568x320`, после
+actual PASS320×568/390×844/768×1024. Private screenshot показывает clipping
+focused textarea при tombstone pin и нижней navigation. Failing rectangles
+и точный predicate не сохранены helper; три записанных measurements относятся
+только к успешным размерам. Не переносим последнее768 measurement на568.
+WM requests ещё не возникли; unread/minimized/native200%/RTP UNRUN.
+Root0197 подтвердил normal owned STOP (`check-c_nuamac` — cleanup ONLY):
+пять native PID/commonPG,17 observed layout PIDs и три browser/Node PG
+отсутствуют, пять портов закрыты, main9 exact10 и source1de не менялись.
+DB/bucket08, profiles, core PASS и layout FAIL сохранены. Следующий шаг —
+faithful baseline воспроизведение landscape, затем отдельное узкое исправление;
+исходный passing7 fixture также включал rotations, поэтому pin budget пока
+не объявляется единственной доказанной причиной.
 
 Metadata v3 использует конечные 188 exact declared pairs и 187 cache inputs.
 `check-qc9e8ww8` FAILED после 127 Go starts: узкий parser не распознал
