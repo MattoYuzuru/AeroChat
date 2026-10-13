@@ -17,7 +17,7 @@ const {createServer}=await import(pathToFileURL(web+'node_modules/vite/dist/node
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE);
 const port=Number(process.env.PINNED_LAYOUT_FIXTURE_PORT??25174);assert.ok(Number.isInteger(port)&&port>1024&&port<65536);
 const sha=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const files=['pages/GroupsPage.tsx','pages/GroupsPage.module.css','app/AppShell.tsx','app/AppShell.module.css','chats/ChatGlyph.tsx','attachments/metadata.ts'];
+const files=['pages/GroupsPage.tsx','pages/GroupsPage.module.css','app/AppShell.tsx','app/AppShell.module.css','chats/ChatGlyph.tsx','attachments/metadata.ts','chats/DirectComposerFeedback.tsx'];
 const source=Object.fromEntries(files.map(file=>[file,sha(web+'src/'+file)]));
 const server=await createServer({configFile:false,root:here,plugins:[{name:'pinned-layout-fixture',enforce:'pre',resolveId(id,importer){if(importer?.endsWith('/AppShell.tsx')&&id==='../auth/useAuth')return web+'tests/mobile/auth.js';if(importer?.endsWith('/AppShell.tsx')&&id==='../rtc/useDirectCallAwareness')return web+'tests/mobile/rtc.js';if(importer?.endsWith('/harness.jsx')&&id.startsWith('../../src/'))return web+'src/'+id.slice('../../src/'.length);}},react()],resolve:{alias:[{find:/^react$/,replacement:web+'node_modules/react/index.js'},{find:/^react-dom\/(.*)$/,replacement:web+'node_modules/react-dom/$1'}]},server:{host:'127.0.0.1',port,strictPort:true,fs:{allow:[repoRoot,web,here]}}});
 let context,ownedPids=[],interrupted=false;const cases=[],pageErrors=[],cleanupErrors=[];
