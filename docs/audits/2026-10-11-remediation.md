@@ -693,16 +693,33 @@ History48px и documentY0 сохранились. Это новый group TOP cl
 отсутствие native/layout PID/PG/profile processes и пять закрытых портов.
 Данные и первый FAIL сохранены; повторного запуска или продления10 нет.
 
-Готовится отдельный regression combined group state на production CSS/SVG/shell
-с неизменными minima140/39/48/32 и natural focus/Tab. Его baseline ещё UNRUN;
-первый результат будет сохранён до узкого исправления. Для SDK завершён
-source review fixed126 selected version map и43 literal imports/27 module owners;
-разрешён только официальный NoRedirect ZIP header preflight. Загрузка исходников,
-сборка SDK, token policy, SFU provider и group audio ещё не подтверждены.
+Отдельный regression combined group state на production CSS/SVG/shell
+с неизменными minima140/39/48/32 и natural focus/Tab воспроизвёл дефект:
+`check-41ph9ui_` дал один genuine FAIL,0 errors/skips. При568×320 editor top108.344px
+находился выше clip161.188px; history48px сохранилась. Это тот же класс TOP
+clipping, численные bounding boxes не объявляются равными native10.
+После независимого cleanup Accepted ADR/dev commit `0e3775f0` предшествовал
+узкому group feedback исправлению `6081466f`. На clean `d260b48b`
+`check-uqhajh8x` прошёл тот же один случай и два viewport: landscape editor
+235.141–274.328px целиком внутри clip161.188–278.188px, history48px и draft/reply/file
+сохранены. Root0235/0238 сверил raw XML/evidence и актуальное отсутствие owned
+PID/PG/profile processes, закрытый порт. Общий свежий774 gate и actual native11
+по-прежнему требуют отдельных результатов; прежний774 PASS не переносится.
+
+Для SDK завершён source review fixed126 selected version map и43 literal
+imports/27 module owners. Header preflight `check-slyegwjm` подтвердил27 official
+direct HTTP200 без body/Go. Первая compile попытка `check-57s6xbfx` сохранила
+FileExistsError служебного ledger после одного успешного stock Go download:
+immutable writer повторно создавал `children.json`. Исправление ограничено
+уникальными start/exit ledger files. Следующий V5 проверил оба seed ZIP штатным
+Go, но остановился на27 штатных `go: downloading` объявлениях из успешного
+package list: строгий helper не принимал непустой stderr. Ошибки/partial outputs
+сохранены; подготовка узкого parser исправления не считается готовой сборкой SDK.
+Token policy, SFU provider и group audio ещё не подтверждены.
 
 До общей готовности остаются:
 
-- Исправление group combined composer, fresh native geometry, unread/minimized и
+- Fresh774 проверка исправленного group composer, fresh native geometry, unread/minimized и
   native200% zoom; завершение actual
   1:1 leave/rejoin/End/permission matrix. Двухаккаунтный
   core21 и все12 media прошли, native two-way RTP/mute — отдельный partial PASS.
