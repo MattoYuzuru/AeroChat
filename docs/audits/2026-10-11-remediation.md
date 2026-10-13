@@ -703,8 +703,11 @@ clipping, численные bounding boxes не объявляются равн
 `check-uqhajh8x` прошёл тот же один случай и два viewport: landscape editor
 235.141–274.328px целиком внутри clip161.188–278.188px, history48px и draft/reply/file
 сохранены. Root0235/0238 сверил raw XML/evidence и актуальное отсутствие owned
-PID/PG/profile processes, закрытый порт. Общий свежий774 gate и actual native11
-по-прежнему требуют отдельных результатов; прежний774 PASS не переносится.
+PID/PG/profile processes, закрытый порт. Свежий общий gate `check-pvqxm88d` на clean `d260b48b` прошёл18 этапов,
+620 unit, прежние7 pinned и147 уникальных mobile cases, всего774/0 failures/errors/skips.
+Новый group regression отдельно дал1 PASS и в774 не включён. Root0242 сверил
+три исходных XML, завершение21 наблюдавшегося PID/12 PG/10 profiles, закрытый
+порт и неизменные main9/foreign8. Actual native11 остаётся отдельной приёмкой.
 
 Для SDK завершён source review fixed126 selected version map и43 literal
 imports/27 module owners. Header preflight `check-slyegwjm` подтвердил27 official
@@ -717,10 +720,31 @@ package list: строгий helper не принимал непустой stder
 сохранены; подготовка узкого parser исправления не считается готовой сборкой SDK.
 Token policy, SFU provider и group audio ещё не подтверждены.
 
+SDK V6 после узкого принятия известных selected download banners загрузил и
+проверил34 distinct modules штатным Go/SumDB, но `check-1kb157z9` остановился
+на redirect compress1.20.1 к официальному GCS. После разрешения только
+наблюдавшегося exact path следующий `check-bu_79fur` остановился до чтения body:
+ZIP превысил32MiB. Отдельный headers-only `check-sh1k9hat` подтвердил
+40 331 560 bytes, identity, proxy302→exact GCS200. Root проверил оба STOP,
+завершение133/124 Go children и отсутствие owned PID/PG. Для V7 разрешён64MiB
+только exact compress1.20.1, остальные125 selected modules сохраняют32MiB;
+global limits, source import authority и штатная проверка SumDB неизменны.
+Package compile, token policy, provider и групповой звук ещё не подтверждены.
+
+Подготовка native11 продвинулась: `check-912dxjxf` подтвердил source pin текущего
+`d260b48b`, `check-sd5uaanc` выполнил новую production frontend сборку.
+Root независимо сверил все107 свежих файлов, 1 850 182 bytes, SHA/size/pathset
+и отсутствие двух owned stage PG. Четыре backend binaries сохраняют честный
+origin/VCS `ee87682`; шесть backend/build Git objects одинаковы, изменения
+текущего SHA относятся к web/docs. `check-157s3j5m` отдельно выполнил byte-copy четырёх EE binaries и свежую
+сборку двух namespace11 fixture helpers, без новой VCS-атрибуции helper binaries.
+Owner сверил203 командных Wait/exit0 и отсутствие203 PID/PG; независимый
+Root readback этого leaf ещё выполняется. Новые DB/bucket, runtime READY и browser geometry/unread/
+native200%/RTP приёмка пока не выполнялись, подготовка не является их PASS.
+
 До общей готовности остаются:
 
-- Fresh774 проверка исправленного group composer, fresh native geometry, unread/minimized и
-  native200% zoom; завершение actual
+- Fresh native geometry, unread/minimized и native200% zoom; завершение actual
   1:1 leave/rejoin/End/permission matrix. Двухаккаунтный
   core21 и все12 media прошли, native two-way RTP/mute — отдельный partial PASS.
 - Завершение #176: проверенный public authorization adapter, pinned SFU/SDK,
