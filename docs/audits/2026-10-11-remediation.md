@@ -643,6 +643,18 @@ dist, текущие SHA шести binaries, VCS текущего SHA у чет
 Это подтверждает подготовку текущей версии; новая база, runtime и совместная
 browser-приёмка ещё не подтверждены. Старый native08 остаётся остановленным.
 
+Native09 достиг READY на текущем SHA, но `check-hl8zycri` остановился за0.449s
+в preflight wrapper: прежние DB `_08` и bucket `-08` не совпадают с fresh09.
+Первым сработал DB assertion; browser/media scenarios не запускались.
+Root пропустил эти две привязки при source review. Owned STOP выполнен сразу;
+`check-ry5823wg` подтверждает только нормальное завершение supervisor/cleanup.
+Root0223 сверил receipts, отсутствие пяти native PID/common PG и закрытые
+пять портов. Данные09 сохранены, повторного запуска09 нет. Независимый полный
+source review11 файлов нашёл только эти две неверные expectations; исправленный
+immutable wrapper не запускался. Fresh10 готовится с явным reuse четырёх
+неизменных EE binaries и107 frontend files; два fixture-bound helpers требуют
+новой сборки, результаты browser-приёмки по-прежнему не переносятся.
+
 Metadata V11 `check-d3j1bb1c` остановился после416 запусков Go на неизвестном
 `x/net v0.0.0-20210226172049-e18ecbb05110`. Root независимо сверил416 Wait,
 415 HTTP200, неизменные201 cache inputs и восемь metadata files с двумя
@@ -651,6 +663,15 @@ Metadata V11 `check-d3j1bb1c` остановился после416 запуск�
 `check-5x3cu70i` также сохранил первый STOP после426 запусков, на
 `x/sys v0.0.0-20201119102817-f84b799fce68`. Эта версия не загружалась;
 граф, выбор версий, сборка SDK и групповой звук по-прежнему не подтверждены.
+
+Следующий V13 `check-cy44a6u0` завершил metadata graph и выбор версий:445 graph
+попыток и две selected list попытки, последние обе имеют exit0. Root0222 сверил
+все447 Wait,445 промежуточных MISS/exit1 и два финальных exit0,513 official
+HTTP200/2045332 bytes, отсутствие450 owned PID/двух PG, исходники и201 cache
+inputs/copies без изменений, отсутствие ZIP. Actual raw selected JSON содержит
+133 уникальных модуля,126 versioned pairs внутри конечного approved frontier;
+protocol и JWT совпали с точными seed versions. Это завершённый MVS metadata
+этап; package import closure, сборка SDK, token policy и provider ещё не выполнены.
 
 До общей готовности остаются:
 
