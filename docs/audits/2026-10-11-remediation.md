@@ -2,9 +2,11 @@
 
 Статус: работа продолжается; общей messenger/demo-приёмки ещё нет. Tracker — [#178](https://github.com/MattoYuzuru/AeroChat/issues/178), исходный срез — [аудит](2026-10-11-readiness.md). Сохранённая ветка `codex/audit-portfolio-readiness` имеет HEAD `920c72ea6ecf67824a8d2c870693843401833126`; PR [#180](https://github.com/MattoYuzuru/AeroChat/pull/180) содержит baseline assertions/cache regression/Vitest CI и исторические screenshots.
 
-Подготовлен и проверен отдельный feature scope для 27 из 30 remediation issues; #173/#175/#176 остаются в работе. Это количество пунктов, а не процент общей готовности: group audio и combined acceptance ещё не завершены.
+Подготовлен и проверен отдельный feature scope для 29 из 30 remediation issues; #176 остаётся в работе. Это количество пунктов, а не процент общей готовности: group audio и combined acceptance ещё не завершены.
 
-Ниже зафиксированы отдельные draft PR и их проверенный feature scope. Они не merged; issues остаются открытыми. Feature receipts не переносятся на будущий integration HEAD. Изменения auth, crypto registry, storage, RTC и shell не объединяются в один feature PR. На проверенном GitHub-срезе открыты 38 draft PR, #180–#217: одна задача может требовать нескольких узких PR, поэтому число PR не равно числу завершённых issues.
+Ниже зафиксированы отдельные draft PR и их проверенный feature scope. Они не merged; issues остаются открытыми. Feature receipts не переносятся на будущий integration HEAD. Изменения auth, crypto registry, storage, RTC и shell не объединяются в один feature PR. Подтверждено создание 52 draft PR, #180–#231: последний полный readback содержал 50, затем созданы #230/#231. Свежий полный список после блокировки недоступен. Одна задача может требовать нескольких узких PR, поэтому число PR не равно числу завершённых issues.
+
+12 октября в 00:41 UTC root независимо прочитал все 433 completed SUCCESS checks этих 43 опубликованных HEAD. Это датированный срез: локальные sender/registration/feedback revisions и последующие commits документации в него не входят. Для каждого нового HEAD требуется свежий CI readback; общий runtime и device-приёмка этим срезом не подтверждаются.
 
 ## Порядок будущего мерджа
 
@@ -24,15 +26,15 @@ source/native/browser gates и CI для точного SHA. Принимаем�
 | --- | --- |
 | Общий baseline | #180 перед остальными PR |
 | Codegen и media | #182 → #185 → #194 → #206 → #207; #195 после #185 |
-| Delivery | #182 → #190 → #204 и #214; #201 после #182; #186 → #209 и будущий storage maintenance |
+| Delivery | #182 → #190 → #204 и #214; #201 после #182; #186 → #209; #186 + #214 → #227 |
 | Backend RTC | #187 → #191; #199 отдельный lobby/liveness slice |
-| Browser RTC | #181 → #189 → #198 → #215 |
+| Browser RTC | #181 → #189 → #198 → #215 → #226 → #231 (также после #221/#222 и frontend prerequisites) |
 | Auth | #192 → #193; #183 и #188 нужны до Identity media state |
-| Group media foundations | #184 → #202; #202 + #183 + #188 + #192 + #193 + #182 → #208 → #210; #210 + #206 → #213 → #216 → #217 → будущий grant store → source delivery/admission/actual media slices |
-| Frontend maintenance | #211 → будущий #173 PR → будущий #175 PR; #196/#200/#203/#212 отдельные изменения с повторной combined UI-проверкой |
+| Group media foundations | #184 → #202; #202 + #183 + #188 + #192 + #193 + #182 → #208 → #210; #210 + #206 → #213 → #216 → #217 → #219 (также после #191) → #221 → #223 → #224 → #225 → #228 → #229 → #230 → public auth/actual media slices |
+| Frontend maintenance | #211 → #218 → #220; #200 + #212 → #222; #196/#203 отдельные изменения с повторной combined UI-проверкой |
 | Evidence | #205 обновляется по окончательному результату, после feature slices |
 
-Ветки `codex/176-identity-prerequisites` и `codex/176-chat-prerequisites` содержат
+Ветки `codex/176-identity-prerequisites`, `codex/176-chat-prerequisites` и `codex/176-rtc-grant-prerequisites` содержат
 локальные ordinary assemblies перечисленных зависимостей; это не дополнительные
 реализованные features и не замена review каждой исходной задачи. Все конфликты
 и необходимые совместимые правки должны быть проверены на итоговом SHA до
@@ -67,29 +69,73 @@ source/native/browser gates и CI для точного SHA. Принимаем�
 | [170](https://github.com/MattoYuzuru/AeroChat/issues/170) | [212](https://github.com/MattoYuzuru/AeroChat/pull/212), `1afafebba2b9420b35a4ba28ca412cdd6ebe1038` | Fresh full `check-4mu649hv`: frozen install, 147 Chromium geometry cases/0 skips, 392 unit/0 skips, lint/typecheck/build. Actual LegacyAppShell и production CSS с representative conversation DOM: textarea минимум 200.59 CSS px, полезная история минимум 48 CSS px. Synthetic auth/RTC, CSS zoom model; полные message pages, native zoom, iOS/Android keyboard/touch/safe area отдельно |
 | [171](https://github.com/MattoYuzuru/AeroChat/issues/171) | [203](https://github.com/MattoYuzuru/AeroChat/pull/203), `17051f57a0668ce9ea22aaf6d1a0f34fec84fc78` | Реальные Entry/AppRouter/auth components на desktop/mobile synthetic fixtures: один реализованный XP/Aero route, честная copy; actual auth backend отдельный gate |
 | [172](https://github.com/MattoYuzuru/AeroChat/issues/172) | [211](https://github.com/MattoYuzuru/AeroChat/pull/211), `e1f5683e3b8df5fe8f22b49b71f0ec8f8dd7f91e` | Production DesktopShell/modal focus: actual Shift+Tab baseline failure, четыре keyboard browser scenarios, 392 unit/0 skips, lint/typecheck/build `check-4ibns3xx`. Auth/gateway и тела страниц синтетические; actual full-page и OS keyboard приёмка отдельно |
+| [173](https://github.com/MattoYuzuru/AeroChat/issues/173) | [218](https://github.com/MattoYuzuru/AeroChat/pull/218), `c41ba2767d534d468e057b49e5cfaa9d669716ce` | Typed lazy modules и compiler-resolved JS/CSS retry, shared pending/three-attempt exhaustion и focus/draft preservation. Independently verified actual retry `check-ebckh0vf`; final `check-zy2k05st`: 392 unit/0 skips, lint/app+Node build и четыре keyboard scenarios. Raw production static closure 788166→353330 bytes; gzip per-asset estimate 214065→110667 bytes. Heavy pages отсутствуют в cold shell closure; `.resources.json` sidecars обязательны для packaging. Actual App/providers cold trace выполнен на desktop Chromium без throttling; retry auth/gateway/RTC fixtures синтетические. Combined/full-account/mobile budgets отдельно |
 | [174](https://github.com/MattoYuzuru/AeroChat/issues/174) | [209](https://github.com/MattoYuzuru/AeroChat/pull/209), `63373e35948e386b42db8740d7816bca6eae0471` | Defaults/override обоих compose profiles и actual local2s/server4s retention на owned PG/S3 fixture `check-nytq5wpe`: detached expired удалён из DB/S3, fresh и attached controls сохранены; final source/render gate `check-e6wfc1y7`. Сокращённые TTL не являются production retention soak |
+| [175](https://github.com/MattoYuzuru/AeroChat/issues/175) | [220](https://github.com/MattoYuzuru/AeroChat/pull/220), `e280b6896867f1f499dc3f9a74ae2330a64fbc52` | Router/DOM7.18.4, official archives/SHA512 SRI и generated lock; production audit 12→0 advisories. URL/POP navigation получает приоритет перед обратной синхронизацией активного окна; focus-only переход сохраняет window/draft identity. Fresh whole `check-xpjotm6y` independently verified root: frozen install/version/SRI/audit0, 395 actual JUnit/0 failure/error/skip, семь actual StrictMode router scenarios/pageErrors0, lint/app+Node build/source clean. Auth/gateway/RTC/realtime и page bodies синтетические; actual accounts/full-page/mobile acceptance отдельно |
 | [177](https://github.com/MattoYuzuru/AeroChat/issues/177) | [193](https://github.com/MattoYuzuru/AeroChat/pull/193), `5eeceb16009c3ab58091bde2011bf90ca1114948` | Bounded IP/account/process admission, trusted proxy allowlist, Argon work bound и dummy missing-account verification. Fresh followup `check-elh8t08f`: uncached race/coverage libs/go+Gateway+Identity+Chat, vet/lint/gofmt/diff на clean HEAD; native integration-tag не выбран, public abuse/load не выполнялся |
 | [179](https://github.com/MattoYuzuru/AeroChat/issues/179) | [214](https://github.com/MattoYuzuru/AeroChat/pull/214), `886cf5e9e4e699bc07f95708437b90cbcdd939f3` | Go1.27.2/seven modules/CI/five application Dockerfiles и fixed dependencies, strict scanner gate. Fresh source `check-lgf25vrd`: darwin/arm64 official DB zero called, 187 unit/race/0 skips, vet/lint/gen drift/source guards. Five Linux/arm64 archives `check-4am4hkdg`/`check-63bq1ozu`: actual compiler1.27.2, image source labels, four service embedded revisions, hashes. Shared cache, Jobs baseline revision boundary; residual module-only GO-2026-5932 не скрыт. External MinIO/mc closure и compiler — отдельный #163 maintenance; all11 hosted checks run `38175925305` success, combined runtime отдельно |
 
 Точные commands, receipts, coverage и fixtures указаны в bodies соответствующих PR. Нативный PG/S3 evidence, React fixtures с synthetic dependencies и реальные browser/backend scenarios различаются по scope; общий зелёный suite не доказывает весь протокол.
 
+Исторические #173 failures сохранены: `check-99s70las` выявил failed-import cache, `check-br_xnvp_` получил fresh JS200 и Explorer recovery, но остановился на неверном folder selector; test-only correction не ослабила network/draft/focus assertions. `check-k42kbjh7` затем выявил meaningful CSS recovery defect: non-null sheet не подтверждает load. В final c41 повторно используется только собственный stylesheet с подтверждённым load; оба свежих успешных gates относятся к этому HEAD.
+
+Исторические #175 failures сохранены: `check-fyeltope` прошёл frozen install/version/SRI/audit0, затем FAILED на desktop back/forward до unit/JUnit/lint/build. `check-h3wpp4p3` подтвердил Maximum update depth; baseline `check-e9i6qg9e` с Router/DOM7.13.1 и identical routing source hashes воспроизвёл тот же POP loop. Font-only403 ограничивает baseline fixture; visual baseline pass не заявлен. Accepted ADR080 clarification предшествовала узкой correction e280; assertions не ослаблялись. SPA/SSR applicability review не означает blanket отсутствие всех рисков.
+
 ## Незавершённые slices
 
 | Issue | Состояние |
 | --- | --- |
-| [173](https://github.com/MattoYuzuru/AeroChat/issues/173) | Source checkpoint `c41ba2767d534d468e057b49e5cfaa9d669716ce`: lazy modules, compiler-resolved URL/CSS retry, shared pending/exhaustion и focus/draft boundaries. Исторический `check-99s70las` на `9c40ad8` FAILED: повторный React.lazy не обходил browser failed-import cache. Новый `check-br_xnvp_` на `39567a1` получил fresh JS query/status200 и восстановил реальный Explorer, но whole gate FAILED из-за fixture selector: поле создания папки находится в разделе «Папки». Test-only correction `77eaa22` сохранила network/draft/focus assertions. Fresh `check-k42kbjh7` на `77eaa22` FAILED на meaningful CSS retry: failed initial Vite link имел non-null sheet и ошибочно считался успешным; новая CSS request отсутствовала. `c41ba27` использует только stylesheet с подтверждённым собственным load, source-reviewed, новый whole gate ещё не выполнялся. Assertions сохранены; real production bundle/network metrics и PR publication впереди |
-| [175](https://github.com/MattoYuzuru/AeroChat/issues/175) | Source preparation `182e8cda7a7b20ca6c3fc0133ec9660fb59077df`: manifest pin7.18.4 и routing fixtures; lock пока не обновлён. Primary advisory reachability review подготовлен. Official registry identity/SRI, lock update/audit, actual routing/full gates — после #173; SPA неприменимость отдельных SSR/RSC findings не означает отсутствие всех advisory risks |
-| [176](https://github.com/MattoYuzuru/AeroChat/issues/176) | [ADR PR184](https://github.com/MattoYuzuru/AeroChat/pull/184), `db519d15500306cd6e40a41f3f31993102a5f331`, Accepted после выбора пользователя: self-hosted LiveKit с SFU access к audio и предупреждением до join/capture, E2EE отдельно. [Contract PR202](https://github.com/MattoYuzuru/AeroChat/pull/202), `c2c3bc0084b42cafa079914df164ff16584f0bb0`, задаёт admission/revocation state model. [Identity state PR208](https://github.com/MattoYuzuru/AeroChat/pull/208), `1adeb615d5a35d5966ca60623c6d5f688b42f02d`, persistent session/device revisions и atomic source outbox, native PG concurrency/rollback/upgrade/reconnect `check-04t43rc4`. [Private Identity PR210](https://github.com/MattoYuzuru/AeroChat/pull/210), `bcd2c22fdb1ba2db2f98d860c6ca92e2806f6238`, отдельный TLS1.3 listener, fixed RTC URI SAN, fresh tuple lookup; actual PG/Connect/TLS отрицательные проверки обоих методов и repeated codegen/race/vet/lint `check-vze8s7wz`. [Chat state PR213](https://github.com/MattoYuzuru/AeroChat/pull/213), `2db4be042daf2f76420f511d1721c84837b4ec00`, содержит retained eligibility epoch/ID-only outbox, fresh actual PG `check-okluw5ek` и ten hosted checks `38174457080`. Следующий private Chat gate `check-j4z557tm` подтвердил actual TLS/PG method scenarios, но whole gate FAILED на существующем owner-transfer unique-index conflict: CASE UPDATE двух rows зависел от порядка обработки. Узкий atomic owner fix [PR216](https://github.com/MattoYuzuru/AeroChat/pull/216), `0c8c112a1572032c50ef3040279c4a6c53e95ddf`, прошёл fresh whole `check-33c5v446`: five-module race/unit/vet/lint, repeated pinned codegen, actual PG50 test events/14 top groups/0 test skips, включая все три новые OwnerTransfer groups. Root независимо проверил receipt и actual JSON. После обычного owner merge [Private Chat PR217](https://github.com/MattoYuzuru/AeroChat/pull/217), `31965813170d763bf88f2c7a7cce21813600ddac`, прошёл fresh whole `check-my5y7zu3`: actual TLS/PG61 test events/15 top groups/0 test skips, включая private method и все три owner-transfer groups, five-module race/unit/vet/lint/twice codegen/drift. Root независимо проверил receipt и actual JSON. Grant journal после ordinary published API prerequisite merge имеет clean `c343e2ae10cbf2b958529aab23c3c42850243f78`. После historical resource_busy новый whole `check-kc_c0zah` реально выполнялся и FAILED на RTC unit/native stage: все 16 MediaStore top groups запущены, два PASS и 14 FAIL, преимущественно первый Reserve возвращал mapped Unavailable; actual test skips0. Fresh/legacy registered bootstrap lifecycle и room exhaustion были пройдены внутри failed whole run; это не отдельный feature pass. Поздние dedicated native/TLS/build/codegen stages не запускались из-за fail-fast. Safe owned diagnostic готовит fixed operation/PgError code и отдельный candidate query, production source пока не меняет; попытка diagnostic остановилась на resource_busy до driver. Additive migration зарегистрирована через embedded files и автоматически применяется штатным startup/upgrade; только MediaStore не подключён к handlers. Добавлены actual fresh/legacy bootstrap/liveness/Leave regressions, которые ещё должны пройти на final merged prerequisite HEAD. Source delivery/ack/retention, trusted admissions, proxy/SFU/teardown и browser media ещё выполняются; private lookup и journal не group audio |
+| [176](https://github.com/MattoYuzuru/AeroChat/issues/176) | [ADR PR184](https://github.com/MattoYuzuru/AeroChat/pull/184), `db519d15500306cd6e40a41f3f31993102a5f331`, Accepted после выбора пользователя: self-hosted LiveKit с SFU access к audio и предупреждением до join/capture, E2EE отдельно. [Contract PR202](https://github.com/MattoYuzuru/AeroChat/pull/202), `c2c3bc0084b42cafa079914df164ff16584f0bb0`, задаёт admission/revocation state model. [Identity state PR208](https://github.com/MattoYuzuru/AeroChat/pull/208), `1adeb615d5a35d5966ca60623c6d5f688b42f02d`, persistent session/device revisions и atomic source outbox, native PG concurrency/rollback/upgrade/reconnect `check-04t43rc4`. [Private Identity PR210](https://github.com/MattoYuzuru/AeroChat/pull/210), `bcd2c22fdb1ba2db2f98d860c6ca92e2806f6238`, отдельный TLS1.3 listener, fixed RTC URI SAN, fresh tuple lookup; actual PG/Connect/TLS отрицательные проверки обоих методов и repeated codegen/race/vet/lint `check-vze8s7wz`. [Chat state PR213](https://github.com/MattoYuzuru/AeroChat/pull/213), `2db4be042daf2f76420f511d1721c84837b4ec00`, содержит retained eligibility epoch/ID-only outbox, fresh actual PG `check-okluw5ek` и ten hosted checks `38174457080`. Следующий private Chat gate `check-j4z557tm` подтвердил actual TLS/PG method scenarios, но whole gate FAILED на существующем owner-transfer unique-index conflict: CASE UPDATE двух rows зависел от порядка обработки. Узкий atomic owner fix [PR216](https://github.com/MattoYuzuru/AeroChat/pull/216), `0c8c112a1572032c50ef3040279c4a6c53e95ddf`, прошёл fresh whole `check-33c5v446`: five-module race/unit/vet/lint, repeated pinned codegen, actual PG50 test events/14 top groups/0 test skips, включая все три новые OwnerTransfer groups. Root независимо проверил receipt и actual JSON. После обычного owner merge [Private Chat PR217](https://github.com/MattoYuzuru/AeroChat/pull/217), `31965813170d763bf88f2c7a7cce21813600ddac`, прошёл fresh whole `check-my5y7zu3`: actual TLS/PG61 test events/15 top groups/0 test skips, включая private method и все три owner-transfer groups, five-module race/unit/vet/lint/twice codegen/drift. Root независимо проверил receipt и actual JSON. Grant journal [PR219](https://github.com/MattoYuzuru/AeroChat/pull/219) имеет clean `4e042055bc924115da112c2af3f580b29e6213ab`: fresh whole `check-jm72dfch` PASS и независимо verified root. Five-module race/unit/vet/lint (24/74/81/130/101 test events), actual Chat private TLS/owner native61 events/15 top groups и Store36 events/все16 top groups, actual TestSKIP0; RTC build/twice pinned Buf+SQLC generation/drift/source guards PASS. Published stacked draft, base обычной prerequisite assembly3f1; GitHub head/base/body проверены root. Historical whole `check-kc_c0zah` на c343 FAILED (2/16 top groups PASS, actual TestSKIP0); safe owned diagnostic `check-b8hifh0c` подтвердил CreateMediaGrant PgError42P08 и exact cast candidate. Named sqlc PreparedAt/two timestamptz casts сохраняют deadline20s. Whole `check-57vwhzpi` на822 FAILED (15/16 PASS): fault injection ошибочно срабатывал при earlier GetCall. Fixture-only348 ограничил error/cancel exact generated participant lookup и подтвердил blocked-query stage перед cancel. Whole `check-s4i_y_x6` затем прошёл все16 native MediaStore groups/четыре fault-cancel cases/actual TestSKIP0, но FAILED на четырёх lint selectors; поздние dedicated TLS/build/codegen stages не запускались. Lexical-only4e устраняет lint, assertions/SQL/error semantics сохранены. Additive migration зарегистрирована через embedded files и автоматически применяется штатным startup/upgrade. В scope PR219 store ещё не имел transport; описанный ниже PR221 добавляет private source receiver, тогда как public admission/media handlers ещё отсутствуют. В новом receiver checkout Accepted ADR097 clarification committed6832657 до кода: own-domain receipt methods, factual no-match и later admission-only ACK/global registration fence. Private receiver [PR221](https://github.com/MattoYuzuru/AeroChat/pull/221), `19e1550ecf794ffac74bbf65609eb1c9f9791a78`, прошёл independently verified whole `check-thggs9i0`: пять module race/unit/coverage/vet/lint, RTC build, twice pinned generation/drift, actual RTC PostgreSQL54 PASS events/все17 top groups (16 store + actual typed receiver TLS), inherited Chat61/15 top groups, actual TestSKIP/fail0. Default-off mTLS listener предоставляет четыре typed RPC и fixed own-domain ACL. Native tests подтверждают receipt replay/conflict/lost response после commit/cert-domain negatives/наблюдаемую PG cancellation; это не end-to-end source producer и не audio teardown. Source-generation process0/source_changed не считается validation PASS. Root независимо сверил remote head/base/body и все10 CI SUCCESS run38185381556. Identity sender [PR223](https://github.com/MattoYuzuru/AeroChat/pull/223), timestamp correction [PR224](https://github.com/MattoYuzuru/AeroChat/pull/224) и Chat sender [PR225](https://github.com/MattoYuzuru/AeroChat/pull/225) опубликованы после independently verified full native gates и all10 CI SUCCESS каждый. Registration #228 и legacy guard #229 опубликованы после fresh local whole и all10 CI SUCCESS; public coordinator ещё проверяется; доставленный source receipt не означает завершение SFU/audio cleanup. Private receiver/source delivery/ack/retention, trusted admissions, proxy/SFU/teardown и browser media ещё выполняются; private lookup и journal не group audio |
 
 ## Общая приёмка и runtime
 
 Локальная integration-ветка объединяет завершённые slices для общей приёмки; она не публикуется и не merge в GitHub/main. Предварительный backend HEAD `2231e66c5d917ea3fd2bb59465a82224ef2d2272` прошёл повторную pinned generation/drift, uncached race/coverage, vet и lint в `check-s4ddoygp`. Совместимость нового HTTP test fixture #155 с constructor #177 исправлена пятым аргументом `nil`, assertions сохранены. Это ещё не final gate: последующие merges, web suite и runtime-приёмка проверяются заново.
 
-Проверенный local integration source checkpoint `b17897c18697a5f091423b2a42108824f5f49fb7` объединяет завершённые slices, mobile #212, Chat state #213, microphone #215, Go maintenance #214, atomic owner fix #216 и private Chat API #217. Нормальные local merges не затрагивали GitHub/main. Конфликты Go maintenance разрешены с сохранением recovery negative fixtures в CI и exact bin paths в development docs. Это source assembly, **fresh combined gates для этого HEAD ещё не выполнялись**; grant store, lazy/router и последующие group audio slices добавляются отдельно.
+Проверенный local integration checkpoint `77df12ce0f72eaee285f86b5806323c83065c1ed` объединяет завершённые slices, mobile #212, Chat state #213, microphone #215, Go maintenance #214, atomic owner fix #216, private Chat API #217, lazy modules #218, grant journal #219 и Router #220. Обычные local merges не затрагивали GitHub/main. При добавлении #220 разрешён один конфликт docs/README с сохранением всех трёх audit/remediation/router links; production code merged автоматически. Fresh whole backend `check-4wsboq1a` independently verified root: Go1.27.2, repeated pinned generation/drift, uncached race/coverage, 725 actual JUnit/0 failure/error/skip (422 unit/RTC PG и 303 actual Identity/Chat/TLS/PG/S3), все16 MediaStore top groups, vet/lint/source guards. Official DB symbol source gate всех семи modules: zero called; GO-2026-5932 module-only/no fixed version сохраняется в evidence. Fresh whole web `check-ll3p8llp` independently verified root: frozen install, 479 actual JUnit/0 failure/error/skip, lint/app+Node build, семь actual StrictMode router и четыре keyboard scenarios. Source before/after clean/unchanged. Это combined source/native scope; actual full-account browser/runtime02 и будущие group media slices ещё не приняты.
 
-Feature CI #193/5eeceb, #198/166068, #211/e1f568, #212/1afafe и #213/2db4be прошёл все десять checks в runs `38170640131`, `38170970463`, `38168340173`, `38172131198`, `38174457080` соответственно. #214/886cf5 прошёл все 11 checks, включая Go vulnerability gate, в run `38175925305`; #215/358b63 прошёл все десять в `38176047784`. Root отдельно прочитал all10 SUCCESS для #216/0c8c11 (`38177732770`) и #217/319658 (`38178053633`). Эти hosted passes относятся к feature HEAD и не доказывают новый combined runtime. Подготовленный следующий native driver задаёт отдельные owned Identity/Chat/RTC profiles, actual Go JSON tests/zero skipped tests и включает private Chat TLS после его завершения; отсутствие JUnit или fixture не считается нулём skips.
+После независимой проверки #221 выполнен ordinary local merge без конфликтов: следующий integration HEAD `397bdd4c3af11c681f778b0f9e4b0a3428965557`. Его combined source/native/browser gates пока UNRUN; successful receipts77df на него не переносятся. Следующий внешний backend driver дополнительно требует exact native receiver top-level test вместе со всеми16 MediaStore groups.
 
-Microphone gap закрыт узким #215 и свежими synthetic controller/button regressions, но actual native WebRTC/permission acceptance ещё предстоит. В #163 готовится отдельный maintenance followup к исходным pinned upstream sources: Go compiler и resolved storage dependencies проверяются вместе, без переноса application scanner pass на MinIO/mc. Fresh read-only Linux/arm64 source assessment `check-aaovp0ak` FAILED по actual symbol findings: оба module loads/scanner JSON корректны, source hashes сохранены, MinIO38/mc11 called vulnerability IDs. Это static source diagnosis, не доказательство эксплуатации работающего стенда. Lightweight helper/recipe/docs checkpoint `418285c2a0c0b627588cef05caced879f38c159e` source-reviewed, helper tests ещё не запускались; effective overlay/manifest пока не скопированы в repo. Actual owned dependency resolution `check-oy9clwi0` FAILED: оба Go get exit0, MinIO tidy exit1 на removed go-openapi/testify/v2 assert/yaml; mc get/tidy/readonly module list exit0. Original snapshots и оба provider code tree hashes неизменны. Утверждён отдельный MinIO-only test-support compatibility replace2.0.2, совпадающий с [primary Prometheus3.11.3 go.mod](https://raw.githubusercontent.com/prometheus/prometheus/v3.11.3/go.mod); повторный resolver, fresh strict source scans, cold build и runtime впереди. Called threshold/package scope/ID suppression не меняются, application pass не переносится на storage.
+Published #222/f1f3fa был добавлен ordinary local merge в clean `1bb680d831500a59bbf14135d8d36cc41ad23bab`. Три конфликта в ChatsPage разрешены с сохранением useId/useLayoutEffect, единственного раннего объявления content mode и обоих textarea ARIA-атрибутов. Этот промежуточный HEAD не проверялся combined gates. После проверки и публикации revision de09 выполнен ordinary merge без новых конфликтов: local integration `dc46673c6aeb0527ae1cd67ebe7d3aca1ca0cdbf` прошла fresh whole backend `check-iqto718z` PASS15, independently verified root/owner: Go1.27.2, seven-module source/vulnerability gates, pinned codegen/config/twice generation/drift, race/coverage/vet/lint,758 actual JUnit/0 failure-error-skip (455 unit/RTC PG +303 Identity/Chat/TLS/PG/S3), обязательные16 MediaStore+actual private receiver/Identity/logout/crypto/ordering/media groups. Official DB source scans zero called; GO-2026-5932 module-only сохраняется. Это exactdc source/native proof, не browser/account/group-audio proof.
+
+После full source/local/hosted review #226 выполнен ordinary local merge без конфликтов в clean `9e43df6aaae1cd5eeaaf3b0014985a8e71b0dbe4`. Whole tree совпадает с verified784, но новый VCS HEAD требует своих fresh gates; dc/784 receipts не переносятся на него. Свежий exact9e backend `check-isir_uy_` PASS15 и web `check-znqmjlym` PASS18 independently verified root/owner: backend758 actual JUnit (455 unit/RTC PG +303 Identity/Chat/TLS/PG/S3), frontend493 JUnit/14 owner и actual Chromium153 owner20/capture12/mute10/recovery/playback/composer9/keyboard4/router7. Failure/error/TestSKIP0, source unchanged/clean; семь official DB source scans zero called с сохранённым GO-2026-5932 module-only. Owned web fixture listener25174 закрыт. Setup runtime03 FAILED до CREATE/spawn; отдельный actual full-account core04 FAILED на image integrity, затем controlled metadata witness подтвердил timestamp representation defect. Watermark/native zoom и group-media acceptance ещё UNRUN; source/synthetic-hook passes их не заменяют. Integration branch не опубликована и GitHub/main не менялся.
+
+Первый combined backend `check-898ywl53` FAILED после 725 actual passed tests/0 skip: root driver требовал укороченное имя вместо точного `TestPrivateAuthorityActualTLSAndPostgresRevocation`. Сам обязательный тест присутствует и PASS в actual XML. Исправлено только exact name в external driver, исходник77df не менялся; полный свежий повтор `check-4wsboq1a` успешно завершил все stages. Первый FAILED не считается whole PASS.
+
+Feature CI #193/5eeceb, #198/166068, #211/e1f568, #212/1afafe и #213/2db4be прошёл все десять checks в runs `38170640131`, `38170970463`, `38168340173`, `38172131198`, `38174457080` соответственно. #214/886cf5 прошёл все 11 checks, включая Go vulnerability gate, в run `38175925305`; #215/358b63 прошёл все десять в `38176047784`. Root отдельно прочитал all10 SUCCESS для #216/0c8c11 (`38177732770`) и #217/319658 (`38178053633`). #218/c41 также прошёл all10 SUCCESS в run `38181590806`, независимо прочитано root. Root отдельно прочитал all10 SUCCESS #219/4e0420 (`38183127444`) и #220/e280b6 (`38183589410`). Эти hosted passes относятся к feature HEAD и не доказывают новый combined runtime. Подготовленный следующий native driver задаёт отдельные owned Identity/Chat/RTC profiles, actual Go JSON tests/zero skipped tests и включает private Chat TLS после его завершения; отсутствие JUnit или fixture не считается нулём skips.
+
+Microphone gap закрыт узким #215 и свежими synthetic controller/button regressions, но actual native WebRTC/permission acceptance ещё предстоит. В #163 выполняется отдельный maintenance followup к исходным pinned upstream sources. Baseline read-only Linux/arm64 assessment `check-aaovp0ak` FAILED: MinIO38/mc11 called vulnerability IDs; это static diagnosis, не runtime exploit. Resolver `check-oy9clwi0` FAILED на MinIO tidy (removed go-openapi/testify/v2 assert/yaml), mc get/tidy/list PASS. MinIO-only compatibility replace2.0.2 соответствует [primary Prometheus3.11.3 go.mod](https://raw.githubusercontent.com/prometheus/prometheus/v3.11.3/go.mod); resolver `check-410a5h6j` PASS. Original provider code trees/archives/module snapshots сохранены, effective overlays и provenance manifest внесены в clean `fdc8ca0dac5af4fd0680cc5c23fd896a2c251925`. Fresh `check-63rw2zlb` PASS: шесть helper tests/manifest, Linux/arm64 official DB source scan zero called для обоих компонентов и readonly compilation actual Go1.27.2; linked modules соответствуют reviewed MVS. Остались GO-2026-5932 module-only/no fixed version и GO-2026-6443 package-only grpc1.83.1/fixed1.83.2, zero called не означает отсутствие этих findings. Narrow grpc1.83.2 resolver обоих компонентов `check-9t55zhdv` PASS: MVS649/366 неизменен кроме одного patch, provider code/original snapshots unchanged. Exact04 overlays и manifest `2ad58d880c491f9a59ce7646b4bbd03cd1c5780b867e8729d147a4367287b2d4` frozen в clean `adb3a4f47c93b3a9d796a3f1c0585a1a5979888c` с новыми digest tags; Fresh `check-2jrmcxgg` PASS: шесть helper tests/manifest, оба Linux/arm64 official DB zero-called scans и readonly Go1.27.2 compiler, linked MVS250/100 exact04. GO-2026-6443 больше не найден; единственный residual GO-2026-5932 — module-only crypto0.57/no symbol. Original/effective/source hashes unchanged; После review ordinary prerequisites assembly69fbade содержит #186 + #214 и pushed как `codex/storage-maintenance-prerequisites`; clean c370 maintenance source merged эту базу. Старый adb receipt не переносится на c370. Checked-in179 parser reused в согласованном CI-wrapper. Следующий f68 source06, обе отдельные cold builds и ordinary S3 runtime09 прошли; их точный scope указан ниже. Application/browser media acceptance ещё не завершена. Called threshold/package scope/ID suppression не меняются, application pass не переносится на storage; ADR-087 license/operator decision остаётся Proposed.
+
+Storage maintenance clean `f68ccc1572ab288d056fcfb08b6b6bcabe5f5208` содержит strict179 parser/CI wrapper и original-first/effective closures. Fresh source06 `check-lnvg9i0g` independently verified root/owner: шесть maintenance helper + шесть wrapper + четыре current179 parser tests, manifest/actionlint, оба Linux/arm64 official DB symbol scans zero called и actual readonly Go1.27.2 binaries с linked MVS250/100. Только GO-2026-5932 module-only остаётся; threshold/scope/ID suppression не менялись. Historical pre-child BUSY, resolver/scan failures сохранены. Source06 не доказывает выполнение binaries или S3.
+
+Два отдельных fresh named builders выполнили `--pull --no-cache` Linux/arm64 TAR-only builds на f68 без изменения default builder: MinIO `check-7a4ggv0s`/`check-3m7p8z0q` и mc `check-sas0ze8m`/`check-laeiy6dn` PASS. Root независимо сверил actual TAR/layers, platform, source/manifest labels, original archive/LICENSE, все восемь recipe/context files, compiler/buildinfo/linked MVS и binary hashes. Исходный cache каждого builder был пуст; это не утверждение о пустом глобальном daemon cache. Builders остановлены, их own cache volumes сохранены. ADR087 license/operator decision остаётся Proposed; exactf68 опубликован как stacked draft [PR227](https://github.com/MattoYuzuru/AeroChat/pull/227) на published69fb prerequisites (#186 + #214). Root сверил head/base/body/18 files/2291 insertions/16 deletions; Root прочитал все12 hosted completed SUCCESS checks для featuref68. Actual Actions checkout использовал temporary PR merge55a1105 в base69fb; root независимо подтвердил parents69fb+f68 и tree equality с feature, опубликованные ZIP digests и raw/status scanner streams, original archives и все восемь provenance files. Только GO-2026-5932 module-only/no called trace остаётся в обоих raw results. Hosted Linux/amd64 evidence не содержит exported TAR/native binary buildinfo/linked MVS или explicit empty-cache inventory; эти дополнительные доказательства получены локально на Linux/arm64. Literal f68 VCS execution не заявляется.
+
+Storage runtime06 остановился до mutation: exact Docker network-not-found response не совпал с узким CLI guard (`check-3iwz9zkd`/`check-3kqnrdz1` FAIL). В новой reviewed07 эта конкретная проверка уточнена; `check-z68zic4f`/`check-ekpo00o5` FAILED после загрузки только собственного MinIO TAR. Loaded `.Id` равен принятому OCI manifest `673375331d413a4f052d7cdecdb6507751a8d25d8c75782f6a41bc0a7ac729a8`, тогда как driver ошибочно ожидал config digest `bba9c5b58e147d308852542f7190ee219edb4c133c8083c58031615896293d95`. Сверка actual TAR index→manifest→config подтверждает исходный artifact. В момент runtime07 failure MinIO image retained, mc ещё не загружен; env profiles/containers/network/data volume/bucket/S3 probe не создавались. Subsequent strict correction/reuse проверена отдельно в08/09. Оба FAILED неизменяемо сохранены, повтор не считается PASS.
+
+Storage runtime08 `check-rt2fefv_`/`check-gu5q8s32` FAILED после successful strict OCI provenance/reuse, mc load, MinIO startup и mc private-bucket/lifecycle bootstrap. Native SDK helper отказал до первого S3 запроса: exact private profile path оставался привязан к06, driver передал08. Затем JSON formatter в cleanup оказался без закрывающей object brace; исходный failed status/cleanupError сохранён. Отдельная mandatory cleanup `check-p2voob7k`/`check-baki9agg` PASS: остановлен только exact owned MinIO CID6ce714f/project/service/image match, actual Running=false, ports29100/29101 закрыты. Own images/data volume/bucket/private profiles/logs retained; main9 и чужие resources не изменены. Это отдельный cleanup proof, не whole runtime PASS. Этот whole08 не подтверждает SDK region/PUT/presign GET/hash/anonymous denial/delete; следующий09 использует новые helper/driver/project, предыдущие artifacts не заменяются.
+
+Storage ordinary runtime09 `check-bnhv4gki`/`check-i3nqa_7g` PASS independently verified root/owner на unchanged exactf68. Новый отдельный project/volume/private bucket, strict accepted OCI index→manifest→config→layers reuse и actual native Go1.27.2 SDKv7.0.99 подтвердили private policy/versioning/lifecycle, fresh region-unset internal location HTTP200/us-east-1,35-byte PUT, public localhost presigned GET с SHA, anonymous403, exact DELETE и StatNoSuchKey. Helper/body/buildinfo/hash/actual stdout проверены;0 generated-credential matches в owned logs. Exact owned CID32c01f/service/project/image/volume сверены, Running=false и29100–01 закрыты; retained data/profiles/images/logs сохранены. Это ordinary S3/SDK fixture, не application ciphertext/browser/elapsedTTL/provider feature matrix/device/capacity или OS/vendor security closure.
+
+Owned runtime02 был собран на exact77df/Go1.27.2: новый DB/bucket, четыре loopback сервиса и bounded supervisor, bootstrap `check-0a1rw1jk`/`check-p4veaweq` independently verified. Actual full-page Chromium core `check-mkjg916l` FAILED при unchanged source после 11 успешных stages: register двух аккаунтов/friends/direct delivery/reply/edit/pin с receiver reload/history/tombstone/screenshots. Для failed-send stage driver перехватывал `SendEncryptedDirectMessageV2` через Playwright `route.fulfill` и возвращал контролируемый HTTP503; этот отказ не получен от gateway или PostgreSQL. При таком отказе draft сохранился, но feedback находился в скрытом mobile overview; обязательный visible-alert assertion не ослаблялся. Это уточнение источника отказа сохраняет исходный FAILED и подтверждённый UI defect. Enter/reconnect/self/group/four media kinds и последующие stages остались UNRUN; подготовка малых fixtures не означает upload/decrypt/use. Runtime owner остановил все свои PID/listeners в `check-av3_879g`, cleanup proof сохранён, DB/bucket/profiles/logs retained; основной девятисервисный стенд не менялся.
+
+Первая revision followup #170 была опубликована как draft [#222](https://github.com/MattoYuzuru/AeroChat/pull/222), `f1f3fa635da7e5b4a14a1eae1e7eddac95dd0982`, на published #212; ADR083 предшествует code. Historical fresh whole `check-vrugibxg` independently verified root: frozen install, 392 actual JUnit/0 failure/error/skip, lint/app+Node build, 24 feedback browser cases и 147 geometry cases, unchanged clean source. Production feedback JSX/component/send/change handlers проверены через synthetic auth/RTC/HTTP503 adapter; actual backend/accounts этим не доказаны. Root осмотрел short/long mobile screenshots и прочитал все 10 hosted SUCCESS run `38187235274`. Видимый direct/self alert находится внутри собственного composer, сохраняет draft/focus/history, имеет bounded long-error scroll и textarea association.
+
+Текущая опубликованная revision [#222](https://github.com/MattoYuzuru/AeroChat/pull/222) — `de09fcad92b6110781130737db3871d3390906ae`; base — published ordinary prerequisite assembly `76c5c0aec6968facbeb617218935e0a8e770b421` (#212 + #200). Узкая correction меняет только три fixture files: extraction точных production send state/ref/completion helpers и проверку освобождения pending lock после failed send. Новый whole `check-daoz0gqz` PASS, root независимо verified receipt: 11 stages exit0, fresh 392 JUnit/0 failure/error/skip, frozen install/lint/app+Node build, 24 feedback + 9 versioned composer + 147 geometry cases, source unchanged/clean, owned listener 25174 закрыт. Сохранены шесть новых screenshots; root и независимый reviewer осмотрели 320 portrait long/568 landscape short. Root прочитал все 10 completed SUCCESS CI checks run `38193680206` и exact head/base/body/draft readback. Historical f1 PASS не переносился. Это synthetic auth/RTC/crypto-action evidence, не actual account/backend/device/native zoom acceptance. На новом combined source/runtime03 предстоит тот же controlled injected HTTP503. Runtime03/layout-unread03 helpers подготовлены отдельно; процессы, новые DB/bucket и watermark queries ещё не запускались.
+
+Identity source sender имеет опубликованный clean `0d43fd9c53bc5d3bfe0c6d044ebf1203741eb243`, draft [PR223](https://github.com/MattoYuzuru/AeroChat/pull/223) на #221. Accepted ADR097 предшествует journal/worker/client code; требуются все восемь native sender top groups и inherited receiver/Chat groups. После historical source prep d6/f6 и pre-child resource_busy actual pinned SQLC generation `check-gr_w7gl5` завершилась process0/source_changed на f6: reviewed пять generated files committed в `9ad7084e8d2c8ab776d22ebf5cca8023685a8284`; generation не считается validation PASS. Whole `check-91c9hkqy` на 9ad FAILED на двух sender cases: Go 1.25.8 не записал VCS settings из managed worktree с .git-файлом. Reviewed external driver собирает binary из нового independent full clone exact SHA тем же Go, проверяет clone HEAD/tree/clean/GOWORK/GOMOD/effective GOFLAGS и actual binary package/vcs.revision/vcs.modified. Whole `check-pamfggpt` на 9ad прошёл эти build/provenance stages, но FAILED на двух sender cases: owned receiver exited before liveness; дальнейшие stages UNRUN. Source trace обнаружил, что pgx ConnString возвращает исходный DSN без изменённых RuntimeParams, и отдельный процесс терял собственный search_path/application_name. Узкий helper/README fix в 0d явно кодирует и повторно проверяет эту URL-привязку, без вывода credentials и ослабления provenance/liveness assertions. Root и независимый reviewer проверили working diff. Первый fresh whole attempt на 0d остановился до child на resource_busy: stages0, receipt отсутствует, execution UNRUN. Native production receiver по-прежнему проверяется на реальных embedded Identity/Chat prerequisite migrations; /healthz означает только liveness, не downstream readiness. Старые FAILED сохранены. Fresh whole `check-yz_w_ns1` PASS40 independently verified root/owner: пять modules race/unit/coverage/vet/lint, все восемь Identity sender native top groups и inherited Chat/17 RTC groups, actual TestSKIP/fail0, repeated pinned codegen/drift, independent exact-SHA clone и native binary actual VCS0d/modified=false. Remote head/base/body/draft и все10 completed SUCCESS CI run38195754260 прочитаны root. Этот source delivery slice default off; registry receipt не audio teardown.
+
+Chat source sender опубликован как stacked draft [PR225](https://github.com/MattoYuzuru/AeroChat/pull/225), clean `0a77b07f0c970e4fde11533e7da5f01c6b6ada0a`, base #224. После original23a source narrow helper исправил сериализацию own DSN; verified published Identity0d вошёл ordinary merge. Actual SQLC generation `check-ljcrn8iz` process0/source_changed дала четыре reviewed outputs, committed7503; это generation, не validation PASS. Whole `check-jhtiql7w` FAILED на ST1005, lexical-only error-prefix fix4ab сохранил assertions/semantics. Whole `check-vxyaztgd` затем выявил actual existing SQL timestamp=text mismatch42883, исправленный отдельным PR224 ниже. Все failures сохранены.
+
+[PR224](https://github.com/MattoYuzuru/AeroChat/pull/224), clean `3a1d8b818038e9f18fb9952b6f7736d9d08a06ab`, base #223: оба SQL CASE получили named nullable argument с явным timestamptz cast, фактически regenerated bindings сохраняют pgtype ABI. Девять sequential native cases проверяют restricted timestamp/replay/replace, exact23514 existing constraint rejection на restricted NULL и rollback, unrestrict/rerestrict/NULL clear/replay; authority epoch и source delivery не меняются. Historical test expectation FAIL `check-sdegbhpt` сохранён, production constraint не ослаблен. Fresh whole `check-pft_i4j8` PASS40 independently verified root/owner: five-module race/unit/vet/lint, новый top/all9 subcases + inherited native groups, actual TestSKIP/fail0, repeat generation/drift, exact clone/native VCS3a1/modified=false. Все10 hosted SUCCESS run38197585484 прочитаны root.
+
+После ordinary merge published3a1 и единственного README conflict с сохранением обоих разделов новый Chat0a77 прошёл `check-_2zmof92` PASS41 independently verified root/owner: пять modules race/unit/coverage/vet/lint, все девять Chat sender + восемь Identity sender + 17 RTC native top groups, actual TestSKIP/fail0, build/twice pinned generation/drift/source guards. Actual receiver binary построен из independent full exact clone с Go1.25.8/VCS0a77/modified=false. Root сверил published head/base/body/draft и all10 CI SUCCESS. Durable default-off journal/worker/private TLS delivery подтверждены; provider cleanup/public group audio остаются UNRUN. Parent receipt/driver/hash/command/log/source/ancestry guards сохраняются.
+
+Registration slice после ordinary merge published/verified Chat2250a77 получила первый clean local generated `dedd4263581bd458e2b1c392f4a329e7b7e37802`. Accepted ADR097 section committed745ad до source; root/independent reviewer прочитали proto/schema/domain/storage/mTLS wrapper и шесть native top cases. Actual pinned generation `check-s4ek_rrc` process0/source_changed создала только пять reviewed outputs, committeddedd; generation не validation PASS. Первая whole `check-duqnwc7c` FAILED на compile: registration transport fixture содержала unused encoding/pem import. Единственная source correction `3dc52d3f6aa09fe36763905ceb552d4a3d5b8846` удалила этот import; assertions/production/schema сохранены. Новый whole `check-b3bwcono` FAILED только на наблюдении owned PostgreSQL locks в concurrent replay test; остальные пять новых registration top cases прошли в этом неуспешном whole. Actual TestSKIP0, source unchanged; Root reviewed narrow three-file lock-graph fixture correction: оба active workers должны через только owned PID достичь удерживаемой fence-blocking transaction, с actual nonsecret graph witness. Историческая indirect chain не была измерена; Correction committed `7b67b62a5452982cb232eddab2055decf04e2873`; fresh whole `check-irz_smgn` FAILED на compile: два inherited TLS single-worker callers по-прежнему передавали int32 в общий helper, signature которого изменили. Graph witness/pure matrix/native registration на7b этим прогоном не подтверждены. Narrow fixture2a восстановила прежний helper API/body для TLS и выделила exact-three-PID graph helper только для двух concurrent calls. Whole `check-43x2s13s` FAILED до graph witness на JSON decode OID; source69f приводит relation к bigint и выводит только static type metadata. Whole `check-_kxt9jyl` на69f получил два actual rooted graph witnesses и PASS всех шести native registration groups/21 pure graph/privacy/0 TestSKIP, но FAILED на redundant state assignment lint. One-line declaration correction сохраняет все switch branches/default. Новый exact clean `ce6869de3f1d38bfddd5a26136f89515fb4b2baa` прошёл `check-vn09c7jr` PASS41, independently verified root/Front: five-module race/cover/vet/lint, builds/twice pinned generation/drift,678 actual PASS events/0 failures/TestSKIP, все шесть registration cases в full и dedicated native cohorts,21 pure graph/privacy и четыре actual owned worker→worker→root witnesses. Full-clone binary actual VCSce6869/modified=false. Published stacked draft [PR228](https://github.com/MattoYuzuru/AeroChat/pull/228), base2250a77, head/base/body/27 files сверены root. Hosted run38203877281 attempt1: test step SUCCESS, Go job FAILED при внешнем JSON-schema GET timeout до lint analysis; root прочитал actual primary log и назначил один bounded failed-job rerun на том же source. Attempt2 прошёл обязательный Go job, root затем независимо прочитал all10 completed SUCCESS на том же source; source/config не изменялись. Исторический network FAIL сохранён. Persisted instance UUID/global allocation fence привязаны к sole verified admission leaf DER; certificate rotation/predecessor takeover unsupported, registration не audio teardown и не освобождение held media. Регистрация опубликована, group audio остаётся незавершённым.
+
+Legacy mic-slot guard имел source freeze `8d8035843cc25dcfad045bdf85a661073921c9d4`; Accepted clarification committedebaf до кода. Constructor-only default off, sorted parent→room→user locks, typed pending и отсутствие false successful release; source review completed. После all10 CI #228 root независимо проверил ordinary merge preview: все26 inherited files byte-exact опубликованному parent, все11 guard files byte-exact8d, конфликтов нет. Merge committed clean `ade1336bf17c63df4d54312cdb00900f36fa7643`. Actual pinned SQLC `check-ddnq4523` создала только два FULL reviewed outputs, committed855; child0/source_changed не validation PASS. Whole855 `check-xvgt19vx` FAILED в трёх fixture setups на existing end-fields constraint23514. Только три setup SQL приведены к valid manual ended/all-three-null active state. Whole811 `check-_9yf9a74` прошёл все8 guard groups, но FAILED на unused second lease assignment lint; assertions и real RegisterLease сохранены. Narrow fixture-only b9c заменяет unused result на `_`. Exact clean `b9c33650abdfbb50102c92ceb26154f53c51c1e6` прошёл `check-mt8_vxig` PASS41 independently verified root/Front:740 actual PASS events/0 fail/TestSKIP,8 guard +6 registration cases в full/dedicated cohorts, inherited Identity8/Chat9/Store16/receiver1,21 pure graph/privacy,4 actual rooted graph witnesses. Full clone VCSb9c/modified=false/tree/binarySHA independently matched; vet/lint/build/twice pinned generation/drift/source guards PASS. Published stacked draft [PR229](https://github.com/MattoYuzuru/AeroChat/pull/229), base228ce6869; exact head/base/body/14files сверены root. All10 hosted completed SUCCESS run38206459972 для current head независимо прочитаны root. Historical FAIL неизменяемы; constructor default off, model ACK не provider teardown. Отдельный public control foundation имеет Accepted docs commit82b до source preparation: durable Leave/End intents, child/room ACK targets и terminal End barrier; typed public adapter/actual auth/SFU cleanup ещё не реализованы. При followup review source freeze `da31caeccad09e0a5ef1051f887e39956d1235e0` обнаружен duplicate migration002 в registration fixture после применения общей inventory000–003. One-file0e удалил redundant fixture application/import; это source diagnosis, не actual native failure. Docs-only clean `c8b126b28e54c393368a50dab98d9612e5baad6c` закрепил до adapter code identity-only own minimal status и saved same-user Leave replay из новой active session без target mutation; End status требует fresh creator/eligible role. Root независимо проверил ordinary merge preview c8b+b9c:20 own/27 incoming files byte-exact, единственная shared fixture сохраняет registration helpers и убирает только duplicate migration; local merge committed `f08a3a7ee7d82aa831a086721e12d71424fa34e3`. Actual pinned generation `check-rtaeov5g` child0/source_changed создала только пять FULL reviewed outputs, committed `4e6ff3e8c4c9e5451662001f6917f6703f9f7b3a`; generation не validation PASS. Первый whole `check-wtqqnh9q` FAILED до native tests на pgtype.Bool caller mismatch. Narrow source `fe1bbb7f9aa3acc79f6e6da871c208d4a544fdd6` проверяет Valid/Bool и сохраняет failclosed pending. Следующий whole `check-ad__pjcv` наfe1 собрал exact-source production binary и получил425 partial PASS events/0 TestSKIP, но PostgreSQL test package FAILED на unused pgxpool import; native coordinator/inherited PG cases не запускались. Import-only correction `64c02510c059c82678608020cd57657e612c91b3` сохраняет assertions. Оба historical compile FAIL сохранены. Новый exact64c whole `check-w3lhrem2` PASS41 independently verified root/RTC:768 actual PASS/0 fail/TestSKIP,7 Control/8 Guard/6 Registration/16 Store/1 receiver в full и dedicated cohorts,8 Identity/9 Chat,4 actual graph witnesses, full-clone VCS/nativeSHA/source unchanged и twice generation/drift. Published stacked draft [PR230](https://github.com/MattoYuzuru/AeroChat/pull/230), base229b9c, exact head/base/body/26 files сверены root. Все10 hosted completed SUCCESS run38218800260 прочитаны root; literal CI checkout VCS не заявляется. Delivery подтвердил будущий own three-domain TLS/PG fixture scope, но это разрешённый план, не test PASS. Handlers Unimplemented/unmounted, model ACK не SFU proof.
+
+Local call-capture owner опубликован как draft [PR226](https://github.com/MattoYuzuru/AeroChat/pull/226), clean `784675a071628c03b210365e38185e0e2d858d51` имеет Accepted ADR до code. Stable call-only owner и direct hook были проверены source; prior whole1a `check-wa2mtoc2` FAILED после семи browser cases на late-capture-token. Новый узкий четырёхфайловый fix обновляет refresh callback-ref в раннем layout effect и делает fixture faithful immutable per-render/actual awareness loading→ready commits; все20 assertions сохранены и peer-return дополнительно проверяет current PC identity/track/connection event без reacapture. Fresh whole `check-swwqm82u` PASS independently verified root: Node22.23.2/pnpm10.19 frozen install, lint/app+Node build, 493 actual JUnit/14 owner cases/0 failure-error-skip, все20 owner Chromium153 cases/pageErrors0, inherited capture12/mute10/recovery/playback/composer9/keyboard4, source unchanged/clean и owned listener25174 закрыт. Root сверил published exact head/base/body/draft; base — ordinary prerequisite pointerdc. Все12 hosted checks completed SUCCESS runs38200731000/38200731008 независимо прочитаны root. Prerequisite backenddc имеет описанный выше отдельный fresh758-test receipt; frontend PASS сам по себе не подтверждает backend. Group-kind arbitration fixture не actual group SDK/audio; recorder-wide physical microphone exclusion не заявляется. Proxy/SFU/SDK/public auth/status/coordinator/UI и actual three-user group audio остаются незавершёнными.
+
+Hosted #187 сохранил девять успешных checks и historical proto FAIL: runner не установил Buf из-за unauthenticated GitHub API rate limit; proto command не запускался. Root прочитал actual job log и 12 октября 00:25 UTC назначил один rerun failed job на том же `847ba901e41112a86ae82a0b2df5f6d293c90a0b`. Повтор proto завершился SUCCESS в 00:25:46 UTC, включая Setup Buf/lint/generate; root затем независимо прочитал все10 completed SUCCESS checks. Historical infrastructure failure сохраняется; остальных девять jobs не запускали заново, source/gate не менялись.
 
 Следующий предварительный HEAD `0777b964f52c264e476a2c64c96e94906f82c8e9` прошёл frozen web install, 476 tests/84 files/0 skips, lint и typecheck/build в `check-3yrvycru`; одна warning об unused RTC callback dependency остаётся отдельным followup #159. Owned native fixture `browser-acceptance-01` собран на Go1.25.8 с exact version0777, отдельными DB/bucket и четырьмя localhost PID; bootstrap receipts `check-kyc2o4i5`/`check-3fdc05rj`. Настоящий Chromium UI/backend прогон `check-54tyel3s` подтвердил register двух аккаунтов, friend request/accept, direct delivery/decrypt, reply и edit, но весь прогон не прошёл: ожидание live pin у второго участника остановилось. По [ADR-069](../adr/069-encrypted-message-mutations-and-pin-recovery-foundation.md) encrypted pins пока сходятся через server-backed fetch; отдельное live-событие явно deferred. Повтор `check-faxjq2vq` остановился на default #177 register429: четвёртая регистрация с одного loopback IP превысила burst3/refill10m. Защиту не ослабляли; для следующих прогонов подготовлен driver с сохранёнными private browser profiles, планируется явно отдельная synthetic registration policy. General messenger acceptance по этим частичным прогонам не заявляется. Owner остановил четыре своих native PID в `check-x17lm5qa`; данные и bucket сохранены, основной девятисервисный стенд не менялся.
 
@@ -100,3 +146,664 @@ Microphone gap закрыт узким #215 и свежими synthetic controll
 Единственный runtime owner — delivery/runtime. Основной owned compose project `aerochat-remediation-20261011`, профиль `~/.local/state/agent-dev/aerochat-remediation-20261011/fixture.env`; ports/volumes/credentials managed вне Git. Feature-native schemas и S3 UUID keys изолированы; special recovery/readiness projects остановлены в finally без удаления retained volumes. Общий runtime ещё не подтверждает все draft fixes: перед rebuild/cutover нужны quiet source freeze, backup/restore prerequisites и новые receipts. Чужие stacks/volumes/cache не меняются; production/SSH/load/публичное scanning не выполнялись.
 
 После общей приёмки появятся 90–120s honest demo script, 4–6 актуальных screenshots и README с implemented/validated/deferred. Текущие screenshots README — исходный audit fixture. Full E2EE/MLS/key backup/history/offline и отсутствие всех bugs не заявляются.
+
+Combined acceptance04 source9e: отдельный setup `check-4c2_rwce`/`check-6hj8hc8m` PASS, independently verified root/Delivery. Четыре actual native binaries имеют Go1.27.2/VCS9e/modified=false/package и independently matched SHA; private profile modes/hashes и оба helpers проверены. Fresh DB04/bucket04, private policy/versioning/staging lifecycle read-only PASS; main9 не rebuilt/cutover. Historical setup03 `check-lnjyfr33`/`check-58epm3vd` FAILED до CREATE/spawn: optional BuildSetting.Value omitempty не учитывалось driver. Immutable03 partial artifacts сохранены, новая04 устраняет только metadata parsing и fixture paths. Actual two-account/media core `check-ybcl06s2` FAILED на `media-direct-image`:15 prior stages PASS, включая register обоих аккаунтов/friends/direct delivery/reply/edit/pin reload/tombstone/failed-send draft/pending Enter/reconnect и direct file actual ciphertext upload/finalize/decrypt/download SHA. Image recipient показал encrypted-envelope integrity error; последующие media/self/group/logout/revoke/layout/native200%/RTP не исполнялись. Исходный FAIL сохранён. Source review установил raw createdAt в AAD и удаление trailing zeros в WS RFC3339Nano. Первый metadata diagnostic `check-kgfrx_ph` FAILED до history/send: закрытые contexts не сохраняют sessionStorage; никаких wire данных не получено. Отдельный bounded controlled run `check-maef1px9` с новыми login sessions на тех же synthetic accounts получил фактический witness: request/HTTP `.170Z`, WS `.17Z`, same instant/different authenticated string, receiver error0→1/message invisible; один UI reload вернул HTTP `.170Z` и ready/error0. Это воспроизведение дефекта, не успешная общая приёмка. Original image stored/HTTP metadata seq9 `.180Z` согласуется с formatter risk, original WS capture отсутствует. После Accepted docs-first bef548 реализован отдельный narrow timestamp compatibility fix26131; его свежие regression gates описаны ниже. Новый actual full core после исправления ещё не запускался. Sole owner остановил только runtime04 в05:26:11UTC; cleanup `check-te3b2i92` PASS/verify0, все четыре native PID/supervisor отсутствуют и28690–93/25173 закрыты; DB/bucket/profiles/artifacts сохранены. Layout/unread owner proofs, native browser200% и native1:1 RTP ещё UNRUN; физические devices/NAT/TURN/WiFi↔cellular/mobileOS остаются UNVERIFIED по принятому Mac-only ограничению.
+
+Возобновление после лимитов: remote default branch `main` по actual GitHub readback остаётся `eab87dd548ceddbf99570fb275eec39979f576e1`, actual portfolio50/50 draft PR на начальном срезе до новых #230/#231. Timestamp compatibility принята в ADR063/068 до code в отдельном docs-first `bef548285138376845a67351181a3f5d2e6f0840`; Реализация `26131ccefc98e0c9edafc3236193525ae16fdfb8` получила root FULL review шести crypto files и fresh `check-2c841zfy` PASS18:620 JUnit/0 failure-error-skip,127 новых cases direct38/group45/helper44,14 owner unit и20 actual Chromium owner/inherited capture12/mute10/recovery/playback/composer9/keyboard4/router7, source unchanged/listener25174 closed. Independent root/Frontend readback подтверждён. Отдельный Go→wire fixture `check-dsip2ekr` PASS5/0skip, actual Go27.2/protobuf1.36.11/direct+group converters/ProtoJSON на clean9e, сохраняет четыре timestamp representations/instant/nanos. Cross-language consumer и новый full core ещё UNRUN; fixed feature publication отделена от их приёмки. Независимый review требует authentication-only retry, strict entire-string/calendar/millisecond handling и coherent group layers. Старые integration/evidence/launcher checkout paths отсутствуют на текущем диске; исходные commits и private patch сохранены, evidence diff восстановлен на exactad3 в новом managed checkout. Live main9 девять running/healthy/bootstrap0, PG/Redis/S3 и health/readiness200; его Compose config labels указывают на отсутствующий old launcher, поэтому штатный restart ещё не воспроизводим. Стенд не перезапускали.
+
+Timestamp fix опубликован как stacked draft [PR231](https://github.com/MattoYuzuru/AeroChat/pull/231), base226784/head26131; source/diff и successful create response head/base/body сверены root до GitHub403; fresh readback/CI заблокированы. Очередь52 созданных draft PR не означает итоговую приёмку; CI нового feature head проверяется отдельно. Parent-first group chain заканчивается #230, затем идут ещё незавершённые public authority/provider/UI slices.
+
+Отдельный actual Go→WebCrypto consumer `check-bwoq5oxi` PASS10/53 JUnit/0 failure-error-skip на clean26131, независимо verified root/Frontend:16 direct/group×WS/HTTP authenticated projections из actual source9e formatter/ProtoJSON fixture и37 negatives. Источник/producer pins сохранены; это interop regression, не actual full core/audio.
+
+Внешний блокер 12 октября08:26UTC: после successful creation PR231 GitHub API на pr-read231/pr-list вернул HTTP403 permission, «Sorry. Your account was suspended», retryable=false. Все GitHub/gitnetwork/API обращения остановлены, alternative credentials/connector обход не выполнялся. PR231 creation response сохранён, fresh readback/CI и публикация обновления evidence205 недоступны. Новый PR не прикрепился к Codex из-за thread attachment identity count>100; call выполнен, ссылка сохранена. Main merge/deploy не выполнялись; последний remote main snapshot eab87dd. Локальные commits/источники/receipts сохранены; локальная работа продолжается.
+
+## Локальное продолжение 12 октября, после блокировки GitHub
+
+Пользователь поручил продолжать работу локально, пока рассматривается апелляция.
+Восстановлен clean local Git checkout integration на `26131ccefc98e0c9edafc3236193525ae16fdfb8`,
+tree `fd9ea2df3517242a16b972206f2ba8813126951b`. Предварительный merge-tree с
+coordinator `64c0251` не содержит конфликтов: 88 отдельных входящих files совпали
+побайтно, обе общие правки main просмотрены полностью. Это только preview;
+integration merge commit и merge в `main` не выполнялись.
+
+Каталог исходной конфигурации main9 восстановлен на clean detached `a912541`.
+Actual `check-toklv7t_` PASS и независимая root-проверка подтверждают четыре
+source SHA, совпадение всех десяти Compose config hashes с существующими
+контейнерами и отсутствие изменения их IDs/data. Контейнеры не перезапускали;
+VCS actual application binaries этого стенда остаётся UNVERIFIED.
+
+В отдельной local ветке `codex/feat-176-public-control-auth` до кода приняты
+уточнения ADR-097: `8a3afc8` и `bdf91fd`. Подготовлен adapter настоящего opaque
+bearer через private Identity/Chat, scoped own Leave/status, creator-only End,
+guard до mutation/commit и общий deadline 5s. Model ACK не выдаётся за provider
+cleanup: публичный результат пока PENDING. Полный source review завершён;
+отдельный небольшой finding исправлен: casing-alias Authorization map key
+отклоняется даже с пустым списком values. Первый affected-unit запуск
+`check-6tbkgume` FAILED на неиспользуемом import в downstream; исходный FAIL
+сохранён. После удаления только import свежий `check-6e_f4hml` PASS:
+16 test events в трёх packages, все десять новых top-level tests, без TestSkip.
+Root независимо сверил фактический Go JSON, шесть frozen source/test files,
+private clone binding и live verify. Это affected-unit evidence;
+SQLC generation, whole gate и восемь native scenarios ещё UNRUN.
+Native scope использует real Identity main и production Chat
+repository/domain/private TLS listener в test host; это не полный Chat main/Compose.
+
+После полного просмотра native fixtures source сохранён в `aef60813`.
+Одна SQLC generation `check-arvmtlk1` завершила child с exit0 и изменила
+ровно два ожидаемых outputs: source_changed=true/reusable=false, это не test PASS.
+Root полностью просмотрел actual 64-line patch, сверил current bytes и
+неизменность 13 inputs. Generated files сохранены отдельным local commit
+`2e2fe09b`; на этом этапе whole/native gate ещё UNRUN, adapter остаётся unmounted.
+
+Browser05 source и privacy correction просмотрены полностью. Выбраны core v2
+и wrapper v3 с ограниченной очисткой дочернего процесса; входные invite tokens
+маскируются на screenshots. Свежий `check-_2sqs3ga` на clean integration261 прошёл 15 stages:
+758 JUnit tests, без failures/errors/skips, включая native PostgreSQL/S3/private
+TLS scenarios, vet/lint и двукратную generation. Root отдельно сверил XML,
+обязательные test names, source/receipt pins и live verify. Семь symbol scans
+с официальной vulnerability DB не нашли Called findings; module-only
+GO-2026-5932 в x/crypto сохранён как residual, общего security approval нет.
+
+`check-36c6u8l3` PASS: offline frozen install и production web build на261,
+root проверил все 107 dist files. `check-tl2_hxdg` PASS: шесть свежих native
+binaries/helpers, actual SHA/build metadata сверены root; четыре сервиса
+имеют Go1.27.2/VCS261/modified=false. Это сборка, не browser/audio acceptance.
+Source-only drivers подготовки отдельной DB05/bucket05/private profiles
+и bounded runtime05 просмотрены полностью. Разрешена одна попытка fixture
+preparation; запуск native services/timer зависит от её actual receipt и
+независимого подтверждения cleanup. Runtime05 использует одну runner-owned
+process group и фиксированные 45 минут после readiness, без autoextension.
+Исторический core04 FAIL и его частичные результаты остаются неизменными.
+
+Подготовка fixture05 `check-le1olsfe` PASS: отдельные DB05/private bucket05,
+четыре приватных profile. После exit root независимо подтвердил отсутствие
+временного MC-container, неизменность десяти main9 container rows и закрытые
+native/preview ports. Actual runtime05 READY в17:01:52UTC, fixed deadline
+17:46:52UTC. Все четыре health/readiness versions равны261, пять процессов
+имеют одну runner-owned group; final runner receipt требует остановки/cleanup.
+
+Первый core05 `check-3q6u5puo` FAILED на `self-message-reload` с TimeoutError.
+Сохранены 18 partial PASS, включая все четыре direct media round trips:
+actual upload/finalize/ciphertext GET/decrypt/download SHA, inline image/audio/video.
+Root независимо сверил actual receipt, четыре download SHA и отсутствие
+двух owned profile browser PIDs/закрытый preview25173 после exit. Self/group,
+logout/revoke и postcore phases не считаются пройденными. Read-only DB05
+показала один self chat и ноль encrypted messages/deliveries для actual A:
+сообщение не persisted. Последующий bounded diagnostic `check-bzwlyk5y`
+подтвердил ошибку ожидания в тесте: locator находил draft в textarea при нуле
+message rows и нуле Send requests, после чего ранний reload отменял подготовку.
+Это не доказательство потери self-message в продукте. В новой версии core
+ожидаются actual message article и завершённый Send HTTP перед reload.
+
+Исправленный whole core `check-hlq_mbez` FAILED раньше, на direct delivery:
+четыре начальных stages прошли, recipient B показывает сообщение, sender A —
+пустую историю и очищенный composer. Read-only DB metadata отдельно подтвердили
+по одной persisted encrypted delivery для A и B. Source review выявил возможную
+гонку: смена action-state identity crypto context отменяет deferred decrypt,
+а поздний optimistic publish уже подавлен authoritative resolved key. Для
+проверки подготовлены семь случаев с настоящим production React hook и
+synthetic gateway/decrypt adapters. В отдельной ветке до production change
+принято уточнение ADR-064, commit `6cb3eb7`: lifetime задаётся session/chat/device/
+page size/availability, server-backed failure нельзя скрывать optimistic copy.
+Базовая регрессия `check-nuwxr82q` сохранила настоящий FAIL: семь cases,
+два failures в фазе authoritative-visible, пять scope cancellations PASS,
+без bootstrap/page/cleanup errors. При deferred decrypt и уже resolved key
+теряются и ready projection, и authoritative failure. После отдельного
+узкого hook fix `9f5c9ac` те же неизменные семь cases в `check-ozc6zevj` PASS:
+ready даёт одну строку, failure остаётся видимым без optimistic fallback,
+смена chat/token/device и retirement/disabled отменяют прежний результат.
+Root независимо сверил JSON/XML, quiet source и отсутствие owned CFT PID/
+process groups/profile matches/fixture port после обоих запусков; live verify
+исправленного source возвращает0. Это actual production React hook с
+synthetic gateway/decrypt, не новый whole browser core. Full web и native06
+проверяются отдельно. Исходные FAIL сохраняются.
+
+На том же frozen `9f5c9ac` полный web gate `check-j052_zr0` PASS: 18 stages,
+620 JUnit cases без failures/errors/skips, lint и build. В raw browser output
+подтверждены capture/playback, восстановление звонка, composer/keyboard/router
+и отсутствие page errors. Отдельные семь sender cases не повторялись и не
+прибавляются к620. Root сверил XML/stage ledger/current source и независимо
+подтвердил отсутствие восьми новых owned headless main processes, их групп,
+private profile matches и fixture listener; чужие исходные процессы сохранены.
+
+Новый собственный source clone `check-77b47m14` PASS содержит весь Git object
+pack без shared alternates/shallow и clean `9f5c9ac` tree. Backend gate этого
+source `check-vq55ft2u` PASS: 15 stages и758 actual JUnit cases без failures/
+errors/skips, PostgreSQL/private TLS/S3, race/vet/lint и generation дважды без
+drift. Семь raw official symbol vulnerability scans не нашли called symbols.
+`GO-2026-5932` остаётся module-only finding для `x/crypto v0.57.0`, fixed version
+не опубликована в полученной базе; blanket security PASS не заявляется.
+Root независимо сверил raw XML/семь scan outputs/current clone/source и live
+verify. Native06 app binaries, новая DB/bucket и runtime ещё не созданы.
+
+Для encrypted groups тот же source watchpoint проверен отдельной регрессией
+настоящего group hook с synthetic adapters. Уточнения ADR-067/068 приняты до
+реализации, commit `f913b13`; fixture-only baseline `0b39679` сохраняет исходный
+hook. Настоящий child XML содержит семь cases: два failures в authoritative-visible,
+пять scope cancellations PASS, bootstrap/list/decrypt counters1 и zero page/
+cleanup errors. Внешний `check-18q2rdf7` отдельно сохраняет ошибку оператора:
+`--reports` указывает на другой каталог, поэтому receipt имеет missing report
+и tests0. Child XML по правильному pinned пути не переносился, receipt не
+переписывался и baseline повторно не запускался. Root проверил actual child
+JSON/XML/stages и независимо подтвердил отсутствие owned PID/PG/profile/25174.
+
+После узкого one-file hook fix `3f63bb2` (8+/6−) SAME7 `check-xygykyz3` PASS:
+ready показывает одну строку, authoritative failure остаётся видимым без
+optimistic body, все пять scope cancellations сохраняются. Fixture bytes не
+менялись; остальные production modules, worker/provider/AAD/bookkeeping
+сохранены. Root сверил настоящий receipt/XML/JSON, current live verify0,
+clean frozen source и independent process/profile/listener absence. Это
+отдельная Group React lifetime проверка, не actual backend/WebCrypto/group audio.
+Full web на новом `3f63bb2` подтверждён отдельным `check-axdzk0as` PASS:
+18 stages, 620 JUnit cases без failures/errors/skips, lint/build и восемь
+browser cohorts. Root независимо сверил raw XML/stages, current live verify0
+и отсутствие девяти owned PID/PG, восьми profiles и listener25174. Чужие
+процессы сохранены. SAME7 Group не повторялись и не прибавляются к620.
+Core06 дополнительно ожидает actual group send HTTP200/
+finished и ready article у A, сохраняя прежние B-delivery/reload assertions.
+
+Для source `3f63bb2` создан новый независимый clone: `check-j8yroo8g` PASS,
+9251 собственных Git objects, один pack, без alternates/shallow/shared hardlinks.
+Production web build `check-kl_0hzir` PASS содержит 107 проверенных dist files,
+Node22.23.2/pnpm10.19 и `/api` на gateway28890. `check-k8mo5csl` PASS собрал
+четыре свежих app binaries с Go1.27.2/VCS3f63/modified=false и два helpers;
+helper VCS не заявляется. Root независимо сверил шесть binary SHA/buildInfo,
+107 dist files и завершение всех 95 owned command PID/PG через actual Wait.
+Backend758 receipt выше относится к9f5; между9f5 и3f63 менялись только семь
+web/docs files, это сохранённая backend prerequisite, не fresh3f63 Go gate.
+
+`check-hi0c87a0` PASS подготовил отдельные DB06 и private bucket06, четыре
+private profiles и fixture ledger. Root независимо сверил все 86 command
+ledger SHA/Wait/return codes, отсутствие их PID/PG и owned MC container,
+неизменность десяти объектов main9 и profile hashes/permissions. Единственный
+runtime owner запустил native06: readiness20:38:36UTC, фиксированное окончание
+21:23:36UTC без продления. Root проверил пять owned PID/common process group,
+восемь health/readiness/version responses и текущие binary SHA. Full core21+
+12 media разрешён отдельно. Основной compose stack не перезапускался.
+
+Первые core06 результаты сохранены отдельно: `check-710qire8` остановился до
+browser/preflight из-за отсутствующего HEAD argument; `check-30y8qt77` FAILED
+после 29 stages и всех12 media из-за ошибочного ожидания `/Logout` вместо
+`/LogoutCurrentSession`. После исправления selector `check-8taow7nx` FAILED
+на logout assertion: last-socket observer сохранялся через full navigation.
+Pinned Playwright1.62.1 очищает WebSocket map при new document, не посылая
+closed старому observer. Это source mechanism, а не доказательство открытого
+реального соединения после logout. Отдельный actual child witness подтвердил
+Login200/finished, новый connection.ready socket и Logout200/finished с
+закрытием того же socket до protected navigation/cleanup. Его внешний
+`check-yjncm58x` сохраняет teardown probe FAIL: immediate bind встретил
+AddrInUse; независимая проверка подтвердила no LISTEN/profile/Node и закрытый
+port. Child4 PASS не объявляется whole gate PASS.
+
+Новый immutable core v3 требует matching main-frame commit, затем новый
+realtime socket и actual connection.ready для logout и revoke target.
+Same-current socket close20s/HTTP200/finished/история/revoke assertions сохранены;
+wrapper проверяет закрытый listener через ECONNREFUSED, сохраняя independent
+PID/PG/profile cleanup. Продукт и frozen runtime source не менялись.
+`check-ozh5zmum` PASS на clean3f63: все21 basic stages и12 media roundtrips,
+всего33 actual PASS, без cleanup errors. Подтверждены logout idle socket,
+повторный UI login с историей, revoke session socket до protected navigation
+и revoke device. Root независимо сверил receipt/live verify0, actual downloaded
+SHA всех12 файлов и оба fresh-document socket witnesses; четыре owned
+wrapper/Node/CFT PID, три process groups и profiles отсутствуют, preview
+возвращает ECONNREFUSED. Из actual core/media metadata создан private handoff
+для отдельного layout/unread прогона. Native zoom/RTP и итоговая приёмка
+остаются отдельными checks.
+
+Первый отдельный layout/unread `check-l2gu7qj_` FAILED на
+`layout-direct-320x568`: AssertionError до сохранения первой geometry,
+stages0/cleanupErrors0. На actual screenshot composer частично обрезан;
+точная неудачная проверка и размеры пока неизвестны. Ни одного WM request
+не было, unread/minimized не заявляются. Source audit выявил пробел покрытия:
+historical mobile fixture не содержит pinned strip, который присутствовал
+в actual UI как tombstone закреплённого сообщения. Новый private diagnostic
+source сохраняет geometry до assertions; production fix ещё не выбирался.
+
+Native 1:1 `check-wghgj4yc` FAILED на remote leave/rejoin timeout. Сохранены
+четыре actual partial PASS: call strip layout/keyboard, start/join,
+двустороннее native RTP и mute/unmute. Actual UDP own-host pair передал
+14460/14701 bytes и57600/57120 samples в обоих направлениях. Это synthetic
+WAV capture, не слышимость реальных устройств и не group audio. Повторное
+присоединение, audio после return, creator End и permission denial ещё не
+прошли. Root проверил actual JSON; source/screenshot показывают кандидат
+ошибки locator: после authoritative Leave UI предлагает «Присоединиться»,
+а driver ждёт «Вернуться». Перед этим есть другие waits, поэтому точный
+failed await требует отдельного безопасного witness. Source diagnostic
+сохраняет все assertions и добавляет substeps. Native 200% zoom остаётся
+UNRUN: необходимый360s reserve в фиксированном runtime06 закончился.
+
+Owner STOP runtime06 `check-joyw54gc` PASS подтверждает только setup/teardown.
+Root независимо проверил отсутствие всех пяти native PID/common group,
+закрытые28890–93/25173 и неизменность десяти объектов main9. DB06/bucket06,
+profiles и все FAIL/PASS сохранены. Следующий diagnostic07 пока SOURCE ONLY;
+он использует тот же verified3f63 bundle/binaries и retained fixtures, не
+переносит core33 PASS на новый runtime и не продлевает runtime06.
+
+Отдельный artifact acquisition `check-e8nky7bo` PASS проверил только exact
+LiveKit protocol `v1.52.2-0.20261007103317-a935cd67c29a` и JWT/v5 `v5.3.1`
+штатным Go1.27 signed SumDB/h1 verifier. Двадцать official direct HTTP200,
+12 tiles/10 bounded verifier starts, последний exit0; Go Wait/PID/PG и
+actual info/mod/zip/ziphash SHA независимо сверены root. Closure, API/MVS,
+provider build и group audio ещё не проверены; GitHub403 publication guard
+сохраняется. Transitives автоматически не скачивались.
+
+Focused diagnostic07 использовал retained DB06/bucket06 и те же проверенные
+3f63 binaries/bundle, с новым current5PID/commonPG/8health proof и фиксированным
+900s окном. Исторический core33 служил только происхождением test profiles и
+идентификаторов, его PASS не переносился на diagnostic07. `check-oef_b3sw`
+FAILED на точной проверке `textarea-fully-visible`, без cleanup errors.
+Actual320×568: pinned row166.984px, composer card20.797px, textarea63.438px;
+thread306.086px распределён на hero67.391/pin166.984/history71.398/composer0.3125.
+Полезная history48.6px сохраняется, focused textarea обрезан. Root независимо
+прочитал измерения/screenshot/receipt и проверил after-exit PID/PG/profile/port.
+После этого создан isolated mobile170 candidate с docs-first уточнением и
+faithful pinned/tombstone fixture; его результаты приведены ниже отдельно.
+
+`check-t2cc65xe` FAILED с четырьмя partial PASS, precise substep
+`peer-explicit-return-click`. Actual LeaveCall200/finished, ended tracks B,
+закрытие всех старых peers A и его один живой muted capture подтверждены.
+После authoritative Leave UI B показывает «Присоединиться», «Вернуться»
+отсутствует; исходный locator теста ошибочен. Root независимо проверил witness,
+receipt/source и after-exit ownership. Узкая source correction ждёт exact Join
+и Returncount0, сохраняя capture/mute/newpeer/audio/End/permission assertions.
+Её `check-dhnzvf0_` FAILED до запуска браузера: при старте осталось277s вместо
+обязательных300s. Corrected scenarios остаются UNRUN, срок не продлевался.
+Отдельное actual UI «Сбой» при connected RTP пока не объяснено полностью:
+source сохраняет failed terminal state, но исходное failure событие неизвестно.
+
+Owner STOP07 `check-zbg8ea7l` PASS — только setup/teardown. Root0137 независимо
+подтвердил отсутствие всех пяти PID/commonPG, ECONNREFUSED native4/preview,
+неизменные exact десять main9 объектов и live verify0. Все данные, historical
+FAIL и source packets сохранены; старый runtime не перезапускается ради retry.
+
+Verified LiveKit/JWT source review подтвердил API/license и выявил109 известных
+declared dependency bounds,61 отсутствующий exact go.mod и65 отсутствующих
+quartets. Это input/cache inventory, полный MVS graph ещё UNKNOWN. Root0135
+проверил compact109 rows, primary SHA и шесть retained byte comparisons;
+на этом этапе новые transitives/Go/ZIP/code не исполняли. Token profile остаётся Proposed:
+нужны явные JSON empty/null правила перед permissive RoomConfig decoder,
+deadline по actual TLS leaf.NotAfter и отказ от пустого configured secret.
+Metadata-only graph проверяется отдельно от двух seed assets.
+
+Mobile170 получил accepted ADR083 уточнение и семь faithful cases на том же
+production DOM/CSS: direct/self320, direct390/568/768/844, tombstone/long pin,
+обычный Tab, draft и rotation. До CSS baseline `check-labihil1` FAILED:
+7 cases,5 FAIL/2 PASS. Первый CSS candidate `ede8702` в `check-f73sj1ki`
+FAILED:3 FAIL/4 PASS; длинный pin уже помещался, но на320 textarea оставалась
+обрезанной сверху. Отдельный observer `check-73in56p6` сохранил те же7/3 FAIL:
+до Tab composer scrollTop0, после Tab19. Кнопка вложений первая в DOM,
+визуально находится во второй строке; для формы было99.578px вместо129px.
+Это объясняет смещение textarea на19px и обрезание её верхних8.609px.
+
+Узкий CSS commit `5516f8b` резервирует всю двухстрочную форму и уменьшает
+hero/pin padding и декоративный avatar только в narrow pinned conversation.
+Исходные семь cases, Tab-порядок и пороги не изменены. `check-wzninkn8` PASS:
+7/7,0 failures/errors/skips/page/cleanup errors, две измеренные ориентации
+каждого case. Actual320: composer137.594px, textarea281.219×67.734px полностью
+видима, полезная history48.6px сохранена. Root0152 независимо проверил XML,
+измерения, receipt SHA, clean5516, отсутствие11 known/observed PID и observed
+CFT PG, нулевые live exact-profile matches и закрытый25174. Каталог профиля
+сохранён; отсутствие живых процессов не означает удаление каталога. Это
+локальный faithful fixture PASS, whole WEB нового HEAD и native acceptance
+проверяются отдельно; historical FAIL не заменяются новым PASS.
+
+Metadata v1 `check-qqzltld1` остановился на exact baseline protobuf1.36.11,
+которого не было в109 max-bound inventory. После добавления только этой пары
+v2 `check-2tvprlzf` остановился на jwt/v5 v5.2.2: Go graph ещё требует lower
+require metadata. Root0153 подтвердил25 Go Wait/exit1, отсутствие всех PID/PG,
+неизменные8 scratch inputs/100 cache inputs/cleanA619 и отсутствие ZIP.
+Четыре official SumDB lookup и20 tiles получены; selected-module phase UNRUN.
+Это ограничение текущего read frontier, полный module/import graph пока не
+подтверждён. Дальнейший concrete require-edge inventory, Accepted token profile,
+package loading/build и provider integration остаются отдельными шагами.
+
+Owner штатно остановил runtime05: `check-_zlznsfr` PASS подтверждает setup/teardown
+и неизменность source261. Независимо проверены отсутствие пяти owned PID и
+их process group, закрытые native/preview ports и неизменность main9. DB05,
+bucket05, profiles и артефакты сохранены. Это не whole browser acceptance PASS.
+
+Первый authorization whole `check-ywvmm3t2` FAILED на lint test host, сохранив
+341 partial Go PASS; новые native cases тогда не исполнялись. После узкой
+fixture correction `check-5cv2_ils` также FAILED: 611 actual Go PASS,
+11 новых unit и семь из восьми native scenarios прошли, без TestSkip.
+Оставшийся scenario пытался создать второй активный звонок для A при pending
+cleanup первого; policy guard корректно отказал. Тест исправлен через настоящий
+отдельный аккаунт B, а результаты deferred fixture Close обработаны для lint:
+commits `e226f48`/`ee11be4`. Root просмотрел весь actual test delta, current pins
+и неизменность whole driver кроме manifest literals. V3 `check-t94k8s46`
+подтвердил все восемь native cases и 11 новых unit, но общий gate FAILED на
+единственном замечании QF1001 к записи role predicate. Эквивалентная замена
+по закону де Моргана сохранена в `a619981` после полного просмотра diff.
+
+Свежий v4 `check-eo68aned` PASS: все 53 stages, 826 actual Go PASS events,
+без GoFail/TestSkip, race/coverage/vet/lint пяти modules, dedicated native8,
+унаследованные PostgreSQL/private TLS cases, pinned Buf/SQLC generation дважды
+без drift. Root независимо сверил raw Go JSON: все восемь новых native cases
+прошли в обоих phases, все 11 новых unit прошли. Current четыре binaries имеют
+Go1.25.8/VCS `a619981`/modified=false; SHA проверены независимо. WT и clone
+чистые; 16 созданных schemas имеют post-DROP absence evidence, все 32 native
+children завершены через Wait и отсутствуют после exit. Live verify из exact
+source checkout возвращает0. Это отдельный local authorization adapter;
+он остаётся unmounted, Gateway/provider/audio/публичная готовность не заявляются.
+
+Текущий mobile HEAD `1de95227` содержит только уточнение инструкции запуска
+после проверенного CSS `5516f8b`; root0154 подтвердил равенство code bytes.
+Новый whole WEB `check-6qa234sy` на clean `1de95227` PASS: все 18 stages и
+620 JUnit tests, без failures/errors/skips. Отдельный `check-dwpz_ro6` PASS:
+исходные 147 сценариев раскладки, без failures/errors/skips. Root0163/0164
+сверил raw XML, stage ledger и exact viewport/conversation/state tuples,
+current source и отсутствие owned PID/PG после exit. Таким образом, whole
+WEB и исходная mobile matrix завершены; они используют synthetic auth/RTC
+и representative DOM, а native browser zoom и реальные OS keyboards отдельно.
+Успешные семь faithful pinned cases остаются receipt на `5516f8b` с явным
+docs-only code equivalence, а не новым receipt на другой HEAD.
+
+Для продолжения #176 выполнен локальный ordinary merge текущего `1de95227`
+и frozen authorization `a619981`: `ce19159`. Root0155/0156 проверил все
+894 file origins; auth/backend bytes сохранены, изменились только пять
+рассмотренных mobile files. В `cd62024` принят технический профиль readonly
+token admission в ADR097: strict JSON перед стандартной JWT verification,
+общий deadline с actual TLS leaf.NotAfter, свежие Identity/Chat проверки и
+финальный coherent registry/fence read. Это уточнение принятой privacy-модели
+с trusted self-hosted SFU; реализации token/provider оно не заменяет.
+Combined HEAD `0a28de4` меняет только два native test pins Go1.25.8→Go1.27.2.
+Его первый fresh whole foundation `check-j5l3nnhr` FAILED на этапе36:
+`TestPostgresGroupLobbyHeartbeatAndCrashEviction` получил `rtc unavailable`
+при начальном StartCall, до heartbeat/crash loop. Actual PostgreSQL log
+подтвердил отсутствие `rtc_media_control_intents`: тест применял только
+начальную миграцию, а production bootstrap уже применяет все зарегистрированные.
+Root0186 подтвердил raw639 TestPASS/0 TestSKIP, отдельные шесть package events
+«no test files», закрытие16 children/PG и отсутствие восьми native schemas.
+Этот FAIL сохранён, оставшиеся этапы на `0a28de4` не считаются выполненными.
+
+Узкий fixture-only commit `c8fec9d` в отдельной ветке применяет полный набор
+зарегистрированных RTC SQL migrations в этом тесте. Production code, assertions
+и тайминги не менялись. Fresh `check-y2m9y5gg` на clean `c8fec9d` PASS:
+57 stages, 854 actual TestPASS, без TestFAIL/TestSKIP; шесть package-only
+«no test files» отдельно. Все обязательные cohorts подтверждены raw Go JSON,
+восемь новых native cases прошли в обоих phases, все11 unit cases прошли.
+Две генерации Buf/SQLC и обе drift checks прошли. Root0188 независимо сверил
+current source/tool/profile hashes, четыре live Go1.27.2 binary metadata с
+VCS `c8fec9d`/modified=false, закрытие32 native children/PG,16 create→absence
+schema records и отдельный read-only PostgreSQL count0. Main9 exact10 не
+изменился; source-bound live verify вернул0. Все семь strict source vulnerability
+scans имеют zero called; module-only GO-2026-5932 в libs/Identity/Chat сохранён
+как ограничение. Это приёмка foundation, authorization adapter остаётся
+unmounted; token/provider/group audio здесь не реализованы.
+
+Fresh native08 на ordinary mobile `1de95227` подготовлен отдельно:
+`check-k_gftemr` PASS — независимый полный local clone; `check-4ty9tjtp`
+PASS — offline frontend install/build и107 dist files; `check-29c07hh8`
+PASS — шесть Go1.27.2 binaries,95 завершённых commands. Root0169/0171/0174
+сверил actual source/build inputs, metadata и отсутствие owned PID/PG.
+Root0185 и отдельный Frontend source review проверили финальные helpers,
+literal-only template bindings и journal4467. Журнал фиксирует только
+закрытые UI/native enums и counts; устойчивый UI «Сбой» при verified RTP
+должен дать отдельный consistency FAIL, исходный dispatch остаётся UNKNOWN.
+Production bundle не менялся. Fresh DB/bucket08/private profiles подготовлены
+`check-fentbxhh` PASS; Root0191 сверил86 actual Wait/expected exits,
+четыре0600 profiles, source/build hashes, отсутствие MC/owned PIDPG и
+main9 exact10. Native08 supervisor запущен с fixed2700s после READY;
+Root0193 подтвердил пять current PID/commonPG и восемь health/readiness200
+с version `1de95227`, current6 binary SHA,107 dist files и profile hashes.
+
+Fresh whole core `check-7rb_4pcb` PASS: все33 stages (21 core +12 media),
+без cleanup errors. Root0195 независимо сверил три lanes × четыре kinds,
+actual ciphertext upload/fetch, decrypt/download SHA и inline image/audio/video
+decode, logout/revoke-session current-document socket witnesses после mutation
+и HTTP200 completion. Failed-send503 — Playwright route.fulfill, не outage
+Gateway. После exit оба owned profile process отсутствуют, preview25173
+закрыт; profile directories сохранены. Live observer выполнился уже после
+36s execution, поэтому отдельные observed PID/PG для core не заявляются.
+
+Fresh layout `check-9kvnmlfa` FIRSTFAIL на `layout-direct-568x320`, после
+actual PASS320×568/390×844/768×1024. Private screenshot показывает clipping
+focused textarea при tombstone pin и нижней navigation. Failing rectangles
+и точный predicate не сохранены helper; три записанных measurements относятся
+только к успешным размерам. Не переносим последнее768 measurement на568.
+WM requests ещё не возникли; unread/minimized/native200%/RTP UNRUN.
+Root0197 подтвердил normal owned STOP (`check-c_nuamac` — cleanup ONLY):
+пять native PID/commonPG,17 observed layout PIDs и три browser/Node PG
+отсутствуют, пять портов закрыты, main9 exact10 и source1de не менялись.
+DB/bucket08, profiles, core PASS и layout FAIL сохранены. Следующий шаг —
+faithful baseline воспроизведение landscape, затем отдельное узкое исправление;
+исходный passing7 fixture также включал rotations, поэтому pin budget пока
+не объявляется единственной доказанной причиной.
+
+Metadata v3 использует конечные 188 exact declared pairs и 187 cache inputs.
+`check-qc9e8ww8` FAILED после 127 Go starts: узкий parser не распознал
+stock Go verification wrapper после requires chain. Tiny v4 исправляет
+только эту форму; отдельные семь pure parser tests прошли. Actual v4
+`check-0tpahl6b` FAILED после 174 Go starts на новом declared dependency
+`github.com/bsm/ginkgo/v2@v2.12.0` из redis go.mod. Новая пара не загружалась.
+Root0166 подтвердил actual Wait/exit1 всех 174 children, отсутствие PID/PG,
+неизменные 187 cache inputs и восемь source metadata inputs с точным
+экспериментальным добавлением двух seeds только в scratch RTC go.mod,
+clean frozen `a619981` и отсутствие ZIP. Получены 173 official HTTP200
+metadata events/985305 bytes. Graph не завершён, selected-module phase
+UNRUN; package import/build/provider/audio readiness не подтверждены.
+Все ранние FAIL сохранены. Actual metadata v5 `check-zjca2awh` остановился
+на declared go-cmp0.5.5 после216 Go starts, actual v6 `check-nju0l4a4` —
+на declared xerrors20191204190536 после235 Go starts. Неизвестные pairs не
+загружались. Root0177/0183 независимо подтвердил Wait/exit1/PIDPG absence,
+неизменность199/201 cache inputs, exact source8 с двумя scratch seeds и
+отсутствие ZIP. V6 получил234 official HTTP200/1279996 bytes; graph остаётся
+неполным. SOURCE-only V7 выводит девять точных pairs из67 actual stock-written
+go.mod с mirror/stock SumDB lookup h1; Root0187 сверил200 literal require lines
+и три явно указанные quoted Go paths. Actual V7 `check-4pu33toy` остановился
+на следующем declared pair `golang.org/x/net v0.10.0`, который не загружался.
+Root0199 подтвердил 259 завершённых Go children, отсутствие owned PID/PG,
+неизменные 201 cache inputs и восемь metadata inputs с двумя scratch seeds,
+отсутствие ZIP и 258 official HTTP200 / 1341358 bytes. Из 76 проверенных
+actual `.mod` подготовлен следующий конечный frontier V8: 217 literal requires,
+12 новых pairs, всего 224. Root0201 проверил source; graph/list и compiled import
+closure ещё не завершены, token/provider readiness не заявляется.
+
+Прогон V8 `check-mlzczj5x` остановился на `x/sys v0.8.0` после309 запусков Go,
+V9b `check-y3f585t1` — на `x/term v0.5.0` после361, V10
+`check-n_dmwy42` — на `x/crypto v0.0.0-20210921155107-089bfa567519` после401.
+Неизвестные версии не загружались; каждый первый STOP сохранён. Все дочерние
+процессы Go завершены, PID/PG отсутствуют, исходники и201 входной файл cache
+неизменны, ZIP отсутствуют. V10 получил400 HTTP200 от официальных Go proxy/SumDB,
+1884622 bytes. Граф и выбор версий всё ещё не завершены, поэтому сборка SDK,
+проверка токенов, provider и групповой звук не подтверждены.
+
+Отдельный landscape regression на clean `2d2d57c` воспроизвёл обрезание поля
+сообщения: `check-wgd7mjpl`, один тест, один failure, ноль errors/skips.
+Траектория 320×568 → 390×844 → 768×1024 → 568×320 использует production CSS,
+SVG и LegacyAppShell, закреплённое удалённое сообщение и тот же порядок
+заполнения/focus. На 568×320 первым не прошёл `textarea-fully-visible`:
+низ editor 285.921875 px превышает границу clip 276.59375 px. История сохраняет
+48 px, но сумма строк grid превышает доступную высоту thread. Дополнительная
+footer-проверка ещё не выполнялась. Это подтверждает clipping в представительном
+fixture; точные метрики исходного native failure не были сохранены.
+Root0202 независимо сверил receipt, geometry, quiet source и завершение
+наблюдавшихся owned PID/PG, отсутствие profile processes и закрытый порт.
+Первый FAIL сохранён. Коммит документации `314d97d` уточнил ADR083 перед
+CSS-исправлением `ee87682`, которое
+ограничило pinned row собственной прокруткой в коротком landscape. На тех же
+fixture/assertions `check-7e1t0ul8` прошёл один случай с четырьмя измерениями
+viewport: editor bottom270.03125 px находится внутри clip276.59375 px,
+history48px сохраняется, thread scroll/client height189 совпадают.
+Отдельный свежий последовательный `check-7vqp70im` на clean `ee87682` прошёл
+18 этапов frontend,620 unit cases, прежние7 pinned и147 уникальных mobile cases;
+все три XML дают774 cases/0 failures/errors/skips. Новый один landscape
+regression в774 не включён и повторно не запускался. Root0211 сверил исходные XML,
+все8 browser JSON с исходными logs, Wait,159 завершённых owned PID,
+11 PG и10 profiles, закрытый порт, сохранённые foreign8 и quiet source.
+Это frontend fixtures с synthetic auth/RTC; новый native layout/unread/minimized,
+200% zoom, call matrix и device-пункты остаются отдельной приёмкой.
+
+Для нового native09 создана независимая полная локальная копия clean `ee87682`.
+`check-jkthllul` подтвердил clone без shared inodes/alternates; source pin
+`check-30n20_z5`, один offline production frontend build `check-dxy8_n5r`
+и шесть native Go27.2 builds `check-67osbu6o` прошли. Root сверил все107 файлов
+dist, текущие SHA шести binaries, VCS текущего SHA у четырёх сервисов,
+95 завершённых команд сборки и отсутствие их owned PID/PG.
+Это подтверждает подготовку текущей версии; новая база, runtime и совместная
+browser-приёмка ещё не подтверждены. Старый native08 остаётся остановленным.
+
+Native09 достиг READY на текущем SHA, но `check-hl8zycri` остановился за0.449s
+в preflight wrapper: прежние DB `_08` и bucket `-08` не совпадают с fresh09.
+Первым сработал DB assertion; browser/media scenarios не запускались.
+Root пропустил эти две привязки при source review. Owned STOP выполнен сразу;
+`check-ry5823wg` подтверждает только нормальное завершение supervisor/cleanup.
+Root0223 сверил receipts, отсутствие пяти native PID/common PG и закрытые
+пять портов. Данные09 сохранены, повторного запуска09 нет. Независимый полный
+source review11 файлов нашёл только эти две неверные expectations; исправленный
+immutable wrapper не запускался. Fresh10 готовится с явным reuse четырёх
+неизменных EE binaries и107 frontend files; два fixture-bound helpers требуют
+новой сборки, результаты browser-приёмки по-прежнему не переносятся.
+
+Metadata V11 `check-d3j1bb1c` остановился после416 запусков Go на неизвестном
+`x/net v0.0.0-20210226172049-e18ecbb05110`. Root независимо сверил416 Wait,
+415 HTTP200, неизменные201 cache inputs и восемь metadata files с двумя
+точными RTC require additions, отсутствие owned PID/PG и ZIP. В V12 добавлены
+только семь версий из291 literal requires в118 actual stock `.mod`;
+`check-5x3cu70i` также сохранил первый STOP после426 запусков, на
+`x/sys v0.0.0-20201119102817-f84b799fce68`. Эта версия не загружалась;
+граф, выбор версий, сборка SDK и групповой звук по-прежнему не подтверждены.
+
+Следующий V13 `check-cy44a6u0` завершил metadata graph и выбор версий:445 graph
+попыток и две selected list попытки, последние обе имеют exit0. Root0222 сверил
+все447 Wait,445 промежуточных MISS/exit1 и два финальных exit0,513 official
+HTTP200/2045332 bytes, отсутствие450 owned PID/двух PG, исходники и201 cache
+inputs/copies без изменений, отсутствие ZIP. Actual raw selected JSON содержит
+133 уникальных модуля,126 versioned pairs внутри конечного approved frontier;
+protocol и JWT совпали с точными seed versions. Это завершённый MVS metadata
+этап; package import closure, сборка SDK, token policy и provider ещё не выполнены.
+
+Native10 использовал четыре неизменных EE service binaries и107 frontend files
+из проверенного09; свежая сборка относится только к двум fixture-bound helpers.
+`check-g3yf0bj4` прошёл все33 actual core scenarios:21 сценарий переписки и12
+вложений direct/self/group × file/image/audio/video. Проверены итоговые размеры
+и SHA скачанных файлов, logout/revoke закрыли текущие sockets после HTTP200.
+Root0229 независимо сверил исходные evidence и media manifest. Это не проверка
+группового live audio или физического устройства.
+
+Следующий `check-6dg7zoao` сохранил25 частичных PASS, включая все18 базовых
+viewport direct/self/group и combined reply/attachment/error direct/self.
+Первый product FAIL — group `reply-attachment-error-group`,
+`textarea-fully-visible` при568×320: верх textarea128.859px находится выше
+clip162.195px; form412.344px внутри composer115.625px, scrollTop200.5px.
+History48px и documentY0 сохранились. Это новый group TOP clipping,
+а не прежний direct pin bottom clipping. Unread/minimized/WM, native200% zoom
+и RTP matrix не запускались. Native10 остановлен сразу; supervisor
+`check-1eo_1tm0` подтверждает только cleanup. Root0230 сверил актуальное
+отсутствие native/layout PID/PG/profile processes и пять закрытых портов.
+Данные и первый FAIL сохранены; повторного запуска или продления10 нет.
+
+Отдельный regression combined group state на production CSS/SVG/shell
+с неизменными minima140/39/48/32 и natural focus/Tab воспроизвёл дефект:
+`check-41ph9ui_` дал один genuine FAIL,0 errors/skips. При568×320 editor top108.344px
+находился выше clip161.188px; history48px сохранилась. Это тот же класс TOP
+clipping, численные bounding boxes не объявляются равными native10.
+После независимого cleanup Accepted ADR/dev commit `0e3775f0` предшествовал
+узкому group feedback исправлению `6081466f`. На clean `d260b48b`
+`check-uqhajh8x` прошёл тот же один случай и два viewport: landscape editor
+235.141–274.328px целиком внутри clip161.188–278.188px, history48px и draft/reply/file
+сохранены. Root0235/0238 сверил raw XML/evidence и актуальное отсутствие owned
+PID/PG/profile processes, закрытый порт. Свежий общий gate `check-pvqxm88d` на clean `d260b48b` прошёл18 этапов,
+620 unit, прежние7 pinned и147 уникальных mobile cases, всего774/0 failures/errors/skips.
+Новый group regression отдельно дал1 PASS и в774 не включён. Root0242 сверил
+три исходных XML, завершение21 наблюдавшегося PID/12 PG/10 profiles, закрытый
+порт и неизменные main9/foreign8. Actual native11 остаётся отдельной приёмкой.
+
+Для SDK завершён source review fixed126 selected version map и43 literal
+imports/27 module owners. Header preflight `check-slyegwjm` подтвердил27 official
+direct HTTP200 без body/Go. Первая compile попытка `check-57s6xbfx` сохранила
+FileExistsError служебного ledger после одного успешного stock Go download:
+immutable writer повторно создавал `children.json`. Исправление ограничено
+уникальными start/exit ledger files. Следующий V5 проверил оба seed ZIP штатным
+Go, но остановился на27 штатных `go: downloading` объявлениях из успешного
+package list: строгий helper не принимал непустой stderr. Ошибки/partial outputs
+сохранены; подготовка узкого parser исправления не считается готовой сборкой SDK.
+Token policy, SFU provider и group audio ещё не подтверждены.
+
+SDK V6 после узкого принятия известных selected download banners загрузил и
+проверил34 distinct modules штатным Go/SumDB, но `check-1kb157z9` остановился
+на redirect compress1.20.1 к официальному GCS. После разрешения только
+наблюдавшегося exact path следующий `check-bu_79fur` остановился до чтения body:
+ZIP превысил32MiB. Отдельный headers-only `check-sh1k9hat` подтвердил
+40 331 560 bytes, identity, proxy302→exact GCS200. Root проверил оба STOP,
+завершение133/124 Go children и отсутствие owned PID/PG. Для V7 разрешён64MiB
+только exact compress1.20.1, остальные125 selected modules сохраняют32MiB;
+global limits, source import authority и штатная проверка SumDB неизменны.
+Package compile, token policy, provider и групповой звук ещё не подтверждены.
+
+Подготовка native11 продвинулась: `check-912dxjxf` подтвердил source pin текущего
+`d260b48b`, `check-sd5uaanc` выполнил новую production frontend сборку.
+Root независимо сверил все107 свежих файлов, 1 850 182 bytes, SHA/size/pathset
+и отсутствие двух owned stage PG. Четыре backend binaries сохраняют честный
+origin/VCS `ee87682`; шесть backend/build Git objects одинаковы, изменения
+текущего SHA относятся к web/docs. `check-157s3j5m` отдельно выполнил byte-copy четырёх EE binaries и свежую
+сборку двух namespace11 fixture helpers, без новой VCS-атрибуции helper binaries.
+Owner сверил203 командных Wait/exit0 и отсутствие203 PID/PG; независимый
+Root readback этого leaf ещё выполняется. Новые DB/bucket, runtime READY и browser geometry/unread/
+native200%/RTP приёмка пока не выполнялись, подготовка не является их PASS.
+
+Следующий SDK V7 `check-f6k88y9c` прошёл:63 distinct source modules проверены
+штатным Go/SumDB;475 selected packages не имеют Error/DepsError/ForTest,
+98 literal import witnesses связаны с actual GoFiles и SHA исходников.
+Последний `go build -mod=readonly ./tokencompileprobe` завершился exit0
+с пустым stderr. Root0250 независимо сверил235 durable Wait,69 exit0 и166
+промежуточных owned metadata MISS/exit1, отсутствие238 известных PID/двух PG,
+ZIP/proxy byte binding, stock h1/ziphash/signed lookup. Это сборка одного exported
+API package, без исполнения token policy, provider или media runtime.
+
+Один pinned SFU source archive `livekit-server v1.13.9` получен отдельно:
+`check-cmquqjay` прошёл exact Origin commit/module bytes и штатную SumDB-проверку,
+ZIP 1 568 067 bytes. Root0253 сверил9 Wait с последним exit0, отсутствие owned
+Go PID/PG, h1/lookup/ziphash/source Dir. Полная сборка SFU, его transitives и
+runtime не выполнялись. Full source нужен для физического one-AUDIO/MIC gate:
+stock source grants не ограничивают cardinality и не являются такой защитой.
+
+Native11 fixture `check-0dxhspwp` подготовил fresh database/bucket и четыре
+private profiles, services/timer ещё не запускал. Root сверил86 durable Wait,
+отсутствие86 PID/PG, profile SHA/mode0600 и пять закрытых портов. Независимый
+полный review12 выбранных drivers и argv/namespace/version-origin/reserve
+contract не нашёл functional blockers. Запуск fixed runtime2700s и actual
+browser-приёмка разрешены отдельным Root0254; их результат пока не заявляется.
+
+До общей готовности остаются:
+
+- Fresh native geometry, unread/minimized и native200% zoom; завершение actual
+  1:1 leave/rejoin/End/permission matrix. Двухаккаунтный
+  core21 и все12 media прошли, native two-way RTP/mute — отдельный partial PASS.
+- Завершение #176: проверенный public authorization adapter, pinned SFU/SDK,
+  admission/revocation/cleanup, lazy UI с privacy warning и actual three-client audio.
+- Итоговый integration SHA, release/restore/security gates, актуальные screenshots
+  и честное demo. После восстановления GitHub — fresh exact-SHA CI/readback и
+  конкретный parent-first merge candidate для отдельного решения пользователя.
+
+Real devices, physical audibility, NAT/forced TURN/Wi-Fi↔cellular и iOS/Android
+OS keyboard остаются UNVERIFIED по принятому Mac-only ограничению. Число PR и
+29 отдельных исправленных scopes не является процентом общей готовности.
+
+
+## Остановка владельцем 13 октября 2026
+
+Native11 `check-7gm4a22e` успел пройти actual33 scenarios на frontend D260:
+21 переписка и12 media; SHA/bytes всех12 расшифрованных скачиваний совпали,
+logout/revoke socket checks прошли. Core evidence d23f852d5aa1f9eb52b277df765f24c0d486fe7c7bc4ef20479b6021ef828a37.
+Последующие layout/unread/minimized/WM, native200% zoom и RTP matrix не запускались:
+владелец отменил их и попросил остановить всех агентов. Это UNRUN по запросу,
+не FAILED. Core live PID/PG не удалось наблюдать; после exit точных profile
+processes нет, browser profile directories retained.
+
+Supervisor `check-uuttms9h` дал cleanup-only PASS/Wait0, reason owner_stop.
+Все5 native PID/common PG35822 и5 портов25173/28990–28993 закрыты; main9 exact10
+containers/foreign8 сохранены, heavy/stack locks свободны. DB11/bucket11/profiles
+retained. Root0255 независимо подтвердил actual core result и отсутствие
+owned native PID/PG/портов. Все три агента завершили итоговые резюме, новых
+работ/adapter worktree/code/commit не начали.
+
+Владелец изменил приоритет: завершать конкретные bugs/security/integration
+без бесконечных полных проверок; невозможные или несоразмерно дорогие проверки
+передавать ему с наблюдаемыми шагами и UNVERIFIED. #176 всё ещё содержит
+отсутствующую реализацию, а не только manual QA. Frozen physical gate proposal
+остаётся Proposed/SOURCE ONLY, без technical acceptance.
+
+[Полный handoff следующей сессии](2026-10-13-handoff.md) содержит новые ограничения,
+точные checkout/HEAD, готовые evidence, runtime STOP и ручной чеклист. Старое
+native11 окно и ранее выданные GO не возобновлять.

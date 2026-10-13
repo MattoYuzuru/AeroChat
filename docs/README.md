@@ -21,7 +21,7 @@
 | Encrypted ordering/read | [ADR-070](adr/070-encrypted-unread-and-read-state-recovery-foundation.md), [ADR-096](adr/096-encrypted-conversation-server-sequence.md) |
 | Команды, runtime и совместная работа агентов | [Development](development.md) |
 | Порядок encrypted operations и metadata migration | [ADR-096](adr/096-encrypted-conversation-server-sequence.md), [Sequence cutover](deploy/encrypted-sequence-cutover.md) |
-| Следующая сессия исправлений | [Промпт координатора](audits/2026-10-11-next-session.md) |
+| Следующая сессия после остановки 13 октября | [Актуальный handoff и промпт](audits/2026-10-13-handoff.md) |
 
 Номер 086 занят двумя существующими ADR; в задачах использовать полное имя файла. Новые номера проверять по всему каталогу.
 
@@ -42,4 +42,4 @@
 
 ## Исторические материалы
 
-[Аудит 25 марта](audits/2026-03-25-repo-audit.md) и [мартовская карта состояния](audit/current-state-architecture.md) сохраняют rationale и старые findings; они не доказывают актуальное поведение. ADR-024 описывает прежний nginx edge, его преемник для текущего server flow — ADR-025. Исторические документы не переписывать под новый код; добавлять ссылку на новый evidence.
+[Аудит 25 марта](audits/2026-03-25-repo-audit.md) и [мартовская карта состояния](audit/current-state-architecture.md) сохраняют rationale и старые findings; они не доказывают актуальное поведение. [Исходный промпт 11 октября](audits/2026-10-11-next-session.md) сохранён для истории; актуальное указание владельца об ограничении проверок находится в handoff 13 октября. ADR-024 описывает прежний nginx edge, его преемник для текущего server flow — ADR-025. Исторические документы не переписывать под новый код; добавлять ссылку на новый evidence.
