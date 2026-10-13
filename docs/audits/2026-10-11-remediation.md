@@ -673,9 +673,36 @@ inputs/copies без изменений, отсутствие ZIP. Actual raw se
 protocol и JWT совпали с точными seed versions. Это завершённый MVS metadata
 этап; package import closure, сборка SDK, token policy и provider ещё не выполнены.
 
+Native10 использовал четыре неизменных EE service binaries и107 frontend files
+из проверенного09; свежая сборка относится только к двум fixture-bound helpers.
+`check-g3yf0bj4` прошёл все33 actual core scenarios:21 сценарий переписки и12
+вложений direct/self/group × file/image/audio/video. Проверены итоговые размеры
+и SHA скачанных файлов, logout/revoke закрыли текущие sockets после HTTP200.
+Root0229 независимо сверил исходные evidence и media manifest. Это не проверка
+группового live audio или физического устройства.
+
+Следующий `check-6dg7zoao` сохранил25 частичных PASS, включая все18 базовых
+viewport direct/self/group и combined reply/attachment/error direct/self.
+Первый product FAIL — group `reply-attachment-error-group`,
+`textarea-fully-visible` при568×320: верх textarea128.859px находится выше
+clip162.195px; form412.344px внутри composer115.625px, scrollTop200.5px.
+History48px и documentY0 сохранились. Это новый group TOP clipping,
+а не прежний direct pin bottom clipping. Unread/minimized/WM, native200% zoom
+и RTP matrix не запускались. Native10 остановлен сразу; supervisor
+`check-1eo_1tm0` подтверждает только cleanup. Root0230 сверил актуальное
+отсутствие native/layout PID/PG/profile processes и пять закрытых портов.
+Данные и первый FAIL сохранены; повторного запуска или продления10 нет.
+
+Готовится отдельный regression combined group state на production CSS/SVG/shell
+с неизменными minima140/39/48/32 и natural focus/Tab. Его baseline ещё UNRUN;
+первый результат будет сохранён до узкого исправления. Для SDK завершён
+source review fixed126 selected version map и43 literal imports/27 module owners;
+разрешён только официальный NoRedirect ZIP header preflight. Загрузка исходников,
+сборка SDK, token policy, SFU provider и group audio ещё не подтверждены.
+
 До общей готовности остаются:
 
-- Fresh native geometry текущего mobile исправления, unread/minimized и
+- Исправление group combined composer, fresh native geometry, unread/minimized и
   native200% zoom; завершение actual
   1:1 leave/rejoin/End/permission matrix. Двухаккаунтный
   core21 и все12 media прошли, native two-way RTP/mute — отдельный partial PASS.
