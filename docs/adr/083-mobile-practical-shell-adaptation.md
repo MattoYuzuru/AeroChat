@@ -127,6 +127,18 @@ ordinal, timestamp, длинный preview и tombstone. Synthetic DOM/CSS пр�
 дополняет actual owned message-page geometry; она не заменяет iOS/Android OS
 keyboard/touch или native browser zoom.
 
+### Уточнение 13 октября 2026: pinned summary в коротком landscape (Accepted)
+
+При коротком landscape с одной строкой composer optional pin и history делят
+остаток высоты thread grid после header и composer. Auto row pin не может
+вытеснять textarea за clipping boundary thread. History сохраняет 48 CSS px,
+composer — существующий минимум 50 CSS px; размеры действий не уменьшаются.
+Pinned row резервирует текущую высоту кнопки и border, без вертикального
+padding контейнера. Card имеет bounded собственный scroll для ordinal,
+metadata и preview с сохранением всего текста, tombstone и перехода к сообщению.
+Уточнение применяется только к direct/self с pin при высоте до 500 CSS px и
+ширине 500–1179 CSS px; portrait, group и desktop presentation не меняются.
+
 ## Последствия
 
 ### Положительные
