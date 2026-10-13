@@ -12,7 +12,7 @@ Source images следуют [ADR-087](../../docs/adr/087-pinned-storage-source-
 4. Собрать оба targets из immutable sources и checked overlay с `-mod=readonly`, `GOTOOLCHAIN=local`. Зафиксировать actual Go и linked dependency versions извлечённых бинарников, binary/image/config SHA-256 и source checkpoint.
 5. Проверить tiny private S3 CRUD/readiness на отдельном owned runtime. Проверка прочитанного lifecycle rule не доказывает истечение реального суточного TTL. Existing data и shared stack не использовать как disposable fixture.
 
-Baseline assessment неизменённых sources на Go1.27.2/Linux-arm64 дала 38 called advisory IDs MinIO и 11 mc; это callgraph diagnosis, не доказанная эксплуатация. Пока effective overlay и итоговые receipts не подготовлены, maintenance результат остаётся pending.
+Baseline assessment неизменённых sources на Go1.27.2/Linux-arm64 дала 38 called advisory IDs MinIO и 11 mc; это callgraph diagnosis, не доказанная эксплуатация. На exact f68 effective overlay прошёл actual source scans без called findings, отдельные cold builds и tiny private S3 runtime; подробности сохранены в [remediation](../../docs/audits/2026-10-11-remediation.md). Overlay включён в [candidate 13 октября](../../docs/audits/2026-10-13-integration-candidate.md). Свежие candidate provenance/parser tests не являются повторной сборкой, scan или runtime PASS. GO-2026-5932 остаётся module-only residual; ADR-087 license/operator decision остаётся Proposed.
 
 ## Источники внутри image
 

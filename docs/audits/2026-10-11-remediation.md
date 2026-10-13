@@ -1,6 +1,6 @@
 # Исправления после аудита 11 октября 2026
 
-Статус: работа продолжается; общей messenger/demo-приёмки ещё нет. Tracker — [#178](https://github.com/MattoYuzuru/AeroChat/issues/178), исходный срез — [аудит](2026-10-11-readiness.md). Сохранённая ветка `codex/audit-portfolio-readiness` имеет HEAD `920c72ea6ecf67824a8d2c870693843401833126`; PR [#180](https://github.com/MattoYuzuru/AeroChat/pull/180) содержит baseline assertions/cache regression/Vitest CI и исторические screenshots.
+Статус: ограниченный локальный integration этап завершён 13 октября; [актуальный candidate report](2026-10-13-integration-candidate.md) отделяет exact-SHA PASS от manual UNVERIFIED и deferred #176. Полной messenger/demo/device-приёмки нет. Tracker — [#178](https://github.com/MattoYuzuru/AeroChat/issues/178), исходный срез — [аудит](2026-10-11-readiness.md). Сохранённая ветка `codex/audit-portfolio-readiness` имеет HEAD `920c72ea6ecf67824a8d2c870693843401833126`; PR [#180](https://github.com/MattoYuzuru/AeroChat/pull/180) содержит baseline assertions/cache regression/Vitest CI и исторические screenshots.
 
 Подготовлен и проверен отдельный feature scope для 29 из 30 remediation issues; #176 остаётся в работе. Это количество пунктов, а не процент общей готовности: group audio и combined acceptance ещё не завершены.
 

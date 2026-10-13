@@ -11,7 +11,7 @@ AeroChat объединяет личные переписки, группы, ф�
 
 [Документация](docs/README.md) · [Разработка](docs/development.md) · [Возможности и ограничения](docs/product/capabilities.md) · [Аудит 11 октября 2026](docs/audits/2026-10-11-readiness.md)
 
-Отдельные draft исправления, точные PR/HEAD и ещё не выполненная общая приёмка перечислены в [remediation report](docs/audits/2026-10-11-remediation.md). Этот README описывает исходный checkout; наличие feature PR не означает, что исправления уже включены в него.
+Этот локальный integration checkout включает сохранённые remediation fixes. Состав, exact-SHA проверки и короткий ручной чеклист — в [candidate report 13 октября](docs/audits/2026-10-13-integration-candidate.md). Отдельные draft PR и историческое evidence перечислены в [remediation report](docs/audits/2026-10-11-remediation.md); они не merged в main, новый общий runtime и device-приёмка ещё не выполнены.
 
 ## Интерфейс
 
@@ -52,7 +52,7 @@ AeroChat объединяет личные переписки, группы, ф�
 
 Требования: Git, Docker / Docker Compose. Для разработки из исходников также нужны Go **1.27.2**, Node.js **22**, pnpm **10.19.0** и инструменты из [development guide](docs/development.md). Go checks используют `GOTOOLCHAIN=go1.27.2`; security/toolchain policy и triage — в [Go lifecycle](docs/security/go-vulnerability-lifecycle.md).
 
-> MinIO и bootstrap client теперь собираются из закреплённых исходников по [ADR-087](docs/adr/087-pinned-storage-source-build-lifecycle.md); первый запуск требует Docker Hub, GitHub codeload и Go modules. Обычный upload отдельно требует исправления presign region ([#165](https://github.com/MattoYuzuru/AeroChat/issues/165)). [Аудит](docs/audits/2026-10-11-readiness.md) сохраняет результаты исходной ревизии.
+> MinIO и bootstrap client собираются из закреплённых исходников с maintained dependencies по [ADR-087](docs/adr/087-pinned-storage-source-build-lifecycle.md); первый запуск требует Docker Hub, GitHub codeload и Go modules. Presign region fix уже включён; storage principal должен иметь `s3:GetBucketLocation` (см. [разработку](docs/development.md)). [Аудит](docs/audits/2026-10-11-readiness.md) сохраняет результаты исходной ревизии. До восстановления GitHub существующие caches/artifacts сохраняются, network acquisition здесь не повторяется.
 
 ```bash
 git clone https://github.com/MattoYuzuru/AeroChat.git

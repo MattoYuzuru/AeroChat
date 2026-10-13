@@ -2,6 +2,11 @@
 
 ## Статус проекта
 
+Локальный remediation candidate собран 13 октября 2026: [состав, exact-SHA PASS,
+UNVERIFIED и deferred features](audits/2026-10-13-integration-candidate.md).
+Это завершённый ограниченный integration этап, без merge/deploy и без claim
+полной device/runtime готовности.
+
 Проект уже вышел за пределы чистой foundation phase.
 
 Сейчас в репозитории есть рабочий базовый продуктовый slice:
@@ -241,7 +246,10 @@ ICE policy читается из `aero-rtc-control`; server compose управл
 [ADR-085](adr/085-server-turn-runtime-and-public-relay-ip-contract.md). Работоспособность звонка
 требует корректного public/relay IP, credentials, открытых портов и отдельной проверки media connectivity.
 Group call flow сейчас покрывает control-plane и lobby UI, но не multiparty browser media transport.
-Текущие дефекты и фактическое evidence описаны в [аудите](audits/2026-10-11-readiness.md).
+#176 требует отсутствующего token/provider/admission/teardown/enforcement кода и privacy UI;
+ручная проверка устройств не заменяет эту реализацию. Остаточный 1:1 UI «Сбой»
+при рабочем звуке передан владельцу как UNVERIFIED, причина dispatch неизвестна.
+Актуальные границы evidence — в [candidate report](audits/2026-10-13-integration-candidate.md).
 
 ---
 
