@@ -599,6 +599,15 @@ actual `.mod` подготовлен следующий конечный frontie
 12 новых pairs, всего 224. Root0201 проверил source; graph/list и compiled import
 closure ещё не завершены, token/provider readiness не заявляется.
 
+Прогон V8 `check-mlzczj5x` остановился на `x/sys v0.8.0` после309 запусков Go,
+V9b `check-y3f585t1` — на `x/term v0.5.0` после361, V10
+`check-n_dmwy42` — на `x/crypto v0.0.0-20210921155107-089bfa567519` после401.
+Неизвестные версии не загружались; каждый первый STOP сохранён. Все дочерние
+процессы Go завершены, PID/PG отсутствуют, исходники и201 входной файл cache
+неизменны, ZIP отсутствуют. V10 получил400 HTTP200 от официальных Go proxy/SumDB,
+1884622 bytes. Граф и выбор версий всё ещё не завершены, поэтому сборка SDK,
+проверка токенов, provider и групповой звук не подтверждены.
+
 Отдельный landscape regression на clean `2d2d57c` воспроизвёл обрезание поля
 сообщения: `check-wgd7mjpl`, один тест, один failure, ноль errors/skips.
 Траектория 320×568 → 390×844 → 768×1024 → 568×320 использует production CSS,
@@ -610,7 +619,20 @@ footer-проверка ещё не выполнялась. Это подтве�
 fixture; точные метрики исходного native failure не были сохранены.
 Root0202 независимо сверил receipt, geometry, quiet source и завершение
 наблюдавшихся owned PID/PG, отсутствие profile processes и закрытый порт.
-Первый FAIL сохранён; CSS-исправление и его проверка ещё впереди.
+Первый FAIL сохранён. Коммит документации `314d97d` уточнил ADR083 перед
+CSS-исправлением `ee87682`, которое
+ограничило pinned row собственной прокруткой в коротком landscape. На тех же
+fixture/assertions `check-7e1t0ul8` прошёл один случай с четырьмя измерениями
+viewport: editor bottom270.03125 px находится внутри clip276.59375 px,
+history48px сохраняется, thread scroll/client height189 совпадают.
+Отдельный свежий последовательный `check-7vqp70im` на clean `ee87682` прошёл
+18 этапов frontend,620 unit cases, прежние7 pinned и147 уникальных mobile cases;
+все три XML дают774 cases/0 failures/errors/skips. Новый один landscape
+regression в774 не включён и повторно не запускался. Root0211 сверил исходные XML,
+все8 browser JSON с исходными logs, Wait,159 завершённых owned PID,
+11 PG и10 profiles, закрытый порт, сохранённые foreign8 и quiet source.
+Это frontend fixtures с synthetic auth/RTC; новый native layout/unread/minimized,
+200% zoom, call matrix и device-пункты остаются отдельной приёмкой.
 
 До общей готовности остаются:
 
