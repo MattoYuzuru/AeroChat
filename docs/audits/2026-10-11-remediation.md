@@ -779,3 +779,31 @@ browser-приёмка разрешены отдельным Root0254; их ре
 Real devices, physical audibility, NAT/forced TURN/Wi-Fi↔cellular и iOS/Android
 OS keyboard остаются UNVERIFIED по принятому Mac-only ограничению. Число PR и
 29 отдельных исправленных scopes не является процентом общей готовности.
+
+
+## Остановка владельцем 13 октября 2026
+
+Native11 `check-7gm4a22e` успел пройти actual33 scenarios на frontend D260:
+21 переписка и12 media; SHA/bytes всех12 расшифрованных скачиваний совпали,
+logout/revoke socket checks прошли. Core evidence d23f852d5aa1f9eb52b277df765f24c0d486fe7c7bc4ef20479b6021ef828a37.
+Последующие layout/unread/minimized/WM, native200% zoom и RTP matrix не запускались:
+владелец отменил их и попросил остановить всех агентов. Это UNRUN по запросу,
+не FAILED. Core live PID/PG не удалось наблюдать; после exit точных profile
+processes нет, browser profile directories retained.
+
+Supervisor `check-uuttms9h` дал cleanup-only PASS/Wait0, reason owner_stop.
+Все5 native PID/common PG35822 и5 портов25173/28990–28993 закрыты; main9 exact10
+containers/foreign8 сохранены, heavy/stack locks свободны. DB11/bucket11/profiles
+retained. Root0255 независимо подтвердил actual core result и отсутствие
+owned native PID/PG/портов. Все три агента завершили итоговые резюме, новых
+работ/adapter worktree/code/commit не начали.
+
+Владелец изменил приоритет: завершать конкретные bugs/security/integration
+без бесконечных полных проверок; невозможные или несоразмерно дорогие проверки
+передавать ему с наблюдаемыми шагами и UNVERIFIED. #176 всё ещё содержит
+отсутствующую реализацию, а не только manual QA. Frozen physical gate proposal
+остаётся Proposed/SOURCE ONLY, без technical acceptance.
+
+[Полный handoff следующей сессии](2026-10-13-handoff.md) содержит новые ограничения,
+точные checkout/HEAD, готовые evidence, runtime STOP и ручной чеклист. Старое
+native11 окно и ранее выданные GO не возобновлять.

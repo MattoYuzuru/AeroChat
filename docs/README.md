@@ -16,7 +16,7 @@
 | TURN и heartbeat звонков | [ADR-085](adr/085-server-turn-runtime-and-public-relay-ip-contract.md), [RTC ADR-086](adr/086-rtc-participant-heartbeat-and-stale-eviction.md) |
 | Push | [Notifications ADR-086](adr/086-web-notifications-and-push-foundation.md) |
 | Команды, runtime и совместная работа агентов | [Development](development.md) |
-| Следующая сессия исправлений | [Промпт координатора](audits/2026-10-11-next-session.md) |
+| Следующая сессия после остановки 13 октября | [Актуальный handoff и промпт](audits/2026-10-13-handoff.md) |
 
 Номер 086 занят двумя существующими ADR; в задачах использовать полное имя файла. Новые номера проверять по всему каталогу.
 
@@ -35,4 +35,4 @@
 
 ## Исторические материалы
 
-[Аудит 25 марта](audits/2026-03-25-repo-audit.md) и [мартовская карта состояния](audit/current-state-architecture.md) сохраняют rationale и старые findings; они не доказывают актуальное поведение. ADR-024 описывает прежний nginx edge, его преемник для текущего server flow — ADR-025. Исторические документы не переписывать под новый код; добавлять ссылку на новый evidence.
+[Аудит 25 марта](audits/2026-03-25-repo-audit.md) и [мартовская карта состояния](audit/current-state-architecture.md) сохраняют rationale и старые findings; они не доказывают актуальное поведение. [Исходный промпт 11 октября](audits/2026-10-11-next-session.md) сохранён для истории; актуальное указание владельца об ограничении проверок находится в handoff 13 октября. ADR-024 описывает прежний nginx edge, его преемник для текущего server flow — ADR-025. Исторические документы не переписывать под новый код; добавлять ссылку на новый evidence.
