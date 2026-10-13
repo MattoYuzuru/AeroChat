@@ -634,6 +634,24 @@ regression в774 не включён и повторно не запускалс
 Это frontend fixtures с synthetic auth/RTC; новый native layout/unread/minimized,
 200% zoom, call matrix и device-пункты остаются отдельной приёмкой.
 
+Для нового native09 создана независимая полная локальная копия clean `ee87682`.
+`check-jkthllul` подтвердил clone без shared inodes/alternates; source pin
+`check-30n20_z5`, один offline production frontend build `check-dxy8_n5r`
+и шесть native Go27.2 builds `check-67osbu6o` прошли. Root сверил все107 файлов
+dist, текущие SHA шести binaries, VCS текущего SHA у четырёх сервисов,
+95 завершённых команд сборки и отсутствие их owned PID/PG.
+Это подтверждает подготовку текущей версии; новая база, runtime и совместная
+browser-приёмка ещё не подтверждены. Старый native08 остаётся остановленным.
+
+Metadata V11 `check-d3j1bb1c` остановился после416 запусков Go на неизвестном
+`x/net v0.0.0-20210226172049-e18ecbb05110`. Root независимо сверил416 Wait,
+415 HTTP200, неизменные201 cache inputs и восемь metadata files с двумя
+точными RTC require additions, отсутствие owned PID/PG и ZIP. В V12 добавлены
+только семь версий из291 literal requires в118 actual stock `.mod`;
+`check-5x3cu70i` также сохранил первый STOP после426 запусков, на
+`x/sys v0.0.0-20201119102817-f84b799fce68`. Эта версия не загружалась;
+граф, выбор версий, сборка SDK и групповой звук по-прежнему не подтверждены.
+
 До общей готовности остаются:
 
 - Fresh native geometry текущего mobile исправления, unread/minimized и
