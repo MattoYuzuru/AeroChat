@@ -159,7 +159,7 @@ Backend ordering encrypted direct/group operations использует per-conv
   - server/prod-like compose теперь включает repo-managed `turn` runtime с явным public relay IP contract,
     чтобы direct-call connectivity не зависела от вне-репозитарного ad-hoc coturn setup;
   - production-grade connectivity по-прежнему не гарантируется без корректно заданной operator-managed TURN/STUN policy;
-  - group call UI сейчас остаётся lobby/control surface без multiparty browser media transport.
+  - group call UI сейчас остаётся lobby/control surface без multiparty browser media transport. Карточка и joined status явно называют лобби без аудио; участие в roster не означает подключения к звуку. Provider, token/admission/teardown runtime, ограничение audio tracks и privacy warning для будущего SFU join ещё не реализованы (#176).
 
 
 ## Platform additions
