@@ -29,7 +29,7 @@ Workflow не занимается:
 Перед автоматизированным rollout должны быть завершены предыдущие platform slices:
 
 - сервер подготовлен по
-  [single-server bootstrap runbook](single-server-bootstrap.md);
+  [single-server bootstrap runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/single-server-bootstrap.md);
 - deploy directory на VPS уже существует и содержит checkout выбранного release source SHA;
 - на VPS уже есть `.env.server` и `.env.server.secrets`;
 - compose stack AeroChat уже умеет подниматься на
@@ -132,7 +132,7 @@ Manual workflow `Deploy Production` выполняет один последов
 3. подключается к VPS, сверяет checkout SHA и повторно валидирует metadata;
 4. подтверждает `.env.server`, `.env.server.secrets`, Compose и Python 3;
 5. валидирует `AERO_WEB_PUSH_*`: полный absence даёт warning, partial-набор прерывает rollout;
-6. создаёт immutable release overlay, сохраняет recovery record/previous overlay и сверяет applied schema/compatibility, затем выполняет Compose config/pull --ignore-buildable/up/ps с этим overlay; storage собирается по `pull_policy: build` из pinned sources;
+6. создаёт immutable release overlay, сохраняет recovery record/previous overlay и сверяет applied schema/compatibility, затем выполняет Compose config/pull --ignore-buildable/up/ps с этим overlay; storage собирается из pinned sources по `pull_policy: build`;
 7. проверяет пять runtime image digests/revision labels и ждёт успешных URL gates:
     - `http://<shared-edge-host-ip>:<web-port>/`
     - `http://<shared-edge-host-ip>:<gateway-port>/readyz`
@@ -163,7 +163,7 @@ Workflow намеренно не трогает:
 Рекомендуемый first launch checklist:
 
 1. Подготовить VPS и cluster edge по
-   [single-server bootstrap runbook](single-server-bootstrap.md).
+   [single-server bootstrap runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/single-server-bootstrap.md).
 2. Проверить, что deploy directory на VPS содержит актуальный checkout этого operational slice.
 3. Проверить прямые upstream'ы:
 
@@ -221,7 +221,7 @@ ss -lntup | rg ':3478|:49160|:49200'
 13. При ручном API smoke для `CreateAttachmentUploadIntent` проверить, что presigned URL указывает на
     `https://media.<zone-domain>`,
     а не на внутренний `minio:9000`, основной application domain или nested host вида `media.<application-host>`.
-14. Зафиксировать предыдущие known-good и текущие deployed manifest digest/source SHA в операторском журнале или release notes; сохранить metadata с пятью image digests по [recovery runbook](data-recovery.md).
+14. Зафиксировать предыдущий known-good tag и текущий deployed tag в операторском журнале или release notes.
 
 Если register/login падают после успешного `upstream`- и `HTTPS`-smoke, отдельно проверь логи bootstrap:
 
@@ -286,8 +286,8 @@ Rollback делается тем же workflow и тем же operator contract:
 
 1. Зайди на VPS по SSH.
 2. Выбери сохранённые metadata и checkout предыдущего known-good source SHA.
-3. Повтори validation и Compose pull --ignore-buildable/up с immutable overlay по [manual verified release flow](verified-release.md); storage собирается из выбранных pinned sources.
-4. Подтверди пять runtime digests/source SHA; сохраняй предыдущие volumes.
+3. Повтори validation и Compose pull --ignore-buildable/up с immutable overlay по [manual verified release flow](verified-release.md).
+4. Собери pinned storage в выбранном checkout; подтверди пять runtime digests/source SHA и сохраняй предыдущие volumes.
 5. Снова проверь прямой gateway upstream, media upstream и публичные `https://<domain>/readyz`,
    `https://<media-domain>/minio/health/live`.
 
