@@ -79,7 +79,13 @@ func ownedPushTLS(t *testing.T, handler http.Handler) (*httptest.Server, *x509.C
 	}
 	roots := x509.NewCertPool()
 	roots.AddCert(parsed)
-	server := httptest.NewUnstartedServer(handler)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Fixture завершает чтение request до ответа: ранний close при отключённом
+		// keep-alive иначе гоняется с клиентской записью и даёт broken pipe.
+		// Отмена request допускает read error; её проверяет вызывающий сценарий.
+		_, _ = io.Copy(io.Discard, r.Body)
+		handler.ServeHTTP(w, r)
+	}))
 	server.TLS = &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{{Certificate: [][]byte{der}, PrivateKey: key}}}
 	server.StartTLS()
 	t.Cleanup(server.Close)
