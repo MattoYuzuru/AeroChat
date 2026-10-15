@@ -3,9 +3,14 @@ import {createRoot} from 'react-dom/client';
 import {useDirectCallSession} from '../../src/rtc/useDirectCallSession';
 import {createDirectCallJoinCoordinator} from '../../src/rtc/join-coordinator';
 import {usePlayback} from 'virtual:playback';
-import {call, participants, log, gatewayState, deferMutation, finishMutation, deferConfiguration, finishConfiguration, deferLeave, finishLeave, failLeave} from './gateway.js';
+import {listeners} from './realtime.js';
+import {call, participants, log, gatewayState, deferMutation, finishMutation, deferConfiguration, finishConfiguration, deferLeave, finishLeave, failLeave, nextCall} from './gateway.js';
 
 const observations = { stops: 0, captures: 0, plays: 0, pauses: 0, peers: [] };
+const candidates = [];
+let candidateDeferred = false;
+let candidatePending = false;
+let finishCandidate;
 let blocked = false;
 let deferPlayback = false;
 let completePlayback;
@@ -27,9 +32,11 @@ class FakePeer extends EventTarget {
   addTrack(){return {getParameters:()=>({encodings:[{}]}), setParameters:async()=>{}, track};}
   close(){this.connectionState='closed'; this.signalingState='closed';}
   async createOffer(){return {type:'offer',sdp:'fixture-offer'};}
+  async createAnswer(){return {type:'answer',sdp:'fixture-answer'};}
   async setLocalDescription(desc){this.signalingState=desc.type==='offer'?'have-local-offer':'stable';}
   async setRemoteDescription(desc){this.remoteDescription=desc; this.signalingState='stable';}
-  async addIceCandidate(){}
+  async addIceCandidate(candidate){candidates.push({peer:observations.peers.indexOf(this),candidate:candidate.candidate});if(candidateDeferred){candidateDeferred=false;candidatePending=true;await new Promise(resolve=>{finishCandidate=resolve;});candidatePending=false;}}
+  emitState(value){this.connectionState=value;this.dispatchEvent(new Event('connectionstatechange'));}
 }
 window.RTCPeerConnection = FakePeer;
 let session;
@@ -51,6 +58,13 @@ window.fixture = {
   finishMutation,
   deferConfiguration,
   finishConfiguration,
+  nextCall,
+  deferCandidate(){candidateDeferred=true;},
+  finishCandidate(){finishCandidate();},
+  connect(){const peer=observations.peers.at(-1);peer.remoteDescription={type:'answer',sdp:'fixture-answer'};peer.signalingState='stable';peer.emitState('connected');},
+  failPeer(){observations.peers.at(-1).emitState('failed');},
+  stalePeerState(){observations.peers[0].emitState('connected');},
+  signal(type,payload){for(const listener of listeners)listener({type:'rtc.signal.received',payload:{signal:{callId:'call-1',fromUserId:'joiner',targetUserId:'creator',type,payload:btoa(payload)}}});},
   deferLeave,
   finishLeave,
   failLeave,
@@ -64,5 +78,5 @@ window.fixture = {
   deferPlayback(){deferPlayback=true;},
   completePlayback(rejectResult){completePlayback(rejectResult);},
   retry(){return session.retryRemoteAudioPlayback(audio);},
-  report(){return {...observations, configurationPending:gatewayState.configurationPending, peers:observations.peers.length, attached:audio.srcObject!==null, log, state:session?.state};},
+  report(){return {...observations, candidatePending,candidates,canJoin:session?.canJoin, signals:gatewayState.signals, configurationPending:gatewayState.configurationPending, peers:observations.peers.length, attached:audio.srcObject!==null, log, state:session?.state};},
 };

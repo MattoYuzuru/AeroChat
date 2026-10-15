@@ -1,7 +1,8 @@
-export const call = { id: 'call-1', scope: {kind: 'direct', directChatId: 'chat-1'}, createdByUserId: 'creator', status: 'active' };
-export const participants = [{ id: 'p-1', userId: 'creator', state: 'active', callId: call.id }, { id: 'p-2', userId: 'joiner', state: 'active', callId: call.id }];
+export let call = { id: 'call-1', scope: {kind: 'direct', directChatId: 'chat-1'}, createdByUserId: 'creator', status: 'active' };
+export let participants = [{ id: 'p-1', userId: 'creator', state: 'active', callId: call.id }, { id: 'p-2', userId: 'joiner', state: 'active', callId: call.id }];
+export function nextCall(){call={...call,id:'call-2',scope:{kind:'direct',directChatId:'chat-2'}};participants=participants.map(participant=>({...participant,callId:call.id}));}
 export const log = [];
-export const gatewayState = {configurationPending:false};
+export const gatewayState = {configurationPending:false, signals:[]};
 let releaseMutation;
 let deferred = false;
 let releaseConfiguration;
@@ -25,7 +26,7 @@ export const gatewayClient = {
   getRtcIceServers: async () => {if(configurationDeferred){configurationDeferred=false;gatewayState.configurationPending=true;await new Promise(resolve=>{releaseConfiguration=resolve;});gatewayState.configurationPending=false;}return [];},
   startCall: token => mutation('start',token),
   joinCall: token => mutation('join',token),
-  sendRtcSignal: async () => {},
+  sendRtcSignal: async (_,signal) => {gatewayState.signals.push(signal.type);},
   touchCallParticipant: async () => { log.push('heartbeat'); },
   leaveCall: async () => { log.push('leave');if(leaveDeferred){leaveDeferred=false;await new Promise(resolve=>{releaseLeave=resolve;});}if(leaveFails)throw new Error('leave unavailable'); },
   endCall: async () => { log.push('end'); },
