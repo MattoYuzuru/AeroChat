@@ -232,6 +232,7 @@ describe("createGatewayClient", () => {
             operationKind: "ENCRYPTED_GROUP_MESSAGE_OPERATION_KIND_CONTENT",
             revision: 1,
             createdAt: "2026-03-22T12:11:00Z",
+            serverSequence: "1",
             storedAt: "2026-03-22T12:11:01Z",
             storedDeliveryCount: 2,
             storedDeliveries: [
@@ -1316,6 +1317,7 @@ describe("createGatewayClient", () => {
               operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
               revision: 1,
               createdAt: "2026-03-22T12:00:00Z",
+              serverSequence: "1",
               storedAt: "2026-03-22T12:00:01Z",
               viewerDelivery: {
                 recipientUserId: "user-2",
@@ -1355,6 +1357,7 @@ describe("createGatewayClient", () => {
         targetMessageId: null,
         revision: 1,
         createdAt: "2026-03-22T12:00:00Z",
+        serverSequence: "1",
         storedAt: "2026-03-22T12:00:01Z",
         viewerDelivery: {
           recipientUserId: "user-2",
@@ -1587,6 +1590,7 @@ describe("createGatewayClient", () => {
               ciphertext: "cipher-1",
               ciphertextSizeBytes: "8",
               createdAt: "2026-03-22T12:00:00Z",
+              serverSequence: "1",
               storedAt: "2026-03-22T12:00:01Z",
               viewerDelivery: {
                 recipientUserId: "user-2",
@@ -1628,6 +1632,7 @@ describe("createGatewayClient", () => {
         ciphertext: "cipher-1",
         ciphertextSizeBytes: 8,
         createdAt: "2026-03-22T12:00:00Z",
+        serverSequence: "1",
         storedAt: "2026-03-22T12:00:01Z",
         viewerDelivery: {
           recipientUserId: "user-2",
@@ -1661,6 +1666,7 @@ describe("createGatewayClient", () => {
             operationKind: "ENCRYPTED_DIRECT_MESSAGE_V2_OPERATION_KIND_CONTENT",
             revision: 1,
             createdAt: "2026-03-22T12:00:00Z",
+            serverSequence: "1",
             storedAt: "2026-03-22T12:00:01Z",
             storedDeliveryCount: 2,
           },
@@ -1700,6 +1706,7 @@ describe("createGatewayClient", () => {
       targetMessageId: null,
       revision: 1,
       createdAt: "2026-03-22T12:00:00Z",
+      serverSequence: "1",
       storedAt: "2026-03-22T12:00:01Z",
       storedDeliveryCount: 2,
       storedDeliveries: [],
@@ -2435,5 +2442,26 @@ describe("createGatewayClient", () => {
         }),
       }),
     );
+  });
+});
+
+
+describe("authoritative encrypted metadata over HTTP", () => {
+  it.each([undefined, "0", "01", "9223372036854775808", 1])("rejects invalid direct/group envelope sequence %s", async (serverSequence) => {
+    const client = createGatewayClient(vi.fn(async () => new Response(JSON.stringify({ envelopes: [{ serverSequence }] }), { status: 200 })), "/api");
+    await expect(client.listEncryptedDirectMessageV2("token", "chat", "device", 50)).rejects.toThrow("порядок сообщений");
+    await expect(client.listEncryptedGroupMessages("token", "group", "device", 50)).rejects.toThrow("порядок сообщений");
+  });
+  it("keeps the entire positive int64 read watermark and accepts a null reset", async () => {
+    const client = createGatewayClient(vi.fn(async () => new Response(JSON.stringify({ encryptedReadState: { selfPosition: null,
+        peerPosition: { messageId: "content", lastReadServerSequence: "9007199254740993" } } }), { status: 200 })), "/api");
+    const snapshot = await client.getDirectChat("token", "chat");
+    expect(snapshot.encryptedReadState).toEqual({ selfPosition: null, peerPosition: { messageId: "content",
+        lastReadServerSequence: "9007199254740993", messageCreatedAt: "", updatedAt: "" } });
+  });
+  it.each([{ messageId: "content" }, { messageId: "content", lastReadServerSequence: "0" },
+    { messageId: "", lastReadServerSequence: "1" }])("rejects an invalid read target %s", async (peerPosition) => {
+    const client = createGatewayClient(vi.fn(async () => new Response(JSON.stringify({ encryptedReadState: { peerPosition } }), { status: 200 })), "/api");
+    await expect(client.getDirectChat("token", "chat")).rejects.toThrow();
   });
 });

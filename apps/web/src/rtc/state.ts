@@ -204,6 +204,12 @@ export function directCallReducer(
         errorMessage: action.message ?? state.errorMessage,
       };
     case "remote_audio_state_replaced":
+      if (
+        state.remoteAudioState === action.remoteAudioState &&
+        state.remoteAudioAvailable === action.remoteAudioAvailable
+      ) {
+        return state;
+      }
       return {
         ...state,
         remoteAudioState: action.remoteAudioState,

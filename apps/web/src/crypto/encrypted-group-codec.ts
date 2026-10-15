@@ -531,6 +531,7 @@ function buildReadyProjection(
         : null,
     revision: envelope.revision,
     createdAt: envelope.createdAt,
+    serverSequence: envelope.serverSequence,
     storedAt: envelope.storedAt,
     payloadSchema,
     text: payload.operation === "tombstone" ? null : payload.message.text,
@@ -562,6 +563,7 @@ function buildFailure(
     targetMessageId: envelope.targetMessageId,
     revision: envelope.revision,
     createdAt: envelope.createdAt,
+    serverSequence: envelope.serverSequence,
     storedAt: envelope.storedAt,
     failureKind,
   };

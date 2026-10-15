@@ -36,6 +36,8 @@
 
 Web вызывает его только пока текущая страница действительно локально участвует в active call.
 
+Правило распространяется и на control-only group lobby ADR-078: локально подтверждённое участие получает 20s heartbeat, observers/readers не продлевают чужие rows. Read-only GetActiveCall не считается heartbeat. Group media этот lifecycle fix не реализует.
+
 Heartbeat остаётся:
 
 - минимальным по payload;

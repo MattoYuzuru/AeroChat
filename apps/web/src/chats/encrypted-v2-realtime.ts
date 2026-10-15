@@ -1,3 +1,4 @@
+import { parseServerSequence } from "../gateway/server-sequence";
 import type { RealtimeEnvelope } from "../realtime/client";
 
 const encryptedDirectMessageV2DeliveryType = "encrypted_direct_message_v2.delivery";
@@ -14,6 +15,7 @@ export interface EncryptedDirectMessageV2RealtimeEvent {
     targetMessageId: string | null;
     revision: number;
     createdAt: string;
+    serverSequence: string;
     storedAt: string;
     viewerDelivery: {
       recipientCryptoDeviceId: string;
@@ -54,6 +56,7 @@ export function parseEncryptedDirectMessageV2RealtimeEvent(
   const operationKind = readRequiredString(payload.envelope.operationKind);
   const createdAt = readRequiredString(payload.envelope.createdAt);
   const storedAt = readRequiredString(payload.envelope.storedAt);
+  const serverSequence = parseServerSequence(payload.envelope.serverSequence);
   const recipientCryptoDeviceId = readRequiredString(
     payload.envelope.viewerDelivery.recipientCryptoDeviceId,
   );
@@ -70,6 +73,7 @@ export function parseEncryptedDirectMessageV2RealtimeEvent(
     operationKind === null ||
     createdAt === null ||
     storedAt === null ||
+    serverSequence === null ||
     recipientCryptoDeviceId === null ||
     viewerStoredAt === null ||
     transportHeader === null ||
@@ -91,6 +95,7 @@ export function parseEncryptedDirectMessageV2RealtimeEvent(
       targetMessageId: readOptionalString(payload.envelope.targetMessageId),
       revision,
       createdAt,
+      serverSequence,
       storedAt,
       viewerDelivery: {
         recipientCryptoDeviceId,

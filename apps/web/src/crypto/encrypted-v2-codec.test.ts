@@ -38,6 +38,7 @@ describe("encrypted direct message v2 codec", () => {
 
     const decrypted = await decryptEncryptedDirectMessageV2Envelope(material, {
       ...envelope,
+      serverSequence: "9007199254740993",
       viewerDelivery: {
         ...envelope.viewerDelivery,
         ...encrypted,
@@ -55,6 +56,7 @@ describe("encrypted direct message v2 codec", () => {
       replyToMessageId: null,
       revision: 1,
       createdAt: "2026-03-22T12:00:00Z",
+      serverSequence: "9007199254740993",
       storedAt: "2026-03-22T12:00:01Z",
       payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
       text: "local encrypted hello",
@@ -121,6 +123,7 @@ function createOpaqueEnvelope(): EncryptedDirectMessageV2Envelope {
     targetMessageId: null,
     revision: 1,
     createdAt: "2026-03-22T12:00:00Z",
+    serverSequence: "1",
     storedAt: "2026-03-22T12:00:01Z",
     viewerDelivery: {
       recipientUserId: "user-2",
