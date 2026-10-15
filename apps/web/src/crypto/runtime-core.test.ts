@@ -403,6 +403,7 @@ describe("createCryptoRuntimeCore", () => {
         targetMessageId: null,
         revision: input.revision,
         createdAt: "2026-03-22T12:11:00Z",
+        serverSequence: "1",
         storedAt: "2026-03-22T12:11:01Z",
         storedDeliveryCount: input.deliveries.length,
         storedDeliveries: input.deliveries.map((delivery: (typeof input.deliveries)[number]) => ({
@@ -456,6 +457,7 @@ describe("createCryptoRuntimeCore", () => {
         ]),
       }),
     );
+    expect(result.localProjection.serverSequence).toBe(result.storedEnvelope.serverSequence);
     expect(result.localProjection.text).toBe("secret hello");
     expect(result.localProjection.attachments).toEqual([]);
     expect(result.localProjection.chatId).toBe("chat-1");
@@ -539,6 +541,7 @@ describe("createCryptoRuntimeCore", () => {
         targetMessageId: null,
         revision: input.revision,
         createdAt: "2026-03-22T12:11:00Z",
+        serverSequence: "1",
         storedAt: "2026-03-22T12:11:01Z",
         storedDeliveryCount: 2,
         storedDeliveries: [
@@ -589,6 +592,7 @@ describe("createCryptoRuntimeCore", () => {
         ciphertext: expect.any(String),
       }),
     );
+    expect(result.localProjection.serverSequence).toBe(result.storedEnvelope.serverSequence);
     expect(result.localProjection.text).toBe("secret group hello");
     expect(result.localProjection.attachments).toEqual([]);
     expect(result.localProjection.groupId).toBe("group-1");
@@ -672,6 +676,7 @@ describe("createCryptoRuntimeCore", () => {
         targetMessageId: null,
         revision: input.revision,
         createdAt: "2026-03-22T12:11:00Z",
+        serverSequence: "1",
         storedAt: "2026-03-22T12:11:01Z",
         storedDeliveryCount: 2,
         storedDeliveries: [],
@@ -785,6 +790,7 @@ describe("createCryptoRuntimeCore", () => {
         targetMessageId: null,
         revision: 1,
         createdAt: "2026-03-22T12:00:00Z",
+        serverSequence: "1",
         storedAt: "2026-03-22T12:00:01Z",
         payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
         replyToMessageId: null,
@@ -1172,6 +1178,7 @@ function createEncryptedGroupEnvelope(): EncryptedGroupEnvelope {
     ciphertext: "",
     ciphertextSizeBytes: 0,
     createdAt: "2026-03-22T12:00:00Z",
+    serverSequence: "1",
     storedAt: "2026-03-22T12:00:01Z",
     viewerDelivery: {
       recipientUserId: "user-1",

@@ -3,6 +3,8 @@
 - Статус: Accepted
 - Дата: 2026-03-28
 
+Исходящий transport и provider compatibility уточнены в [ADR-095](095-web-push-egress-boundary.md); стандартные Web Push payload/VAPID semantics этого ADR сохраняются.
+
 ## Контекст
 
 `README`, `roadmap` и audit уже фиксируют, что notifications/PWA остаются подтверждённым продуктовым gap:

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -84,7 +83,6 @@ func run() error {
 		libauth.NewSessionTokenManager(),
 		app.NewFriendRequestNotificationDispatcher(
 			libnotifications.NewWebPushClient(
-				&http.Client{},
 				cfg.WebPushSubscriber,
 				cfg.WebPushVAPIDPublicKey,
 				cfg.WebPushVAPIDPrivateKey,
