@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -22,11 +23,12 @@ type Subscription struct {
 }
 
 type WebPushClient struct {
-	httpClient *http.Client
-	subscriber string
-	publicKey  string
-	privateKey string
-	ttlSeconds int
+	httpClient   *http.Client
+	subscriber   string
+	publicKey    string
+	privateKey   string
+	ttlSeconds   int
+	batchTimeout time.Duration
 }
 
 func MissingWebPushConfigFields(subscriber string, publicKey string, privateKey string) []string {
@@ -57,17 +59,15 @@ func ValidateWebPushConfig(subscriber string, publicKey string, privateKey strin
 	return fmt.Errorf("неполная web push конфигурация: отсутствуют %s", strings.Join(missing, ", "))
 }
 
-func NewWebPushClient(httpClient *http.Client, subscriber string, publicKey string, privateKey string) *WebPushClient {
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 10 * time.Second}
-	}
-
+func NewWebPushClient(subscriber string, publicKey string, privateKey string) *WebPushClient {
+	dialer := &net.Dialer{Timeout: pushDialTimeout, KeepAlive: -1}
 	return &WebPushClient{
-		httpClient: httpClient,
-		subscriber: strings.TrimSpace(subscriber),
-		publicKey:  strings.TrimSpace(publicKey),
-		privateKey: strings.TrimSpace(privateKey),
-		ttlSeconds: defaultPushTTLSeconds,
+		httpClient:   newPushHTTPClient(net.DefaultResolver.LookupNetIP, dialer.DialContext),
+		subscriber:   strings.TrimSpace(subscriber),
+		publicKey:    strings.TrimSpace(publicKey),
+		privateKey:   strings.TrimSpace(privateKey),
+		ttlSeconds:   defaultPushTTLSeconds,
+		batchTimeout: pushBatchTimeout,
 	}
 }
 
@@ -92,16 +92,25 @@ func (c *WebPushClient) SendJSON(
 	if !c.Enabled() || len(subscriptions) == 0 {
 		return nil, nil
 	}
+	ctx, cancel := context.WithTimeout(ctx, c.batchTimeout)
+	defer cancel()
 
 	message, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("marshal web push payload: %w", err)
+		return nil, errors.New("web push payload encoding failed")
 	}
 
 	var invalidSubscriptionIDs []string
 	var sendErrors []error
 	for _, subscription := range subscriptions {
-		if strings.TrimSpace(subscription.Endpoint) == "" {
+		if ctx.Err() != nil {
+			sendErrors = append(sendErrors, errors.New("web push batch interrupted"))
+			break
+		}
+		endpoint, err := NormalizeWebPushEndpoint(subscription.Endpoint)
+		if err != nil {
+			invalidSubscriptionIDs = append(invalidSubscriptionIDs, subscription.ID)
+			sendErrors = append(sendErrors, ErrWebPushEndpoint)
 			continue
 		}
 
@@ -109,7 +118,7 @@ func (c *WebPushClient) SendJSON(
 			ctx,
 			message,
 			&webpush.Subscription{
-				Endpoint: subscription.Endpoint,
+				Endpoint: endpoint,
 				Keys: webpush.Keys{
 					P256dh: subscription.P256DHKey,
 					Auth:   subscription.AuthSecret,
@@ -125,10 +134,11 @@ func (c *WebPushClient) SendJSON(
 				VAPIDPrivateKey: c.privateKey,
 			},
 		)
-		if response != nil {
+		if response != nil && response.Body != nil {
 			_ = response.Body.Close()
 		}
-		if sendErr == nil {
+		if sendErr != nil || response == nil {
+			sendErrors = append(sendErrors, errors.New("web push request failed"))
 			continue
 		}
 
@@ -136,8 +146,9 @@ func (c *WebPushClient) SendJSON(
 			invalidSubscriptionIDs = append(invalidSubscriptionIDs, subscription.ID)
 			continue
 		}
-
-		sendErrors = append(sendErrors, fmt.Errorf("endpoint %s: %w", subscription.Endpoint, sendErr))
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			sendErrors = append(sendErrors, errors.New("web push provider did not accept request"))
+		}
 	}
 
 	return invalidSubscriptionIDs, errors.Join(sendErrors...)

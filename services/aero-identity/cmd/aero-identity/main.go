@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -74,18 +73,22 @@ func run() error {
 		return fmt.Errorf("identity database bootstrap: %w", err)
 	}
 
+	passwordAdmission, err := identity.NewPasswordAdmission(cfg.PasswordHashConcurrency)
+	if err != nil {
+		return err
+	}
 	service := identity.NewService(
 		repository,
 		identityauth.NewPasswordHasher(),
 		libauth.NewSessionTokenManager(),
 		app.NewFriendRequestNotificationDispatcher(
 			libnotifications.NewWebPushClient(
-				&http.Client{},
 				cfg.WebPushSubscriber,
 				cfg.WebPushVAPIDPublicKey,
 				cfg.WebPushVAPIDPrivateKey,
 			),
 		),
+		passwordAdmission,
 	)
 	handler := connecthandler.NewHandler(serviceName, version, service)
 
