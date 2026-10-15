@@ -201,3 +201,29 @@ minimal scoped receipt, не создаёт target и не меняет replacem
 Model-complete Leave не становится public media COMPLETE: при UNKNOWN provider
 facts adapter возвращает media_PENDING. Уточнение пока docs-only, actual
 authorization/read adapters и SDK/admission/proxy ACK не реализованы.
+
+### Следующий адаптер авторизации media control
+
+Уточнение ADR-097 принято координатором 2026-10-12 до реализации. Отдельная
+фабрика без подключения к app/gateway должна проверять настоящий opaque bearer
+через private Identity и свежие Chat facts, разрешать own status/replay без
+подмены роли и возвращать PENDING до подтверждения provider cleanup. Общий
+бюджет 5s начинается до Connect decode; нужны actual read/write deadlines,
+body cap 4KiB и отдельные server limits для raw headers/cleanup. Обязательный
+локальный guard проверяется перед первой journal mutation и обоими commit paths.
+
+Основание coordinator `64c0251` прошло local whole `check-w3lhrem2`: 41 этап,
+768 actual PASS events, без failure/TestSKIP. Это не проверка нового адаптера
+или SFU. Его code/native scopes пока UNIMPLEMENTED/UNRUN. GitHub publication
+заблокирована ответом 403 account suspended; новые локальные проверки отдельно
+фиксируют exact source, сохраняя внешний publication gate BLOCKED. Существующие
+production stubs/feature flag остаются прежними; SDK, SFU и UI относятся к следующим slices.
+
+Native scope адаптера отдельно использует production Identity main и Chat
+test host с production PG repository/domain/group writers/private TLS listener,
+при максимуме трёх одновременных участников вместе с RTC test. Test-only typing
+storage очищает только отсутствующие entries при reader/remove; auth facts и
+roles остаются настоящими. Проверка не запускает Redis/S3 и не подтверждает
+полный Chat main/Compose; полный стек проверяется отдельной браузерной приёмкой.
+Accepted границы и allowlist зафиксированы в ADR-097 до fixture code. Этот новый
+native scope пока UNRUN.

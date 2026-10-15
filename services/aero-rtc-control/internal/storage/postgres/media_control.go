@@ -43,8 +43,25 @@ func controlError(err error) error {
 func controlIntent(r ql.RtcMediaControlIntent) control.Intent {
 	return control.Intent{ID: r.ID, RequestID: r.RequestID, CallID: r.CallID, GroupID: r.GroupID, ActorUserID: r.ActorUserID, Kind: r.Kind, State: r.State, Resolution: r.Resolution, CreatedAt: r.CreatedAt.Time}
 }
-func (s *MediaControlStore) Request(ctx context.Context, r control.Request) (result control.Intent, resultErr error) {
+func (s *MediaControlStore) Request(ctx context.Context, r control.Request) (control.Intent, error) {
+	return s.request(ctx, r, nil)
+}
+
+// Authorized entry требует локальный guard; model Request не становится public capability.
+func (s *MediaControlStore) RequestAuthorized(ctx context.Context, r control.Request, guard func(context.Context) error) (control.Intent, error) {
+	if guard == nil {
+		return control.Intent{}, control.ErrUnavailable
+	}
+	return s.request(ctx, r, guard)
+}
+
+func (s *MediaControlStore) request(ctx context.Context, r control.Request, guard func(context.Context) error) (result control.Intent, resultErr error) {
 	defer func() { resultErr = controlError(resultErr) }()
+	if guard != nil {
+		if err := guard(ctx); err != nil {
+			return control.Intent{}, err
+		}
+	}
 	if r.Validate() != nil {
 		return control.Intent{}, control.ErrDenied
 	}
@@ -63,10 +80,20 @@ func (s *MediaControlStore) Request(ctx context.Context, r control.Request) (res
 	if r.Kind == "end" && (call.CreatedByUserID != r.Actor.UserID || !r.Actor.Eligible()) {
 		return control.Intent{}, control.ErrDenied
 	}
+	if guard != nil {
+		if err := guard(ctx); err != nil {
+			return control.Intent{}, err
+		}
+	}
 	old, err := q.GetMediaControlByRequest(ctx, ql.GetMediaControlByRequestParams{ActorUserID: r.Actor.UserID, RequestID: r.ID})
 	if err == nil {
 		if old.CallID != r.CallID || old.GroupID != r.Actor.GroupID || old.Kind != r.Kind {
 			return control.Intent{}, control.ErrConflict
+		}
+		if guard != nil {
+			if err := guard(ctx); err != nil {
+				return control.Intent{}, err
+			}
 		}
 		if err := slot.tx.Commit(ctx); err != nil {
 			return control.Intent{}, err
@@ -107,6 +134,11 @@ func (s *MediaControlStore) Request(ctx context.Context, r control.Request) (res
 	resolution := "known"
 	if r.Kind == "end" && len(rooms) == 0 {
 		resolution = "unknown"
+	}
+	if guard != nil {
+		if err := guard(ctx); err != nil {
+			return control.Intent{}, err
+		}
 	}
 	intent, err := q.CreateMediaControlIntent(ctx, ql.CreateMediaControlIntentParams{ID: uuid.New(), RequestID: r.ID, ActorUserID: r.Actor.UserID, ActorSessionID: r.Actor.SessionID, ActorDeviceID: r.Actor.DeviceID, ActorSessionRevision: r.Actor.SessionRevision, ActorDeviceRevision: r.Actor.DeviceRevision, CallID: r.CallID, GroupID: r.Actor.GroupID, Kind: r.Kind, Resolution: resolution, CreatedAt: timestamptzValue(r.At)})
 	if err != nil {
@@ -166,6 +198,11 @@ func (s *MediaControlStore) Request(ctx context.Context, r control.Request) (res
 			} else if n != 1 {
 				return control.Intent{}, control.ErrUnavailable
 			}
+		}
+	}
+	if guard != nil {
+		if err := guard(ctx); err != nil {
+			return control.Intent{}, err
 		}
 	}
 	if err := slot.tx.Commit(ctx); err != nil {

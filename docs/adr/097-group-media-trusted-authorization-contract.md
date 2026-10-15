@@ -300,6 +300,100 @@ generation/full gates/publication — ordinary merge generated, verified и
 published parents, новый clean freeze и собственные receipts. До actual
 trusted ACK acceptance public media complete не заявляется.
 
+### Авторизация публичного media control и свежесть запроса
+
+Уточнение Accepted координатором 2026-10-12 после review source и Go 1.25
+для отдельного unmounted adapter slice. Этот docs commit предшествует коду.
+
+Existing RTC не имеет AuthContext/JWT middleware: public handler читает bearer
+из request Header, legacy GetCurrentProfile возвращает лишь user ID. Existing
+opaque sessionv1 остаётся прежним; adapter принимает ровно один nonempty Bearer
+через EqualFold scan ВСЕХ Header map keys/values (без Get/Values-only selector),
+отвергает duplicate/casing aliases/comma/control и вызывает ResolveSessionBearer. Body
+содержит только existing call/request/operation IDs, не Actor/auth/group facts.
+Full active user/session/device tuple и revisions проверяются actual private
+Identity; source DTO не содержит exp/crypto-device trust/source expiry timestamp.
+SFU JWT/token policy и Go27/pinned SDK остаются отдельным следующим контрактом.
+
+Typed identity-only OwnStatusSubject/read и saved same-user LEAVE replay из
+новой active session используют только текущую Identity subject, без Chat calls,
+без fabricated RoleRemoved/Reader и без old-target/replacement mutation. Final
+CheckBoundSession проверяет текущую resolved session, не session из old receipt.
+Новый LEAVE требует exact held tuple и genuine Chat PRESENT/reader или REMOVED
+со своим validated group/user/epoch. NOT_FOUND/unavailable не превращаются в
+REMOVED. END command/replay/status каждый раз требует immutable creator и
+fresh PRESENT eligible role; GroupOwner/admin другого user это право не даёт.
+
+Outer HTTP wrapper создаёт один child context min(incoming deadline,5s) в начале
+ServeHTTP ДО Connect body decode. Actual ResponseController.SetReadDeadline(D),
+SetWriteDeadline(D) и MaxBytesReader4KiB/bounded read ограничивают body/decode;
+unsupported/error не допускает Connect/source/domain work. Raw header phase
+уже прошла: отдельный server ReadHeaderTimeout<=5s/MaxHeaderBytes8192, без claim
+охвата raw headers request D или exact8192wirecutoff с Go bufio slack. D общий
+для source calls, DB wait/recheck/commit/final snapshot и response. Facts
+request-local и истекают в D;
+никакого source expiry/JWT поля или per-hop renewal не вводится. Последние
+сетевые source checks выполняются до RTC TX/locks. Guarded writer получает
+required local func(context.Context)error, сформированный AuthorizedService:
+только ctx/deadline/time/immutable tuple validation, без network/DB callbacks.
+Он проверяется до TX, после sorted binding recheck, до первой journal mutation
+и перед ОБОИМИ commit paths (new intent/saved replay); nil/expired evidence
+запрещает mutation/replay. Сетевые source callbacks под locks отсутствуют. Unguarded
+model Request не становится public adapter entry. Это local freshness, не
+atomic auth transaction между сервисами: source-event recovery закрывает race
+после последнего lookup, а postcommit timeout/response loss остаётся uncertainty.
+
+Constructor-only typed HTTPS clients принимают dedicated verified CA и sole RTC
+leaf/clientAuth/expiry/TLS1.3/standard hostname checks; redirects/envproxy/plaintext/
+caller override запрещены, exact2Identity/1Chat methods only. Секреты/body/IDs не
+пишутся в logs/errors; static method/status/duration. Existing app/gateway не
+mount отдельный service, oldthree typed stubs остаются Unimplemented; только
+own native fixture создаёт explicit authorized factory. DTO/proto/schema и
+production media flag не расширяются. Request5s inherited private caps и
+bounded body/header policy подтверждаются actual owned3domain TLS/PG fixtures.
+OWN read deadline очищается только full body EOF+live ctx до ServeHTTP return;
+unread/error/expired body не продлевается, connection/stream не переиспользуется.
+OWN write deadline сохраняется через net/http finish flush; buffered write
+не доказывает delivery за5s. OWN server finite ReadTimeout/WriteTimeout<=5s
+ограничивает cleanup unsupported writer/early auth reject. До error response
+HTTP1 получает close-after-error; wrapper не вызывает blocking Body.Close или
+unbounded drain, net/http finishRequest завершает original body под D/fallback.
+HTTP2 завершает лишь own stream; Connect/source work не вызывается. Slow raw header/body/cancel/keepalive проверяются
+отдельно. Gateway404 native phase только после остановки Id/Chat, max3native;
+source-only gateway evidence явно static, не actual404.
+
+До actual trusted provider proof public outcome ВСЕГДА PENDING с fixed reason,
+даже если local/model journal complete/known или fixture RoomClaim ACK. Body/
+header/constructor boolean не включает COMPLETE. SDK/proxy/admission token/
+cleanup workers/UI/runtime и реальный group audio остаются отдельными slices.
+
+#### Границы native-проверки адаптера
+
+Уточнение Accepted координатором 2026-10-12 до добавления тестового хоста Chat.
+Максимум три одновременных участника этой проверки: production Identity main,
+Chat в отдельном test host и RTC test. Identity выдаёт настоящие opaque sessions;
+Chat использует production PostgreSQL repository, domain service, публичные
+group writers и private mTLS authorization listener. Роли, membership epoch и
+auth facts не подменяются. Обычный запуск tests остаётся прежним; режим хоста
+выбирает только явный private fixture profile, без пустых или skipped tests.
+
+Test host допускает лишь Ping, CreateGroup, CreateGroupInviteLink,
+JoinGroupByInviteLink, UpdateGroupMemberRole, TransferGroupOwnership и
+RemoveGroupMember. Reader transition и remove вызывают очистку typing: для
+отсутствующих в этой проверке typing entries используется отдельное пустое
+in-memory test storage. Оно не участвует в авторизации; остальные typing методы
+недоступны. Media, presence и notifications не используются и не открываются
+через allowlist. Chat production/main/dependencies не меняются, Redis/S3 clients
+и cleanup workers не запускаются. Fixture использует только собственную свежую
+UUID schema, настоящие migrations, PG и TLS; source binding, лимиты и cleanup
+проверяются отдельно до запуска.
+
+Такой результат подтверждает production Chat domain/listener в тестовом хосте,
+а не полный Chat main, Compose или readiness медиа. Полный production Chat с
+owned Redis/S3 входит в отдельную сквозную браузерную приёмку. Счётчик вызовов
+может делегировать реальному source и сохранять только числа для ZEROChat
+assertions; bearer, subject IDs и source facts в артефакт счётчика не попадают.
+
 ### Identity source delivery journal
 
 Identity sender — отдельный default-disabled implementation slice. Migration
@@ -407,6 +501,56 @@ body/header overrides и default-off/coupled shutdown. Source-only preparation
 publication требуют ordinary merge verified generated/published Identity и
 Chat sender parents, fresh clean freeze и собственные receipts. SDK/JWT/grant
 issuance, connection admission, cleanup ACK и media flag сюда не входят.
+
+### Readonly token candidate: PolicyV1
+
+Уточнение Accepted координатором для отдельного docs-first readonly slice; implementation ещё не начата. Оно фиксирует узкий readonly profile; не принимает provider/admission/mint/lease/forwarding. Privacy-модель ADR-089 сохраняется: audio доступно trusted SFU, E2EE — отдельный этап.
+
+#### Зависимости и граница результата
+
+Первый узкий slice использует direct `github.com/livekit/protocol v1.52.2-0.20261007103317-a935cd67c29a` (schema commit `a935cd67c29a361744f7c965baaf8f904c0652fd`) и `github.com/golang-jwt/jwt/v5 v5.3.1`, Go 1.27.2. LiveKit server, server-sdk-go и browser SDK сюда не входят. Оба seed assets проверены стандартным Go/SumDB; auth/JWT public API и лицензии прочитаны. Однако exact selected MVS graph, package import closure и vulnerability/build/native gates остаются отдельными prerequisites: просмотр declared requirements или cache bytes не подтверждает closure. Общий candidate из ordinary source и auth adapter требует собственного clean freeze и fresh Go 1.27 gates. Недоступный fresh published-ref guard остаётся prerequisite публикации/release, а не отменяется локальным review.
+
+Единственный успешный результат — ephemeral internal `ValidatedCandidate`: full immutable grant/room/call/participant + user/session/device/revision/eligibility tuple, verified registered admission instance/fence, checked-at и deadline. Он не является token, grant activation, reusable permit, lease, permission to forward, cleanup ACK или public response. Нет registry/slot/lease/watermark/outbox mutation, mint/refresh endpoint, новой schema/proto, service mount/main/env/feature flag. Raw JWT, decoded payload, bearer, secret и token hash не сохраняются и не логируются. Credential остаётся стандартным bearer: это не device proof-of-possession и не новая crypto scheme.
+
+#### Точный профиль подписанного token
+
+- Compact JWS: ровно3 непустых сегмента, ≤4096B; strict unpadded base64url, valid UTF-8 JSON object/EOF, decoded header≤512B/payload≤3072B, depth≤8. Header только canonical `alg=HS256`, `typ=JWT`; absent kid/jku/x5u/crit и любых дополнительных JOSE fields. Structural scanner отвергает duplicate keys во всех objects, неизвестные fields и noncanonical casing aliases; один `DisallowUnknownFields` не заменяет эти проверки. Нет JWE, trailing input или reencoding token перед signature.
+- `iss` — непустой exact configured API key; constructor требует fixed issuer и nonempty owned byte secret (nil/empty []byte закрыт до token parse), secret выбирается только этим key, без caller kid/JWKS. `sub` — explicit canonical lowercase nonzero UUID, exact registry participant_identity; empty-sub/JTI fallback запрещён. Optional raw signed `identity`, если присутствует, совпадает с sub; проверить до protocol verifier overwrite. `video.room` — explicit canonical nonzero UUID exact immutable room_name. JWT не выбирает user/session/device/group/generation/owner/fence.
+- `iat`, `nbf`, `exp` обязательны, non-null, canonical integer epoch seconds в диапазоне0..253402300799; нет float/exponent/string/bool/date truncation. `iat=nbf`, `exp-iat=600s` с overflow guard, `nbf≤now<exp` и `iat≤now`, leeway0. Эти поля и request deadline проверяются снова после источников/final snapshot. Absent nbf/iat, expiry в stock minute grace и future iat/nbf внутри этой минуты не проходят local policy.
+- `video` обязателен: roomJoin=true; explicit non-null canPublish=true/canSubscribe=true; canPublishData=false/canUpdateOwnMetadata=false/canSubscribeMetrics=false/canManageAgentSession=false; canPublishSources exact single lowercase `microphone`, без duplicate/alias/UNKNOWN/другого source. Nil publish/data flags и пустой source list не принимаются как безопасные defaults. Это source grant, **не доказательство одного actual AUDIO track**.
+- Kind — explicit `standard`; дополнительные known fields имеют только формы следующей таблицы. Это сужает неопределённое optional-empty wording и **не разрешает ни одной capability**. Все названия — exact canonical JSON tags (case aliases запрещены); repeated object key запрещён даже при одинаковом значении.
+
+| JSON fields | Exact allowed shape |
+|---|---|
+| Header alg/typ; payload iss/sub/kind; video.room | Required non-null string с exact value/binding; empty/other type denied. |
+| iat/nbf/exp | Required non-null canonical integer/range/date rules выше; string/float/exponent/bool denied. |
+| video; video.roomJoin; canPublish/canSubscribe | Required non-null object; required boolean true; required pointer-backed booleans true. |
+| video.canPublishData/canUpdateOwnMetadata/canSubscribeMetrics/canManageAgentSession | Все REQUIRED present boolean false, non-null; absent/nil/permissive defaults denied. |
+| video.canPublishSources | Required array exactly ["microphone"], без null/alias/duplicate/other source. |
+| identity | Absent либо non-null string exactlysub; empty/null/mismatch denied до verifier overwrite. |
+| aud / jti | aud absent, [] либо ""; jti absent либо "". null/[""]/nonempty/other type denied, no fallback. |
+| kindDetails / attributes | Absent либо exact [] / {}, соответственно. null/other type/nonempty denied. |
+| name/metadata/roomPreset/sha256 | Absent либо exact "". null/other type/nonempty denied. |
+| sip/agent/inference/observability/agentEndpoint/roomConfig | Absent либо JSON null (nil). ANY object даже{}, array/scalar denied. |
+| video.roomCreate/roomList/roomRecord/roomAdmin/ingressAdmin/hidden/recorder/agent | Absent либо boolean false. null/true/other type denied. |
+| video.destinationRoom | Absent либо exact "". null/other type/nonempty denied. |
+
+Raw duplicate/canonical-key/unknown audit и non-null forbidden-object deny выполняются **до** typed/custom decode; RoomConfig.UnmarshalJSON delegates to protojson.DiscardUnknown=true, поэтому outer DisallowUnknownFields alone недостаточен. Любой unknown field/namespace/depth/type закрыт, никаких normalized aliases или silently dropped fields. Token/grants/registered claims и raw library errors не логируются; библиотечные errors отображаются в fixed internal codes, не возвращаются как user/downstream payload.
+
+Stock default mint6h не используется этим профилем. TTL600s согласуется с reviewed stock refresh minimum10min при incoming lifetime600s; longer original lifetime, изменённые grants/key/kind либо иной actual refreshed shape должны отклоняться. Только source/API mint-format fixture не доказывает server refresh/reconnect. Actual pinned provider refresh/signaling integration остаётся отдельной проверкой. Clock skew приводит к deny/degraded; менять tolerance можно только явным дальнейшим ADR. JWT expiry/refresh/WS close/mute не освобождают slot/generation/publication budget/lease.
+
+#### Стандартная verification и readonly freshness
+
+1. Trusted token adapter после real VerifiedFingerprint задаёт один D=min(parent deadline,start+5s,actual verified peer leaf.NotAfter) **до** structural decode и existing WithVerifiedLeaf. Readonly facade требует live deadline и может только укоротить его до start+5s; все DB pool waits, signature, fresh calls и final view входят в него. После каждого шага и перед return — live ctx/time guard. Pure bounded HMAC нельзя прервать посередине; before/after guards не допускают late candidate. Никаких новых per-stage budgets/cache authority. Затем bounded canonical/duplicate/unknown/forbidden-object raw scanner выполняется ДО ЛЮБОГО `auth.ParseAPIToken` и любого protocol typed/custom decode; запрещённый RoomConfig object не доходит до custom unmarshal.
+2. Только после успешного bounded raw scanner `auth.ParseAPIToken(original)` получает original JWS как unverified selector; APIKey должен совпасть с configured key. Затем `Verify(configuredSecret)` проверяет original JWS стандартной library. Его60s leeway, token-selected issuer и overwrite Identity не являются policy. После signature success typed raw payload с exported `jwt.RegisteredClaims` + `auth.ClaimGrants` декодируется и сравнивается с verified values; этот последующий decode не заменяет обязательный scanner до ParseAPIToken/custom decode. Нет собственного signer/hash/handshake; `ParseUnverified` не выдаёт authorization.
+3. Дополнительно `jwt.NewValidator(WithIssuer(configured), WithSubject(registryIdentity), WithExpirationRequired(), WithNotBeforeRequired(), WithIssuedAt(), WithLeeway(0), WithTimeFunc(clock.Now)).Validate(claims)`. Этот API не проверяет signature; WithIssuedAt не требует presence — explicit nil guard и raw integer/date/TTL checks обязательны. Не выдавать WithStrictDecoding option для Parser за option injection в protocol.Verify/NewValidator.
+4. TLS caller fact — existing `transport/admission.VerifiedFingerprint` из реального verified TLS1.3 chain/fixed media-admission URI, перенесённый trusted adapter через existing `domain/admission.WithVerifiedLeaf/VerifiedLeaf`. Missing/zero/unregistered/wrong/expired caller закрыт; body/header/constructor boolean не выбирают owner. Foundation facade unmounted; будущий mount отдельно обязан получить этот fact из реального TLS, а не произвольного context value.
+5. Initial **один readonly SQL statement** связывает exact signed room+identity с full immutable grant/auth key и текущим registered leaf instance/fence/state; включает active grant/room/call/current participant, deny watermark и open End/closing barriers. Подготовленный/revoking/revoked/неизвестный grant не даёт candidate. Existing GetMediaGrant(id) недостаточен для room+identity/final view; допускается узкий named SQLC selector по existing schema, без FOR UPDATE/EnsureMutex/writes.
+6. Последовательно свежие **Identity.CheckBoundSession → Chat.CheckGroupSubject → Identity.CheckBoundSession**, same D, existing private typed clients. Оба Identity возвращают exact ACTIVE registry user/session/device + positive exact revisions; JWT/opaque body не выбирают tuple, ResolveSessionBearer без browser bearer здесь не вызывается. Chat — exact group/user PRESENT current owner/admin/member с exact stored positive epoch. reader/removed/not-found закрыты; unknown/malformed/timeout/unavailable не превращаются в fabricated revoke/role/crypto-trust/expiry DTO.
+7. Final **один readonly SQL statement** повторяет view той же room+identity+verified leaf и сверяет full key/authority tuple/active states/current fence/watermark/End barrier; повторная strict token time/D проверка перед return. Нет network under locks/transaction. Это текущий RTC statement snapshot и ограниченная свежесть источников, **не distributed atomicity**: source может измениться между чтениями. Candidate не сериализуется/кешируется и действует только внутри данного attempt D; будущий lease writer обязан заново сделать sorted locked recheck/registration/current source/required local guard и single-lease conflict до effects.
+
+Definitive denial либо unavailable/cancel возвращают только internal error и не меняют persistent state; source receiver/будущий reconcile независимо доставляют committed revoke. Успешная candidate policy не решает oneMIC first-forward, actual kind/CID/SDP/RTP aliases, admission fence lifecycle, provider cleanup/absence ACK, privacy UI, browser SDK/audio/NAT/TURN/devices. Эти slices требуют отдельных Accepted contracts/actual gates; public control всегдаPENDING до trusted provider proof. Trusted SFU privacy/E2EE boundary ADR089 сохраняется.
+
 
 ## Chat eligibility epoch
 

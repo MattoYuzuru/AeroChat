@@ -74,3 +74,11 @@ SELECT NOT EXISTS(
 -- name: RetryMediaControlRoom :execrows
 UPDATE rtc_media_control_rooms SET state='pending',claim_until=NULL,last_error=$5,retry_at=$6
 WHERE parent_id=$1 AND room_id=$2 AND state='claimed' AND claim_owner=$3 AND claim_fence=$4 AND claim_until>=clock_timestamp();
+
+-- name: GetOwnMediaLeaveProjection :one
+SELECT id,request_id,call_id,kind,created_at FROM rtc_media_control_intents
+WHERE id=sqlc.arg(operation_id) AND actor_user_id=sqlc.arg(actor_user_id) AND kind='leave';
+
+-- name: GetOwnMediaControlRequestProjection :one
+SELECT id,request_id,call_id,kind,created_at FROM rtc_media_control_intents
+WHERE request_id=sqlc.arg(request_id) AND actor_user_id=sqlc.arg(actor_user_id);
