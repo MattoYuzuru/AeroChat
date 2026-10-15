@@ -1,3 +1,4 @@
+import { isEncryptedMessageReadByPeer } from "../chats/encrypted-read-position";
 import {
   useEffect,
   useEffectEvent,
@@ -2685,24 +2686,9 @@ interface EncryptedReplyTargetDescriptor {
 }
 
 interface EncryptedDirectConversationReadPositionLike {
-  messageCreatedAt: string;
-  messageId: string;
+  lastReadServerSequence: string;
 }
 
-function isEncryptedMessageReadByPeer(
-  entry: EncryptedDirectMessageV2ProjectedMessageEntry,
-  peerReadPosition: EncryptedDirectConversationReadPositionLike | null,
-): boolean {
-  if (peerReadPosition === null) {
-    return false;
-  }
-
-  if (entry.createdAt !== peerReadPosition.messageCreatedAt) {
-    return entry.createdAt < peerReadPosition.messageCreatedAt;
-  }
-
-  return entry.messageId <= peerReadPosition.messageId;
-}
 
 function describeDirectCallPhaseLabel(
   phase:
