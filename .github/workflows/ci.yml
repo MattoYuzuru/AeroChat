@@ -54,6 +54,12 @@ jobs:
       - name: Verify recovery policy negative fixtures
         run: python3 -B infra/scripts/test_recovery.py
 
+      - name: Verify Go lifecycle source pins
+        run: python3 -B infra/scripts/go_lifecycle.py check
+
+      - name: Verify vulnerability gate negative fixtures
+        run: python3 -B infra/scripts/test_go_vuln.py
+
       - name: Validate local compose
         run: docker compose --env-file .env.example -f infra/compose/docker-compose.yml config >/dev/null
 
@@ -61,7 +67,7 @@ jobs:
         run: docker compose --env-file .env.server.example --env-file .env.server.secrets.example -f infra/compose/docker-compose.server.yml config >/dev/null
 
   images:
-    needs: [workflows, infra, go, web, proto]
+    needs: [workflows, infra, go, go-vuln, web, proto]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -141,10 +147,40 @@ jobs:
         run: go test ./libs/go/... ./services/aero-gateway/... ./services/aero-identity/... ./services/aero-chat/... ./services/aero-rtc-control/... ./services/aero-jobs/... ./gen/go/...
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        run: |
+          lint_version="$(python3 -B infra/scripts/go_lifecycle.py get golangci_lint_version)"
+          GOBIN="$RUNNER_TEMP/go-lint-bin" go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$lint_version"
+          "$RUNNER_TEMP/go-lint-bin/golangci-lint" run ./libs/go/... ./services/aero-gateway/... ./services/aero-identity/... ./services/aero-chat/... ./services/aero-rtc-control/... ./services/aero-jobs/... ./gen/go/...
+
+  go-vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v5
         with:
-          version: v2.11.3
-          args: ./libs/go/... ./services/aero-gateway/... ./services/aero-identity/... ./services/aero-chat/... ./services/aero-rtc-control/... ./services/aero-jobs/... ./gen/go/...
+          ref: ${{ env.EXPECTED_SOURCE_SHA }}
+
+      - name: Setup pinned Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+
+      - name: Install pinned vulnerability scanner
+        run: |
+          scanner_version="$(python3 -B infra/scripts/go_lifecycle.py get govulncheck_version)"
+          GOBIN="$RUNNER_TEMP/go-vuln-bin" go install "golang.org/x/vuln/cmd/govulncheck@v$scanner_version"
+
+      - name: Scan all workspace modules on frozen SHA
+        run: python3 -B infra/scripts/check-go-vuln.py --source-sha "$EXPECTED_SOURCE_SHA" --scanner "$RUNNER_TEMP/go-vuln-bin/govulncheck" --output-dir "$RUNNER_TEMP/go-vuln-evidence"
+
+      - name: Preserve vulnerability diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: go-vuln-${{ env.EXPECTED_SOURCE_SHA }}
+          path: ${{ runner.temp }}/go-vuln-evidence
+          if-no-files-found: error
+          retention-days: 7
 
   web:
     runs-on: ubuntu-latest

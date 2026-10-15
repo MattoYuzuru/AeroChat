@@ -4,9 +4,9 @@
 
 ## Инструменты
 
-- Git, Go **1.25** по `go.work`, Node.js **22** по CI, pnpm **10.19.0** по `package.json`.
+- Git, Go **1.27.2** по `go.work` / `infra/go-toolchain.json`, Node.js **22** по CI, pnpm **10.19.0** по `package.json`. Для source checks задать `GOTOOLCHAIN=go1.27.2`; глобальные Go настройки менять не требуется.
 - Docker Engine / Docker Compose для полного локального стенда.
-- Task, Buf, sqlc и golangci-lint устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`; версии зафиксированы в скрипте. Task leaf-команды используют exact `bin` paths; `task check` не требует ручного изменения PATH для Buf/sqlc/linter. Для прямого вызова этих CLI: `export PATH="$PWD/bin:$PATH"`.
+- Task, Buf, sqlc, golangci-lint и govulncheck устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`. Go/linter/scanner pins — `infra/go-toolchain.json`; Buf/Task/sqlc pins сохраняются в installer. Task leaf-команды используют exact `bin` paths; `task check` не требует ручного изменения PATH для Buf/sqlc/linter. Для прямого вызова этих CLI: `export PATH="$PWD/bin:$PATH"`.
 
 Установка инструментов и зависимостей:
 
@@ -72,6 +72,7 @@ Web Push endpoints ограничены [ADR-095](adr/095-web-push-egress-bounda
 | Generated drift | `task generated:check` |
 | Go tests | `task go:test` |
 | Go lint | `task go:lint` |
+| Go pins / actual toolchain | `python3 -B infra/scripts/go_lifecycle.py check --runtime` |
 | Web unit tests | `task web:test` |
 | Web lint | `task web:lint` |
 | Web typecheck/build | `task web:build` |
@@ -107,6 +108,32 @@ Go unit tests сами по себе не доказывают работу stor
 6. Findings дедуплицируются по причине и подтверждаются evidence. Каждая issue ведёт к узкому завершённому PR, а не к одновременному redesign auth, crypto, storage, RTC и shell.
 
 Для личной инфраструктуры сначала читать `/Users/yuzuru/AGENTS.md` и его navigator; при local Docker discovery, runtime version mismatch или конкурирующих/пропущенных checks применять `workstation-dev`. По умолчанию проверяется текущая машина. SSH/VPN/другие хосты входят в scope только по явному заданию.
+
+### Lazy UI regression
+
+`app-routes` содержит только metadata/path builders; содержимое приложений находится в `app-content`. Lazy declarations стабильны вне render. Retry создаёт новый loader только для неудавшегося экземпляра и получает compiled URL из allowlisted `build/lazy-module-urls.mjs`. Одного сброса [React lazy](https://react.dev/reference/react/lazy) недостаточно: браузер может кешировать отказ dynamic import по URL. Для descriptor доступны три свежих query URL за lifetime страницы, shared pending retry и cache только полной успешной загрузки. Общие auth/crypto/notifications/RTC providers остаются в bootstrap.
+
+Сборка выпускает `assets/*.js.resources.json` с проверяемым expected module и static CSS closure. Эти файлы обязательны вместе с JS/CSS; текущая упаковка копирует весь `dist`. Клиент запрашивает sidecar только при ручном retry, ограничивает его 16 KiB/64 stylesheet paths, проверяет same-origin/asset directory/redirect и ждёт CSS load. Повторно используется только stylesheet с подтверждённым собственным `load`, поэтому первоначально успешный Vite CSS при первом retry может скачаться ещё раз. Наличие `link.sheet` не заменяет подтверждение сетевой загрузки. Ошибка вложенной static JS dependency, отсутствующий sidecar и исчерпание попыток оставляют inline error; автоматической перезагрузки и переписывания shared imports нет. Plugin использует metadata и hook ordering Vite **7.3.1** из frozen lock, проверяет их наличие при build; см. ADR005 и versioned primary source links.
+
+`apps/web/tests/lazy/lazy.mjs` собирает production AppRouter, shell и реальные People/Explorer pages в chunks. Playwright прерывает настоящий запрос JS chunk и CSS, проверяет retry, соседнее поле ввода, быстрые повторные нажатия, одновременные failed instances, close/reopen identity, lifetime exhaustion и закрытие окна до позднего завершения загрузки. Неверный module path, oversized JSON, внешний CSS и sidecar redirect проверяются реальными bounded HTTP responses. Счётчики evaluation shared React/provider modules и fixture root дополняют анализ единственности emitted module identity; они не доказывают actual auth/crypto provider lifecycle. Перед запуском задаются `PLAYWRIGHT_MODULE`, `CHROMIUM_EXECUTABLE` и внешний собственный `LAZY_BUILD_DIR`; Vite build не очищает этот каталог. Fixture использует bounded localhost25174 и закрывает browser/server в finally. Auth/gateway/RTC/realtime здесь синтетические; actual accounts, общий crypto bootstrap и real-device поведение эта проверка не подтверждает.
+
+### Router maintenance
+
+React Router остаётся в Declarative/BrowserRouter Mode. При обновлении maintained
+7.x проверять official release notes и registry metadata выбранной версии,
+обновлять lockfile через pnpm10.19.0 и сохранять raw production audit вне Git.
+Для каждой advisory отдельно фиксировать reachable/unreachable и необходимые
+предпосылки по code trace; Framework-only advisory нельзя выдавать за доказанный
+RCE static SPA. Текущий [review #175](audits/2026-10-11-router-advisories.md)
+явно различает подготовку, выполненные gates и оставшиеся проверки.
+
+`apps/web/tests/router/router.mjs` использует actual AppRouter/DesktopShell и
+window-scoped location/path builders для deep-link/refresh, back/forward,
+повторного открытия conversation singleton и encoded query IDs. Auth/gateway/
+RTC/realtime и тела страниц здесь синтетические, поэтому это не message-page или
+backend acceptance. Перед запуском задать `PLAYWRIGHT_MODULE` и
+`CHROMIUM_EXECUTABLE`; fixture использует bounded localhost25174 и освобождает
+browser/server в finally. Source наличие fixture само по себе не означает PASS.
 
 ## Server runtime и публикация
 
