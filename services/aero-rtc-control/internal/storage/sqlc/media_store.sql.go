@@ -941,6 +941,56 @@ func (q *Queries) GetMediaSourceEvent(ctx context.Context, arg GetMediaSourceEve
 	return i, err
 }
 
+const getMediaSourceReceipt = `-- name: GetMediaSourceReceipt :one
+SELECT i.origin_domain, i.event_id, i.kind, i.subject_id, i.user_id, i.device_id, i.source_revision, i.operation_id, i.received_at,
+    (SELECT COUNT(DISTINCT (t.grant_id,t.room_id,t.room_name,t.room_generation,
+        t.participant_identity,t.grant_generation,g.call_id,g.participant_id,
+        g.user_id,g.session_id,g.device_id,g.session_revision,g.device_revision,g.eligibility_epoch))::bigint
+     FROM rtc_media_operation_targets t JOIN rtc_media_grants g ON g.id=t.grant_id
+     WHERE t.operation_id=i.operation_id AND g.user_id=i.user_id AND (
+       (i.kind='session' AND g.session_id=i.subject_id AND g.device_id=i.device_id AND g.session_revision<=i.source_revision) OR
+       (i.kind='device' AND g.device_id=i.subject_id AND g.device_revision<=i.source_revision) OR
+       (i.kind='group' AND g.group_id=i.subject_id AND g.eligibility_epoch<=i.source_revision)
+     ))::bigint AS affected_registry_grants
+FROM rtc_media_source_inbox i WHERE i.origin_domain=$1 AND i.event_id=$2
+`
+
+type GetMediaSourceReceiptParams struct {
+	OriginDomain string    `db:"origin_domain" json:"origin_domain"`
+	EventID      uuid.UUID `db:"event_id" json:"event_id"`
+}
+
+type GetMediaSourceReceiptRow struct {
+	OriginDomain           string             `db:"origin_domain" json:"origin_domain"`
+	EventID                uuid.UUID          `db:"event_id" json:"event_id"`
+	Kind                   string             `db:"kind" json:"kind"`
+	SubjectID              uuid.UUID          `db:"subject_id" json:"subject_id"`
+	UserID                 uuid.UUID          `db:"user_id" json:"user_id"`
+	DeviceID               uuid.UUID          `db:"device_id" json:"device_id"`
+	SourceRevision         int64              `db:"source_revision" json:"source_revision"`
+	OperationID            uuid.UUID          `db:"operation_id" json:"operation_id"`
+	ReceivedAt             pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	AffectedRegistryGrants int64              `db:"affected_registry_grants" json:"affected_registry_grants"`
+}
+
+func (q *Queries) GetMediaSourceReceipt(ctx context.Context, arg GetMediaSourceReceiptParams) (GetMediaSourceReceiptRow, error) {
+	row := q.db.QueryRow(ctx, getMediaSourceReceipt, arg.OriginDomain, arg.EventID)
+	var i GetMediaSourceReceiptRow
+	err := row.Scan(
+		&i.OriginDomain,
+		&i.EventID,
+		&i.Kind,
+		&i.SubjectID,
+		&i.UserID,
+		&i.DeviceID,
+		&i.SourceRevision,
+		&i.OperationID,
+		&i.ReceivedAt,
+		&i.AffectedRegistryGrants,
+	)
+	return i, err
+}
+
 const hasPendingMediaCleanup = `-- name: HasPendingMediaCleanup :one
 SELECT EXISTS(SELECT 1 FROM rtc_media_cleanup_outbox WHERE operation_id=$1 AND state<>'acked')::boolean
 `

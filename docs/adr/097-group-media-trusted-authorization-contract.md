@@ -34,6 +34,10 @@ Proto service/method names ниже задают будущие отдельны
 | RtcMediaAdmission.CloseConnection | media-admission | Только owner connection ID и matching grant key; stale close не снимает replacement lease |
 | RtcMediaRevocation.ApplyIdentityEvent | identity | Только Identity outbox domain, собственная session/device revision и subject binding |
 | RtcMediaRevocation.ApplyChatEvent | chat | Только Chat outbox domain, membership revision и group/user binding |
+| RtcMediaRevocation.GetIdentityEventReceipt | identity | Только свой canonical event ID; generic subject/operation lookup отсутствует |
+| RtcMediaRevocation.GetChatEventReceipt | chat | Только свой canonical event ID; current receipt без browser capability |
+| RtcMediaAdmission.RegisterInstance (later) | media-admission | Verified unique leaf fingerprint; server выдаёт instance UUID/global persisted fence |
+| RtcMediaAdmission.AcknowledgeProxyCleanup (later) | media-admission | Matching operation/full key/lease/owner fence и реальное closure proof; не WS close boolean |
 
 Admission proxy не получает broad subject lookup в Identity/Chat; все authority checks выполняет RTC. Identity/Chat caller не может mint/activate grant, а admission caller не может выдавать authoritative revoke event от их имени. Private SFU management API доступен только RTC с отдельной server credential; browser/admin grant его не получает. Internal service principal не подменяет пользовательскую авторизацию публичных RPC или operation status. Implementation negative fixtures должны отвергать absent/wrong certificate, сертификат допустимой CA с wrong principal, public route/browser credential, cross-domain event и spoofed caller header.
 
@@ -92,6 +96,55 @@ Own Logout останавливает local tracks немедленно неза
 Будущие proto-first операции отделяют request/status teardown от legacy lobby result и содержат operation ID + эти два outcome. Existing End/Leave с active media grants не возвращают успешный terminal lobby response до cleanup; старый client получает pending/error с fail-closed compatibility behavior. Call/participant terminal state и unique-user slot не освобождаются обходным legacy RPC. Пока обязательные negative tests этого поведения, durable crash replay, caller status authorization и trusted acknowledgements не проходят, media flag выключен. Private source lookups реализованы отдельными slices; registered durable store
 source подготовлен, а его handler integration, эти additive APIs и workers
 ещё не реализованы.
+
+### Private source receipt и последующая registration boundary
+
+Уточнение принято координатором 2026-10-12 до receiver implementation.
+
+Private source receiver вводит отдельный proto `rtc.revocation.v1`, вне public
+mux/gateway. Fixed per-method certificate ACL: `ApplyIdentityEvent` и
+`GetIdentityEventReceipt` доступны только verified single URI
+`urn:aerochat:service:identity`; `ApplyChatEvent` и `GetChatEventReceipt` — только
+`urn:aerochat:service:chat`. Dedicated client CA, chain/expiry/clientAuth/TLS1.3
+и method allowlist обязательны вместе. Caller/domain берётся из TLS+method,
+не header/body; generic subject/operation lookup не вводится.
+
+Event DTO содержит только canonical semantic tuple, который RTC inbox сохраняет
+и сравнивает: event ID, kind, exact subject/user/device IDs и положительная
+revision. Identity SESSION/DEVICE сохраняет exact binding; Chat
+eligibility_denied/member_removed канонически превращается в group denied pair
+и resulting eligibility epoch. Original reason/occurred_at остаются source
+outbox audit fields, не доставляются как ignored DTO и не объявляются RTC
+verified. received_at выдаёт RTC; timestamps не определяют authority/expiry.
+Changed canonical payload duplicate конфликтует; same tuple возвращает тот же
+operation. Source producer получает tuple только из committed own outbox row,
+не из incoming browser authorization booleans.
+
+DURABLY_APPLIED подтверждает RTC commit inbox/watermark/operation и durable
+cleanup, не SFU teardown. NO_MATCHING_REGISTRY_GRANTS — factual matching set
+под registry mutex, без обещания отсутствия RTP/SFU orphan. Affected count
+считает distinct full grant keys exact event scope, не action/lease rows и не
+чужие targets shared operation. Nonempty target остаётся MEDIA_PENDING до
+matching required proxy/SFU acknowledgement; пустое journal completion никогда
+не отображается как media/SFU completion. Source callback/status actor может
+читать только own-domain event receipt; public user status — поздний отдельный
+fresh-authorized RPC, без anonymous/revoked-bearer polling.
+
+Более поздняя trusted admission registration выдаёт server-global persisted
+monotonic fence и instance UUID от RTC, связывает их с verified unique leaf
+fingerprint. Caller-selected owner/identity/fence запрещены; overflow failclosed.
+Admission-only AcknowledgeProxyCleanup — отдельный future method, не overload
+обычного WS CloseConnection. Он подтверждает exact stored operation/fullkey/
+lease/owner fence и фактическое закрытие соответствующих connections; boolean
+body не receipt. SFU ACK поступает только от future RTC-owned pinned SDK adapter
+после matching-generation absence verification. Source senders, registration,
+SDK/proxy cleanup, public status/UI и feature enable — отдельные narrow slices.
+
+До media flag обязательный compatibility slice закрывает все legacy
+Start/Join/Leave/End/liveness paths: heldmedia prepared/active/revoking блокирует
+новый direct/group call и не освобождается legacy participant exit до trusted
+ACK. Flagoff legacy unchanged. Cleanup claim busy/notyet/fence exhaustion —
+transient/pending или unavailable, не authorityrevoked/deny watermark.
 
 ## Chat eligibility epoch
 
