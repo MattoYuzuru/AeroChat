@@ -1,4 +1,4 @@
-FROM golang:1.25.8-alpine AS builder
+FROM golang:1.27.2-alpine3.24@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS builder
 
 WORKDIR /src
 
@@ -8,7 +8,9 @@ COPY services/aero-rtc-control ./services/aero-rtc-control
 
 WORKDIR /src/services/aero-rtc-control
 
-RUN GOWORK=off go build -o /out/aero-rtc-control ./cmd/aero-rtc-control
+ARG AERO_BUILD_REVISION=dev
+
+RUN GOWORK=off go build -ldflags "-X main.version=${AERO_BUILD_REVISION}" -o /out/aero-rtc-control ./cmd/aero-rtc-control
 
 FROM alpine:3.22
 

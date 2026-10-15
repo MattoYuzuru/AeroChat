@@ -21,24 +21,19 @@ export function ShellEntrySurface({
       <section className={styles.screen}>
         <div className={styles.monitorNoise} aria-hidden="true" />
         <div className={styles.screenHeader}>
-          <span>AeroChat firmware shell</span>
-          <span>{surface === "chooser" ? "preset selector" : "boot sequence"}</span>
+          <span>AeroChat</span>
+          <span>{surface === "chooser" ? "Оформление" : "Запуск"}</span>
         </div>
         <div className={styles.body}>
           <p className={styles.eyebrow}>{eyebrow}</p>
           <h1 className={styles.title}>{title}</h1>
           <p className={styles.message}>{message}</p>
-          <div className={styles.systemLines} aria-hidden="true">
-            <span>checking shell registry ... ok</span>
-            <span>loading xp-first desktop profile ... ok</span>
-            <span>gateway session handoff ... pending</span>
-          </div>
           {actions && <div className={styles.actions}>{actions}</div>}
         </div>
         <p className={styles.footerHint}>
           {surface === "chooser"
-            ? "Use arrows or choose a preset to continue."
-            : "Boot will continue automatically when the current session is resolved."}
+            ? "Нажмите «Продолжить», чтобы открыть приложение."
+            : "Приложение откроется автоматически после проверки сессии."}
         </p>
       </section>
     </main>

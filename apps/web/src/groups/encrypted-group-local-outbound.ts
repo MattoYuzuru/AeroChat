@@ -1,3 +1,4 @@
+import { requireServerSequence } from "../gateway/server-sequence";
 import type { EncryptedGroupDecryptedEnvelope } from "../crypto/types";
 
 interface EncryptedGroupLocalOutboundEvent {
@@ -12,6 +13,7 @@ const resolvedProjectionKeyLimit = 200;
 export function publishLocalEncryptedGroupProjection(
   projection: EncryptedGroupDecryptedEnvelope,
 ) {
+  requireServerSequence(projection.serverSequence);
   const key = buildProjectionKey(projection);
   if (resolved.has(key)) {
     return;
