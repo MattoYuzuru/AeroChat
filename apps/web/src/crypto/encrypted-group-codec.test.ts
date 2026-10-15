@@ -43,6 +43,7 @@ describe("encrypted group codec", () => {
 
     const decrypted = await decryptEncryptedGroupEnvelope(material, {
       ...envelope,
+      serverSequence: "9007199254740993",
       ...encrypted,
       viewerDelivery: {
         ...envelope.viewerDelivery,
@@ -63,6 +64,7 @@ describe("encrypted group codec", () => {
       replyToMessageId: null,
       revision: 1,
       createdAt: "2026-03-22T12:00:00Z",
+      serverSequence: "9007199254740993",
       storedAt: "2026-03-22T12:00:01Z",
       payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
       text: "group local hello",
@@ -201,6 +203,7 @@ function createOpaqueEnvelope(): EncryptedGroupEnvelope {
     ciphertext: "",
     ciphertextSizeBytes: 0,
     createdAt: "2026-03-22T12:00:00Z",
+    serverSequence: "1",
     storedAt: "2026-03-22T12:00:01Z",
     viewerDelivery: {
       recipientUserId: "user-2",
