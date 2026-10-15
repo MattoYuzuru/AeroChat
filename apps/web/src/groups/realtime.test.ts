@@ -217,3 +217,12 @@ describe("parseGroupRealtimeEvent", () => {
     });
   });
 });
+
+
+describe("encrypted read event validation", () => {
+  it.each([undefined, "0", "01", 1])("rejects an invalid read sequence %s without applying unread reset", (lastReadServerSequence) => {
+    expect(parseGroupRealtimeEvent({ id: "invalid-read", type: "group.read.updated", issuedAt: "2026-10-11T00:00:00Z",
+      payload: { groupId: "lane", encryptedUnread: { unreadCount: 0 }, encryptedReadState: { selfPosition: { messageId: "content",
+            lastReadServerSequence } } } })).toBeNull();
+  });
+});

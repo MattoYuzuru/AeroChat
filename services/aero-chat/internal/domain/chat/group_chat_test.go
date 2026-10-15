@@ -427,7 +427,7 @@ func TestEditGroupMessageRejectsNonAuthorAndAttachmentOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create group attachment intent: %v", err)
 	}
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}

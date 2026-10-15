@@ -50,7 +50,7 @@ AeroChat объединяет личные переписки, группы, ф�
 
 Требования: Git, Docker / Docker Compose. Для разработки из исходников также нужны Go **1.27.2**, Node.js **22**, pnpm **10.19.0** и инструменты из [development guide](docs/development.md). Go checks используют `GOTOOLCHAIN=go1.27.2`; security/toolchain policy и triage — в [Go lifecycle](docs/security/go-vulnerability-lifecycle.md).
 
-> По [аудиту](docs/audits/2026-10-11-readiness.md) чистый запуск сейчас блокируется недоступными storage images ([#163](https://github.com/MattoYuzuru/AeroChat/issues/163)); обычный upload также требует исправления presign region ([#165](https://github.com/MattoYuzuru/AeroChat/issues/165)). Ниже — штатные команды, а не подтверждение успешного cold-cache запуска.
+> MinIO и bootstrap client теперь собираются из закреплённых исходников по [ADR-087](docs/adr/087-pinned-storage-source-build-lifecycle.md); первый запуск требует Docker Hub, GitHub codeload и Go modules. Обычный upload отдельно требует исправления presign region ([#165](https://github.com/MattoYuzuru/AeroChat/issues/165)). [Аудит](docs/audits/2026-10-11-readiness.md) сохраняет результаты исходной ревизии.
 
 ```bash
 git clone https://github.com/MattoYuzuru/AeroChat.git

@@ -921,9 +921,10 @@ func cloneEncryptedReadPosition(position *chatv1.EncryptedConversationReadPositi
 	}
 
 	return &chatv1.EncryptedConversationReadPosition{
-		MessageId:        position.GetMessageId(),
-		MessageCreatedAt: position.GetMessageCreatedAt(),
-		UpdatedAt:        position.GetUpdatedAt(),
+		MessageId:              position.GetMessageId(),
+		LastReadServerSequence: position.GetLastReadServerSequence(),
+		MessageCreatedAt:       position.GetMessageCreatedAt(),
+		UpdatedAt:              position.GetUpdatedAt(),
 	}
 }
 
