@@ -99,6 +99,8 @@ Web-клиент использует уже существующие RPC:
 
 - local audio track добавляется через `addTrack()`;
 - remote audio рендерится через реальный `HTMLAudioElement`;
+- playback attach/cleanup привязан к изменению remote stream, а не к render или participant refresh;
+- одинаковый playback state не создаёт новое состояние; autoplay denial требует явного retry, завершение старого `play()` после смены stream игнорируется;
 - при уходе peer'а peer connection закрывается, но lifecycle сервера остаётся source of truth;
 - при уходе пользователя из текущего direct-chat scope page-scoped session покидает call best-effort через `LeaveCall`.
 
