@@ -1,15 +1,3 @@
-import type { ReactNode } from "react";
-import { CreateGroupPage } from "../pages/CreateGroupPage";
-import { ChatsPage } from "../pages/ChatsPage";
-import { ExplorerPage } from "../pages/ExplorerPage";
-import { FriendRequestsPage } from "../pages/FriendRequestsPage";
-import { GroupsPage } from "../pages/GroupsPage";
-import { PeoplePage } from "../pages/PeoplePage";
-import { PersonProfilePage } from "../pages/PersonProfilePage";
-import { ProfilePage } from "../pages/ProfilePage";
-import { SearchPage } from "../pages/SearchPage";
-import { SelfChatPage } from "../pages/SelfChatPage";
-import { SettingsPage } from "../pages/SettingsPage";
 import type {
   ShellAppDefinition,
   ShellAppId,
@@ -318,37 +306,6 @@ export function isRouteBackedShellAppId(appId: ShellAppId): boolean {
     appId === "direct_chat" ||
     appId === "group_chat"
   );
-}
-
-export function renderShellAppContent(appId: ShellAppId): ReactNode {
-  switch (appId) {
-    case "self_chat":
-      return <SelfChatPage />;
-    case "group_creator":
-      return <CreateGroupPage />;
-    case "profile":
-      return <ProfilePage />;
-    case "friend_requests":
-      return <FriendRequestsPage />;
-    case "explorer":
-      return <ExplorerPage />;
-    case "people":
-      return <PeoplePage />;
-    case "person_profile":
-      return <PersonProfilePage />;
-    case "chats":
-    case "direct_chat":
-      return <ChatsPage />;
-    case "groups":
-    case "group_chat":
-      return <GroupsPage />;
-    case "search":
-      return <SearchPage />;
-    case "settings":
-      return <SettingsPage />;
-    default:
-      return null;
-  }
 }
 
 function buildRoutePath(pathname: string, searchParams: URLSearchParams): string {

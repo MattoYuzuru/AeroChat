@@ -1,0 +1,6 @@
+{
+  "go_version": "1.27.2",
+  "golangci_lint_version": "2.14.0",
+  "govulncheck_version": "1.7.0",
+  "go_builder_image": "golang:1.27.2-alpine3.24@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d"
+}

@@ -1,5 +1,7 @@
 # ADR-012: Foundation для gateway / BFF как единой edge-точки входа
 
+> Readiness contract раздела 5 уточняется [ADR-093](093-full-readiness-storage-and-downstream-propagation.md): downstream `/readyz` вместо RPC Ping, который остаётся process/transport diagnostics.
+
 - Статус: Accepted
 - Дата: 2026-03-22
 

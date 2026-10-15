@@ -15,6 +15,7 @@ import {
   subscribeRealtimeLifecycleEvents,
 } from "../realtime/events";
 import type { DirectCallAwarenessEntry } from "./awareness";
+import type { DirectCallJoinCoordinator, DirectCallJoinLease } from "./join-coordinator";
 import {
   applyDirectCallTrackContentHint,
   buildDirectCallAudioConstraints,
@@ -55,6 +56,7 @@ const directCallParticipantHeartbeatIntervalMs = 20_000;
 const directCallDisconnectRecoveryGraceMs = 8_000;
 
 interface UseDirectCallSessionOptions {
+  joinCoordinator: DirectCallJoinCoordinator;
   enabled: boolean;
   token: string;
   chat: DirectChat | null;
@@ -76,6 +78,8 @@ export interface DirectCallSession {
   canJoin: boolean;
   canLeave: boolean;
   canEnd: boolean;
+  canToggleMicrophone: boolean;
+  isMicrophoneMuted: boolean;
   isLocallyJoined: boolean;
   isDirectChatSupported: boolean;
   dismissError(): void;
@@ -84,6 +88,7 @@ export interface DirectCallSession {
   joinCall(): Promise<void>;
   leaveCall(): Promise<void>;
   endCall(): Promise<void>;
+  toggleMicrophone(): void;
 }
 
 export function useDirectCallSession(
@@ -95,6 +100,7 @@ export function useDirectCallSession(
     chat,
     currentUserId,
     enabled,
+    joinCoordinator,
     onUnauthenticated,
     refreshDirectChatCall,
     token,
@@ -105,10 +111,16 @@ export function useDirectCallSession(
     createInitialDirectCallState,
   );
   const [remoteAudioStream, setRemoteAudioStream] = useState<MediaStream | null>(null);
+  const [isMicrophoneMuted, setIsMicrophoneMuted] = useState(false);
+  const [hasLiveMicrophone, setHasLiveMicrophone] = useState(false);
+  const microphoneMutedRef = useRef(false);
   const stateRef = useRef(state);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const localJoinedCallIdRef = useRef<string | null>(null);
+  const runtimeGenerationRef = useRef(0);
+  const pendingJoinGenerationRef = useRef<number | null>(null);
+  const sessionActiveRef = useRef(false);
   const peerRecoveryHandlerRef = useRef<(reason: "disconnected" | "failed") => boolean>(
     () => false,
   );
@@ -178,12 +190,16 @@ export function useDirectCallSession(
     peerRecoveryPlanRef.current = null;
   }, [clearPeerRecoveryTimer]);
 
-  const refreshRTCConfiguration = useCallback(async () => {
+  const refreshRTCConfiguration = useCallback(async (generation = runtimeGenerationRef.current) => {
     try {
       const iceServers = await gatewayClient.getRtcIceServers(token);
-      rtcConfigurationRef.current = buildDirectCallRTCConfiguration(iceServers);
+      if (runtimeGenerationRef.current === generation) {
+        rtcConfigurationRef.current = buildDirectCallRTCConfiguration(iceServers);
+      }
     } catch {
-      rtcConfigurationRef.current = directCallRTCConfiguration;
+      if (runtimeGenerationRef.current === generation) {
+        rtcConfigurationRef.current = directCallRTCConfiguration;
+      }
     }
   }, [token]);
 
@@ -198,12 +214,14 @@ export function useDirectCallSession(
     }
 
     clearDisconnectRecoveryTimer();
-    teardownDirectCallPeerRuntime({
-      peerConnection: peerConnectionRef.current,
-      remoteStream: remoteStreamRef.current,
-    });
+    const peerConnection = peerConnectionRef.current;
+    const remoteStream = remoteStreamRef.current;
     peerConnectionRef.current = null;
     remoteStreamRef.current = null;
+    teardownDirectCallPeerRuntime({
+      peerConnection,
+      remoteStream,
+    });
     pendingRemoteICECandidatesRef.current = [];
     setRemoteAudioStream(null);
     dispatch({
@@ -213,7 +231,18 @@ export function useDirectCallSession(
     });
   }, [clearDisconnectRecoveryTimer]);
 
+  const resetMicrophoneMute = useCallback(() => {
+    microphoneMutedRef.current = false;
+    setIsMicrophoneMuted(false);
+    setHasLiveMicrophone(false);
+  }, []);
+
   const disposeLocalRuntime = useCallback(() => {
+    runtimeGenerationRef.current += 1;
+    if (pendingJoinGenerationRef.current !== null) {
+      pendingJoinGenerationRef.current = null;
+      dispatch({ type: "action_finished" });
+    }
     clearPeerRecoveryPlan();
     clearDisconnectRecoveryTimer();
     teardownDirectCallRuntime({
@@ -222,13 +251,14 @@ export function useDirectCallSession(
       remoteStream: remoteStreamRef.current,
     });
     localStreamRef.current = null;
+    resetMicrophoneMute();
     localJoinedCallIdRef.current = null;
     peerConnectionRef.current = null;
     remoteStreamRef.current = null;
     pendingRemoteICECandidatesRef.current = [];
     setRemoteAudioStream(null);
     dispatch({ type: "local_left" });
-  }, [clearDisconnectRecoveryTimer, clearPeerRecoveryPlan]);
+  }, [clearDisconnectRecoveryTimer, clearPeerRecoveryPlan, resetMicrophoneMute]);
 
   const scheduleDisconnectedPeerRecovery = useCallback(
     (peerConnection: RTCPeerConnection) => {
@@ -266,7 +296,7 @@ export function useDirectCallSession(
     return describeGatewayError(error, fallbackMessage);
   }, [onUnauthenticated]);
 
-  const ensureLocalAudioStream = useCallback(async (): Promise<MediaStream> => {
+  const ensureLocalAudioStream = useCallback(async (generation: number): Promise<MediaStream> => {
     if (localStreamRef.current !== null) {
       return localStreamRef.current;
     }
@@ -315,6 +345,10 @@ export function useDirectCallSession(
           navigator.mediaDevices.getSupportedConstraints?.() ?? {},
         ),
       });
+      if (runtimeGenerationRef.current !== generation) {
+        teardownDirectCallRuntime({ localStream: stream, peerConnection: null, remoteStream: null });
+        throw new Error("Запуск звонка отменён после смены локальной сессии.");
+      }
       if (stream.getAudioTracks().length === 0) {
         teardownDirectCallRuntime({
           localStream: stream,
@@ -331,12 +365,22 @@ export function useDirectCallSession(
       }
 
       stream.getAudioTracks().forEach((track) => {
+        track.enabled = !microphoneMutedRef.current;
+        track.onended = () => {
+          if (localStreamRef.current === stream) {
+            setHasLiveMicrophone(stream.getAudioTracks().some((item) => item.readyState === "live"));
+          }
+        };
         applyDirectCallTrackContentHint(track);
       });
       localStreamRef.current = stream;
+      setHasLiveMicrophone(stream.getAudioTracks().some((track) => track.readyState === "live"));
       dispatch({ type: "media_ready" });
       return stream;
     } catch (error) {
+      if (runtimeGenerationRef.current !== generation) {
+        throw error;
+      }
       const mediaFailure = resolveMediaFailure(error);
       dispatch({
         type: "media_failed",
@@ -388,6 +432,7 @@ export function useDirectCallSession(
     }
 
     peerConnection.addEventListener("icecandidate", (event) => {
+      if (peerConnectionRef.current !== peerConnection) return;
       const call = stateRef.current.call;
       const remoteUser = call
         ? selectDirectCallRemoteParticipant(stateRef.current, currentUserId)
@@ -400,6 +445,7 @@ export function useDirectCallSession(
         type: "ice_candidate",
         payload: encodeRTCIceCandidatePayload(event.candidate.toJSON()),
       }).catch((error) => {
+        if (peerConnectionRef.current !== peerConnection) return;
         dispatch({
           type: "failure",
           message: describeError(error, "Не удалось отправить ICE candidate."),
@@ -408,6 +454,7 @@ export function useDirectCallSession(
     });
 
     peerConnection.addEventListener("track", (event) => {
+      if (peerConnectionRef.current !== peerConnection) return;
       const stream = event.streams[0] ?? new MediaStream([event.track]);
       remoteStreamRef.current = stream;
       setRemoteAudioStream(stream);
@@ -419,6 +466,7 @@ export function useDirectCallSession(
     });
 
     peerConnection.addEventListener("iceconnectionstatechange", () => {
+      if (peerConnectionRef.current !== peerConnection) return;
       switch (peerConnection.iceConnectionState) {
         case "connected":
         case "completed":
@@ -430,6 +478,7 @@ export function useDirectCallSession(
     });
 
     peerConnection.addEventListener("connectionstatechange", () => {
+      if (peerConnectionRef.current !== peerConnection) return;
       switch (peerConnection.connectionState) {
         case "connected":
           clearDisconnectRecoveryTimer();
@@ -466,7 +515,7 @@ export function useDirectCallSession(
             peerConnectionState: "failed",
             message: "WebRTC-соединение завершилось с ошибкой.",
           });
-          resetPeerRuntime();
+          disposeLocalRuntime();
           return;
         case "closed":
           clearDisconnectRecoveryTimer();
@@ -487,7 +536,7 @@ export function useDirectCallSession(
     clearPeerRecoveryPlan,
     currentUserId,
     describeError,
-    resetPeerRuntime,
+    disposeLocalRuntime,
     scheduleDisconnectedPeerRecovery,
     sendRTCSignal,
   ]);
@@ -506,7 +555,11 @@ export function useDirectCallSession(
     if (peerConnection === null) {
       return;
     }
-    clearPeerRecoveryTimer();
+
+    const generation = runtimeGenerationRef.current;
+    let applyingPeer = peerConnection;
+    const isCurrentPeer = () =>
+      runtimeGenerationRef.current === generation && peerConnectionRef.current === applyingPeer;
 
     try {
       switch (signal.type) {
@@ -526,16 +579,22 @@ export function useDirectCallSession(
             if (refreshedPeerConnection === null) {
               return;
             }
+            applyingPeer = refreshedPeerConnection;
             if (hasMatchingRemoteSessionDescription(refreshedPeerConnection, offer)) {
               return;
             }
             await refreshedPeerConnection.setRemoteDescription(offer);
-            pendingRemoteICECandidatesRef.current = await flushPendingRemoteICECandidates(
+            if (!isCurrentPeer()) return;
+            const pendingCandidates = await flushPendingRemoteICECandidates(
               refreshedPeerConnection,
               pendingRemoteICECandidatesRef.current,
             );
+            if (!isCurrentPeer()) return;
+            pendingRemoteICECandidatesRef.current = pendingCandidates;
             const answer = await refreshedPeerConnection.createAnswer();
+            if (!isCurrentPeer()) return;
             await refreshedPeerConnection.setLocalDescription(answer);
+            if (!isCurrentPeer()) return;
             dispatch({
               type: "peer_state_replaced",
               peerConnectionState: "connecting",
@@ -548,12 +607,17 @@ export function useDirectCallSession(
           }
 
           await peerConnection.setRemoteDescription(offer);
-          pendingRemoteICECandidatesRef.current = await flushPendingRemoteICECandidates(
+          if (!isCurrentPeer()) return;
+          const pendingCandidates = await flushPendingRemoteICECandidates(
             peerConnection,
             pendingRemoteICECandidatesRef.current,
           );
+          if (!isCurrentPeer()) return;
+          pendingRemoteICECandidatesRef.current = pendingCandidates;
           const answer = await peerConnection.createAnswer();
+          if (!isCurrentPeer()) return;
           await peerConnection.setLocalDescription(answer);
+          if (!isCurrentPeer()) return;
           dispatch({
             type: "peer_state_replaced",
             peerConnectionState: "connecting",
@@ -575,10 +639,13 @@ export function useDirectCallSession(
           }
 
           await peerConnection.setRemoteDescription(answer);
-          pendingRemoteICECandidatesRef.current = await flushPendingRemoteICECandidates(
+          if (!isCurrentPeer()) return;
+          const pendingCandidates = await flushPendingRemoteICECandidates(
             peerConnection,
             pendingRemoteICECandidatesRef.current,
           );
+          if (!isCurrentPeer()) return;
+          pendingRemoteICECandidatesRef.current = pendingCandidates;
           dispatch({
             type: "peer_state_replaced",
             peerConnectionState: "connecting",
@@ -591,23 +658,25 @@ export function useDirectCallSession(
             throw new Error("invalid ice candidate payload");
           }
 
-          pendingRemoteICECandidatesRef.current = await queueOrApplyRemoteICECandidate(
+          const pendingCandidates = await queueOrApplyRemoteICECandidate(
             peerConnection,
             pendingRemoteICECandidatesRef.current,
             candidate,
           );
+          if (!isCurrentPeer()) return;
+          pendingRemoteICECandidatesRef.current = pendingCandidates;
           return;
         }
         default:
       }
     } catch (error) {
+      if (!isCurrentPeer()) return;
       dispatch({
         type: "failure",
         message: describeError(error, "Не удалось применить входящий RTC signal."),
       });
     }
   }, [
-    clearPeerRecoveryTimer,
     describeError,
     ensurePeerConnection,
     resetPeerRuntime,
@@ -646,22 +715,30 @@ export function useDirectCallSession(
       return;
     }
 
+    const generation = runtimeGenerationRef.current;
+    const isCurrentPeer = () =>
+      runtimeGenerationRef.current === generation && peerConnectionRef.current === peerConnection;
+
     try {
       dispatch({
         type: "peer_state_replaced",
         peerConnectionState: "negotiating",
       });
       const offer = await peerConnection.createOffer();
+      if (!isCurrentPeer()) return;
       await peerConnection.setLocalDescription(offer);
+      if (!isCurrentPeer()) return;
       await sendRTCSignal(participant.userId, {
         type: "offer",
         payload: encodeRTCSessionDescriptionPayload(offer),
       });
+      if (!isCurrentPeer()) return;
       dispatch({
         type: "peer_state_replaced",
         peerConnectionState: "connecting",
       });
     } catch (error) {
+      if (!isCurrentPeer()) return;
       dispatch({
         type: "failure",
         message: describeError(error, "Не удалось создать offer для прямого звонка."),
@@ -706,6 +783,7 @@ export function useDirectCallSession(
 
     clearPeerRecoveryTimer();
     peerRecoveryPlanRef.current = nextPlan;
+    const generation = runtimeGenerationRef.current;
     peerRecoveryTimerRef.current = window.setTimeout(() => {
       void (async () => {
         const plan = peerRecoveryPlanRef.current;
@@ -717,7 +795,10 @@ export function useDirectCallSession(
           return;
         }
 
-        await refreshRTCConfiguration();
+        await refreshRTCConfiguration(generation);
+        if (runtimeGenerationRef.current !== generation || peerRecoveryPlanRef.current !== plan) {
+          return;
+        }
         resetPeerRuntime();
 
         const refreshedCall = stateRef.current.call;
@@ -802,25 +883,53 @@ export function useDirectCallSession(
     };
   }, [schedulePeerRecovery]);
 
+  async function compensateCancelledJoin(callId: string, chatId: string, lease: DirectCallJoinLease) {
+    try {
+      await gatewayClient.leaveCall(token, callId);
+    } catch {
+      lease.markUncertain(chatId, callId);
+    }
+  }
+
   async function startCall() {
-    if (!enabled || chat === null || !isDirectChatSupported) {
+    if (!sessionActiveRef.current || !enabled || chat === null || !isDirectChatSupported || pendingJoinGenerationRef.current !== null) {
       return;
     }
 
+    const acquisition = joinCoordinator.acquire(currentUserId, null);
+    if (acquisition.lease === null) {
+      dispatch({ type: "failure", message: acquisition.message });
+      void runRefreshDirectChatCall(false);
+      return;
+    }
+    const lease = acquisition.lease;
+
+    const generation = ++runtimeGenerationRef.current;
+    pendingJoinGenerationRef.current = generation;
     dispatch({ type: "action_started", actionState: "starting" });
 
     let localStream: MediaStream | null = null;
     try {
-      localStream = await ensureLocalAudioStream();
+      localStream = await ensureLocalAudioStream(generation);
       await refreshRTCConfiguration();
+      if (runtimeGenerationRef.current !== generation) {
+        return;
+      }
       const response = await gatewayClient.startCall(token, {
         kind: "direct",
         directChatId: chat.id,
       });
+      if (runtimeGenerationRef.current !== generation) {
+        await compensateCancelledJoin(response.call.id, chat.id, lease);
+        return;
+      }
       dispatch({ type: "action_finished" });
       localStreamRef.current = localStream;
       await bootstrapJoinedCall(response.call, response.selfParticipant);
     } catch (error) {
+      if (runtimeGenerationRef.current !== generation) {
+        return;
+      }
       if (localStream !== null) {
         clearPeerRecoveryPlan();
         teardownDirectCallRuntime({
@@ -829,6 +938,7 @@ export function useDirectCallSession(
           remoteStream: remoteStreamRef.current,
         });
         localStreamRef.current = null;
+        resetMicrophoneMute();
         localJoinedCallIdRef.current = null;
         peerConnectionRef.current = null;
         remoteStreamRef.current = null;
@@ -858,31 +968,58 @@ export function useDirectCallSession(
         type: "failure",
         message: describeError(error, "Не удалось начать аудиозвонок."),
       });
+    } finally {
+      lease.release();
+      if (pendingJoinGenerationRef.current === generation) {
+        pendingJoinGenerationRef.current = null;
+      }
     }
   }
 
   async function joinCall() {
     const currentCall = stateRef.current.call;
     if (
+      !sessionActiveRef.current ||
       !enabled ||
       chat === null ||
       currentCall === null ||
-      !isDirectChatSupported
+      !isDirectChatSupported ||
+      pendingJoinGenerationRef.current !== null
     ) {
       return;
     }
 
+    const acquisition = joinCoordinator.acquire(currentUserId, currentCall.id);
+    if (acquisition.lease === null) {
+      dispatch({ type: "failure", message: acquisition.message });
+      void runRefreshDirectChatCall(false);
+      return;
+    }
+    const lease = acquisition.lease;
+
+    const generation = ++runtimeGenerationRef.current;
+    pendingJoinGenerationRef.current = generation;
     dispatch({ type: "action_started", actionState: "joining" });
 
     let localStream: MediaStream | null = null;
     try {
-      localStream = await ensureLocalAudioStream();
+      localStream = await ensureLocalAudioStream(generation);
       await refreshRTCConfiguration();
+      if (runtimeGenerationRef.current !== generation) {
+        return;
+      }
       const response = await gatewayClient.joinCall(token, currentCall.id);
+      if (runtimeGenerationRef.current !== generation) {
+        await compensateCancelledJoin(response.call.id, chat.id, lease);
+        return;
+      }
       dispatch({ type: "action_finished" });
       localStreamRef.current = localStream;
       await bootstrapJoinedCall(response.call, response.selfParticipant);
     } catch (error) {
+      if (runtimeGenerationRef.current !== generation) {
+        return;
+      }
       if (localStream !== null) {
         clearPeerRecoveryPlan();
         teardownDirectCallRuntime({
@@ -891,6 +1028,7 @@ export function useDirectCallSession(
           remoteStream: remoteStreamRef.current,
         });
         localStreamRef.current = null;
+        resetMicrophoneMute();
         localJoinedCallIdRef.current = null;
         peerConnectionRef.current = null;
         remoteStreamRef.current = null;
@@ -911,6 +1049,11 @@ export function useDirectCallSession(
         type: "failure",
         message: describeError(error, "Не удалось присоединиться к активному звонку."),
       });
+    } finally {
+      lease.release();
+      if (pendingJoinGenerationRef.current === generation) {
+        pendingJoinGenerationRef.current = null;
+      }
     }
   }
 
@@ -946,45 +1089,85 @@ export function useDirectCallSession(
     dispatch({ type: "clear_error" });
   }
 
-  async function retryRemoteAudioPlayback(audioElement: HTMLAudioElement | null) {
-    if (audioElement === null) {
+  function toggleMicrophone() {
+    const currentCall = stateRef.current.call;
+    if (
+      !sessionActiveRef.current ||
+      !enabled ||
+      currentCall === null ||
+      localJoinedCallIdRef.current !== currentCall.id ||
+      stateRef.current.actionState !== "idle" ||
+      stateRef.current.mediaState !== "ready"
+    ) {
+      return;
+    }
+
+    const tracks = localStreamRef.current?.getAudioTracks().filter(
+      (track) => track.readyState === "live",
+    ) ?? [];
+    if (tracks.length === 0) {
+      return;
+    }
+
+    const muted = !microphoneMutedRef.current;
+    microphoneMutedRef.current = muted;
+    for (const track of tracks) {
+      track.enabled = !muted;
+    }
+    setIsMicrophoneMuted(muted);
+  }
+
+  const retryRemoteAudioPlayback = useCallback(async (audioElement: HTMLAudioElement | null) => {
+    const stream = audioElement?.srcObject;
+    if (audioElement === null || stream == null) {
       return;
     }
 
     try {
       await audioElement.play();
+      if (audioElement.srcObject !== stream || remoteStreamRef.current !== stream) {
+        return;
+      }
       dispatch({
         type: "remote_audio_state_replaced",
         remoteAudioState: stateRef.current.remoteAudioAvailable ? "ready" : "idle",
         remoteAudioAvailable: stateRef.current.remoteAudioAvailable,
       });
     } catch {
+      if (audioElement.srcObject !== stream || remoteStreamRef.current !== stream) {
+        return;
+      }
       dispatch({
         type: "remote_audio_state_replaced",
         remoteAudioState: "blocked",
         remoteAudioAvailable: stateRef.current.remoteAudioAvailable,
       });
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (!enabled || activeChatID === null || !isDirectChatSupported) {
+      sessionActiveRef.current = false;
       dispatch({ type: "sync_succeeded", call: null, participants: [] });
       return;
     }
 
+    sessionActiveRef.current = true;
     dispatch({ type: "sync_started" });
     void runRefreshDirectChatCall(true);
 
     return () => {
+      sessionActiveRef.current = false;
       disposeLocalRuntime();
     };
   }, [
     activeChatID,
+    currentUserId,
     disposeLocalRuntime,
     enabled,
     isDirectChatSupported,
     runRefreshDirectChatCall,
+    token,
   ]);
 
   useEffect(() => {
@@ -1203,12 +1386,16 @@ export function useDirectCallSession(
     };
   }, [enabled, joinedCallID, state.localJoinedCallId, token]);
 
+  const visibleErrorMessage = joinCoordinator.describeUncertainCall(currentUserId, state.call?.id ?? null) ?? state.errorMessage;
   return {
-    state,
+    state: visibleErrorMessage === state.errorMessage ? state : {...state,errorMessage:visibleErrorMessage},
     phase,
     remoteAudioStream,
     selfParticipant,
     remoteParticipant,
+    canToggleMicrophone:
+      enabled && isLocallyJoined && hasLiveMicrophone && state.mediaState === "ready" && state.actionState === "idle",
+    isMicrophoneMuted,
     canStart:
       isDirectChatSupported &&
       state.call === null &&
@@ -1238,6 +1425,7 @@ export function useDirectCallSession(
     joinCall,
     leaveCall,
     endCall,
+    toggleMicrophone,
   };
 }
 
