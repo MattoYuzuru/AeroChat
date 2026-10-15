@@ -1,3 +1,4 @@
+import { isEncryptedMessageReadByPeer } from "../chats/encrypted-read-position";
 import {
   useEffect,
   useEffectEvent,
@@ -59,6 +60,7 @@ import { useWebNotifications } from "../notifications/context";
 import { useDirectCallAwareness } from "../rtc/useDirectCallAwareness";
 import { useDirectCallSession } from "../rtc/useDirectCallSession";
 import { useDesktopShellHost, useDesktopShellWindowLocation } from "../shell/context";
+import { isThreadReadVisible } from "../chats/read-visibility";
 import {
   isViewportPinnedToBottom,
   scheduleThreadViewportBottomAlignment,
@@ -97,6 +99,11 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const [isComposerSending, setIsComposerSending] = useState(false);
   const composerSendInFlightRef = useRef(false);
   const composerVersionRef = useRef(0);
+  const [mobileWindowContentMode, setMobileWindowContentMode] = useState<"thread" | "info">(
+    "thread",
+  );
+  const directWindowContentMode =
+    desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
   const [composerError, setComposerError] = useState<string | null>(null);
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
   const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
@@ -116,6 +123,11 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const keepScrollPinnedToBottomRef = useRef(true);
   const olderHistoryAnchorRef = useRef<ThreadViewportOlderHistoryAnchor | null>(null);
   const isPageVisible = usePageVisibility();
+  const isThreadVisible = isThreadReadVisible({
+    pageVisible: isPageVisible,
+    windowVisible: desktopShellHost?.isCurrentWindowVisible ?? true,
+    timelineVisible: directWindowContentMode === "thread",
+  });
   const sessionToken =
     authState.status === "authenticated" ? authState.token : "";
   const currentUserId =
@@ -127,6 +139,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     token: sessionToken,
     currentUserId,
     composerText,
+    threadVisible: isThreadVisible,
     onUnauthenticated: () => expireSession(),
   });
   const encryptedMediaAttachmentDraft = useEncryptedMediaAttachmentDraft({
@@ -331,6 +344,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const latestEncryptedMessage = encryptedMessageEntries.at(-1) ?? null;
   const activeEncryptedDirectChatId = selectedThread?.chat.id ?? null;
   const directCall = useDirectCallSession({
+    joinCoordinator: directCallAwareness.joinCoordinator,
     enabled:
       authState.status === "authenticated" &&
       isThreadRouteActive &&
@@ -360,7 +374,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const shouldAutoMarkEncryptedRead =
     authState.status === "authenticated" &&
     isThreadRouteActive &&
-    isPageVisible &&
+    isThreadVisible &&
     selectedThread !== null &&
     encryptedLane.status === "ready" &&
     latestEncryptedMessage !== null &&
@@ -625,11 +639,6 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     selectedThread !== null
       ? getPeerParticipant(selectedThread.chat, currentUserId)
       : null;
-  const [mobileWindowContentMode, setMobileWindowContentMode] = useState<"thread" | "info">(
-    "thread",
-  );
-  const directWindowContentMode =
-    desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
   const isDesktopTargetWindow = desktopShellHost !== null && isThreadRouteActive;
   const people = usePeople({
     enabled:
@@ -2755,24 +2764,9 @@ interface EncryptedReplyTargetDescriptor {
 }
 
 interface EncryptedDirectConversationReadPositionLike {
-  messageCreatedAt: string;
-  messageId: string;
+  lastReadServerSequence: string;
 }
 
-function isEncryptedMessageReadByPeer(
-  entry: EncryptedDirectMessageV2ProjectedMessageEntry,
-  peerReadPosition: EncryptedDirectConversationReadPositionLike | null,
-): boolean {
-  if (peerReadPosition === null) {
-    return false;
-  }
-
-  if (entry.createdAt !== peerReadPosition.messageCreatedAt) {
-    return entry.createdAt < peerReadPosition.messageCreatedAt;
-  }
-
-  return entry.messageId <= peerReadPosition.messageId;
-}
 
 function describeDirectCallPhaseLabel(
   phase:

@@ -108,6 +108,20 @@ RETURNING
     ended_by_user_id,
     end_reason;
 
+-- name: LockCallByID :one
+SELECT * FROM rtc_calls
+WHERE id = sqlc.arg(id)
+FOR UPDATE;
+
+-- name: ReleaseEndedParticipationByUserID :exec
+UPDATE rtc_call_participants p
+SET state = 'left', left_at = sqlc.arg(at), updated_at = sqlc.arg(at)
+FROM rtc_calls c
+WHERE p.call_id = c.id
+  AND c.status = 'ended'
+  AND p.user_id = sqlc.arg(user_id)
+  AND p.state = 'active';
+
 -- name: EndCall :execrows
 UPDATE rtc_calls
 SET

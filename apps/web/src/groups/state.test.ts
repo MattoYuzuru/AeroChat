@@ -292,6 +292,7 @@ describe("group realtime state helpers", () => {
       encryptedReadState: {
         selfPosition: {
           messageId: "encrypted-1",
+          lastReadServerSequence: "1",
           messageCreatedAt: "2026-04-10T12:08:00Z",
           updatedAt: "2026-04-10T12:09:00Z",
         },

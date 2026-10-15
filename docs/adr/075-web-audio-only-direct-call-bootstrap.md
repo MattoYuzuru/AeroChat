@@ -99,6 +99,8 @@ Web-клиент использует уже существующие RPC:
 
 - local audio track добавляется через `addTrack()`;
 - remote audio рендерится через реальный `HTMLAudioElement`;
+- playback attach/cleanup привязан к изменению remote stream, а не к render или participant refresh;
+- одинаковый playback state не создаёт новое состояние; autoplay denial требует явного retry, завершение старого `play()` после смены stream игнорируется;
 - при уходе peer'а peer connection закрывается, но lifecycle сервера остаётся source of truth;
 - при уходе пользователя из текущего direct-chat scope page-scoped session покидает call best-effort через `LeaveCall`.
 
@@ -126,6 +128,8 @@ navigator.mediaDevices.getUserMedia({ audio: true })
 ```
 
 Если это не удалось, UI показывает bounded ошибку и не оставляет server-backed join/start side effects.
+
+Ожидающий capture/start/join принадлежит поколению текущего локального runtime. Смена chat scope, token или unmount инвалидирует это поколение: поздний capture немедленно освобождает все tracks, до RPC/создания peer продолжение проверяет актуальность. Если успешный Start/Join ответ пришёл после teardown, клиент ожидает один компенсирующий `LeaveCall`, удерживая provider-owned lease пользователя. Неопределённый результат выхода блокирует повторный join именно этого call до свежего authoritative snapshot с другим/пустым active call; fire-and-forget fallback после освобождения lease здесь не отправляется. Повторный click во время операции не запускает второй capture/RPC. Для уже joined звонка navigation policy ADR-076 сохраняется.
 
 Явно обрабатываются:
 

@@ -417,6 +417,7 @@ export interface AttachmentUploadSession {
   uploadUrl: string;
   httpMethod: string;
   headers: Record<string, string>;
+  formFields: Record<string, string>;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;
@@ -493,6 +494,7 @@ export interface GroupReadState {
 }
 
 export interface EncryptedConversationReadPosition {
+  lastReadServerSequence: string;
   messageId: string;
   messageCreatedAt: string;
   updatedAt: string;
@@ -599,6 +601,7 @@ export interface EncryptedGroupEnvelope {
   ciphertext: string;
   ciphertextSizeBytes: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   viewerDelivery: EncryptedGroupMessageDelivery;
 }
@@ -615,6 +618,7 @@ export interface EncryptedGroupStoredEnvelope {
   targetMessageId: string | null;
   revision: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   storedDeliveryCount: number;
   storedDeliveries: EncryptedGroupMessageDelivery[];
@@ -635,6 +639,7 @@ export interface EncryptedDirectMessageV2StoredEnvelope {
   targetMessageId: string | null;
   revision: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   storedDeliveryCount: number;
   storedDeliveries: EncryptedDirectMessageV2StoredDelivery[];
@@ -656,6 +661,7 @@ export interface EncryptedDirectMessageV2Envelope {
   targetMessageId: string | null;
   revision: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   viewerDelivery: EncryptedDirectMessageV2Delivery;
 }
