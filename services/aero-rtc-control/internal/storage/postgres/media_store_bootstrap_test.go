@@ -52,12 +52,22 @@ func TestMediaStoreRegisteredBootstrapUpgradeKeepsLegacyLifecycle(t *testing.T) 
 					t.Fatal(err)
 				}
 			}
-			callRow, creator, err := repo.CreateCallWithParticipant(ctx, rtc.Call{ID: call.String(), Scope: rtc.ConversationScope{Type: rtc.ScopeTypeGroup, GroupID: group.String()}, CreatedByUserID: users[0].String(), Status: rtc.CallStatusActive, CreatedAt: now, StartedAt: now, UpdatedAt: now}, rtc.CallParticipant{ID: uuid.NewString(), CallID: call.String(), UserID: users[0].String(), State: rtc.ParticipantStateActive, JoinedAt: now, UpdatedAt: now})
+			createCall := repo.CreateCallWithParticipant
+			if legacy {
+				createCall = func(ctx context.Context, c rtc.Call, p rtc.CallParticipant) (*rtc.Call, *rtc.CallParticipant, error) {
+					return createLegacyControlFixtureCall(t, db, c, p)
+				}
+			}
+			callRow, creator, err := createCall(ctx, rtc.Call{ID: call.String(), Scope: rtc.ConversationScope{Type: rtc.ScopeTypeGroup, GroupID: group.String()}, CreatedByUserID: users[0].String(), Status: rtc.CallStatusActive, CreatedAt: now, StartedAt: now, UpdatedAt: now}, rtc.CallParticipant{ID: uuid.NewString(), CallID: call.String(), UserID: users[0].String(), State: rtc.ParticipantStateActive, JoinedAt: now, UpdatedAt: now})
 			if err != nil {
 				t.Fatal(err)
 			}
 			joined := rtc.CallParticipant{ID: uuid.NewString(), CallID: call.String(), UserID: users[1].String(), State: rtc.ParticipantStateActive, JoinedAt: now, UpdatedAt: now}
-			if _, _, err := repo.JoinParticipant(ctx, joined); err != nil {
+			if legacy {
+				if err := createLegacyControlFixtureParticipant(ctx, db, joined); err != nil {
+					t.Fatal(err)
+				}
+			} else if _, _, err := repo.JoinParticipant(ctx, joined); err != nil {
 				t.Fatal(err)
 			}
 			if err := dbbootstrap.Apply(ctx, db, rtcOptions); err != nil {
@@ -67,7 +77,7 @@ func TestMediaStoreRegisteredBootstrapUpgradeKeepsLegacyLifecycle(t *testing.T) 
 				t.Fatal("repeat registered bootstrap failed", err)
 			}
 			var migrations, grants int
-			if err := db.QueryRow(ctx, "SELECT count(*) FROM schema_migrations WHERE service_name='aero-rtc-control'").Scan(&migrations); err != nil || migrations != 3 {
+			if err := db.QueryRow(ctx, "SELECT count(*) FROM schema_migrations WHERE service_name='aero-rtc-control'").Scan(&migrations); err != nil || migrations != 4 {
 				t.Fatalf("registered RTC migrations=%d err=%v", migrations, err)
 			}
 			if err := db.QueryRow(ctx, "SELECT count(*) FROM rtc_media_grants").Scan(&grants); err != nil || grants != 0 {

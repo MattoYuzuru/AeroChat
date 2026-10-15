@@ -202,6 +202,104 @@ media policy/flag не включаются. Source preparation в отдель�
 merge generated, verified и published Identity→Chat→registration parents,
 нового clean freeze и собственных fresh receipts.
 
+### Public group Leave / End: parent control intent
+
+Уточнение Accepted координатором 2026-10-12 для отдельного coordinator
+slice; implementation ещё не начата. Docs commit предшествует коду.
+
+Public media Leave/End вводятся как additive proto-first commands
+RequestGroupMediaLeave/RequestGroupMediaEnd с call_id и canonical request_id,
+а GetGroupMediaOperation читает authorized status. Контракт выделен в отдельный
+unmounted GroupMediaControlService: existing RtcControlService не расширяет
+gateway interface. Typed stubs возвращают Unimplemented до отдельного adapter
+slice; body/model tuple не становится public capability. Старые LeaveCall/EndCall не
+получают successful left/ended response с pending внутри. Request ID служит
+лишь idempotency correlation; body не выбирает user/session/device, grant,
+room/generation, owner/fence, child actions, authority outcome или ACK.
+
+Own Leave допускается только для held grant exact resolved active auth
+user/session/device binding, включая reader/removed Chat subject: прекращение
+собственного media не даёт нового admission. End actor — immutable call
+creator с active Identity и свежей eligible Chat role owner/admin/member.
+Текущий GroupOwner/admin не получает End privilege автоматически; смена
+eligible роли сохраняет epoch, поэтому management privilege не кешируется
+по epoch. Own minimal Leave status доступен новой active session того же user
+без roster/чужих bindings. End aggregate status требует свежего current End
+права. Revoked bearer/anonymous status запрещён; own logout оставляет pending
+до следующей authorized session либо отдельного approved admin reconcile.
+
+Уточнение Accepted координатором 2026-10-12 до adapter implementation:
+own minimal status использует отдельный typed identity-only OwnStatusSubject /
+read, полученный после fresh active ResolveSessionBearer. Его разрешение —
+exact persisted actor user, не current Chat role или roster. Новая active
+session того же user может читать только original minimal own receipt.
+Chat NOT_FOUND/unavailable не превращается в выдуманный RoleRemoved/Reader
+для прохождения model Actor validator. End aggregate status сохраняет fresh
+active Identity +immutable call creator +current eligible Chat role; own
+identity-only read не открывает этот путь. Revoked/anonymous bearer запрещён.
+
+Saved same-user Leave request replay из НОВОЙ active session может вернуть
+original scoped minimal receipt без новых targets или mutation. Это recovery
+прежнего command, не Leave текущей replacement generation. Новый Leave всё ещё
+требует exact current resolved session/device held binding. Request/kind/call
+изменение конфликтует, operation/request ID не является capability. Adapter
+берёт auth subject из verified remote result, не body/header boolean.
+Public mapping остаётся media_PENDING при UNKNOWN provider proof, даже если
+model leave journal complete; model ACK/status не пересекает trusted media
+completion boundary. Admission signature/proxy/ACK — отдельный SDK contract
+и slice, service/runtime/media flag этим уточнением не включаются.
+
+Coordinator сохраняет immutable parent intent/request mapping, exact per-grant
+child operations и отдельные room-generation cleanup targets с guarded claims.
+Leave выбирает один own exact grant; replay прежнего request не выбирает
+replacement generation. End под call lock выбирает все prepared/active/revoking
+grants и active legacy participant IDs этого call, все non-closed rooms этого
+call и проверяет referenced rooms. Snapshot включает full grant/room/call/
+participant/auth revision/eligibility epoch binding, stored lease и expected
+server registration owner/fence. Browser и новый leaf не выбирают targets.
+Already-revoking source child сохраняет свою operation/reason/authority outcome;
+его immutable binding не переприсваивается. Один child остаётся one-grant
+operation, а не скрытая multi-target замена существующего ACK finalizer.
+
+OPEN END INTENT — durable admission И terminal barrier. Он блокирует legacy
+End, last-Leave, stale prune/conflict/orphan repair от successful call ENDED /
+room CLOSED даже после ВСЕХ grant REVOKED при0held/0participants, пока room ACK
+pending. Start той же group не создаёт replacement call; Join/Reserve/Activate/
+RegisterLease и future initial/reconnect admission закрыты. Барьер нельзя
+считать исчезнувшим по отсутствию held grant, activity или истечению JWT.
+Child может release свой participant/user slot лишь после полного собственного
+matching ACK; parent End и selected rooms остаются pending/closing. Только
+parent finalizer может завершить call/room при открытом End intent.
+
+Parent completion требует ALL exact child actions и ALL selected room-generation
+trusted teardown/absence ACK. Final transaction повторно проверяет immutable
+targets, child proof/state, room proof и отсутствие неожиданных participants /
+held grants/leases; затем атомарно terminal call/rooms и parent receipt.
+Empty/UNKNOWN registry set не становится media complete, synthetic room ACK не
+создаётся. Provider facts остаются UNKNOWN/PENDING без trusted adapter. WS close,
+local tracks stop/mute/Leave action, provider HTTP200 и token/certificate expiry
+не являются ACK. New leaf/same service URI не наследует predecessor targets;
+rotation/takeover остаются unsupported, pending old targets neverdelete.
+
+Fresh Identity/Chat lookup выполняется вне DB TX в общем5s budget. Внутри —
+sorted call parents → rooms → users → grants/leases → intent/children/outbox,
+recheck full binding/watermarks/target set; новый parent/user требует rollback
+и bounded retry, не поздний parent lock. Pending group intent входит в parent
+discovery даже при отсутствии participants/grants. Нет distributed atomicity
+между authority lookup и RTC commit: source events и5s recovery закрывают race,
+transient failure не объявляет permanent revoked и не повышает watermark.
+
+Same authenticated actor/request/kind/call возвращает тот же durable receipt
+после response loss/crash, changed duplicate конфликтует. Command/status
+каждый раз заново авторизуется; operation ID не capability. Pending intents,
+full targets и mappings удерживаются. Worker lease/claim owner/fence и DB clock
+защищают stale CAS; busy/not-due остаётся pending, exhaustion unavailable.
+Реальные sender/admission/SDK/proxy cleanup workers, public wiring/UI и media
+enable — отдельные slices. Dormant coordinator preparation требует review;
+generation/full gates/publication — ordinary merge generated, verified и
+published parents, новый clean freeze и собственные receipts. До actual
+trusted ACK acceptance public media complete не заявляется.
+
 ### Identity source delivery journal
 
 Identity sender — отдельный default-disabled implementation slice. Migration

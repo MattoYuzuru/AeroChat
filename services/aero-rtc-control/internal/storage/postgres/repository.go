@@ -139,6 +139,19 @@ func (r *Repository) CreateCallWithParticipant(ctx context.Context, call rtc.Cal
 	}()
 
 	q := r.queries.WithTx(tx)
+	if call.Scope.Type == rtc.ScopeTypeGroup {
+		if _, err := q.GetOpenMediaEndByGroup(ctx, mustParseUUID(call.Scope.GroupID)); err == nil {
+			return nil, nil, rtc.ErrMediaCleanupPending
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, rtc.ErrUnavailable
+		}
+	}
+	if _, err := q.GetOpenMediaEndForActiveUser(ctx, mustParseUUID(participant.UserID)); err == nil {
+		return nil, nil, rtc.ErrMediaCleanupPending
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, rtc.ErrUnavailable
+	}
+
 	if slot != nil {
 		defer rollbackMedia(tx)
 		if err := slot.allowLegacyJoin(spec); err != nil {
@@ -217,6 +230,11 @@ func (r *Repository) JoinParticipant(ctx context.Context, participant rtc.CallPa
 	if err != nil {
 		return nil, nil, convertError(err)
 	}
+	if pending, err := mediaEndPending(ctx, q, locked.ID); err != nil {
+		return nil, nil, rtc.ErrUnavailable
+	} else if pending {
+		return nil, nil, rtc.ErrMediaCleanupPending
+	}
 	if locked.Status != rtc.CallStatusActive {
 		return nil, nil, rtc.ErrConflict
 	}
@@ -277,6 +295,11 @@ func (r *Repository) LeaveParticipantAndMaybeEndCall(ctx context.Context, callID
 	if err != nil {
 		return false, convertError(err)
 	}
+	if pending, err := mediaEndPending(ctx, q, call.ID); err != nil {
+		return false, rtc.ErrUnavailable
+	} else if pending {
+		return false, rtc.ErrMediaCleanupPending
+	}
 	rows, err := q.ListActiveParticipantsByCallID(ctx, call.ID)
 	if err != nil {
 		return false, convertError(err)
@@ -328,6 +351,14 @@ func (r *Repository) EndCallWithParticipants(ctx context.Context, callID, userID
 	call, err := slotLockedCall(ctx, q, slot, mustParseUUID(callID))
 	if err != nil {
 		return nil, nil, convertError(err)
+	}
+	if pending, err := mediaEndPending(ctx, q, call.ID); err != nil {
+		return nil, nil, rtc.ErrUnavailable
+	} else if pending {
+		if call.CreatedByUserID.String() != userID {
+			return nil, nil, rtc.ErrPermissionDenied
+		}
+		return nil, nil, rtc.ErrMediaCleanupPending
 	}
 	if call.Status != rtc.CallStatusActive {
 		return nil, nil, rtc.ErrConflict

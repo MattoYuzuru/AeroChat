@@ -125,3 +125,79 @@ proxy/SFU acknowledgement и отдельный durable call-wide End/Leave coor
 SDK/proxy/worker/UI/audio исключены. До generation/full checks/publication —
 ordinary merge generated+verified+published Identity→Chat→registration parents,
 новый clean freeze и собственные receipts; прежние PASS не переносятся.
+
+## Accepted план public media Leave / End coordinator
+
+План принят координатором 2026-10-12 по ADR097; additive контракты сгенерированы
+и reviewed, но compile/native/runtime acceptance ещё не завершена. Additive commands с call_id/request_id и
+fresh-authorized operation status, immutable parent intent + one-grant children
+и room-generation cleanup journal. Live authority/provider adapters не реализованы.
+Own Leave требует exact active auth session/device binding, включая own
+reader/removed subject. End разрешён call creator +fresh eligible Chat role;
+GroupOwner/admin не получает это право автоматически. Новая active own session
+может читать minimal own Leave status без roster; revoked/anonymous bearer нет.
+
+OPEN END INTENT удерживает admission/terminal barrier даже при0held/0participants
+и всех grants REVOKED, пока selected room ACK pending. Legacy End/last-Leave/
+stale/orphan paths не пишут premature ENDED/CLOSED; same-group Start и все
+Join/Reserve/Activate/RegisterLease/reconnect закрыты. Child release допустим
+только после full own ACK, parent End завершается лишь после ALL exact child
+и room-generation trusted ACK в atomic finalizer. Empty UNKNOWN не complete.
+
+Fresh lookup вне TX и sorted parents→rooms→users/recheck внутри не обещают
+distributed auth atomicity. Local Leave/mute/WS close/providerHTTP200/expiry не
+ACK; new leaf не наследует old targets, rotation unsupported. Pending history
+neverdelete. Existing lobby/direct off-mode неизменен; SDK/proxy/workers/UI/
+public enable не входят в coordinator foundation. Code только после Accepted
+ADR review/commit, own fresh gates и verified generated published parent merges.
+
+GroupMediaControlService proto расположен в `proto/aerochat/rtc/v1/
+group_media_control_service.proto`. Он не регистрируется app/gateway; все три
+typed stubs — Unimplemented. Existing RtcControlService и gateway interface
+не меняются. `MediaControlStore` принимает validated model Actor/RoomClaim facts,
+а не live Identity/Chat response или trusted SFU/proxy ACK. Reference journal
+complete в native fixture не подтверждает звук/provider absence и не отдаётся
+public клиенту. Authorization/SDK/private ACK adapters — отдельные узкие slices.
+
+Registered additive migration000003 применяется обычным embedded bootstrap;
+ledger теперь содержит четыре RTC migrations. Она удерживает immutable
+intent/children/participants/room targets и pending history. Persisted open End
+barrier действует независимо от constructor policy, включая zero-held phase.
+Own child finalizer освобождает собственный slot после full model action ACK,
+но call/room завершает только parent после всех child и room journals. Empty
+unknown intent не становится complete. Room claim использует DB clock,15s lease
+и guarded monotonic owner/fence/attempt CAS; это не benchmark и не worker loop.
+
+Source tests подготовлены для exact targets/replay/status, observed End↔Join/
+lease barriers, zero-held pending End, rollback/cancel/fence expiry/exhaustion,
+other-room progress и actual registered003 upgrade/repeat retained history.
+Они ещё UNRUN. Старые pre-upgrade fixtures seed primitive SQLC queries под old
+schema; current writers вызываются после registered bootstrap, без42P01 bypass.
+Native profiles/schema ownership/heavy queue прежние; до запуска — verified
+published Identity→Chat→registration→guard ordinary merges и fresh freeze.
+
+Первый whole check `check-wtqqnh9q` на generated HEAD `4e6ff3e` завершился
+compile FAIL до native tests: SQLC возвращает nullable `pgtype.Bool` для
+`MediaControlChildrenReady`, а source ожидал `bool`. Исправление учитывает
+`Valid` и `Bool`: неизвестный/false result сохраняет pending и не позволяет
+room action обойти children barrier. Generated SQL/proto не редактируются.
+Исторический FAIL сохраняется; native/provider completion не подтверждена
+и требует нового whole check на clean исправленном HEAD.
+
+Следующий whole check `check-ad__pjcv` на `fe1bbb7` собрал production
+RTC binary с exact-source VCS, но test package PostgreSQL не скомпилировался:
+в `media_control_test.go` остался неиспользуемый `pgxpool` import. Он удалён
+без изменения assertions. Остальные выполненные tests не принимают этот
+package: native coordinator и inherited PostgreSQL cases ещё UNRUN; полный
+результат требует нового clean-source whole check.
+
+Accepted adapter refinement 2026-10-12: own minimal status использует отдельный
+identity-only OwnStatusSubject/read после fresh active Identity, без требования
+Chat role/roster и без fabricated RoleRemoved/Reader при NOT_FOUND/unavailable.
+Saved same-user Leave replay из новой active session возвращает original
+minimal scoped receipt, не создаёт target и не меняет replacement generation;
+новый Leave требует exact current session/device held binding. End status
+по-прежнему fresh creator +eligible Chat role. Revoked/anonymous bearer denied.
+Model-complete Leave не становится public media COMPLETE: при UNKNOWN provider
+facts adapter возвращает media_PENDING. Уточнение пока docs-only, actual
+authorization/read adapters и SDK/admission/proxy ACK не реализованы.
