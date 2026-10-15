@@ -3,13 +3,18 @@ name: Deploy Production
 on:
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: "GHCR tag для production rollout"
+      release_digest:
+        description: "Immutable OCI digest AeroChat release manifest (sha256:...)"
+        required: true
+        type: string
+      source_sha:
+        description: "Точный source commit SHA из Publish Images summary"
         required: true
         type: string
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: production-rollout
@@ -21,7 +26,8 @@ jobs:
     environment:
       name: production
     env:
-      IMAGE_TAG: ${{ inputs.image_tag }}
+      RELEASE_DIGEST: ${{ inputs.release_digest }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
       DEPLOY_DIR: ${{ vars.AERO_PROD_DEPLOY_DIR }}
       COMPOSE_FILE: ${{ vars.AERO_PROD_COMPOSE_FILE }}
       EDGE_DOMAIN: ${{ vars.AERO_PROD_EDGE_DOMAIN }}
@@ -37,7 +43,8 @@ jobs:
           set -euo pipefail
 
           required_vars=(
-            IMAGE_TAG
+            RELEASE_DIGEST
+            SOURCE_SHA
             DEPLOY_DIR
             COMPOSE_FILE
             EDGE_DOMAIN
@@ -56,8 +63,13 @@ jobs:
             fi
           done
 
-          if ! printf '%s' "$IMAGE_TAG" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'; then
-            echo "::error::image_tag содержит недопустимые символы"
+          if ! printf '%s' "$RELEASE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+            echo "::error::release_digest должен быть полным OCI SHA-256 digest"
+            exit 1
+          fi
+
+          if ! printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::source_sha должен быть полным commit SHA"
             exit 1
           fi
 
@@ -71,6 +83,29 @@ jobs:
             exit 1
           fi
 
+      - name: Checkout release tooling
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Setup ORAS
+        uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1
+        with:
+          version: 1.3.0
+          url: https://github.com/oras-project/oras/releases/download/v1.3.0/oras_1.3.0_linux_amd64.tar.gz
+          checksum: 6cdc692f929100feb08aa8de584d02f7bcc30ec7d88bc2adc2054d782db57c64
+
+      - name: Validate immutable release before SSH
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          namespace="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          release_repo="$namespace/aerochat-release"
+          printf '%s' "$REGISTRY_TOKEN" | oras login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          oras manifest fetch "$release_repo@$RELEASE_DIGEST" --output "$RUNNER_TEMP/release-oci.json"
+          layer="$(python3 infra/scripts/release_manifest.py artifact "$RUNNER_TEMP/release-oci.json" --source-sha "$SOURCE_SHA")"
+          oras blob fetch "$release_repo@$layer" --output "$RUNNER_TEMP/release.json"
+          python3 infra/scripts/release_manifest.py blob "$RUNNER_TEMP/release-oci.json" --source-sha "$SOURCE_SHA" --blob "$RUNNER_TEMP/release.json"
+          python3 infra/scripts/release_manifest.py validate "$RUNNER_TEMP/release.json" --source-sha "$SOURCE_SHA" --namespace "$namespace" --overlay "$RUNNER_TEMP/release-compose.json"
+
       - name: Prepare SSH material
         run: |
           set -euo pipefail
@@ -78,7 +113,7 @@ jobs:
           printf '%s\n' "$SSH_PRIVATE_KEY" > "$RUNNER_TEMP/aero_prod_key"
           printf '%s\n' "$SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/aero_prod_known_hosts"
 
-      - name: Roll out selected image tag
+      - name: Roll out selected immutable release
         run: |
           set -euo pipefail
 
@@ -96,10 +131,14 @@ jobs:
             --
             "$DEPLOY_DIR"
             "$COMPOSE_FILE"
-            "$IMAGE_TAG"
+            "$RELEASE_DIGEST"
+            "$SOURCE_SHA"
+            "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
             "$EDGE_DOMAIN"
             "$MEDIA_EDGE_DOMAIN"
           )
+
+          scp -i "$RUNNER_TEMP/aero_prod_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/aero_prod_known_hosts" -P "$SSH_PORT" "$RUNNER_TEMP/release.json" "${SSH_USER}@${SSH_HOST}:${DEPLOY_DIR}/release-${SOURCE_SHA}.json"
 
           # shellcheck disable=SC2029
           # Аргументы передаются в remote `bash -s -- ...` намеренно и не используются как часть shell-кода.
@@ -108,9 +147,11 @@ jobs:
 
           DEPLOY_DIR=$1
           COMPOSE_FILE=$2
-          IMAGE_TAG=$3
-          EDGE_DOMAIN=$4
-          MEDIA_EDGE_DOMAIN=$5
+          RELEASE_DIGEST=$3
+          SOURCE_SHA=$4
+          IMAGE_NAMESPACE=$5
+          EDGE_DOMAIN=$6
+          MEDIA_EDGE_DOMAIN=$7
 
           require_command() {
             local name="$1"
@@ -186,6 +227,8 @@ jobs:
           require_command docker
           require_command grep
           require_command sed
+          require_command git
+          require_command python3
 
           if ! docker compose version >/dev/null 2>&1; then
             echo "Docker Compose plugin не найден на сервере" >&2
@@ -194,6 +237,14 @@ jobs:
 
           mkdir -p "$DEPLOY_DIR"
           cd "$DEPLOY_DIR"
+
+          if [ "$(git rev-parse HEAD)" != "$SOURCE_SHA" ]; then
+            echo "Deployment checkout должен соответствовать выбранному source SHA" >&2
+            exit 1
+          fi
+
+          RELEASE_OVERLAY="release-compose-${SOURCE_SHA}.json"
+          python3 infra/scripts/release_manifest.py validate "release-${SOURCE_SHA}.json" --source-sha "$SOURCE_SHA" --namespace "$IMAGE_NAMESPACE" --overlay "$RELEASE_OVERLAY"
 
           if [ ! -f .env.server ]; then
             echo ".env.server не найден в $DEPLOY_DIR" >&2
@@ -209,6 +260,13 @@ jobs:
             echo "Compose file $COMPOSE_FILE не найден в $DEPLOY_DIR" >&2
             exit 1
           fi
+
+          for storage_source in infra/storage/Dockerfile infra/scripts/bootstrap-media-storage.sh; do
+            if [ ! -f "$storage_source" ]; then
+              echo "Storage source $storage_source отсутствует: обновите checkout в $DEPLOY_DIR" >&2
+              exit 1
+            fi
+          done
 
           shared_edge_host_ip="$(read_env_var .env.server AERO_SHARED_EDGE_HOST_IP)"
           web_host_port="$(read_env_var .env.server AERO_WEB_HOST_PORT)"
@@ -241,37 +299,34 @@ jobs:
             exit 1
           fi
 
-          previous_tag="$(grep '^AERO_IMAGE_TAG=' .env.server | head -n1 | cut -d= -f2- || true)"
-          echo "Текущий AERO_IMAGE_TAG: ${previous_tag:-<не задан>}"
-
-          update_env_var .env.server AERO_IMAGE_TAG "$IMAGE_TAG"
-          echo "Новый AERO_IMAGE_TAG: $IMAGE_TAG"
+          echo "Выбран immutable release $RELEASE_DIGEST source $SOURCE_SHA"
 
           docker compose \
             --env-file .env.server \
             --env-file .env.server.secrets \
-            -f "$COMPOSE_FILE" \
+            -f "$COMPOSE_FILE" -f "$RELEASE_OVERLAY" \
             config >/dev/null
 
           docker compose \
             --env-file .env.server \
             --env-file .env.server.secrets \
-            -f "$COMPOSE_FILE" \
-            pull
+            -f "$COMPOSE_FILE" -f "$RELEASE_OVERLAY" \
+            pull --ignore-buildable
 
           docker compose \
             --env-file .env.server \
             --env-file .env.server.secrets \
-            -f "$COMPOSE_FILE" \
+            -f "$COMPOSE_FILE" -f "$RELEASE_OVERLAY" \
             up -d
 
           docker compose \
             --env-file .env.server \
             --env-file .env.server.secrets \
-            -f "$COMPOSE_FILE" \
+            -f "$COMPOSE_FILE" -f "$RELEASE_OVERLAY" \
             ps
 
           wait_for_url "Web upstream" "http://${shared_edge_host_ip}:${web_host_port}/"
+          python3 infra/scripts/release_manifest.py runtime "release-${SOURCE_SHA}.json" --source-sha "$SOURCE_SHA" --namespace "$IMAGE_NAMESPACE" --compose-file "$COMPOSE_FILE" --overlay "$RELEASE_OVERLAY" --env-file .env.server --env-file .env.server.secrets
           wait_for_url "Gateway upstream readyz" "http://${shared_edge_host_ip}:${gateway_host_port}/readyz"
           wait_for_url "Media upstream live" "http://${shared_edge_host_ip}:${media_host_port}/minio/health/live"
           wait_for_url "HTTPS web root" "https://${EDGE_DOMAIN}/"
@@ -279,9 +334,15 @@ jobs:
           wait_for_url "HTTPS readyz" "https://${EDGE_DOMAIN}/readyz"
           wait_for_url "HTTPS media live" "https://${MEDIA_EDGE_DOMAIN}/minio/health/live"
 
-          if [ -n "$previous_tag" ]; then
-            echo "Для rollback используй предыдущий tag: $previous_tag"
+          actual_source="$(curl -fsS "http://${shared_edge_host_ip}:${gateway_host_port}/readyz" | python3 -c 'import json,sys; print(json.load(sys.stdin)["service"]["version"])')"
+          if [ "$actual_source" != "$SOURCE_SHA" ]; then
+            echo "Gateway readiness не подтверждает выбранный source SHA" >&2
+            exit 1
           fi
+
+          update_env_var .env.server AERO_RELEASE_DIGEST "$RELEASE_DIGEST"
+          update_env_var .env.server AERO_RELEASE_SOURCE_SHA "$SOURCE_SHA"
+          echo "Rollback: выберите предыдущую пару release digest/source SHA и сохранённый release-compose JSON"
           REMOTE
 
       - name: Write job summary
@@ -289,7 +350,8 @@ jobs:
           {
             echo "## Production rollout"
             echo
-            echo "- image_tag: \`$IMAGE_TAG\`"
+            echo "- release_digest: \`$RELEASE_DIGEST\`"
+            echo "- source_sha: \`$SOURCE_SHA\`"
             echo "- deploy dir: \`$DEPLOY_DIR\`"
             echo "- domain: \`$EDGE_DOMAIN\`"
             echo "- media domain: \`$MEDIA_EDGE_DOMAIN\`"

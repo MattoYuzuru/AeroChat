@@ -140,6 +140,14 @@ Route не обязан описывать:
 
 Это local shell responsibility.
 
+Новый browser location (включая Back/Forward) имеет приоритет над ранее active
+window: shell запускает canonical target из URL, не заменяя этот URL устаревшим
+routePath предыдущего окна в том же commit. Начальный route-backed deep-link
+с ещё отсутствующим active window также ожидает launch, включая повторный mount
+effect StrictMode. Когда пользователь фокусирует живое окно без нового browser
+location, active window синхронизирует URL как раньше. Ни один переход не
+пересоздаёт соседние window instances или их черновики.
+
 ### 10. Search result и system notifications открывают canonical target window
 
 Если shell получает action уровня "открыть direct chat", "открыть group", "открыть settings" или "показать message result",

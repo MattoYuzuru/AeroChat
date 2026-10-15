@@ -627,6 +627,14 @@ func bearerToken[T any](req *connect.Request[T]) (string, error) {
 
 func mapError(err error) error {
 	switch {
+	case errors.Is(err, context.Canceled):
+		return connect.NewError(connect.CodeCanceled, err)
+	case errors.Is(err, context.DeadlineExceeded):
+		return connect.NewError(connect.CodeDeadlineExceeded, err)
+	case errors.Is(err, identity.ErrResourceExhausted):
+		coded := connect.NewError(connect.CodeResourceExhausted, errors.New("слишком много запросов входа или регистрации: повторите позже"))
+		coded.Meta().Set("Retry-After", "1")
+		return coded
 	case errors.Is(err, identity.ErrInvalidArgument):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, identity.ErrLoginTaken):

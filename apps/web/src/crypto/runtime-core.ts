@@ -1,3 +1,4 @@
+import { requireServerSequence } from "../gateway/server-sequence";
 import type {
   EncryptedDirectMessageV2Envelope,
   EncryptedGroupEnvelope,
@@ -317,6 +318,7 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           targetMessageId: envelope.targetMessageId,
           revision: envelope.revision,
           createdAt: envelope.createdAt,
+          serverSequence: envelope.serverSequence,
           storedAt: envelope.storedAt,
           failureKind: "runtime_unavailable",
         }));
@@ -334,6 +336,7 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           targetMessageId: envelope.targetMessageId,
           revision: envelope.revision,
           createdAt: envelope.createdAt,
+          serverSequence: envelope.serverSequence,
           storedAt: envelope.storedAt,
           failureKind: "runtime_unavailable",
         }));
@@ -369,6 +372,7 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           targetMessageId: envelope.targetMessageId,
           revision: envelope.revision,
           createdAt: envelope.createdAt,
+          serverSequence: envelope.serverSequence,
           storedAt: envelope.storedAt,
           failureKind: "runtime_unavailable",
         }));
@@ -389,6 +393,7 @@ export function createCryptoRuntimeCore(dependencies: RuntimeDependencies) {
           targetMessageId: envelope.targetMessageId,
           revision: envelope.revision,
           createdAt: envelope.createdAt,
+          serverSequence: envelope.serverSequence,
           storedAt: envelope.storedAt,
           failureKind: "runtime_unavailable",
         }));
@@ -880,6 +885,7 @@ async function sendEncryptedDirectMessageV2Mutation(
       replyToMessageId: normalizedReplyToMessageId,
       revision: storedEnvelope.revision,
       createdAt: storedEnvelope.createdAt,
+      serverSequence: requireServerSequence(storedEnvelope.serverSequence),
       storedAt: storedEnvelope.storedAt,
       payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1",
       text: input.kind === "tombstone" ? null : normalizedText === "" ? null : normalizedText,
@@ -1093,6 +1099,7 @@ async function sendEncryptedGroupMutation(
       replyToMessageId: normalizedReplyToMessageId,
       revision: storedEnvelope.revision,
       createdAt: storedEnvelope.createdAt,
+      serverSequence: requireServerSequence(storedEnvelope.serverSequence),
       storedAt: storedEnvelope.storedAt,
       payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1",
       text: input.kind === "tombstone" ? null : normalizedText === "" ? null : normalizedText,
