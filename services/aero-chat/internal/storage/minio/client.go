@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/domain/chat"
@@ -13,9 +14,12 @@ import (
 )
 
 type Client struct {
-	bootstrap *minio.Client
-	presign   *minio.Client
-	bucket    string
+	bootstrap      *minio.Client
+	presign        *minio.Client
+	bucket         string
+	presignMu      sync.Mutex
+	presignHost    string
+	presignOptions minio.Options
 }
 
 func NewClient(
@@ -48,19 +52,46 @@ func NewClient(
 	if err != nil {
 		return nil, fmt.Errorf("create internal minio client: %w", err)
 	}
-	presignClient, err := minio.New(presignHost, &minio.Options{
+	presignOptions := minio.Options{
 		Creds:  creds,
 		Secure: resolvedPresignSecure,
-	})
+	}
+	_, err = minio.New(presignHost, &presignOptions)
 	if err != nil {
 		return nil, fmt.Errorf("create presign minio client: %w", err)
 	}
 
 	return &Client{
-		bootstrap: bootstrapClient,
-		presign:   presignClient,
-		bucket:    bucket,
+		bootstrap:      bootstrapClient,
+		bucket:         bucket,
+		presignHost:    presignHost,
+		presignOptions: presignOptions,
 	}, nil
+}
+
+func (c *Client) presigningClient(ctx context.Context) (*minio.Client, error) {
+	c.presignMu.Lock()
+	defer c.presignMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if c.presign != nil {
+		return c.presign, nil
+	}
+
+	// Public endpoint нужен только для подписи: region discovery выполняется внутри storage-сети.
+	region, err := c.bootstrap.GetBucketLocation(ctx, c.bucket)
+	if err != nil {
+		return nil, fmt.Errorf("resolve media bucket region: %w", err)
+	}
+	options := c.presignOptions
+	options.Region = region
+	client, err := minio.New(c.presignHost, &options)
+	if err != nil {
+		return nil, fmt.Errorf("create regional presign client: %w", err)
+	}
+	c.presign = client
+	return client, nil
 }
 
 func (c *Client) EnsureBucket(ctx context.Context) error {
@@ -81,7 +112,11 @@ func (c *Client) CreateUpload(ctx context.Context, objectKey string, mimeType st
 		return nil, fmt.Errorf("upload session already expired")
 	}
 
-	presignedURL, err := c.presign.PresignedPutObject(ctx, c.bucket, objectKey, expiry)
+	presign, err := c.presigningClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	presignedURL, err := presign.PresignedPutObject(ctx, c.bucket, objectKey, expiry)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +140,11 @@ func (c *Client) CreateDownload(ctx context.Context, objectKey string, expiresAt
 		return nil, fmt.Errorf("download session already expired")
 	}
 
-	presignedURL, err := c.presign.PresignedGetObject(ctx, c.bucket, objectKey, expiry, nil)
+	presign, err := c.presigningClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	presignedURL, err := presign.PresignedGetObject(ctx, c.bucket, objectKey, expiry, nil)
 	if err != nil {
 		return nil, err
 	}
