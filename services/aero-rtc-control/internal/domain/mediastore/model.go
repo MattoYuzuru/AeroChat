@@ -1,5 +1,5 @@
 // Package mediastore описывает dormant storage ADR-097, не transport authorization.
-// Ни один runtime handler не использует этот пакет. Trusted caller/ACK facts должен
+// Private source receiver использует этот пакет; public media/admission handlers не подключены. Trusted caller/ACK facts должен
 // проверять будущий mTLS/SDK adapter; переданные IDs сами по себе не capability.
 package mediastore
 
