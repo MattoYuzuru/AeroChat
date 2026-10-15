@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -81,6 +80,12 @@ func run() error {
 	}); err != nil {
 		return fmt.Errorf("chat database bootstrap: %w", err)
 	}
+	sequenceCtx, sequenceCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	sequenceErr := repository.CheckEncryptedSequencesReady(sequenceCtx)
+	sequenceCancel()
+	if sequenceErr != nil {
+		return sequenceErr
+	}
 
 	typingStore := redisstate.NewTypingStore(cfg.RedisAddress)
 	defer func() {
@@ -120,7 +125,6 @@ func run() error {
 		objectStorage,
 		app.NewMessageNotificationDispatcher(
 			libnotifications.NewWebPushClient(
-				&http.Client{},
 				cfg.WebPushSubscriber,
 				cfg.WebPushVAPIDPublicKey,
 				cfg.WebPushVAPIDPrivateKey,
@@ -157,7 +161,10 @@ func run() error {
 				return err
 			}
 
-			return typingStore.Ping(ctx)
+			if err := typingStore.Ping(ctx); err != nil {
+				return err
+			}
+			return objectStorage.ReadinessCheck(ctx)
 		},
 		handler,
 	)

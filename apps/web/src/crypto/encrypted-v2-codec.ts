@@ -416,6 +416,7 @@ function buildReadyProjection(
         : null,
     revision: envelope.revision,
     createdAt: envelope.createdAt,
+    serverSequence: envelope.serverSequence,
     storedAt: envelope.storedAt,
     payloadSchema,
     text:
@@ -446,6 +447,7 @@ function buildFailure(
     targetMessageId: envelope.targetMessageId,
     revision: envelope.revision,
     createdAt: envelope.createdAt,
+    serverSequence: envelope.serverSequence,
     storedAt: envelope.storedAt,
     failureKind,
   };

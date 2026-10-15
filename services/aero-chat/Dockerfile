@@ -1,4 +1,4 @@
-FROM golang:1.25.8-alpine AS builder
+FROM golang:1.27.2-alpine3.24@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS builder
 
 WORKDIR /src
 
@@ -8,7 +8,9 @@ COPY services/aero-chat ./services/aero-chat
 
 WORKDIR /src/services/aero-chat
 
-RUN GOWORK=off go build -o /out/aero-chat ./cmd/aero-chat
+ARG AERO_BUILD_REVISION=dev
+
+RUN GOWORK=off go build -ldflags "-X main.version=${AERO_BUILD_REVISION}" -o /out/aero-chat ./cmd/aero-chat
 
 FROM alpine:3.22
 

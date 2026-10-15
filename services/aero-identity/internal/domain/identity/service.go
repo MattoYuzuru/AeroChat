@@ -11,6 +11,7 @@ import (
 	"time"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
+	libnotifications "github.com/MattoYuzuru/AeroChat/libs/go/notifications"
 	"github.com/google/uuid"
 )
 
@@ -334,9 +335,9 @@ func (s *Service) UpsertWebPushSubscription(
 		return err
 	}
 
-	endpoint, err := normalizeRequiredURLString(input.Endpoint, "endpoint")
+	endpoint, err := libnotifications.NormalizeWebPushEndpoint(input.Endpoint)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: web push endpoint is not allowed", ErrInvalidArgument)
 	}
 	p256dhKey, err := normalizeRequiredTokenString(input.P256DHKey, "p256dh_key", 512)
 	if err != nil {
@@ -375,6 +376,12 @@ func (s *Service) DeleteWebPushSubscription(ctx context.Context, token string, e
 	if err != nil {
 		return err
 	}
+	canonicalEndpoint, policyErr := libnotifications.NormalizeWebPushEndpoint(normalizedEndpoint)
+	if policyErr == nil && canonicalEndpoint != normalizedEndpoint {
+		if _, err := s.repo.DeleteWebPushSubscription(ctx, authSession.User.ID, canonicalEndpoint); err != nil {
+			return err
+		}
+	}
 
 	_, err = s.repo.DeleteWebPushSubscription(ctx, authSession.User.ID, normalizedEndpoint)
 	return err
@@ -398,7 +405,11 @@ func (s *Service) RevokeSessionOrDevice(ctx context.Context, token string, targe
 	at := s.now()
 	switch {
 	case target.SessionID != nil:
-		ok, revokeErr := s.repo.RevokeSession(ctx, authSession.User.ID, strings.TrimSpace(*target.SessionID), at)
+		targetID, err := normalizeRevocationTargetID(*target.SessionID)
+		if err != nil {
+			return err
+		}
+		ok, revokeErr := s.repo.RevokeSession(ctx, authSession.User.ID, targetID, at)
 		if revokeErr != nil {
 			return revokeErr
 		}
@@ -407,7 +418,11 @@ func (s *Service) RevokeSessionOrDevice(ctx context.Context, token string, targe
 		}
 		return nil
 	case target.DeviceID != nil:
-		ok, revokeErr := s.repo.RevokeDevice(ctx, authSession.User.ID, strings.TrimSpace(*target.DeviceID), at)
+		targetID, err := normalizeRevocationTargetID(*target.DeviceID)
+		if err != nil {
+			return err
+		}
+		ok, revokeErr := s.repo.RevokeDevice(ctx, authSession.User.ID, targetID, at)
 		if revokeErr != nil {
 			return revokeErr
 		}
@@ -418,6 +433,14 @@ func (s *Service) RevokeSessionOrDevice(ctx context.Context, token string, targe
 	default:
 		return fmt.Errorf("%w: revoke target is required", ErrInvalidArgument)
 	}
+}
+
+func normalizeRevocationTargetID(value string) (string, error) {
+	id, err := uuid.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return "", fmt.Errorf("%w: revoke target must be a UUID", ErrInvalidArgument)
+	}
+	return id.String(), nil
 }
 
 func (s *Service) ListBlockedUsers(ctx context.Context, token string) ([]BlockedUser, error) {

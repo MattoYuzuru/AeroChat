@@ -103,6 +103,7 @@ export interface EncryptedDirectMessageV2ReadyProjection {
   replyToMessageId: string | null;
   revision: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   payloadSchema: "aerochat.web.encrypted_direct_message_v2.payload.v1";
   text: string | null;
@@ -122,6 +123,7 @@ export interface EncryptedDirectMessageV2DecryptFailure {
   targetMessageId: string | null;
   revision: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   failureKind:
     | "runtime_unavailable"
@@ -152,6 +154,7 @@ export interface EncryptedGroupReadyProjection {
   replyToMessageId: string | null;
   revision: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   payloadSchema: "aerochat.web.encrypted_group_message_v1.payload.v1";
   text: string | null;
@@ -174,6 +177,7 @@ export interface EncryptedGroupDecryptFailure {
   targetMessageId: string | null;
   revision: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   failureKind:
     | "runtime_unavailable"
