@@ -40,6 +40,7 @@ type Querier interface {
 	DeleteEncryptedGroupRosterMembersByGroupID(ctx context.Context, groupID uuid.UUID) error
 	DeleteGroupMembership(ctx context.Context, arg DeleteGroupMembershipParams) (int64, error)
 	DeleteWebPushSubscriptionsByIDs(ctx context.Context, dollar_1 []uuid.UUID) (int64, error)
+	DemoteGroupOwnerForTransfer(ctx context.Context, arg DemoteGroupOwnerForTransferParams) (int64, error)
 	DetachDirectMessageAttachments(ctx context.Context, arg DetachDirectMessageAttachmentsParams) (int64, error)
 	DetachEncryptedDirectMessageV2Attachments(ctx context.Context, arg DetachEncryptedDirectMessageV2AttachmentsParams) (int64, error)
 	DetachEncryptedGroupMessageV1Attachments(ctx context.Context, arg DetachEncryptedGroupMessageV1AttachmentsParams) (int64, error)
@@ -120,6 +121,7 @@ type Querier interface {
 	PinDirectChatMessage(ctx context.Context, arg PinDirectChatMessageParams) (int64, error)
 	PinEncryptedDirectMessageV2(ctx context.Context, arg PinEncryptedDirectMessageV2Params) (int64, error)
 	PinEncryptedGroupMessage(ctx context.Context, arg PinEncryptedGroupMessageParams) (int64, error)
+	PromoteGroupOwnerForTransfer(ctx context.Context, arg PromoteGroupOwnerForTransferParams) (int64, error)
 	PublishLegacyAttachmentFinalKey(ctx context.Context, arg PublishLegacyAttachmentFinalKeyParams) (int64, error)
 	RepairDirectEncryptedReadSequence(ctx context.Context, chatID uuid.UUID) error
 	RepairGroupEncryptedReadSequence(ctx context.Context, groupID uuid.UUID) error
@@ -141,7 +143,6 @@ type Querier interface {
 	TouchGroupThreadUpdatedAt(ctx context.Context, arg TouchGroupThreadUpdatedAtParams) error
 	TouchGroupUpdatedAt(ctx context.Context, arg TouchGroupUpdatedAtParams) error
 	TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error
-	TransferGroupOwnership(ctx context.Context, arg TransferGroupOwnershipParams) (int64, error)
 	UnpinDirectChatMessage(ctx context.Context, arg UnpinDirectChatMessageParams) (int64, error)
 	UnpinEncryptedDirectMessageV2(ctx context.Context, arg UnpinEncryptedDirectMessageV2Params) (int64, error)
 	UnpinEncryptedGroupMessage(ctx context.Context, arg UnpinEncryptedGroupMessageParams) (int64, error)
