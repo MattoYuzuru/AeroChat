@@ -56,39 +56,33 @@ func (s *Service) CreateAttachmentUploadIntent(
 	now := s.now()
 	attachmentID := s.newID()
 	uploadSessionID := s.newID()
-	objectKey := buildAttachmentObjectKey(
-		scope,
-		resolvedDirectChatID,
-		resolvedGroupID,
-		authSession.User.ID,
-		attachmentID,
-		normalizedRelaySchema,
-		normalizedFileName,
-	)
+	objectKey := "final/" + attachmentID + ".bin"
+	stagingKey := "staging/" + uploadSessionID + ".bin"
 	expiresAt := now.Add(s.uploadIntentTTL)
 
-	upload, err := s.objectStorage.CreateUpload(ctx, objectKey, normalizedMimeType, expiresAt)
+	intent, err := s.repo.CreateAttachmentUploadIntent(ctx, CreateAttachmentUploadIntentParams{
+		AttachmentID:     attachmentID,
+		UploadSessionID:  uploadSessionID,
+		OwnerUserID:      authSession.User.ID,
+		Scope:            scope,
+		DirectChatID:     resolvedDirectChatID,
+		GroupID:          resolvedGroupID,
+		BucketName:       s.storageBucketName,
+		ObjectKey:        objectKey,
+		StagingObjectKey: stagingKey,
+		FileName:         normalizedFileName,
+		MimeType:         normalizedMimeType,
+		RelaySchema:      normalizedRelaySchema,
+		SizeBytes:        normalizedSize,
+		ExpiresAt:        expiresAt,
+		CreatedAt:        now,
+		UserQuotaBytes:   s.mediaUserQuotaBytes,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	intent, err := s.repo.CreateAttachmentUploadIntent(ctx, CreateAttachmentUploadIntentParams{
-		AttachmentID:    attachmentID,
-		UploadSessionID: uploadSessionID,
-		OwnerUserID:     authSession.User.ID,
-		Scope:           scope,
-		DirectChatID:    resolvedDirectChatID,
-		GroupID:         resolvedGroupID,
-		BucketName:      s.storageBucketName,
-		ObjectKey:       objectKey,
-		FileName:        normalizedFileName,
-		MimeType:        normalizedMimeType,
-		RelaySchema:     normalizedRelaySchema,
-		SizeBytes:       normalizedSize,
-		ExpiresAt:       upload.ExpiresAt,
-		CreatedAt:       now,
-		UserQuotaBytes:  s.mediaUserQuotaBytes,
-	})
+	upload, err := s.objectStorage.CreateUpload(ctx, stagingKey, normalizedMimeType, normalizedSize, expiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +90,7 @@ func (s *Service) CreateAttachmentUploadIntent(
 	intent.UploadSession.UploadURL = upload.URL
 	intent.UploadSession.HTTPMethod = upload.HTTPMethod
 	intent.UploadSession.Headers = upload.Headers
+	intent.UploadSession.FormFields = upload.FormFields
 	intent.UploadSession.ExpiresAt = upload.ExpiresAt
 	return intent, nil
 }
@@ -115,56 +110,59 @@ func (s *Service) CompleteAttachmentUpload(ctx context.Context, token string, at
 		return nil, err
 	}
 
-	attachment, uploadSession, err := s.repo.GetAttachment(ctx, normalizedAttachmentID)
+	ctx, cancel := context.WithTimeout(ctx, attachmentFinalizationTimeout)
+	defer cancel()
+	finalization, err := s.repo.BeginAttachmentFinalization(ctx, normalizedAttachmentID)
 	if err != nil {
 		return nil, err
 	}
-	if uploadSession == nil || uploadSession.ID != normalizedUploadSessionID {
+	defer finalization.Close(context.Background())
+	attachment, uploadSession := finalization.Attachment(), finalization.UploadSession()
+	if uploadSession == nil || uploadSession.ID != normalizedUploadSessionID || attachment.OwnerUserID != authSession.User.ID {
 		return nil, ErrNotFound
 	}
-	if attachment.OwnerUserID != authSession.User.ID {
-		return nil, ErrNotFound
+	if uploadSession.StagingObjectKey == "" || !strings.HasPrefix(attachment.ObjectKey, "final/") {
+		return nil, fmt.Errorf("%w: legacy upload requires a new intent", ErrConflict)
+	}
+	if uploadSession.Status == AttachmentUploadSessionCompleted && (attachment.Status == AttachmentStatusUploaded || attachment.Status == AttachmentStatusAttached) {
+		return attachment, nil
 	}
 	if attachment.Status != AttachmentStatusPending || uploadSession.Status != AttachmentUploadSessionPending {
 		return nil, fmt.Errorf("%w: attachment upload intent is not pending", ErrConflict)
 	}
-	now := s.now()
-	if !uploadSession.ExpiresAt.After(now) {
-		_, expireErr := s.repo.ExpireAttachmentUploadSession(ctx, ExpireAttachmentUploadSessionParams{
-			AttachmentID:    attachment.ID,
-			UploadSessionID: uploadSession.ID,
-			OwnerUserID:     authSession.User.ID,
-			ExpiredAt:       now,
-		})
-		if expireErr != nil {
-			return nil, expireErr
+	if !uploadSession.ExpiresAt.After(s.now()) {
+		_, err := finalization.Expire(ctx, ExpireAttachmentUploadSessionParams{AttachmentID: attachment.ID, UploadSessionID: uploadSession.ID, OwnerUserID: authSession.User.ID, ExpiredAt: s.now()})
+		if err != nil {
+			return nil, err
 		}
 		return nil, fmt.Errorf("%w: upload intent expired", ErrConflict)
 	}
-
-	objectInfo, err := s.objectStorage.StatObject(ctx, attachment.ObjectKey)
+	objectInfo, err := s.objectStorage.StatObject(ctx, uploadSession.StagingObjectKey)
 	if err != nil {
 		return nil, err
 	}
-	if objectInfo.Size != attachment.SizeBytes {
-		failedAttachment, failErr := s.repo.FailAttachmentUpload(ctx, FailAttachmentUploadParams{
-			AttachmentID:    attachment.ID,
-			UploadSessionID: uploadSession.ID,
-			OwnerUserID:     authSession.User.ID,
-			FailedAt:        s.now(),
-		})
-		if failErr == nil && failedAttachment != nil {
-			return nil, fmt.Errorf("%w: uploaded object size mismatch", ErrConflict)
+	if objectInfo.Size != attachment.SizeBytes || objectInfo.ContentType != attachment.MimeType || objectInfo.ETag == "" {
+		_, failErr := finalization.Fail(ctx, FailAttachmentUploadParams{AttachmentID: attachment.ID, UploadSessionID: uploadSession.ID, OwnerUserID: authSession.User.ID, FailedAt: s.now()})
+		if failErr != nil {
+			return nil, failErr
 		}
-		return nil, fmt.Errorf("%w: uploaded object size mismatch", ErrConflict)
+		return nil, fmt.Errorf("%w: uploaded object metadata mismatch", ErrConflict)
 	}
-
-	return s.repo.CompleteAttachmentUpload(ctx, CompleteAttachmentUploadParams{
-		AttachmentID:    attachment.ID,
-		UploadSessionID: uploadSession.ID,
-		OwnerUserID:     authSession.User.ID,
-		CompletedAt:     now,
-	})
+	if err := s.objectStorage.PromoteObject(ctx, uploadSession.StagingObjectKey, attachment.ObjectKey, objectInfo.ETag, attachment.MimeType); err != nil {
+		return nil, err
+	}
+	finalInfo, err := s.objectStorage.StatObject(ctx, attachment.ObjectKey)
+	if err != nil {
+		return nil, err
+	}
+	if finalInfo.Size != attachment.SizeBytes || finalInfo.ContentType != attachment.MimeType {
+		return nil, fmt.Errorf("%w: final object metadata mismatch", ErrConflict)
+	}
+	completedAt := s.now()
+	if !uploadSession.ExpiresAt.After(completedAt) {
+		return nil, fmt.Errorf("%w: upload intent expired during finalization", ErrConflict)
+	}
+	return finalization.Complete(ctx, CompleteAttachmentUploadParams{AttachmentID: attachment.ID, UploadSessionID: uploadSession.ID, OwnerUserID: authSession.User.ID, CompletedAt: completedAt})
 }
 
 func (s *Service) GetAttachment(ctx context.Context, token string, attachmentID string) (*AttachmentAccess, error) {
@@ -181,6 +179,9 @@ func (s *Service) GetAttachment(ctx context.Context, token string, attachmentID 
 	attachment, _, err := s.repo.GetAttachment(ctx, normalizedAttachmentID)
 	if err != nil {
 		return nil, err
+	}
+	if !strings.HasPrefix(attachment.ObjectKey, "final/") {
+		return nil, fmt.Errorf("%w: legacy attachment requires verified backfill", ErrConflict)
 	}
 	if attachment.Status != AttachmentStatusAttached {
 		if attachment.OwnerUserID != authSession.User.ID {
@@ -415,26 +416,4 @@ func validateAttachmentRelayMetadata(relaySchema string, fileName string, mimeTy
 		return fmt.Errorf("%w: encrypted relay upload must use application/octet-stream relay mime type", ErrInvalidArgument)
 	}
 	return nil
-}
-
-func buildAttachmentObjectKey(scope string, directChatID *string, groupID *string, ownerUserID string, attachmentID string, relaySchema string, fileName string) string {
-	extension := strings.ToLower(filepath.Ext(fileName))
-	if relaySchema == AttachmentRelaySchemaEncryptedBlobV1 {
-		extension = ".bin"
-	}
-	switch scope {
-	case AttachmentScopeDirect:
-		return fmt.Sprintf("attachments/direct/%s/%s/%s/original%s", dereferenceString(directChatID), ownerUserID, attachmentID, extension)
-	case AttachmentScopeGroup:
-		return fmt.Sprintf("attachments/group/%s/%s/%s/original%s", dereferenceString(groupID), ownerUserID, attachmentID, extension)
-	default:
-		return fmt.Sprintf("attachments/unknown/%s/%s/original%s", ownerUserID, attachmentID, extension)
-	}
-}
-
-func dereferenceString(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
 }

@@ -28,7 +28,12 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    image: aerochat-minio:7ced9663
+    pull_policy: build
+    build:
+      context: ../..
+      dockerfile: infra/storage/Dockerfile
+      target: minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -38,7 +43,7 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,7 +52,12 @@ services:
       - "${AERO_SHARED_EDGE_HOST_IP}:${AERO_MEDIA_HOST_PORT}:9000"
 
   minio-bootstrap:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z-cpuv1
+    image: aerochat-mc:7394ce0d
+    pull_policy: build
+    build:
+      context: ../..
+      dockerfile: infra/storage/Dockerfile
+      target: mc
     restart: "no"
     depends_on:
       minio:
@@ -106,6 +116,7 @@ services:
       AERO_MEDIA_UPLOAD_INTENT_TTL: ${AERO_MEDIA_UPLOAD_INTENT_TTL}
       AERO_MEDIA_ATTACHMENT_CLEANUP_INTERVAL: ${AERO_MEDIA_ATTACHMENT_CLEANUP_INTERVAL}
       AERO_MEDIA_UNATTACHED_ATTACHMENT_TTL: ${AERO_MEDIA_UNATTACHED_ATTACHMENT_TTL}
+      AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION: ${AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION:-168h}
       AERO_MEDIA_ATTACHMENT_CLEANUP_BATCH_SIZE: ${AERO_MEDIA_ATTACHMENT_CLEANUP_BATCH_SIZE}
       AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES: ${AERO_MEDIA_MAX_UPLOAD_SIZE_BYTES}
       AERO_MEDIA_USER_QUOTA_BYTES: ${AERO_MEDIA_USER_QUOTA_BYTES}
