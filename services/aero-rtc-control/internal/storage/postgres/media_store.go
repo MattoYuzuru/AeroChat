@@ -17,14 +17,22 @@ import (
 	ql "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/storage/sqlc"
 )
 
-// MediaStore пока не подключён к service/transport. Он сериализует journal,
+// MediaStore подключён к private source receiver; public media/admission handlers отсутствуют. Он сериализует journal,
 // но не проверяет mTLS, свежесть remote authority, JWT или реальный SFU ACK.
 type MediaStore struct {
-	db *pgxpool.Pool
-	q  *ql.Queries
+	db             *pgxpool.Pool
+	q              *ql.Queries
+	mediaSlotGuard bool
 }
 
 func NewMediaStore(db *pgxpool.Pool) *MediaStore { return &MediaStore{db: db, q: ql.New(db)} }
+
+// Constructor policy не включается private receiver/main и не выдаёт media capability.
+func NewMediaStoreWithMediaSlotGuard(db *pgxpool.Pool) *MediaStore {
+	s := NewMediaStore(db)
+	s.mediaSlotGuard = true
+	return s
+}
 
 func mediaError(err error) error {
 	if err == nil {
@@ -96,20 +104,52 @@ func (s *MediaStore) Reserve(ctx context.Context, r media.ReserveRequest) (media
 	if r.Validate() != nil || r.RequestID == uuid.Nil || r.CallID == uuid.Nil || r.At.IsZero() {
 		return media.Grant{}, media.ErrDenied
 	}
-	tx, err := s.db.Begin(ctx)
+	var tx pgx.Tx
+	var slot *slotTransaction
+	var err error
+	if s.mediaSlotGuard {
+		slot, err = retrySlot(ctx, func() (*slotTransaction, error) {
+			return beginSlotTransaction(ctx, s.db, s.q, slotSpec{call: r.CallID, user: r.UserID})
+		})
+		if err == nil {
+			tx = slot.tx
+		}
+	} else {
+		tx, err = s.db.Begin(ctx)
+	}
 	if err != nil {
 		return media.Grant{}, mediaError(err)
 	}
 	defer rollbackMedia(tx)
 	q := s.q.WithTx(tx)
-	call, err := q.LockCallByID(ctx, r.CallID)
+	if slot != nil {
+		if err := slot.allowReserve(slotSpec{call: r.CallID, user: r.UserID}); err != nil {
+			return media.Grant{}, err
+		}
+		if len(slot.snapshot.held) == 0 {
+			if err := q.ReleaseEndedParticipationByUserID(ctx, ql.ReleaseEndedParticipationByUserIDParams{UserID: r.UserID, At: timestamptzValue(r.At)}); err != nil {
+				return media.Grant{}, mediaError(err)
+			}
+		}
+	}
+	call, err := slotLockedCall(ctx, q, slot, r.CallID)
 	if err != nil {
 		return media.Grant{}, mediaError(err)
+	}
+	if pending, err := mediaEndPending(ctx, q, call.ID); err != nil {
+		return media.Grant{}, mediaError(err)
+	} else if pending {
+		return media.Grant{}, media.ErrPending
 	}
 	if call.Status != rtc.CallStatusActive || call.ScopeType != rtc.ScopeTypeGroup || !call.GroupID.Valid || uuid.UUID(call.GroupID.Bytes) != r.GroupID {
 		return media.Grant{}, media.ErrDenied
 	}
-	room, err := q.GetHeldMediaRoom(ctx, r.CallID)
+	var room ql.RtcMediaRoom
+	if slot != nil {
+		room, err = q.FindHeldMediaRoomByCall(ctx, r.CallID)
+	} else {
+		room, err = q.GetHeldMediaRoom(ctx, r.CallID)
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		generation, nextErr := q.NextMediaRoomGeneration(ctx, r.CallID)
 		if nextErr != nil {
@@ -252,6 +292,11 @@ func (s *MediaStore) Activate(ctx context.Context, key media.Key, fresh media.Au
 		return media.Grant{}, err
 	}
 	defer rollbackMedia(tx)
+	if pending, err := mediaEndPending(ctx, q, g.CallID); err != nil {
+		return media.Grant{}, mediaError(err)
+	} else if pending {
+		return media.Grant{}, media.ErrPending
+	}
 	if g.Authority != fresh {
 		return media.Grant{}, media.ErrDenied
 	}
@@ -304,6 +349,11 @@ func (s *MediaStore) RegisterLease(ctx context.Context, key media.Key, fresh med
 		return media.Lease{}, err
 	}
 	defer rollbackMedia(tx)
+	if pending, err := mediaEndPending(ctx, q, g.CallID); err != nil {
+		return media.Lease{}, mediaError(err)
+	} else if pending {
+		return media.Lease{}, media.ErrPending
+	}
 	if g.State != "active" || g.Authority != fresh {
 		return media.Lease{}, media.ErrDenied
 	}
@@ -719,6 +769,12 @@ func (s *MediaStore) RecordCleanupAcknowledgement(ctx context.Context, c media.C
 func finishMediaParticipation(ctx context.Context, q *ql.Queries, g media.Grant, at time.Time) error {
 	if _, err := q.LeaveParticipant(ctx, ql.LeaveParticipantParams{ID: g.ParticipantID, LeftAt: timestamptzValue(at), UpdatedAt: timestamptzValue(at)}); err != nil {
 		return err
+	}
+	// Даже zero-held parent intent удерживает terminal barrier до room ACK.
+	if pending, err := mediaEndPending(ctx, q, g.CallID); err != nil {
+		return err
+	} else if pending {
+		return nil
 	}
 	count, err := q.CountActiveParticipantsByCallID(ctx, g.CallID)
 	if err != nil {
