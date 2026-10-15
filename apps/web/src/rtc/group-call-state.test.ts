@@ -36,6 +36,12 @@ const selfParticipant = {
 };
 
 describe("group-call-state", () => {
+  it("offers explicit return to a server participant without local lobby ownership", () => {
+    const input = {actionState:"idle" as const,call:activeCall,currentUserId:"user-1",selfParticipant,selfRole:"member" as const};
+    expect(deriveGroupCallActionAvailability({...input,hasLocalOwnership:false}).canJoin).toBe(true);
+    expect(deriveGroupCallActionAvailability({...input,hasLocalOwnership:true}).canJoin).toBe(false);
+    expect(deriveGroupCallActionAvailability({...input,hasLocalOwnership:false,selfRole:"reader"}).canJoin).toBe(false);
+  });
   it("keeps reader in read-only mode", () => {
     expect(canActivelyParticipateInGroupCall("reader")).toBe(false);
 

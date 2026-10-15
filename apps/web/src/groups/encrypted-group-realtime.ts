@@ -1,3 +1,4 @@
+import { parseServerSequence } from "../gateway/server-sequence";
 import type { RealtimeEnvelope } from "../realtime/client";
 
 const encryptedGroupMessageDeliveryType = "encrypted_group_message_v1.delivery";
@@ -19,6 +20,7 @@ export interface EncryptedGroupRealtimeEvent {
     ciphertext: string;
     ciphertextSizeBytes: number;
     createdAt: string;
+    serverSequence: string;
     storedAt: string;
     viewerDelivery: {
       recipientUserId: string;
@@ -57,6 +59,7 @@ export function parseEncryptedGroupRealtimeEvent(
   const operationKind = readRequiredString(payload.envelope.operationKind);
   const createdAt = readRequiredString(payload.envelope.createdAt);
   const storedAt = readRequiredString(payload.envelope.storedAt);
+  const serverSequence = parseServerSequence(payload.envelope.serverSequence);
   const recipientUserId = readRequiredString(payload.envelope.viewerDelivery.recipientUserId);
   const recipientCryptoDeviceId = readRequiredString(
     payload.envelope.viewerDelivery.recipientCryptoDeviceId,
@@ -76,6 +79,7 @@ export function parseEncryptedGroupRealtimeEvent(
     operationKind === null ||
     createdAt === null ||
     storedAt === null ||
+    serverSequence === null ||
     recipientUserId === null ||
     recipientCryptoDeviceId === null ||
     viewerStoredAt === null ||
@@ -103,6 +107,7 @@ export function parseEncryptedGroupRealtimeEvent(
       ciphertext,
       ciphertextSizeBytes,
       createdAt,
+      serverSequence,
       storedAt,
       viewerDelivery: {
         recipientUserId,

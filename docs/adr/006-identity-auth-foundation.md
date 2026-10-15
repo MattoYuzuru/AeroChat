@@ -3,6 +3,8 @@
 - Статус: Accepted
 - Дата: 2026-03-16
 
+Persisted session/device authority revisions и atomic source revocation outbox развивают [ADR-097](097-group-media-trusted-authorization-contract.md); scope и проверки — [Identity README](../../services/aero-identity/README.md). Source event persistence не означает media teardown; private authorization/delivery остаются отдельными этапами.
+
 ## Контекст
 
 После завершения Foundation phase проекту нужен следующий изолированный slice:
@@ -98,6 +100,10 @@ Session token:
 - используется только для аутентификации текущей сессии.
 
 Это решение не считается device crypto identity и не подменяет будущую E2EE-модель.
+
+Уточнение от 2026-10-11 ([#155](https://github.com/MattoYuzuru/AeroChat/issues/155)): wire format `v1.<canonical lowercase UUID>.<32-byte secret encoded as unpadded base64url>` остаётся прежним. Parser проверяет длину, UUID форму, version и canonical base64url до repository access. Malformed credential возвращает unauthenticated; `GetSessionAuthByID` в identity/chat дополнительно возвращает явную auth error при невалидном UUID вместо panic. Валидные ранее выданные tokens сохраняют совместимость.
+
+Public revoke сначала аутентифицирует caller, затем проверяет UUID session/device target до revoke repository access. Некорректный target возвращает `invalid_argument` со статическим сообщением без исходного значения вместо `mustParseUUID` panic. Поддерживаемые UUID representations нормализуются через existing UUID parser; owner-bound lookup, `not_found` для чужого/отсутствующего target и signed crypto-device approval не меняются.
 
 ### 5. Block list и privacy
 

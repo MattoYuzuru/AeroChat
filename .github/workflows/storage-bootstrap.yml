@@ -1,0 +1,88 @@
+name: Storage Bootstrap
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cold-source-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Validate local and server storage models
+        run: |
+          python3 -B infra/storage/test_maintenance.py
+          python3 -B infra/scripts/test_go_vuln.py
+          python3 -B infra/storage/test_vulnerabilities.py
+          python3 -B infra/storage/verify-maintenance.py
+          docker compose --env-file .env.example -f infra/compose/docker-compose.yml config --quiet
+          docker compose --env-file .env.server.example --env-file .env.server.secrets.example -f infra/compose/docker-compose.server.yml config --quiet
+
+      - name: Set up maintained Go compiler
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: false
+
+      - name: Install pinned source scanner
+        run: |
+          scanner_version="$(python3 -B infra/scripts/go_lifecycle.py get govulncheck_version)"
+          GOBIN="$RUNNER_TEMP/storage-tools" go install "golang.org/x/vuln/cmd/govulncheck@v$scanner_version"
+
+      - name: Check both storage source closures before build
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: python3 -B infra/storage/check-vulnerabilities.py --source-sha "$EXPECTED_SOURCE_SHA" --scanner "$RUNNER_TEMP/storage-tools/govulncheck" --output-dir "$RUNNER_TEMP/storage-vuln" --goarch amd64
+
+      - name: Preserve source scan diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: storage-source-scan-${{ github.sha }}
+          path: ${{ runner.temp }}/storage-vuln
+          if-no-files-found: warn
+
+      - name: Build pinned storage sources without restored cache
+        run: |
+          docker compose --env-file .env.example -f infra/compose/docker-compose.yml build --pull --no-cache minio minio-bootstrap
+          docker image inspect aerochat-minio:7ced9663-maintenance-2ad58d880c49 aerochat-mc:7394ce0d-maintenance-2ad58d880c49 --format '{{.Id}} {{json .Config.Labels}}'
+
+      - name: Bootstrap PostgreSQL and private S3 bucket
+        run: |
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml pull postgres
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml up -d --no-build --pull never --wait postgres minio
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml run --rm --pull never minio-bootstrap
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml run --rm --pull never --entrypoint /bin/sh -v "$PWD/infra/scripts/smoke-media-storage.sh:/smoke.sh:ro" minio-bootstrap /smoke.sh
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:9000/aerochat-attachments/)" = 403
+          curl --fail --silent --show-error -D /tmp/cors-headers -o /dev/null -X OPTIONS -H 'Origin: http://127.0.0.1:8088' -H 'Access-Control-Request-Method: PUT' http://127.0.0.1:9000/aerochat-attachments/cors-smoke
+          grep -iq '^access-control-allow-origin: http://127.0.0.1:8088' /tmp/cors-headers
+
+      - name: Preserve storage provenance
+        if: success()
+        run: |
+          mkdir -p /tmp/storage-provenance
+          docker image inspect aerochat-minio:7ced9663-maintenance-2ad58d880c49 aerochat-mc:7394ce0d-maintenance-2ad58d880c49 > /tmp/storage-provenance/images.json
+          cp infra/storage/Dockerfile /tmp/storage-provenance/Dockerfile
+          cp infra/storage/maintenance.json /tmp/storage-provenance/maintenance.json
+          cp -R infra/storage/deps /tmp/storage-provenance/deps
+          printf '%s\n' "$GITHUB_SHA" > /tmp/storage-provenance/source-head
+
+      - name: Upload storage provenance
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: storage-provenance-${{ github.sha }}
+          path: /tmp/storage-provenance
+
+      - name: Stop fixture and preserve logs
+        if: always()
+        run: |
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml logs --tail 50 postgres minio
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml down

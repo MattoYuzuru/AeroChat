@@ -36,14 +36,13 @@ type Repository interface {
 	DeleteWebPushSubscriptionsByIDs(context.Context, []string) (int64, error)
 	CreateAttachmentUploadIntent(context.Context, CreateAttachmentUploadIntentParams) (*AttachmentUploadIntent, error)
 	GetAttachment(context.Context, string) (*Attachment, *AttachmentUploadSession, error)
+	BeginAttachmentFinalization(context.Context, string) (AttachmentFinalization, error)
+	ListAttachmentSourceCleanup(context.Context, time.Time, int32) ([]string, error)
+	RescheduleAttachmentSourceCleanup(context.Context, string, time.Time) error
 	ListAttachments(context.Context, []string) ([]Attachment, error)
-	CompleteAttachmentUpload(context.Context, CompleteAttachmentUploadParams) (*Attachment, error)
-	FailAttachmentUpload(context.Context, FailAttachmentUploadParams) (*Attachment, error)
-	ExpireAttachmentUploadSession(context.Context, ExpireAttachmentUploadSessionParams) (bool, error)
 	ExpirePendingAttachmentUploadSessions(context.Context, time.Time, int32) (int64, error)
 	ExpireOrphanUploadedAttachments(context.Context, time.Time, time.Time, int32) (int64, error)
 	ListAttachmentObjectDeletionCandidates(context.Context, time.Time, time.Time, time.Time, int32) ([]AttachmentObjectCleanupCandidate, error)
-	MarkAttachmentDeleted(context.Context, string, time.Time) (bool, error)
 	CreateGroup(context.Context, CreateGroupParams) (*Group, error)
 	ListGroups(context.Context, string) ([]Group, error)
 	GetGroup(context.Context, string, string) (*Group, error)
@@ -144,9 +143,10 @@ type PresenceStateStore interface {
 }
 
 type ObjectStorage interface {
-	CreateUpload(context.Context, string, string, time.Time) (*PresignedObjectUpload, error)
+	CreateUpload(context.Context, string, string, int64, time.Time) (*PresignedObjectUpload, error)
 	CreateDownload(context.Context, string, time.Time) (*PresignedObjectDownload, error)
 	StatObject(context.Context, string) (*StoredObjectInfo, error)
+	PromoteObject(context.Context, string, string, string, string) error
 	DeleteObject(context.Context, string) error
 }
 
@@ -154,6 +154,7 @@ type PresignedObjectUpload struct {
 	URL        string
 	HTTPMethod string
 	Headers    map[string]string
+	FormFields map[string]string
 	ExpiresAt  time.Time
 }
 
@@ -1279,7 +1280,7 @@ func (s *Service) SendEncryptedDirectMessageV2(ctx context.Context, token string
 		return nil, err
 	}
 
-	storedAt := normalizeStoredMessageTimestamp(s.now(), normalizedMessageCreatedAt)
+	storedAt := s.now().UTC()
 	storedEnvelope, err := s.repo.CreateEncryptedDirectMessageV2(ctx, CreateEncryptedDirectMessageV2Params{
 		MessageID:            normalizedMessageID,
 		ChatID:               normalizedChatID,
@@ -1527,7 +1528,7 @@ func (s *Service) SendEncryptedGroupMessage(ctx context.Context, token string, p
 		return nil, err
 	}
 
-	storedAt := normalizeStoredMessageTimestamp(s.now(), normalizedMessageCreatedAt)
+	storedAt := s.now().UTC()
 	storedEnvelope, err := s.repo.CreateEncryptedGroupMessage(ctx, CreateEncryptedGroupMessageParams{
 		MessageID:            normalizedMessageID,
 		GroupID:              group.ID,
@@ -2072,12 +2073,17 @@ func (s *Service) MarkEncryptedDirectChatRead(ctx context.Context, token string,
 		return nil, 0, err
 	}
 
+	if message.OperationKind != EncryptedDirectMessageV2OperationContent || message.ServerSequence <= 0 {
+		return nil, 0, fmt.Errorf("%w: read position must reference sequenced content", ErrInvalidArgument)
+	}
+
 	if _, err := s.repo.UpsertEncryptedDirectChatReadState(ctx, UpsertEncryptedDirectChatReadStateParams{
-		ChatID:            normalizedChatID,
-		UserID:            authSession.User.ID,
-		LastReadMessageID: message.MessageID,
-		LastReadMessageAt: message.CreatedAt,
-		UpdatedAt:         s.now(),
+		ChatID:                 normalizedChatID,
+		UserID:                 authSession.User.ID,
+		LastReadMessageID:      message.MessageID,
+		LastReadMessageAt:      message.CreatedAt,
+		LastReadServerSequence: message.ServerSequence,
+		UpdatedAt:              s.now(),
 	}); err != nil {
 		return nil, 0, err
 	}
@@ -2162,12 +2168,17 @@ func (s *Service) MarkEncryptedGroupChatRead(ctx context.Context, token string, 
 		return nil, 0, err
 	}
 
+	if message.OperationKind != EncryptedGroupMessageOperationContent || message.ServerSequence <= 0 {
+		return nil, 0, fmt.Errorf("%w: read position must reference sequenced content", ErrInvalidArgument)
+	}
+
 	if _, err := s.repo.UpsertEncryptedGroupReadState(ctx, UpsertEncryptedGroupReadStateParams{
-		GroupID:           normalizedGroupID,
-		UserID:            authSession.User.ID,
-		LastReadMessageID: message.MessageID,
-		LastReadMessageAt: message.CreatedAt,
-		UpdatedAt:         s.now(),
+		GroupID:                normalizedGroupID,
+		UserID:                 authSession.User.ID,
+		LastReadMessageID:      message.MessageID,
+		LastReadMessageAt:      message.CreatedAt,
+		LastReadServerSequence: message.ServerSequence,
+		UpdatedAt:              s.now(),
 	}); err != nil {
 		return nil, 0, err
 	}
@@ -3426,15 +3437,6 @@ func normalizeRequiredTimestamp(value time.Time, field string) (time.Time, error
 	}
 
 	return value.UTC(), nil
-}
-
-func normalizeStoredMessageTimestamp(serverNow time.Time, messageCreatedAt time.Time) time.Time {
-	serverNow = serverNow.UTC()
-	if serverNow.Before(messageCreatedAt) {
-		return messageCreatedAt
-	}
-
-	return serverNow
 }
 
 func normalizeOptionalScopeID(value *string, field string) (*string, error) {

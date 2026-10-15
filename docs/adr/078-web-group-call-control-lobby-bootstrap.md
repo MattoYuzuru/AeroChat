@@ -80,6 +80,10 @@ Web следует уже существующей серверной semantics:
 
 Для bounded resync используется и периодический refresh, пока active group calls видимы в открытой странице.
 
+Liveness текущего lobby поддерживается отдельным TouchCallParticipant каждые 20 секунд и сразу после локального успешного start/join/rejoin. Одного read polling недостаточно: generic RTC stale eviction использует activity timestamp, а не GetActiveCall. Heartbeat разрешён только локальному owner текущего user/group/call, при active self participant и актуальной eligible role. Observer, reader и server participation из другого/прежнего окна сами не получают ownership; UI предлагает явный «Вернуться» через idempotent Join.
+
+Ownership инвалидируется при смене thread/account и unmount; late start/join response не создаёт heartbeat в новом scope. Hidden page снимает interval, explicit Leave/End прекращает heartbeat до server round-trip. Definitive authorization/not-found/conflict прекращает ownership, transient ошибки видны и повторяются только следующим bounded heartbeat. Без heartbeat generic server stale policy остаётся crash fallback. Microphone/peer/audio playback этот slice не создаёт.
+
 ### 5. One-active-call-per-user conflict surface остаётся bounded и явным
 
 Если `StartCall` или `JoinCall` отклонены policy `one-active-call-per-user`, group UI показывает отдельное bounded сообщение:
