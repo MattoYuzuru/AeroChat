@@ -146,6 +146,43 @@ Start/Join/Leave/End/liveness paths: heldmedia prepared/active/revoking блок
 ACK. Flagoff legacy unchanged. Cleanup claim busy/notyet/fence exhaustion —
 transient/pending или unavailable, не authorityrevoked/deny watermark.
 
+### Identity source delivery journal
+
+Identity sender — отдельный default-disabled implementation slice. Migration
+добавляет delivery journal на committed source event; backfill создаёт pending
+rows только для существующего outbox. Новый revoke записывает outbox и journal
+в той же source transaction. Immutable outbox и receipt mapping удерживаются:
+pending/claimed/quarantined rows не удаляются. DTO формируется только из claimed
+outbox row; browser/body не создаёт producer authority facts.
+
+Single-inflight worker использует общий attempt deadline **5s** для
+claim→receipt lookup/apply→CAS, claim lease **15s**, recovery wake **1s** и bounded
+backoff **1–30s**. Это начальные constants без capacity benchmark, не media
+lifetime. Fence/attempt монотонны; CAS требует event, current owner/fence,
+pending state и nonexpired DB-clock lease. Network вызов не удерживает TX lock.
+Потеря ответа/crash до CAS восстанавливаются own receipt lookup и canonical
+replay; RTC DURABLY_APPLIED завершает только delivery journal, не media teardown.
+Own receipt lookup по event ID не доказывает canonical tuple. Recovery после
+successful lookup обязательно делает canonical Apply replay в том же общем5s
+context: valid receipt должен сохранить event/operation ID. AlreadyExists
+quarantined guarded CAS; transient/invalid/different operation остаются pending.
+Новый proto digest или произвольное восстановление source payload не вводятся.
+
+Permanent canonical conflict либо malformed claimed row переводится guarded
+CAS в **quarantined**, static reason canonical_conflict/source_row_invalid.
+Immutable row/mapping/fence сохраняются, automatic retry исключён; payload
+repair/requeue не выдумывается. Stale worker не может quarantined/delivered
+новый claim. Operator recovery — отдельная авторизованная процедура.
+
+Exhausted fence/attempt row остаётся неизменной и fail closed. Claim selection
+исключает exhausted counters до выбора следующего eligible due event;
+bounded operator diagnosis сообщает только static exhausted_counter, без
+payload IDs. Такой event не блокирует прогресс других due rows. Counter/retry
+math guarded: никакого shift от unbounded attempt и timestamp из source audit.
+Source revoke/public auth outcome сохраняется; sender success не является
+successful media completion. Chat sender/registration/SFU/proxy ACK/media flag
+остаются отдельными slices.
+
 ## Chat eligibility epoch
 
 Chat хранит монотонную revision для допуска exact `(group_id, user_id)` к audio, отдельно от физически удаляемой membership row. Retained tombstone сохраняет счётчик после remove/leave; rejoin не возвращает revision к начальному значению. Это **eligibility epoch**, а не версия любой смены роли или timestamp. Источник текущей role остаётся Chat membership. Private lookup всегда возвращает свежую role; RTC не кеширует management privileges по одному eligibility epoch.
