@@ -1625,6 +1625,7 @@ export function DesktopShell({
     currentWindowSearch: activeWindowRouteLocation?.search ?? "",
     currentWindowTargetKey: activeWindow?.target?.key ?? null,
     isCurrentWindowActive: activeWindow !== null,
+    isCurrentWindowVisible: activeWindow !== null && activeWindow.state !== "minimized",
     desktopGridCapacity: desktopGridMetrics.capacity,
     desktopRegistryState,
     desktopUnreadTargetMap,
@@ -2022,6 +2023,7 @@ export function DesktopShell({
                           currentWindowSearch: windowRouteLocation?.search ?? "",
                           currentWindowTargetKey: window.target?.key ?? null,
                           isCurrentWindowActive: runtimeState.activeWindowId === window.windowId,
+                          isCurrentWindowVisible: window.state !== "minimized",
                           setActiveWindowContentMode: (contentMode) => {
                             setWindowContentMode(window, contentMode);
                           },
