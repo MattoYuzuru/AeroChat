@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"strconv"
 	"time"
 
 	chatv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/v1"
@@ -159,9 +160,10 @@ type attachmentWire struct {
 }
 
 type directChatReadPositionWire struct {
-	MessageID        string `json:"messageId"`
-	MessageCreatedAt string `json:"messageCreatedAt"`
-	UpdatedAt        string `json:"updatedAt"`
+	LastReadServerSequence string `json:"lastReadServerSequence,omitempty"`
+	MessageID              string `json:"messageId"`
+	MessageCreatedAt       string `json:"messageCreatedAt"`
+	UpdatedAt              string `json:"updatedAt"`
 }
 
 type directChatReadStateWire struct {
@@ -372,9 +374,10 @@ func toEncryptedConversationReadPositionWire(position *chatv1.EncryptedConversat
 	}
 
 	return &directChatReadPositionWire{
-		MessageID:        position.GetMessageId(),
-		MessageCreatedAt: formatProtoTimestamp(position.GetMessageCreatedAt()),
-		UpdatedAt:        formatProtoTimestamp(position.GetUpdatedAt()),
+		MessageID:              position.GetMessageId(),
+		LastReadServerSequence: strconv.FormatInt(position.GetLastReadServerSequence(), 10),
+		MessageCreatedAt:       formatProtoTimestamp(position.GetMessageCreatedAt()),
+		UpdatedAt:              formatProtoTimestamp(position.GetUpdatedAt()),
 	}
 }
 

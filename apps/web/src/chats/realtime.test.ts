@@ -95,6 +95,7 @@ describe("parseDirectChatRealtimeEvent", () => {
         encryptedReadState: {
           selfPosition: {
             messageId: "encrypted-3",
+            lastReadServerSequence: "3",
             messageCreatedAt: "2026-04-06T12:00:20Z",
             updatedAt: "2026-04-06T12:01:00Z",
           },
@@ -121,6 +122,7 @@ describe("parseDirectChatRealtimeEvent", () => {
       encryptedReadState: {
         selfPosition: {
           messageId: "encrypted-3",
+            lastReadServerSequence: "3",
           messageCreatedAt: "2026-04-06T12:00:20Z",
           updatedAt: "2026-04-06T12:01:00Z",
         },
@@ -201,5 +203,14 @@ describe("parseDirectChatRealtimeEvent", () => {
     });
 
     expect(event).toBeNull();
+  });
+});
+
+
+describe("encrypted read event validation", () => {
+  it.each([undefined, "0", "01", 1])("rejects an invalid read sequence %s without applying unread reset", (lastReadServerSequence) => {
+    expect(parseDirectChatRealtimeEvent({ id: "invalid-read", type: "direct_chat.read.updated",
+      issuedAt: "2026-10-11T00:00:00Z", payload: { chatId: "lane", encryptedUnread: { unreadCount: 0 },
+        encryptedReadState: { selfPosition: { messageId: "content", lastReadServerSequence } } } })).toBeNull();
   });
 });

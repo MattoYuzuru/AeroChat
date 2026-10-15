@@ -302,6 +302,7 @@ describe("chatsReducer", () => {
       readState: {
         selfPosition: {
           messageId: "encrypted-1",
+          lastReadServerSequence: "1",
           messageCreatedAt: "2026-04-06T12:03:30Z",
           updatedAt: "2026-04-06T12:04:00Z",
         },
@@ -337,6 +338,7 @@ describe("chatsReducer", () => {
           targetMessageId: null,
           revision: 1,
           createdAt: "2026-04-07T12:04:30Z",
+          serverSequence: "1",
           storedAt: "2026-04-07T12:05:00Z",
           viewerDelivery: {
             recipientCryptoDeviceId: "crypto-user-1",

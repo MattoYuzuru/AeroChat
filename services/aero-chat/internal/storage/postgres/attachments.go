@@ -55,15 +55,23 @@ func (r *Repository) CreateAttachmentUploadIntent(ctx context.Context, params ch
 	}
 
 	sessionRow, err := q.CreateAttachmentUploadSession(ctx, chatsqlc.CreateAttachmentUploadSessionParams{
-		ID:           mustParseUUID(params.UploadSessionID),
-		AttachmentID: mustParseUUID(params.AttachmentID),
-		OwnerUserID:  mustParseUUID(params.OwnerUserID),
-		Status:       chat.AttachmentUploadSessionPending,
-		ExpiresAt:    timestamptzValue(params.ExpiresAt),
-		CreatedAt:    timestamptzValue(params.CreatedAt),
-		UpdatedAt:    timestamptzValue(params.CreatedAt),
+		ID:               mustParseUUID(params.UploadSessionID),
+		AttachmentID:     mustParseUUID(params.AttachmentID),
+		OwnerUserID:      mustParseUUID(params.OwnerUserID),
+		Status:           chat.AttachmentUploadSessionPending,
+		ExpiresAt:        timestamptzValue(params.ExpiresAt),
+		CreatedAt:        timestamptzValue(params.CreatedAt),
+		UpdatedAt:        timestamptzValue(params.CreatedAt),
+		StagingObjectKey: pgtype.Text{String: params.StagingObjectKey, Valid: true},
 	})
 	if err != nil {
+		return nil, convertError(err)
+	}
+	if err := q.CreateAttachmentSourceCleanup(ctx, chatsqlc.CreateAttachmentSourceCleanupParams{
+		ObjectKey: params.StagingObjectKey, AttachmentID: mustParseUUID(params.AttachmentID),
+		CapabilityExpiresAt: timestamptzValue(params.ExpiresAt),
+		NextAttemptAt:       timestamptzValue(params.ExpiresAt.Add(5 * time.Minute)), CreatedAt: timestamptzValue(params.CreatedAt),
+	}); err != nil {
 		return nil, convertError(err)
 	}
 
@@ -98,7 +106,11 @@ func (r *Repository) CreateAttachmentUploadIntent(ctx context.Context, params ch
 }
 
 func (r *Repository) GetAttachment(ctx context.Context, attachmentID string) (*chat.Attachment, *chat.AttachmentUploadSession, error) {
-	row, err := r.queries.GetAttachmentRowByID(ctx, mustParseUUID(attachmentID))
+	return getAttachment(ctx, r.queries, attachmentID)
+}
+
+func getAttachment(ctx context.Context, q *chatsqlc.Queries, attachmentID string) (*chat.Attachment, *chat.AttachmentUploadSession, error) {
+	row, err := q.GetAttachmentRowByID(ctx, mustParseUUID(attachmentID))
 	if err != nil {
 		return nil, nil, convertError(err)
 	}
@@ -114,15 +126,16 @@ func (r *Repository) GetAttachment(ctx context.Context, attachmentID string) (*c
 	var uploadSession *chat.AttachmentUploadSession
 	if row.UploadSessionID.Valid {
 		uploadSession = &chat.AttachmentUploadSession{
-			ID:           uuid.UUID(row.UploadSessionID.Bytes).String(),
-			AttachmentID: row.ID.String(),
-			OwnerUserID:  uuid.UUID(row.UploadSessionOwnerUserID.Bytes).String(),
-			Status:       row.UploadSessionStatus.String,
-			CreatedAt:    timestampValue(row.UploadSessionCreatedAt),
-			UpdatedAt:    timestampValue(row.UploadSessionUpdatedAt),
-			ExpiresAt:    timestampValue(row.UploadSessionExpiresAt),
-			CompletedAt:  timestamptzPointer(row.UploadSessionCompletedAt),
-			FailedAt:     timestamptzPointer(row.UploadSessionFailedAt),
+			ID:               uuid.UUID(row.UploadSessionID.Bytes).String(),
+			AttachmentID:     row.ID.String(),
+			OwnerUserID:      uuid.UUID(row.UploadSessionOwnerUserID.Bytes).String(),
+			Status:           row.UploadSessionStatus.String,
+			CreatedAt:        timestampValue(row.UploadSessionCreatedAt),
+			UpdatedAt:        timestampValue(row.UploadSessionUpdatedAt),
+			ExpiresAt:        timestampValue(row.UploadSessionExpiresAt),
+			CompletedAt:      timestamptzPointer(row.UploadSessionCompletedAt),
+			FailedAt:         timestamptzPointer(row.UploadSessionFailedAt),
+			StagingObjectKey: row.UploadSessionStagingObjectKey.String,
 		}
 	}
 
@@ -270,15 +283,16 @@ func (r *Repository) MarkAttachmentDeleted(ctx context.Context, attachmentID str
 
 func attachmentUploadSessionFromModel(row chatsqlc.AttachmentUploadSession) chat.AttachmentUploadSession {
 	return chat.AttachmentUploadSession{
-		ID:           row.ID.String(),
-		AttachmentID: row.AttachmentID.String(),
-		OwnerUserID:  row.OwnerUserID.String(),
-		Status:       row.Status,
-		CreatedAt:    timestampValue(row.CreatedAt),
-		UpdatedAt:    timestampValue(row.UpdatedAt),
-		ExpiresAt:    timestampValue(row.ExpiresAt),
-		CompletedAt:  timestamptzPointer(row.CompletedAt),
-		FailedAt:     timestamptzPointer(row.FailedAt),
+		ID:               row.ID.String(),
+		AttachmentID:     row.AttachmentID.String(),
+		OwnerUserID:      row.OwnerUserID.String(),
+		Status:           row.Status,
+		CreatedAt:        timestampValue(row.CreatedAt),
+		UpdatedAt:        timestampValue(row.UpdatedAt),
+		ExpiresAt:        timestampValue(row.ExpiresAt),
+		CompletedAt:      timestamptzPointer(row.CompletedAt),
+		FailedAt:         timestamptzPointer(row.FailedAt),
+		StagingObjectKey: row.StagingObjectKey.String,
 	}
 }
 

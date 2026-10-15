@@ -5,13 +5,13 @@
 - публичный edge принадлежит shared `Traefik` в `k3s`;
 - TLS обслуживается existing `cert-manager`;
 - AeroChat runtime живёт в `docker-compose`;
-- production deploy остаётся ручным и tag-driven.
+- production deploy остаётся ручным и выбирает immutable release manifest.
 
 Цель текущего этапа:
 
 - выполнять production rollout только вручную и явно;
 - использовать GitHub Environment `production` как deploy gate;
-- менять на сервере только выбранный `AERO_IMAGE_TAG`;
+- выбирать все пять application image digests одного проверенного source SHA через release overlay;
 - проверять и host upstream'ы, и HTTPS path через shared edge;
 - не смешивать rollout с `kubectl apply`, cert-manager management и remote provisioning.
 
@@ -30,7 +30,7 @@ Workflow не занимается:
 
 - сервер подготовлен по
   [single-server bootstrap runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/single-server-bootstrap.md);
-- deploy directory на VPS уже существует и содержит актуальный checkout репозитория;
+- deploy directory на VPS уже существует и содержит checkout выбранного release source SHA;
 - на VPS уже есть `.env.server` и `.env.server.secrets`;
 - compose stack AeroChat уже умеет подниматься на
   `${AERO_SHARED_EDGE_HOST_IP}:${AERO_WEB_HOST_PORT}`,
@@ -127,18 +127,13 @@ resources и сертификаты за оператора.
 
 Manual workflow `Deploy Production` выполняет один последовательный цикл:
 
-1. принимает входной `image_tag`;
-2. проверяет обязательные environment secrets и variables;
-3. подключается к VPS по SSH;
-4. подтверждает наличие `.env.server`, `.env.server.secrets` и compose file;
+1. принимает `release_digest` и `source_sha` из успешного Publish Images summary;
+2. валидирует OCI artifact и полный JSON manifest до SSH по [verified release contract](verified-release.md);
+3. подключается к VPS, сверяет checkout SHA и повторно валидирует metadata;
+4. подтверждает `.env.server`, `.env.server.secrets`, Compose и Python 3;
 5. валидирует `AERO_WEB_PUSH_*`: полный absence даёт warning, partial-набор прерывает rollout;
-6. обновляет `AERO_IMAGE_TAG` в `.env.server`;
-7. выполняет `docker compose ... config`;
-8. выполняет `docker compose ... pull`;
-9. выполняет `docker compose ... up -d`;
-10. показывает `docker compose ... ps`;
-11. читает `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT` и `AERO_MEDIA_HOST_PORT` из `.env.server`;
-11. ждёт успешных проверок:
+6. создаёт immutable release overlay и выполняет Compose config/pull --ignore-buildable/up/ps с этим overlay; storage собирается из pinned sources;
+7. проверяет пять runtime image digests/revision labels и ждёт успешных URL gates:
     - `http://<shared-edge-host-ip>:<web-port>/`
     - `http://<shared-edge-host-ip>:<gateway-port>/readyz`
     - `http://<shared-edge-host-ip>:<media-port>/minio/health/live`
@@ -146,6 +141,7 @@ Manual workflow `Deploy Production` выполняет один последов
     - `https://<domain>/healthz`
     - `https://<domain>/readyz`
     - `https://<media-domain>/minio/health/live`
+8. требует выбранный SHA в gateway readiness и только после успеха сохраняет `AERO_RELEASE_DIGEST` / `AERO_RELEASE_SOURCE_SHA` в `.env.server`.
 
 Workflow намеренно не трогает:
 
@@ -153,7 +149,7 @@ Workflow намеренно не трогает:
 - Kubernetes manifests;
 - `cert-manager` и TLS secrets;
 - git checkout на VPS;
-- release selection для отдельных сервисов по разным тегам.
+- release selection отдельных сервисов вне полного manifest.
 
 Важно:
 
@@ -188,10 +184,9 @@ kubectl -n aerochat-edge get certificate
 ```
 
 5. Создать и заполнить GitHub Environment `production`.
-6. Выбрать первый стабильный `image_tag`.
-   Для первого live run рекомендуется `vX.Y.Z`, а не `edge`.
+6. Выбрать manifest digest/source SHA из успешного Publish Images summary и заранее подготовить checkout этого SHA.
 7. Открыть GitHub Actions и вручную запустить workflow `Deploy Production`.
-8. Передать выбранный `image_tag` в `workflow_dispatch`.
+8. Передать выбранные `release_digest` и `source_sha` в `workflow_dispatch`.
 9. Дождаться успешного завершения job и встроенных upstream/HTTPS проверок.
 10. С внешней машины выполнить базовую проверку домена:
 
@@ -276,21 +271,21 @@ Workflow на сервере дожидается успешного ответ�
 
 Rollback делается тем же workflow и тем же operator contract:
 
-1. Определи предыдущий известный рабочий tag.
+1. Определи предыдущие known-good manifest digest/source SHA и подготовь соответствующий checkout.
 2. Запусти workflow `Deploy Production` ещё раз.
-3. Передай предыдущий tag как `image_tag`.
+3. Передай предыдущие `release_digest` и `source_sha`.
 4. Дождись тех же upstream и HTTPS checks.
 
-Это сознательно тот же tag-driven flow, а не отдельная rollback automation.
+Это тот же verified release flow, а не отдельная rollback automation.
 
 ### Manual fallback
 
 Если GitHub Actions недоступен, fallback остаётся таким же, как в bootstrap runbook:
 
 1. Зайди на VPS по SSH.
-2. Верни `AERO_IMAGE_TAG` в `.env.server` на предыдущий known-good tag.
-3. Выполни `docker compose ... pull`.
-4. Выполни `docker compose ... up -d`.
+2. Выбери сохранённые metadata и checkout предыдущего known-good source SHA.
+3. Повтори validation и Compose pull --ignore-buildable/up с immutable overlay по [manual verified release flow](verified-release.md).
+4. Подтверди пять runtime digests/source SHA; сохраняй предыдущие volumes.
 5. Снова проверь прямой gateway upstream, media upstream и публичные `https://<domain>/readyz`,
    `https://<media-domain>/minio/health/live`.
 
