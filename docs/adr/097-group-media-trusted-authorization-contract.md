@@ -5,6 +5,12 @@
 - Задача: [#176](https://github.com/MattoYuzuru/AeroChat/issues/176)
 - Предпосылка: принятый [ADR-089](089-group-audio-sfu-and-admission-boundary.md)
 
+> Текущая реализация: private Identity/Chat APIs и source senders, RTC receiver,
+> registry, registration, guard, coordinator и authorized control factory реализованы.
+> Factory не mounted; provider/token/SFU/admission/teardown workers и browser audio
+> не подключены. Ниже сохранены исходный контекст и контракт; актуальный обзор —
+> в [состоянии проекта](../project-status.md).
+
 ## Контекст
 
 `aero-rtc-control` сегодня проверяет bearer через Identity `GetCurrentProfile` и получает только user ID. Проверка Chat использует bearer текущего пользователя. Эти публичные операции достаточны для lobby, но не дают независимую проверку исходной auth session при reconnect по SFU JWT или reconcile после logout. Сохранять пользовательский bearer и выдавать его за target user запрещено. Доверять session ID или membership, которые прислал browser, также нельзя.

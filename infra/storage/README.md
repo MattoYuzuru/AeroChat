@@ -26,7 +26,7 @@ Cold acquisition проверяется в новом owned BuildKit state с я
 
 Тяжёлые проверки используют shared `heavy`; runtime mutations — отдельный exact project lock. Env, credentials, raw scanner logs и receipts остаются вне Git. Останавливаются только собственные fixture processes/containers; данные, архивы и builder state сохраняются до отдельного согласованного cleanup.
 
-Effective overlay включает gRPC1.83.2 — fixed patch для GO-2026-6443 (missing authority/Host server panic). Previous source/compiler receipt относится к overlay с1.83.1; после patch нужна свежая проверка. No-fixed GO-2026-5932 остаётся только module inventory неиспользуемого OpenPGP, без ID/package исключений.
+Effective overlay включает gRPC1.83.2 — fixed patch для GO-2026-6443 (missing authority/Host server panic). Overlay с1.83.2 прошёл source scan `check-lnvg9i0g`, отдельные cold builds и runtime09; результаты относятся к source f68, не к произвольной новой сборке. No-fixed GO-2026-5932 остаётся только module inventory неиспользуемого OpenPGP, без ID/package исключений.
 
 В Storage Bootstrap CI `check-vulnerabilities.py` проверяет обе source closure для Linux/amd64 до cold image build. Компилятор и scanner берутся из общего `infra/go-toolchain.json`; parser и called-symbol threshold используются из application gate, без отдельной политики исключений. Archive/original module checks выполняются до effective overlay; scanner запускается readonly. Даже при ошибке первого компонента gate сохраняет результат второго и отклоняет общий результат. Raw scanner output и status загружаются как CI artifact при неуспехе тоже. Локальная Linux/arm64 проверка относится к другому target и фиксируется отдельно.
 

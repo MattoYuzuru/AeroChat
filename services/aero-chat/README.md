@@ -12,11 +12,11 @@ AFTER membership trigger атомарно меняет state/outbox, включ�
 
 Existing membership и invite writers сериализуются на group row; quota paths берут user quota lock до group. Invite disable/create соблюдают group → invite порядок, Join не инвертирует его. Group encrypted message append сохраняет group → thread порядок. Raw cascades требуют отдельных native concurrency checks: trigger atomicity не является доказательством отсутствия deadlock.
 
-Event resulting denied revision2 применяется только к matching pair/grant с revision≤2; новый eligible grant revision3 его не принимает. Dispatch/ack/retry worker, retention/backpressure, private Chat authorization API, RTC grant/admission/proxy/SFU/browser audio в этот slice не входят. Committed event не означает media_teardown_complete; group audio остаётся выключенным. Позднейший private API обязан проверять fresh membership + retained state/revision и неизвестные значения отвергать.
+Event resulting denied revision2 применяется только к matching pair/grant с revision≤2; новый eligible grant revision3 его не принимает. Dispatch/ack/retry worker и private Chat authorization API реализованы ниже; RTC grant/operation journal находится в RTC-сервисе. Retention/backpressure, provider/admission/proxy/SFU/browser audio остаются отдельными этапами. Committed event не означает media_teardown_complete. Private API проверяет fresh membership + retained state/revision и отвергает неизвестные значения.
 
 ## Private subject lookup
 
-Следующий отдельный API slice добавляет `chat.authorization.v1.InternalAuthorizationService.CheckGroupSubject`. Exact group/user IDs поступают из registry RTC, а не из browser claims. Одна SQLC query читает snapshot group/membership/retained authority; fresh role возвращается при неизменном eligibility epoch для owner/admin/member. Missing authority при existing membership, mismatch presence/class, unknown role и exhausted eligible epoch возвращают sanitized unavailable. Genuine never-known pair получает NOT_FOUND без fabricated IDs/epoch; tombstone получает REMOVED с persisted epoch. LastSeen/profile/MLS/messages не читаются и не изменяются.
+Private API предоставляет `chat.authorization.v1.InternalAuthorizationService.CheckGroupSubject`. Exact group/user IDs поступают из registry RTC, а не из browser claims. Одна SQLC query читает snapshot group/membership/retained authority; fresh role возвращается при неизменном eligibility epoch для owner/admin/member. Missing authority при existing membership, mismatch presence/class, unknown role и exhausted eligible epoch возвращают sanitized unavailable. Genuine never-known pair получает NOT_FOUND без fabricated IDs/epoch; tombstone получает REMOVED с persisted epoch. LastSeen/profile/MLS/messages не читаются и не изменяются.
 
 Private listener disabled по умолчанию. Для explicit setup нужны:
 
@@ -30,20 +30,24 @@ Private listener disabled по умолчанию. Для explicit setup нуж�
 
 TLS1.3 и verified client chain обязательны; единственный URI SAN caller — `urn:aerochat:service:rtc-control`. Header/произвольный env principal не авторизуют. Public Chat mux private route не регистрирует. Missing/bad config/CA/keypair закрывают startup без plaintext fallback; fatal public/private server exit останавливает второй listener. Общий request budget5s, body limit4096, static errors/logs без credential/subject payload. Эта конфигурация не открывает grants/SFU и не включает group audio.
 
-Local source preparation не заменяет required exact-HEAD gates: state native checks должны пройти до publication state/API; API требует собственных actual typed Connect/mTLS/PG checks с wrong/no/expired/ambiguous/wrong-EKU certificates, raw HTTP/header spoof/public route denial, same-connection fresh role/epoch transitions и cancellation. Deployment isolation, реальные devices/NAT/TURN/WAN и media ACK остаются отдельными проверками. Runtime/certificate provisioning выполняет согласованный owner, а не API code.
+Typed Connect/mTLS/PG tests проверяют wrong/no/expired/ambiguous/wrong-EKU
+certificates, raw HTTP/header spoof/public route denial, fresh role/epoch
+transitions на том же connection и cancellation. Deployment isolation,
+physical devices/NAT/TURN/WAN и trusted media ACK требуют отдельной приёмки.
+Runtime/certificate provisioning выполняет согласованный owner.
 
 ## Проверки
 
-Go1.25.8; пример unit gate:
+Go1.27.2; пример unit gate:
 
 ```sh
-GOTOOLCHAIN=go1.25.8 go test -race -cover ./...
+GOTOOLCHAIN=go1.27.2 go test -race -cover ./...
 ```
 
 Native authority cases помечены `integration` и требуют `AERO_CHAT_AUTHORITY_TEST_ENV_FILE` с профилем owned loopback PostgreSQL `aerochat_media_test:25432`. Тесты создают исключительно новые `rtc_chat_authority176_UUID` schemas: absence preflight, atomic CREATE, exact search_path, cleanup только собственных успешно созданных schemas. Команда в разрешённом runtime scope:
 
 ```sh
-GOTOOLCHAIN=go1.25.8 go test -tags=integration -race -count=1 -timeout=120s -run '^TestGroupAuthority' ./internal/storage/postgres
+GOTOOLCHAIN=go1.27.2 go test -tags=integration -race -count=1 -timeout=120s -run '^TestGroupAuthority' ./internal/storage/postgres
 ```
 
 В общий local workflow команды запускаются через shared `agent-dev` resource heavy, source фиксируется committed HEAD/receipt; значения fixture DSN не выводятся. Этот selector не запускает другие integration suites с чужими profiles/schema names и не переносит их старые результаты.
@@ -107,13 +111,7 @@ production exact-head RTC binary внеGit/verifiedSHA+vcsHEAD/owned ephemeral
 listeners/PID TERM3/KILL3. Cases source triggerrollback/backfill/eligible writers,
 observed claim/takeover/staleCAS/exhaustion/malformedquarantine, actual TLSreceipt
 postcommit CASfault/restart/canonicalconflict, enabledwrapper cancellation,
-clientcertificate/redirect/SAN boundaries. Code prep не является native PASS.
-
-Local Chat source prep может идти от reviewed UNVERIFIED Identityd6 в отдельном
-WT. До fullgates/publication обязательно ordinary merge generated/verified/
-published Identity parent и fresh clean whole run; parent receipts не переносятся.
-No manualgeneratedcode, no media flag/runtimeenable. Actual group sound, trusted
-SDK/proxy cleanup, real devices/NAT/TURN остаются UNVERIFIED.
+clientcertificate/redirect/SAN boundaries. Точный результат фиксируется для выбранного SHA и test scope.
 
 Sender integration также требует `AERO_RTC_TEST_DATABASE_ENV_FILE` с PostgreSQL
 URL и `AERO_RTC_RECEIVER_TEST_BINARY`, `AERO_RTC_RECEIVER_TEST_HEAD`,
@@ -121,7 +119,7 @@ URL и `AERO_RTC_RECEIVER_TEST_BINARY`, `AERO_RTC_RECEIVER_TEST_HEAD`,
 записывает собственные `search_path`/`application_name` в URL и проверяет их
 повторным parse: изменение `pgx.ConnConfig.RuntimeParams` не обновляет исходный
 `ConnString()` ([pgx v5.8.0](https://pkg.go.dev/github.com/jackc/pgx/v5@v5.8.0#ConnConfig.ConnString)).
-Профили и URL не выводятся. Правила full-clone сборки Go 1.25.8 и проверки
+Профили и URL не выводятся. Правила full-clone сборки Go 1.27.2 и проверки
 реальных VCS settings перечислены в [Identity native gate](../aero-identity/README.md#identity-revocation-sender).
 Отсутствие metadata не принимается за PASS; новые fixtures не ослабляют native
-assertions, а ordinary verified published Identity parent нужен до codegen/gates.
+assertions, а изменённые контракты требуют согласованной генерации и проверки drift.

@@ -17,9 +17,9 @@ Migration `000001_dormant_media_grant_store.sql` зарегистрирован�
 обычном старте, включая upgrade существующей БД. Условного migrator нет.
 Отдельный `MediaStore` пока не вызывается RTC service/transport handlers.
 Lobby/1:1 по-прежнему использует прежний
-repository; media flag, SDK/JWT, private RTC API, proxy, workers и frontend
-отсутствуют. До их включения нужен отдельный reviewed compatibility slice:
-End/Leave/stale eviction с held grants обязаны возвращать pending cleanup.
+repository; Private RTC source/registration API и dormant guard/coordinator реализованы.
+SDK/JWT/provider, proxy, workers и group-audio frontend не подключены.
+Guard сохраняет pending cleanup для End/Leave/stale eviction с held grants.
 
 Store сохраняет opaque binding, tuple session/device revisions и eligibility
 epoch, отдельные room/grant generations, user mutex, source inbox/deny watermarks,
@@ -69,13 +69,12 @@ Native `TestMediaStore*` используют только fresh `rtc_test_UUID`
 и observed lock wait; это storage evidence, не два RPC/WS или audio/network.
 
 ```bash
-GOTOOLCHAIN=go1.25.8 agent-dev run --cwd "$PWD" --resource heavy -- go test -json -race -count=1 -timeout=120s -run '^TestMediaStore' ./internal/storage/postgres
+GOTOOLCHAIN=go1.27.2 agent-dev run --cwd "$PWD" --resource heavy -- go test -json -race -count=1 -timeout=120s -run '^TestMediaStore' ./internal/storage/postgres
 ```
 
 Обязательный gate задаёт task-owned `AERO_RTC_TEST_DATABASE_ENV_FILE`; skips
 не считаются native evidence. Отдельно проверяются unit/race, vet/lint, touched
-formatting, frozen source и два pinned SQLC/Buf generations без drift. Future
-Go27 combined candidate проверяется заново и не наследует Go1.25.8 receipt.
+formatting, frozen source и два pinned SQLC/Buf generations без drift. Результаты привязаны к выбранному exact HEAD и runtime profile.
 
 
 Registration concurrency fixture сохраняет3s/10ms wait и два concurrent workers.
@@ -98,33 +97,17 @@ concurrent replay/distinct-nonce test. Shared `registrationWait` для двух
 TLS single-worker barriers сохраняет исходные signature и body; TLS source не
 изменяется. Изменение helper API требует inventory всех callers до нового gate.
 
-Whole `check-43x2s13s` на `2a94bdf` завершился FAIL при декодировании lock metadata,
-до успешного graph witness; 21 pure graph cases и остальные пять native registration
-cases прошли, но не заменяют whole gate. Source review выявил несовместимость:
-`pg_locks.relation` имеет тип OID, который PostgreSQL преобразует в JSON string,
-а fixture ожидает числовой `uint32`. Тестовый query явно приводит OID к `bigint`;
-диагностика type error содержит только имя поля, категорию JSON и Go type,
-без исходного JSON/value. В этом failed gate observed graph не был получен.
 
-Whole `check-_kxt9jyl` на `69f57cc` получил два actual owned graph witnesses
-worker→worker→root и PASS всех шести native registration cases, 21 pure graph cases
-и privacy case без actual test SKIP. Whole остаётся FAIL: RTC lint обнаружил
-избыточную initial assignment при преобразовании instance state в transport enum.
-Все три допустимые ветви присваивают значение, default возвращает ошибку;
-объявление без инициализации сохраняет mapping. Fresh exact-source whole gate
-после исправления ещё не выполнялся; partial native PASS его не заменяет.
+## Native public control
 
-Guard whole `check-xvgt19vx` на `855df3d` завершился FAIL в трёх fixture setups
-с SQLSTATE23514 (`rtc_calls_end_fields_check`), до соответствующих guard assertions.
-Остальные пять guard groups и все шесть native registration cases прошли без
-actual test SKIP; это partial evidence, не whole PASS. Ended setups задают допустимый
-`end_reason='manual'`, active reset очищает `ended_at`, `ended_by_user_id` и
-`end_reason`; schema, production и assertions сохранены. Исправленные setups
-и новый exact-source whole gate пока UNRUN.
+Для scope `TestPrivateControl*`, `TestOwnMediaControl*`, `TestPublicMediaControl*`
+и `TestAuthorizedGroupMediaControlFactory*` нужен PostgreSQL profile и exact-source
+Identity binary + Chat test-host binary. Указать `AERO_RTC_CONTROL_AUTH_TEST_HEAD`,
+`AERO_RTC_CONTROL_IDENTITY_TEST_BINARY`, `AERO_RTC_CONTROL_CHAT_TEST_BINARY`,
+их `_SHA256` и абсолютный `AERO_RTC_CONTROL_AUTH_NATIVE_REGISTRY` с mode0600.
+Бинарники собраны Go1.27.2, содержат правильные package/VCS metadata и не меняются
+во время проверки. Отсутствующий profile или неверное происхождение — FAIL.
 
-Whole `check-_9yf9a74` на `811fd73` прошёл все восемь guard groups и 216 RTC test
-PASS events без failures/skips, но завершился FAIL на RTC lint: fixture сохраняла
-неиспользуемый результат второго `RegisterLease`. Сам вызов, проверка ошибки,
-partial/final ACK и new-call assertions сохраняются; ненужное присвоение заменено
-на `_`. Later dedicated native cohorts, generation и builds в этом whole UNRUN;
-новый exact-source gate после lint fix пока UNRUN.
+Собственные random localhost ports, fresh schemas и ephemeral TLS материал
+очищаются fixture; registry содержит только lifecycle facts без DSN/credentials.
+Проверка не является SFU/provider/media ACK или реальным групповым аудио.
