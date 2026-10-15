@@ -4,9 +4,9 @@
 
 ## Инструменты
 
-- Git, Go **1.25** по `go.work`, Node.js **22** по CI, pnpm **10.19.0** по `package.json`.
+- Git, Go **1.27.2** по `go.work` / `infra/go-toolchain.json`, Node.js **22** по CI, pnpm **10.19.0** по `package.json`. Для source checks задать `GOTOOLCHAIN=go1.27.2`; глобальные Go настройки менять не требуется.
 - Docker Engine / Docker Compose для полного локального стенда.
-- Task, Buf, sqlc и golangci-lint устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`; версии зафиксированы в скрипте. Task leaf-команды используют exact `bin` paths; `task check` не требует ручного изменения PATH для Buf/sqlc/linter. Для прямого вызова этих CLI: `export PATH="$PWD/bin:$PATH"`.
+- Task, Buf, sqlc, golangci-lint и govulncheck устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`. Go/linter/scanner pins — `infra/go-toolchain.json`; Buf/Task/sqlc pins сохраняются в installer. Task leaf-команды используют exact `bin` paths; `task check` не требует ручного изменения PATH для Buf/sqlc/linter. Для прямого вызова этих CLI: `export PATH="$PWD/bin:$PATH"`.
 
 Установка инструментов и зависимостей:
 
@@ -72,6 +72,7 @@ Web Push endpoints ограничены [ADR-095](adr/095-web-push-egress-bounda
 | Generated drift | `task generated:check` |
 | Go tests | `task go:test` |
 | Go lint | `task go:lint` |
+| Go pins / actual toolchain | `python3 -B infra/scripts/go_lifecycle.py check --runtime` |
 | Web unit tests | `task web:test` |
 | Web lint | `task web:lint` |
 | Web typecheck/build | `task web:build` |
