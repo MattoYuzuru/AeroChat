@@ -6,7 +6,7 @@
 
 - Git, Go **1.25** по `go.work`, Node.js **22** по CI, pnpm **10.19.0** по `package.json`.
 - Docker Engine / Docker Compose для полного локального стенда.
-- Task, Buf, sqlc и golangci-lint устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`; версии зафиксированы в скрипте. Перед запуском: `export PATH="$PWD/bin:$PATH"`.
+- Task, Buf, sqlc и golangci-lint устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`; версии зафиксированы в скрипте. Task leaf-команды используют exact `bin` paths; `task check` не требует ручного изменения PATH для Buf/sqlc/linter. Для прямого вызова этих CLI: `export PATH="$PWD/bin:$PATH"`.
 
 Установка инструментов и зависимостей:
 
@@ -33,12 +33,14 @@ docker compose -f infra/compose/docker-compose.yml down
 
 Root `.env.example` управляет compose. Для запуска из исходников использовать `services/*/.env.example`, `apps/web/.env.example` и `pnpm --filter @aerochat/web dev`. Source-mode приложениям нужны доступные инфраструктурные зависимости; Vite сам их не поднимает.
 
+MinIO и bootstrap client собираются из pinned upstream sources по [ADR-087](adr/087-pinned-storage-source-build-lifecycle.md), включая checksum архивов и base image digests. Первый запуск скачивает Go modules и компилирует storage; старые binary image tags не используются. Для проверки acquisition без shared build cache создать отдельный BuildKit builder (`docker buildx create --driver docker-container --name <unique-name>`) и выполнить `docker buildx build --builder <unique-name> --pull --no-cache --load --target minio -t aerochat-minio:7ced9663 -f infra/storage/Dockerfile .`, затем аналогично target `mc` с tag `aerochat-mc:7394ce0d`. Не удалять чужие builders, caches и volumes. Обычный повторный `compose up --build` сам по себе не доказывает cold-cache bootstrap.
+
 | Конфигурация | Назначение и ограничение |
 | --- | --- |
 | `AERO_MEDIA_S3_INTERNAL_ENDPOINT`, `AERO_MEDIA_S3_PRESIGN_ENDPOINT` (source-mode); `MEDIA_S3_PUBLIC_ENDPOINT` (compose) | Внутренний service-to-storage endpoint и отдельный browser-visible endpoint для presigned URL; браузеру нельзя отдавать compose-host `minio:9000`. |
 | `MEDIA_S3_CORS_ALLOWED_ORIGINS` | Origins для browser upload; локальный compose применяет CORS и bootstrap приватного bucket. |
 | `AERO_MEDIA_USER_QUOTA_BYTES` | Per-user budget по backend attachment state; `detached`, `expired`, `deleted` не удерживают активный budget. |
-| `AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION` | Grace period перед удалением detached objects; source-mode читает ключ, оба compose пока не пробрасывают его ([#174](https://github.com/MattoYuzuru/AeroChat/issues/174)). |
+| `AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION` | Grace period перед удалением detached objects; source-mode и оба Compose профиля применяют значение, default `168h` (7 дней). Короткий TTL допустим для отдельного disposable fixture; `attached` objects не становятся eligible по возрасту. Правила [ADR-050](adr/050-attachment-retention-delete-semantics-foundation.md) и [ADR-073](adr/073-encrypted-media-retention-and-tombstone-parity.md) сохраняются. |
 | `AERO_MAX_ACTIVE_GROUP_MEMBERSHIPS_PER_USER` | Лимит активных membership для create/join; leave/remove освобождают capacity. |
 | `AERO_WEB_PUSH_SUBSCRIBER`, `AERO_WEB_PUSH_VAPID_PUBLIC_KEY`, `AERO_WEB_PUSH_VAPID_PRIVATE_KEY` | Полный VAPID-блок нужен для background push; частичная конфигурация считается ошибкой старта, пустая отключает push. |
 
@@ -80,7 +82,9 @@ gofmt -l $(git ls-files '*.go' ':!:gen/go/**')
 git diff --check
 ```
 
-Текущий `task check` объявляет шаги через parallel `deps`: установка tools/web dependencies и генерация могут конкурировать с lint/tests/build. Для воспроизводимого evidence использовать отдельные шаги выше. Web CI включает Vitest наряду с lint/build; локально запускать `task web:test` и фиксировать его результат отдельно.
+`task check` выполняет последовательные task calls: tools → frozen web install → proto lint → Buf/SQLC generation+drift → Go tests/lint → web lint/tests/build → Compose config. Failed preparation останавливает consumers; generation не меняет outputs одновременно с Go checks. Local/server Compose checks используют те же example env files, что CI, и `config --quiet` не выводит интерполированную модель. Source freeze обязателен для итогового прогона; `check` намеренно отклоняет незакоммиченные generated changes. Отдельные команды выше остаются доступны для узких checks.
+
+Task по умолчанию отдаёт precedence inherited environment: root `env: PATH` не гарантирует добавление `bin` к уже существующему process PATH ([официальный contract](https://taskfile.dev/docs/guide/environment/)). Поэтому local tool references заданы явно, а generation helper получает `bin` через command-local PATH.
 
 Go unit tests сами по себе не доказывают работу storage/runtime. Для integration evidence нужен отдельный стенд и явный setup изменяемого модуля; если соответствующего suite ещё нет, фиксировать этот gap. `pass` с пропущенной integration-веткой не означает, что storage проверен. Evidence каждого прогона должен содержать checkout/HEAD, команду, версии инструментов, runtime/env profile без секретов, exit code и список skipped checks.
 

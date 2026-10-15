@@ -11,7 +11,6 @@ import (
 	"time"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
-	identityauth "github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -62,6 +61,7 @@ type Repository interface {
 	ListWebPushSubscriptions(context.Context, string) ([]WebPushSubscription, error)
 	DeleteWebPushSubscriptionsByIDs(context.Context, []string) (int64, error)
 	GetCryptoDeviceRegistryStatsByUserID(context.Context, string) (int64, int64, int64, error)
+	CreateFirstCryptoDevice(context.Context, CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error)
 	CreateCryptoDevice(context.Context, CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error)
 	ListCryptoDevices(context.Context, string) ([]CryptoDevice, error)
 	GetCryptoDeviceDetails(context.Context, string, string) (*CryptoDeviceDetails, error)
@@ -87,7 +87,8 @@ type NotificationDispatcher interface {
 
 type Service struct {
 	repo                            Repository
-	passwords                       *identityauth.PasswordHasher
+	passwords                       PasswordHasher
+	passwordAdmission               *PasswordAdmission
 	sessionToken                    *libauth.SessionTokenManager
 	notificationDispatcher          NotificationDispatcher
 	sessionTouchInterval            time.Duration
@@ -101,13 +102,18 @@ type Service struct {
 
 func NewService(
 	repo Repository,
-	passwords *identityauth.PasswordHasher,
+	passwords PasswordHasher,
 	sessionToken *libauth.SessionTokenManager,
 	notificationDispatcher NotificationDispatcher,
+	passwordAdmission *PasswordAdmission,
 ) *Service {
+	if passwordAdmission == nil {
+		passwordAdmission, _ = NewPasswordAdmission(2)
+	}
 	return &Service{
 		repo:                            repo,
 		passwords:                       passwords,
+		passwordAdmission:               passwordAdmission,
 		sessionToken:                    sessionToken,
 		notificationDispatcher:          notificationDispatcher,
 		sessionTouchInterval:            defaultSessionTouchInterval,
@@ -158,7 +164,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (*AuthSessi
 		return nil, err
 	}
 
-	passwordHash, err := s.passwords.Hash(input.Password)
+	passwordHash, err := s.hashPassword(ctx, login, input.Password)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
@@ -226,17 +232,9 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (*AuthSession, er
 		return nil, err
 	}
 
-	credential, err := s.repo.GetPasswordCredentialByLogin(ctx, login)
+	credential, err := s.verifyPasswordCredential(ctx, login, input.Password)
 	if err != nil {
 		return nil, err
-	}
-
-	valid, err := s.passwords.Verify(input.Password, credential.PasswordHash)
-	if err != nil {
-		return nil, fmt.Errorf("verify password: %w", err)
-	}
-	if !valid {
-		return nil, ErrInvalidCredentials
 	}
 
 	now := s.now()
@@ -400,7 +398,11 @@ func (s *Service) RevokeSessionOrDevice(ctx context.Context, token string, targe
 	at := s.now()
 	switch {
 	case target.SessionID != nil:
-		ok, revokeErr := s.repo.RevokeSession(ctx, authSession.User.ID, strings.TrimSpace(*target.SessionID), at)
+		targetID, err := normalizeRevocationTargetID(*target.SessionID)
+		if err != nil {
+			return err
+		}
+		ok, revokeErr := s.repo.RevokeSession(ctx, authSession.User.ID, targetID, at)
 		if revokeErr != nil {
 			return revokeErr
 		}
@@ -409,7 +411,11 @@ func (s *Service) RevokeSessionOrDevice(ctx context.Context, token string, targe
 		}
 		return nil
 	case target.DeviceID != nil:
-		ok, revokeErr := s.repo.RevokeDevice(ctx, authSession.User.ID, strings.TrimSpace(*target.DeviceID), at)
+		targetID, err := normalizeRevocationTargetID(*target.DeviceID)
+		if err != nil {
+			return err
+		}
+		ok, revokeErr := s.repo.RevokeDevice(ctx, authSession.User.ID, targetID, at)
 		if revokeErr != nil {
 			return revokeErr
 		}
@@ -420,6 +426,14 @@ func (s *Service) RevokeSessionOrDevice(ctx context.Context, token string, targe
 	default:
 		return fmt.Errorf("%w: revoke target is required", ErrInvalidArgument)
 	}
+}
+
+func normalizeRevocationTargetID(value string) (string, error) {
+	id, err := uuid.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return "", fmt.Errorf("%w: revoke target must be a UUID", ErrInvalidArgument)
+	}
+	return id.String(), nil
 }
 
 func (s *Service) ListBlockedUsers(ctx context.Context, token string) ([]BlockedUser, error) {

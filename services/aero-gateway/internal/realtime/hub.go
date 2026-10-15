@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"connectrpc.com/connect"
@@ -35,11 +36,14 @@ type session struct {
 	connectionID        string
 	principal           Principal
 	authToken           string
+	authenticator       Authenticator
 	boundCryptoDeviceID string
 	outbound            chan Envelope
+	revalidation        chan struct{}
 	ctx                 context.Context
 	cancel              context.CancelFunc
 	closeOnce           sync.Once
+	stopping            atomic.Bool
 }
 
 func NewHub(
@@ -59,8 +63,8 @@ func NewHub(
 	}
 }
 
-func (h *Hub) ServeConnection(conn *websocket.Conn, principal Principal, authToken string) error {
-	s, err := h.register(conn, principal, authToken)
+func (h *Hub) ServeConnection(conn *websocket.Conn, principal Principal, authToken string, authenticator Authenticator) error {
+	s, err := h.register(conn, principal, authToken, authenticator)
 	if err != nil {
 		return err
 	}
@@ -73,6 +77,33 @@ func (h *Hub) ServeConnection(conn *websocket.Conn, principal Principal, authTok
 	}
 
 	return s.run(h, h.pingInterval, h.writeTimeout)
+}
+
+// RevalidateUser перепроверяет соединения пользователя после успешной auth mutation.
+// Решение о действительности каждой сессии по-прежнему принимает identity.
+func (h *Hub) RevalidateUser(userID string) {
+	for _, s := range h.userSessionsByID(userID) {
+		select {
+		case s.revalidation <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (h *Hub) CloseToken(token string) {
+	h.mu.RLock()
+	var targets []*session
+	for _, bucket := range h.sessions {
+		for _, s := range bucket {
+			if s.authToken == strings.TrimSpace(token) {
+				targets = append(targets, s)
+			}
+		}
+	}
+	h.mu.RUnlock()
+	for _, s := range targets {
+		s.close(websocket.StatusPolicyViolation, "session revoked")
+	}
 }
 
 func (h *Hub) PublishToUser(userID string, envelope Envelope) int {
@@ -173,7 +204,7 @@ func (h *Hub) Close() {
 	}
 }
 
-func (h *Hub) register(conn *websocket.Conn, principal Principal, authToken string) (*session, error) {
+func (h *Hub) register(conn *websocket.Conn, principal Principal, authToken string, authenticator Authenticator) (*session, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -183,14 +214,16 @@ func (h *Hub) register(conn *websocket.Conn, principal Principal, authToken stri
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &session{
-		logger:       h.logger.With(slog.String("user_id", principal.UserID)),
-		conn:         conn,
-		connectionID: newEnvelopeID(),
-		principal:    principal,
-		authToken:    strings.TrimSpace(authToken),
-		outbound:     make(chan Envelope, defaultOutboundBuffer),
-		ctx:          ctx,
-		cancel:       cancel,
+		logger:        h.logger.With(slog.String("user_id", principal.UserID)),
+		conn:          conn,
+		connectionID:  newEnvelopeID(),
+		principal:     principal,
+		authToken:     strings.TrimSpace(authToken),
+		authenticator: authenticator,
+		outbound:      make(chan Envelope, defaultOutboundBuffer),
+		revalidation:  make(chan struct{}, 1),
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 
 	if h.sessions[principal.UserID] == nil {
@@ -245,7 +278,7 @@ func (h *Hub) bindSessionToCryptoDevice(s *session, cryptoDeviceID string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if h.closed {
+	if h.closed || s.stopping.Load() {
 		return
 	}
 
@@ -288,7 +321,14 @@ func (s *session) run(h *Hub, pingInterval time.Duration, writeTimeout time.Dura
 			}
 			s.close(websocket.StatusInternalError, "read failed")
 			return err
+		case <-s.revalidation:
+			if !s.revalidate(writeTimeout) {
+				return nil
+			}
 		case envelope := <-s.outbound:
+			if !s.revalidate(writeTimeout) {
+				return nil
+			}
 			if err := s.writeEnvelope(envelope, writeTimeout); err != nil {
 				s.close(websocket.StatusInternalError, "write failed")
 				if isExpectedClose(err) {
@@ -297,6 +337,9 @@ func (s *session) run(h *Hub, pingInterval time.Duration, writeTimeout time.Dura
 				return err
 			}
 		case <-ticker.C:
+			if !s.revalidate(writeTimeout) {
+				return nil
+			}
 			if err := s.ping(writeTimeout); err != nil {
 				s.close(websocket.StatusGoingAway, "ping timeout")
 				if isExpectedClose(err) {
@@ -306,6 +349,20 @@ func (s *session) run(h *Hub, pingInterval time.Duration, writeTimeout time.Dura
 			}
 		}
 	}
+}
+
+func (s *session) revalidate(timeout time.Duration) bool {
+	if s.stopping.Load() {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, timeout)
+	defer cancel()
+	principal, err := s.authenticator.Authenticate(ctx, s.authToken)
+	if err != nil || ctx.Err() != nil || principal.UserID != s.principal.UserID {
+		s.close(websocket.StatusPolicyViolation, "session authorization failed")
+		return false
+	}
+	return !s.stopping.Load()
 }
 
 func (s *session) readLoop(h *Hub, result chan<- error) {
@@ -406,6 +463,9 @@ func bindRejectDetails(err error) (string, string) {
 }
 
 func (s *session) enqueue(envelope Envelope) bool {
+	if s.stopping.Load() {
+		return false
+	}
 	select {
 	case <-s.ctx.Done():
 		return false
@@ -432,6 +492,7 @@ func (s *session) ping(timeout time.Duration) error {
 
 func (s *session) close(code websocket.StatusCode, reason string) {
 	s.closeOnce.Do(func() {
+		s.stopping.Store(true)
 		go func() {
 			// Закрываем соединение вне вызывающего стека, чтобы shutdown не блокировался
 			// на ожидании close handshake и не превращался в hard close из-за отмены ctx.

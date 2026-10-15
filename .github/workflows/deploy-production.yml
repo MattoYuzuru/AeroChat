@@ -261,6 +261,13 @@ jobs:
             exit 1
           fi
 
+          for storage_source in infra/storage/Dockerfile infra/scripts/bootstrap-media-storage.sh; do
+            if [ ! -f "$storage_source" ]; then
+              echo "Storage source $storage_source отсутствует: обновите checkout в $DEPLOY_DIR" >&2
+              exit 1
+            fi
+          done
+
           shared_edge_host_ip="$(read_env_var .env.server AERO_SHARED_EDGE_HOST_IP)"
           web_host_port="$(read_env_var .env.server AERO_WEB_HOST_PORT)"
           gateway_host_port="$(read_env_var .env.server AERO_GATEWAY_HOST_PORT)"
