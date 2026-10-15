@@ -141,6 +141,8 @@ browser/server в finally. Source наличие fixture само по себе 
 
 Application images для пяти services проходят reusable CI на точном SHA, затем публикуются в GHCR для `linux/amd64` как один [verified release](deploy/verified-release.md): immutable manifest digest + source SHA + пять image digests. Production workflow выбирает `release_digest` и `source_sha`; application `edge`/semver tags больше не продвигаются. Секреты остаются в `.env.server.secrets`; `.env.server` сохраняет выбранную пару `AERO_RELEASE_DIGEST` / `AERO_RELEASE_SOURCE_SHA` после успешных gates.
 
+Для проверки boot/chooser: `node apps/web/tests/entry/entry.mjs` с `PLAYWRIGHT_MODULE` и `CHROMIUM_EXECUTABLE`, через общий heavy runner. Fixture использует Vite `127.0.0.1:25174` (`ENTRY_FIXTURE_PORT` меняет порт): first-run login/register, login error, daily valid-session и explicit reboot на desktop/mobile. Production AppRouter/AuthPage/entry state исполняются напрямую; auth context и post-auth shell синтетические, backend login и полный workspace не подтверждаются. `ENTRY_SOURCE_ROOT` задаёт другой `apps/web/` для baseline без изменения его файлов.
+
 ## Клиентский порядок encrypted conversations
 
 Encrypted web после ADR-096 требует серверный `serverSequence` как положительную decimal int64 строку; read position использует `lastReadServerSequence`. Sender `createdAt` остаётся display/AAD metadata. HTTP без корректного порядка показывает ошибку, некорректные realtime events не применяются. Обновление backend и web согласуется при cutover; старый backend без sequence с новым web несовместим. Переиндексация локального поиска меняет только memory cache, сохраняя pending outbound и локальный ключевой материал.

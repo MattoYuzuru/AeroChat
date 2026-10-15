@@ -51,11 +51,17 @@ jobs:
       - name: Verify release metadata negative fixtures
         run: python3 -B infra/scripts/test_release_manifest.py
 
+      - name: Verify recovery policy negative fixtures
+        run: python3 -B infra/scripts/test_recovery.py
+
       - name: Verify Go lifecycle source pins
         run: python3 -B infra/scripts/go_lifecycle.py check
 
       - name: Verify vulnerability gate negative fixtures
         run: python3 -B infra/scripts/test_go_vuln.py
+
+      - name: Verify native RTC evidence negative fixtures
+        run: python3 -B infra/scripts/test_rtc_control_native.py
 
       - name: Validate local compose
         run: docker compose --env-file .env.example -f infra/compose/docker-compose.yml config >/dev/null
@@ -64,7 +70,7 @@ jobs:
         run: docker compose --env-file .env.server.example --env-file .env.server.secrets.example -f infra/compose/docker-compose.server.yml config >/dev/null
 
   images:
-    needs: [workflows, infra, go, go-vuln, web, proto]
+    needs: [workflows, infra, go, native-rtc-control, go-vuln, web, proto]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -110,6 +116,57 @@ jobs:
         with:
           name: release-image-${{ env.EXPECTED_SOURCE_SHA }}-${{ matrix.service }}
           path: /tmp/release-images/${{ matrix.service }}.tar
+          retention-days: 7
+
+  native-rtc-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: aerochat_rtc_test
+          POSTGRES_USER: rtc_control_ci
+          POSTGRES_PASSWORD: rtc_control_ci_fixture
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U rtc_control_ci -d aerochat_rtc_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout exact native source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ env.EXPECTED_SOURCE_SHA }}
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+
+      - name: Setup pinned native Go
+        if: hashFiles('services/aero-rtc-control/internal/storage/postgres/public_control_auth_native_test.go', 'services/aero-rtc-control/internal/storage/postgres/public_control_auth_native_fixture_test.go') != ''
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+
+      - name: Run strict native RTC cohort
+        if: hashFiles('services/aero-rtc-control/internal/storage/postgres/public_control_auth_native_test.go', 'services/aero-rtc-control/internal/storage/postgres/public_control_auth_native_fixture_test.go') != ''
+        env:
+          AERO_RTC_TEST_DATABASE_URL: postgres://rtc_control_ci:rtc_control_ci_fixture@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/aerochat_rtc_test?sslmode=disable
+        run: python3 -B infra/scripts/check-rtc-control-native.py --source-sha "$EXPECTED_SOURCE_SHA" --output-dir "$RUNNER_TEMP/rtc-control-native"
+
+      - name: Native cohort not applicable to this source
+        if: hashFiles('services/aero-rtc-control/internal/storage/postgres/public_control_auth_native_test.go', 'services/aero-rtc-control/internal/storage/postgres/public_control_auth_native_fixture_test.go') == ''
+        run: echo "not-applicable - RTC public-control native fixtures are absent in this source"
+
+      - name: Preserve native RTC evidence
+        if: always() && hashFiles('services/aero-rtc-control/internal/storage/postgres/public_control_auth_native_test.go', 'services/aero-rtc-control/internal/storage/postgres/public_control_auth_native_fixture_test.go') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rtc-control-native-${{ env.EXPECTED_SOURCE_SHA }}
+          path: ${{ runner.temp }}/rtc-control-native/evidence
+          if-no-files-found: error
           retention-days: 7
 
   go:

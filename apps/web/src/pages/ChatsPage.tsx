@@ -510,7 +510,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
         scheduleSearchJumpOutcome({
           notice:
             encryptedLane.errorMessage ??
-            "Encrypted search result нельзя открыть в этом browser profile: local crypto runtime или bounded lane недоступны.",
+            "Нельзя открыть найденное сообщение: история этой переписки недоступна на этом устройстве.",
           highlightedMessageId: null,
           anchorId: null,
         });
@@ -527,7 +527,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
       if (encryptedTarget === null) {
         scheduleSearchJumpOutcome({
           notice:
-            "Найденное encrypted сообщение пока не попало в текущее локально загруженное окно direct lane. Deep history backfill в этом slice не реализован.",
+            "Это сообщение ещё не загружено на этом устройстве. Откройте переписку и загрузите доступную историю.",
           highlightedMessageId: null,
           anchorId: null,
         });
@@ -619,7 +619,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
       .catch((error) => {
         const message = describeGatewayError(
           error,
-          "Не удалось обновить encrypted read state через gateway.",
+          "Не удалось отметить сообщения прочитанными.",
         );
         if (isGatewayErrorCode(error, "unauthenticated")) {
           expireSession();
@@ -765,7 +765,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   }
   const activeReadStatusLabel =
     selectedThread === null
-      ? "Без видимого read state"
+      ? "Нет сведений о прочтении"
       : describeActiveDirectReadStatus(
           selectedThread.readState,
           selectedThread.encryptedReadState,
@@ -1278,7 +1278,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
         >
         <div className={styles.heroHeader}>
           <div>
-            <p className={styles.cardLabel}>Chats</p>
+            <p className={styles.cardLabel}>Чаты</p>
             <h1 className={styles.title}>Личные чаты AeroChat</h1>
             <p className={styles.subtitle}>
               Окно личного чата показывает текущую переписку и обычный composer без разделения на
@@ -1331,7 +1331,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
             <div className={styles.panelHeader}>
               <div>
                 <p className={styles.cardLabel}>Список</p>
-                <h2 className={styles.sectionTitle}>Direct chats</h2>
+                <h2 className={styles.sectionTitle}>Личные чаты</h2>
               </div>
               <p className={styles.sectionDescription}>
                 Новый чат создаётся только явным действием из раздела друзей.
@@ -1341,7 +1341,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
             {requestedPeerUserId !== "" && chats.state.isCreatingChat && (
               <StateCard
                 title="Подготавливаем чат"
-                message="Ищем существующий direct thread или создаём новый через gateway."
+                message="Открываем вашу переписку с выбранным пользователем."
               />
             )}
 
@@ -1375,7 +1375,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
 
             {chats.state.status === "ready" && chats.state.chats.length === 0 && (
               <StateCard
-                title="Direct chats пока нет"
+                title="Личных чатов пока нет"
                 message="Откройте раздел друзей и создайте первый личный чат явным действием."
                 action={
                   <Link className={styles.linkButton} to="/app/people">
@@ -1488,7 +1488,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
             {!isDesktopTargetWindow && (
               <div className={styles.panelHeader}>
                 <div>
-                  <p className={styles.cardLabel}>Thread</p>
+                  <p className={styles.cardLabel}>Переписка</p>
                   <h2 className={styles.sectionTitle}>
                     {selectedPeer ? selectedPeer.nickname : "Выберите чат"}
                   </h2>
@@ -1511,7 +1511,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       }}
                       type="button"
                     >
-                      Обновить thread
+                      Обновить переписку
                     </button>
                   )}
                 </div>
@@ -1536,27 +1536,27 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
               chats.state.chats.length > 0 && (
               <StateCard
                 title="Чат ещё не выбран"
-                message="На широком экране можно держать список и пустой thread рядом. На узком экране сначала показываем обзор чатов."
+                message="Выберите чат из списка, чтобы открыть переписку."
               />
               )}
 
             {requestedPeerUserId !== "" && chats.state.isCreatingChat && (
               <StateCard
-                title="Открываем direct thread"
-                message="Подтягиваем chat snapshot и готовим thread к чтению и отправке."
+                title="Открываем переписку"
+                message="Загружаем сообщения. Скоро можно будет продолжить переписку."
               />
             )}
 
             {isThreadRouteActive && chats.state.threadStatus === "loading" && (
               <StateCard
-                title="Загружаем thread"
-                message="Получаем chat snapshot, сообщения и видимый read state без realtime-предположений."
+                title="Загружаем переписку"
+                message="Загружаем доступную историю переписки."
               />
             )}
 
             {isThreadRouteActive && chats.state.threadStatus === "error" && chats.state.selectedChatId && (
               <StateCard
-                title="Thread недоступен"
+                title="Переписка недоступна"
                 message={chats.state.threadErrorMessage ?? "Не удалось загрузить выбранный чат."}
                 action={
                   <button
@@ -1579,7 +1579,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                   <section className={styles.profilePanel}>
                     <div className={styles.panelHeader}>
                       <div>
-                        <p className={styles.cardLabel}>Direct info</p>
+                        <p className={styles.cardLabel}>Информация о чате</p>
                         <h3 className={styles.blockTitle}>
                           {selectedDirectProfile?.nickname ?? selectedPeer?.nickname ?? "Собеседник"}
                         </h3>
@@ -1664,7 +1664,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                       <aside className={styles.profileAsideCard}>
                         <div className={styles.profileSectionHeader}>
                           <p className={styles.cardLabel}>Уведомления</p>
-                          <h4 className={styles.profileFactTitle}>Push для этого чата</h4>
+                          <h4 className={styles.profileFactTitle}>Уведомления чата</h4>
                         </div>
                         <label className={styles.notificationToggleCard}>
                           <div className={styles.notificationToggleCopy}>
@@ -1731,7 +1731,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                         </div>
                         <dl className={styles.profileFactList}>
                           <div>
-                            <dt>Login</dt>
+                            <dt>Логин</dt>
                             <dd>@{selectedDirectProfile?.login ?? selectedPeer?.login ?? "unknown"}</dd>
                           </div>
                           <div>
@@ -1760,11 +1760,11 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                         </div>
                         <dl className={styles.profileFactList}>
                           <div>
-                            <dt>Status</dt>
+                            <dt>Статус</dt>
                             <dd>{selectedDirectProfile?.statusText ?? "не задан"}</dd>
                           </div>
                           <div>
-                            <dt>Bio</dt>
+                            <dt>О себе</dt>
                             <dd>{selectedDirectProfile?.bio ?? "не задано"}</dd>
                           </div>
                           <div>
@@ -1776,7 +1776,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                             <dd>{selectedDirectProfile?.birthday ?? "не задан"}</dd>
                           </div>
                           <div>
-                            <dt>Read receipts</dt>
+                            <dt>Отметки прочтения</dt>
                             <dd>
                               {selectedDirectProfile === null
                                 ? "нет profile snapshot"
@@ -1786,7 +1786,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                             </dd>
                           </div>
                           <div>
-                            <dt>Presence</dt>
+                            <dt>Статус в сети</dt>
                             <dd>
                               {selectedDirectProfile === null
                                 ? "нет profile snapshot"
@@ -1796,7 +1796,7 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
                             </dd>
                           </div>
                           <div>
-                            <dt>Typing visibility</dt>
+                            <dt>Показ набора текста</dt>
                             <dd>
                               {selectedDirectProfile === null
                                 ? "нет profile snapshot"
@@ -2601,7 +2601,7 @@ function StateCard({
 }: StateCardProps) {
   return (
     <section className={styles.stateCard} data-tone={tone}>
-      <p className={styles.cardLabel}>Chats state</p>
+      <p className={styles.cardLabel}>Состояние чатов</p>
       <h3 className={styles.stateTitle}>{title}</h3>
       <p className={styles.stateMessage}>{message}</p>
       {action && <div className={styles.actions}>{action}</div>}
@@ -2868,21 +2868,21 @@ function describeChatPreview(
 ): string {
   if (isSelfDirectChat(chat, currentUserId)) {
     if (chat.pinnedMessageIds.length > 0) {
-      return "Ваш self chat уже содержит закреплённые сообщения и готов к быстрому переносу между устройствами.";
+      return "В ваших заметках есть закреплённые сообщения. На другом устройстве доступна только загруженная там история.";
     }
 
-    return "Ваш приватный chat с собой готов для заметок, быстрых файлов и multi-device handoff.";
+    return "Сохраняйте здесь заметки и файлы. На другом устройстве доступна только загруженная там история.";
   }
 
   if (chat.pinnedMessageIds.length > 0) {
-    return `Есть закреплённые сообщения и готовый direct thread с ${peer ? `@${peer.login}` : "собеседником"}.`;
+    return `Есть закреплённые сообщения в переписке с ${peer ? `@${peer.login}` : "собеседником"}.`;
   }
 
   if (peer) {
-    return `Личный чат с @${peer.login} с подключённым realtime transport foundation и без тяжёлого shell-overhead.`;
+    return `Личная переписка с @${peer.login}.`;
   }
 
-  return "Личный thread готов к открытию.";
+  return "Личная переписка готова к открытию.";
 }
 
 function describeActiveDirectReadStatus(
@@ -2912,7 +2912,7 @@ function describeActiveDirectReadStatus(
 
 function describeReadStatus(readState: DirectChatReadState | null): string {
   if (!readState?.peerPosition) {
-    return "Без видимого read state";
+    return "Нет сведений о прочтении";
   }
 
   return `Прочитано ${formatDateTime(readState.peerPosition.updatedAt)}`;
