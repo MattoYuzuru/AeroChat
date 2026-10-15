@@ -8,11 +8,14 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	ActivateCryptoDevice(ctx context.Context, arg ActivateCryptoDeviceParams) (CryptoDevice, error)
 	ApproveCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg ApproveCryptoDeviceLinkIntentByIDAndUserIDParams) (ApproveCryptoDeviceLinkIntentByIDAndUserIDRow, error)
+	ClaimAuthorityDelivery(ctx context.Context, ownerID pgtype.UUID) (ClaimAuthorityDeliveryRow, error)
+	CompleteAuthorityDelivery(ctx context.Context, arg CompleteAuthorityDeliveryParams) (int64, error)
 	CreateAuthorityRevocationEvent(ctx context.Context, arg CreateAuthorityRevocationEventParams) error
 	CreateCryptoDevice(ctx context.Context, arg CreateCryptoDeviceParams) (CryptoDevice, error)
 	CreateCryptoDeviceBundle(ctx context.Context, arg CreateCryptoDeviceBundleParams) (CryptoDeviceBundle, error)
@@ -46,6 +49,7 @@ type Querier interface {
 	GetSocialGraphState(ctx context.Context, arg GetSocialGraphStateParams) (GetSocialGraphStateRow, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error)
 	GetUserByLogin(ctx context.Context, login string) (GetUserByLoginRow, error)
+	HasExhaustedAuthorityDelivery(ctx context.Context) (bool, error)
 	ListBlockedUsersByUserID(ctx context.Context, blockerUserID uuid.UUID) ([]ListBlockedUsersByUserIDRow, error)
 	ListCryptoDeviceLinkIntentsByUserID(ctx context.Context, userID uuid.UUID) ([]ListCryptoDeviceLinkIntentsByUserIDRow, error)
 	ListCryptoDevicesByUserID(ctx context.Context, userID uuid.UUID) ([]CryptoDevice, error)
@@ -56,6 +60,8 @@ type Querier interface {
 	ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
 	ListWebPushSubscriptionsByUserID(ctx context.Context, userID uuid.UUID) ([]WebPushSubscription, error)
 	LockCryptoDeviceRegistryOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	QuarantineAuthorityDelivery(ctx context.Context, arg QuarantineAuthorityDeliveryParams) (int64, error)
+	RetryAuthorityDelivery(ctx context.Context, arg RetryAuthorityDeliveryParams) (int64, error)
 	RevokeCryptoDeviceWithMetadata(ctx context.Context, arg RevokeCryptoDeviceWithMetadataParams) (CryptoDevice, error)
 	RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (RevokeDeviceRow, error)
 	RevokeDeviceSessions(ctx context.Context, arg RevokeDeviceSessionsParams) error
