@@ -81,6 +81,15 @@ Web-клиент использует уже существующие RPC:
 - compact in-call status, peer presence, bounded error state и `Покинуть` / `Завершить звонок`;
 - скрытый `audio` element для remote playback.
 
+Наблюдаемая приёмка remediation допускает отдельный минимальный microphone mute:
+после успешного local join кнопка меняет `MediaStreamTrack.enabled` только у
+собственных live audio tracks. Выключенный track выдаёт тишину по
+[WebRTC capture contract](https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-enabled).
+Это не `LeaveCall` и не гарантия освобождения физического microphone device.
+Состояние сохраняется при пересоздании peer внутри того же local runtime и
+сбрасывается при полном teardown/выходе, смене chat/account/token и unmount.
+Отдельный device picker, remote mute metadata и output gain этим не вводятся.
+
 Выбор сделан потому, что:
 
 - direct chat уже является естественным conversation scope для 1:1 call;
