@@ -12,21 +12,62 @@ import (
 )
 
 type Querier interface {
+	AckMediaCleanupAction(ctx context.Context, arg AckMediaCleanupActionParams) (int64, error)
+	ActivateMediaGrant(ctx context.Context, arg ActivateMediaGrantParams) (int64, error)
+	ActivateMediaRoom(ctx context.Context, id uuid.UUID) error
+	AdvanceMediaDenyWatermark(ctx context.Context, arg AdvanceMediaDenyWatermarkParams) error
+	AllocateMediaGrantGeneration(ctx context.Context, userID uuid.UUID) (int64, error)
+	BeginMediaGrantRevoke(ctx context.Context, arg BeginMediaGrantRevokeParams) (int64, error)
+	BeginMediaLeaseClose(ctx context.Context, grantID uuid.UUID) error
+	ClaimMediaCleanupAction(ctx context.Context, arg ClaimMediaCleanupActionParams) (RtcMediaCleanupOutbox, error)
+	CloseMediaLease(ctx context.Context, arg CloseMediaLeaseParams) (int64, error)
 	CountActiveParticipantsByCallID(ctx context.Context, callID uuid.UUID) (int64, error)
+	CountHeldMediaRoomGrants(ctx context.Context, roomID uuid.UUID) (int64, error)
 	CreateCall(ctx context.Context, arg CreateCallParams) (RtcCall, error)
+	CreateMediaCleanupAction(ctx context.Context, arg CreateMediaCleanupActionParams) error
+	CreateMediaGrant(ctx context.Context, arg CreateMediaGrantParams) (RtcMediaGrant, error)
+	CreateMediaLease(ctx context.Context, arg CreateMediaLeaseParams) (RtcMediaConnectionLease, error)
+	CreateMediaOperation(ctx context.Context, arg CreateMediaOperationParams) (RtcMediaOperation, error)
+	CreateMediaOperationTarget(ctx context.Context, arg CreateMediaOperationTargetParams) error
+	CreateMediaRoom(ctx context.Context, arg CreateMediaRoomParams) (RtcMediaRoom, error)
+	CreateMediaSourceEvent(ctx context.Context, arg CreateMediaSourceEventParams) error
 	CreateParticipant(ctx context.Context, arg CreateParticipantParams) (RtcCallParticipant, error)
 	EndCall(ctx context.Context, arg EndCallParams) (int64, error)
+	EnsureMediaUserMutex(ctx context.Context, userID uuid.UUID) error
+	ExpireNeverActivatedMediaGrant(ctx context.Context, arg ExpireNeverActivatedMediaGrantParams) (int64, error)
+	FinishMediaGrantRevoke(ctx context.Context, arg FinishMediaGrantRevokeParams) (int64, error)
+	FinishMediaOperation(ctx context.Context, arg FinishMediaOperationParams) error
+	FinishMediaRoom(ctx context.Context, arg FinishMediaRoomParams) error
 	GetActiveCallByDirectChatID(ctx context.Context, directChatID pgtype.UUID) (GetActiveCallByDirectChatIDRow, error)
 	GetActiveCallByGroupID(ctx context.Context, groupID pgtype.UUID) (GetActiveCallByGroupIDRow, error)
 	GetActiveParticipantByCallIDAndUserID(ctx context.Context, arg GetActiveParticipantByCallIDAndUserIDParams) (RtcCallParticipant, error)
 	GetActiveParticipationByUserID(ctx context.Context, userID uuid.UUID) (GetActiveParticipationByUserIDRow, error)
 	GetCallByID(ctx context.Context, id uuid.UUID) (GetCallByIDRow, error)
+	GetHeldMediaGrantByUser(ctx context.Context, userID uuid.UUID) (GetHeldMediaGrantByUserRow, error)
+	GetHeldMediaLease(ctx context.Context, grantID uuid.UUID) (RtcMediaConnectionLease, error)
+	GetHeldMediaRoom(ctx context.Context, callID uuid.UUID) (RtcMediaRoom, error)
+	GetMediaCleanupAction(ctx context.Context, arg GetMediaCleanupActionParams) (RtcMediaCleanupOutbox, error)
+	GetMediaGrant(ctx context.Context, id uuid.UUID) (GetMediaGrantRow, error)
+	GetMediaGrantByRequest(ctx context.Context, requestID uuid.UUID) (GetMediaGrantByRequestRow, error)
+	GetMediaLease(ctx context.Context, id uuid.UUID) (RtcMediaConnectionLease, error)
+	GetMediaOperation(ctx context.Context, id uuid.UUID) (RtcMediaOperation, error)
+	GetMediaOperationByOrigin(ctx context.Context, arg GetMediaOperationByOriginParams) (RtcMediaOperation, error)
+	GetMediaOperationGrantIDs(ctx context.Context, operationID uuid.UUID) ([]uuid.UUID, error)
+	GetMediaOperationTarget(ctx context.Context, arg GetMediaOperationTargetParams) (RtcMediaOperationTarget, error)
+	GetMediaSourceEvent(ctx context.Context, arg GetMediaSourceEventParams) (RtcMediaSourceInbox, error)
+	HasPendingMediaCleanup(ctx context.Context, operationID uuid.UUID) (bool, error)
 	LeaveActiveParticipantsByCallID(ctx context.Context, arg LeaveActiveParticipantsByCallIDParams) (int64, error)
 	LeaveParticipant(ctx context.Context, arg LeaveParticipantParams) (int64, error)
 	ListActiveParticipantsByCallID(ctx context.Context, callID uuid.UUID) ([]RtcCallParticipant, error)
 	ListParticipantsByCallID(ctx context.Context, callID uuid.UUID) ([]RtcCallParticipant, error)
 	LockCallByID(ctx context.Context, id uuid.UUID) (RtcCall, error)
+	LockMediaRoom(ctx context.Context, id uuid.UUID) (RtcMediaRoom, error)
+	LockMediaUserMutex(ctx context.Context, userID uuid.UUID) (RtcMediaUserGeneration, error)
+	MarkMediaOperationAuthorityRevoked(ctx context.Context, id uuid.UUID) error
+	MediaAuthorityDenied(ctx context.Context, arg MediaAuthorityDeniedParams) (bool, error)
+	NextMediaRoomGeneration(ctx context.Context, callID uuid.UUID) (int64, error)
 	ReleaseEndedParticipationByUserID(ctx context.Context, arg ReleaseEndedParticipationByUserIDParams) error
+	RetryMediaCleanupAction(ctx context.Context, arg RetryMediaCleanupActionParams) (int64, error)
 	TouchParticipantSignal(ctx context.Context, arg TouchParticipantSignalParams) (int64, error)
 }
 
