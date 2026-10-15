@@ -20,6 +20,7 @@ type Config struct {
 	WebPushVAPIDPublicKey    string
 	WebPushVAPIDPrivateKey   string
 	PasswordHashConcurrency  int
+	InternalAuthorization    InternalAuthorizationConfig
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
@@ -36,6 +37,10 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	internalAuthorization, err := loadInternalAuthorizationConfig()
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
 		DatabaseURL:              lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
@@ -47,6 +52,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		WebPushVAPIDPublicKey:    lookupString("AERO_WEB_PUSH_VAPID_PUBLIC_KEY", ""),
 		WebPushVAPIDPrivateKey:   lookupString("AERO_WEB_PUSH_VAPID_PRIVATE_KEY", ""),
 		PasswordHashConcurrency:  passwordConcurrency,
+		InternalAuthorization:    internalAuthorization,
 	}
 	if err := libnotifications.ValidateWebPushConfig(
 		cfg.WebPushSubscriber,
