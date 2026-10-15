@@ -97,3 +97,31 @@ heavy only; actualnamedPG/TLS/upgrade/cancel cases/testSKIP0 и twicepinnedBufSQ
 drift0 required. Native only approved fresh rtc_test_UUID schemas +own TLS/certs,
 no sharedCompose/S3/SDK/download/flag. Pending media cleanup/real device/NAT/TURN/
 group sound remain UNVERIFIED.
+
+## План guard foundation для legacy mic-slot
+
+Source preparation отдельного slice по ADR097 — dormant constructor policy,
+default off, без env activation. `NewRepositoryWithMediaSlotGuard` и
+`NewMediaStoreWithMediaSlotGuard` явно выбирают policy; обычные constructors,
+main и config её не включают. Она сериализует legacy Create/Join и group Reserve под общим
+user mutex. Parent discovery включает old active participation ended-call и
+held grant; sorted calls → rooms → users locks и повторная проверка binding
+исключают child→parent inversion. Изменившийся parent set требует rollback и
+не более трёх полных transaction attempts в исходном context; exhaustion/DB
+error означает unavailable, не revoked. Same-call legacy Join возвращает
+только уже существующий matching participant и не выдаёт media grant/token;
+repository не получает session/device и не заявляет проверку этого tuple.
+
+Guard охватывает legacy Leave/End, ended-orphan repair, stale conflict/pruning
+и ineligible signal-target exit. Matching held prepared/active/revoking grant
+удерживает slot. Typed pending превращается в sanitized FailedPrecondition,
+без successful left/ended response; существующий flag-off lobby/direct/stale
+lifecycle сохраняется. В этом foundation cleanup не начинается и Leave/End
+не объявляется принятым к исполнению. Source preparation ещё не native PASS.
+
+WS close, mute и expiry токена не являются SFU teardown ACK. Future matching
+proxy/SFU acknowledgement и отдельный durable call-wide End/Leave coordinator
+нужны до media enable; one-grant finalizer не расширяется скрыто. Public status,
+SDK/proxy/worker/UI/audio исключены. До generation/full checks/publication —
+ordinary merge generated+verified+published Identity→Chat→registration parents,
+новый clean freeze и собственные receipts; прежние PASS не переносятся.

@@ -239,6 +239,10 @@ func mapError(err error) error {
 	}
 
 	switch {
+	case errors.Is(err, rtc.ErrMediaCleanupPending):
+		return connect.NewError(connect.CodeFailedPrecondition, rtc.ErrMediaCleanupPending)
+	case errors.Is(err, rtc.ErrUnavailable):
+		return connect.NewError(connect.CodeUnavailable, rtc.ErrUnavailable)
 	case errors.Is(err, rtc.ErrInvalidArgument):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, rtc.ErrUnauthorized):

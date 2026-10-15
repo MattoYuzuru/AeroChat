@@ -37,6 +37,7 @@ type Querier interface {
 	EndCall(ctx context.Context, arg EndCallParams) (int64, error)
 	EnsureMediaUserMutex(ctx context.Context, userID uuid.UUID) error
 	ExpireNeverActivatedMediaGrant(ctx context.Context, arg ExpireNeverActivatedMediaGrantParams) (int64, error)
+	FindHeldMediaRoomByCall(ctx context.Context, callID uuid.UUID) (RtcMediaRoom, error)
 	FinishMediaGrantRevoke(ctx context.Context, arg FinishMediaGrantRevokeParams) (int64, error)
 	FinishMediaOperation(ctx context.Context, arg FinishMediaOperationParams) error
 	FinishMediaRoom(ctx context.Context, arg FinishMediaRoomParams) error
@@ -59,11 +60,14 @@ type Querier interface {
 	GetMediaOperationTarget(ctx context.Context, arg GetMediaOperationTargetParams) (RtcMediaOperationTarget, error)
 	GetMediaSourceEvent(ctx context.Context, arg GetMediaSourceEventParams) (RtcMediaSourceInbox, error)
 	GetMediaSourceReceipt(ctx context.Context, arg GetMediaSourceReceiptParams) (GetMediaSourceReceiptRow, error)
+	GetSlotParticipant(ctx context.Context, id uuid.UUID) (RtcCallParticipant, error)
 	HasPendingMediaCleanup(ctx context.Context, operationID uuid.UUID) (bool, error)
 	LeaveActiveParticipantsByCallID(ctx context.Context, arg LeaveActiveParticipantsByCallIDParams) (int64, error)
 	LeaveParticipant(ctx context.Context, arg LeaveParticipantParams) (int64, error)
 	ListActiveParticipantsByCallID(ctx context.Context, callID uuid.UUID) ([]RtcCallParticipant, error)
+	ListHeldMediaGrantsByCall(ctx context.Context, callID uuid.UUID) ([]ListHeldMediaGrantsByCallRow, error)
 	ListParticipantsByCallID(ctx context.Context, callID uuid.UUID) ([]RtcCallParticipant, error)
+	ListSlotParticipationsByUser(ctx context.Context, userID uuid.UUID) ([]RtcCallParticipant, error)
 	LockAdmissionFence(ctx context.Context) (int64, error)
 	LockCallByID(ctx context.Context, id uuid.UUID) (RtcCall, error)
 	LockMediaRoom(ctx context.Context, id uuid.UUID) (RtcMediaRoom, error)

@@ -146,6 +146,62 @@ Start/Join/Leave/End/liveness paths: heldmedia prepared/active/revoking блок
 ACK. Flagoff legacy unchanged. Cleanup claim busy/notyet/fence exhaustion —
 transient/pending или unavailable, не authorityrevoked/deny watermark.
 
+### Guard foundation для legacy mic-slot
+
+Следующий отдельный slice ограничен transactional guard. Он не инициирует
+cleanup и не реализует готовый media End/Leave. Policy передаётся явно через
+constructor; default off. Env activation, media flag, public operation/status
+API, SDK/proxy/cleanup workers сюда не входят. Пока production policy выключена,
+обычный lobby/direct lifecycle и stale eviction ADR086 сохраняются.
+
+При opt-in policy один user mutex сериализует legacy active participation и
+held media grant во всех calls/tabs/devices. Prepared/active/revoking удерживают
+slot даже при уже left legacy participant или ended call. Legacy Start/Join
+другого call отклоняются до mutation; group Reserve не обходит active legacy
+participation другого call. Same-call Join не захватывает grant иной auth
+session/device. Same-request Reserve replay сохраняет exact authority/call
+binding; revoked/revoking generation не активируется повторно.
+
+Обязательные guarded writers: CreateCallWithParticipant и JoinParticipant,
+включая ended-orphan repair; LeaveParticipantAndMaybeEndCall и
+EndCallWithParticipants; все callers stale conflict resolution/pruning,
+public Leave/End и direct repository exit ineligible SendSignal target.
+Наличие held grant не позволяет этим exits записать successful left/ended
+или освободить unique user slot. Guard возвращает typed pending; public RPC
+отображает его как sanitized FailedPrecondition, без fabricated terminal
+response или media-complete receipt. Signal target с definitive eligibility
+deny не получает сигнал даже при pending cleanup. Это не permanent source
+revocation и не основание повышать deny watermark.
+
+Lock protocol: до TX определить target и old legacy/held call/room parents,
+включая active participant ended-call; затем sorted call parents → sorted
+room parents → sorted user mutexes → grant/lease → operation/outbox. Для
+End после target call lock повторно проверить participant/user set. Под user
+mutex заново проверить parent set и full binding. Новый parent/user, которого
+нет в locked set, означает rollback и bounded retry всей transaction;
+добавлять parent lock после user mutex запрещено. Исчерпание retry/DB failure
+возвращает unavailable, не authority revoked. Сетевых authority checks под
+DB locks нет; uniqueness constraints дополняют, а не заменяют protocol.
+
+Guard-only refusal не создаёт cleanup operation и не обещает, что Leave/End
+принят к исполнению. Он лишь сохраняет slot и прежнее состояние. Existing
+matching operation/ACK продолжает жить по своему immutable binding. WS close
+закрывает только exact lease; mute, JWT/certificate expiry и heartbeat stale
+не являются authoritative SFU ACK и не освобождают publication budget/slot.
+Never-activated expiry допускается только после20s при persisted отсутствии
+activation intent и любого lease; это отдельный storage fact, не media teardown.
+
+Durable call-wide End/Leave intent, запрет новых Join и per-grant child
+operations требуют отдельного accepted contract и узкого coordinator PR.
+Текущий one-grant ACK finalizer нельзя скрыто расширять в multi-target End.
+Только future trusted matching proxy/SFU ACK завершает media; guards и
+NoMatching/empty journal completion этого не доказывают. До coordinator,
+trusted admission/cleanup adapters и общей compatibility приёмки production
+media policy/flag не включаются. Source preparation в отдельном worktree
+допустима после review; generation/full gates/publication требуют обычного
+merge generated, verified и published Identity→Chat→registration parents,
+нового clean freeze и собственных fresh receipts.
+
 ### Identity source delivery journal
 
 Identity sender — отдельный default-disabled implementation slice. Migration
