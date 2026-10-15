@@ -67,6 +67,47 @@ Frontend строится как:
 - анимации, blur и визуальные эффекты применяются умеренно;
 - accessibility и responsiveness обязательны.
 
+Метаданные приложений и маршрутов не импортируют страницы или shell-компоненты.
+Desktop/mobile surfaces и содержимое приложений загружаются по требованию. Loading
+и ошибка загрузки содержимого ограничены отдельным окном: frame, соседние окна и
+их локальное состояние сохраняются. Повторная попытка создаёт новый lazy loader
+только для неудавшегося экземпляра; успешные экземпляры и общие runtime providers
+не перезапускаются. Быстрые повторные нажатия не запускают параллельные retry,
+а завершение загрузки после закрытия окна не открывает его заново.
+
+После отказа native dynamic import браузер может сохранить ошибку по URL даже
+для нового React lazy. Ручной retry получает URL того же модуля из сборочного
+Rollup file reference; URL не извлекается из функции или текста ошибки. Plugin
+выпускает рядом с chunk ограниченный JSON со static CSS closure. Перед retry
+клиент проверяет same-origin, ожидаемый путь модуля и ограниченный список CSS.
+Неудавшиеся стили запрашиваются с новым query и дожидаются load до показа окна.
+Повторно используются только stylesheet, для которых этот loader подтвердил
+собственный `load`: наличие `link.sheet` после сетевого отказа не доказывает успех.
+При первом retry первоначально успешный Vite stylesheet может быть запрошен ещё
+раз; error/timeout удаляет только собственный неудавшийся link.
+
+Для одного descriptor за lifetime страницы допускаются не более трёх свежих
+retry URL. Одновременные retry разделяют одну pending operation, а только полная
+успешная загрузка CSS и модуля сохраняется для будущих открытий окна. Уже открытые
+успешные окна сохраняют тип компонента и локальное состояние. Исчерпание попыток,
+отсутствие sidecar или ошибка вложенной static JS dependency оставляют доступную
+ошибку; общие provider/import URL не переписываются и страница автоматически
+не перезагружается. Это восстановление конкретного UI chunk, а не обход всех
+browser module caches.
+
+Основание: [Rollup File URLs](https://rollupjs.org/plugin-development/#file-urls),
+[Vite 7 Plugin API](https://v7.vite.dev/guide/api-plugin) и исходники точного
+установленного Vite 7.3.1:
+[metadata](https://github.com/vitejs/vite/blob/v7.3.1/packages/vite/src/node/plugins/metadata.ts),
+[CSS](https://github.com/vitejs/vite/blob/v7.3.1/packages/vite/src/node/plugins/css.ts),
+[порядок hooks](https://github.com/vitejs/vite/blob/v7.3.1/packages/vite/src/node/plugins/index.ts).
+Plugin проверяет наличие `viteMetadata.importedCss` после CSS build hooks,
+не изменяет JavaScript после расчёта chunk hash. Основная актуальная документация
+Vite описывает также Vite 8/Rolldown и не заменяет эту проверку установленной версии.
+
+Загрузка общих auth/crypto/notifications/RTC providers остаётся частью bootstrap.
+Разделение UI chunks само по себе не означает отложенный запуск криптографии.
+
 ### 5. Markdown policy
 
 Во frontend не допускается raw HTML rendering для пользовательских сообщений.

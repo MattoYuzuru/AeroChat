@@ -11,6 +11,7 @@ import (
 	"time"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
+	libnotifications "github.com/MattoYuzuru/AeroChat/libs/go/notifications"
 	"github.com/google/uuid"
 )
 
@@ -334,9 +335,9 @@ func (s *Service) UpsertWebPushSubscription(
 		return err
 	}
 
-	endpoint, err := normalizeRequiredURLString(input.Endpoint, "endpoint")
+	endpoint, err := libnotifications.NormalizeWebPushEndpoint(input.Endpoint)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: web push endpoint is not allowed", ErrInvalidArgument)
 	}
 	p256dhKey, err := normalizeRequiredTokenString(input.P256DHKey, "p256dh_key", 512)
 	if err != nil {
@@ -374,6 +375,12 @@ func (s *Service) DeleteWebPushSubscription(ctx context.Context, token string, e
 	normalizedEndpoint, err := normalizeRequiredURLString(endpoint, "endpoint")
 	if err != nil {
 		return err
+	}
+	canonicalEndpoint, policyErr := libnotifications.NormalizeWebPushEndpoint(normalizedEndpoint)
+	if policyErr == nil && canonicalEndpoint != normalizedEndpoint {
+		if _, err := s.repo.DeleteWebPushSubscription(ctx, authSession.User.ID, canonicalEndpoint); err != nil {
+			return err
+		}
 	}
 
 	_, err = s.repo.DeleteWebPushSubscription(ctx, authSession.User.ID, normalizedEndpoint)
