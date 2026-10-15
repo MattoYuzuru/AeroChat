@@ -54,6 +54,8 @@ Native media integration `go -C services/aero-chat test -tags integration ./inte
 
 Encrypted server ordering по [ADR-096](adr/096-encrypted-conversation-server-sequence.md) использует тот же PostgreSQL profile только для собственных disposable schemas. `go test -count=1 -tags integration -run TestEncrypted ./services/aero-chat/internal/storage/postgres` проверяет sender clock/read cutoff, commit serialization, cancellation, duplicate/overflow и bounded metadata backfill; S3 эти tests не трогают. [Sequence cutover](deploy/encrypted-sequence-cutover.md) требует остановки старых writers, verified backup/restore и opt-in CLI до запуска нового chat service на legacy data. Web adoption и full two-account browser acceptance фиксируются отдельно.
 
+Web Push endpoints ограничены [ADR-095](adr/095-web-push-egress-boundary.md): HTTPS/443, `fcm.googleapis.com`, `updates.push.services.mozilla.com` и непустые subdomains `*.push.apple.com`. Sender повторно проверяет старые subscriptions, весь DNS answer и числовой dial; proxy environment и redirects отключены. Custom push providers пока не поддерживаются. Request budget 5s, DNS/dial/TLS/header 2s, весь sequential batch 10s. Private/mixed DNS, TLS и timeout не удаляют допустимый subscription; HTTP 404/410 и структурно запрещённый URL — invalid. Локальные fixtures подтверждают transport boundary, не actual browser/OS delivery.
+
 ## Проверки
 
 Запускать последовательно после установки инструментов и зависимостей. Генерация меняет файлы: проверять её diff и не совмещать с редактированием тех же контрактов. Buf remote plugins закреплены version + revision в `buf.gen.yaml`: protobuf Go `1.36.11`, Connect Go `1.19.1`, оба revision `1`. SQLC закреплён на `1.30.0` в installer и CI. Версия Buf CLI — `1.59.0`.

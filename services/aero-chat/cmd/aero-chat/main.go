@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -126,7 +125,6 @@ func run() error {
 		objectStorage,
 		app.NewMessageNotificationDispatcher(
 			libnotifications.NewWebPushClient(
-				&http.Client{},
 				cfg.WebPushSubscriber,
 				cfg.WebPushVAPIDPublicKey,
 				cfg.WebPushVAPIDPrivateKey,
