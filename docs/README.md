@@ -6,7 +6,7 @@
 
 | Задача | Источник |
 | --- | --- |
-Исходные дефекты, проверки и ограничения | [Аудит 11 октября 2026](audits/2026-10-11-readiness.md) |
+| Исходные дефекты, проверки и ограничения | [Аудит 11 октября 2026](audits/2026-10-11-readiness.md) |
 | Исправления, draft PR/HEAD и незавершённая приёмка | [Remediation 11 октября 2026](audits/2026-10-11-remediation.md) |
 | React Router maintenance и применимость advisory | [Router advisory review](audits/2026-10-11-router-advisories.md) |
 | Подробный inventory возможностей и ограничений | [Capabilities](product/capabilities.md) |
