@@ -188,8 +188,9 @@ export function useAttachmentComposer({
       await uploadFileWithProgress({
         body: file,
         uploadUrl: intent.uploadSession.uploadUrl,
-        httpMethod: intent.uploadSession.httpMethod || "PUT",
+        httpMethod: intent.uploadSession.httpMethod,
         headers: intent.uploadSession.headers,
+        formFields: intent.uploadSession.formFields,
         signal: abortController.signal,
         onProgress(progress) {
           dispatch({

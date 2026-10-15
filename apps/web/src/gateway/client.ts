@@ -1,3 +1,4 @@
+import { requireServerSequence } from "./server-sequence";
 import type {
   Attachment,
   AttachmentUploadSession,
@@ -402,6 +403,7 @@ interface AttachmentUploadSessionWire extends TimestampedWire {
   expiresAt?: string;
   completedAt?: string;
   failedAt?: string;
+  formFields?: Record<string, string>;
 }
 
 interface MessageTombstoneWire {
@@ -439,6 +441,7 @@ interface DirectChatReadStateWire {
 }
 
 interface EncryptedConversationReadPositionWire extends TimestampedWire {
+  lastReadServerSequence?: string;
   messageId?: string;
   messageCreatedAt?: string;
 }
@@ -471,6 +474,7 @@ interface EncryptedDirectMessageV2EnvelopeWire {
   targetMessageId?: string;
   revision?: number | string;
   createdAt?: string;
+  serverSequence?: string;
   storedAt?: string;
   viewerDelivery?: EncryptedDirectMessageV2DeliveryWire;
 }
@@ -484,6 +488,7 @@ interface EncryptedDirectMessageV2StoredEnvelopeWire {
   targetMessageId?: string;
   revision?: number | string;
   createdAt?: string;
+  serverSequence?: string;
   storedAt?: string;
   storedDeliveryCount?: number | string;
   storedDeliveries?: EncryptedDirectMessageV2StoredDeliveryWire[];
@@ -573,6 +578,7 @@ interface EncryptedGroupEnvelopeWire {
   ciphertext?: string;
   ciphertextSizeBytes?: number | string;
   createdAt?: string;
+  serverSequence?: string;
   storedAt?: string;
   viewerDelivery?: EncryptedGroupMessageDeliveryWire;
 }
@@ -589,6 +595,7 @@ interface EncryptedGroupStoredEnvelopeWire {
   targetMessageId?: string;
   revision?: number | string;
   createdAt?: string;
+  serverSequence?: string;
   storedAt?: string;
   storedDeliveryCount?: number | string;
   storedDeliveries?: EncryptedGroupMessageDeliveryWire[];
@@ -2941,11 +2948,17 @@ function normalizeEncryptedConversationReadPosition(
   const messageId = input.messageId ?? "";
   const messageCreatedAt = input.messageCreatedAt ?? "";
   const updatedAt = input.updatedAt ?? "";
-  if (messageId === "" && messageCreatedAt === "" && updatedAt === "") {
+  if (messageId === "" && messageCreatedAt === "" && updatedAt === "" &&
+    (input.lastReadServerSequence === undefined || input.lastReadServerSequence === "0")) {
     return null;
   }
 
+  if (messageId.trim() === "") {
+    throw new Error("Не удалось подтвердить позицию прочтения. Обновите AeroChat и повторите попытку.");
+  }
+
   return {
+    lastReadServerSequence: requireServerSequence(input.lastReadServerSequence),
     messageId,
     messageCreatedAt,
     updatedAt,
@@ -3057,6 +3070,7 @@ function normalizeAttachmentUploadSession(
     uploadUrl: input?.uploadUrl ?? "",
     httpMethod: input?.httpMethod ?? "",
     headers: input?.headers ?? {},
+    formFields: input?.formFields ?? {},
     createdAt: input?.createdAt ?? "",
     updatedAt: input?.updatedAt ?? "",
     expiresAt: input?.expiresAt ?? "",
@@ -3408,6 +3422,7 @@ function normalizeEncryptedDirectMessageV2StoredEnvelope(
     targetMessageId: normalizeNullableString(input?.targetMessageId),
     revision: normalizeCount(input?.revision),
     createdAt: input?.createdAt ?? "",
+    serverSequence: requireServerSequence(input?.serverSequence),
     storedAt: input?.storedAt ?? "",
     storedDeliveryCount: normalizeCount(input?.storedDeliveryCount),
     storedDeliveries: (input?.storedDeliveries ?? []).map(
@@ -3428,6 +3443,7 @@ function normalizeEncryptedDirectMessageV2Envelope(
     targetMessageId: normalizeNullableString(input?.targetMessageId),
     revision: normalizeCount(input?.revision),
     createdAt: input?.createdAt ?? "",
+    serverSequence: requireServerSequence(input?.serverSequence),
     storedAt: input?.storedAt ?? "",
     viewerDelivery: normalizeEncryptedDirectMessageV2Delivery(input?.viewerDelivery),
   };
@@ -3548,6 +3564,7 @@ function normalizeEncryptedGroupEnvelope(
     ciphertext: input?.ciphertext ?? "",
     ciphertextSizeBytes: normalizeCount(input?.ciphertextSizeBytes),
     createdAt: input?.createdAt ?? "",
+    serverSequence: requireServerSequence(input?.serverSequence),
     storedAt: input?.storedAt ?? "",
     viewerDelivery: normalizeEncryptedGroupMessageDelivery(input?.viewerDelivery),
   };
@@ -3568,6 +3585,7 @@ function normalizeEncryptedGroupStoredEnvelope(
     targetMessageId: normalizeNullableString(input?.targetMessageId),
     revision: normalizeCount(input?.revision),
     createdAt: input?.createdAt ?? "",
+    serverSequence: requireServerSequence(input?.serverSequence),
     storedAt: input?.storedAt ?? "",
     storedDeliveryCount: normalizeCount(input?.storedDeliveryCount),
     storedDeliveries: (input?.storedDeliveries ?? []).map(

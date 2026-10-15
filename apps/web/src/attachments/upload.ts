@@ -10,6 +10,7 @@ interface UploadFileWithProgressInput {
   uploadUrl: string;
   httpMethod: string;
   headers: Record<string, string>;
+  formFields: Record<string, string>;
   onProgress(progress: number): void;
   signal?: AbortSignal;
 }
@@ -19,16 +20,41 @@ export function uploadFileWithProgress({
   uploadUrl,
   httpMethod,
   headers,
+  formFields,
   onProgress,
   signal,
 }: UploadFileWithProgressInput): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (httpMethod !== "POST" || !formFields?.policy || !formFields.key) {
+      reject(new Error("upload requires a bounded POST policy"));
+      return;
+    }
+    if (signal?.aborted) {
+      reject(new AttachmentUploadAbortedError());
+      return;
+    }
+    if (Object.keys(headers).some((name) => name.toLowerCase() === "content-type")) {
+      reject(new Error("multipart Content-Type must be set by the browser"));
+      return;
+    }
+    const form = new FormData();
+    for (const [name, value] of Object.entries(formFields)) {
+      form.append(name, value);
+    }
+    form.append("file", body instanceof Blob ? body : new Blob([body]), "ciphertext.bin");
     const request = new XMLHttpRequest();
     request.open(httpMethod, uploadUrl, true);
 
     for (const [headerName, headerValue] of Object.entries(headers)) {
       request.setRequestHeader(headerName, headerValue);
     }
+
+    const abort = () => request.abort();
+    const settle = (error?: Error) => {
+      signal?.removeEventListener("abort", abort);
+      if (error) reject(error);
+      else resolve();
+    };
 
     request.upload.onprogress = (event) => {
       if (!event.lengthComputable || event.total <= 0) {
@@ -40,36 +66,29 @@ export function uploadFileWithProgress({
 
     request.onload = () => {
       if (request.status >= 200 && request.status < 300) {
-        resolve();
+        settle();
         return;
       }
 
-      reject(new Error(`upload failed with status ${request.status}`));
+      settle(new Error(`upload failed with status ${request.status}`));
     };
 
     request.onerror = () => {
-      reject(new Error("upload failed"));
+      settle(new Error("upload failed"));
     };
 
     request.onabort = () => {
-      reject(new AttachmentUploadAbortedError());
+      settle(new AttachmentUploadAbortedError());
     };
 
     if (signal) {
-      if (signal.aborted) {
-        request.abort();
-        return;
-      }
-
-      signal.addEventListener(
-        "abort",
-        () => {
-          request.abort();
-        },
-        { once: true },
-      );
+      signal.addEventListener("abort", abort, { once: true });
     }
 
-    request.send(body);
+    try {
+      request.send(form);
+    } catch (error) {
+      settle(error instanceof Error ? error : new Error("upload failed"));
+    }
   });
 }

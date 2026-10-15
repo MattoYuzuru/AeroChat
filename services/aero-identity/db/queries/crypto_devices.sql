@@ -1,3 +1,6 @@
+-- name: LockCryptoDeviceRegistryOwner :one
+SELECT id FROM users WHERE id = $1 FOR UPDATE;
+
 -- name: GetCryptoDeviceRegistryStatsByUserID :one
 SELECT
     COUNT(*)::bigint AS total_count,

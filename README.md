@@ -50,7 +50,7 @@ AeroChat объединяет личные переписки, группы, ф�
 
 Требования: Git, Docker / Docker Compose. Для разработки из исходников также нужны Go **1.25**, Node.js **22**, pnpm **10.19.0** и инструменты из [development guide](docs/development.md).
 
-> По [аудиту](docs/audits/2026-10-11-readiness.md) чистый запуск сейчас блокируется недоступными storage images ([#163](https://github.com/MattoYuzuru/AeroChat/issues/163)); обычный upload также требует исправления presign region ([#165](https://github.com/MattoYuzuru/AeroChat/issues/165)). Ниже — штатные команды, а не подтверждение успешного cold-cache запуска.
+> MinIO и bootstrap client теперь собираются из закреплённых исходников по [ADR-087](docs/adr/087-pinned-storage-source-build-lifecycle.md); первый запуск требует Docker Hub, GitHub codeload и Go modules. Обычный upload отдельно требует исправления presign region ([#165](https://github.com/MattoYuzuru/AeroChat/issues/165)). [Аудит](docs/audits/2026-10-11-readiness.md) сохраняет результаты исходной ревизии.
 
 ```bash
 git clone https://github.com/MattoYuzuru/AeroChat.git
@@ -72,7 +72,7 @@ docker compose -f infra/compose/docker-compose.yml logs --tail=100 aero-gateway 
 
 Server topology использует image-based Docker Compose и общий `k3s + Traefik` edge с TLS через `cert-manager`. Media публикуется на отдельном browser-visible origin. Repo-managed `coturn` работает как прямой host UDP/TCP service по [ADR-085](docs/adr/085-server-turn-runtime-and-public-relay-ip-contract.md).
 
-Для подготовки сервера читать [single-server bootstrap](docs/deploy/single-server-bootstrap.md); production rollout, health gates и rollback описаны в [runbook](docs/deploy/production-rollout.md). Application images публикуются в GHCR для `linux/amd64`; сборку можно выбрать по точному `sha-<commit>` tag.
+Для подготовки сервера читать [single-server bootstrap](docs/deploy/single-server-bootstrap.md); production rollout, health gates и rollback описаны в [runbook](docs/deploy/production-rollout.md). Application images проходят gates точного SHA и выбираются по [immutable release manifest](docs/deploy/verified-release.md) с пятью image digests.
 
 ## Архитектура и код
 

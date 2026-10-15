@@ -122,7 +122,7 @@ func TestCompleteAttachmentUploadAndAttachToDirectMessage(t *testing.T) {
 		t.Fatalf("create upload intent: %v", err)
 	}
 
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}
@@ -177,8 +177,9 @@ func TestUnattachedAttachmentRemainsOwnerScoped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create upload intent: %v", err)
 	}
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
-		Size: intent.Attachment.SizeBytes,
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
+		Size:        intent.Attachment.SizeBytes,
+		ContentType: intent.Attachment.MimeType,
 	}
 	if _, err := service.CompleteAttachmentUpload(context.Background(), alice.Token, intent.Attachment.ID, intent.UploadSession.ID); err != nil {
 		t.Fatalf("complete attachment upload: %v", err)
@@ -203,7 +204,7 @@ func TestSendAttachmentOnlyMessageInDirectChat(t *testing.T) {
 		t.Fatalf("create upload intent: %v", err)
 	}
 
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}
@@ -255,7 +256,7 @@ func TestSendAttachmentOnlyMessageInGroupChat(t *testing.T) {
 		t.Fatalf("create upload intent: %v", err)
 	}
 
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}
@@ -313,7 +314,7 @@ func TestEncryptedDirectMessageTombstoneDetachesEncryptedRelayBlobAndReleasesQuo
 		t.Fatalf("create encrypted direct upload intent: %v", err)
 	}
 
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}
@@ -460,7 +461,7 @@ func TestSendEncryptedGroupMessageAttachesEncryptedRelayBlobForGroupParticipants
 		t.Fatalf("create encrypted group upload intent: %v", err)
 	}
 
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}
@@ -552,7 +553,7 @@ func TestEncryptedGroupMessageTombstoneDetachesEncryptedRelayBlobAndReleasesQuot
 		t.Fatalf("create encrypted group upload intent: %v", err)
 	}
 
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}
@@ -775,7 +776,7 @@ func TestDeleteDirectMessageTransitionsAttachmentToDetached(t *testing.T) {
 		t.Fatalf("create upload intent: %v", err)
 	}
 
-	repo.objectStorage.objects[intent.Attachment.ObjectKey] = StoredObjectInfo{
+	repo.objectStorage.objects[intent.UploadSession.StagingObjectKey] = StoredObjectInfo{
 		Size:        intent.Attachment.SizeBytes,
 		ContentType: intent.Attachment.MimeType,
 	}

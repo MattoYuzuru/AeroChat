@@ -403,7 +403,7 @@ func TestListFriendsRefreshesSessionTouchWhenLastSeenIsStale(t *testing.T) {
 
 func newTestService() *Service {
 	repo := newFakeRepository()
-	service := NewService(repo, identityauth.NewPasswordHasher(), libauth.NewSessionTokenManager(), nil)
+	service := NewService(repo, identityauth.NewPasswordHasher(), libauth.NewSessionTokenManager(), nil, nil)
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	service.now = func() time.Time {
 		now = now.Add(time.Second)
@@ -864,6 +864,17 @@ func (r *fakeRepository) CreateCryptoDevice(_ context.Context, params CreateCryp
 	deviceCopy := device
 	bundleCopy := cloneCryptoBundle(bundle)
 	return &deviceCopy, &bundleCopy, nil
+}
+
+func (r *fakeRepository) CreateFirstCryptoDevice(ctx context.Context, params CreateCryptoDeviceParams) (*CryptoDevice, *CryptoDeviceBundle, error) {
+	total, _, _, err := r.GetCryptoDeviceRegistryStatsByUserID(ctx, params.Device.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if total != 0 {
+		return nil, nil, ErrConflict
+	}
+	return r.CreateCryptoDevice(ctx, params)
 }
 
 func (r *fakeRepository) ListCryptoDevices(_ context.Context, userID string) ([]CryptoDevice, error) {

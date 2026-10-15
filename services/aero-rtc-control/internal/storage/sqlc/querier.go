@@ -25,6 +25,8 @@ type Querier interface {
 	LeaveParticipant(ctx context.Context, arg LeaveParticipantParams) (int64, error)
 	ListActiveParticipantsByCallID(ctx context.Context, callID uuid.UUID) ([]RtcCallParticipant, error)
 	ListParticipantsByCallID(ctx context.Context, callID uuid.UUID) ([]RtcCallParticipant, error)
+	LockCallByID(ctx context.Context, id uuid.UUID) (RtcCall, error)
+	ReleaseEndedParticipationByUserID(ctx context.Context, arg ReleaseEndedParticipationByUserIDParams) error
 	TouchParticipantSignal(ctx context.Context, arg TouchParticipantSignalParams) (int64, error)
 }
 
