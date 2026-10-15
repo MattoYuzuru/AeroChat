@@ -36,7 +36,7 @@ class MemoryStorage implements ShellPreferencesStorageLike {
 }
 
 describe("desktop registry", () => {
-  it("always restores mandatory system apps on desktop", () => {
+  it("lists default system apps after persistence", () => {
     const storage = new MemoryStorage();
 
     writeDesktopRegistryState(storage, createInitialDesktopRegistryState());
@@ -48,7 +48,8 @@ describe("desktop registry", () => {
       "Я",
       "Создать группу",
       "Поиск",
-      "Explorer",
+      "Проводник",
+      "Люди",
       "Заявки",
       "Настройки",
     ]);
@@ -166,7 +167,7 @@ describe("desktop registry", () => {
 
     expect(visibleEntries).toHaveLength(10);
     expect(overflow).toEqual([
-      { bucket: "contacts", title: "Контакты", count: 8 },
+      { bucket: "contacts", title: "Контакты", count: 9 },
       { bucket: "groups", title: "Группы", count: 1 },
     ]);
   });

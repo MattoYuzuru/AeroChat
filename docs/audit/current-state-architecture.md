@@ -1,5 +1,9 @@
 # Текущий аудит состояния AeroChat
 
+> **Исторический материал марта 2026.** Документ сохраняет исходные findings и последующие локальные дополнения, но не является актуальным readiness report. Текущие проверки и ограничения: [аудит 11 октября 2026](../audits/2026-10-11-readiness.md); обзор возможностей: [capabilities](../product/capabilities.md).
+>
+> Утверждения ниже об отсутствии backend self chat, repo-managed TURN, push, service worker или install flow устарели: см. [ADR-084](../adr/084-self-chat-foundation.md), [ADR-085](../adr/085-server-turn-runtime-and-public-relay-ip-contract.md), [notifications ADR-086](../adr/086-web-notifications-and-push-foundation.md). Наличие реализации не означает полной E2EE, call или offline/PWA готовности. Исторические findings проверять заново на текущем HEAD.
+
 ## Executive summary
 
 На март 2026 года AeroChat уже является работающим self-hosted веб-чатом с одним внешним backend edge через `aero-gateway`, отдельными сервисными границами `aero-identity` и `aero-chat`, локальным/full-stack compose-окружением и prod-like single-server rollout через server compose + shared `Traefik`.

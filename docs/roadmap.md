@@ -227,6 +227,7 @@ storage/model и bounded compatibility reads в репозитории всё е
 - [x] Signaling model
 - [x] Active call and participant control-plane foundation через `aero-rtc-control`
 - [x] Web audio-only 1:1 direct-call bootstrap
+- [x] Repo-managed TURN runtime и явный public relay IP contract для server compose
 - [ ] 1:1 call polish, continuity и richer call UX
 - [x] One-active-call-per-user policy
 - [x] Group call control-plane и web lobby bootstrap
@@ -235,9 +236,12 @@ storage/model и bounded compatibility reads в репозитории всё е
 - [ ] Future screen-share hooks
 
 Примечание:
-текущий direct-call web slice остаётся bounded audio-only bootstrap без repo-level STUN/TURN
-orchestration и без device controls. Group call flow сейчас покрывает control-plane и lobby UI,
-но не multiparty browser media transport.
+текущий direct-call web slice остаётся bounded audio-only bootstrap без device controls.
+ICE policy читается из `aero-rtc-control`; server compose управляет TURN runtime по
+[ADR-085](adr/085-server-turn-runtime-and-public-relay-ip-contract.md). Работоспособность звонка
+требует корректного public/relay IP, credentials, открытых портов и отдельной проверки media connectivity.
+Group call flow сейчас покрывает control-plane и lobby UI, но не multiparty browser media transport.
+Текущие дефекты и фактическое evidence описаны в [аудите](audits/2026-10-11-readiness.md).
 
 ---
 

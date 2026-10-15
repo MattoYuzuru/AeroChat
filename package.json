@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.19.0",
   "scripts": {
     "lint:web": "pnpm --filter @aerochat/web lint",
+    "test:web": "pnpm --filter @aerochat/web test",
     "build:web": "pnpm --filter @aerochat/web build"
   }
 }

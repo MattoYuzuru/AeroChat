@@ -104,7 +104,7 @@ describe("resolveShellRouteEntry", () => {
     expect(resolved?.app.appId).toBe("explorer");
     expect(resolved?.target).toEqual({
       key: "explorer",
-      title: "Explorer",
+      title: "Проводник",
       routePath: "/app/explorer?section=overflow",
     });
   });
@@ -116,7 +116,7 @@ describe("resolveShellRouteEntry", () => {
     expect(resolved?.app.appId).toBe("explorer");
     expect(resolved?.target).toEqual({
       key: "explorer",
-      title: "Explorer",
+      title: "Проводник",
       routePath: "/app/explorer?folder=folder-7",
     });
   });

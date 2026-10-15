@@ -98,7 +98,7 @@ describe("desktop context menu", () => {
       {
         kind: "command",
         id: "open_explorer",
-        label: "Открыть Explorer",
+        label: "Открыть проводник",
         tone: "default",
       },
     ]);
