@@ -7,25 +7,13 @@ import (
 	"testing"
 	"time"
 
-	rtcschema "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/db/schema"
 	media "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/mediastore"
 	"github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/domain/rtc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func mediaTestDatabase(t *testing.T) *pgxpool.Pool {
-	t.Helper()
-	db := newTestDatabase(t)
-	content, err := rtcschema.Files.ReadFile("000001_dormant_media_grant_store.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(context.Background(), string(content)); err != nil {
-		t.Fatal(err)
-	}
-	return db
-}
+func mediaTestDatabase(t *testing.T) *pgxpool.Pool { t.Helper(); return newTestDatabase(t) }
 func mediaTestCall(t *testing.T, db *pgxpool.Pool) (uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
 	user := uuid.New()

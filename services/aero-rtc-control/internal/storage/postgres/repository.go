@@ -18,8 +18,9 @@ import (
 )
 
 type Repository struct {
-	db      *pgxpool.Pool
-	queries *rtcsqlc.Queries
+	db             *pgxpool.Pool
+	queries        *rtcsqlc.Queries
+	mediaSlotGuard bool
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository {
@@ -27,6 +28,25 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 		db:      db,
 		queries: rtcsqlc.New(db),
 	}
+}
+
+// Constructor policy остаётся dormant: main/config не включает guard.
+func NewRepositoryWithMediaSlotGuard(db *pgxpool.Pool) *Repository {
+	r := NewRepository(db)
+	r.mediaSlotGuard = true
+	return r
+}
+
+func (r *Repository) beginLegacySlot(ctx context.Context, s slotSpec) (pgx.Tx, *slotTransaction, error) {
+	if !r.mediaSlotGuard {
+		tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+		return tx, nil, err
+	}
+	slot, err := retrySlot(ctx, func() (*slotTransaction, error) { return beginSlotTransaction(ctx, r.db, r.queries, s) })
+	if err != nil {
+		return nil, nil, slotLegacyError(err)
+	}
+	return slot.tx, slot, nil
 }
 
 func (r *Repository) Ping(ctx context.Context) error {
@@ -99,16 +119,45 @@ func (r *Repository) GetActiveParticipationByUserID(ctx context.Context, userID 
 	}, nil
 }
 
-func (r *Repository) CreateCallWithParticipant(ctx context.Context, call rtc.Call, participant rtc.CallParticipant) (*rtc.Call, *rtc.CallParticipant, error) {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+func (r *Repository) CreateCallWithParticipant(ctx context.Context, call rtc.Call, participant rtc.CallParticipant) (resultCall *rtc.Call, resultParticipant *rtc.CallParticipant, resultErr error) {
+	if r.mediaSlotGuard {
+		defer func() { resultErr = slotLegacyError(resultErr) }()
+	}
+	spec := slotSpec{call: mustParseUUID(call.ID), user: mustParseUUID(participant.UserID), create: true}
+	if r.mediaSlotGuard && (spec.call == uuid.Nil || spec.user == uuid.Nil || mustParseUUID(participant.ID) == uuid.Nil || mustParseUUID(participant.CallID) != spec.call || mustParseUUID(call.CreatedByUserID) != spec.user) {
+		return nil, nil, rtc.ErrInvalidArgument
+	}
+	tx, slot, err := r.beginLegacySlot(ctx, spec)
 	if err != nil {
-		return nil, nil, fmt.Errorf("begin tx: %w", err)
+		if !r.mediaSlotGuard {
+			return nil, nil, fmt.Errorf("begin tx: %w", err)
+		}
+		return nil, nil, err
 	}
 	defer func() {
 		_ = tx.Rollback(ctx)
 	}()
 
 	q := r.queries.WithTx(tx)
+	if call.Scope.Type == rtc.ScopeTypeGroup {
+		if _, err := q.GetOpenMediaEndByGroup(ctx, mustParseUUID(call.Scope.GroupID)); err == nil {
+			return nil, nil, rtc.ErrMediaCleanupPending
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, rtc.ErrUnavailable
+		}
+	}
+	if _, err := q.GetOpenMediaEndForActiveUser(ctx, mustParseUUID(participant.UserID)); err == nil {
+		return nil, nil, rtc.ErrMediaCleanupPending
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, rtc.ErrUnavailable
+	}
+
+	if slot != nil {
+		defer rollbackMedia(tx)
+		if err := slot.allowLegacyJoin(spec); err != nil {
+			return nil, nil, err
+		}
+	}
 	if err := q.ReleaseEndedParticipationByUserID(ctx, rtcsqlc.ReleaseEndedParticipationByUserIDParams{
 		UserID: mustParseUUID(participant.UserID), At: timestamptzValue(participant.UpdatedAt),
 	}); err != nil {
@@ -157,16 +206,34 @@ func (r *Repository) CreateParticipant(ctx context.Context, participant rtc.Call
 	return joined, err
 }
 
-func (r *Repository) JoinParticipant(ctx context.Context, participant rtc.CallParticipant) (*rtc.Call, *rtc.CallParticipant, error) {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+func (r *Repository) JoinParticipant(ctx context.Context, participant rtc.CallParticipant) (resultCall *rtc.Call, resultParticipant *rtc.CallParticipant, resultErr error) {
+	if r.mediaSlotGuard {
+		defer func() { resultErr = slotLegacyError(resultErr) }()
+	}
+	spec := slotSpec{call: mustParseUUID(participant.CallID), user: mustParseUUID(participant.UserID)}
+	if r.mediaSlotGuard && (spec.call == uuid.Nil || spec.user == uuid.Nil) {
+		return nil, nil, rtc.ErrInvalidArgument
+	}
+	tx, slot, err := r.beginLegacySlot(ctx, spec)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := r.queries.WithTx(tx)
-	locked, err := q.LockCallByID(ctx, mustParseUUID(participant.CallID))
+	if slot != nil {
+		defer rollbackMedia(tx)
+		if err := slot.allowLegacyJoin(spec); err != nil {
+			return nil, nil, err
+		}
+	}
+	locked, err := slotLockedCall(ctx, q, slot, mustParseUUID(participant.CallID))
 	if err != nil {
 		return nil, nil, convertError(err)
+	}
+	if pending, err := mediaEndPending(ctx, q, locked.ID); err != nil {
+		return nil, nil, rtc.ErrUnavailable
+	} else if pending {
+		return nil, nil, rtc.ErrMediaCleanupPending
 	}
 	if locked.Status != rtc.CallStatusActive {
 		return nil, nil, rtc.ErrConflict
@@ -205,16 +272,33 @@ func (r *Repository) JoinParticipant(ctx context.Context, participant rtc.CallPa
 	return call, &result, nil
 }
 
-func (r *Repository) LeaveParticipantAndMaybeEndCall(ctx context.Context, callID, participantID string, at time.Time) (bool, error) {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+func (r *Repository) LeaveParticipantAndMaybeEndCall(ctx context.Context, callID, participantID string, at time.Time) (result bool, resultErr error) {
+	if r.mediaSlotGuard {
+		defer func() { resultErr = slotLegacyError(resultErr) }()
+	}
+	if r.mediaSlotGuard && (mustParseUUID(callID) == uuid.Nil || mustParseUUID(participantID) == uuid.Nil) {
+		return false, rtc.ErrInvalidArgument
+	}
+	tx, slot, err := r.beginLegacySlot(ctx, slotSpec{call: mustParseUUID(callID), participant: mustParseUUID(participantID)})
 	if err != nil {
 		return false, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := r.queries.WithTx(tx)
-	call, err := q.LockCallByID(ctx, mustParseUUID(callID))
+	if slot != nil {
+		defer rollbackMedia(tx)
+		if err := slot.allowLegacyRelease(); err != nil {
+			return false, err
+		}
+	}
+	call, err := slotLockedCall(ctx, q, slot, mustParseUUID(callID))
 	if err != nil {
 		return false, convertError(err)
+	}
+	if pending, err := mediaEndPending(ctx, q, call.ID); err != nil {
+		return false, rtc.ErrUnavailable
+	} else if pending {
+		return false, rtc.ErrMediaCleanupPending
 	}
 	rows, err := q.ListActiveParticipantsByCallID(ctx, call.ID)
 	if err != nil {
@@ -248,22 +332,44 @@ func (r *Repository) LeaveParticipantAndMaybeEndCall(ctx context.Context, callID
 	return true, nil
 }
 
-func (r *Repository) EndCallWithParticipants(ctx context.Context, callID, userID string, at time.Time) (*rtc.Call, []rtc.CallParticipant, error) {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+func (r *Repository) EndCallWithParticipants(ctx context.Context, callID, userID string, at time.Time) (resultCall *rtc.Call, resultParticipants []rtc.CallParticipant, resultErr error) {
+	if r.mediaSlotGuard {
+		defer func() { resultErr = slotLegacyError(resultErr) }()
+	}
+	if r.mediaSlotGuard && (mustParseUUID(callID) == uuid.Nil || mustParseUUID(userID) == uuid.Nil) {
+		return nil, nil, rtc.ErrInvalidArgument
+	}
+	tx, slot, err := r.beginLegacySlot(ctx, slotSpec{call: mustParseUUID(callID), end: true})
 	if err != nil {
 		return nil, nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := r.queries.WithTx(tx)
-	call, err := q.LockCallByID(ctx, mustParseUUID(callID))
+	if slot != nil {
+		defer rollbackMedia(tx)
+	}
+	call, err := slotLockedCall(ctx, q, slot, mustParseUUID(callID))
 	if err != nil {
 		return nil, nil, convertError(err)
+	}
+	if pending, err := mediaEndPending(ctx, q, call.ID); err != nil {
+		return nil, nil, rtc.ErrUnavailable
+	} else if pending {
+		if call.CreatedByUserID.String() != userID {
+			return nil, nil, rtc.ErrPermissionDenied
+		}
+		return nil, nil, rtc.ErrMediaCleanupPending
 	}
 	if call.Status != rtc.CallStatusActive {
 		return nil, nil, rtc.ErrConflict
 	}
 	if call.CreatedByUserID.String() != userID {
 		return nil, nil, rtc.ErrPermissionDenied
+	}
+	if slot != nil {
+		if err := slot.allowLegacyRelease(); err != nil {
+			return nil, nil, err
+		}
 	}
 	rows, err := q.ListActiveParticipantsByCallID(ctx, call.ID)
 	if err != nil {

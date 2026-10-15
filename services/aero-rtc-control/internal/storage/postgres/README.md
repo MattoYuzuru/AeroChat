@@ -76,3 +76,55 @@ GOTOOLCHAIN=go1.25.8 agent-dev run --cwd "$PWD" --resource heavy -- go test -jso
 не считаются native evidence. Отдельно проверяются unit/race, vet/lint, touched
 formatting, frozen source и два pinned SQLC/Buf generations без drift. Future
 Go27 combined candidate проверяется заново и не наследует Go1.25.8 receipt.
+
+
+Registration concurrency fixture сохраняет3s/10ms wait и два concurrent workers.
+Наблюдение ограничено exact root locker и двумя owned PID, application/database
+binding, active Lock waits и real ungranted fence-row/transaction locks; каждый
+worker должен достигать того же root через только owned blockers без cycle,
+foreign/zero/self PID. Success и last-failure witness содержат только PID/lock
+metadata, без query text, credentials или domain payload. Прямой blocker не всегда
+root: PostgreSQL допускает hard/soft очередь, а row waits могут отражаться через
+transaction lock ([pg_blocking_pids](https://www.postgresql.org/docs/current/functions-info.html#FUNCTIONS-INFO-SESSION),
+[pg_locks](https://www.postgresql.org/docs/current/view-pg-locks.html)).
+Гипотеза о worker→worker→locker для исторического direct-only predicate failure
+не является actual observed graph; новый native witness и fresh exact-source
+whole gate обязательны. Pure graph tests не заменяют native concurrent replay,
+distinct nonce/fence/allocation assertions и не доказывают registration/media enable.
+
+
+Strong graph helper `registrationConcurrentWait` обслуживает только две barriers
+concurrent replay/distinct-nonce test. Shared `registrationWait` для двух inherited
+TLS single-worker barriers сохраняет исходные signature и body; TLS source не
+изменяется. Изменение helper API требует inventory всех callers до нового gate.
+
+Whole `check-43x2s13s` на `2a94bdf` завершился FAIL при декодировании lock metadata,
+до успешного graph witness; 21 pure graph cases и остальные пять native registration
+cases прошли, но не заменяют whole gate. Source review выявил несовместимость:
+`pg_locks.relation` имеет тип OID, который PostgreSQL преобразует в JSON string,
+а fixture ожидает числовой `uint32`. Тестовый query явно приводит OID к `bigint`;
+диагностика type error содержит только имя поля, категорию JSON и Go type,
+без исходного JSON/value. В этом failed gate observed graph не был получен.
+
+Whole `check-_kxt9jyl` на `69f57cc` получил два actual owned graph witnesses
+worker→worker→root и PASS всех шести native registration cases, 21 pure graph cases
+и privacy case без actual test SKIP. Whole остаётся FAIL: RTC lint обнаружил
+избыточную initial assignment при преобразовании instance state в transport enum.
+Все три допустимые ветви присваивают значение, default возвращает ошибку;
+объявление без инициализации сохраняет mapping. Fresh exact-source whole gate
+после исправления ещё не выполнялся; partial native PASS его не заменяет.
+
+Guard whole `check-xvgt19vx` на `855df3d` завершился FAIL в трёх fixture setups
+с SQLSTATE23514 (`rtc_calls_end_fields_check`), до соответствующих guard assertions.
+Остальные пять guard groups и все шесть native registration cases прошли без
+actual test SKIP; это partial evidence, не whole PASS. Ended setups задают допустимый
+`end_reason='manual'`, active reset очищает `ended_at`, `ended_by_user_id` и
+`end_reason`; schema, production и assertions сохранены. Исправленные setups
+и новый exact-source whole gate пока UNRUN.
+
+Whole `check-_9yf9a74` на `811fd73` прошёл все восемь guard groups и 216 RTC test
+PASS events без failures/skips, но завершился FAIL на RTC lint: fixture сохраняла
+неиспользуемый результат второго `RegisterLease`. Сам вызов, проверка ошибки,
+partial/final ACK и new-call assertions сохраняются; ненужное присвоение заменено
+на `_`. Later dedicated native cohorts, generation и builds в этом whole UNRUN;
+новый exact-source gate после lint fix пока UNRUN.
