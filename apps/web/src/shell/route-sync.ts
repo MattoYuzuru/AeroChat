@@ -3,7 +3,17 @@ export function shouldSyncDesktopRouteToActiveWindow(options: {
   activeWindowRoutePath: string | null;
   currentPath: string;
   routeLaunchKey: string | null;
+  previousLocationKey: string;
+  currentLocationKey: string;
 }): boolean {
+  if (options.previousLocationKey !== options.currentLocationKey) {
+    return false;
+  }
+
+  if (options.activeWindowLaunchKey === null && options.routeLaunchKey !== null) {
+    return false;
+  }
+
   if (options.activeWindowRoutePath === null) {
     return false;
   }
