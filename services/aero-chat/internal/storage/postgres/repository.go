@@ -36,7 +36,11 @@ func (r *Repository) Ping(ctx context.Context) error {
 }
 
 func (r *Repository) GetSessionAuthByID(ctx context.Context, sessionID string) (*chat.SessionAuth, error) {
-	row, err := r.queries.GetSessionAuthByID(ctx, mustParseUUID(sessionID))
+	id, err := uuid.Parse(sessionID)
+	if err != nil {
+		return nil, chat.ErrUnauthorized
+	}
+	row, err := r.queries.GetSessionAuthByID(ctx, id)
 	if err != nil {
 		return nil, convertError(err)
 	}
