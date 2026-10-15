@@ -1,0 +1,58 @@
+name: Storage Bootstrap
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cold-source-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Validate local and server storage models
+        run: |
+          docker compose --env-file .env.example -f infra/compose/docker-compose.yml config --quiet
+          docker compose --env-file .env.server.example --env-file .env.server.secrets.example -f infra/compose/docker-compose.server.yml config --quiet
+
+      - name: Build pinned storage sources without restored cache
+        run: |
+          docker compose --env-file .env.example -f infra/compose/docker-compose.yml build --pull --no-cache minio minio-bootstrap
+          docker image inspect aerochat-minio:7ced9663 aerochat-mc:7394ce0d --format '{{.Id}} {{json .Config.Labels}}'
+
+      - name: Bootstrap PostgreSQL and private S3 bucket
+        run: |
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml pull postgres
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml up -d --no-build --pull never --wait postgres minio
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml run --rm --pull never minio-bootstrap
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml run --rm --pull never --entrypoint /bin/sh -v "$PWD/infra/scripts/smoke-media-storage.sh:/smoke.sh:ro" minio-bootstrap /smoke.sh
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:9000/aerochat-attachments/)" = 403
+          curl --fail --silent --show-error -D /tmp/cors-headers -o /dev/null -X OPTIONS -H 'Origin: http://127.0.0.1:8088' -H 'Access-Control-Request-Method: PUT' http://127.0.0.1:9000/aerochat-attachments/cors-smoke
+          grep -iq '^access-control-allow-origin: http://127.0.0.1:8088' /tmp/cors-headers
+
+      - name: Preserve storage provenance
+        if: success()
+        run: |
+          mkdir -p /tmp/storage-provenance
+          docker image inspect aerochat-minio:7ced9663 aerochat-mc:7394ce0d > /tmp/storage-provenance/images.json
+          cp infra/storage/Dockerfile /tmp/storage-provenance/Dockerfile
+          printf '%s\n' "$GITHUB_SHA" > /tmp/storage-provenance/source-head
+
+      - name: Upload storage provenance
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: storage-provenance-${{ github.sha }}
+          path: /tmp/storage-provenance
+
+      - name: Stop fixture and preserve logs
+        if: always()
+        run: |
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml logs --tail 50 postgres minio
+          docker compose --project-name storage-ci --env-file .env.example -f infra/compose/docker-compose.yml down

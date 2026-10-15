@@ -1292,17 +1292,40 @@ func TestNewHTTPHandlerPublishesPeopleRemovalAndBlockUpdates(t *testing.T) {
 
 func identityHTTPHandler(handler identityv1connect.IdentityServiceHandler) http.Handler {
 	_, httpHandler := identityv1connect.NewIdentityServiceHandler(handler)
-	return httpHandler
+	return withTestReadiness(httpHandler, func(ctx context.Context) error {
+		_, err := handler.Ping(ctx, connect.NewRequest(&identityv1.PingRequest{}))
+		return err
+	})
 }
 
 func chatHTTPHandler(handler chatv1connect.ChatServiceHandler) http.Handler {
 	_, httpHandler := chatv1connect.NewChatServiceHandler(handler)
-	return httpHandler
+	return withTestReadiness(httpHandler, func(ctx context.Context) error {
+		_, err := handler.Ping(ctx, connect.NewRequest(&chatv1.PingRequest{}))
+		return err
+	})
 }
 
 func rtcHTTPHandler(handler rtcv1connect.RtcControlServiceHandler) http.Handler {
 	_, httpHandler := rtcv1connect.NewRtcControlServiceHandler(handler)
-	return httpHandler
+	return withTestReadiness(httpHandler, func(ctx context.Context) error {
+		_, err := handler.Ping(ctx, connect.NewRequest(&rtcv1.PingRequest{}))
+		return err
+	})
+}
+
+func withTestReadiness(handler http.Handler, check func(context.Context) error) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/readyz" {
+			if check(r.Context()) != nil {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
 }
 
 type testIdentityHandler struct {

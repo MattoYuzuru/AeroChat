@@ -32,6 +32,7 @@ interface UseChatsOptions {
   token: string;
   currentUserId: string;
   composerText: string;
+  threadVisible?: boolean;
   onUnauthenticated(): void;
 }
 
@@ -57,6 +58,7 @@ export function useChats({
   token,
   currentUserId,
   composerText,
+  threadVisible = true,
   onUnauthenticated,
 }: UseChatsOptions) {
   const [state, dispatch] = useReducer(
@@ -466,6 +468,7 @@ export function useChats({
   const shouldAutoMarkRead =
     enabled &&
     isPageVisible &&
+    threadVisible &&
     state.threadStatus === "ready" &&
     activeThreadChatId !== null &&
     latestThreadMessage !== null &&

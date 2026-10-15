@@ -20,10 +20,12 @@ import {
 import { runKeyedQueuedRefresh, runQueuedRefresh } from "./refresh";
 import { subscribeRealtimeEnvelopes, subscribeRealtimeLifecycleEvents } from "../realtime/events";
 import { parseRTCRealtimeEvent } from "./realtime";
+import { createDirectCallJoinCoordinator, type DirectCallJoinCoordinator } from "./join-coordinator";
 
 const refreshActiveCallsIntervalMs = 15000;
 
 interface DirectCallAwarenessContextValue {
+  joinCoordinator: DirectCallJoinCoordinator;
   state: DirectCallAwarenessState;
   refreshAllActiveDirectCalls(showLoading?: boolean): Promise<void>;
   refreshDirectChatCall(chatId: string, showLoading?: boolean): Promise<void>;
@@ -35,6 +37,7 @@ const DirectCallAwarenessContext = createContext<DirectCallAwarenessContextValue
 
 export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
   const { state: authState, expireSession } = useAuth();
+  const [joinCoordinator] = useState(createDirectCallJoinCoordinator);
   const [state, dispatch] = useReducer(
     directCallAwarenessReducer,
     undefined,
@@ -81,10 +84,12 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
           const activeEntries = (
             await Promise.all<DirectCallAwarenessEntry | null>(
               chats.map(async (chat) => {
+                const observationVersion = joinCoordinator.observationVersion();
                 const call = await gatewayClient.getActiveCall(token, {
                   kind: "direct",
                   directChatId: chat.id,
                 });
+                joinCoordinator.observeChat(chat.id, call?.id ?? null, observationVersion);
                 if (call === null || call.scope.kind !== "direct") {
                   return null;
                 }
@@ -117,7 +122,7 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
         }
       });
     },
-    [authState.status, resolveProtectedError, token],
+    [authState.status, joinCoordinator, resolveProtectedError, token],
   );
 
   const refreshDirectChatCall = useCallback(
@@ -143,10 +148,12 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
               chat = chats.find((item) => item.id === normalizedChatId) ?? null;
             }
 
+            const observationVersion = joinCoordinator.observationVersion();
             const call = await gatewayClient.getActiveCall(token, {
               kind: "direct",
               directChatId: normalizedChatId,
             });
+            joinCoordinator.observeChat(normalizedChatId, call?.id ?? null, observationVersion);
             const participants =
               call === null ? [] : await gatewayClient.listCallParticipants(token, call.id);
 
@@ -170,7 +177,7 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
         },
       );
     },
-    [authState.status, resolveProtectedError, token],
+    [authState.status, joinCoordinator, resolveProtectedError, token],
   );
 
   const refreshKnownActiveDirectCalls = useCallback(async () => {
@@ -254,6 +261,7 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
   }, [authState.status, isPageVisible, refreshKnownActiveDirectCalls, state.activeCallsByChatId]);
 
   const value: DirectCallAwarenessContextValue = {
+    joinCoordinator,
     state,
     refreshAllActiveDirectCalls,
     refreshDirectChatCall,

@@ -1,3 +1,4 @@
+import { compareServerSequences, requireServerSequence } from "../gateway/server-sequence";
 import type {
   EncryptedDirectMessageV2DecryptFailure,
   EncryptedDirectMessageV2DecryptedEnvelope,
@@ -17,6 +18,10 @@ export interface EncryptedDirectMessageV2ProjectedMessageEntry {
   revision: number;
   replyToMessageId: string | null;
   createdAt: string;
+  serverSequence: string;
+  lastAppliedServerSequence: string;
+  lastEditServerSequence: string | null;
+  tombstoneServerSequence: string | null;
   storedAt: string;
   text: string | null;
   markdownPolicy: string | null;
@@ -35,6 +40,7 @@ export interface EncryptedDirectMessageV2ProjectionFailureEntry {
   senderCryptoDeviceId: string;
   revision: number;
   createdAt: string;
+  serverSequence: string;
   storedAt: string;
   failureKind:
     | EncryptedDirectMessageV2DecryptFailure["failureKind"]
@@ -52,10 +58,23 @@ export function mergeEncryptedDirectMessageV2Projection(
 ): EncryptedDirectMessageV2ProjectionEntry[] {
   const nextEntries = new Map<string, EncryptedDirectMessageV2ProjectionEntry>();
   for (const entry of current) {
+    requireServerSequence(entry.serverSequence);
+    if (entry.kind === "message") {
+      requireServerSequence(entry.lastAppliedServerSequence);
+      if (entry.lastEditServerSequence !== null) {
+        requireServerSequence(entry.lastEditServerSequence);
+      }
+      if (entry.tombstoneServerSequence !== null) {
+        requireServerSequence(entry.tombstoneServerSequence);
+      }
+    }
     nextEntries.set(entry.key, entry);
   }
 
-  for (const update of updates) {
+  for (const update of [...updates].sort((left, right) =>
+    compareServerSequences(left.serverSequence, right.serverSequence),
+  )) {
+    requireServerSequence(update.serverSequence);
     if (update.status === "decrypt_failed") {
       nextEntries.set(buildFailureKey(update.messageId, update.revision), {
         kind: "failure",
@@ -66,6 +85,7 @@ export function mergeEncryptedDirectMessageV2Projection(
         senderCryptoDeviceId: update.senderCryptoDeviceId,
         revision: update.revision,
         createdAt: update.createdAt,
+        serverSequence: update.serverSequence,
         storedAt: update.storedAt,
         failureKind: update.failureKind,
       });
@@ -115,8 +135,9 @@ function applyReadyProjection(
 ): boolean {
   if (update.operationKind === "content") {
     const current = entries.get(buildMessageKey(update.messageId));
-    if (current?.kind === "message" && current.revision > update.revision) {
-      return false;
+    if (current?.kind === "message" &&
+      compareServerSequences(current.lastAppliedServerSequence, update.serverSequence) >= 0) {
+      return true;
     }
 
     entries.set(buildMessageKey(update.messageId), {
@@ -129,6 +150,10 @@ function applyReadyProjection(
       revision: update.revision,
       replyToMessageId: update.replyToMessageId,
       createdAt: update.createdAt,
+      serverSequence: update.serverSequence,
+      lastAppliedServerSequence: update.serverSequence,
+      lastEditServerSequence: null,
+      tombstoneServerSequence: null,
       storedAt: update.storedAt,
       text: update.text,
       markdownPolicy: update.markdownPolicy,
@@ -153,36 +178,46 @@ function applyReadyProjection(
       senderCryptoDeviceId: update.senderCryptoDeviceId,
       revision: update.revision,
       createdAt: update.createdAt,
+      serverSequence: update.serverSequence,
       storedAt: update.storedAt,
       failureKind: "unresolved_target",
     });
     return false;
   }
 
+  const isLatestOperation = compareServerSequences(update.serverSequence, target.lastAppliedServerSequence) > 0;
+  const next: EncryptedDirectMessageV2ProjectedMessageEntry = {
+    ...target,
+    lastAppliedServerSequence: isLatestOperation ? update.serverSequence : target.lastAppliedServerSequence,
+    revision: isLatestOperation ? update.revision : target.revision,
+    storedAt: maxTimestamp(target.storedAt, update.storedAt),
+  };
+
   if (update.operationKind === "edit") {
-    entries.set(targetKey, {
-      ...target,
-      revision: Math.max(target.revision, update.revision),
-      replyToMessageId: update.replyToMessageId,
-      storedAt: maxTimestamp(target.storedAt, update.storedAt),
-      text: update.text,
-      markdownPolicy: update.markdownPolicy,
-      attachments: update.attachments,
-      editedAt: update.editedAt ?? update.storedAt,
-    });
-    return true;
+    if (target.lastEditServerSequence === null ||
+      compareServerSequences(update.serverSequence, target.lastEditServerSequence) > 0) {
+      next.lastEditServerSequence = update.serverSequence;
+      next.replyToMessageId = update.replyToMessageId;
+      next.editedAt = update.editedAt ?? update.storedAt;
+      if (!target.isTombstone) {
+        next.text = update.text;
+        next.markdownPolicy = update.markdownPolicy;
+        next.attachments = update.attachments;
+      }
+    }
+  } else {
+    if (target.tombstoneServerSequence === null ||
+      compareServerSequences(update.serverSequence, target.tombstoneServerSequence) > 0) {
+      next.tombstoneServerSequence = update.serverSequence;
+      next.deletedAt = update.deletedAt ?? update.storedAt;
+    }
+    next.text = null;
+    next.markdownPolicy = null;
+    next.attachments = [];
+    next.isTombstone = true;
   }
 
-  entries.set(targetKey, {
-    ...target,
-    revision: Math.max(target.revision, update.revision),
-    storedAt: maxTimestamp(target.storedAt, update.storedAt),
-    text: null,
-    markdownPolicy: null,
-    attachments: [],
-    deletedAt: update.deletedAt ?? update.storedAt,
-    isTombstone: true,
-  });
+  entries.set(targetKey, next);
   return true;
 }
 
@@ -190,11 +225,8 @@ function compareProjectionEntries(
   left: EncryptedDirectMessageV2ProjectionEntry,
   right: EncryptedDirectMessageV2ProjectionEntry,
 ): number {
-  if (left.createdAt === right.createdAt) {
-    return left.key.localeCompare(right.key);
-  }
-
-  return left.createdAt.localeCompare(right.createdAt);
+  return compareServerSequences(left.serverSequence, right.serverSequence) ||
+    left.key.localeCompare(right.key);
 }
 
 function buildMessageKey(messageId: string): string {

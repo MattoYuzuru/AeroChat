@@ -477,9 +477,10 @@ func (r *Repository) GetEncryptedGroupReadStateEntry(ctx context.Context, userID
 	}
 	if row.LastReadMessageID.Valid && row.LastReadMessageCreatedAt.Valid && row.UpdatedAt.Valid {
 		entry.LastReadPosition = &chat.EncryptedConversationReadPosition{
-			MessageID:        row.LastReadMessageID.String(),
-			MessageCreatedAt: timestampValue(row.LastReadMessageCreatedAt),
-			UpdatedAt:        timestampValue(row.UpdatedAt),
+			MessageID:              row.LastReadMessageID.String(),
+			MessageCreatedAt:       timestampValue(row.LastReadMessageCreatedAt),
+			LastReadServerSequence: row.LastReadServerSequence,
+			UpdatedAt:              timestampValue(row.UpdatedAt),
 		}
 	}
 
@@ -558,9 +559,10 @@ func (r *Repository) ListEncryptedDirectChatReadStateEntries(ctx context.Context
 		}
 		if row.LastReadMessageID.Valid && row.LastReadMessageCreatedAt.Valid && row.UpdatedAt.Valid {
 			entry.LastReadPosition = &chat.EncryptedConversationReadPosition{
-				MessageID:        row.LastReadMessageID.String(),
-				MessageCreatedAt: timestampValue(row.LastReadMessageCreatedAt),
-				UpdatedAt:        timestampValue(row.UpdatedAt),
+				MessageID:              row.LastReadMessageID.String(),
+				MessageCreatedAt:       timestampValue(row.LastReadMessageCreatedAt),
+				LastReadServerSequence: row.LastReadServerSequence,
+				UpdatedAt:              timestampValue(row.UpdatedAt),
 			}
 		}
 		result = append(result, entry)
@@ -1154,6 +1156,7 @@ func (r *Repository) UpsertEncryptedDirectChatReadState(ctx context.Context, par
 		LastReadMessageID:        mustParseUUID(params.LastReadMessageID),
 		LastReadMessageCreatedAt: timestamptzValue(params.LastReadMessageAt),
 		UpdatedAt:                timestamptzValue(params.UpdatedAt),
+		LastReadServerSequence:   params.LastReadServerSequence,
 	})
 	if err != nil {
 		return false, convertError(err)
@@ -1169,6 +1172,7 @@ func (r *Repository) UpsertEncryptedGroupReadState(ctx context.Context, params c
 		LastReadMessageID:        mustParseUUID(params.LastReadMessageID),
 		LastReadMessageCreatedAt: timestamptzValue(params.LastReadMessageAt),
 		UpdatedAt:                timestamptzValue(params.UpdatedAt),
+		LastReadServerSequence:   params.LastReadServerSequence,
 	})
 	if err != nil {
 		return false, convertError(err)
@@ -1391,11 +1395,13 @@ func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params 
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
+	defer rollbackEncryptedMessageTx(tx)
 
 	q := r.queries.WithTx(tx)
+	sequence, err := q.ReserveDirectEncryptedSequence(ctx, mustParseUUID(params.ChatID))
+	if err != nil {
+		return nil, convertError(err)
+	}
 	row, err := q.CreateDirectChatEncryptedMessageV2(ctx, chatsqlc.CreateDirectChatEncryptedMessageV2Params{
 		ID:                   mustParseUUID(params.MessageID),
 		ChatID:               mustParseUUID(params.ChatID),
@@ -1406,6 +1412,7 @@ func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params 
 		Revision:             int32(params.Revision),
 		CreatedAt:            timestamptzValue(params.CreatedAt),
 		StoredAt:             timestamptzValue(params.StoredAt),
+		ServerSequence:       pgtype.Int8{Int64: sequence, Valid: true},
 	})
 	if err != nil {
 		return nil, convertError(err)
@@ -1487,6 +1494,7 @@ func (r *Repository) CreateEncryptedDirectMessageV2(ctx context.Context, params 
 		Revision:             uint32(row.Revision),
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
+		ServerSequence:       row.ServerSequence,
 		StoredDeliveryCount:  uint32(len(params.Deliveries)),
 		StoredDeliveries:     storedDeliveries,
 	}, nil
@@ -1497,11 +1505,13 @@ func (r *Repository) CreateEncryptedGroupMessage(ctx context.Context, params cha
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
+	defer rollbackEncryptedMessageTx(tx)
 
 	q := r.queries.WithTx(tx)
+	sequence, err := q.ReserveGroupEncryptedSequence(ctx, mustParseUUID(params.GroupID))
+	if err != nil {
+		return nil, convertError(err)
+	}
 	row, err := q.CreateEncryptedGroupMessage(ctx, chatsqlc.CreateEncryptedGroupMessageParams{
 		ID:                   mustParseUUID(params.MessageID),
 		GroupID:              mustParseUUID(params.GroupID),
@@ -1517,6 +1527,7 @@ func (r *Repository) CreateEncryptedGroupMessage(ctx context.Context, params cha
 		CiphertextSizeBytes:  int64(len(params.Ciphertext)),
 		CreatedAt:            timestamptzValue(params.CreatedAt),
 		StoredAt:             timestamptzValue(params.StoredAt),
+		ServerSequence:       pgtype.Int8{Int64: sequence, Valid: true},
 	})
 	if err != nil {
 		return nil, convertError(err)
@@ -1593,6 +1604,7 @@ func (r *Repository) CreateEncryptedGroupMessage(ctx context.Context, params cha
 		Revision:             uint32(row.Revision),
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
+		ServerSequence:       row.ServerSequence,
 		StoredDeliveryCount:  uint32(len(storedDeliveries)),
 		StoredDeliveries:     storedDeliveries,
 	}, nil
@@ -1669,6 +1681,9 @@ func (r *Repository) CreateGroupMessage(ctx context.Context, params chat.CreateG
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupEncryptedConversation(ctx, mustParseUUID(params.GroupID)); err != nil {
+		return nil, convertError(err)
+	}
 	row, err := q.CreateGroupMessage(ctx, chatsqlc.CreateGroupMessageParams{
 		ID:               mustParseUUID(params.MessageID),
 		ThreadID:         mustParseUUID(params.ThreadID),
@@ -1773,6 +1788,9 @@ func (r *Repository) ListEncryptedDirectMessageV2(ctx context.Context, userID st
 
 	result := make([]chat.EncryptedDirectMessageV2Envelope, 0, len(rows))
 	for _, row := range rows {
+		if row.ServerSequence <= 0 {
+			return nil, encryptedSequenceUnavailable()
+		}
 		result = append(result, toDomainEncryptedDirectMessageV2Envelope(row))
 	}
 
@@ -1790,6 +1808,10 @@ func (r *Repository) GetEncryptedDirectMessageV2(ctx context.Context, userID str
 		return nil, convertError(err)
 	}
 
+	if row.ServerSequence <= 0 {
+		return nil, encryptedSequenceUnavailable()
+	}
+
 	return &chat.EncryptedDirectMessageV2Envelope{
 		MessageID:            row.ID.String(),
 		ChatID:               row.ChatID.String(),
@@ -1800,6 +1822,7 @@ func (r *Repository) GetEncryptedDirectMessageV2(ctx context.Context, userID str
 		Revision:             uint32(row.Revision),
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
+		ServerSequence:       row.ServerSequence,
 		ViewerDelivery: chat.EncryptedDirectMessageV2Delivery{
 			RecipientUserID:         row.RecipientUserID.String(),
 			RecipientCryptoDeviceID: row.RecipientCryptoDeviceID.String(),
@@ -1820,6 +1843,10 @@ func (r *Repository) GetEncryptedDirectMessageV2Stored(ctx context.Context, chat
 		return nil, convertError(err)
 	}
 
+	if row.ServerSequence <= 0 {
+		return nil, encryptedSequenceUnavailable()
+	}
+
 	return &chat.EncryptedDirectMessageV2StoredEnvelope{
 		MessageID:            row.ID.String(),
 		ChatID:               row.ChatID.String(),
@@ -1830,6 +1857,7 @@ func (r *Repository) GetEncryptedDirectMessageV2Stored(ctx context.Context, chat
 		Revision:             uint32(row.Revision),
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
+		ServerSequence:       row.ServerSequence,
 	}, nil
 }
 
@@ -1846,6 +1874,9 @@ func (r *Repository) ListEncryptedGroupMessages(ctx context.Context, userID stri
 
 	result := make([]chat.EncryptedGroupEnvelope, 0, len(rows))
 	for _, row := range rows {
+		if row.ServerSequence <= 0 {
+			return nil, encryptedSequenceUnavailable()
+		}
 		result = append(result, toDomainEncryptedGroupEnvelope(row))
 	}
 
@@ -1863,6 +1894,10 @@ func (r *Repository) GetEncryptedGroupMessage(ctx context.Context, userID string
 		return nil, convertError(err)
 	}
 
+	if row.ServerSequence <= 0 {
+		return nil, encryptedSequenceUnavailable()
+	}
+
 	envelope := toDomainEncryptedGroupEnvelopeFromGet(row)
 	return &envelope, nil
 }
@@ -1874,6 +1909,10 @@ func (r *Repository) GetEncryptedGroupStoredMessage(ctx context.Context, groupID
 	})
 	if err != nil {
 		return nil, convertError(err)
+	}
+
+	if row.ServerSequence <= 0 {
+		return nil, encryptedSequenceUnavailable()
 	}
 
 	return &chat.EncryptedGroupStoredEnvelope{
@@ -1889,6 +1928,7 @@ func (r *Repository) GetEncryptedGroupStoredMessage(ctx context.Context, groupID
 		Revision:             uint32(row.Revision),
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
+		ServerSequence:       row.ServerSequence,
 	}, nil
 }
 
@@ -2032,6 +2072,9 @@ func (r *Repository) UpdateGroupMessageText(ctx context.Context, params chat.Edi
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupEncryptedConversation(ctx, mustParseUUID(params.GroupID)); err != nil {
+		return false, convertError(err)
+	}
 	affected, err := q.EditGroupMessageText(ctx, chatsqlc.EditGroupMessageTextParams{
 		GroupID:     mustParseUUID(params.GroupID),
 		ID:          mustParseUUID(params.MessageID),
@@ -2306,6 +2349,9 @@ func (r *Repository) PinEncryptedGroupMessage(ctx context.Context, groupID strin
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupEncryptedConversation(ctx, mustParseUUID(groupID)); err != nil {
+		return false, convertError(err)
+	}
 	messageRow, err := q.GetEncryptedGroupStoredMessage(ctx, chatsqlc.GetEncryptedGroupStoredMessageParams{
 		GroupID: mustParseUUID(groupID),
 		ID:      mustParseUUID(messageID),
@@ -2359,6 +2405,9 @@ func (r *Repository) UnpinEncryptedGroupMessage(ctx context.Context, groupID str
 	}()
 
 	q := r.queries.WithTx(tx)
+	if _, err := q.LockGroupEncryptedConversation(ctx, mustParseUUID(groupID)); err != nil {
+		return false, convertError(err)
+	}
 	messageRow, err := q.GetEncryptedGroupStoredMessage(ctx, chatsqlc.GetEncryptedGroupStoredMessageParams{
 		GroupID: mustParseUUID(groupID),
 		ID:      mustParseUUID(messageID),
@@ -2539,6 +2588,7 @@ func toDomainEncryptedDirectMessageV2Envelope(row chatsqlc.ListDirectChatEncrypt
 		Revision:             uint32(row.Revision),
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
+		ServerSequence:       row.ServerSequence,
 		ViewerDelivery: chat.EncryptedDirectMessageV2Delivery{
 			RecipientUserID:         row.RecipientUserID.String(),
 			RecipientCryptoDeviceID: row.RecipientCryptoDeviceID.String(),
@@ -2566,6 +2616,7 @@ func toDomainEncryptedGroupEnvelope(row chatsqlc.ListEncryptedGroupMessagesByDev
 		CiphertextSizeBytes:  row.CiphertextSizeBytes,
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
+		ServerSequence:       row.ServerSequence,
 		ViewerDelivery: chat.EncryptedGroupMessageDelivery{
 			RecipientUserID:         row.RecipientUserID.String(),
 			RecipientCryptoDeviceID: row.RecipientCryptoDeviceID.String(),
@@ -2590,6 +2641,7 @@ func toDomainEncryptedGroupEnvelopeFromGet(row chatsqlc.GetEncryptedGroupMessage
 		CiphertextSizeBytes:  row.CiphertextSizeBytes,
 		CreatedAt:            timestampValue(row.CreatedAt),
 		StoredAt:             timestampValue(row.StoredAt),
+		ServerSequence:       row.ServerSequence,
 		ViewerDelivery: chat.EncryptedGroupMessageDelivery{
 			RecipientUserID:         row.RecipientUserID.String(),
 			RecipientCryptoDeviceID: row.RecipientCryptoDeviceID.String(),
