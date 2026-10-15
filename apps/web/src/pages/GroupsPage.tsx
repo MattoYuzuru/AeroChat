@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useId,
   useMemo,
   useReducer,
   useRef,
@@ -18,6 +19,7 @@ import { useVideoNoteRecorder } from "../attachments/useVideoNoteRecorder";
 import { useVoiceNoteRecorder } from "../attachments/useVoiceNoteRecorder";
 import { useAuth } from "../auth/useAuth";
 import { ChatGlyph } from "../chats/ChatGlyph";
+import { DirectComposerFeedback } from "../chats/DirectComposerFeedback";
 import { EncryptedMessageAttachmentList } from "../chats/EncryptedMessageAttachmentList";
 import { SafeMessageMarkdown } from "../chats/SafeMessageMarkdown";
 import { useEncryptedMediaAttachmentDraft } from "../chats/useEncryptedMediaAttachmentDraft";
@@ -131,6 +133,8 @@ export function GroupsPage() {
   const [joinInput, setJoinInput] = useState("");
   const [encryptedComposerText, setEncryptedComposerText] = useState("");
   const [encryptedComposerError, setEncryptedComposerError] = useState<string | null>(null);
+  const composerFeedbackId = useId();
+  const composerViewportRef = useRef<HTMLElement | null>(null);
   const [editingEncryptedMessageId, setEditingEncryptedMessageId] = useState<string | null>(null);
   const [selectedEncryptedReplyMessageId, setSelectedEncryptedReplyMessageId] =
     useState<string | null>(null);
@@ -3266,11 +3270,18 @@ export function GroupsPage() {
                     </section>
 
                     {encryptedGroupLane.status === "ready" && (
-                      <section className={styles.composerCard}>
+                      <section className={styles.composerCard} ref={composerViewportRef}>
                         <form
                           className={styles.composer}
                           onSubmit={handleSendEncryptedGroupMessage}
                         >
+                          <DirectComposerFeedback
+                            id={composerFeedbackId}
+                            message={encryptedComposerError}
+                            className={`${styles.error} ${styles.composerFeedback}`}
+                            visible={isPageVisible}
+                            viewportRef={composerViewportRef}
+                          />
                           {selectedEncryptedReplyEntry && (
                             <div className={styles.replyComposerCard}>
                               <div>
@@ -3510,6 +3521,7 @@ export function GroupsPage() {
 
                             <label className={styles.field}>
                               <textarea
+                                aria-describedby={encryptedComposerError ? composerFeedbackId : undefined}
                                 aria-label="Сообщение"
                                 disabled={
                                   cryptoRuntime.state.isActionPending ||
@@ -3587,9 +3599,6 @@ export function GroupsPage() {
                             </button>
                           </div>
 
-                          {encryptedComposerError && (
-                            <div className={styles.error}>{encryptedComposerError}</div>
-                          )}
                         </form>
                       </section>
                     )}
