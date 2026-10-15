@@ -7,6 +7,7 @@ import (
 )
 
 func TestLoadConfigDefaults(t *testing.T) {
+	t.Setenv("AERO_AUTH_PASSWORD_CONCURRENCY", "")
 	t.Setenv("AERO_DATABASE_URL", "")
 	t.Setenv("AERO_HTTP_ADDR", "")
 	t.Setenv("AERO_LOG_LEVEL", "")
@@ -26,6 +27,20 @@ func TestLoadConfigDefaults(t *testing.T) {
 	}
 	if cfg.DatabaseBootstrapTimeout != 30*time.Second {
 		t.Fatalf("ожидался database bootstrap timeout по умолчанию, получен %s", cfg.DatabaseBootstrapTimeout)
+	}
+	if cfg.PasswordHashConcurrency != 2 {
+		t.Fatalf("default password concurrency: %d", cfg.PasswordHashConcurrency)
+	}
+}
+
+func TestLoadConfigRejectsUnboundedPasswordConcurrency(t *testing.T) {
+	for _, value := range []string{"0", "-1", "9", "invalid"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("AERO_AUTH_PASSWORD_CONCURRENCY", value)
+			if _, err := LoadConfig(":8081"); err == nil {
+				t.Fatal("invalid password concurrency must fail startup")
+			}
+		})
 	}
 }
 

@@ -73,6 +73,10 @@ func run() error {
 		return fmt.Errorf("identity database bootstrap: %w", err)
 	}
 
+	passwordAdmission, err := identity.NewPasswordAdmission(cfg.PasswordHashConcurrency)
+	if err != nil {
+		return err
+	}
 	service := identity.NewService(
 		repository,
 		identityauth.NewPasswordHasher(),
@@ -84,6 +88,7 @@ func run() error {
 				cfg.WebPushVAPIDPrivateKey,
 			),
 		),
+		passwordAdmission,
 	)
 	handler := connecthandler.NewHandler(serviceName, version, service)
 

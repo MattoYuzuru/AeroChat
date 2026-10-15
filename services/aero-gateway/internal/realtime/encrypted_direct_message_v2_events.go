@@ -1,5 +1,7 @@
 package realtime
 
+import "strconv"
+
 import chatv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/v1"
 
 type EncryptedDirectMessageV2DeliveredPayload struct {
@@ -7,6 +9,7 @@ type EncryptedDirectMessageV2DeliveredPayload struct {
 }
 
 type encryptedDirectMessageV2EnvelopeWire struct {
+	ServerSequence       string                                `json:"serverSequence"`
 	MessageID            string                                `json:"messageId"`
 	ChatID               string                                `json:"chatId"`
 	SenderUserID         string                                `json:"senderUserId"`
@@ -49,6 +52,7 @@ func toEncryptedDirectMessageV2EnvelopeWire(
 
 	return &encryptedDirectMessageV2EnvelopeWire{
 		MessageID:            envelope.GetMessageId(),
+		ServerSequence:       strconv.FormatInt(envelope.GetServerSequence(), 10),
 		ChatID:               envelope.GetChatId(),
 		SenderUserID:         envelope.GetSenderUserId(),
 		SenderCryptoDeviceID: envelope.GetSenderCryptoDeviceId(),

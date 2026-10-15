@@ -134,8 +134,8 @@ Manual workflow `Deploy Production` выполняет один последов
 5. валидирует `AERO_WEB_PUSH_*`: полный absence даёт warning, partial-набор прерывает rollout;
 6. обновляет `AERO_IMAGE_TAG` в `.env.server`;
 7. выполняет `docker compose ... config`;
-8. выполняет `docker compose ... pull`;
-9. выполняет `docker compose ... up -d`;
+8. выполняет `docker compose ... pull --ignore-buildable`;
+9. выполняет `docker compose ... up -d` (storage собирается по `pull_policy: build` из pinned sources);
 10. показывает `docker compose ... ps`;
 11. читает `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT` и `AERO_MEDIA_HOST_PORT` из `.env.server`;
 11. ждёт успешных проверок:
@@ -289,8 +289,8 @@ Rollback делается тем же workflow и тем же operator contract:
 
 1. Зайди на VPS по SSH.
 2. Верни `AERO_IMAGE_TAG` в `.env.server` на предыдущий known-good tag.
-3. Выполни `docker compose ... pull`.
-4. Выполни `docker compose ... up -d`.
+3. Выполни `docker compose ... pull --ignore-buildable`.
+4. Собери storage: `docker compose ... build minio minio-bootstrap`, затем выполни `docker compose ... up -d`.
 5. Снова проверь прямой gateway upstream, media upstream и публичные `https://<domain>/readyz`,
    `https://<media-domain>/minio/health/live`.
 
