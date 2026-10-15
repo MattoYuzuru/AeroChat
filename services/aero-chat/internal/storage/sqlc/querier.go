@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -19,6 +20,7 @@ type Querier interface {
 	AttachGroupMessageAttachment(ctx context.Context, arg AttachGroupMessageAttachmentParams) error
 	CompleteAttachmentUpload(ctx context.Context, arg CompleteAttachmentUploadParams) (int64, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (CreateAttachmentRow, error)
+	CreateAttachmentSourceCleanup(ctx context.Context, arg CreateAttachmentSourceCleanupParams) error
 	CreateAttachmentUploadSession(ctx context.Context, arg CreateAttachmentUploadSessionParams) (AttachmentUploadSession, error)
 	CreateDirectChat(ctx context.Context, arg CreateDirectChatParams) (DirectChat, error)
 	CreateDirectChatEncryptedMessageV2(ctx context.Context, arg CreateDirectChatEncryptedMessageV2Params) (DirectChatEncryptedMessagesV2, error)
@@ -66,6 +68,7 @@ type Querier interface {
 	GetGroupMessageByIDAndUserID(ctx context.Context, arg GetGroupMessageByIDAndUserIDParams) (GetGroupMessageByIDAndUserIDRow, error)
 	GetGroupReadStateEntryByGroupIDAndUserID(ctx context.Context, arg GetGroupReadStateEntryByGroupIDAndUserIDParams) (GetGroupReadStateEntryByGroupIDAndUserIDRow, error)
 	GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowByIDAndUserIDParams) (GetGroupRowByIDAndUserIDRow, error)
+	GetLegacyCapabilityExpiry(ctx context.Context) (pgtype.Timestamptz, error)
 	GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSessionAuthByIDRow, error)
 	InsertEncryptedGroupRosterDevice(ctx context.Context, arg InsertEncryptedGroupRosterDeviceParams) error
 	InsertEncryptedGroupRosterMember(ctx context.Context, arg InsertEncryptedGroupRosterMemberParams) error
@@ -74,6 +77,7 @@ type Querier interface {
 	ListActiveWebPushSubscriptionsByUserIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]WebPushSubscription, error)
 	ListAttachmentObjectDeletionCandidates(ctx context.Context, arg ListAttachmentObjectDeletionCandidatesParams) ([]ListAttachmentObjectDeletionCandidatesRow, error)
 	ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListAttachmentRowsByIDsRow, error)
+	ListAttachmentSourceCleanup(ctx context.Context, arg ListAttachmentSourceCleanupParams) ([]string, error)
 	ListCurrentCryptoDeviceBundlesByDeviceIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListCurrentCryptoDeviceBundlesByDeviceIDsRow, error)
 	ListDirectChatEncryptedMessageV2ByDevice(ctx context.Context, arg ListDirectChatEncryptedMessageV2ByDeviceParams) ([]ListDirectChatEncryptedMessageV2ByDeviceRow, error)
 	ListDirectChatMessages(ctx context.Context, arg ListDirectChatMessagesParams) ([]ListDirectChatMessagesRow, error)
@@ -96,8 +100,11 @@ type Querier interface {
 	ListGroupReplyPreviewRows(ctx context.Context, arg ListGroupReplyPreviewRowsParams) ([]ListGroupReplyPreviewRowsRow, error)
 	ListGroupRowsByUserID(ctx context.Context, userID uuid.UUID) ([]ListGroupRowsByUserIDRow, error)
 	ListGroupTypingStateEntries(ctx context.Context, arg ListGroupTypingStateEntriesParams) ([]ListGroupTypingStateEntriesRow, error)
+	ListLegacyAttachmentIDs(ctx context.Context, limit int32) ([]uuid.UUID, error)
 	ListPinnedMessageIDsByChatID(ctx context.Context, chatID uuid.UUID) ([]uuid.UUID, error)
+	LockAttachmentForFinalization(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	LockAttachmentQuotaOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	LockAttachmentUploadSession(ctx context.Context, attachmentID uuid.UUID) (uuid.UUID, error)
 	LockGroupByID(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	LockGroupMembershipQuotaOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	MarkAttachmentAttached(ctx context.Context, arg MarkAttachmentAttachedParams) (int64, error)
@@ -105,6 +112,8 @@ type Querier interface {
 	PinDirectChatMessage(ctx context.Context, arg PinDirectChatMessageParams) (int64, error)
 	PinEncryptedDirectMessageV2(ctx context.Context, arg PinEncryptedDirectMessageV2Params) (int64, error)
 	PinEncryptedGroupMessage(ctx context.Context, arg PinEncryptedGroupMessageParams) (int64, error)
+	PublishLegacyAttachmentFinalKey(ctx context.Context, arg PublishLegacyAttachmentFinalKeyParams) (int64, error)
+	RescheduleAttachmentSourceCleanup(ctx context.Context, arg RescheduleAttachmentSourceCleanupParams) error
 	SearchDirectMessages(ctx context.Context, arg SearchDirectMessagesParams) ([]SearchDirectMessagesRow, error)
 	SearchGroupMessages(ctx context.Context, arg SearchGroupMessagesParams) ([]SearchGroupMessagesRow, error)
 	SetAllDirectChatNotificationPreferencesByUserID(ctx context.Context, arg SetAllDirectChatNotificationPreferencesByUserIDParams) error

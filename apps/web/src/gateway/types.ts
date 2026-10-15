@@ -417,6 +417,7 @@ export interface AttachmentUploadSession {
   uploadUrl: string;
   httpMethod: string;
   headers: Record<string, string>;
+  formFields: Record<string, string>;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;

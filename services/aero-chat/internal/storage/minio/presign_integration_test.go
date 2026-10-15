@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,6 +19,93 @@ import (
 )
 
 func TestPresignUploadDownloadOnDisposableStorage(t *testing.T) {
+	client := disposableStorageClient(t)
+	key := "staging/" + uuid.NewString()
+	finalKey := "final/" + uuid.NewString()
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		for _, key := range []string{key, finalKey} {
+			if err := client.DeleteObject(ctx, key); err != nil {
+				t.Error("fixture object cleanup failed")
+			}
+		}
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := client.EnsureBucket(ctx); err != nil {
+		t.Fatal("fixture staging policy validation failed")
+	}
+	payload := []byte{0x91, 0x73, 0x08, 0xFE, 0x11, 0xC4, 0x21, 0xA9}
+	upload, err := client.CreateUpload(ctx, key, "application/octet-stream", int64(len(payload)), time.Now().Add(time.Minute))
+	if err != nil {
+		t.Fatal("upload signing failed against internal endpoint")
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for field, value := range upload.FormFields {
+		if err := writer.WriteField(field, value); err != nil {
+			t.Fatal("cannot construct policy field")
+		}
+	}
+	part, err := writer.CreateFormFile("file", "ciphertext.bin")
+	if err != nil {
+		t.Fatal("cannot construct file part")
+	}
+	if _, err := part.Write(payload); err != nil {
+		t.Fatal("cannot write fixture payload")
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal("cannot close multipart fixture")
+	}
+	request, err := http.NewRequestWithContext(ctx, upload.HTTPMethod, upload.URL, bytes.NewReader(body.Bytes()))
+	if err != nil {
+		t.Fatal("cannot construct fixture upload")
+	}
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	for name, value := range upload.Headers {
+		request.Header.Set(name, value)
+	}
+	httpClient := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	response, err := httpClient.Do(request)
+	if err != nil {
+		t.Fatal("presigned upload request failed")
+	}
+	_, copyErr := io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+	closeErr := response.Body.Close()
+	if (response.StatusCode != http.StatusOK && response.StatusCode != http.StatusNoContent) || copyErr != nil || closeErr != nil {
+		t.Fatalf("upload status=%d or body read failed", response.StatusCode)
+	}
+	info, err := client.StatObject(ctx, key)
+	if err != nil || info.Size != int64(len(payload)) || info.ContentType != "application/octet-stream" {
+		t.Fatal("stored object metadata differs from upload")
+	}
+	if err := client.PromoteObject(ctx, key, finalKey, info.ETag, info.ContentType); err != nil {
+		t.Fatal("conditional fixture promotion failed")
+	}
+	download, err := client.CreateDownload(ctx, finalKey, time.Now().Add(time.Minute))
+	if err != nil {
+		t.Fatal("download signing failed against internal endpoint")
+	}
+	request, err = http.NewRequestWithContext(ctx, http.MethodGet, download.URL, nil)
+	if err != nil {
+		t.Fatal("cannot construct fixture download")
+	}
+	response, err = httpClient.Do(request)
+	if err != nil {
+		t.Fatal("presigned download request failed")
+	}
+	actual, readErr := io.ReadAll(io.LimitReader(response.Body, int64(len(payload)+1)))
+	closeErr = response.Body.Close()
+	if response.StatusCode != http.StatusOK || readErr != nil || closeErr != nil || !bytes.Equal(actual, payload) {
+		t.Fatal("download did not return the exact uploaded bytes")
+	}
+}
+
+func disposableStorageClient(t *testing.T) *Client {
+	t.Helper()
 	profilePath := os.Getenv("AERO_MEDIA_TEST_ENV_FILE")
 	if profilePath == "" {
 		t.Fatal("integration requires AERO_MEDIA_TEST_ENV_FILE for owned localhost storage")
@@ -62,59 +150,5 @@ func TestPresignUploadDownloadOnDisposableStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot create fixture storage client")
 	}
-	key := "presign-fixture/" + uuid.NewString()
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := client.DeleteObject(ctx, key); err != nil {
-			t.Error("fixture object cleanup failed")
-		}
-	})
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	upload, err := client.CreateUpload(ctx, key, "application/octet-stream", time.Now().Add(time.Minute))
-	if err != nil {
-		t.Fatal("upload signing failed against internal endpoint")
-	}
-	payload := []byte{0x91, 0x73, 0x08, 0xFE, 0x11, 0xC4, 0x21, 0xA9}
-	request, err := http.NewRequestWithContext(ctx, upload.HTTPMethod, upload.URL, bytes.NewReader(payload))
-	if err != nil {
-		t.Fatal("cannot construct fixture upload")
-	}
-	for name, value := range upload.Headers {
-		request.Header.Set(name, value)
-	}
-	httpClient := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-		return http.ErrUseLastResponse
-	}}
-	response, err := httpClient.Do(request)
-	if err != nil {
-		t.Fatal("presigned upload request failed")
-	}
-	_, copyErr := io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
-	closeErr := response.Body.Close()
-	if response.StatusCode != http.StatusOK || copyErr != nil || closeErr != nil {
-		t.Fatalf("upload status=%d or body read failed", response.StatusCode)
-	}
-	info, err := client.StatObject(ctx, key)
-	if err != nil || info.Size != int64(len(payload)) || info.ContentType != "application/octet-stream" {
-		t.Fatal("stored object metadata differs from upload")
-	}
-	download, err := client.CreateDownload(ctx, key, time.Now().Add(time.Minute))
-	if err != nil {
-		t.Fatal("download signing failed against internal endpoint")
-	}
-	request, err = http.NewRequestWithContext(ctx, http.MethodGet, download.URL, nil)
-	if err != nil {
-		t.Fatal("cannot construct fixture download")
-	}
-	response, err = httpClient.Do(request)
-	if err != nil {
-		t.Fatal("presigned download request failed")
-	}
-	actual, readErr := io.ReadAll(io.LimitReader(response.Body, int64(len(payload)+1)))
-	closeErr = response.Body.Close()
-	if response.StatusCode != http.StatusOK || readErr != nil || closeErr != nil || !bytes.Equal(actual, payload) {
-		t.Fatal("download did not return the exact uploaded bytes")
-	}
+	return client
 }

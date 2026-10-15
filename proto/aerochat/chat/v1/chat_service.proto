@@ -280,6 +280,7 @@ message AttachmentUploadSession {
   google.protobuf.Timestamp expires_at = 9;
   google.protobuf.Timestamp completed_at = 10;
   google.protobuf.Timestamp failed_at = 11;
+  map<string, string> form_fields = 12;
 }
 
 message MessageTombstone {

@@ -30,16 +30,25 @@ type Attachment struct {
 	RelaySchema  string             `db:"relay_schema" json:"relay_schema"`
 }
 
+type AttachmentSourceCleanup struct {
+	ObjectKey           string             `db:"object_key" json:"object_key"`
+	AttachmentID        uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	CapabilityExpiresAt pgtype.Timestamptz `db:"capability_expires_at" json:"capability_expires_at"`
+	NextAttemptAt       pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type AttachmentUploadSession struct {
-	ID           uuid.UUID          `db:"id" json:"id"`
-	AttachmentID uuid.UUID          `db:"attachment_id" json:"attachment_id"`
-	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
-	Status       string             `db:"status" json:"status"`
-	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	CompletedAt  pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
-	FailedAt     pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	AttachmentID     uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	OwnerUserID      uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	Status           string             `db:"status" json:"status"`
+	ExpiresAt        pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	CompletedAt      pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
+	FailedAt         pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	StagingObjectKey pgtype.Text        `db:"staging_object_key" json:"staging_object_key"`
 }
 
 type CryptoDevice struct {

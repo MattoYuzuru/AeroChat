@@ -298,18 +298,20 @@ type Attachment struct {
 }
 
 type AttachmentUploadSession struct {
-	ID           string
-	AttachmentID string
-	OwnerUserID  string
-	Status       string
-	UploadURL    string
-	HTTPMethod   string
-	Headers      map[string]string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	ExpiresAt    time.Time
-	CompletedAt  *time.Time
-	FailedAt     *time.Time
+	ID               string
+	AttachmentID     string
+	OwnerUserID      string
+	Status           string
+	UploadURL        string
+	HTTPMethod       string
+	Headers          map[string]string
+	FormFields       map[string]string
+	StagingObjectKey string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ExpiresAt        time.Time
+	CompletedAt      *time.Time
+	FailedAt         *time.Time
 }
 
 type AttachmentUploadIntent struct {
@@ -340,6 +342,7 @@ type AttachmentLifecycleCleanupReport struct {
 	ExpiredUploadSessions    int64
 	ExpiredOrphanAttachments int64
 	DeletedAttachments       int
+	DeletedUploadSources     int
 }
 
 type MessageTombstone struct {
@@ -798,21 +801,22 @@ type EditGroupMessageParams struct {
 }
 
 type CreateAttachmentUploadIntentParams struct {
-	AttachmentID    string
-	UploadSessionID string
-	OwnerUserID     string
-	Scope           string
-	DirectChatID    *string
-	GroupID         *string
-	BucketName      string
-	ObjectKey       string
-	FileName        string
-	MimeType        string
-	RelaySchema     string
-	SizeBytes       int64
-	ExpiresAt       time.Time
-	CreatedAt       time.Time
-	UserQuotaBytes  int64
+	AttachmentID     string
+	UploadSessionID  string
+	OwnerUserID      string
+	Scope            string
+	DirectChatID     *string
+	GroupID          *string
+	BucketName       string
+	ObjectKey        string
+	StagingObjectKey string
+	FileName         string
+	MimeType         string
+	RelaySchema      string
+	SizeBytes        int64
+	ExpiresAt        time.Time
+	CreatedAt        time.Time
+	UserQuotaBytes   int64
 }
 
 type CompleteAttachmentUploadParams struct {
