@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
@@ -138,12 +139,21 @@ func newLobbyTestDatabase(t *testing.T) *pgxpool.Pool {
 	if _, err := db.Exec(ctx, "CREATE TABLE users(id uuid PRIMARY KEY)"); err != nil {
 		t.Fatal(err)
 	}
-	content, err := rtcschema.Files.ReadFile("000000_rtc_call_control_foundation.sql")
+	entries, err := fs.ReadDir(rtcschema.Files, ".")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(ctx, string(content)); err != nil {
-		t.Fatal(err)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+		content, err := rtcschema.Files.ReadFile(entry.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(ctx, string(content)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return db
 }
