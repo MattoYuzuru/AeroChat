@@ -6,7 +6,7 @@
 
 - Git, Go **1.25** по `go.work`, Node.js **22** по CI, pnpm **10.19.0** по `package.json`.
 - Docker Engine / Docker Compose для полного локального стенда.
-- Task, Buf, sqlc и golangci-lint устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`; версии зафиксированы в скрипте. Перед запуском: `export PATH="$PWD/bin:$PATH"`.
+- Task, Buf, sqlc и golangci-lint устанавливаются `infra/scripts/install-dev-tools.sh` в `bin`; версии зафиксированы в скрипте. Task leaf-команды используют exact `bin` paths; `task check` не требует ручного изменения PATH для Buf/sqlc/linter. Для прямого вызова этих CLI: `export PATH="$PWD/bin:$PATH"`.
 
 Установка инструментов и зависимостей:
 
@@ -82,7 +82,9 @@ gofmt -l $(git ls-files '*.go' ':!:gen/go/**')
 git diff --check
 ```
 
-Текущий `task check` объявляет шаги через parallel `deps`: установка tools/web dependencies и генерация могут конкурировать с lint/tests/build. Для воспроизводимого evidence использовать отдельные шаги выше. Web CI включает Vitest наряду с lint/build; локально запускать `task web:test` и фиксировать его результат отдельно.
+`task check` выполняет последовательные task calls: tools → frozen web install → proto lint → Buf/SQLC generation+drift → Go tests/lint → web lint/tests/build → Compose config. Failed preparation останавливает consumers; generation не меняет outputs одновременно с Go checks. Local/server Compose checks используют те же example env files, что CI, и `config --quiet` не выводит интерполированную модель. Source freeze обязателен для итогового прогона; `check` намеренно отклоняет незакоммиченные generated changes. Отдельные команды выше остаются доступны для узких checks.
+
+Task по умолчанию отдаёт precedence inherited environment: root `env: PATH` не гарантирует добавление `bin` к уже существующему process PATH ([официальный contract](https://taskfile.dev/docs/guide/environment/)). Поэтому local tool references заданы явно, а generation helper получает `bin` через command-local PATH.
 
 Go unit tests сами по себе не доказывают работу storage/runtime. Для integration evidence нужен отдельный стенд и явный setup изменяемого модуля; если соответствующего suite ещё нет, фиксировать этот gap. `pass` с пропущенной integration-веткой не означает, что storage проверен. Evidence каждого прогона должен содержать checkout/HEAD, команду, версии инструментов, runtime/env profile без секретов, exit code и список skipped checks.
 
