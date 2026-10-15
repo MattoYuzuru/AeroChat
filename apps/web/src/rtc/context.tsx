@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -21,11 +22,14 @@ import { runKeyedQueuedRefresh, runQueuedRefresh } from "./refresh";
 import { subscribeRealtimeEnvelopes, subscribeRealtimeLifecycleEvents } from "../realtime/events";
 import { parseRTCRealtimeEvent } from "./realtime";
 import { createDirectCallJoinCoordinator, type DirectCallJoinCoordinator } from "./join-coordinator";
+import { createLocalCallCaptureOwner, type LocalCallCaptureOwner } from "./local-call-capture-owner";
 
 const refreshActiveCallsIntervalMs = 15000;
 
 interface DirectCallAwarenessContextValue {
   joinCoordinator: DirectCallJoinCoordinator;
+  localCaptureOwner: LocalCallCaptureOwner;
+  captureAuthEpoch: symbol | null;
   state: DirectCallAwarenessState;
   refreshAllActiveDirectCalls(showLoading?: boolean): Promise<void>;
   refreshDirectChatCall(chatId: string, showLoading?: boolean): Promise<void>;
@@ -38,6 +42,7 @@ const DirectCallAwarenessContext = createContext<DirectCallAwarenessContextValue
 export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
   const { state: authState, expireSession } = useAuth();
   const [joinCoordinator] = useState(createDirectCallJoinCoordinator);
+  const [localCaptureOwner] = useState(createLocalCallCaptureOwner);
   const [state, dispatch] = useReducer(
     directCallAwarenessReducer,
     undefined,
@@ -52,6 +57,11 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
   const chatRefreshQueuedRef = useRef(new Set<string>());
   const isPageVisible = usePageVisibility();
   const token = authState.status === "authenticated" ? authState.token : "";
+  const currentUserId = authState.status === "authenticated" ? authState.profile.id : "";
+  const captureAuthEpoch = useMemo(
+    () => token === "" || currentUserId === "" ? null : Symbol(),
+    [token, currentUserId],
+  );
 
   useEffect(() => {
     stateRef.current = state;
@@ -262,6 +272,8 @@ export function DirectCallAwarenessProvider({ children }: PropsWithChildren) {
 
   const value: DirectCallAwarenessContextValue = {
     joinCoordinator,
+    localCaptureOwner,
+    captureAuthEpoch,
     state,
     refreshAllActiveDirectCalls,
     refreshDirectChatCall,

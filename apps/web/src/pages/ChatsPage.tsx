@@ -99,14 +99,14 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
     [windowLocation.search],
   );
   const [composerText, setComposerText] = useState("");
-  const [isComposerSending, setIsComposerSending] = useState(false);
-  const composerSendInFlightRef = useRef(false);
-  const composerVersionRef = useRef(0);
   const [mobileWindowContentMode, setMobileWindowContentMode] = useState<"thread" | "info">(
     "thread",
   );
   const directWindowContentMode =
     desktopShellHost?.currentWindowContentMode ?? mobileWindowContentMode;
+  const [isComposerSending, setIsComposerSending] = useState(false);
+  const composerSendInFlightRef = useRef(false);
+  const composerVersionRef = useRef(0);
   const [composerError, setComposerError] = useState<string | null>(null);
   const composerFeedbackId = useId();
   const composerViewportRef = useRef<HTMLElement | null>(null);
@@ -350,6 +350,8 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
   const activeEncryptedDirectChatId = selectedThread?.chat.id ?? null;
   const directCall = useDirectCallSession({
     joinCoordinator: directCallAwareness.joinCoordinator,
+    localCaptureOwner: directCallAwareness.localCaptureOwner,
+    captureAuthEpoch: directCallAwareness.captureAuthEpoch,
     enabled:
       authState.status === "authenticated" &&
       isThreadRouteActive &&
@@ -2463,8 +2465,8 @@ export function ChatsPage({ routeMode = "direct" }: ChatsPageProps) {
 
                       <label className={styles.field}>
                         <textarea
-                          aria-describedby={composerFeedbackMessage ? composerFeedbackId : undefined}
                           aria-label="Сообщение"
+                          aria-describedby={composerFeedbackMessage ? composerFeedbackId : undefined}
                           disabled={
                             chats.state.isSendingMessage ||
                             encryptedMediaAttachmentDraft.isUploading

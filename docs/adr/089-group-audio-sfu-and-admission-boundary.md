@@ -35,6 +35,20 @@ Mute/unmute принадлежит пользователю, remote unmute за�
 
 Для четырёх участников при плановом Opus payload 32 kbit/s SFU получает около 128 kbit/s и отправляет около 384 kbit/s до transport overhead; это арифметический budget, не benchmark. До увеличения лимита измерить CPU, actual bitrate/loss/jitter, packet retransmit и overhead на согласованном стенде. SFU host ports/TLS/public IP и TURN credentials отделены от существующего 1:1 coturn contract; collision и forced relay проверяются runtime owner. SDK грузится lazy при первом group call.
 
+### Local call capture ownership — Accepted clarification
+
+Статус уточнения: **Accepted** — coordinator принял call-only foundation scope 2026-10-12. Этот раздел не означает, что browser owner уже реализован или group media включён. [План узкого slice](../product/local-call-capture-owner-plan.md) отделяет local capture от authoritative admission.
+
+Для direct и будущего group runtime предлагается один local **call-capture slot на app instance**, а не отдельный slot на user. Его lifetime: `capture_pending → retained → closing → released`. Synchronous acquire выполняется до capture; успешный join сохраняет lease до собственного полного teardown. Mute, peer recovery, потеря focus и minimized desktop окно не освобождают lease. Conflict виден пользователю; auto-switch и остановка чужого owner запрещены.
+
+Local identity состоит из opaque owner token, локальной auth epoch и scope/runtime generation. Epoch меняется при account/token boundary без хранения bearer, JWT или выдуманного server session ID в coordinator. Phase/release проверяют exact owner identity: stale cleanup другой generation не освобождает текущую lease. При account change pending capture старого account удерживает единственный app slot до settlement, а не освобождает параллельный slot для нового user.
+
+Cancellation/unmount немедленно запрещают late adoption и останавливают уже полученные собственные tracks **до async cleanup**. Незавершённый capture остаётся `closing`: поздний результат останавливается до release, пустые refs или timer не доказывают отсутствие позднего stream. Пока browser permission promise не settled, UI не выдаёт закрытие за успешное освобождение. `retained` отличается от существующего direct pending join coordinator: тот сохраняет свою RPC/uncertain-compensation lifetime и не хранит active media.
+
+Local release не освобождает backend grant/publication slot. Authoritative held/revoking/operation status и matching proxy/SFU teardown acknowledgement остаются отдельным контрактом ADR-097. Group-kind unit contract не является SDK/media implementation или доказательством group audio. Cross-tab/device enforcement принадлежит backend; этот app-local coordinator не создаёт browser authorization boundary.
+
+Уточнение ограничено calls. Существующие encrypted voice/video MediaRecorder notes, включая video-only fallback и recorded drafts, не изменяются и не auto-discard. SFU recording запрет и microphone publication budget не означают запрет локальной заметки во время call. Общая взаимная блокировка calls и recorders требует отдельного product решения; call-only slice не обещает единственного физического микрофона во всём приложении. SDK/dependencies, group UI/capture/flag, proto/backend/proxy здесь не реализуются.
+
 ## Последовательность узких PR
 
 1. Принятый ADR, contract/state machine и тесты admission/revocation. Уточнить identity session authorization interface; public токены не логируются.

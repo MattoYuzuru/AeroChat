@@ -95,8 +95,9 @@ Go unit tests сами по себе не доказывают работу stor
 
 ## Совместная работа агентов
 
-Для регрессии direct composer: `node apps/web/tests/composer/composer.mjs` с `PLAYWRIGHT_MODULE` и `CHROMIUM_EXECUTABLE`. Собственный Vite использует `127.0.0.1:25174` (`COMPOSER_FIXTURE_PORT` меняет порт); параллельно с другими fixtures этот порт не занимать. Проверяются исходные React send/Enter/change/edit/cancel handlers: задержка, повторный вход, ошибка/повтор, отмена, смена переписки/reply, повторный выбор редактирования с теми же ID и ошибка старой переписки. Crypto action синтетический: ciphertext и network этим тестом не подтверждаются. `COMPOSER_SOURCE_ROOT` позволяет выполнить те же assertions на другом `apps/web/` без его редактирования.
 Для регрессии автоматического чтения: `node apps/web/tests/read/read-effects.mjs`. Передать `PLAYWRIGHT_MODULE` (путь к установленному Playwright) и `CHROMIUM_EXECUTABLE` (путь к Chromium); fixture использует только свой Vite на `127.0.0.1:25174` (`READ_FIXTURE_PORT` позволяет сменить порт). Он исполняет исходные React read effects для direct/self и group с синтетическим gateway. Проверяются minimize/restore, скрытая вкладка и информация группы; это не замена приёмке с двумя аккаунтами. `READ_EFFECT_SOURCE_ROOT` задаёт другой `apps/web/` для воспроизведения исходного дефекта без редактирования checkout.
+
+Для регрессии direct composer: `node apps/web/tests/composer/composer.mjs` с `PLAYWRIGHT_MODULE` и `CHROMIUM_EXECUTABLE`. Собственный Vite использует `127.0.0.1:25174` (`COMPOSER_FIXTURE_PORT` меняет порт); параллельно с другими fixtures этот порт не занимать. Проверяются исходные React send/Enter/change/edit/cancel handlers: задержка, повторный вход, ошибка/повтор, отмена, смена переписки/reply, повторный выбор редактирования с теми же ID и ошибка старой переписки. Crypto action синтетический: ciphertext и network этим тестом не подтверждаются. `COMPOSER_SOURCE_ROOT` позволяет выполнить те же assertions на другом `apps/web/` без его редактирования.
 
 Пять логических направлений: координатор и Product/Architecture, SDE, Frontend/RTC, SRE/DevOps, Harness/Cleaner. Это роли, а не требование одновременно запустить пять агентов: число активных исполнителей ограничено доступными runtime slots. Специалистов подключать к конкретным вопросам; координатор сверяет выводы и формирует одну очередь задач.
 
@@ -141,8 +142,6 @@ browser/server в finally. Source наличие fixture само по себе 
 
 Application images для пяти services проходят reusable CI на точном SHA, затем публикуются в GHCR для `linux/amd64` как один [verified release](deploy/verified-release.md): immutable manifest digest + source SHA + пять image digests. Production workflow выбирает `release_digest` и `source_sha`; application `edge`/semver tags больше не продвигаются. Секреты остаются в `.env.server.secrets`; `.env.server` сохраняет выбранную пару `AERO_RELEASE_DIGEST` / `AERO_RELEASE_SOURCE_SHA` после успешных gates.
 
-Для проверки boot/chooser: `node apps/web/tests/entry/entry.mjs` с `PLAYWRIGHT_MODULE` и `CHROMIUM_EXECUTABLE`, через общий heavy runner. Fixture использует Vite `127.0.0.1:25174` (`ENTRY_FIXTURE_PORT` меняет порт): first-run login/register, login error, daily valid-session и explicit reboot на desktop/mobile. Production AppRouter/AuthPage/entry state исполняются напрямую; auth context и post-auth shell синтетические, backend login и полный workspace не подтверждаются. `ENTRY_SOURCE_ROOT` задаёт другой `apps/web/` для baseline без изменения его файлов.
-
 ## Клиентский порядок encrypted conversations
 
 Encrypted web после ADR-096 требует серверный `serverSequence` как положительную decimal int64 строку; read position использует `lastReadServerSequence`. Sender `createdAt` остаётся display/AAD metadata. HTTP без корректного порядка показывает ошибку, некорректные realtime events не применяются. Обновление backend и web согласуется при cutover; старый backend без sequence с новым web несовместим. Переиндексация локального поиска меняет только memory cache, сохраняя pending outbound и локальный ключевой материал.
@@ -152,6 +151,7 @@ Local content projection хранит origin `serverSequence` для history/rea
 Terminal tombstone остаётся terminal по ADR-069: независимые локальные `lastEditServerSequence` и `tombstoneServerSequence` делают edit/delete arrival-order независимым. Late old edit или accepted edit после удаления не возвращает body/attachments; display metadata последнего edit и delete выбирается по sequence каждой категории. Group partial edit с `attachments: null` сохраняет последнее explicit attachment значение через локальный `lastAttachmentsServerSequence`. Эти поля не передаются в ciphertext/AAD или API.
 
 Если mutation расшифрована до origin content, projection показывает `unresolved_target`, а текущая lane хранит pending payload только в памяти (min(valid page size, 64)). Поздний content запускает повтор соответствующих operations; applied/duplicate payload удаляется, scope change/unmount очищает pending. Overflow не скрывает unresolved failure. При reopen/reload или crypto-device rebind/reconnect hook объединяет fetch и scoped opaque realtime buffer (64 events), сортирует по sequence. Без concurrent updates snapshot заменяется; при concurrent updates он объединяется только с тем же requestKey, а request generation отсекает старые загрузки. Recovery вне окна зависит от наличия origin/mutation в bounded fetch/buffer; full historical backfill этим не реализован.
+Для проверки boot/chooser: `node apps/web/tests/entry/entry.mjs` с `PLAYWRIGHT_MODULE` и `CHROMIUM_EXECUTABLE`, через общий heavy runner. Fixture использует Vite `127.0.0.1:25174` (`ENTRY_FIXTURE_PORT` меняет порт): first-run login/register, login error, daily valid-session и explicit reboot на desktop/mobile. Production AppRouter/AuthPage/entry state исполняются напрямую; auth context и post-auth shell синтетические, backend login и полный workspace не подтверждаются. `ENTRY_SOURCE_ROOT` задаёт другой `apps/web/` для baseline без изменения его файлов.
 
 ## Мобильная геометрия conversation
 
@@ -160,3 +160,14 @@ Mobile LegacyAppShell ограничен `100dvh`: header/call strip/navigation 
 Geometry regression использует настоящий LegacyAppShell и production conversation CSS с representative DOM, synthetic auth/RTC. Проверяются 320/390/768 portrait и landscape, 0/2/50 rows, active call strip, keyboard/draft/info/scroll и textarea не уже 140 CSS px, минимум 48 CSS px полезной истории без padding и отсутствие перекрытия composer. В коротком viewport composer получает минимум 50 CSS px; кнопки не меньше 32 CSS px полностью видимы после обычного Tab-фокуса и programmatic scroll reveal. Это не тест touch-жестов. Дополнительный CSS viewport640×360 моделирует layout при 200% zoom desktop1280×720; это не native browser zoom. Полные actual pages на integration HEAD, iOS/Android OS keyboard, touch-жесты и hardware safe area остаются отдельной наблюдаемой приёмкой.
 
 Send feedback выбранного direct/self thread размещается внутри собственного scroll composer, отдельно от скрываемого mobile overview. Длинный alert ограничен собственной высотой и доступен через Tab; reveal меняет только composer scroll, сохраняя draft/focus/history. `apps/web/tests/composer-feedback/feedback.mjs` связывает regression с production JSX-site/компонентом и точными send/change handlers, использует настоящий LegacyAppShell/CSS и synthetic HTTP503 adapter. Это дополняет geometry fixture; реальный отказ gateway в полной message page проверяется в отдельном owned runtime.
+
+
+## Local call-capture owner: подготовленный browser regression
+
+`apps/web/tests/rtc/owner.mjs` проверяет actual direct hook/local slot на React с
+bounded synthetic media/PC/RPC и новым private external `LOCAL_CALL_OWNER_ARTIFACT_DIR`.
+Запуск: `agent-dev run --cwd "$PWD" --node 22 --resource heavy -- node apps/web/tests/rtc/owner.mjs`,
+с согласованным `RTC_FIXTURE_PORT` и внешними Playwright/Chromium paths из RTC README.
+Контракт [call-only owner](product/local-call-capture-owner-plan.md) не включает notes,
+не заменяет backend admission/ACK и не подтверждает SDK/group audio или physical devices.
+Новый source gate/receipt обязателен; preparation не является выполненным PASS.

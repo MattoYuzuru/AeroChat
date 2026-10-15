@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {useDirectCallSession} from '../../src/rtc/useDirectCallSession';
 import {DirectCallMicrophoneButton} from '../../src/rtc/DirectCallMicrophoneButton';
 import {createDirectCallJoinCoordinator} from '../../src/rtc/join-coordinator';
+import {createLocalCallCaptureOwner} from '../../src/rtc/local-call-capture-owner';
 import {usePlayback} from 'virtual:playback';
 import {listeners} from './realtime.js';
 import {call, participants, log, gatewayState, deferMutation, finishMutation, deferConfiguration, finishConfiguration, deferLeave, finishLeave, failLeave, nextCall} from './gateway.js';
@@ -42,7 +43,7 @@ class FakePeer extends EventTarget {
 window.RTCPeerConnection = FakePeer;
 let session;
 let root;
-const opts = {joinCoordinator:createDirectCallJoinCoordinator(),enabled:true, token:'synthetic', chat:{id:'chat-1',kind:'direct'}, awarenessEntry:null, awarenessSyncStatus:'ready', currentUserId:'creator', pageVisible:true, refreshDirectChatCall:async()=>{}, onUnauthenticated:()=>{}};
+const opts = {joinCoordinator:createDirectCallJoinCoordinator(),localCaptureOwner:createLocalCallCaptureOwner(),captureAuthEpoch:Symbol(),enabled:true, token:'synthetic', chat:{id:'chat-1',kind:'direct'}, awarenessEntry:null, awarenessSyncStatus:'ready', currentUserId:'creator', pageVisible:true, refreshDirectChatCall:async()=>{}, onUnauthenticated:()=>{}};
 function Harness(){
   session=useDirectCallSession(opts);
   usePlayback({directCallAudioRef:{current:audio}, directCallRemoteAudioStream:session.remoteAudioStream, retryDirectCallRemoteAudioPlayback:session.retryRemoteAudioPlayback});
@@ -56,9 +57,9 @@ window.fixture = {
   end(){return session.endCall();},
   toggleMicrophone(){session.toggleMicrophone();},
   endCapture(){track.readyState='ended';track.onended?.();},
-  changeToken(){opts.token='synthetic-renewed';root.render(React.createElement(Harness));},
-  refreshAccount(){opts.currentUserId='joiner';opts.token='synthetic-joiner';opts.awarenessEntry=null;root.render(React.createElement(Harness));},
-  changeAccountOnly(){opts.currentUserId='joiner';opts.awarenessEntry=null;root.render(React.createElement(Harness));},
+  changeToken(){opts.captureAuthEpoch=Symbol();opts.token='synthetic-renewed';root.render(React.createElement(Harness));},
+  refreshAccount(){opts.captureAuthEpoch=Symbol();opts.currentUserId='joiner';opts.token='synthetic-joiner';opts.awarenessEntry=null;root.render(React.createElement(Harness));},
+  changeAccountOnly(){opts.captureAuthEpoch=Symbol();opts.currentUserId='joiner';opts.awarenessEntry=null;root.render(React.createElement(Harness));},
   deferCapture(){captureDeferred=true;},
   releaseCapture(){releaseCapture();},
   rejectCapture(){rejectCapture(new DOMException('denied','NotAllowedError'));},
@@ -77,7 +78,7 @@ window.fixture = {
   finishLeave,
   failLeave,
   observeInactive(){opts.joinCoordinator.observeChat('chat-1',null,opts.joinCoordinator.observationVersion());opts.awarenessEntry=null;root.render(React.createElement(Harness));},
-  changeAccount(){opts.currentUserId='joiner';opts.token='synthetic-joiner';},
+  changeAccount(){opts.captureAuthEpoch=Symbol();opts.currentUserId='joiner';opts.token='synthetic-joiner';},
   changeScope(){opts.chat={id:'chat-2',kind:'direct'};opts.awarenessEntry=null;root.render(React.createElement(Harness));},
   emitTrack(){const event=new Event('track');Object.defineProperties(event,{streams:{value:[stream()]},track:{value:track}});observations.peers.at(-1).dispatchEvent(event);},
   unmount(){root.unmount();},
@@ -86,5 +87,5 @@ window.fixture = {
   deferPlayback(){deferPlayback=true;},
   completePlayback(rejectResult){completePlayback(rejectResult);},
   retry(){return session.retryRemoteAudioPlayback(audio);},
-  report(){return {...observations, candidatePending,candidates,canJoin:session?.canJoin, canToggleMicrophone:session?.canToggleMicrophone, isMicrophoneMuted:session?.isMicrophoneMuted, trackEnabled:track.enabled, signals:gatewayState.signals, configurationPending:gatewayState.configurationPending, peers:observations.peers.length, attached:audio.srcObject!==null, log, state:session?.state};},
+  report(){return {...observations,localCapture:opts.localCaptureOwner.getSnapshot(), candidatePending,candidates,canJoin:session?.canJoin, canToggleMicrophone:session?.canToggleMicrophone, isMicrophoneMuted:session?.isMicrophoneMuted, trackEnabled:track.enabled, signals:gatewayState.signals, configurationPending:gatewayState.configurationPending, peers:observations.peers.length, attached:audio.srcObject!==null, log, state:session?.state};},
 };
