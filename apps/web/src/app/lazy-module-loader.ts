@@ -70,4 +70,3 @@ export function createLazyModule<P extends object = Record<string, never>>(
     },
   };
 }
-
