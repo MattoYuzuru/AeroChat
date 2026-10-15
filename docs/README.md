@@ -1,17 +1,14 @@
 # Навигатор AeroChat
 
-Начать с [README](../README.md) и [обязательных правил](../AGENTS.md). Статус feature, принятое решение и подтвержденное поведение — разные источники: checked box в roadmap не заменяет evidence.
+Начать с [README](../README.md) и [обязательных правил](../AGENTS.md). Текущее состояние, архитектурные решения и исторические проверки имеют отдельные источники.
 
 ## Где искать
 
 | Задача | Источник |
 | --- | --- |
-| Согласованный локальный candidate, PASS и ручной чеклист | [Integration candidate 13 октября](audits/2026-10-13-integration-candidate.md) |
-| Исходные дефекты, проверки и ограничения | [Аудит 11 октября 2026](audits/2026-10-11-readiness.md) |
-| Исправления, draft PR/HEAD и незавершённая приёмка | [Remediation 11 октября 2026](audits/2026-10-11-remediation.md) |
-| React Router maintenance и применимость advisory | [Router advisory review](audits/2026-10-11-router-advisories.md) |
-| Подробный inventory возможностей и ограничений | [Capabilities](product/capabilities.md) |
-| Приоритеты реализации | [Roadmap](roadmap.md) и issue index в текущем аудите |
+| Текущее состояние и ручная приёмка | [Состояние проекта](project-status.md) |
+| Реализованные возможности | [Capabilities](product/capabilities.md) |
+| Дальнейшее развитие | [Roadmap](roadmap.md) |
 | Архитектурные инварианты | [ADR-001](adr/001-architecture.md), [ADR-002](adr/002-crypto.md), [ADR-003](adr/003-realtime-and-rtc.md), [ADR-004](adr/004-storage-and-relay.md) |
 | Продуктовый канон оболочки | [Web Shell XP](product/web-shell-xp.md), [ADR-079](adr/079-desktop-shell-primary-desktop-web-surface.md)–[ADR-083](adr/083-mobile-practical-shell-adaptation.md) |
 | Self-host и публичный edge | [Bootstrap](deploy/single-server-bootstrap.md), [Verified release](deploy/verified-release.md), [Rollout/rollback](deploy/production-rollout.md), [DB/S3 recovery](deploy/data-recovery.md), [ADR-025](adr/025-k3s-traefik-shared-edge-deployment.md), [ADR-094](adr/094-known-good-release-and-encrypted-recovery.md) |
@@ -22,7 +19,6 @@
 | Encrypted ordering/read | [ADR-070](adr/070-encrypted-unread-and-read-state-recovery-foundation.md), [ADR-096](adr/096-encrypted-conversation-server-sequence.md) |
 | Команды, runtime и совместная работа агентов | [Development](development.md) |
 | Порядок encrypted operations и metadata migration | [ADR-096](adr/096-encrypted-conversation-server-sequence.md), [Sequence cutover](deploy/encrypted-sequence-cutover.md) |
-| Следующая сессия после остановки 13 октября | [Актуальный handoff и промпт](audits/2026-10-13-handoff.md) |
 
 Номер 086 занят двумя существующими ADR; в задачах использовать полное имя файла. Новые номера проверять по всему каталогу.
 
@@ -43,4 +39,10 @@
 
 ## Исторические материалы
 
-[Аудит 25 марта](audits/2026-03-25-repo-audit.md) и [мартовская карта состояния](audit/current-state-architecture.md) сохраняют rationale и старые findings; они не доказывают актуальное поведение. [Исходный промпт 11 октября](audits/2026-10-11-next-session.md) сохранён для истории; актуальное указание владельца об ограничении проверок находится в handoff 13 октября. ADR-024 описывает прежний nginx edge, его преемник для текущего server flow — ADR-025. Исторические документы не переписывать под новый код; добавлять ссылку на новый evidence.
+- [Аудит 25 марта](audits/2026-03-25-repo-audit.md) и [мартовская карта архитектуры](audit/current-state-architecture.md).
+- [Аудит 11 октября](audits/2026-10-11-readiness.md), [сводка исправлений](audits/2026-10-11-remediation.md) и [проверки кандидата 13 октября](audits/2026-10-13-integration-candidate.md).
+- [React Router advisory review](audits/2026-10-11-router-advisories.md).
+
+Эти документы фиксируют указанную ревизию и не являются текущим backlog.
+Результаты промежуточных запусков и завершённые планы доступны в Git и PR.
+ADR-024 описывает прежний nginx edge; текущий server flow определён ADR-025.

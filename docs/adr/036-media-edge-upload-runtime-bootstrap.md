@@ -4,7 +4,7 @@
 - Дата: 2026-04-13
 
 > Примечание: текущий канонический media hostname contract для production уточнён в
-> [ADR-037](/home/mattoyudzuru/GolandProjects/AeroChat/docs/adr/037-media-edge-hostname-normalization.md).
+> [ADR-037](037-media-edge-hostname-normalization.md).
 > Остальные runtime-решения этого ADR остаются в силе.
 >
 > Runtime note: на актуальных community-релизах MinIO явный browser CORS применяется через
