@@ -93,6 +93,8 @@ Task по умолчанию отдаёт precedence inherited environment: root
 
 Go unit tests сами по себе не доказывают работу storage/runtime. Для integration evidence нужен отдельный стенд и явный setup изменяемого модуля; если соответствующего suite ещё нет, фиксировать этот gap. `pass` с пропущенной integration-веткой не означает, что storage проверен. Evidence каждого прогона должен содержать checkout/HEAD, команду, версии инструментов, runtime/env profile без секретов, exit code и список skipped checks.
 
+Native public-control RTC tests запускаются отдельно с `-tags=integration`: job `native-rtc-control` собирает exact-source Identity/Chat hosts и использует собственный PostgreSQL. Missing profile, skipped case и неполный cleanup проваливают проверку; [профиль и evidence](testing/rtc-control-native.md).
+
 ## Совместная работа агентов
 
 Для регрессии автоматического чтения: `node apps/web/tests/read/read-effects.mjs`. Передать `PLAYWRIGHT_MODULE` (путь к установленному Playwright) и `CHROMIUM_EXECUTABLE` (путь к Chromium); fixture использует только свой Vite на `127.0.0.1:25174` (`READ_FIXTURE_PORT` позволяет сменить порт). Он исполняет исходные React read effects для direct/self и group с синтетическим gateway. Проверяются minimize/restore, скрытая вкладка и информация группы; это не замена приёмке с двумя аккаунтами. `READ_EFFECT_SOURCE_ROOT` задаёт другой `apps/web/` для воспроизведения исходного дефекта без редактирования checkout.
