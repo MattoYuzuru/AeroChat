@@ -1,3 +1,4 @@
+import { requireServerSequence } from "../gateway/server-sequence";
 import type { EncryptedDirectMessageV2DecryptedEnvelope } from "../crypto/types";
 
 interface EncryptedDirectMessageV2LocalOutboundEvent {
@@ -14,6 +15,7 @@ const resolvedProjectionKeyLimit = 200;
 export function publishLocalEncryptedDirectMessageV2Projection(
   projection: EncryptedDirectMessageV2DecryptedEnvelope,
 ) {
+  requireServerSequence(projection.serverSequence);
   const key = buildProjectionKey(projection);
   if (resolved.has(key)) {
     return;

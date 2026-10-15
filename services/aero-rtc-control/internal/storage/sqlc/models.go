@@ -30,16 +30,25 @@ type Attachment struct {
 	RelaySchema  string             `db:"relay_schema" json:"relay_schema"`
 }
 
+type AttachmentSourceCleanup struct {
+	ObjectKey           string             `db:"object_key" json:"object_key"`
+	AttachmentID        uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	CapabilityExpiresAt pgtype.Timestamptz `db:"capability_expires_at" json:"capability_expires_at"`
+	NextAttemptAt       pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type AttachmentUploadSession struct {
-	ID           uuid.UUID          `db:"id" json:"id"`
-	AttachmentID uuid.UUID          `db:"attachment_id" json:"attachment_id"`
-	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
-	Status       string             `db:"status" json:"status"`
-	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	CompletedAt  pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
-	FailedAt     pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	AttachmentID     uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	OwnerUserID      uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	Status           string             `db:"status" json:"status"`
+	ExpiresAt        pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	CompletedAt      pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
+	FailedAt         pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	StagingObjectKey pgtype.Text        `db:"staging_object_key" json:"staging_object_key"`
 }
 
 type CryptoDevice struct {
@@ -100,12 +109,13 @@ type CryptoDeviceLinkIntent struct {
 }
 
 type DirectChat struct {
-	ID              uuid.UUID          `db:"id" json:"id"`
-	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
-	UserLowID       uuid.UUID          `db:"user_low_id" json:"user_low_id"`
-	UserHighID      uuid.UUID          `db:"user_high_id" json:"user_high_id"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	CreatedByUserID         uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	UserLowID               uuid.UUID          `db:"user_low_id" json:"user_low_id"`
+	UserHighID              uuid.UUID          `db:"user_high_id" json:"user_high_id"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EncryptedServerSequence int64              `db:"encrypted_server_sequence" json:"encrypted_server_sequence"`
 }
 
 type DirectChatEncryptedMessageDeliveriesV2 struct {
@@ -135,6 +145,7 @@ type DirectChatEncryptedMessagesV2 struct {
 	Revision             int32              `db:"revision" json:"revision"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       pgtype.Int8        `db:"server_sequence" json:"server_sequence"`
 }
 
 type DirectChatEncryptedReadStatesV1 struct {
@@ -143,6 +154,7 @@ type DirectChatEncryptedReadStatesV1 struct {
 	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 }
 
 type DirectChatMessage struct {
@@ -195,11 +207,12 @@ type DirectChatReadReceipt struct {
 }
 
 type Group struct {
-	ID              uuid.UUID          `db:"id" json:"id"`
-	Name            string             `db:"name" json:"name"`
-	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	Name                    string             `db:"name" json:"name"`
+	CreatedByUserID         uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EncryptedServerSequence int64              `db:"encrypted_server_sequence" json:"encrypted_server_sequence"`
 }
 
 type GroupChatReadState struct {
@@ -248,6 +261,7 @@ type GroupEncryptedMessagesV1 struct {
 	CiphertextSizeBytes  int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       pgtype.Int8        `db:"server_sequence" json:"server_sequence"`
 }
 
 type GroupEncryptedReadStatesV1 struct {
@@ -256,6 +270,7 @@ type GroupEncryptedReadStatesV1 struct {
 	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 }
 
 type GroupEncryptedRosterDevicesV1 struct {
@@ -328,6 +343,18 @@ type GroupThread struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type IdentityAuthorityRevocationOutbox struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	SubjectKind    string             `db:"subject_kind" json:"subject_kind"`
+	SubjectID      uuid.UUID          `db:"subject_id" json:"subject_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	DeviceID       uuid.UUID          `db:"device_id" json:"device_id"`
+	SessionID      pgtype.UUID        `db:"session_id" json:"session_id"`
+	SourceRevision int64              `db:"source_revision" json:"source_revision"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	Reason         string             `db:"reason" json:"reason"`
+}
+
 type MessageAttachment struct {
 	AttachmentID               uuid.UUID          `db:"attachment_id" json:"attachment_id"`
 	DirectChatMessageID        pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
@@ -392,12 +419,13 @@ type UserBlock struct {
 }
 
 type UserDevice struct {
-	ID         uuid.UUID          `db:"id" json:"id"`
-	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
-	Label      string             `db:"label" json:"label"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
-	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	ID                uuid.UUID          `db:"id" json:"id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	Label             string             `db:"label" json:"label"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	RevokedAt         pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	AuthorityRevision int64              `db:"authority_revision" json:"authority_revision"`
 }
 
 type UserFriendRequest struct {
@@ -422,13 +450,14 @@ type UserPasswordCredential struct {
 }
 
 type UserSession struct {
-	ID         uuid.UUID          `db:"id" json:"id"`
-	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
-	DeviceID   uuid.UUID          `db:"device_id" json:"device_id"`
-	TokenHash  string             `db:"token_hash" json:"token_hash"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
-	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	ID                uuid.UUID          `db:"id" json:"id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	DeviceID          uuid.UUID          `db:"device_id" json:"device_id"`
+	TokenHash         string             `db:"token_hash" json:"token_hash"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	RevokedAt         pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	AuthorityRevision int64              `db:"authority_revision" json:"authority_revision"`
 }
 
 type WebPushSubscription struct {

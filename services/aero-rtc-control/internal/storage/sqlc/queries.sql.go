@@ -607,6 +607,52 @@ func (q *Queries) ListParticipantsByCallID(ctx context.Context, callID uuid.UUID
 	return items, nil
 }
 
+const lockCallByID = `-- name: LockCallByID :one
+SELECT id, scope_type, direct_chat_id, group_id, created_by_user_id, status, created_at, started_at, updated_at, ended_at, ended_by_user_id, end_reason FROM rtc_calls
+WHERE id = $1
+FOR UPDATE
+`
+
+func (q *Queries) LockCallByID(ctx context.Context, id uuid.UUID) (RtcCall, error) {
+	row := q.db.QueryRow(ctx, lockCallByID, id)
+	var i RtcCall
+	err := row.Scan(
+		&i.ID,
+		&i.ScopeType,
+		&i.DirectChatID,
+		&i.GroupID,
+		&i.CreatedByUserID,
+		&i.Status,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.UpdatedAt,
+		&i.EndedAt,
+		&i.EndedByUserID,
+		&i.EndReason,
+	)
+	return i, err
+}
+
+const releaseEndedParticipationByUserID = `-- name: ReleaseEndedParticipationByUserID :exec
+UPDATE rtc_call_participants p
+SET state = 'left', left_at = $1, updated_at = $1
+FROM rtc_calls c
+WHERE p.call_id = c.id
+  AND c.status = 'ended'
+  AND p.user_id = $2
+  AND p.state = 'active'
+`
+
+type ReleaseEndedParticipationByUserIDParams struct {
+	At     pgtype.Timestamptz `db:"at" json:"at"`
+	UserID uuid.UUID          `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) ReleaseEndedParticipationByUserID(ctx context.Context, arg ReleaseEndedParticipationByUserIDParams) error {
+	_, err := q.db.Exec(ctx, releaseEndedParticipationByUserID, arg.At, arg.UserID)
+	return err
+}
+
 const touchParticipantSignal = `-- name: TouchParticipantSignal :execrows
 UPDATE rtc_call_participants
 SET

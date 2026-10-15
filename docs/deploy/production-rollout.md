@@ -132,7 +132,7 @@ Manual workflow `Deploy Production` выполняет один последов
 3. подключается к VPS, сверяет checkout SHA и повторно валидирует metadata;
 4. подтверждает `.env.server`, `.env.server.secrets`, Compose и Python 3;
 5. валидирует `AERO_WEB_PUSH_*`: полный absence даёт warning, partial-набор прерывает rollout;
-6. создаёт immutable release overlay и выполняет Compose config/pull --ignore-buildable/up/ps с этим overlay; storage собирается из pinned sources по pull_policy: build;
+6. создаёт immutable release overlay, сохраняет recovery record/previous overlay и сверяет applied schema/compatibility, затем выполняет Compose config/pull --ignore-buildable/up/ps с этим overlay; storage собирается из pinned sources по `pull_policy: build`;
 7. проверяет пять runtime image digests/revision labels и ждёт успешных URL gates:
     - `http://<shared-edge-host-ip>:<web-port>/`
     - `http://<shared-edge-host-ip>:<gateway-port>/readyz`
@@ -185,7 +185,7 @@ kubectl -n aerochat-edge get certificate
 
 5. Создать и заполнить GitHub Environment `production`.
 6. Выбрать manifest digest/source SHA из успешного Publish Images summary и заранее подготовить checkout этого SHA.
-7. Открыть GitHub Actions и вручную запустить workflow `Deploy Production`.
+7. Для первого пустого runtime выполнить manual verified release flow, revision/readiness и пользовательский smoke, затем сохранить explicit known-good baseline по [recovery runbook](data-recovery.md). Workflow отвергает unknown previous selection; последующие rollout запускаются вручную через GitHub Actions `Deploy Production`.
 8. Передать выбранные `release_digest` и `source_sha` в `workflow_dispatch`.
 9. Дождаться успешного завершения job и встроенных upstream/HTTPS проверок.
 10. С внешней машины выполнить базовую проверку домена:
@@ -268,6 +268,8 @@ Workflow на сервере дожидается успешного ответ�
 - отсутствие TLS warning при внешнем заходе на application и media домены.
 
 ## Rollback
+
+Перед любым image rollback применяется [DB-aware recovery contract](data-recovery.md): workflow сохраняет previous state до mutation и требует exact applied schema/compatibility preflight. Unknown previous selection блокирует automation; first empty bootstrap и explicit baseline выполняются оператором вручную. Возврат image digests сам по себе не откатывает данные или external configuration.
 
 Rollback делается тем же workflow и тем же operator contract:
 

@@ -11,6 +11,7 @@ import (
 	commonv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/common/v1"
 	identityv1 "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1"
 	identityv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1/identityv1connect"
+	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/admission"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/realtime"
 )
 
@@ -20,6 +21,7 @@ type IdentityHandler struct {
 	version     string
 	client      identityv1connect.IdentityServiceClient
 	realtimeHub *realtime.Hub
+	admission   *admission.Limiter
 }
 
 func NewIdentityHandler(
@@ -28,6 +30,7 @@ func NewIdentityHandler(
 	version string,
 	client identityv1connect.IdentityServiceClient,
 	realtimeHub *realtime.Hub,
+	authAdmission *admission.Limiter,
 ) *IdentityHandler {
 	return &IdentityHandler{
 		logger:      logger,
@@ -35,6 +38,7 @@ func NewIdentityHandler(
 		version:     version,
 		client:      client,
 		realtimeHub: realtimeHub,
+		admission:   authAdmission,
 	}
 }
 
@@ -48,15 +52,29 @@ func (h *IdentityHandler) Ping(context.Context, *connect.Request[identityv1.Ping
 }
 
 func (h *IdentityHandler) Register(ctx context.Context, req *connect.Request[identityv1.RegisterRequest]) (*connect.Response[identityv1.RegisterResponse], error) {
+	release, err := h.admission.Acquire(ctx, admission.Register, req.Peer().Addr, req.Header(), req.Msg.Login)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return forwardUnary(ctx, req, h.client.Register)
 }
 
 func (h *IdentityHandler) Login(ctx context.Context, req *connect.Request[identityv1.LoginRequest]) (*connect.Response[identityv1.LoginResponse], error) {
+	release, err := h.admission.Acquire(ctx, admission.Login, req.Peer().Addr, req.Header(), req.Msg.Login)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return forwardUnary(ctx, req, h.client.Login)
 }
 
 func (h *IdentityHandler) LogoutCurrentSession(ctx context.Context, req *connect.Request[identityv1.LogoutCurrentSessionRequest]) (*connect.Response[identityv1.LogoutCurrentSessionResponse], error) {
-	return forwardUnary(ctx, req, h.client.LogoutCurrentSession)
+	response, err := forwardUnary(ctx, req, h.client.LogoutCurrentSession)
+	if err == nil && h.realtimeHub != nil {
+		h.realtimeHub.CloseToken(strings.TrimSpace(strings.TrimPrefix(req.Header().Get("Authorization"), "Bearer ")))
+	}
+	return response, err
 }
 
 func (h *IdentityHandler) GetCurrentProfile(ctx context.Context, req *connect.Request[identityv1.GetCurrentProfileRequest]) (*connect.Response[identityv1.GetCurrentProfileResponse], error) {
@@ -84,7 +102,17 @@ func (h *IdentityHandler) ListDevices(ctx context.Context, req *connect.Request[
 }
 
 func (h *IdentityHandler) RevokeSessionOrDevice(ctx context.Context, req *connect.Request[identityv1.RevokeSessionOrDeviceRequest]) (*connect.Response[identityv1.RevokeSessionOrDeviceResponse], error) {
-	return forwardUnary(ctx, req, h.client.RevokeSessionOrDevice)
+	var userID string
+	if h.realtimeHub != nil {
+		if profile, err := h.fetchCurrentProfile(ctx, req.Header()); err == nil {
+			userID = profile.GetId()
+		}
+	}
+	response, err := forwardUnary(ctx, req, h.client.RevokeSessionOrDevice)
+	if err == nil && userID != "" {
+		h.realtimeHub.RevalidateUser(userID)
+	}
+	return response, err
 }
 
 func (h *IdentityHandler) ListBlockedUsers(ctx context.Context, req *connect.Request[identityv1.ListBlockedUsersRequest]) (*connect.Response[identityv1.ListBlockedUsersResponse], error) {

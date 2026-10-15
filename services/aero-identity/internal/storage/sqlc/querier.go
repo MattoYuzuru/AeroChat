@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	ActivateCryptoDevice(ctx context.Context, arg ActivateCryptoDeviceParams) (CryptoDevice, error)
 	ApproveCryptoDeviceLinkIntentByIDAndUserID(ctx context.Context, arg ApproveCryptoDeviceLinkIntentByIDAndUserIDParams) (ApproveCryptoDeviceLinkIntentByIDAndUserIDRow, error)
+	CreateAuthorityRevocationEvent(ctx context.Context, arg CreateAuthorityRevocationEventParams) error
 	CreateCryptoDevice(ctx context.Context, arg CreateCryptoDeviceParams) (CryptoDevice, error)
 	CreateCryptoDeviceBundle(ctx context.Context, arg CreateCryptoDeviceBundleParams) (CryptoDeviceBundle, error)
 	CreateCryptoDeviceLinkIntent(ctx context.Context, arg CreateCryptoDeviceLinkIntentParams) (CreateCryptoDeviceLinkIntentRow, error)
@@ -54,10 +55,11 @@ type Querier interface {
 	ListOutgoingFriendRequestsByUserID(ctx context.Context, requesterUserID uuid.UUID) ([]ListOutgoingFriendRequestsByUserIDRow, error)
 	ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
 	ListWebPushSubscriptionsByUserID(ctx context.Context, userID uuid.UUID) ([]WebPushSubscription, error)
+	LockCryptoDeviceRegistryOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	RevokeCryptoDeviceWithMetadata(ctx context.Context, arg RevokeCryptoDeviceWithMetadataParams) (CryptoDevice, error)
-	RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (int64, error)
+	RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (RevokeDeviceRow, error)
 	RevokeDeviceSessions(ctx context.Context, arg RevokeDeviceSessionsParams) error
-	RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error)
+	RevokeSession(ctx context.Context, arg RevokeSessionParams) (RevokeSessionRow, error)
 	SupersedeCurrentCryptoDeviceBundle(ctx context.Context, arg SupersedeCurrentCryptoDeviceBundleParams) (int64, error)
 	TouchSessionAndDevice(ctx context.Context, arg TouchSessionAndDeviceParams) error
 	UpdateCryptoDeviceBundleTracking(ctx context.Context, arg UpdateCryptoDeviceBundleTrackingParams) (CryptoDevice, error)

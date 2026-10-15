@@ -125,6 +125,8 @@
 
 `reader` выбран консервативно как read-only role и для RTC foundation тоже не считается активным speaking/joining участником.
 
+При каждом SendSignal адресат дополнительно проверяется по текущему typed chat roster: GetDirectChat.participants либо ListGroupMembers с bearer отправителя. Bearer адресата не требуется и не подставляется. Group target должен оставаться owner/admin/member; удалённый или reader target не получает envelope, его RTC participant атомарно переводится left. Неопределённый downstream failure отклоняет relay без предположения, что membership уже отозвана. Проверка актуальна на момент downstream read; атомарный distributed revoke между chat membership write и gateway publish этот slice не вводит.
+
 ### 6. Signaling transport model
 
 `RtcControlService` остаётся typed ConnectRPC API для command/read path.
@@ -158,6 +160,12 @@ Realtime delivery reuse'ит существующий gateway websocket transpor
 - `rtc_call_participants`.
 
 Active call и participant lifecycle хранятся авторитетно в БД.
+
+Join/rejoin, leave с возможным завершением последнего participant и manual end выполняются одной repository transaction с общей row lock `rtc_calls FOR UPDATE`. Проверка active status, participant mutation и count/termination используют этот lock; manual end освобождает всех участников и меняет call status атомарно. Ошибка любого statement откатывает весь переход. Repository возвращает locked snapshot для join/end, а service не собирает эти переходы из отдельных write calls.
+
+Перед insert нового active participant repository идемпотентно освобождает его старые active rows, если связанный call уже ended. Это восстанавливает slot после исторической гонки, сохраняя partial unique index one-active-user. Массовый repair существующей БД и изменение deployment model в этот fix не входят.
+
+Используются [row-level locks PostgreSQL](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS) и [sqlc WithTx](https://docs.sqlc.dev/en/v1.30.0/howto/transactions.html).
 
 Signaling delivery остаётся честно ephemeral:
 

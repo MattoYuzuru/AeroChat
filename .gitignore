@@ -13,3 +13,4 @@ apps/web/vite.config.js
 coverage/
 tmp/
 /release-*.json
+/.release-recovery/

@@ -13,6 +13,8 @@ Application tags `sha-*` служат acquisition reference, но production в�
 
 ## Подготовка
 
+Нужен [known-good record и schema/data recovery plan](data-recovery.md). Automation не принимает unknown/partial previous selection; добавленные migrations требуют reviewed exact-SHA compatibility declaration. Manual first launch допустим только на доказанно пустых durable targets с последующим явным known-good baseline.
+
 Сохранить предыдущие release digest/source SHA и JSON metadata для rollback. Server checkout должен **заранее** соответствовать выбранному source SHA; workflow его не переключает. На сервере нужны Docker Compose, Git и Python 3; `.env.server.secrets` сохраняется без изменений. ORAS 1.3.0 нужен Actions runner либо trusted operator client для acquisition; устанавливать ORAS на VPS для workflow не требуется.
 
 ## Manual acquisition и bootstrap

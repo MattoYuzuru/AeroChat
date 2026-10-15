@@ -75,7 +75,7 @@ INSERT INTO user_devices (
     last_seen_at,
     revoked_at
 ) VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, user_id, label, created_at, last_seen_at, revoked_at;
+RETURNING id, user_id, label, created_at, last_seen_at, revoked_at, authority_revision;
 
 -- name: CreateSession :one
 INSERT INTO user_sessions (
@@ -87,7 +87,7 @@ INSERT INTO user_sessions (
     last_seen_at,
     revoked_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, device_id, token_hash, created_at, last_seen_at, revoked_at;
+RETURNING id, user_id, device_id, token_hash, created_at, last_seen_at, revoked_at, authority_revision;
 
 -- name: GetPasswordCredentialByLogin :one
 SELECT
@@ -210,12 +210,14 @@ SELECT
     s.created_at AS session_created_at,
     s.last_seen_at AS session_last_seen_at,
     s.revoked_at AS session_revoked_at,
+    s.authority_revision AS session_authority_revision,
     d.id AS device_id,
     d.user_id AS device_user_id,
     d.label AS device_label,
     d.created_at AS device_created_at,
     d.last_seen_at AS device_last_seen_at,
     d.revoked_at AS device_revoked_at,
+    d.authority_revision AS device_authority_revision,
     u.id AS user_id,
     u.login,
     u.nickname,
@@ -251,20 +253,22 @@ WITH touched_session AS (
 )
 SELECT 1;
 
--- name: RevokeSession :execrows
+-- name: RevokeSession :one
 UPDATE user_sessions
-SET revoked_at = $3
-WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL;
+SET revoked_at = $3, authority_revision = authority_revision + 1
+WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
+RETURNING id, user_id, device_id, authority_revision;
 
 -- name: RevokeDeviceSessions :exec
 UPDATE user_sessions
-SET revoked_at = $3
+SET revoked_at = $3, authority_revision = authority_revision + 1
 WHERE device_id = $1 AND user_id = $2 AND revoked_at IS NULL;
 
--- name: RevokeDevice :execrows
+-- name: RevokeDevice :one
 UPDATE user_devices
-SET revoked_at = $3
-WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL;
+SET revoked_at = $3, authority_revision = authority_revision + 1
+WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
+RETURNING id, user_id, authority_revision;
 
 -- name: ListDevicesByUserID :many
 SELECT
@@ -273,7 +277,8 @@ SELECT
     label,
     created_at,
     last_seen_at,
-    revoked_at
+    revoked_at,
+    authority_revision
 FROM user_devices
 WHERE user_id = $1
 ORDER BY created_at DESC;
@@ -286,7 +291,8 @@ SELECT
     token_hash,
     created_at,
     last_seen_at,
-    revoked_at
+    revoked_at,
+    authority_revision
 FROM user_sessions
 WHERE user_id = $1
 ORDER BY created_at DESC;
