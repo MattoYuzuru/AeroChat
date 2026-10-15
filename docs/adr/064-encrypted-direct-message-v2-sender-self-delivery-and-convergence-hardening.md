@@ -218,3 +218,32 @@ Bounded optimistic UI для originating sender device остаётся допу
 
 Не выбрано, потому что existing viewer-device-scoped list/get path уже покрывает нужную fetch semantics,
 если self-delivery становится persisted first-class delivery record.
+
+## Уточнение 12 октября 2026: lifetime sender projection
+
+Статус уточнения: Accepted — координатор принял после проверки исходников и границы server-backed authority, до изменения production hook.
+
+Actual browser core05 на source `26131cc` сохранил sender UI без строки при
+очищенном composer, тогда как recipient UI показал сообщение. Отдельный READ ONLY
+metadata probe подтвердил persisted sender и recipient deliveries. Это не
+потеря серверного ciphertext. Полный core остаётся FAIL; причина cancellation
+проверяется отдельной регрессией actual React hook, а не объявляется по одному снимку.
+
+Identity объекта crypto context меняется вместе с `isActionPending`. При неизменных
+session token, chat, active crypto-device и page size такая смена не отменяет
+уже начатое чтение или decrypt для той же lane. Hook получает текущий runtime
+через ref; snapshot остаётся входом существующего scope/availability resolver.
+Изменение token/chat/device/page size, disabled/bootstrapping/unavailable/error
+и unmount сохраняют отмену старого результата.
+
+Правило server-backed authority из раздела6 сохраняется: resolved-key bookkeeping
+и discard outbound buffer не меняются, поздний HTTP optimistic publish не
+возвращает отброшенную запись и не скрывает authoritative decrypt failure.
+Provider, worker, codec, AAD, roster, backend и transport contracts не меняются.
+
+Регрессия должна реально исполнить production hook, local outbound buffer и merge
+в React/Chromium: deferred self-delivery decrypt, смена action-state identity,
+подавленный поздний local publish, затем ровно одна authoritative строка.
+Отдельно проверяются видимый AAD failure без optimistic fallback и отмена при
+смене chat/token/device, retirement, disabled. Gateway/decrypt adapters этой
+регрессии синтетические; она не заменяет новый whole browser core на новом runtime.

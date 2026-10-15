@@ -173,3 +173,10 @@ bounded synthetic media/PC/RPC и новым private external `LOCAL_CALL_OWNER_
 Контракт [call-only owner](product/local-call-capture-owner-plan.md) не включает notes,
 не заменяет backend admission/ACK и не подтверждает SDK/group audio или physical devices.
 Новый source gate/receipt обязателен; preparation не является выполненным PASS.
+
+
+## Sender projection: подготовленная регрессия lifetime context
+
+`node apps/web/tests/sender-projection/sender-projection.mjs` требует `PLAYWRIGHT_MODULE` и `CHROMIUM_EXECUTABLE`; `SENDER_PROJECTION_SOURCE_ROOT` выбирает исходный `apps/web/` для RED/исправленного GREEN без редактирования другого checkout. Фикстура использует только собственный Vite `127.0.0.1:25174` (`SENDER_PROJECTION_FIXTURE_PORT` меняет порт), настоящий production hook/outbound buffer/merge и synthetic gateway/deferred decrypt adapter. Проверяются pending-state context identity, поздний HTTP local publish, authoritative ready/failure и отмена при смене scope; текущие исходники SHA читаются до/после. `SENDER_PROJECTION_JUNIT` задаёт новый абсолютный XML файл с actual семью cases и zero skips. Это не actual backend/WebCrypto или whole browser core PASS; такая приёмка проводится отдельно. Source наличие fixture не означает PASS.
+
+Sender projection fixture требует `SENDER_PROJECTION_ARTIFACT_DIR`: новый собственный canonical абсолютный каталог0700 вне Git. До запуска CFT записываются private `ownership.json` с точным profile/executableSHA; после запуска — PID/PGID/start time. TERM/INT сразу закрывает только свежие процессы с этим profile. После выхода runtime owner независимо подтверждает отсутствие owned profile/PID/PGID и освобождение fixture port; нормальный finally не заменяет этот readback. Фазы/counters FAIL не содержат token, key material или payload.
