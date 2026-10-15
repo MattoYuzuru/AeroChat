@@ -115,11 +115,7 @@ SELECT
           AND m.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR m.created_at > self_read.last_read_message_created_at
-              OR (
-                  m.created_at = self_read.last_read_message_created_at
-                  AND m.id > self_read.last_read_message_id
-              )
+              OR m.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
@@ -173,11 +169,7 @@ SELECT
           AND m.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR m.created_at > self_read.last_read_message_created_at
-              OR (
-                  m.created_at = self_read.last_read_message_created_at
-                  AND m.id > self_read.last_read_message_id
-              )
+              OR m.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
@@ -317,11 +309,7 @@ SELECT
           AND gm.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR gm.created_at > self_read.last_read_message_created_at
-              OR (
-                  gm.created_at = self_read.last_read_message_created_at
-                  AND gm.id > self_read.last_read_message_id
-              )
+              OR gm.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE((
@@ -374,11 +362,7 @@ SELECT
           AND gm.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR gm.created_at > self_read.last_read_message_created_at
-              OR (
-                  gm.created_at = self_read.last_read_message_created_at
-                  AND gm.id > self_read.last_read_message_id
-              )
+              OR gm.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE((
@@ -748,6 +732,7 @@ SELECT
     self.user_id,
     r.last_read_message_id,
     r.last_read_message_created_at,
+    COALESCE(r.last_read_server_sequence, 0)::BIGINT AS last_read_server_sequence,
     r.updated_at
 FROM group_memberships AS self
 LEFT JOIN group_encrypted_read_states_v1 AS r
@@ -774,6 +759,7 @@ SELECT
     u.read_receipts_enabled,
     r.last_read_message_id,
     r.last_read_message_created_at,
+    COALESCE(r.last_read_server_sequence, 0)::BIGINT AS last_read_server_sequence,
     r.updated_at
 FROM direct_chat_participants AS self
 JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
@@ -962,8 +948,9 @@ INSERT INTO direct_chat_encrypted_messages_v2 (
     target_message_id,
     revision,
     created_at,
-    stored_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    stored_at,
+    server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING
     id,
     chat_id,
@@ -973,7 +960,8 @@ RETURNING
     target_message_id,
     revision,
     created_at,
-    stored_at;
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence;
 
 -- name: CreateDirectChatEncryptedMessageV2Delivery :exec
 INSERT INTO direct_chat_encrypted_message_deliveries_v2 (
@@ -1091,8 +1079,9 @@ INSERT INTO group_encrypted_messages_v1 (
     ciphertext,
     ciphertext_size_bytes,
     created_at,
-    stored_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    stored_at,
+    server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING
     id,
     group_id,
@@ -1106,7 +1095,8 @@ RETURNING
     revision,
     ciphertext_size_bytes,
     created_at,
-    stored_at;
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence;
 
 -- name: CreateEncryptedGroupMessageDelivery :exec
 INSERT INTO group_encrypted_message_deliveries_v1 (
@@ -1161,8 +1151,9 @@ INSERT INTO attachment_upload_sessions (
     status,
     expires_at,
     created_at,
-    updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    updated_at,
+    staging_object_key
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING
     id,
     attachment_id,
@@ -1172,7 +1163,41 @@ RETURNING
     created_at,
     updated_at,
     completed_at,
-    failed_at;
+    failed_at,
+    staging_object_key;
+
+-- name: LockAttachmentForFinalization :one
+SELECT id FROM attachments WHERE id = $1 FOR UPDATE;
+
+-- name: LockAttachmentUploadSession :one
+SELECT id FROM attachment_upload_sessions WHERE attachment_id = $1 FOR UPDATE;
+
+-- name: CreateAttachmentSourceCleanup :exec
+INSERT INTO attachment_source_cleanup (object_key, attachment_id, capability_expires_at, next_attempt_at, created_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (object_key) DO NOTHING;
+
+-- name: ListAttachmentSourceCleanup :many
+SELECT object_key FROM attachment_source_cleanup
+WHERE next_attempt_at <= $1
+ORDER BY next_attempt_at, object_key
+LIMIT $2;
+
+-- name: RescheduleAttachmentSourceCleanup :exec
+UPDATE attachment_source_cleanup SET next_attempt_at = $2 WHERE object_key = $1;
+
+-- name: ListLegacyAttachmentIDs :many
+SELECT id FROM attachments
+WHERE object_key NOT LIKE 'final/%' AND status IN ('uploaded', 'attached', 'detached')
+ORDER BY created_at, id LIMIT $1;
+
+-- name: GetLegacyCapabilityExpiry :one
+SELECT MAX(expires_at)::timestamptz AS expires_at
+FROM attachment_upload_sessions WHERE staging_object_key IS NULL;
+
+-- name: PublishLegacyAttachmentFinalKey :execrows
+UPDATE attachments SET object_key = $2
+WHERE id = $1 AND object_key = $3 AND status IN ('uploaded', 'attached', 'detached');
 
 -- name: LockAttachmentQuotaOwner :one
 SELECT id
@@ -1214,6 +1239,7 @@ SELECT
     s.updated_at AS upload_session_updated_at,
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
+    s.staging_object_key AS upload_session_staging_object_key,
     ma.direct_chat_message_id,
     ma.group_message_id,
     ma.encrypted_direct_message_v2_id,
@@ -1251,6 +1277,7 @@ SELECT
     s.updated_at AS upload_session_updated_at,
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
+    s.staging_object_key AS upload_session_staging_object_key,
     ma.direct_chat_message_id,
     ma.group_message_id,
     ma.encrypted_direct_message_v2_id,
@@ -1371,7 +1398,7 @@ WITH candidates AS (
       AND ma.attachment_id IS NULL
     ORDER BY s.expires_at ASC, s.id ASC
     LIMIT $2
-    FOR UPDATE OF s, a SKIP LOCKED
+    FOR UPDATE OF a SKIP LOCKED
 ),
 updated_attachments AS (
     UPDATE attachments AS a
@@ -1688,18 +1715,16 @@ INSERT INTO direct_chat_encrypted_read_states_v1 (
     user_id,
     last_read_message_id,
     last_read_message_created_at,
-    updated_at
-) VALUES ($1, $2, $3, $4, $5)
+    updated_at,
+    last_read_server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (chat_id, user_id) DO UPDATE
 SET
     last_read_message_id = EXCLUDED.last_read_message_id,
     last_read_message_created_at = EXCLUDED.last_read_message_created_at,
-    updated_at = EXCLUDED.updated_at
-WHERE direct_chat_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
-   OR (
-        direct_chat_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
-        AND direct_chat_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
-   );
+    updated_at = EXCLUDED.updated_at,
+    last_read_server_sequence = EXCLUDED.last_read_server_sequence
+WHERE direct_chat_encrypted_read_states_v1.last_read_server_sequence < EXCLUDED.last_read_server_sequence;
 
 -- name: ListDirectChatEncryptedMessageV2ByDevice :many
 SELECT
@@ -1712,6 +1737,7 @@ SELECT
     m.revision,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.transport_header,
@@ -1725,7 +1751,7 @@ WHERE self.user_id = $1
   AND m.chat_id = $2
   AND d.recipient_user_id = $1
   AND d.recipient_crypto_device_id = $3
-ORDER BY m.created_at DESC, m.id DESC
+ORDER BY m.server_sequence DESC
 LIMIT $4;
 
 -- name: GetDirectChatEncryptedMessageV2ByDevice :one
@@ -1739,6 +1765,7 @@ SELECT
     m.revision,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.transport_header,
@@ -1764,7 +1791,8 @@ SELECT
     target_message_id,
     revision,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 FROM direct_chat_encrypted_messages_v2
 WHERE chat_id = $1 AND id = $2;
 
@@ -1784,6 +1812,7 @@ SELECT
     m.ciphertext_size_bytes,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.stored_at AS delivery_stored_at
@@ -1794,7 +1823,7 @@ WHERE self.user_id = $1
   AND m.group_id = $2
   AND d.recipient_user_id = $1
   AND d.recipient_crypto_device_id = $3
-ORDER BY m.created_at DESC, m.id DESC
+ORDER BY m.server_sequence DESC
 LIMIT $4;
 
 -- name: GetEncryptedGroupMessageByDevice :one
@@ -1813,6 +1842,7 @@ SELECT
     m.ciphertext_size_bytes,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.stored_at AS delivery_stored_at
@@ -1838,7 +1868,8 @@ SELECT
     target_message_id,
     revision,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 FROM group_encrypted_messages_v1
 WHERE group_id = $1 AND id = $2;
 
@@ -1867,18 +1898,16 @@ INSERT INTO group_encrypted_read_states_v1 (
     user_id,
     last_read_message_id,
     last_read_message_created_at,
-    updated_at
-) VALUES ($1, $2, $3, $4, $5)
+    updated_at,
+    last_read_server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (group_id, user_id) DO UPDATE
 SET
     last_read_message_id = EXCLUDED.last_read_message_id,
     last_read_message_created_at = EXCLUDED.last_read_message_created_at,
-    updated_at = EXCLUDED.updated_at
-WHERE group_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
-   OR (
-        group_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
-        AND group_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
-   );
+    updated_at = EXCLUDED.updated_at,
+    last_read_server_sequence = EXCLUDED.last_read_server_sequence
+WHERE group_encrypted_read_states_v1.last_read_server_sequence < EXCLUDED.last_read_server_sequence;
 
 -- name: CreateDirectChatMessageTombstone :execrows
 INSERT INTO direct_chat_message_tombstones (

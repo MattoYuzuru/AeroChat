@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -37,6 +38,19 @@ func (s *Service) RunAttachmentLifecycleCleanup(ctx context.Context, options Att
 	limit := int32(batchSize)
 
 	report := &AttachmentLifecycleCleanupReport{}
+	sources, err := s.repo.ListAttachmentSourceCleanup(ctx, now, limit)
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range sources {
+		if err := s.objectStorage.DeleteObject(ctx, key); err != nil {
+			return nil, err
+		}
+		if err := s.repo.RescheduleAttachmentSourceCleanup(ctx, key, now.Add(time.Hour)); err != nil {
+			return nil, err
+		}
+		report.DeletedUploadSources++
+	}
 
 	expiredUploadSessions, err := s.repo.ExpirePendingAttachmentUploadSessions(ctx, now, limit)
 	if err != nil {
@@ -56,11 +70,7 @@ func (s *Service) RunAttachmentLifecycleCleanup(ctx context.Context, options Att
 	}
 
 	for _, candidate := range candidates {
-		if err := s.objectStorage.DeleteObject(ctx, candidate.ObjectKey); err != nil {
-			return nil, err
-		}
-
-		deleted, err := s.repo.MarkAttachmentDeleted(ctx, candidate.ID, now)
+		deleted, err := s.deleteAttachmentObjects(ctx, candidate.ID, now, now.Add(-unattachedTTL), now.Add(-detachedRetention))
 		if err != nil {
 			return nil, err
 		}
@@ -70,4 +80,40 @@ func (s *Service) RunAttachmentLifecycleCleanup(ctx context.Context, options Att
 	}
 
 	return report, nil
+}
+
+func (s *Service) deleteAttachmentObjects(ctx context.Context, id string, now, failedBefore, detachedBefore time.Time) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, attachmentFinalizationTimeout)
+	defer cancel()
+	lock, err := s.repo.BeginAttachmentFinalization(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	defer lock.Close(context.Background())
+	a := lock.Attachment()
+	eligible := false
+	switch a.Status {
+	case AttachmentStatusExpired:
+		eligible = a.MessageID == nil && a.UpdatedAt.Before(now)
+	case AttachmentStatusFailed:
+		eligible = a.MessageID == nil && a.FailedAt != nil && !a.FailedAt.After(failedBefore)
+	case AttachmentStatusDetached:
+		eligible = !a.UpdatedAt.After(detachedBefore)
+	}
+	if !eligible {
+		return false, nil
+	}
+	if session := lock.UploadSession(); session != nil && session.ExpiresAt.Add(5*time.Minute).After(now) {
+		return false, nil
+	}
+	if err := s.objectStorage.DeleteObject(ctx, a.ObjectKey); err != nil {
+		return false, err
+	}
+	// Детерминированный final key покрывает crash backfill до публикации новой metadata.
+	if !strings.HasPrefix(a.ObjectKey, "final/") {
+		if err := s.objectStorage.DeleteObject(ctx, "final/"+a.ID+".bin"); err != nil {
+			return false, err
+		}
+	}
+	return lock.Delete(ctx, now)
 }

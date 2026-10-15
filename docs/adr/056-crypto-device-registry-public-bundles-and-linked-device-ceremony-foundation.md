@@ -229,6 +229,10 @@
 
 Это единственное допустимое исключение из общего правила linked-device approval.
 
+Уточнение исполнения от 2026-10-11 для [#151](https://github.com/MattoYuzuru/AeroChat/issues/151): first bootstrap допускается только для полностью пустого registry, включая отсутствие `pending_link` и исторических `revoked` records. Отзыв последнего устройства не разрешает новый bootstrap через password login; recovery/reset требует отдельного решения.
+
+Проверка пустого registry и вставка первого device с bundle выполняются одной repository transaction под блокировкой строки владельца `users` (`SELECT ... FOR UPDATE`), с явно выбранным `READ COMMITTED`, чтобы повторное чтение после ожидания lock видело committed регистрацию. Одновременный второй bootstrap после ожидания lock получает `ErrConflict`. Такая блокировка использует [row locks PostgreSQL](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS) и сохраняет legitimate multi-device active state: unique constraint на все active devices аккаунта не вводится. Ошибка bundle insert откатывает также device insert, поэтому незавершённая попытка не создаёт trust root. Signed approval для последующих устройств остаётся обязательным.
+
 Такой device становится первым trust root аккаунта в рамках текущего registry state.
 
 Это не отдельный account master key и не вечная глобальная роль.

@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/admission"
 )
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
@@ -20,10 +22,15 @@ type Config struct {
 	ChatBaseURL          string
 	RTCBaseURL           string
 	CORSAllowedOrigins   []string
+	AuthAdmission        admission.Config
 }
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
 func LoadConfig(defaultHTTPAddress string) (Config, error) {
+	authAdmission, err := admission.LoadConfig()
+	if err != nil {
+		return Config{}, err
+	}
 	shutdownTimeout, err := lookupDuration("AERO_SHUTDOWN_TIMEOUT", 10*time.Second)
 	if err != nil {
 		return Config{}, err
@@ -70,6 +77,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		ChatBaseURL:          chatBaseURL,
 		RTCBaseURL:           rtcBaseURL,
 		CORSAllowedOrigins:   lookupCSV("AERO_CORS_ALLOWED_ORIGINS"),
+		AuthAdmission:        authAdmission,
 	}, nil
 }
 

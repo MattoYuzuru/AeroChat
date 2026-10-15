@@ -11,10 +11,12 @@
 | Приоритеты реализации | [Roadmap](roadmap.md) и issue index в текущем аудите |
 | Архитектурные инварианты | [ADR-001](adr/001-architecture.md), [ADR-002](adr/002-crypto.md), [ADR-003](adr/003-realtime-and-rtc.md), [ADR-004](adr/004-storage-and-relay.md) |
 | Продуктовый канон оболочки | [Web Shell XP](product/web-shell-xp.md), [ADR-079](adr/079-desktop-shell-primary-desktop-web-surface.md)–[ADR-083](adr/083-mobile-practical-shell-adaptation.md) |
-| Self-host и публичный edge | [Bootstrap](deploy/single-server-bootstrap.md), [Rollout/rollback](deploy/production-rollout.md), [ADR-025](adr/025-k3s-traefik-shared-edge-deployment.md) |
+| Self-host и публичный edge | [Bootstrap](deploy/single-server-bootstrap.md), [Verified release](deploy/verified-release.md), [Rollout/rollback](deploy/production-rollout.md), [ADR-025](adr/025-k3s-traefik-shared-edge-deployment.md) |
 | TURN и heartbeat звонков | [ADR-085](adr/085-server-turn-runtime-and-public-relay-ip-contract.md), [RTC ADR-086](adr/086-rtc-participant-heartbeat-and-stale-eviction.md) |
-| Push | [Notifications ADR-086](adr/086-web-notifications-and-push-foundation.md) |
+| Push | [Notifications ADR-086](adr/086-web-notifications-and-push-foundation.md), [ADR-095: egress policy](adr/095-web-push-egress-boundary.md) |
+| Encrypted ordering/read | [ADR-070](adr/070-encrypted-unread-and-read-state-recovery-foundation.md), [ADR-096](adr/096-encrypted-conversation-server-sequence.md) |
 | Команды, runtime и совместная работа агентов | [Development](development.md) |
+| Порядок encrypted operations и metadata migration | [ADR-096](adr/096-encrypted-conversation-server-sequence.md), [Sequence cutover](deploy/encrypted-sequence-cutover.md) |
 | Следующая сессия исправлений | [Промпт координатора](audits/2026-10-11-next-session.md) |
 
 Номер 086 занят двумя существующими ADR; в задачах использовать полное имя файла. Новые номера проверять по всему каталогу.

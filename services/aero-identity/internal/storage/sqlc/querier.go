@@ -54,6 +54,7 @@ type Querier interface {
 	ListOutgoingFriendRequestsByUserID(ctx context.Context, requesterUserID uuid.UUID) ([]ListOutgoingFriendRequestsByUserIDRow, error)
 	ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
 	ListWebPushSubscriptionsByUserID(ctx context.Context, userID uuid.UUID) ([]WebPushSubscription, error)
+	LockCryptoDeviceRegistryOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	RevokeCryptoDeviceWithMetadata(ctx context.Context, arg RevokeCryptoDeviceWithMetadataParams) (CryptoDevice, error)
 	RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (int64, error)
 	RevokeDeviceSessions(ctx context.Context, arg RevokeDeviceSessionsParams) error

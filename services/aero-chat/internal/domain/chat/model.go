@@ -298,18 +298,20 @@ type Attachment struct {
 }
 
 type AttachmentUploadSession struct {
-	ID           string
-	AttachmentID string
-	OwnerUserID  string
-	Status       string
-	UploadURL    string
-	HTTPMethod   string
-	Headers      map[string]string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	ExpiresAt    time.Time
-	CompletedAt  *time.Time
-	FailedAt     *time.Time
+	ID               string
+	AttachmentID     string
+	OwnerUserID      string
+	Status           string
+	UploadURL        string
+	HTTPMethod       string
+	Headers          map[string]string
+	FormFields       map[string]string
+	StagingObjectKey string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ExpiresAt        time.Time
+	CompletedAt      *time.Time
+	FailedAt         *time.Time
 }
 
 type AttachmentUploadIntent struct {
@@ -340,6 +342,7 @@ type AttachmentLifecycleCleanupReport struct {
 	ExpiredUploadSessions    int64
 	ExpiredOrphanAttachments int64
 	DeletedAttachments       int
+	DeletedUploadSources     int
 }
 
 type MessageTombstone struct {
@@ -387,6 +390,7 @@ type EncryptedDirectMessageV2StoredDelivery struct {
 }
 
 type EncryptedDirectMessageV2Envelope struct {
+	ServerSequence       int64
 	MessageID            string
 	ChatID               string
 	SenderUserID         string
@@ -400,6 +404,7 @@ type EncryptedDirectMessageV2Envelope struct {
 }
 
 type EncryptedDirectMessageV2StoredEnvelope struct {
+	ServerSequence       int64
 	MessageID            string
 	ChatID               string
 	SenderUserID         string
@@ -421,6 +426,7 @@ type EncryptedGroupMessageDelivery struct {
 }
 
 type EncryptedGroupEnvelope struct {
+	ServerSequence       int64
 	MessageID            string
 	GroupID              string
 	ThreadID             string
@@ -439,6 +445,7 @@ type EncryptedGroupEnvelope struct {
 }
 
 type EncryptedGroupStoredEnvelope struct {
+	ServerSequence       int64
 	MessageID            string
 	GroupID              string
 	ThreadID             string
@@ -536,9 +543,10 @@ type GroupReadPosition struct {
 }
 
 type EncryptedConversationReadPosition struct {
-	MessageID        string
-	MessageCreatedAt time.Time
-	UpdatedAt        time.Time
+	LastReadServerSequence int64
+	MessageID              string
+	MessageCreatedAt       time.Time
+	UpdatedAt              time.Time
 }
 
 type DirectChatReadState struct {
@@ -798,21 +806,22 @@ type EditGroupMessageParams struct {
 }
 
 type CreateAttachmentUploadIntentParams struct {
-	AttachmentID    string
-	UploadSessionID string
-	OwnerUserID     string
-	Scope           string
-	DirectChatID    *string
-	GroupID         *string
-	BucketName      string
-	ObjectKey       string
-	FileName        string
-	MimeType        string
-	RelaySchema     string
-	SizeBytes       int64
-	ExpiresAt       time.Time
-	CreatedAt       time.Time
-	UserQuotaBytes  int64
+	AttachmentID     string
+	UploadSessionID  string
+	OwnerUserID      string
+	Scope            string
+	DirectChatID     *string
+	GroupID          *string
+	BucketName       string
+	ObjectKey        string
+	StagingObjectKey string
+	FileName         string
+	MimeType         string
+	RelaySchema      string
+	SizeBytes        int64
+	ExpiresAt        time.Time
+	CreatedAt        time.Time
+	UserQuotaBytes   int64
 }
 
 type CompleteAttachmentUploadParams struct {
@@ -845,11 +854,12 @@ type UpsertDirectChatReadReceiptParams struct {
 }
 
 type UpsertEncryptedDirectChatReadStateParams struct {
-	ChatID            string
-	UserID            string
-	LastReadMessageID string
-	LastReadMessageAt time.Time
-	UpdatedAt         time.Time
+	LastReadServerSequence int64
+	ChatID                 string
+	UserID                 string
+	LastReadMessageID      string
+	LastReadMessageAt      time.Time
+	UpdatedAt              time.Time
 }
 
 type UpsertGroupChatReadStateParams struct {
@@ -861,11 +871,12 @@ type UpsertGroupChatReadStateParams struct {
 }
 
 type UpsertEncryptedGroupReadStateParams struct {
-	GroupID           string
-	UserID            string
-	LastReadMessageID string
-	LastReadMessageAt time.Time
-	UpdatedAt         time.Time
+	LastReadServerSequence int64
+	GroupID                string
+	UserID                 string
+	LastReadMessageID      string
+	LastReadMessageAt      time.Time
+	UpdatedAt              time.Time
 }
 
 type PutDirectChatTypingIndicatorParams struct {

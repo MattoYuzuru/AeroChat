@@ -4,10 +4,13 @@ import (
 	"log/slog"
 	"net/http"
 
+	"connectrpc.com/connect"
+
 	chatv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/chat/v1/chatv1connect"
 	identityv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/identity/v1/identityv1connect"
 	rtcv1connect "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1/rtcv1connect"
 	"github.com/MattoYuzuru/AeroChat/libs/go/observability"
+	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/admission"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/downstream"
 	edgehttp "github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/edgehttp"
 	"github.com/MattoYuzuru/AeroChat/services/aero-gateway/internal/realtime"
@@ -22,10 +25,11 @@ func NewHTTPHandler(logger *slog.Logger, meta observability.ServiceMeta, cfg Con
 		realtime.NewHandler(logger, realtime.NewIdentityAuthenticator(clients.Identity), realtimeHub, cfg.CORSAllowedOrigins),
 	)
 
-	identityPath, identityHandler := identityv1connect.NewIdentityServiceHandler(
-		connecthandler.NewIdentityHandler(logger, meta.Name, meta.Version, clients.Identity, realtimeHub),
-	)
+	identityService := connecthandler.NewIdentityHandler(logger, meta.Name, meta.Version, clients.Identity, realtimeHub, admission.NewLimiter(cfg.AuthAdmission))
+	identityPath, identityHandler := identityv1connect.NewIdentityServiceHandler(identityService)
 	connectMux.Handle(identityPath, identityHandler)
+	connectMux.Handle(identityv1connect.IdentityServiceRegisterProcedure, connect.NewUnaryHandler(identityv1connect.IdentityServiceRegisterProcedure, identityService.Register, connect.WithReadMaxBytes(admission.MaxAuthRequestBytes)))
+	connectMux.Handle(identityv1connect.IdentityServiceLoginProcedure, connect.NewUnaryHandler(identityv1connect.IdentityServiceLoginProcedure, identityService.Login, connect.WithReadMaxBytes(admission.MaxAuthRequestBytes)))
 
 	chatPath, chatHandler := chatv1connect.NewChatServiceHandler(
 		connecthandler.NewChatHandler(logger, meta.Name, meta.Version, clients.Chat, clients.Identity, realtimeHub),

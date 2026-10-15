@@ -99,6 +99,10 @@ Session token:
 
 Это решение не считается device crypto identity и не подменяет будущую E2EE-модель.
 
+Уточнение от 2026-10-11 ([#155](https://github.com/MattoYuzuru/AeroChat/issues/155)): wire format `v1.<canonical lowercase UUID>.<32-byte secret encoded as unpadded base64url>` остаётся прежним. Parser проверяет длину, UUID форму, version и canonical base64url до repository access. Malformed credential возвращает unauthenticated; `GetSessionAuthByID` в identity/chat дополнительно возвращает явную auth error при невалидном UUID вместо panic. Валидные ранее выданные tokens сохраняют совместимость.
+
+Public revoke сначала аутентифицирует caller, затем проверяет UUID session/device target до revoke repository access. Некорректный target возвращает `invalid_argument` со статическим сообщением без исходного значения вместо `mustParseUUID` panic. Поддерживаемые UUID representations нормализуются через existing UUID parser; owner-bound lookup, `not_found` для чужого/отсутствующего target и signed crypto-device approval не меняются.
+
 ### 5. Block list и privacy
 
 Identity domain на этом этапе хранит relation block list:
