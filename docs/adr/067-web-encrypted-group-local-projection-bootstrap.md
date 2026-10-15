@@ -232,3 +232,25 @@ Encrypted group lane:
 
 Не выбрано, потому что это оставило бы backend opaque contracts без реального web consumption
 и вынудило бы следующий PR одновременно решать runtime, fetch, realtime, projection и send.
+
+## Уточнение 12 октября 2026: lifetime group projection
+
+Статус уточнения: Accepted — координатор проверил lifetime и границы scope до реализации.
+
+В source `9f5c9ac` group hook сохраняет тот же механизм, который отдельно
+воспроизведён для direct lane: object identity crypto context меняется при
+`isActionPending`, а уже начатый decrypt может быть отменён при неизменной группе.
+Наличие этого механизма является source candidate; actual group failure и
+group RED/GREEN ещё не подтверждены. Direct 7-case PASS не считается group coverage.
+
+Смена состояния действия при неизменных token/group/device/page size не отменяет
+чтение/decrypt group lane. Hook использует ref текущего runtime; существующие
+load descriptor и scope key, request version, disabled/retired device и unmount
+по-прежнему отменяют старый результат при смене области группы.
+
+Bootstrap/list остаются source of truth; truthful decrypt failure/unavailable из
+раздела2 не скрываются local optimistic projection. Worker/provider, codecs,
+AAD, roster, buffered/resolved bookkeeping, backend и transport не меняются.
+Проверка lifetime исполняет actual production group hook, buffer и merge в React
+с synthetic bootstrap/list/deferred decrypt adapters. Она не является actual
+WebCrypto/backend/group audio, MLS или whole browser core acceptance.
