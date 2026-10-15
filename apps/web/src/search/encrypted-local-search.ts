@@ -1,3 +1,4 @@
+import { compareServerSequences, requireServerSequence } from "../gateway/server-sequence";
 import {
   encryptedDirectMessageV2ProjectionLimit,
   mergeEncryptedDirectMessageV2Projection,
@@ -101,6 +102,7 @@ interface EncryptedLocalSearchLaneCacheEntry {
   indexedMessages: EncryptedLocalIndexedMessage[];
 }
 
+const encryptedLocalSearchOrderSchema = "server-sequence-v1";
 const encryptedLocalSearchLaneCache = new Map<string, EncryptedLocalSearchLaneCacheEntry>();
 let encryptedLocalSearchSequence = 0;
 
@@ -113,6 +115,9 @@ export function primeEncryptedDirectLocalSearchIndex(input: {
   chat: DirectChat;
   items: EncryptedDirectMessageV2ProjectionEntry[];
 }) {
+  for (const item of input.items) {
+    requireServerSequence(item.serverSequence);
+  }
   storeLaneCacheEntry({
     key: buildDirectLaneKey(input.chat.id),
     scope: "direct",
@@ -134,6 +139,9 @@ export function primeEncryptedGroupLocalSearchIndex(input: {
   const authors = input.bootstrap?.rosterMembers.map((member) => member.user) ?? [];
   const threadId = input.bootstrap?.lane.threadId ?? null;
 
+  for (const item of input.items) {
+    requireServerSequence(item.serverSequence);
+  }
   storeLaneCacheEntry({
     key: buildGroupLaneKey(input.group.id),
     scope: "group",
@@ -663,11 +671,11 @@ function normalizeForSearch(value: string): string {
 }
 
 function buildDirectLaneKey(chatId: string): string {
-  return `direct:${chatId}`;
+  return `${encryptedLocalSearchOrderSchema}:direct:${chatId}`;
 }
 
 function buildGroupLaneKey(groupId: string): string {
-  return `group:${groupId}`;
+  return `${encryptedLocalSearchOrderSchema}:group:${groupId}`;
 }
 
 function deduplicateEncryptedDirectEnvelopes(
@@ -709,12 +717,9 @@ function deduplicateEncryptedGroupEnvelopes(
 }
 
 function compareEncryptedEnvelopes(
-  left: Pick<EncryptedDirectMessageV2Envelope | EncryptedGroupEnvelope, "createdAt" | "messageId">,
-  right: Pick<EncryptedDirectMessageV2Envelope | EncryptedGroupEnvelope, "createdAt" | "messageId">,
+  left: Pick<EncryptedDirectMessageV2Envelope | EncryptedGroupEnvelope, "serverSequence" | "messageId">,
+  right: Pick<EncryptedDirectMessageV2Envelope | EncryptedGroupEnvelope, "serverSequence" | "messageId">,
 ) {
-  if (left.createdAt === right.createdAt) {
-    return left.messageId.localeCompare(right.messageId);
-  }
-
-  return left.createdAt.localeCompare(right.createdAt);
+  return compareServerSequences(left.serverSequence, right.serverSequence) ||
+    left.messageId.localeCompare(right.messageId);
 }

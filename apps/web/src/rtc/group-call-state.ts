@@ -41,13 +41,14 @@ export function deriveGroupCallActionAvailability(input: {
   currentUserId: string;
   selfParticipant: RtcCallParticipant | null;
   selfRole: GroupMemberRole;
+  hasLocalOwnership?: boolean;
 }): GroupCallActionAvailability {
   const isReadOnly = !canActivelyParticipateInGroupCall(input.selfRole);
   const actionIdle = input.actionState === "idle";
 
   return {
     canStart: actionIdle && !isReadOnly && input.call === null,
-    canJoin: actionIdle && !isReadOnly && input.call !== null && input.selfParticipant === null,
+    canJoin: actionIdle && !isReadOnly && input.call !== null && (input.selfParticipant === null || input.hasLocalOwnership === false),
     canLeave: actionIdle && input.call !== null && input.selfParticipant !== null,
     canEnd:
       actionIdle &&

@@ -36,6 +36,7 @@ export interface DesktopShellHost {
   currentWindowSearch: string;
   currentWindowTargetKey: string | null;
   isCurrentWindowActive: boolean;
+  isCurrentWindowVisible: boolean;
   desktopGridCapacity: number;
   desktopRegistryState: DesktopRegistryState;
   desktopUnreadTargetMap: DesktopUnreadTargetMap;
