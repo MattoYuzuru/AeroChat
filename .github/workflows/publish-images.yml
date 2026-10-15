@@ -2,89 +2,77 @@ name: Publish Images
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - "v*.*.*"
+    branches: [main]
+    tags: ["v*.*.*"]
 
 permissions:
   contents: read
-  packages: write
+
+concurrency:
+  group: image-publication-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
+  quality:
+    uses: ./.github/workflows/ci.yml
+    with:
+      source_sha: ${{ github.sha }}
+
   publish:
+    needs: quality
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: web
-            image_name: aerochat-web
-            dockerfile: apps/web/Dockerfile
-            build_args: |
-              VITE_GATEWAY_BASE_URL=/api
-          - service: aero-gateway
-            image_name: aerochat-aero-gateway
-            dockerfile: services/aero-gateway/Dockerfile
-            build_args: ""
-          - service: aero-identity
-            image_name: aerochat-aero-identity
-            dockerfile: services/aero-identity/Dockerfile
-            build_args: ""
-          - service: aero-chat
-            image_name: aerochat-aero-chat
-            dockerfile: services/aero-chat/Dockerfile
-            build_args: ""
-          - service: aero-rtc-control
-            image_name: aerochat-aero-rtc-control
-            dockerfile: services/aero-rtc-control/Dockerfile
-            build_args: ""
-
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Normalize image namespace
-        id: repo
-        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - name: Checkout exact candidate
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.sha }}
 
-      - name: Extract image metadata
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Retrieve all verified images
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          images: ghcr.io/${{ steps.repo.outputs.owner }}/${{ matrix.image_name }}
-          flavor: |
-            latest=false
-          tags: |
-            type=raw,value=edge,enable={{is_default_branch}}
-            type=sha,format=long,prefix=sha-
-            type=semver,pattern=v{{version}}
-            type=semver,pattern=v{{major}}.{{minor}}
-            type=semver,pattern=v{{major}}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.title=${{ matrix.image_name }}
-            org.opencontainers.image.description=AeroChat ${{ matrix.service }} service image
+          pattern: release-image-${{ github.sha }}-*
+          path: /tmp/release-images
+          merge-multiple: true
 
-      - name: Build and push image
-        uses: docker/build-push-action@v6
+      - name: Validate complete image set before any publication
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          namespace="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          for service in web aero-gateway aero-identity aero-chat aero-rtc-control; do
+            test -f "/tmp/release-images/$service.tar"
+            docker load -i "/tmp/release-images/$service.tar"
+            test "$(docker image inspect "$namespace/aerochat-$service:sha-$SOURCE_SHA" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$SOURCE_SHA"
+          done
+
+      - name: Setup ORAS
+        uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1
         with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: linux/amd64
-          push: true
-          build-args: ${{ matrix.build_args }}
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          version: 1.3.0
+          url: https://github.com/oras-project/oras/releases/download/v1.3.0/oras_1.3.0_linux_amd64.tar.gz
+          checksum: 6cdc692f929100feb08aa8de584d02f7bcc30ec7d88bc2adc2054d782db57c64
+
+      - name: Publish immutable images and finalize one release manifest
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          namespace="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$REGISTRY_TOKEN" | oras login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          mkdir -p /tmp/release-digests /tmp/release-manifest
+          for service in web aero-gateway aero-identity aero-chat aero-rtc-control; do
+            image="$namespace/aerochat-$service:sha-$SOURCE_SHA"
+            docker push "$image"
+            docker image inspect "$image" --format '{{range .RepoDigests}}{{println .}}{{end}}' > "/tmp/release-digests/$service.txt"
+          done
+          python3 infra/scripts/release_manifest.py assemble /tmp/release-digests --source-sha "$SOURCE_SHA" --namespace "$namespace" > /tmp/release-manifest/release.json
+          cd /tmp/release-manifest
+          oras push "$namespace/aerochat-release:sha-$SOURCE_SHA" --artifact-type application/vnd.aerochat.release.v1+json --annotation "org.opencontainers.image.revision=$SOURCE_SHA" release.json:application/vnd.aerochat.release.v1+json
+          digest="$(oras resolve "$namespace/aerochat-release:sha-$SOURCE_SHA")"
+          # shellcheck disable=SC2016
+          printf 'Release: `%s/aerochat-release@%s`\n\nSource SHA: `%s`\n' "$namespace" "$digest" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -126,7 +125,6 @@ func run() error {
 		objectStorage,
 		app.NewMessageNotificationDispatcher(
 			libnotifications.NewWebPushClient(
-				&http.Client{},
 				cfg.WebPushSubscriber,
 				cfg.WebPushVAPIDPublicKey,
 				cfg.WebPushVAPIDPrivateKey,
@@ -163,7 +161,10 @@ func run() error {
 				return err
 			}
 
-			return typingStore.Ping(ctx)
+			if err := typingStore.Ping(ctx); err != nil {
+				return err
+			}
+			return objectStorage.ReadinessCheck(ctx)
 		},
 		handler,
 	)
