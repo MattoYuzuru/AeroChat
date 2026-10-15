@@ -25,7 +25,19 @@ func (r *Repository) GetCryptoDeviceRegistryStatsByUserID(ctx context.Context, u
 }
 
 func (r *Repository) CreateCryptoDevice(ctx context.Context, params identity.CreateCryptoDeviceParams) (*identity.CryptoDevice, *identity.CryptoDeviceBundle, error) {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	return r.createCryptoDevice(ctx, params, false)
+}
+
+func (r *Repository) CreateFirstCryptoDevice(ctx context.Context, params identity.CreateCryptoDeviceParams) (*identity.CryptoDevice, *identity.CryptoDeviceBundle, error) {
+	return r.createCryptoDevice(ctx, params, true)
+}
+
+func (r *Repository) createCryptoDevice(ctx context.Context, params identity.CreateCryptoDeviceParams, first bool) (*identity.CryptoDevice, *identity.CryptoDeviceBundle, error) {
+	options := pgx.TxOptions{}
+	if first {
+		options.IsoLevel = pgx.ReadCommitted
+	}
+	tx, err := r.db.BeginTx(ctx, options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("begin tx: %w", err)
 	}
@@ -34,6 +46,19 @@ func (r *Repository) CreateCryptoDevice(ctx context.Context, params identity.Cre
 	}()
 
 	q := r.queries.WithTx(tx)
+	if first {
+		// Пустой registry не содержит строки для lock; сериализуем bootstrap по владельцу.
+		if _, err := q.LockCryptoDeviceRegistryOwner(ctx, mustParseUUID(params.Device.UserID)); err != nil {
+			return nil, nil, convertError(err)
+		}
+		stats, err := q.GetCryptoDeviceRegistryStatsByUserID(ctx, mustParseUUID(params.Device.UserID))
+		if err != nil {
+			return nil, nil, convertError(err)
+		}
+		if stats.TotalCount != 0 {
+			return nil, nil, identity.ErrConflict
+		}
+	}
 	deviceRow, err := q.CreateCryptoDevice(ctx, identitysqlc.CreateCryptoDeviceParams{
 		ID:                     mustParseUUID(params.Device.ID),
 		UserID:                 mustParseUUID(params.Device.UserID),

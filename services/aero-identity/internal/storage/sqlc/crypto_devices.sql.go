@@ -961,6 +961,16 @@ func (q *Queries) ListCryptoDevicesByUserID(ctx context.Context, userID uuid.UUI
 	return items, nil
 }
 
+const lockCryptoDeviceRegistryOwner = `-- name: LockCryptoDeviceRegistryOwner :one
+SELECT id FROM users WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockCryptoDeviceRegistryOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockCryptoDeviceRegistryOwner, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
 const revokeCryptoDeviceWithMetadata = `-- name: RevokeCryptoDeviceWithMetadata :one
 UPDATE crypto_devices
 SET

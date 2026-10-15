@@ -323,6 +323,31 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 	return i, err
 }
 
+const createAttachmentSourceCleanup = `-- name: CreateAttachmentSourceCleanup :exec
+INSERT INTO attachment_source_cleanup (object_key, attachment_id, capability_expires_at, next_attempt_at, created_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (object_key) DO NOTHING
+`
+
+type CreateAttachmentSourceCleanupParams struct {
+	ObjectKey           string             `db:"object_key" json:"object_key"`
+	AttachmentID        uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	CapabilityExpiresAt pgtype.Timestamptz `db:"capability_expires_at" json:"capability_expires_at"`
+	NextAttemptAt       pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateAttachmentSourceCleanup(ctx context.Context, arg CreateAttachmentSourceCleanupParams) error {
+	_, err := q.db.Exec(ctx, createAttachmentSourceCleanup,
+		arg.ObjectKey,
+		arg.AttachmentID,
+		arg.CapabilityExpiresAt,
+		arg.NextAttemptAt,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const createAttachmentUploadSession = `-- name: CreateAttachmentUploadSession :one
 INSERT INTO attachment_upload_sessions (
     id,
@@ -331,8 +356,9 @@ INSERT INTO attachment_upload_sessions (
     status,
     expires_at,
     created_at,
-    updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    updated_at,
+    staging_object_key
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING
     id,
     attachment_id,
@@ -342,17 +368,19 @@ RETURNING
     created_at,
     updated_at,
     completed_at,
-    failed_at
+    failed_at,
+    staging_object_key
 `
 
 type CreateAttachmentUploadSessionParams struct {
-	ID           uuid.UUID          `db:"id" json:"id"`
-	AttachmentID uuid.UUID          `db:"attachment_id" json:"attachment_id"`
-	OwnerUserID  uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
-	Status       string             `db:"status" json:"status"`
-	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	AttachmentID     uuid.UUID          `db:"attachment_id" json:"attachment_id"`
+	OwnerUserID      uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	Status           string             `db:"status" json:"status"`
+	ExpiresAt        pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	StagingObjectKey pgtype.Text        `db:"staging_object_key" json:"staging_object_key"`
 }
 
 func (q *Queries) CreateAttachmentUploadSession(ctx context.Context, arg CreateAttachmentUploadSessionParams) (AttachmentUploadSession, error) {
@@ -364,6 +392,7 @@ func (q *Queries) CreateAttachmentUploadSession(ctx context.Context, arg CreateA
 		arg.ExpiresAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+		arg.StagingObjectKey,
 	)
 	var i AttachmentUploadSession
 	err := row.Scan(
@@ -376,6 +405,7 @@ func (q *Queries) CreateAttachmentUploadSession(ctx context.Context, arg CreateA
 		&i.UpdatedAt,
 		&i.CompletedAt,
 		&i.FailedAt,
+		&i.StagingObjectKey,
 	)
 	return i, err
 }
@@ -401,7 +431,16 @@ type CreateDirectChatParams struct {
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) CreateDirectChat(ctx context.Context, arg CreateDirectChatParams) (DirectChat, error) {
+type CreateDirectChatRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	UserLowID       uuid.UUID          `db:"user_low_id" json:"user_low_id"`
+	UserHighID      uuid.UUID          `db:"user_high_id" json:"user_high_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateDirectChat(ctx context.Context, arg CreateDirectChatParams) (CreateDirectChatRow, error) {
 	row := q.db.QueryRow(ctx, createDirectChat,
 		arg.ID,
 		arg.CreatedByUserID,
@@ -410,7 +449,7 @@ func (q *Queries) CreateDirectChat(ctx context.Context, arg CreateDirectChatPara
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i DirectChat
+	var i CreateDirectChatRow
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedByUserID,
@@ -432,8 +471,9 @@ INSERT INTO direct_chat_encrypted_messages_v2 (
     target_message_id,
     revision,
     created_at,
-    stored_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    stored_at,
+    server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING
     id,
     chat_id,
@@ -443,7 +483,8 @@ RETURNING
     target_message_id,
     revision,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 `
 
 type CreateDirectChatEncryptedMessageV2Params struct {
@@ -456,9 +497,23 @@ type CreateDirectChatEncryptedMessageV2Params struct {
 	Revision             int32              `db:"revision" json:"revision"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       pgtype.Int8        `db:"server_sequence" json:"server_sequence"`
 }
 
-func (q *Queries) CreateDirectChatEncryptedMessageV2(ctx context.Context, arg CreateDirectChatEncryptedMessageV2Params) (DirectChatEncryptedMessagesV2, error) {
+type CreateDirectChatEncryptedMessageV2Row struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       int64              `db:"server_sequence" json:"server_sequence"`
+}
+
+func (q *Queries) CreateDirectChatEncryptedMessageV2(ctx context.Context, arg CreateDirectChatEncryptedMessageV2Params) (CreateDirectChatEncryptedMessageV2Row, error) {
 	row := q.db.QueryRow(ctx, createDirectChatEncryptedMessageV2,
 		arg.ID,
 		arg.ChatID,
@@ -469,8 +524,9 @@ func (q *Queries) CreateDirectChatEncryptedMessageV2(ctx context.Context, arg Cr
 		arg.Revision,
 		arg.CreatedAt,
 		arg.StoredAt,
+		arg.ServerSequence,
 	)
-	var i DirectChatEncryptedMessagesV2
+	var i CreateDirectChatEncryptedMessageV2Row
 	err := row.Scan(
 		&i.ID,
 		&i.ChatID,
@@ -481,6 +537,7 @@ func (q *Queries) CreateDirectChatEncryptedMessageV2(ctx context.Context, arg Cr
 		&i.Revision,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 	)
 	return i, err
 }
@@ -681,8 +738,9 @@ INSERT INTO group_encrypted_messages_v1 (
     ciphertext,
     ciphertext_size_bytes,
     created_at,
-    stored_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    stored_at,
+    server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING
     id,
     group_id,
@@ -696,7 +754,8 @@ RETURNING
     revision,
     ciphertext_size_bytes,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 `
 
 type CreateEncryptedGroupMessageParams struct {
@@ -714,6 +773,7 @@ type CreateEncryptedGroupMessageParams struct {
 	CiphertextSizeBytes  int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       pgtype.Int8        `db:"server_sequence" json:"server_sequence"`
 }
 
 type CreateEncryptedGroupMessageRow struct {
@@ -730,6 +790,7 @@ type CreateEncryptedGroupMessageRow struct {
 	CiphertextSizeBytes  int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       int64              `db:"server_sequence" json:"server_sequence"`
 }
 
 func (q *Queries) CreateEncryptedGroupMessage(ctx context.Context, arg CreateEncryptedGroupMessageParams) (CreateEncryptedGroupMessageRow, error) {
@@ -748,6 +809,7 @@ func (q *Queries) CreateEncryptedGroupMessage(ctx context.Context, arg CreateEnc
 		arg.CiphertextSizeBytes,
 		arg.CreatedAt,
 		arg.StoredAt,
+		arg.ServerSequence,
 	)
 	var i CreateEncryptedGroupMessageRow
 	err := row.Scan(
@@ -764,6 +826,7 @@ func (q *Queries) CreateEncryptedGroupMessage(ctx context.Context, arg CreateEnc
 		&i.CiphertextSizeBytes,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 	)
 	return i, err
 }
@@ -813,7 +876,15 @@ type CreateGroupParams struct {
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error) {
+type CreateGroupRow struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	Name            string             `db:"name" json:"name"`
+	CreatedByUserID uuid.UUID          `db:"created_by_user_id" json:"created_by_user_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (CreateGroupRow, error) {
 	row := q.db.QueryRow(ctx, createGroup,
 		arg.ID,
 		arg.Name,
@@ -821,7 +892,7 @@ func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (Group
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
-	var i Group
+	var i CreateGroupRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -1297,7 +1368,7 @@ WITH candidates AS (
       AND ma.attachment_id IS NULL
     ORDER BY s.expires_at ASC, s.id ASC
     LIMIT $2
-    FOR UPDATE OF s, a SKIP LOCKED
+    FOR UPDATE OF a SKIP LOCKED
 ),
 updated_attachments AS (
     UPDATE attachments AS a
@@ -1448,6 +1519,7 @@ SELECT
     s.updated_at AS upload_session_updated_at,
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
+    s.staging_object_key AS upload_session_staging_object_key,
     ma.direct_chat_message_id,
     ma.group_message_id,
     ma.encrypted_direct_message_v2_id,
@@ -1459,36 +1531,37 @@ WHERE a.id = $1
 `
 
 type GetAttachmentRowByIDRow struct {
-	ID                         uuid.UUID          `db:"id" json:"id"`
-	OwnerUserID                uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
-	ScopeKind                  string             `db:"scope_kind" json:"scope_kind"`
-	DirectChatID               pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
-	GroupID                    pgtype.UUID        `db:"group_id" json:"group_id"`
-	BucketName                 string             `db:"bucket_name" json:"bucket_name"`
-	ObjectKey                  string             `db:"object_key" json:"object_key"`
-	FileName                   string             `db:"file_name" json:"file_name"`
-	MimeType                   string             `db:"mime_type" json:"mime_type"`
-	RelaySchema                string             `db:"relay_schema" json:"relay_schema"`
-	SizeBytes                  int64              `db:"size_bytes" json:"size_bytes"`
-	Status                     string             `db:"status" json:"status"`
-	CreatedAt                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UploadedAt                 pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
-	AttachedAt                 pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
-	FailedAt                   pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
-	DeletedAt                  pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	UploadSessionID            pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
-	UploadSessionOwnerUserID   pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
-	UploadSessionStatus        pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
-	UploadSessionExpiresAt     pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
-	UploadSessionCreatedAt     pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
-	UploadSessionUpdatedAt     pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
-	UploadSessionCompletedAt   pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
-	UploadSessionFailedAt      pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
-	DirectChatMessageID        pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
-	GroupMessageID             pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
-	EncryptedDirectMessageV2ID pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
-	EncryptedGroupMessageV1ID  pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
+	ID                            uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID                   uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind                     string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID                  pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID                       pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName                    string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey                     string             `db:"object_key" json:"object_key"`
+	FileName                      string             `db:"file_name" json:"file_name"`
+	MimeType                      string             `db:"mime_type" json:"mime_type"`
+	RelaySchema                   string             `db:"relay_schema" json:"relay_schema"`
+	SizeBytes                     int64              `db:"size_bytes" json:"size_bytes"`
+	Status                        string             `db:"status" json:"status"`
+	CreatedAt                     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt                    pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt                    pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt                      pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt                     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	UploadSessionID               pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
+	UploadSessionOwnerUserID      pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
+	UploadSessionStatus           pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
+	UploadSessionExpiresAt        pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
+	UploadSessionCreatedAt        pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
+	UploadSessionUpdatedAt        pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
+	UploadSessionCompletedAt      pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
+	UploadSessionFailedAt         pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
+	UploadSessionStagingObjectKey pgtype.Text        `db:"upload_session_staging_object_key" json:"upload_session_staging_object_key"`
+	DirectChatMessageID           pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	GroupMessageID                pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	EncryptedDirectMessageV2ID    pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
+	EncryptedGroupMessageV1ID     pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
 }
 
 func (q *Queries) GetAttachmentRowByID(ctx context.Context, id uuid.UUID) (GetAttachmentRowByIDRow, error) {
@@ -1521,6 +1594,7 @@ func (q *Queries) GetAttachmentRowByID(ctx context.Context, id uuid.UUID) (GetAt
 		&i.UploadSessionUpdatedAt,
 		&i.UploadSessionCompletedAt,
 		&i.UploadSessionFailedAt,
+		&i.UploadSessionStagingObjectKey,
 		&i.DirectChatMessageID,
 		&i.GroupMessageID,
 		&i.EncryptedDirectMessageV2ID,
@@ -1540,6 +1614,7 @@ SELECT
     m.revision,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.transport_header,
@@ -1573,6 +1648,7 @@ type GetDirectChatEncryptedMessageV2ByDeviceRow struct {
 	Revision                int32              `db:"revision" json:"revision"`
 	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence          int64              `db:"server_sequence" json:"server_sequence"`
 	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
 	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
 	TransportHeader         []byte             `db:"transport_header" json:"transport_header"`
@@ -1599,6 +1675,7 @@ func (q *Queries) GetDirectChatEncryptedMessageV2ByDevice(ctx context.Context, a
 		&i.Revision,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 		&i.RecipientUserID,
 		&i.RecipientCryptoDeviceID,
 		&i.TransportHeader,
@@ -1619,7 +1696,8 @@ SELECT
     target_message_id,
     revision,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 FROM direct_chat_encrypted_messages_v2
 WHERE chat_id = $1 AND id = $2
 `
@@ -1629,9 +1707,22 @@ type GetDirectChatEncryptedMessageV2StoredParams struct {
 	ID     uuid.UUID `db:"id" json:"id"`
 }
 
-func (q *Queries) GetDirectChatEncryptedMessageV2Stored(ctx context.Context, arg GetDirectChatEncryptedMessageV2StoredParams) (DirectChatEncryptedMessagesV2, error) {
+type GetDirectChatEncryptedMessageV2StoredRow struct {
+	ID                   uuid.UUID          `db:"id" json:"id"`
+	ChatID               uuid.UUID          `db:"chat_id" json:"chat_id"`
+	SenderUserID         uuid.UUID          `db:"sender_user_id" json:"sender_user_id"`
+	SenderCryptoDeviceID uuid.UUID          `db:"sender_crypto_device_id" json:"sender_crypto_device_id"`
+	OperationKind        string             `db:"operation_kind" json:"operation_kind"`
+	TargetMessageID      pgtype.UUID        `db:"target_message_id" json:"target_message_id"`
+	Revision             int32              `db:"revision" json:"revision"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       int64              `db:"server_sequence" json:"server_sequence"`
+}
+
+func (q *Queries) GetDirectChatEncryptedMessageV2Stored(ctx context.Context, arg GetDirectChatEncryptedMessageV2StoredParams) (GetDirectChatEncryptedMessageV2StoredRow, error) {
 	row := q.db.QueryRow(ctx, getDirectChatEncryptedMessageV2Stored, arg.ChatID, arg.ID)
-	var i DirectChatEncryptedMessagesV2
+	var i GetDirectChatEncryptedMessageV2StoredRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChatID,
@@ -1642,6 +1733,7 @@ func (q *Queries) GetDirectChatEncryptedMessageV2Stored(ctx context.Context, arg
 		&i.Revision,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 	)
 	return i, err
 }
@@ -1789,11 +1881,7 @@ SELECT
           AND m.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR m.created_at > self_read.last_read_message_created_at
-              OR (
-                  m.created_at = self_read.last_read_message_created_at
-                  AND m.id > self_read.last_read_message_id
-              )
+              OR m.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
@@ -1911,6 +1999,7 @@ SELECT
     m.ciphertext_size_bytes,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.stored_at AS delivery_stored_at
@@ -1946,6 +2035,7 @@ type GetEncryptedGroupMessageByDeviceRow struct {
 	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence          int64              `db:"server_sequence" json:"server_sequence"`
 	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
 	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
 	DeliveryStoredAt        pgtype.Timestamptz `db:"delivery_stored_at" json:"delivery_stored_at"`
@@ -1974,6 +2064,7 @@ func (q *Queries) GetEncryptedGroupMessageByDevice(ctx context.Context, arg GetE
 		&i.CiphertextSizeBytes,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 		&i.RecipientUserID,
 		&i.RecipientCryptoDeviceID,
 		&i.DeliveryStoredAt,
@@ -1987,6 +2078,7 @@ SELECT
     self.user_id,
     r.last_read_message_id,
     r.last_read_message_created_at,
+    COALESCE(r.last_read_server_sequence, 0)::BIGINT AS last_read_server_sequence,
     r.updated_at
 FROM group_memberships AS self
 LEFT JOIN group_encrypted_read_states_v1 AS r
@@ -2004,6 +2096,7 @@ type GetEncryptedGroupReadStateEntryByGroupIDAndUserIDRow struct {
 	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
 	LastReadMessageID        pgtype.UUID        `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
@@ -2015,6 +2108,7 @@ func (q *Queries) GetEncryptedGroupReadStateEntryByGroupIDAndUserID(ctx context.
 		&i.UserID,
 		&i.LastReadMessageID,
 		&i.LastReadMessageCreatedAt,
+		&i.LastReadServerSequence,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -2033,7 +2127,8 @@ SELECT
     target_message_id,
     revision,
     created_at,
-    stored_at
+    stored_at,
+    COALESCE(server_sequence, 0)::BIGINT AS server_sequence
 FROM group_encrypted_messages_v1
 WHERE group_id = $1 AND id = $2
 `
@@ -2056,6 +2151,7 @@ type GetEncryptedGroupStoredMessageRow struct {
 	Revision             int32              `db:"revision" json:"revision"`
 	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt             pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence       int64              `db:"server_sequence" json:"server_sequence"`
 }
 
 func (q *Queries) GetEncryptedGroupStoredMessage(ctx context.Context, arg GetEncryptedGroupStoredMessageParams) (GetEncryptedGroupStoredMessageRow, error) {
@@ -2074,6 +2170,7 @@ func (q *Queries) GetEncryptedGroupStoredMessage(ctx context.Context, arg GetEnc
 		&i.Revision,
 		&i.CreatedAt,
 		&i.StoredAt,
+		&i.ServerSequence,
 	)
 	return i, err
 }
@@ -2413,11 +2510,7 @@ SELECT
           AND gm.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR gm.created_at > self_read.last_read_message_created_at
-              OR (
-                  gm.created_at = self_read.last_read_message_created_at
-                  AND gm.id > self_read.last_read_message_id
-              )
+              OR gm.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE((
@@ -2469,6 +2562,18 @@ func (q *Queries) GetGroupRowByIDAndUserID(ctx context.Context, arg GetGroupRowB
 		&i.NotificationsEnabled,
 	)
 	return i, err
+}
+
+const getLegacyCapabilityExpiry = `-- name: GetLegacyCapabilityExpiry :one
+SELECT MAX(expires_at)::timestamptz AS expires_at
+FROM attachment_upload_sessions WHERE staging_object_key IS NULL
+`
+
+func (q *Queries) GetLegacyCapabilityExpiry(ctx context.Context) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, getLegacyCapabilityExpiry)
+	var expires_at pgtype.Timestamptz
+	err := row.Scan(&expires_at)
+	return expires_at, err
 }
 
 const getSessionAuthByID = `-- name: GetSessionAuthByID :one
@@ -2848,6 +2953,7 @@ SELECT
     s.updated_at AS upload_session_updated_at,
     s.completed_at AS upload_session_completed_at,
     s.failed_at AS upload_session_failed_at,
+    s.staging_object_key AS upload_session_staging_object_key,
     ma.direct_chat_message_id,
     ma.group_message_id,
     ma.encrypted_direct_message_v2_id,
@@ -2859,36 +2965,37 @@ WHERE a.id = ANY($1::uuid[])
 `
 
 type ListAttachmentRowsByIDsRow struct {
-	ID                         uuid.UUID          `db:"id" json:"id"`
-	OwnerUserID                uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
-	ScopeKind                  string             `db:"scope_kind" json:"scope_kind"`
-	DirectChatID               pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
-	GroupID                    pgtype.UUID        `db:"group_id" json:"group_id"`
-	BucketName                 string             `db:"bucket_name" json:"bucket_name"`
-	ObjectKey                  string             `db:"object_key" json:"object_key"`
-	FileName                   string             `db:"file_name" json:"file_name"`
-	MimeType                   string             `db:"mime_type" json:"mime_type"`
-	RelaySchema                string             `db:"relay_schema" json:"relay_schema"`
-	SizeBytes                  int64              `db:"size_bytes" json:"size_bytes"`
-	Status                     string             `db:"status" json:"status"`
-	CreatedAt                  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt                  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	UploadedAt                 pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
-	AttachedAt                 pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
-	FailedAt                   pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
-	DeletedAt                  pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	UploadSessionID            pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
-	UploadSessionOwnerUserID   pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
-	UploadSessionStatus        pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
-	UploadSessionExpiresAt     pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
-	UploadSessionCreatedAt     pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
-	UploadSessionUpdatedAt     pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
-	UploadSessionCompletedAt   pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
-	UploadSessionFailedAt      pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
-	DirectChatMessageID        pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
-	GroupMessageID             pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
-	EncryptedDirectMessageV2ID pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
-	EncryptedGroupMessageV1ID  pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
+	ID                            uuid.UUID          `db:"id" json:"id"`
+	OwnerUserID                   uuid.UUID          `db:"owner_user_id" json:"owner_user_id"`
+	ScopeKind                     string             `db:"scope_kind" json:"scope_kind"`
+	DirectChatID                  pgtype.UUID        `db:"direct_chat_id" json:"direct_chat_id"`
+	GroupID                       pgtype.UUID        `db:"group_id" json:"group_id"`
+	BucketName                    string             `db:"bucket_name" json:"bucket_name"`
+	ObjectKey                     string             `db:"object_key" json:"object_key"`
+	FileName                      string             `db:"file_name" json:"file_name"`
+	MimeType                      string             `db:"mime_type" json:"mime_type"`
+	RelaySchema                   string             `db:"relay_schema" json:"relay_schema"`
+	SizeBytes                     int64              `db:"size_bytes" json:"size_bytes"`
+	Status                        string             `db:"status" json:"status"`
+	CreatedAt                     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	UploadedAt                    pgtype.Timestamptz `db:"uploaded_at" json:"uploaded_at"`
+	AttachedAt                    pgtype.Timestamptz `db:"attached_at" json:"attached_at"`
+	FailedAt                      pgtype.Timestamptz `db:"failed_at" json:"failed_at"`
+	DeletedAt                     pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	UploadSessionID               pgtype.UUID        `db:"upload_session_id" json:"upload_session_id"`
+	UploadSessionOwnerUserID      pgtype.UUID        `db:"upload_session_owner_user_id" json:"upload_session_owner_user_id"`
+	UploadSessionStatus           pgtype.Text        `db:"upload_session_status" json:"upload_session_status"`
+	UploadSessionExpiresAt        pgtype.Timestamptz `db:"upload_session_expires_at" json:"upload_session_expires_at"`
+	UploadSessionCreatedAt        pgtype.Timestamptz `db:"upload_session_created_at" json:"upload_session_created_at"`
+	UploadSessionUpdatedAt        pgtype.Timestamptz `db:"upload_session_updated_at" json:"upload_session_updated_at"`
+	UploadSessionCompletedAt      pgtype.Timestamptz `db:"upload_session_completed_at" json:"upload_session_completed_at"`
+	UploadSessionFailedAt         pgtype.Timestamptz `db:"upload_session_failed_at" json:"upload_session_failed_at"`
+	UploadSessionStagingObjectKey pgtype.Text        `db:"upload_session_staging_object_key" json:"upload_session_staging_object_key"`
+	DirectChatMessageID           pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
+	GroupMessageID                pgtype.UUID        `db:"group_message_id" json:"group_message_id"`
+	EncryptedDirectMessageV2ID    pgtype.UUID        `db:"encrypted_direct_message_v2_id" json:"encrypted_direct_message_v2_id"`
+	EncryptedGroupMessageV1ID     pgtype.UUID        `db:"encrypted_group_message_v1_id" json:"encrypted_group_message_v1_id"`
 }
 
 func (q *Queries) ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]ListAttachmentRowsByIDsRow, error) {
@@ -2927,6 +3034,7 @@ func (q *Queries) ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.U
 			&i.UploadSessionUpdatedAt,
 			&i.UploadSessionCompletedAt,
 			&i.UploadSessionFailedAt,
+			&i.UploadSessionStagingObjectKey,
 			&i.DirectChatMessageID,
 			&i.GroupMessageID,
 			&i.EncryptedDirectMessageV2ID,
@@ -2935,6 +3043,38 @@ func (q *Queries) ListAttachmentRowsByIDs(ctx context.Context, dollar_1 []uuid.U
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAttachmentSourceCleanup = `-- name: ListAttachmentSourceCleanup :many
+SELECT object_key FROM attachment_source_cleanup
+WHERE next_attempt_at <= $1
+ORDER BY next_attempt_at, object_key
+LIMIT $2
+`
+
+type ListAttachmentSourceCleanupParams struct {
+	NextAttemptAt pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	Limit         int32              `db:"limit" json:"limit"`
+}
+
+func (q *Queries) ListAttachmentSourceCleanup(ctx context.Context, arg ListAttachmentSourceCleanupParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listAttachmentSourceCleanup, arg.NextAttemptAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -3030,6 +3170,7 @@ SELECT
     m.revision,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.transport_header,
@@ -3043,7 +3184,7 @@ WHERE self.user_id = $1
   AND m.chat_id = $2
   AND d.recipient_user_id = $1
   AND d.recipient_crypto_device_id = $3
-ORDER BY m.created_at DESC, m.id DESC
+ORDER BY m.server_sequence DESC
 LIMIT $4
 `
 
@@ -3064,6 +3205,7 @@ type ListDirectChatEncryptedMessageV2ByDeviceRow struct {
 	Revision                int32              `db:"revision" json:"revision"`
 	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence          int64              `db:"server_sequence" json:"server_sequence"`
 	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
 	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
 	TransportHeader         []byte             `db:"transport_header" json:"transport_header"`
@@ -3096,6 +3238,7 @@ func (q *Queries) ListDirectChatEncryptedMessageV2ByDevice(ctx context.Context, 
 			&i.Revision,
 			&i.CreatedAt,
 			&i.StoredAt,
+			&i.ServerSequence,
 			&i.RecipientUserID,
 			&i.RecipientCryptoDeviceID,
 			&i.TransportHeader,
@@ -3327,11 +3470,7 @@ SELECT
           AND m.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR m.created_at > self_read.last_read_message_created_at
-              OR (
-                  m.created_at = self_read.last_read_message_created_at
-                  AND m.id > self_read.last_read_message_id
-              )
+              OR m.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE(self_pref.notifications_enabled, TRUE) AS notifications_enabled,
@@ -3607,6 +3746,7 @@ SELECT
     u.read_receipts_enabled,
     r.last_read_message_id,
     r.last_read_message_created_at,
+    COALESCE(r.last_read_server_sequence, 0)::BIGINT AS last_read_server_sequence,
     r.updated_at
 FROM direct_chat_participants AS self
 JOIN direct_chat_participants AS p ON p.chat_id = self.chat_id
@@ -3626,6 +3766,7 @@ type ListEncryptedDirectChatReadStateEntriesRow struct {
 	ReadReceiptsEnabled      bool               `db:"read_receipts_enabled" json:"read_receipts_enabled"`
 	LastReadMessageID        pgtype.UUID        `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
@@ -3643,6 +3784,7 @@ func (q *Queries) ListEncryptedDirectChatReadStateEntries(ctx context.Context, a
 			&i.ReadReceiptsEnabled,
 			&i.LastReadMessageID,
 			&i.LastReadMessageCreatedAt,
+			&i.LastReadServerSequence,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -3671,6 +3813,7 @@ SELECT
     m.ciphertext_size_bytes,
     m.created_at,
     m.stored_at,
+    COALESCE(m.server_sequence, 0)::BIGINT AS server_sequence,
     d.recipient_user_id,
     d.recipient_crypto_device_id,
     d.stored_at AS delivery_stored_at
@@ -3681,7 +3824,7 @@ WHERE self.user_id = $1
   AND m.group_id = $2
   AND d.recipient_user_id = $1
   AND d.recipient_crypto_device_id = $3
-ORDER BY m.created_at DESC, m.id DESC
+ORDER BY m.server_sequence DESC
 LIMIT $4
 `
 
@@ -3707,6 +3850,7 @@ type ListEncryptedGroupMessagesByDeviceRow struct {
 	CiphertextSizeBytes     int64              `db:"ciphertext_size_bytes" json:"ciphertext_size_bytes"`
 	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	StoredAt                pgtype.Timestamptz `db:"stored_at" json:"stored_at"`
+	ServerSequence          int64              `db:"server_sequence" json:"server_sequence"`
 	RecipientUserID         uuid.UUID          `db:"recipient_user_id" json:"recipient_user_id"`
 	RecipientCryptoDeviceID uuid.UUID          `db:"recipient_crypto_device_id" json:"recipient_crypto_device_id"`
 	DeliveryStoredAt        pgtype.Timestamptz `db:"delivery_stored_at" json:"delivery_stored_at"`
@@ -3741,6 +3885,7 @@ func (q *Queries) ListEncryptedGroupMessagesByDevice(ctx context.Context, arg Li
 			&i.CiphertextSizeBytes,
 			&i.CreatedAt,
 			&i.StoredAt,
+			&i.ServerSequence,
 			&i.RecipientUserID,
 			&i.RecipientCryptoDeviceID,
 			&i.DeliveryStoredAt,
@@ -4291,11 +4436,7 @@ SELECT
           AND gm.sender_user_id <> self.user_id
           AND (
               self_read.last_read_message_id IS NULL
-              OR gm.created_at > self_read.last_read_message_created_at
-              OR (
-                  gm.created_at = self_read.last_read_message_created_at
-                  AND gm.id > self_read.last_read_message_id
-              )
+              OR gm.server_sequence > self_read.last_read_server_sequence
           )
     ), 0)::INT AS encrypted_unread_count,
     COALESCE((
@@ -4420,6 +4561,32 @@ func (q *Queries) ListGroupTypingStateEntries(ctx context.Context, arg ListGroup
 	return items, nil
 }
 
+const listLegacyAttachmentIDs = `-- name: ListLegacyAttachmentIDs :many
+SELECT id FROM attachments
+WHERE object_key NOT LIKE 'final/%' AND status IN ('uploaded', 'attached', 'detached')
+ORDER BY created_at, id LIMIT $1
+`
+
+func (q *Queries) ListLegacyAttachmentIDs(ctx context.Context, limit int32) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listLegacyAttachmentIDs, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPinnedMessageIDsByChatID = `-- name: ListPinnedMessageIDsByChatID :many
 SELECT message_id
 FROM direct_chat_pins
@@ -4447,6 +4614,16 @@ func (q *Queries) ListPinnedMessageIDsByChatID(ctx context.Context, chatID uuid.
 	return items, nil
 }
 
+const lockAttachmentForFinalization = `-- name: LockAttachmentForFinalization :one
+SELECT id FROM attachments WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockAttachmentForFinalization(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockAttachmentForFinalization, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
 const lockAttachmentQuotaOwner = `-- name: LockAttachmentQuotaOwner :one
 SELECT id
 FROM users
@@ -4456,6 +4633,17 @@ FOR UPDATE
 
 func (q *Queries) LockAttachmentQuotaOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, lockAttachmentQuotaOwner, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
+const lockAttachmentUploadSession = `-- name: LockAttachmentUploadSession :one
+SELECT id FROM attachment_upload_sessions WHERE attachment_id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockAttachmentUploadSession(ctx context.Context, attachmentID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockAttachmentUploadSession, attachmentID)
+	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
 }
@@ -4629,6 +4817,39 @@ func (q *Queries) PinEncryptedGroupMessage(ctx context.Context, arg PinEncrypted
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const publishLegacyAttachmentFinalKey = `-- name: PublishLegacyAttachmentFinalKey :execrows
+UPDATE attachments SET object_key = $2
+WHERE id = $1 AND object_key = $3 AND status IN ('uploaded', 'attached', 'detached')
+`
+
+type PublishLegacyAttachmentFinalKeyParams struct {
+	ID          uuid.UUID `db:"id" json:"id"`
+	ObjectKey   string    `db:"object_key" json:"object_key"`
+	ObjectKey_2 string    `db:"object_key_2" json:"object_key_2"`
+}
+
+func (q *Queries) PublishLegacyAttachmentFinalKey(ctx context.Context, arg PublishLegacyAttachmentFinalKeyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, publishLegacyAttachmentFinalKey, arg.ID, arg.ObjectKey, arg.ObjectKey_2)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const rescheduleAttachmentSourceCleanup = `-- name: RescheduleAttachmentSourceCleanup :exec
+UPDATE attachment_source_cleanup SET next_attempt_at = $2 WHERE object_key = $1
+`
+
+type RescheduleAttachmentSourceCleanupParams struct {
+	ObjectKey     string             `db:"object_key" json:"object_key"`
+	NextAttemptAt pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+}
+
+func (q *Queries) RescheduleAttachmentSourceCleanup(ctx context.Context, arg RescheduleAttachmentSourceCleanupParams) error {
+	_, err := q.db.Exec(ctx, rescheduleAttachmentSourceCleanup, arg.ObjectKey, arg.NextAttemptAt)
+	return err
 }
 
 const searchDirectMessages = `-- name: SearchDirectMessages :many
@@ -5252,18 +5473,16 @@ INSERT INTO direct_chat_encrypted_read_states_v1 (
     user_id,
     last_read_message_id,
     last_read_message_created_at,
-    updated_at
-) VALUES ($1, $2, $3, $4, $5)
+    updated_at,
+    last_read_server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (chat_id, user_id) DO UPDATE
 SET
     last_read_message_id = EXCLUDED.last_read_message_id,
     last_read_message_created_at = EXCLUDED.last_read_message_created_at,
-    updated_at = EXCLUDED.updated_at
-WHERE direct_chat_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
-   OR (
-        direct_chat_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
-        AND direct_chat_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
-   )
+    updated_at = EXCLUDED.updated_at,
+    last_read_server_sequence = EXCLUDED.last_read_server_sequence
+WHERE direct_chat_encrypted_read_states_v1.last_read_server_sequence < EXCLUDED.last_read_server_sequence
 `
 
 type UpsertEncryptedDirectChatReadStateParams struct {
@@ -5272,6 +5491,7 @@ type UpsertEncryptedDirectChatReadStateParams struct {
 	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 }
 
 func (q *Queries) UpsertEncryptedDirectChatReadState(ctx context.Context, arg UpsertEncryptedDirectChatReadStateParams) (int64, error) {
@@ -5281,6 +5501,7 @@ func (q *Queries) UpsertEncryptedDirectChatReadState(ctx context.Context, arg Up
 		arg.LastReadMessageID,
 		arg.LastReadMessageCreatedAt,
 		arg.UpdatedAt,
+		arg.LastReadServerSequence,
 	)
 	if err != nil {
 		return 0, err
@@ -5294,18 +5515,16 @@ INSERT INTO group_encrypted_read_states_v1 (
     user_id,
     last_read_message_id,
     last_read_message_created_at,
-    updated_at
-) VALUES ($1, $2, $3, $4, $5)
+    updated_at,
+    last_read_server_sequence
+) VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (group_id, user_id) DO UPDATE
 SET
     last_read_message_id = EXCLUDED.last_read_message_id,
     last_read_message_created_at = EXCLUDED.last_read_message_created_at,
-    updated_at = EXCLUDED.updated_at
-WHERE group_encrypted_read_states_v1.last_read_message_created_at < EXCLUDED.last_read_message_created_at
-   OR (
-        group_encrypted_read_states_v1.last_read_message_created_at = EXCLUDED.last_read_message_created_at
-        AND group_encrypted_read_states_v1.last_read_message_id < EXCLUDED.last_read_message_id
-   )
+    updated_at = EXCLUDED.updated_at,
+    last_read_server_sequence = EXCLUDED.last_read_server_sequence
+WHERE group_encrypted_read_states_v1.last_read_server_sequence < EXCLUDED.last_read_server_sequence
 `
 
 type UpsertEncryptedGroupReadStateParams struct {
@@ -5314,6 +5533,7 @@ type UpsertEncryptedGroupReadStateParams struct {
 	LastReadMessageID        uuid.UUID          `db:"last_read_message_id" json:"last_read_message_id"`
 	LastReadMessageCreatedAt pgtype.Timestamptz `db:"last_read_message_created_at" json:"last_read_message_created_at"`
 	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	LastReadServerSequence   int64              `db:"last_read_server_sequence" json:"last_read_server_sequence"`
 }
 
 func (q *Queries) UpsertEncryptedGroupReadState(ctx context.Context, arg UpsertEncryptedGroupReadStateParams) (int64, error) {
@@ -5323,6 +5543,7 @@ func (q *Queries) UpsertEncryptedGroupReadState(ctx context.Context, arg UpsertE
 		arg.LastReadMessageID,
 		arg.LastReadMessageCreatedAt,
 		arg.UpdatedAt,
+		arg.LastReadServerSequence,
 	)
 	if err != nil {
 		return 0, err

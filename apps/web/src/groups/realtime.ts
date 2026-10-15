@@ -1,3 +1,4 @@
+import { hasValidEncryptedReadSequences, requireServerSequence } from "../gateway/server-sequence";
 import type {
   Attachment,
   EncryptedConversationReadPosition,
@@ -180,6 +181,7 @@ interface GroupReadStateWire {
 }
 
 interface EncryptedConversationReadPositionWire {
+  lastReadServerSequence?: string;
   messageId?: string;
   messageCreatedAt?: string;
   updatedAt?: string;
@@ -596,6 +598,9 @@ function normalizeReadUpdatedPayload(
   }
 
   const payload = input as GroupReadUpdatedPayloadWire;
+  if (!hasValidEncryptedReadSequences(payload.encryptedReadState)) {
+    return null;
+  }
   const groupId = typeof payload.groupId === "string" ? payload.groupId : "";
   if (groupId === "") {
     return null;
@@ -898,11 +903,13 @@ function normalizeEncryptedConversationReadPosition(
   const messageId = input.messageId ?? "";
   const messageCreatedAt = input.messageCreatedAt ?? "";
   const updatedAt = input.updatedAt ?? "";
-  if (messageId === "" && messageCreatedAt === "" && updatedAt === "") {
+  if (messageId === "" && messageCreatedAt === "" && updatedAt === "" &&
+    (input.lastReadServerSequence === undefined || input.lastReadServerSequence === "0")) {
     return null;
   }
 
   return {
+    lastReadServerSequence: requireServerSequence(input.lastReadServerSequence),
     messageId,
     messageCreatedAt,
     updatedAt,
