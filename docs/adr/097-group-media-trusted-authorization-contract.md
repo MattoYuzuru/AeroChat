@@ -215,6 +215,45 @@ worktree, но full Chat gates/publication требуют ordinary merge verifie
 generated/published Identity parent, новый clean freeze и fresh whole receipts.
 Никакого переноса parent PASS либо enable media/runtime из source prep.
 
+### Регистрация экземпляра admission
+
+Уточнение принято координатором 2026-10-12 до implementation этого отдельного
+slice. Private `rtc.admission.v1.AdmissionRegistrationService.RegisterInstance`
+принимает только canonical UUID `request_id` для идемпотентности. Verified
+single URI `urn:aerochat:service:media-admission`, dedicated client CA,
+chain/expiry/clientAuth/TLS1.3 и fixed method ACL обязательны. Fingerprint —
+стандартный SHA256 DER фактически проверенного leaf certificate; он поступает
+из trusted transport context. Body/header не выбирают fingerprint, instance
+UUID или fence. Listener отдельный и default-disabled; source receiver не
+расширяет Identity/Chat allowlist. Public mux/gateway этот метод не открывает.
+
+RTC в одной PostgreSQL transaction выдаёт opaque instance UUID и положительный
+server-global monotonic fence, сохраняя unique leaf fingerprint. Это sequence
+регистраций, не election term: регистрация другого leaf не инвалидирует ранее
+выданные instances. Overflow прекращает новую allocation без mutation; уже
+сохранённый own retry остаётся доступен. Request ID scoped к verified leaf;
+одинаковый request ID у другого leaf не даёт доступ к первой регистрации.
+
+Same leaf + same request ID возвращает прежние instance/fence/state после
+потери ответа или RTC restart, без повторной allocation. Same leaf + distinct
+request ID конфликтует, включая draining/retired history. Retry retired state
+не активирует его заново. Регистрация не освобождает grants/leases/publication
+budgets и не подтверждает media cleanup; JWT/certificate expiry и WS close
+не являются ACK. Новый leaf с тем же service URI не получает predecessor
+ownership или права завершить old targets. Rotation/takeover/recovery old
+owner — отдельный contract до media enable; pending old bindings сохраняются.
+
+Deployment authority выдаёт unique leaf на instance. Копии одного certificate
+и request ID не различают физические процессы: mTLS fingerprint не является
+новым proof-of-possession протоколом. Native fixtures проверяют concurrent
+identical replay/duplicate-leaf conflict, global fence/overflow, durable
+response-loss/restart и retained inactive state, actual TLS/method isolation,
+body/header overrides и default-off/coupled shutdown. Source-only preparation
+может идти в отдельном worktree до parent gates; generation/full gates/PR
+publication требуют ordinary merge verified generated/published Identity и
+Chat sender parents, fresh clean freeze и собственные receipts. SDK/JWT/grant
+issuance, connection admission, cleanup ACK и media flag сюда не входят.
+
 ## Chat eligibility epoch
 
 Chat хранит монотонную revision для допуска exact `(group_id, user_id)` к audio, отдельно от физически удаляемой membership row. Retained tombstone сохраняет счётчик после remove/leave; rejoin не возвращает revision к начальному значению. Это **eligibility epoch**, а не версия любой смены роли или timestamp. Источник текущей role остаётся Chat membership. Private lookup всегда возвращает свежую role; RTC не кеширует management privileges по одному eligibility epoch.

@@ -17,7 +17,7 @@ import (
 	ql "github.com/MattoYuzuru/AeroChat/services/aero-rtc-control/internal/storage/sqlc"
 )
 
-// MediaStore пока не подключён к service/transport. Он сериализует journal,
+// MediaStore подключён к private source receiver; public media/admission handlers отсутствуют. Он сериализует journal,
 // но не проверяет mTLS, свежесть remote authority, JWT или реальный SFU ACK.
 type MediaStore struct {
 	db *pgxpool.Pool

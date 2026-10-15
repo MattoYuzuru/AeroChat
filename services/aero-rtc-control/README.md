@@ -59,3 +59,41 @@ SKIP0; pinned Buf/SQLC twice/drift0. Source generation меняет files и с�
 является PASS receipt. Source prep/typed fixture не доказывает group sound,
 physical devices/NAT/TURN: UNVERIFIED. До flag отдельный compatibility gate
 закрывает все legacy Start/Join/Leave/End/liveness heldmedia bypass.
+
+## Admission instance registration foundation
+
+Registered additive migration000002 создаёт persisted global fence/instance
+history автоматически при обычном startup/upgrade. RegisterInstance — один
+proto-first method на отдельном optional TLS listener, defaultoff. Это лишь
+service instance registration, не grant/token/lease admission и не media ACK.
+
+Body содержит только canonical UUID request_id для correlation. Sole verified
+URI urn:aerochat:service:media-admission, explicitclientAuth/chain/expiry/TLS1.3/
+methodACL; fingerprint SHA256 фактического verified leaf DER приходит из
+transport context. Headers/body не выбирают fingerprint/serverUUID/fence.
+Source receiver Identity/Chat allowlist не расширяется, public gateway/mux
+не открывают registration. Uniqueleaf provisioning — deployment contract;
+cert+nonce copies не различают физические процессы.
+
+Singleton row lock +ownleaf lookup +guardedincrement+instanceinsert в одной TX.
+Sameleaf/samerequest replay =same UUID/globalpositivefence/currentstate после
+loss/restart; distinctnonce того же leaf конфликтует даже retired. Same nonce
+другого leaf создаёт только own registration. Newinstance не invalidatesothers:
+globalfence — sequence, не election. Overflow mutationless, savedretry доступен
+приMax. Binding/history immutable, inactive retry неreactivates; rotation/newleaf
+predecessor takeover/ACK UNSUPPORTED, oldtargets/heldslots retained.
+
+AERO_RTC_INTERNAL_ADMISSION_REGISTRATION_ENABLED=false default. Enable требует
+LISTEN_ADDR, TLS_CERT_FILE, TLS_KEY_FILE, CLIENT_CA_FILE с тем же prefix.
+Dedicated CA/operator-owned paths/privateports, TLSserverAuth+SAN иstrictPEM;
+runtime owner включает отдельно. Budget5s/body4K/header8K/read5/write6/idle30,
+staticlogs безIDs/nonce/fingerprint/keys/query/body. Public/source/registration
+servers cancel/shutdown coupled; registration requestctx наследует wrapperctx.
+
+Source prep started from reviewed UNVERIFIED Identity→Chat local parents.
+No generation/native/compile/runtimePASS из этого README. Before fullgates/PR
+ordinary merge generated+verified+published parents, exactcleanfreeze, bounded
+heavy only; actualnamedPG/TLS/upgrade/cancel cases/testSKIP0 и twicepinnedBufSQLC
+drift0 required. Native only approved fresh rtc_test_UUID schemas +own TLS/certs,
+no sharedCompose/S3/SDK/download/flag. Pending media cleanup/real device/NAT/TURN/
+group sound remain UNVERIFIED.
