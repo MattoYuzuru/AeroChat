@@ -11,6 +11,7 @@ import (
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
 type Config struct {
+	InternalAdmissionRegistration InternalAdmissionRegistrationConfig
 	InternalRevocation            InternalRevocationConfig
 	DatabaseURL                   string
 	HTTPAddress                   string
@@ -30,6 +31,10 @@ type Config struct {
 
 // LoadConfig загружает конфигурацию из env с безопасными значениями по умолчанию.
 func LoadConfig(defaultHTTPAddress string) (Config, error) {
+	registrationCfg, err := loadInternalAdmissionRegistrationConfig()
+	if err != nil {
+		return Config{}, err
+	}
 	privateCfg, err := loadInternalRevocationConfig()
 	if err != nil {
 		return Config{}, err
@@ -72,6 +77,7 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 	}
 
 	return Config{
+		InternalAdmissionRegistration: registrationCfg,
 		InternalRevocation:            privateCfg,
 		DatabaseURL:                   lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
 		HTTPAddress:                   lookupString("AERO_HTTP_ADDR", defaultHTTPAddress),

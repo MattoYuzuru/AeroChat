@@ -7,10 +7,12 @@ import (
 	"time"
 
 	libnotifications "github.com/MattoYuzuru/AeroChat/libs/go/notifications"
+	"github.com/MattoYuzuru/AeroChat/services/aero-chat/internal/transport/rtcrevocation"
 )
 
 // Config описывает минимальную runtime-конфигурацию сервиса.
 type Config struct {
+	RevocationDelivery               rtcrevocation.Config
 	InternalAuthorization            InternalAuthorizationConfig
 	DatabaseURL                      string
 	RedisAddress                     string
@@ -101,7 +103,12 @@ func LoadConfig(defaultHTTPAddress string) (Config, error) {
 		return Config{}, err
 	}
 
+	deliveryConfig, err := loadRevocationDeliveryConfig()
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
+		RevocationDelivery:               deliveryConfig,
 		InternalAuthorization:            privateAuthorization,
 		DatabaseURL:                      lookupString("AERO_DATABASE_URL", "postgres://aerochat:aerochat@localhost:5432/aerochat?sslmode=disable"),
 		RedisAddress:                     lookupString("AERO_REDIS_ADDR", "localhost:6379"),
