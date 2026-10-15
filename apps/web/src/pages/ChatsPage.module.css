@@ -1604,3 +1604,27 @@
     flex-shrink: 0;
   }
 }
+
+@media (max-height: 500px) and (min-width: 500px) and (max-width: 1179px) {
+  .threadLayout:has(> .pinnedStrip) {
+    grid-template-rows: auto minmax(calc(2.45rem + 1px), 1fr) minmax(3rem, 1fr) minmax(3.125rem, auto);
+  }
+
+  .threadLayout:has(> .pinnedStrip) > .pinnedStrip {
+    padding-block: 0;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .threadLayout:has(> .pinnedStrip) > .pinnedStrip > .pinnedRow {
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .threadLayout:has(> .pinnedStrip) > .pinnedStrip .pinnedCard {
+    height: 100%;
+    min-height: 2.45rem;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+}
