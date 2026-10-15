@@ -6,6 +6,8 @@
 
 Общий tracker: [#178](https://github.com/MattoYuzuru/AeroChat/issues/178).
 
+Этот отчёт сохраняет исходный audit evidence. Последующие отдельные draft fixes и границы их проверки перечислены в [remediation report](2026-10-11-remediation.md); результаты новых веток не переписывают исторические наблюдения ниже.
+
 ## Главные выводы
 
 - RTC remote audio effect повторяет play/pause после render; bounded React fixture дал 4 play / 3 pause без пользовательских действий ([#157](https://github.com/MattoYuzuru/AeroChat/issues/157)). Это сильный кандидат на причину посредственного звука, акустический эффект не измерен.

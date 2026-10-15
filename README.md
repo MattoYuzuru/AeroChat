@@ -11,6 +11,8 @@ AeroChat объединяет личные переписки, группы, ф�
 
 [Документация](docs/README.md) · [Разработка](docs/development.md) · [Возможности и ограничения](docs/product/capabilities.md) · [Аудит 11 октября 2026](docs/audits/2026-10-11-readiness.md)
 
+Отдельные draft исправления, точные PR/HEAD и ещё не выполненная общая приёмка перечислены в [remediation report](docs/audits/2026-10-11-remediation.md). Этот README описывает исходный checkout; наличие feature PR не означает, что исправления уже включены в него.
+
 ## Интерфейс
 
 Рабочий стол с окнами переписок:
