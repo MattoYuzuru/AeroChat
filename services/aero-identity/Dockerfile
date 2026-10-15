@@ -8,7 +8,9 @@ COPY services/aero-identity ./services/aero-identity
 
 WORKDIR /src/services/aero-identity
 
-RUN GOWORK=off go build -o /out/aero-identity ./cmd/aero-identity
+ARG AERO_BUILD_REVISION=dev
+
+RUN GOWORK=off go build -ldflags "-X main.version=${AERO_BUILD_REVISION}" -o /out/aero-identity ./cmd/aero-identity
 
 FROM alpine:3.22
 

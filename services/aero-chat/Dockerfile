@@ -8,7 +8,9 @@ COPY services/aero-chat ./services/aero-chat
 
 WORKDIR /src/services/aero-chat
 
-RUN GOWORK=off go build -o /out/aero-chat ./cmd/aero-chat
+ARG AERO_BUILD_REVISION=dev
+
+RUN GOWORK=off go build -ldflags "-X main.version=${AERO_BUILD_REVISION}" -o /out/aero-chat ./cmd/aero-chat
 
 FROM alpine:3.22
 

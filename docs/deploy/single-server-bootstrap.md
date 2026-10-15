@@ -96,7 +96,7 @@
 
 - `.env.server.example`
   - versioned шаблон для несекретных runtime-настроек;
-  - сюда входят image namespace/tag, primary domain, node-reachable host IP и high ports;
+  - сюда входят image namespace, выбранный release digest/source SHA, primary domain, node-reachable host IP и high ports;
   - этот файл можно безопасно хранить в репозитории как пример.
 
 - `.env.server.secrets.example`
@@ -105,7 +105,7 @@
 
 - `.env.server` на VPS
   - реальная рабочая копия non-secret runtime config;
-  - оператор обычно меняет здесь `AERO_IMAGE_TAG`;
+  - verified release flow сохраняет здесь `AERO_RELEASE_DIGEST` / `AERO_RELEASE_SOURCE_SHA` после успешных gates;
   - здесь же фиксируются `AERO_SHARED_EDGE_HOST_IP`, `AERO_WEB_HOST_PORT`, `AERO_GATEWAY_HOST_PORT`, `AERO_MEDIA_HOST_PORT`,
     `AERO_MEDIA_EDGE_DOMAIN`, `MEDIA_S3_PUBLIC_ENDPOINT`, `MEDIA_S3_CORS_ALLOWED_ORIGINS`,
     `AERO_RTC_TURN_EXTERNAL_IP`, `AERO_RTC_TURN_RELAY_IP` и relay port range для coturn.
@@ -231,7 +231,7 @@ cp .env.server.secrets.example .env.server.secrets
 Минимально важные non-secret переменные в `.env.server`:
 
 - `AERO_IMAGE_NAMESPACE`
-- `AERO_IMAGE_TAG`
+- `AERO_RELEASE_DIGEST` / `AERO_RELEASE_SOURCE_SHA` по [verified release contract](verified-release.md)
 - `AERO_EDGE_DOMAIN`
 - `AERO_MEDIA_EDGE_DOMAIN`
 - `AERO_SHARED_EDGE_HOST_IP`
@@ -283,21 +283,7 @@ docker compose \
   config
 ```
 
-5. Загрузи выбранный release tag и подними runtime:
-
-```bash
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  pull
-
-docker compose \
-  --env-file .env.server \
-  --env-file .env.server.secrets \
-  -f infra/compose/docker-compose.server.yml \
-  up -d
-```
+5. Получи и валидируй immutable release metadata, подготовь checkout выбранного source SHA и подними runtime с release overlay по [manual verified release flow](verified-release.md). Bare Compose base использует legacy tag placeholders и не является проверенным deployment.
 
 На штатном first launch ручной `psql` не нужен:
 
@@ -424,17 +410,17 @@ curl -fsS https://media.keykomi.com/minio/health/live
 
 Если GitHub Actions недоступен, fallback остаётся таким:
 
-1. Измени `AERO_IMAGE_TAG` в `.env.server`.
-2. Выполни `docker compose ... config`.
-3. Выполни `docker compose ... pull --ignore-buildable`.
-4. Собери storage: `docker compose ... build minio minio-bootstrap`, затем выполни `docker compose ... up -d`.
+1. Выбери release manifest digest/source SHA и соответствующий checkout.
+2. Валидируй metadata и создай Compose overlay по [verified release flow](verified-release.md).
+3. Выполни Compose config/pull --ignore-buildable/up с этим overlay; storage собирается из pinned sources.
+4. Подтверди пять runtime image digests/revision labels.
 5. Проверь `docker compose ... ps`.
 6. Снова проверь:
    - `http://${AERO_SHARED_EDGE_HOST_IP}:${AERO_GATEWAY_HOST_PORT}/readyz`
    - `https://<domain>/readyz`
    - `https://<media-domain>/minio/health/live`
 
-Rollback делается тем же flow после возврата `AERO_IMAGE_TAG` на предыдущий known-good tag.
+Rollback использует тот же flow с предыдущим known-good manifest digest/source SHA и сохранённым overlay. Volumes не удаляются.
 
 ## Если меняются host IP или upstream ports
 
