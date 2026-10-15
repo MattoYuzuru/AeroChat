@@ -530,7 +530,23 @@ func (f *fakeAuthenticator) Authenticate(context.Context, string) (*Authenticate
 }
 
 type fakeScopeAuthorizer struct {
-	accessByScope map[string]*ScopeAccess
+	accessByScope     map[string]*ScopeAccess
+	participantAccess map[string]*ScopeAccess
+	participantError  error
+}
+
+func (f *fakeScopeAuthorizer) GetParticipantAccess(ctx context.Context, token string, scope ConversationScope, userID string) (*ScopeAccess, error) {
+	if f.participantError != nil {
+		return nil, f.participantError
+	}
+	if f.participantAccess != nil {
+		access, ok := f.participantAccess[userID]
+		if !ok {
+			return nil, ErrPermissionDenied
+		}
+		return access, nil
+	}
+	return f.GetScopeAccess(ctx, token, scope)
 }
 
 func (f *fakeScopeAuthorizer) GetScopeAccess(_ context.Context, _ string, scope ConversationScope) (*ScopeAccess, error) {
