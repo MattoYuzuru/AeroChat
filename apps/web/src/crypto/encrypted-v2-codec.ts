@@ -1,4 +1,5 @@
 import type { EncryptedDirectMessageV2Envelope } from "../gateway/types";
+import { historicalWebTimestampAADCandidate } from "./encrypted-aad-timestamp";
 import type {
   EncryptedDirectMessageV2DecryptFailure,
   EncryptedDirectMessageV2DecryptedEnvelope,
@@ -95,7 +96,9 @@ export async function decryptEncryptedDirectMessageV2Envelope(
   }
 
   try {
-    const plaintext = await decryptPayload(material, header, envelope);
+    const plaintext = await decryptPayloadWithTimestampCompatibility(
+      material, header, envelope,
+    );
     const payload = parsePayload(plaintext);
     if (payload === null || payload.operation !== operationKind) {
       return buildFailure(envelope, "invalid_payload");
@@ -226,6 +229,27 @@ async function encryptEncryptedDirectMessageV2PayloadWithImportedKey(input: {
     ciphertext: toBase64(new Uint8Array(ciphertext)),
     ciphertextSizeBytes: new Uint8Array(ciphertext).byteLength,
   };
+}
+
+async function decryptPayloadWithTimestampCompatibility(
+  material: LocalCryptoDeviceMaterial,
+  header: EncryptedDirectMessageV2TransportHeaderV1,
+  envelope: EncryptedDirectMessageV2Envelope,
+): Promise<string> {
+  try {
+    return await decryptPayload(material, header, envelope);
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== "OperationError") {
+      throw error;
+    }
+    const createdAt = historicalWebTimestampAADCandidate(envelope.createdAt);
+    if (createdAt === null) {
+      throw error;
+    }
+
+    // Повторяет только authentication; parsing/projection/callback сюда не входят.
+    return decryptPayload(material, header, { ...envelope, createdAt });
+  }
 }
 
 async function decryptPayload(

@@ -133,6 +133,79 @@ Legacy plaintext direct chat flow сохраняется как отдельны
 - один logical message не dual-write’ится как plaintext и ciphertext;
 - encrypted lane и legacy timeline продолжают жить раздельно.
 
+## Уточнение 12 октября 2026: совместимость timestamp в AAD
+
+Статус уточнения: Accepted — координатор проверил границы совместимости до реализации
+по [#178](https://github.com/MattoYuzuru/AeroChat/issues/178).
+Уточнение сохраняет local projection из [ADR-062](062-web-encrypted-direct-message-v2-local-projection-foundation.md)
+и серверный порядок из [ADR-096](096-encrypted-conversation-server-sequence.md).
+
+### Контекст и подтверждённая граница
+
+Исторический web sender передаёт `createdAt` в UTC ISO-форме с тремя цифрами
+миллисекунд и включает эту строку в AAD. Timestamp transport сохраняет момент
+времени, но его строковые представления могут различаться. На integration
+`9e43df6` отдельная проверка двух реальных аккаунтов `check-maef1px9` сохранила
+один message witness: request и HTTP envelope содержали `.170Z`, realtime envelope —
+`.17Z`. Receiver показал integrity error; один UI reload с HTTP representation
+восстановил projection. Проверка не меняла ключи или ciphertext.
+
+Полная browser core04 остаётся FAIL на изображении после 15 успешных этапов.
+Исходный realtime envelope этого изображения не сохранён: controlled witness
+подтверждает причину отдельного воспроизведения, а не успешное прохождение core04.
+Одно исправление realtime formatter не покрывает history HTTP representation
+whole-second timestamp без `.000`.
+
+### Принятое правило декодирования
+
+1. Existing raw metadata AAD authentication выполняется первым без изменений.
+   Успех raw attempt не запускает совместимость. Ошибка payload/schema/recipient
+   validation или ошибка другого вида не запускает дополнительный attempt.
+2. Только после `DOMException` с именем `OperationError` допускается не более
+   одного distinct candidate для `createdAt`, восстанавливающего историческую
+   UTC ISO-форму web sender с тремя цифрами миллисекунд. Каждый attempt выполняет
+   полную существующую AES-GCM authentication; plaintext fallback не вводится.
+3. Candidate допустим только для точного формата
+   `YYYY-MM-DDTHH:mm:ss[.fraction]Z`: четыре цифры года `0001`–`9999`, корректная
+   григорианская дата, часы `00`–`23`, минуты/секунды `00`–`59`, uppercase `Z`,
+   fraction отсутствует либо содержит от одной до девяти decimal digits.
+   Offset, leap second, year `0000`, extended year, calendar rollover,
+   whitespace и иная syntax не создают candidate.
+4. Instant должен быть точно представим миллисекундами: все fractional digits
+   после первых трёх должны быть нулевыми. Fraction дополняется справа до трёх
+   цифр или удаляет только лишние нули: `.12` → `.120`, `Z` → `.000Z`,
+   `.120000` → `.120`. Nonzero sub-millisecond digits не округляются и не
+   отбрасываются. Если candidate равен raw, второго attempt нет.
+5. Все остальные AAD fields и порядок JSON сохраняются. Исходный envelope не
+   мутируется; ready projection сохраняет received metadata, а descriptor callback
+   вызывается только после полного success и ровно один раз. Timestamp instant,
+   message/chat/sender/device/recipient/operation/target/revision bindings нельзя
+   заменить другим значением для успешной расшифровки.
+6. Неуспех обоих attempts возвращает существующее статическое integrity/decrypt
+   failure. Alternate keys/devices, persisted plaintext retry state и raw crypto
+   logging не добавляются. Верхняя граница — два codec attempts на envelope.
+
+Это правило не меняет sender encoding, алгоритмы, ключи, AAD fields, payload или
+transport schema, backend, storage и sequence. Helper не является новым общим
+timestamp validator: прежний raw путь сохраняется, а invalid input не получает
+нового compatibility acceptance. Существующие whole-second или sub-millisecond
+ciphertexts, которые успешно проходят raw authentication, продолжают работать.
+
+### Последствия и обязательная проверка
+
+Совместимость ограничена известной исторической web representation того же
+authenticated millisecond instant. Общий claim о полном encrypted messenger,
+ratchet или MLS не меняется. Additive raw timestamp field и миграция ciphertext
+не входят в этот slice.
+
+До приёмки требуются production codec regressions для direct и group, включая
+raw success, `.120Z` → `.12Z`, `.000Z` → `Z`, coherent group unwrap/payload,
+изменённый instant/context/ciphertext, strict calendar/sub-millisecond matrix,
+attempt bound и callback once. Transport regression использует actual gateway
+formatter и ProtoJSON marshal, а не их handwritten imitation. Fresh frozen web
+gates и новый exact-runtime browser core/media run подтверждаются отдельно;
+принятие этого уточнения не является implementation или PASS.
+
 ## Последствия
 
 ### Положительные
