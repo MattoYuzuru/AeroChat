@@ -55,3 +55,73 @@ Migration/bootstrap повторяемые и additive. Rollback к старом
 unique owner index независимо от heap/UUID order. Missing, restricted или уже
 изменившийся target не оставляет группу без owner; ошибка promotion откатывает
 обе роли. Owner/admin/member transitions сохраняют audio eligibility epoch.
+
+Write restriction явно типизирует timestamp parameter как `timestamptz` в обоих
+CASE expressions, включая idempotency predicate. Именованный nullable
+[sqlc.narg](https://docs.sqlc.dev/en/latest/howto/named_parameters.html#nullable-parameters)
+сохраняет поле `WriteRestrictedAt` с типом `pgtype.Timestamptz`. Это сохраняет nullable time и
+повторный unchanged result при установке/снятии ограничения; message-only
+restriction не меняет audio eligibility epoch. Native
+`TestGroupAuthorityWriteRestrictionTimestampRoundTrip` проверяет реальный
+repository writer, persisted timestamp, повтор и NULL при снятии ограничения на
+owned PostgreSQL. Установка ограничения без timestamp по-прежнему отклоняется
+constraint `group_memberships_write_restriction_consistency`, сохраняя прежнюю
+дату и authority epoch; native regression проверяет и этот rollback.
+
+## Chat revocation sender
+
+Migration025 добавляет chat_revocation_delivery journal, backfill существующего
+outbox024 и qualified SECURITY INVOKER AFTER INSERT outbox trigger. Source
+membership/epoch/outbox/journal записываются в одной TX, journal failure rollback
+всего transition. Historical024 и текущие group-first locks не переписываются;
+новый trigger не берёт parent group/user locks. FK RESTRICT только immutable
+outbox event, без group/user cascade, history pending/quarantined retained.
+
+Producer формирует ровно event/group/user IDs + source_revision→eligibility_epoch
+из claimed committed row. eligibility_denied/member_removed оба group-denied;
+original reason/time остаются source audit. RPC не содержит current role,
+reader/removal/present/eligible flags: sender/receiver не выдумывают эти facts
+из отсутствующих полей и не отменяют old event после rejoin. Current management
+role читается свежим private authorization API отдельно от audio epoch.
+
+Pending/delivered/quarantined journal: DB-clock lease15s, monotonic owner/fence/
+attempt, expired/stale CAS rejected. Exhausted counters unchanged/excluded перед
+next eligible selection, static exhausted_counter и прогресс другого event.
+Unknown source row/canonical conflict guarded quarantine/staticreason/noautorepair.
+Own receipt lookup MUST canonical Apply replay under SAME total5s; sameevent/op,
+transient/invalid/differentoperation pending. Delivered — durable RTC commit,
+NO_MATCHING/MEDIA_PENDING factual registry receipt, не SFU absence/media completion.
+
+Default off AERO_CHAT_RTC_REVOCATION_DELIVERY_ENABLED=false. При enable нужны
+BASE_URL(private https authority), SERVER_CA_FILE, TLS_CERT_FILE, TLS_KEY_FILE
+с prefix AERO_CHAT_RTC_REVOCATION_DELIVERY_. Fixed sole Chat URI/clientAuth,
+TLS1.3/strict CA/standard hostname verification, no redirects/envproxy/caller
+override. Typed ApplyChatEvent/GetChatEventReceipt only; read/send4096/header8192.
+Singleinflight/wake1s/capped1–30s retry — начальные constants, не benchmark.
+Worker связан с production app HTTP ctx и awaited shutdown; attachment cleanup/
+Redis/S3/crypto flow не меняются, native sender fixtures их не запускают.
+
+Native scope: approved rtc-chat-authority176 profile/new rtc_chat_authority176_UUID
+и RTC profile/new rtc_test_UUID, absence/atomicCREATE/exactsearch_path/own cleanup,
+production exact-head RTC binary внеGit/verifiedSHA+vcsHEAD/owned ephemeral
+listeners/PID TERM3/KILL3. Cases source triggerrollback/backfill/eligible writers,
+observed claim/takeover/staleCAS/exhaustion/malformedquarantine, actual TLSreceipt
+postcommit CASfault/restart/canonicalconflict, enabledwrapper cancellation,
+clientcertificate/redirect/SAN boundaries. Code prep не является native PASS.
+
+Local Chat source prep может идти от reviewed UNVERIFIED Identityd6 в отдельном
+WT. До fullgates/publication обязательно ordinary merge generated/verified/
+published Identity parent и fresh clean whole run; parent receipts не переносятся.
+No manualgeneratedcode, no media flag/runtimeenable. Actual group sound, trusted
+SDK/proxy cleanup, real devices/NAT/TURN остаются UNVERIFIED.
+
+Sender integration также требует `AERO_RTC_TEST_DATABASE_ENV_FILE` с PostgreSQL
+URL и `AERO_RTC_RECEIVER_TEST_BINARY`, `AERO_RTC_RECEIVER_TEST_HEAD`,
+`AERO_RTC_RECEIVER_TEST_BINARY_SHA256`. Перед subprocess launch fixture явно
+записывает собственные `search_path`/`application_name` в URL и проверяет их
+повторным parse: изменение `pgx.ConnConfig.RuntimeParams` не обновляет исходный
+`ConnString()` ([pgx v5.8.0](https://pkg.go.dev/github.com/jackc/pgx/v5@v5.8.0#ConnConfig.ConnString)).
+Профили и URL не выводятся. Правила full-clone сборки Go 1.25.8 и проверки
+реальных VCS settings перечислены в [Identity native gate](../aero-identity/README.md#identity-revocation-sender).
+Отсутствие metadata не принимается за PASS; новые fixtures не ослабляют native
+assertions, а ordinary verified published Identity parent нужен до codegen/gates.

@@ -169,10 +169,7 @@ func run() error {
 		handler,
 	)
 
-	if err := app.RunHTTPServers(ctx, logger, observability.HTTPServerConfig{
-		Address:         cfg.HTTPAddress,
-		ShutdownTimeout: cfg.ShutdownTimeout,
-	}, httpHandler, cfg.InternalAuthorization, chat.NewGroupSubjectAuthorizer(repository)); err != nil && !errors.Is(err, context.Canceled) {
+	if err := app.RunServersWithSourceDelivery(ctx, logger, cfg, httpHandler, chat.NewGroupSubjectAuthorizer(repository), postgres.NewDeliveryRepository(db)); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 
