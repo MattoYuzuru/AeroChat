@@ -811,7 +811,7 @@
   }
 }
 
-@media (max-width: 920px) {
+@media (max-width: 1179px) {
   .listPane[data-mobile-hidden="true"],
   .threadPane[data-mobile-hidden="true"] {
     display: none;
@@ -1304,32 +1304,93 @@
   width: min(100%, 15rem);
 }
 
-@media (max-width: 920px) {
+@media (max-width: 1179px) {
+  .composerCard {
+    min-height: 0;
+    max-height: min(50dvh, 22rem);
+    overflow-y: auto;
+  }
+
   .heroCard[data-mobile-hidden="true"] {
     display: none;
   }
 
   .workspace[data-mobile-thread-active="true"] {
-    min-height: calc(100dvh - 12.5rem);
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    align-content: stretch;
+  }
+
+  .layout:has(.workspace[data-mobile-thread-active="true"]) {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
   }
 
   .threadPane[data-mobile-hidden="false"] {
-    min-height: inherit;
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .threadPane[data-mobile-hidden="false"] > .sectionCard {
     display: grid;
-    min-height: inherit;
-    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden;
+    padding: 0;
+  }
+
+  .threadPane[data-mobile-hidden="false"] > .sectionCard > .panelHeader {
+    display: flex;
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .threadPane[data-mobile-hidden="false"] > .sectionCard > .panelHeader > div:first-child {
+    display: none;
+  }
+
+  .threadPane[data-mobile-hidden="false"] > .sectionCard > .panelHeader .headerActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .threadPane[data-mobile-hidden="false"] > .sectionCard > .panelHeader .secondaryButton {
+    min-height: 2rem;
+    padding: 0.3rem 0.55rem;
   }
 
   .threadLayout {
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    --mobile-history-padding: 0.7rem;
+    grid-template-rows: auto auto minmax(calc(3rem + var(--mobile-history-padding) + var(--mobile-history-padding) + 1px), 1fr) minmax(0, auto);
+    overflow: hidden;
+  }
+
+  .threadLayout:has(> .profilePanel) {
+    display: block;
+    overflow-y: auto;
+  }
+
+  .threadLayout > .threadHero {
+    grid-row: 1;
+  }
+  .threadLayout > .pinnedStrip {
+    grid-row: 2;
+  }
+  .threadLayout > .messagesPanel {
+    grid-row: 3;
+  }
+  .threadLayout > .composerCard {
+    grid-row: 4;
   }
 
   .messagesViewport {
-    padding: 0.7rem 0.65rem;
+    padding: var(--mobile-history-padding) 0.65rem;
   }
 }
 
@@ -1347,7 +1408,16 @@
   }
 
   .composerRow {
-    grid-template-columns: 2.45rem minmax(0, 1fr) 2.45rem 2.45rem 2.45rem;
+    grid-template-columns: repeat(4, minmax(2.45rem, 1fr));
+  }
+
+  .composerRow > .field {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+
+  .composerRow > button {
+    grid-row: 2;
   }
 
   .messageBubble,
@@ -1362,5 +1432,102 @@
 
   .pinnedRow {
     grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 1179px) {
+  .threadEyebrow,
+  .threadDescription,
+  .threadStatusRow > span {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .threadHeroRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .threadStatusRow > span,
+  .threadDescription,
+  .threadEyebrow {
+    display: none;
+  }
+
+  .threadTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 1179px) {
+  .composerCard .field textarea {
+    height: 2.45rem;
+  }
+
+  .composer .error {
+    margin: 0;
+    padding: 0.35rem 0.55rem;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 1179px) {
+  .threadHeroRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .threadTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .threadIdentity > div {
+    min-width: 0;
+  }
+}
+
+@media (max-height: 500px) and (min-width: 500px) and (max-width: 1179px) {
+  .composerRow {
+    grid-template-columns: 2.45rem minmax(0, 1fr) 2.45rem 2.45rem 2.45rem;
+  }
+
+  .composerRow > .field,
+  .composerRow > button {
+    grid-row: auto;
+    grid-column: auto;
+  }
+}
+
+@media (max-height: 500px) and (max-width: 1179px) {
+  .threadLayout {
+    --mobile-history-padding: 0px;
+    grid-template-rows: auto auto minmax(3rem, 1fr) minmax(3.125rem, auto);
+  }
+
+  .threadPane[data-mobile-hidden="false"] > .sectionCard > .panelHeader {
+    padding-block: 0.125rem;
+  }
+
+  .threadHero,
+  .composerCard {
+    padding-block: 0.25rem;
+  }
+
+  .threadHero .avatarBadgeLarge {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+  }
+
+  .composerCard {
+    min-height: 3.125rem;
+  }
+
+  .messagesViewport {
+    padding-block: 0;
   }
 }

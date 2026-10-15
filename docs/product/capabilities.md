@@ -46,6 +46,8 @@ Backend ordering encrypted direct/group operations использует per-conv
     - viewer-relative unread/read state хранится как control-plane metadata по stable logical `message_id`, без server-side plaintext preview;
     - `ListDirectChats` / `GetDirectChat` и realtime получают отдельный encrypted unread/read slice рядом с legacy plaintext read state;
     - active encrypted DM v2 lane умеет явно продвигать encrypted mark-as-read и сходиться с server-backed unread counters;
+    - composer допускает одну отправку одновременно, сохраняет новый текст во время запроса и не очищает новый черновик после отмены/повторного выбора редактирования и другую переписку при завершении старого запроса; ошибка сохраняет текст, вложение и reply для повторной отправки и не переносится в другую переписку;
+    - автоматическое чтение требует видимой вкладки и несвёрнутого окна с открытой историей; фокус другого видимого окна сам по себе не запрещает чтение;
   - encrypted search recovery foundation:
     - `/app/search` сохраняет текущий entrypoint; активный encrypted search работает по локальной projection, а server-side search содержимого legacy direct/group history de-scoped;
     - encrypted direct/group search работает только по локально fetched + decrypted message text внутри browser/runtime boundary;
@@ -81,6 +83,7 @@ Backend ordering encrypted direct/group operations использует per-conv
         - viewer-relative unread/read для encrypted group lane считается по opaque control-plane metadata и не зависит от plaintext body;
         - `ListGroups` / `GetGroupChat`, realtime и active encrypted lane теперь умеют продвигать отдельный encrypted read progression;
         - legacy group read state и encrypted group read state остаются честно раздельными;
+        - свёрнутое окно и экран информации группы сохраняют unread до открытия истории;
       - coexistence остаётся честным: encrypted lane не притворяется unified timeline поверх legacy plaintext history;
     - coexistence остаётся bounded и честной:
       - legacy plaintext group history не переписывается и не re-encrypt'ится;
