@@ -1311,6 +1311,7 @@ func toProtoEncryptedDirectMessageV2Envelope(value chat.EncryptedDirectMessageV2
 		Revision:             value.Revision,
 		CreatedAt:            timestamppb.New(value.CreatedAt),
 		StoredAt:             timestamppb.New(value.StoredAt),
+		ServerSequence:       value.ServerSequence,
 		ViewerDelivery:       toProtoEncryptedDirectMessageV2Delivery(value.ViewerDelivery),
 	}
 }
@@ -1326,6 +1327,7 @@ func toProtoEncryptedDirectMessageV2StoredEnvelope(value chat.EncryptedDirectMes
 		Revision:             value.Revision,
 		CreatedAt:            timestamppb.New(value.CreatedAt),
 		StoredAt:             timestamppb.New(value.StoredAt),
+		ServerSequence:       value.ServerSequence,
 		StoredDeliveryCount:  value.StoredDeliveryCount,
 	}
 	for _, delivery := range value.StoredDeliveries {
@@ -1479,6 +1481,7 @@ func toProtoEncryptedGroupEnvelope(value chat.EncryptedGroupEnvelope) *chatv1.En
 		CiphertextSizeBytes:  uint64(max(value.CiphertextSizeBytes, 0)),
 		CreatedAt:            timestamppb.New(value.CreatedAt),
 		StoredAt:             timestamppb.New(value.StoredAt),
+		ServerSequence:       value.ServerSequence,
 		ViewerDelivery:       toProtoEncryptedGroupMessageDelivery(value.ViewerDelivery),
 	}
 }
@@ -1497,6 +1500,7 @@ func toProtoEncryptedGroupStoredEnvelope(value chat.EncryptedGroupStoredEnvelope
 		Revision:             value.Revision,
 		CreatedAt:            timestamppb.New(value.CreatedAt),
 		StoredAt:             timestamppb.New(value.StoredAt),
+		ServerSequence:       value.ServerSequence,
 		StoredDeliveryCount:  value.StoredDeliveryCount,
 		StoredDeliveries:     make([]*chatv1.EncryptedGroupMessageDelivery, 0, len(value.StoredDeliveries)),
 	}
@@ -1669,9 +1673,10 @@ func toProtoEncryptedConversationReadPosition(value *chat.EncryptedConversationR
 	}
 
 	return &chatv1.EncryptedConversationReadPosition{
-		MessageId:        value.MessageID,
-		MessageCreatedAt: timestamppb.New(value.MessageCreatedAt),
-		UpdatedAt:        timestamppb.New(value.UpdatedAt),
+		MessageId:              value.MessageID,
+		LastReadServerSequence: value.LastReadServerSequence,
+		MessageCreatedAt:       timestamppb.New(value.MessageCreatedAt),
+		UpdatedAt:              timestamppb.New(value.UpdatedAt),
 	}
 }
 

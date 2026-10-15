@@ -390,6 +390,7 @@ type EncryptedDirectMessageV2StoredDelivery struct {
 }
 
 type EncryptedDirectMessageV2Envelope struct {
+	ServerSequence       int64
 	MessageID            string
 	ChatID               string
 	SenderUserID         string
@@ -403,6 +404,7 @@ type EncryptedDirectMessageV2Envelope struct {
 }
 
 type EncryptedDirectMessageV2StoredEnvelope struct {
+	ServerSequence       int64
 	MessageID            string
 	ChatID               string
 	SenderUserID         string
@@ -424,6 +426,7 @@ type EncryptedGroupMessageDelivery struct {
 }
 
 type EncryptedGroupEnvelope struct {
+	ServerSequence       int64
 	MessageID            string
 	GroupID              string
 	ThreadID             string
@@ -442,6 +445,7 @@ type EncryptedGroupEnvelope struct {
 }
 
 type EncryptedGroupStoredEnvelope struct {
+	ServerSequence       int64
 	MessageID            string
 	GroupID              string
 	ThreadID             string
@@ -539,9 +543,10 @@ type GroupReadPosition struct {
 }
 
 type EncryptedConversationReadPosition struct {
-	MessageID        string
-	MessageCreatedAt time.Time
-	UpdatedAt        time.Time
+	LastReadServerSequence int64
+	MessageID              string
+	MessageCreatedAt       time.Time
+	UpdatedAt              time.Time
 }
 
 type DirectChatReadState struct {
@@ -849,11 +854,12 @@ type UpsertDirectChatReadReceiptParams struct {
 }
 
 type UpsertEncryptedDirectChatReadStateParams struct {
-	ChatID            string
-	UserID            string
-	LastReadMessageID string
-	LastReadMessageAt time.Time
-	UpdatedAt         time.Time
+	LastReadServerSequence int64
+	ChatID                 string
+	UserID                 string
+	LastReadMessageID      string
+	LastReadMessageAt      time.Time
+	UpdatedAt              time.Time
 }
 
 type UpsertGroupChatReadStateParams struct {
@@ -865,11 +871,12 @@ type UpsertGroupChatReadStateParams struct {
 }
 
 type UpsertEncryptedGroupReadStateParams struct {
-	GroupID           string
-	UserID            string
-	LastReadMessageID string
-	LastReadMessageAt time.Time
-	UpdatedAt         time.Time
+	LastReadServerSequence int64
+	GroupID                string
+	UserID                 string
+	LastReadMessageID      string
+	LastReadMessageAt      time.Time
+	UpdatedAt              time.Time
 }
 
 type PutDirectChatTypingIndicatorParams struct {
