@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package aerochat.rtc.v1;
+
+option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/v1;rtcv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Public contract не подключён к app/gateway. Handler stubs возвращают Unimplemented.
+service GroupMediaControlService {
+  rpc RequestGroupMediaLeave(RequestGroupMediaLeaveRequest) returns (RequestGroupMediaLeaveResponse);
+  rpc RequestGroupMediaEnd(RequestGroupMediaEndRequest) returns (RequestGroupMediaEndResponse);
+  rpc GetGroupMediaOperation(GetGroupMediaOperationRequest) returns (GetGroupMediaOperationResponse);
+}
+
+message RequestGroupMediaLeaveRequest {
+  string call_id = 1;
+  string request_id = 2;
+}
+message RequestGroupMediaEndRequest {
+  string call_id = 1;
+  string request_id = 2;
+}
+message GetGroupMediaOperationRequest {
+  string operation_id = 1;
+}
+enum MediaControlKind {
+  MEDIA_CONTROL_KIND_UNSPECIFIED = 0;
+  MEDIA_CONTROL_KIND_LEAVE = 1;
+  MEDIA_CONTROL_KIND_END = 2;
+}
+enum MediaControlOutcome {
+  MEDIA_CONTROL_OUTCOME_UNSPECIFIED = 0;
+  MEDIA_CONTROL_OUTCOME_PENDING = 1;
+  MEDIA_CONTROL_OUTCOME_COMPLETE = 2;
+}
+message GroupMediaOperation {
+  string operation_id = 1;
+  string call_id = 2;
+  MediaControlKind kind = 3;
+  MediaControlOutcome media_outcome = 4;
+  string pending_reason = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+message RequestGroupMediaLeaveResponse {
+  GroupMediaOperation operation = 1;
+}
+message RequestGroupMediaEndResponse {
+  GroupMediaOperation operation = 1;
+}
+message GetGroupMediaOperationResponse {
+  GroupMediaOperation operation = 1;
+}

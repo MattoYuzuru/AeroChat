@@ -92,7 +92,7 @@ func authorityDatabase(t *testing.T, legacy bool) (*pgxpool.Pool, context.Contex
 			t.Fatal(err)
 		}
 		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") || entry.Name() == authorityMigration {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") || entry.Name() >= authorityMigration {
 				continue
 			}
 			data, err := identityschema.Files.ReadFile(entry.Name())

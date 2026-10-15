@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package aerochat.rtc.admission.v1;
+
+option go_package = "github.com/MattoYuzuru/AeroChat/gen/go/aerochat/rtc/admission/v1;rtcadmissionv1";
+
+// Регистрация не выдаёт grants/leases и не подтверждает media cleanup.
+service AdmissionRegistrationService {
+  rpc RegisterInstance(RegisterInstanceRequest) returns (RegisterInstanceResponse);
+}
+
+enum AdmissionInstanceState {
+  ADMISSION_INSTANCE_STATE_UNSPECIFIED = 0;
+  ADMISSION_INSTANCE_STATE_ACTIVE = 1;
+  ADMISSION_INSTANCE_STATE_DRAINING = 2;
+  ADMISSION_INSTANCE_STATE_RETIRED = 3;
+}
+
+message RegisterInstanceRequest {
+  string request_id = 1;
+}
+
+message AdmissionInstance {
+  string instance_id = 1;
+  int64 registration_fence = 2;
+  AdmissionInstanceState state = 3;
+}
+
+message RegisterInstanceResponse {
+  AdmissionInstance instance = 1;
+}

@@ -12,11 +12,102 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const claimAuthorityDelivery = `-- name: ClaimAuthorityDelivery :one
+WITH candidate AS (
+    SELECT d.event_id FROM identity_revocation_delivery d
+    JOIN identity_authority_revocation_outbox e ON e.id = d.event_id
+    WHERE d.state = 'pending' AND d.next_attempt_at <= clock_timestamp()
+        AND (d.claim_until IS NULL OR d.claim_until <= clock_timestamp())
+        AND d.attempt < 9223372036854775807 AND d.claim_fence < 9223372036854775807
+    ORDER BY e.occurred_at, e.id
+    LIMIT 1 FOR UPDATE OF d SKIP LOCKED
+), claimed AS (
+    UPDATE identity_revocation_delivery d
+    SET attempt = d.attempt + 1, claim_fence = d.claim_fence + 1,
+        claim_owner = $1, claim_until = clock_timestamp() + interval '15 seconds'
+    FROM candidate c WHERE d.event_id = c.event_id
+    RETURNING d.event_id, d.attempt, d.claim_fence, d.claim_owner, d.claim_until
+)
+SELECT c.event_id, c.attempt, c.claim_fence, c.claim_owner, c.claim_until, e.subject_kind, e.subject_id, e.user_id, e.device_id, e.session_id, e.source_revision
+FROM claimed c JOIN identity_authority_revocation_outbox e ON e.id = c.event_id
+`
+
+type ClaimAuthorityDeliveryRow struct {
+	EventID        uuid.UUID          `db:"event_id" json:"event_id"`
+	Attempt        int64              `db:"attempt" json:"attempt"`
+	ClaimFence     int64              `db:"claim_fence" json:"claim_fence"`
+	ClaimOwner     pgtype.UUID        `db:"claim_owner" json:"claim_owner"`
+	ClaimUntil     pgtype.Timestamptz `db:"claim_until" json:"claim_until"`
+	SubjectKind    string             `db:"subject_kind" json:"subject_kind"`
+	SubjectID      uuid.UUID          `db:"subject_id" json:"subject_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	DeviceID       uuid.UUID          `db:"device_id" json:"device_id"`
+	SessionID      pgtype.UUID        `db:"session_id" json:"session_id"`
+	SourceRevision int64              `db:"source_revision" json:"source_revision"`
+}
+
+func (q *Queries) ClaimAuthorityDelivery(ctx context.Context, ownerID pgtype.UUID) (ClaimAuthorityDeliveryRow, error) {
+	row := q.db.QueryRow(ctx, claimAuthorityDelivery, ownerID)
+	var i ClaimAuthorityDeliveryRow
+	err := row.Scan(
+		&i.EventID,
+		&i.Attempt,
+		&i.ClaimFence,
+		&i.ClaimOwner,
+		&i.ClaimUntil,
+		&i.SubjectKind,
+		&i.SubjectID,
+		&i.UserID,
+		&i.DeviceID,
+		&i.SessionID,
+		&i.SourceRevision,
+	)
+	return i, err
+}
+
+const completeAuthorityDelivery = `-- name: CompleteAuthorityDelivery :execrows
+UPDATE identity_revocation_delivery
+SET state = 'delivered', operation_id = $1,
+    registry_media_effect = $2, affected_registry_grants = $3,
+    received_at = clock_timestamp()
+WHERE event_id = $4 AND state = 'pending'
+    AND claim_owner = $5 AND claim_fence = $6
+    AND claim_until > clock_timestamp()
+`
+
+type CompleteAuthorityDeliveryParams struct {
+	OperationID pgtype.UUID `db:"operation_id" json:"operation_id"`
+	MediaEffect pgtype.Text `db:"media_effect" json:"media_effect"`
+	GrantCount  pgtype.Int8 `db:"grant_count" json:"grant_count"`
+	EventID     uuid.UUID   `db:"event_id" json:"event_id"`
+	OwnerID     pgtype.UUID `db:"owner_id" json:"owner_id"`
+	Fence       int64       `db:"fence" json:"fence"`
+}
+
+func (q *Queries) CompleteAuthorityDelivery(ctx context.Context, arg CompleteAuthorityDeliveryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeAuthorityDelivery,
+		arg.OperationID,
+		arg.MediaEffect,
+		arg.GrantCount,
+		arg.EventID,
+		arg.OwnerID,
+		arg.Fence,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createAuthorityRevocationEvent = `-- name: CreateAuthorityRevocationEvent :exec
-INSERT INTO identity_authority_revocation_outbox (
-    id, subject_kind, subject_id, user_id, device_id, session_id,
-    source_revision, occurred_at, reason
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+WITH event AS (
+    INSERT INTO identity_authority_revocation_outbox (
+        id, subject_kind, subject_id, user_id, device_id, session_id,
+        source_revision, occurred_at, reason
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING id
+)
+INSERT INTO identity_revocation_delivery(event_id) SELECT id FROM event
 `
 
 type CreateAuthorityRevocationEventParams struct {
@@ -44,4 +135,76 @@ func (q *Queries) CreateAuthorityRevocationEvent(ctx context.Context, arg Create
 		arg.Reason,
 	)
 	return err
+}
+
+const hasExhaustedAuthorityDelivery = `-- name: HasExhaustedAuthorityDelivery :one
+SELECT EXISTS (
+    SELECT 1 FROM identity_revocation_delivery
+    WHERE state = 'pending' AND next_attempt_at <= clock_timestamp()
+        AND (attempt = 9223372036854775807 OR claim_fence = 9223372036854775807)
+    LIMIT 1
+)
+`
+
+func (q *Queries) HasExhaustedAuthorityDelivery(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, hasExhaustedAuthorityDelivery)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const quarantineAuthorityDelivery = `-- name: QuarantineAuthorityDelivery :execrows
+UPDATE identity_revocation_delivery SET state = 'quarantined', quarantine_reason = $1
+WHERE event_id = $2 AND state = 'pending'
+    AND claim_owner = $3 AND claim_fence = $4
+    AND claim_until > clock_timestamp()
+`
+
+type QuarantineAuthorityDeliveryParams struct {
+	Reason  pgtype.Text `db:"reason" json:"reason"`
+	EventID uuid.UUID   `db:"event_id" json:"event_id"`
+	OwnerID pgtype.UUID `db:"owner_id" json:"owner_id"`
+	Fence   int64       `db:"fence" json:"fence"`
+}
+
+func (q *Queries) QuarantineAuthorityDelivery(ctx context.Context, arg QuarantineAuthorityDeliveryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, quarantineAuthorityDelivery,
+		arg.Reason,
+		arg.EventID,
+		arg.OwnerID,
+		arg.Fence,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const retryAuthorityDelivery = `-- name: RetryAuthorityDelivery :execrows
+UPDATE identity_revocation_delivery
+SET claim_owner = NULL, claim_until = NULL,
+    next_attempt_at = clock_timestamp() + make_interval(secs => $1::double precision)
+WHERE event_id = $2 AND state = 'pending'
+    AND claim_owner = $3 AND claim_fence = $4
+    AND claim_until > clock_timestamp()
+`
+
+type RetryAuthorityDeliveryParams struct {
+	RetrySeconds float64     `db:"retry_seconds" json:"retry_seconds"`
+	EventID      uuid.UUID   `db:"event_id" json:"event_id"`
+	OwnerID      pgtype.UUID `db:"owner_id" json:"owner_id"`
+	Fence        int64       `db:"fence" json:"fence"`
+}
+
+func (q *Queries) RetryAuthorityDelivery(ctx context.Context, arg RetryAuthorityDeliveryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, retryAuthorityDelivery,
+		arg.RetrySeconds,
+		arg.EventID,
+		arg.OwnerID,
+		arg.Fence,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
