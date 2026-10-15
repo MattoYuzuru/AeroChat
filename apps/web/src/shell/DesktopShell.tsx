@@ -18,7 +18,6 @@ import {
   buildGroupChatShellTarget,
   buildPersonProfileShellTarget,
   isRouteBackedShellAppId,
-  renderShellAppContent,
   resolveShellRouteEntry,
   shellAppRegistry,
 } from "../app/app-routes";
@@ -115,6 +114,7 @@ import {
   type ShellWindowViewport,
 } from "./window-placement";
 import { shouldSyncDesktopRouteToActiveWindow } from "./route-sync";
+import { renderShellAppContent } from "../app/app-content";
 import { containModalFocus } from "./modal-focus";
 import styles from "./DesktopShell.module.css";
 
