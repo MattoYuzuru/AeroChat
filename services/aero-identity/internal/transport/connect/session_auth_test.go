@@ -17,7 +17,7 @@ import (
 )
 
 func TestMalformedSessionCredentialsReturnUnauthenticated(t *testing.T) {
-	service := identity.NewService(postgres.NewRepository(nil), nil, libauth.NewSessionTokenManager(), nil)
+	service := identity.NewService(postgres.NewRepository(nil), nil, libauth.NewSessionTokenManager(), nil, nil)
 	_, handler := identityv1connect.NewIdentityServiceHandler(NewHandler("identity-fixture", "test", service))
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -78,7 +78,7 @@ func TestAuthenticatedMalformedRevokeTargetsReturnInvalidArgument(t *testing.T) 
 		Session:   identity.Session{ID: sessionID, LastSeenAt: time.Now()},
 		TokenHash: hash,
 	}}
-	service := identity.NewService(repo, nil, manager, nil)
+	service := identity.NewService(repo, nil, manager, nil, nil)
 	_, handler := identityv1connect.NewIdentityServiceHandler(NewHandler("identity-fixture", "test", service))
 	server := httptest.NewServer(handler)
 	defer server.Close()

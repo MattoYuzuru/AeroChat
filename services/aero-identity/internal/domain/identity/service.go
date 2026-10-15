@@ -11,7 +11,6 @@ import (
 	"time"
 
 	libauth "github.com/MattoYuzuru/AeroChat/libs/go/auth"
-	identityauth "github.com/MattoYuzuru/AeroChat/services/aero-identity/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -88,7 +87,8 @@ type NotificationDispatcher interface {
 
 type Service struct {
 	repo                            Repository
-	passwords                       *identityauth.PasswordHasher
+	passwords                       PasswordHasher
+	passwordAdmission               *PasswordAdmission
 	sessionToken                    *libauth.SessionTokenManager
 	notificationDispatcher          NotificationDispatcher
 	sessionTouchInterval            time.Duration
@@ -102,13 +102,18 @@ type Service struct {
 
 func NewService(
 	repo Repository,
-	passwords *identityauth.PasswordHasher,
+	passwords PasswordHasher,
 	sessionToken *libauth.SessionTokenManager,
 	notificationDispatcher NotificationDispatcher,
+	passwordAdmission *PasswordAdmission,
 ) *Service {
+	if passwordAdmission == nil {
+		passwordAdmission, _ = NewPasswordAdmission(2)
+	}
 	return &Service{
 		repo:                            repo,
 		passwords:                       passwords,
+		passwordAdmission:               passwordAdmission,
 		sessionToken:                    sessionToken,
 		notificationDispatcher:          notificationDispatcher,
 		sessionTouchInterval:            defaultSessionTouchInterval,
@@ -159,7 +164,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (*AuthSessi
 		return nil, err
 	}
 
-	passwordHash, err := s.passwords.Hash(input.Password)
+	passwordHash, err := s.hashPassword(ctx, login, input.Password)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
@@ -227,17 +232,9 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (*AuthSession, er
 		return nil, err
 	}
 
-	credential, err := s.repo.GetPasswordCredentialByLogin(ctx, login)
+	credential, err := s.verifyPasswordCredential(ctx, login, input.Password)
 	if err != nil {
 		return nil, err
-	}
-
-	valid, err := s.passwords.Verify(input.Password, credential.PasswordHash)
-	if err != nil {
-		return nil, fmt.Errorf("verify password: %w", err)
-	}
-	if !valid {
-		return nil, ErrInvalidCredentials
 	}
 
 	now := s.now()

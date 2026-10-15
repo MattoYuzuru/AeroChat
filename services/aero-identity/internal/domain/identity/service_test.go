@@ -403,7 +403,7 @@ func TestListFriendsRefreshesSessionTouchWhenLastSeenIsStale(t *testing.T) {
 
 func newTestService() *Service {
 	repo := newFakeRepository()
-	service := NewService(repo, identityauth.NewPasswordHasher(), libauth.NewSessionTokenManager(), nil)
+	service := NewService(repo, identityauth.NewPasswordHasher(), libauth.NewSessionTokenManager(), nil, nil)
 	now := time.Date(2026, 3, 16, 12, 0, 0, 0, time.UTC)
 	service.now = func() time.Time {
 		now = now.Add(time.Second)
