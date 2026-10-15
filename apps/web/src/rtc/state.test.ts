@@ -8,6 +8,28 @@ import {
 } from "./state";
 
 describe("directCallReducer", () => {
+  it("keeps identical remote audio state stable while preserving real transitions", () => {
+    for (const remoteAudioState of ["idle", "ready", "blocked"] as const) {
+      const state = directCallReducer(createInitialDirectCallState(), {
+        type: "remote_audio_state_replaced",
+        remoteAudioState,
+        remoteAudioAvailable: true,
+      });
+      expect(directCallReducer(state, {
+        type: "remote_audio_state_replaced",
+        remoteAudioState,
+        remoteAudioAvailable: true,
+      })).toBe(state);
+      const cleared = directCallReducer(state, {
+        type: "remote_audio_state_replaced",
+        remoteAudioState: "idle",
+        remoteAudioAvailable: false,
+      });
+      expect(cleared).not.toBe(state);
+      expect(cleared.remoteAudioAvailable).toBe(false);
+    }
+  });
+
   it("marks ended terminal state when active call disappears after sync", () => {
     const readyState = directCallReducer(createInitialDirectCallState(), {
       type: "sync_succeeded",
