@@ -29,7 +29,7 @@ Workflow не занимается:
 Перед автоматизированным rollout должны быть завершены предыдущие platform slices:
 
 - сервер подготовлен по
-  [single-server bootstrap runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/single-server-bootstrap.md);
+  [single-server bootstrap runbook](single-server-bootstrap.md);
 - deploy directory на VPS уже существует и содержит checkout выбранного release source SHA;
 - на VPS уже есть `.env.server` и `.env.server.secrets`;
 - compose stack AeroChat уже умеет подниматься на
@@ -163,7 +163,7 @@ Workflow намеренно не трогает:
 Рекомендуемый first launch checklist:
 
 1. Подготовить VPS и cluster edge по
-   [single-server bootstrap runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/single-server-bootstrap.md).
+   [single-server bootstrap runbook](single-server-bootstrap.md).
 2. Проверить, что deploy directory на VPS содержит актуальный checkout этого operational slice.
 3. Проверить прямые upstream'ы:
 
