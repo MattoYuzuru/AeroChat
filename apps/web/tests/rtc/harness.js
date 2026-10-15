@@ -1,6 +1,7 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {useDirectCallSession} from '../../src/rtc/useDirectCallSession';
+import {DirectCallMicrophoneButton} from '../../src/rtc/DirectCallMicrophoneButton';
 import {createDirectCallJoinCoordinator} from '../../src/rtc/join-coordinator';
 import {usePlayback} from 'virtual:playback';
 import {listeners} from './realtime.js';
@@ -15,7 +16,7 @@ let blocked = false;
 let deferPlayback = false;
 let completePlayback;
 const audio = {srcObject: null, pause(){observations.pauses++;}, play(){observations.plays++;if(deferPlayback){deferPlayback=false;return new Promise((resolve,reject)=>{completePlayback=rejectResult=>rejectResult?reject(new Error('blocked')):resolve();});}if(observations.plays>3)return new Promise(()=>{});return blocked ? Promise.reject(new Error('blocked')) : Promise.resolve();}};
-const track = {stop:()=>observations.stops++, contentHint:'', kind:'audio'};
+const track = {stop:()=>observations.stops++, contentHint:'', kind:'audio', enabled:true, readyState:'live'};
 const stream = () => ({getTracks:()=>[track], getAudioTracks:()=>[track]});
 const capturedStream = () => ({getTracks:()=>[track,{...track}],getAudioTracks:()=>[track]});
 let captureDeferred = false;
@@ -45,12 +46,19 @@ const opts = {joinCoordinator:createDirectCallJoinCoordinator(),enabled:true, to
 function Harness(){
   session=useDirectCallSession(opts);
   usePlayback({directCallAudioRef:{current:audio}, directCallRemoteAudioStream:session.remoteAudioStream, retryDirectCallRemoteAudioPlayback:session.retryRemoteAudioPlayback});
-  return React.createElement('pre',null,JSON.stringify(session.state));
+  return React.createElement(React.Fragment,null,React.createElement('pre',null,JSON.stringify(session.state)),React.createElement(DirectCallMicrophoneButton,{session}));
 }
 window.fixture = {
   mount(){root=createRoot(document.getElementById('root'));root.render(React.createElement(Harness));},
   start(){return session.startCall();},
   join(){return session.joinCall();},
+  leave(){return session.leaveCall();},
+  end(){return session.endCall();},
+  toggleMicrophone(){session.toggleMicrophone();},
+  endCapture(){track.readyState='ended';track.onended?.();},
+  changeToken(){opts.token='synthetic-renewed';root.render(React.createElement(Harness));},
+  refreshAccount(){opts.currentUserId='joiner';opts.token='synthetic-joiner';opts.awarenessEntry=null;root.render(React.createElement(Harness));},
+  changeAccountOnly(){opts.currentUserId='joiner';opts.awarenessEntry=null;root.render(React.createElement(Harness));},
   deferCapture(){captureDeferred=true;},
   releaseCapture(){releaseCapture();},
   rejectCapture(){rejectCapture(new DOMException('denied','NotAllowedError'));},
@@ -78,5 +86,5 @@ window.fixture = {
   deferPlayback(){deferPlayback=true;},
   completePlayback(rejectResult){completePlayback(rejectResult);},
   retry(){return session.retryRemoteAudioPlayback(audio);},
-  report(){return {...observations, candidatePending,candidates,canJoin:session?.canJoin, signals:gatewayState.signals, configurationPending:gatewayState.configurationPending, peers:observations.peers.length, attached:audio.srcObject!==null, log, state:session?.state};},
+  report(){return {...observations, candidatePending,candidates,canJoin:session?.canJoin, canToggleMicrophone:session?.canToggleMicrophone, isMicrophoneMuted:session?.isMicrophoneMuted, trackEnabled:track.enabled, signals:gatewayState.signals, configurationPending:gatewayState.configurationPending, peers:observations.peers.length, attached:audio.srcObject!==null, log, state:session?.state};},
 };
