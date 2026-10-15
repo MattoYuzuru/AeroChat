@@ -1,8 +1,5 @@
 version: "3"
 
-env:
-  PATH: "{{.ROOT_DIR}}/bin:{{.PATH}}"
-
 tasks:
   tools:
     desc: Устанавливает локальные dev-инструменты в ./bin
@@ -12,22 +9,22 @@ tasks:
   proto:lint:
     desc: Проверяет protobuf-контракты через Buf
     cmds:
-      - buf lint
+      - '"{{.ROOT_DIR}}/bin/buf" lint'
 
   proto:generate:
     desc: Генерирует Go и ConnectRPC код из protobuf-контрактов
     cmds:
-      - buf generate
+      - '"{{.ROOT_DIR}}/bin/buf" generate'
 
   sqlc:generate:
     desc: Генерирует типизированный Go-код из SQL-запросов
     cmds:
-      - sqlc generate
+      - '"{{.ROOT_DIR}}/bin/sqlc" generate'
 
   generated:check:
     desc: Генерирует Buf/SQLC код и отклоняет drift относительно HEAD
     cmds:
-      - sh infra/scripts/check-generated.sh
+      - 'PATH="{{.ROOT_DIR}}/bin:$PATH" sh infra/scripts/check-generated.sh'
 
   go:fmt:
     desc: Форматирует Go-код во всех workspace-модулях
@@ -42,12 +39,12 @@ tasks:
   go:lint:
     desc: Запускает golangci-lint по всем Go-модулям
     cmds:
-      - golangci-lint run ./libs/go/... ./services/aero-gateway/... ./services/aero-identity/... ./services/aero-chat/... ./services/aero-rtc-control/... ./services/aero-jobs/... ./gen/go/...
+      - '"{{.ROOT_DIR}}/bin/golangci-lint" run ./libs/go/... ./services/aero-gateway/... ./services/aero-identity/... ./services/aero-chat/... ./services/aero-rtc-control/... ./services/aero-jobs/... ./gen/go/...'
 
   web:install:
     desc: Устанавливает frontend-зависимости
     cmds:
-      - npx pnpm@10.19.0 install
+      - npx pnpm@10.19.0 install --frozen-lockfile
 
   web:lint:
     desc: Запускает lint для web-приложения
@@ -67,12 +64,12 @@ tasks:
   compose:config:
     desc: Проверяет docker compose-конфигурацию
     cmds:
-      - docker compose -f infra/compose/docker-compose.yml config
+      - docker compose --env-file .env.example -f infra/compose/docker-compose.yml config --quiet
 
   compose:server:config:
     desc: Проверяет server/prod-like compose-конфигурацию
     cmds:
-      - docker compose --env-file .env.server.example -f infra/compose/docker-compose.server.yml config
+      - docker compose --env-file .env.server.example --env-file .env.server.secrets.example -f infra/compose/docker-compose.server.yml config --quiet
 
   compose:up:
     desc: Поднимает dev-окружение
@@ -81,15 +78,15 @@ tasks:
 
   check:
     desc: Выполняет основной набор локальных проверок
-    deps:
-      - tools
-      - proto:lint
-      - proto:generate
-      - sqlc:generate
-      - go:test
-      - go:lint
-      - web:install
-      - web:lint
-      - web:build
-      - compose:config
-      - compose:server:config
+    cmds:
+      - task: tools
+      - task: web:install
+      - task: proto:lint
+      - task: generated:check
+      - task: go:test
+      - task: go:lint
+      - task: web:lint
+      - task: web:test
+      - task: web:build
+      - task: compose:config
+      - task: compose:server:config

@@ -84,6 +84,26 @@ func TestLoadConfigRejectsInvalidBootstrapDuration(t *testing.T) {
 	}
 }
 
+func TestLoadConfigDetachedRetentionOverride(t *testing.T) {
+	t.Setenv("AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION", "30s")
+
+	cfg, err := LoadConfig(":8082")
+	if err != nil {
+		t.Fatalf("загрузка выбранного retention: %v", err)
+	}
+	if cfg.MediaDetachedAttachmentRetention != 30*time.Second {
+		t.Fatalf("ожидался retention 30s, получен %s", cfg.MediaDetachedAttachmentRetention)
+	}
+}
+
+func TestLoadConfigRejectsInvalidDetachedRetention(t *testing.T) {
+	t.Setenv("AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION", "later")
+
+	if _, err := LoadConfig(":8082"); err == nil {
+		t.Fatal("ожидалась ошибка для невалидного detached retention")
+	}
+}
+
 func TestLoadConfigRejectsInvalidAttachmentCleanupBatchSize(t *testing.T) {
 	t.Setenv("AERO_MEDIA_ATTACHMENT_CLEANUP_BATCH_SIZE", "many")
 

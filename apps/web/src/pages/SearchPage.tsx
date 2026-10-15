@@ -602,7 +602,7 @@ export function SearchPage() {
 
             <form className={`${styles.form} ${styles.compactForm}`} onSubmit={handlePeopleSubmit}>
               <label className={styles.field}>
-                <span>Login</span>
+                <span>Логин</span>
                 <input
                   autoCapitalize="none"
                   autoComplete="off"
@@ -1098,7 +1098,7 @@ export function SearchPage() {
                   <p className={styles.cardLabel}>Локально</p>
                   <h3 className={styles.pathTitle}>Локальный поиск</h3>
                   <p className={styles.pathDescription}>
-                    Только сообщения, доступные в текущей сессии.
+                    Только сообщения, загруженные на этом устройстве.
                   </p>
                 </div>
                 <span className={styles.metaTag}>
@@ -1116,8 +1116,8 @@ export function SearchPage() {
 
               {encryptedSearchStatus === "loading" && (
                 <InlineState
-                  title="Готовим локальный индекс"
-                  message="Поиск идёт по сообщениям, доступным в этой сессии."
+                  title="Подготавливаем поиск"
+                  message="Поиск идёт по сообщениям, загруженным на этом устройстве."
                 />
               )}
 

@@ -40,8 +40,8 @@ export function AuthPage({ mode }: AuthPageProps) {
         getAuthErrorMessage(
           error,
           isRegister
-            ? "Не удалось завершить регистрацию через gateway."
-            : "Не удалось выполнить вход через gateway.",
+            ? "Не удалось завершить регистрацию. Повторите попытку."
+            : "Не удалось войти. Проверьте данные и повторите попытку.",
         ),
       );
     } finally {

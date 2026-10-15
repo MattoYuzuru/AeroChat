@@ -39,6 +39,7 @@ describe("patchLiveEncryptedDirectChatActivity", () => {
         targetMessageId: null,
         revision: 1,
         createdAt: "2026-03-25T10:07:00Z",
+        serverSequence: "1",
         storedAt: "2026-03-25T10:07:01Z",
         viewerDelivery: {
           recipientCryptoDeviceId: "crypto-1",
@@ -86,6 +87,7 @@ describe("patchLiveEncryptedDirectChatActivity", () => {
           targetMessageId: null,
           revision: 1,
           createdAt: "2026-03-25T10:07:00Z",
+          serverSequence: "1",
           storedAt: "2026-03-25T10:07:01Z",
           viewerDelivery: {
             recipientCryptoDeviceId: "crypto-1",
