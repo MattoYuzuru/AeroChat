@@ -51,6 +51,15 @@ type AttachmentUploadSession struct {
 	StagingObjectKey pgtype.Text        `db:"staging_object_key" json:"staging_object_key"`
 }
 
+type ChatAuthorityRevocationOutbox struct {
+	EventID        uuid.UUID          `db:"event_id" json:"event_id"`
+	GroupID        uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	SourceRevision int64              `db:"source_revision" json:"source_revision"`
+	Reason         string             `db:"reason" json:"reason"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+}
+
 type CryptoDevice struct {
 	ID                     uuid.UUID          `db:"id" json:"id"`
 	UserID                 uuid.UUID          `db:"user_id" json:"user_id"`
@@ -312,6 +321,15 @@ type GroupMembership struct {
 	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
 	IsWriteRestricted bool               `db:"is_write_restricted" json:"is_write_restricted"`
 	WriteRestrictedAt pgtype.Timestamptz `db:"write_restricted_at" json:"write_restricted_at"`
+}
+
+type GroupMembershipAuthorityVersion struct {
+	GroupID   uuid.UUID          `db:"group_id" json:"group_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	Revision  int64              `db:"revision" json:"revision"`
+	Present   bool               `db:"present" json:"present"`
+	Eligible  bool               `db:"eligible" json:"eligible"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type GroupMessage struct {
