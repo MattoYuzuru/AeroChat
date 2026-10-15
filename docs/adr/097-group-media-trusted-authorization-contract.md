@@ -76,6 +76,8 @@ Own Logout останавливает local tracks немедленно неза
 
 ## Проверки и границы slice
 
+Первый state implementation slice добавляет Identity persisted session/device revisions и source outbox в existing revoke transaction; [Identity README](../../services/aero-identity/README.md) описывает migration, tuple, retry и native storage checks. Доставка/ack/outbox retention, private authorization RPC и все media adapters в этот slice не входят. Implementation наличие кода и passed native source checks не заменяет future actual admission/SFU proof.
+
 Pure reference model проверяет exact binding, revoked session/device, reader/removed, authority failure, initial/refreshed identity после revoke, old-generation acknowledgement и pending failed teardown. Это model evidence, а не proof JWT, mTLS, proxy, SFU track limits или сети. Production RTC lobby, contracts/generated code, Identity/Chat handlers, dependencies, runtime и UI в этом slice не меняются; group audio остаётся отсутствующим.
 
 Дальше нужны узкие PR: internal authorization proto/handlers + closed listener tests; pinned SFU/proxy runtime с SDK endpoint matrix; durable grant/admission/teardown integration; lazy browser lifecycle; synthetic и отдельная real-device/NAT/TURN приёмка. Источник privacy остаётся ADR-089: transport audio доступно trusted SFU, E2EE не заявляется.

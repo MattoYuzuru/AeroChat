@@ -29,6 +29,7 @@
 | Область | Основные пути |
 | --- | --- |
 | Auth / social / crypto-device trust | `services/aero-identity/internal/domain/identity`, `internal/storage/postgres`, `apps/web/src/auth`, `apps/web/src/crypto` |
+| Identity source authority revisions/outbox и scoped native checks | [Identity README](../services/aero-identity/README.md) |
 | Browser RPC и realtime | `services/aero-gateway/internal/transport/connect`, `internal/realtime`, `apps/web/src/gateway`, `apps/web/src/realtime` |
 | Сообщения / группы / media | `services/aero-chat/internal/domain/chat`, `internal/storage`, `apps/web/src/chats`, `src/groups`, `src/attachments` |
 | Звонки | `services/aero-rtc-control`, `apps/web/src/rtc` |

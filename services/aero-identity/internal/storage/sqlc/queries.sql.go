@@ -21,7 +21,7 @@ INSERT INTO user_devices (
     last_seen_at,
     revoked_at
 ) VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, user_id, label, created_at, last_seen_at, revoked_at
+RETURNING id, user_id, label, created_at, last_seen_at, revoked_at, authority_revision
 `
 
 type CreateDeviceParams struct {
@@ -50,6 +50,7 @@ func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) (Use
 		&i.CreatedAt,
 		&i.LastSeenAt,
 		&i.RevokedAt,
+		&i.AuthorityRevision,
 	)
 	return i, err
 }
@@ -112,7 +113,7 @@ INSERT INTO user_sessions (
     last_seen_at,
     revoked_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, device_id, token_hash, created_at, last_seen_at, revoked_at
+RETURNING id, user_id, device_id, token_hash, created_at, last_seen_at, revoked_at, authority_revision
 `
 
 type CreateSessionParams struct {
@@ -144,6 +145,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (U
 		&i.CreatedAt,
 		&i.LastSeenAt,
 		&i.RevokedAt,
+		&i.AuthorityRevision,
 	)
 	return i, err
 }
@@ -532,12 +534,14 @@ SELECT
     s.created_at AS session_created_at,
     s.last_seen_at AS session_last_seen_at,
     s.revoked_at AS session_revoked_at,
+    s.authority_revision AS session_authority_revision,
     d.id AS device_id,
     d.user_id AS device_user_id,
     d.label AS device_label,
     d.created_at AS device_created_at,
     d.last_seen_at AS device_last_seen_at,
     d.revoked_at AS device_revoked_at,
+    d.authority_revision AS device_authority_revision,
     u.id AS user_id,
     u.login,
     u.nickname,
@@ -570,12 +574,14 @@ type GetSessionAuthByIDRow struct {
 	SessionCreatedAt         pgtype.Timestamptz `db:"session_created_at" json:"session_created_at"`
 	SessionLastSeenAt        pgtype.Timestamptz `db:"session_last_seen_at" json:"session_last_seen_at"`
 	SessionRevokedAt         pgtype.Timestamptz `db:"session_revoked_at" json:"session_revoked_at"`
+	SessionAuthorityRevision int64              `db:"session_authority_revision" json:"session_authority_revision"`
 	DeviceID                 uuid.UUID          `db:"device_id" json:"device_id"`
 	DeviceUserID             uuid.UUID          `db:"device_user_id" json:"device_user_id"`
 	DeviceLabel              string             `db:"device_label" json:"device_label"`
 	DeviceCreatedAt          pgtype.Timestamptz `db:"device_created_at" json:"device_created_at"`
 	DeviceLastSeenAt         pgtype.Timestamptz `db:"device_last_seen_at" json:"device_last_seen_at"`
 	DeviceRevokedAt          pgtype.Timestamptz `db:"device_revoked_at" json:"device_revoked_at"`
+	DeviceAuthorityRevision  int64              `db:"device_authority_revision" json:"device_authority_revision"`
 	UserID                   uuid.UUID          `db:"user_id" json:"user_id"`
 	Login                    string             `db:"login" json:"login"`
 	Nickname                 string             `db:"nickname" json:"nickname"`
@@ -607,12 +613,14 @@ func (q *Queries) GetSessionAuthByID(ctx context.Context, id uuid.UUID) (GetSess
 		&i.SessionCreatedAt,
 		&i.SessionLastSeenAt,
 		&i.SessionRevokedAt,
+		&i.SessionAuthorityRevision,
 		&i.DeviceID,
 		&i.DeviceUserID,
 		&i.DeviceLabel,
 		&i.DeviceCreatedAt,
 		&i.DeviceLastSeenAt,
 		&i.DeviceRevokedAt,
+		&i.DeviceAuthorityRevision,
 		&i.UserID,
 		&i.Login,
 		&i.Nickname,
@@ -936,7 +944,8 @@ SELECT
     label,
     created_at,
     last_seen_at,
-    revoked_at
+    revoked_at,
+    authority_revision
 FROM user_devices
 WHERE user_id = $1
 ORDER BY created_at DESC
@@ -958,6 +967,7 @@ func (q *Queries) ListDevicesByUserID(ctx context.Context, userID uuid.UUID) ([]
 			&i.CreatedAt,
 			&i.LastSeenAt,
 			&i.RevokedAt,
+			&i.AuthorityRevision,
 		); err != nil {
 			return nil, err
 		}
@@ -1248,7 +1258,8 @@ SELECT
     token_hash,
     created_at,
     last_seen_at,
-    revoked_at
+    revoked_at,
+    authority_revision
 FROM user_sessions
 WHERE user_id = $1
 ORDER BY created_at DESC
@@ -1271,6 +1282,7 @@ func (q *Queries) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([
 			&i.CreatedAt,
 			&i.LastSeenAt,
 			&i.RevokedAt,
+			&i.AuthorityRevision,
 		); err != nil {
 			return nil, err
 		}
@@ -1328,10 +1340,11 @@ func (q *Queries) ListWebPushSubscriptionsByUserID(ctx context.Context, userID u
 	return items, nil
 }
 
-const revokeDevice = `-- name: RevokeDevice :execrows
+const revokeDevice = `-- name: RevokeDevice :one
 UPDATE user_devices
-SET revoked_at = $3
+SET revoked_at = $3, authority_revision = authority_revision + 1
 WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
+RETURNING id, user_id, authority_revision
 `
 
 type RevokeDeviceParams struct {
@@ -1340,17 +1353,22 @@ type RevokeDeviceParams struct {
 	RevokedAt pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
 }
 
-func (q *Queries) RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeDevice, arg.ID, arg.UserID, arg.RevokedAt)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+type RevokeDeviceRow struct {
+	ID                uuid.UUID `db:"id" json:"id"`
+	UserID            uuid.UUID `db:"user_id" json:"user_id"`
+	AuthorityRevision int64     `db:"authority_revision" json:"authority_revision"`
+}
+
+func (q *Queries) RevokeDevice(ctx context.Context, arg RevokeDeviceParams) (RevokeDeviceRow, error) {
+	row := q.db.QueryRow(ctx, revokeDevice, arg.ID, arg.UserID, arg.RevokedAt)
+	var i RevokeDeviceRow
+	err := row.Scan(&i.ID, &i.UserID, &i.AuthorityRevision)
+	return i, err
 }
 
 const revokeDeviceSessions = `-- name: RevokeDeviceSessions :exec
 UPDATE user_sessions
-SET revoked_at = $3
+SET revoked_at = $3, authority_revision = authority_revision + 1
 WHERE device_id = $1 AND user_id = $2 AND revoked_at IS NULL
 `
 
@@ -1365,10 +1383,11 @@ func (q *Queries) RevokeDeviceSessions(ctx context.Context, arg RevokeDeviceSess
 	return err
 }
 
-const revokeSession = `-- name: RevokeSession :execrows
+const revokeSession = `-- name: RevokeSession :one
 UPDATE user_sessions
-SET revoked_at = $3
+SET revoked_at = $3, authority_revision = authority_revision + 1
 WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
+RETURNING id, user_id, device_id, authority_revision
 `
 
 type RevokeSessionParams struct {
@@ -1377,12 +1396,23 @@ type RevokeSessionParams struct {
 	RevokedAt pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
 }
 
-func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeSession, arg.ID, arg.UserID, arg.RevokedAt)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+type RevokeSessionRow struct {
+	ID                uuid.UUID `db:"id" json:"id"`
+	UserID            uuid.UUID `db:"user_id" json:"user_id"`
+	DeviceID          uuid.UUID `db:"device_id" json:"device_id"`
+	AuthorityRevision int64     `db:"authority_revision" json:"authority_revision"`
+}
+
+func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) (RevokeSessionRow, error) {
+	row := q.db.QueryRow(ctx, revokeSession, arg.ID, arg.UserID, arg.RevokedAt)
+	var i RevokeSessionRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DeviceID,
+		&i.AuthorityRevision,
+	)
+	return i, err
 }
 
 const touchSessionAndDevice = `-- name: TouchSessionAndDevice :exec

@@ -343,6 +343,18 @@ type GroupThread struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type IdentityAuthorityRevocationOutbox struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	SubjectKind    string             `db:"subject_kind" json:"subject_kind"`
+	SubjectID      uuid.UUID          `db:"subject_id" json:"subject_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	DeviceID       uuid.UUID          `db:"device_id" json:"device_id"`
+	SessionID      pgtype.UUID        `db:"session_id" json:"session_id"`
+	SourceRevision int64              `db:"source_revision" json:"source_revision"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	Reason         string             `db:"reason" json:"reason"`
+}
+
 type MessageAttachment struct {
 	AttachmentID               uuid.UUID          `db:"attachment_id" json:"attachment_id"`
 	DirectChatMessageID        pgtype.UUID        `db:"direct_chat_message_id" json:"direct_chat_message_id"`
@@ -381,12 +393,13 @@ type UserBlock struct {
 }
 
 type UserDevice struct {
-	ID         uuid.UUID          `db:"id" json:"id"`
-	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
-	Label      string             `db:"label" json:"label"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
-	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	ID                uuid.UUID          `db:"id" json:"id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	Label             string             `db:"label" json:"label"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	RevokedAt         pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	AuthorityRevision int64              `db:"authority_revision" json:"authority_revision"`
 }
 
 type UserFriendRequest struct {
@@ -411,13 +424,14 @@ type UserPasswordCredential struct {
 }
 
 type UserSession struct {
-	ID         uuid.UUID          `db:"id" json:"id"`
-	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
-	DeviceID   uuid.UUID          `db:"device_id" json:"device_id"`
-	TokenHash  string             `db:"token_hash" json:"token_hash"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
-	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	ID                uuid.UUID          `db:"id" json:"id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	DeviceID          uuid.UUID          `db:"device_id" json:"device_id"`
+	TokenHash         string             `db:"token_hash" json:"token_hash"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastSeenAt        pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	RevokedAt         pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	AuthorityRevision int64              `db:"authority_revision" json:"authority_revision"`
 }
 
 type WebPushSubscription struct {
