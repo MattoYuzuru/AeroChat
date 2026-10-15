@@ -5,6 +5,12 @@
 - Задача: [#176](https://github.com/MattoYuzuru/AeroChat/issues/176)
 - Предпосылка: принятый [ADR-089](089-group-audio-sfu-and-admission-boundary.md)
 
+> Текущая реализация: private Identity/Chat APIs и source senders, RTC receiver,
+> registry, registration, guard, coordinator и authorized control factory реализованы.
+> Factory не mounted; provider/token/SFU/admission/teardown workers и browser audio
+> не подключены. Ниже сохранены исходный контекст и контракт; актуальный обзор —
+> в [состоянии проекта](../project-status.md).
+
 ## Контекст
 
 `aero-rtc-control` сегодня проверяет bearer через Identity `GetCurrentProfile` и получает только user ID. Проверка Chat использует bearer текущего пользователя. Эти публичные операции достаточны для lobby, но не дают независимую проверку исходной auth session при reconnect по SFU JWT или reconcile после logout. Сохранять пользовательский bearer и выдавать его за target user запрещено. Доверять session ID или membership, которые прислал browser, также нельзя.
@@ -508,7 +514,7 @@ issuance, connection admission, cleanup ACK и media flag сюда не вход
 
 #### Зависимости и граница результата
 
-Первый узкий slice использует direct `github.com/livekit/protocol v1.52.2-0.20261007103317-a935cd67c29a` (schema commit `a935cd67c29a361744f7c965baaf8f904c0652fd`) и `github.com/golang-jwt/jwt/v5 v5.3.1`, Go 1.27.2. LiveKit server, server-sdk-go и browser SDK сюда не входят. Оба seed assets проверены стандартным Go/SumDB; auth/JWT public API и лицензии прочитаны. Однако exact selected MVS graph, package import closure и vulnerability/build/native gates остаются отдельными prerequisites: просмотр declared requirements или cache bytes не подтверждает closure. Общий candidate из ordinary source и auth adapter требует собственного clean freeze и fresh Go 1.27 gates. Недоступный fresh published-ref guard остаётся prerequisite публикации/release, а не отменяется локальным review.
+Первый узкий slice использует direct `github.com/livekit/protocol v1.52.2-0.20261007103317-a935cd67c29a` (schema commit `a935cd67c29a361744f7c965baaf8f904c0652fd`) и `github.com/golang-jwt/jwt/v5 v5.3.1`, Go 1.27.2. LiveKit server, server-sdk-go и browser SDK сюда не входят. Оба seed assets проверены стандартным Go/SumDB; auth/JWT public API и лицензии прочитаны. Однако exact selected MVS graph, package import closure и vulnerability/build/native gates остаются отдельными prerequisites: просмотр declared requirements или cache bytes не подтверждает closure. Общий candidate из ordinary source и auth adapter требует собственного clean freeze и fresh Go 1.27 gates. Проверка опубликованных refs и CI обязательна перед публикацией/release; локальный review её не заменяет.
 
 Единственный успешный результат — ephemeral internal `ValidatedCandidate`: full immutable grant/room/call/participant + user/session/device/revision/eligibility tuple, verified registered admission instance/fence, checked-at и deadline. Он не является token, grant activation, reusable permit, lease, permission to forward, cleanup ACK или public response. Нет registry/slot/lease/watermark/outbox mutation, mint/refresh endpoint, новой schema/proto, service mount/main/env/feature flag. Raw JWT, decoded payload, bearer, secret и token hash не сохраняются и не логируются. Credential остаётся стандартным bearer: это не device proof-of-possession и не новая crypto scheme.
 

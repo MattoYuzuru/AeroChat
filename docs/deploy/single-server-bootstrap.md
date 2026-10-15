@@ -16,7 +16,7 @@
 - не превращать документ в provisioning кластера, полную Kubernetes-миграцию или zero-downtime orchestration.
 
 Основной production rollout по GitHub Actions описан отдельно в
-[production-rollout runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/production-rollout.md).
+[production-rollout runbook](production-rollout.md).
 Этот документ остаётся source of truth для server preparation, shared edge contract и ручного fallback flow.
 
 ## Модель окружений
@@ -159,7 +159,7 @@
 
 Минимальный пример ресурсов лежит в:
 
-- [aero.keykomi.com.example.yaml](/home/mattoyudzuru/GolandProjects/AeroChat/infra/k8s/shared-edge/aero.keykomi.com.example.yaml)
+- [aero.keykomi.com.example.yaml](../../infra/k8s/shared-edge/aero.keykomi.com.example.yaml)
 
 Перед применением оператор обязан заменить:
 

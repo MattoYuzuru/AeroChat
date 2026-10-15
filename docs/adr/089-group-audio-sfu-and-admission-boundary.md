@@ -37,7 +37,7 @@ Mute/unmute принадлежит пользователю, remote unmute за�
 
 ### Local call capture ownership — Accepted clarification
 
-Статус уточнения: **Accepted** — coordinator принял call-only foundation scope 2026-10-12. Этот раздел не означает, что browser owner уже реализован или group media включён. [План узкого slice](../product/local-call-capture-owner-plan.md) отделяет local capture от authoritative admission.
+Статус уточнения: **Accepted** — coordinator принял call-only foundation scope 2026-10-12. Local browser owner реализован; group media остаётся отдельной незавершённой функцией. [Контракт local owner](../product/local-call-capture-owner.md) отделяет local capture от authoritative admission.
 
 Для direct и будущего group runtime предлагается один local **call-capture slot на app instance**, а не отдельный slot на user. Его lifetime: `capture_pending → retained → closing → released`. Synchronous acquire выполняется до capture; успешный join сохраняет lease до собственного полного teardown. Mute, peer recovery, потеря focus и minimized desktop окно не освобождают lease. Conflict виден пользователю; auto-switch и остановка чужого owner запрещены.
 

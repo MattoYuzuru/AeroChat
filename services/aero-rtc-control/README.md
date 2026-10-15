@@ -1,8 +1,16 @@
-# RTC control и private source receiver
+# RTC control и media foundations
 
-Public lobby/1:1 control остаётся прежним. Registered media migration000001
-применяется embedded bootstrap при normal startup/upgrade. Group audio/SDK/proxy,
-source senders, trusted registration/cleanup ACK и media flag пока отсутствуют.
+Сервис управляет lifecycle/signaling звонков 1:1 и групповым лобби. Для будущего
+group media реализованы persisted grants/operations, private source receiver,
+admission-instance registration, legacy media-slot guard и Leave/End coordinator.
+Identity/Chat source senders и private authority APIs реализованы в своих сервисах.
+
+Authorized public-control factory проверяет свежие private facts и scoped status,
+но не mounted в app/gateway. Provider/token adapter, SFU/admission proxy, trusted
+media teardown ACK, workers и browser group audio ещё не подключены. Private
+listeners и delivery по умолчанию выключены; публичные media stubs возвращают
+Unimplemented. Контракты — [ADR-089](../../docs/adr/089-group-audio-sfu-and-admission-boundary.md)
+и [ADR-097](../../docs/adr/097-group-media-trusted-authorization-contract.md).
 
 ## Private source events
 
@@ -18,7 +26,7 @@ event/subject/user/device IDs, positive revision); Chat — pair/resulting denie
 eligibility epoch, оба original audit reason канонически group-denied. Source
 audit reason/time не передаются; received_at server-owned. Caller producer должен
 получать tuple из собственных committed outbox rows, не browser authorization
-booleans. Source sender worker этим slice не реализован.
+booleans. Source sender workers реализованы в Identity и Chat; по умолчанию они выключены.
 
 DURABLY_APPLIED означает RTC inbox/watermark/operation commit. Same canonical
 event replay получает тот же operation; changed payload conflict. Own-domain
@@ -27,7 +35,7 @@ receipt lookup содержит лишь event ID, не generic subject/operatio
 NO_MATCHING_REGISTRY_GRANTS factual empty registry set: не SFU/RTP absence proof.
 Nonempty target всегда MEDIA_PENDING в этом receiver, даже если journal помечен
 complete тестовой моделью. Реальный media completion требует позднего reviewed
-trusted SDK/proxy adapter; публичный status/polling — отдельный slice.
+trusted SDK/proxy adapter; authorized control adapter описан ниже и пока не mounted в public app/gateway.
 
 Default off. Explicit runtime owner config:
 
@@ -43,22 +51,6 @@ URI/method allowlist не расширяется env. Server leaf требует
 private/public server смерть останавливает оба. Request budget максимум5s,
 body/response4096, headers8192, read5s/write6s/idle30s. Logs fixed method/status/
 duration/static TLS rejection без payload identifiers/URI query/credentials.
-
-## Source checks
-
-Pinned Go1.25.8/GOTOOLCHAIN=go1.25.8; future27 combined gate отдельный. Профиль
-AERO_RTC_TEST_DATABASE_ENV_FILE указывает approved task-owned RTC env path;
-значения DSN не выводить. Только new rtc_test_UUID в dedicated aerochat_rtc_test:
-absence+atomic CREATE, exact search_path, cleanup только successfully-created own
-schema. Private TLS listeners/certs ephemeral own localhost; runtime owner
-delivery управляет retained Compose и shared ports, изменений стенда нет.
-
-После source freeze — bounded whole unit/race/coverage/vet/lint/build, actual
-native16 storage groups и TLS method-domain matrix, nonempty actual go-test JSON/
-SKIP0; pinned Buf/SQLC twice/drift0. Source generation меняет files и сама не
-является PASS receipt. Source prep/typed fixture не доказывает group sound,
-physical devices/NAT/TURN: UNVERIFIED. До flag отдельный compatibility gate
-закрывает все legacy Start/Join/Leave/End/liveness heldmedia bypass.
 
 ## Admission instance registration foundation
 
@@ -90,17 +82,9 @@ runtime owner включает отдельно. Budget5s/body4K/header8K/read5/
 staticlogs безIDs/nonce/fingerprint/keys/query/body. Public/source/registration
 servers cancel/shutdown coupled; registration requestctx наследует wrapperctx.
 
-Source prep started from reviewed UNVERIFIED Identity→Chat local parents.
-No generation/native/compile/runtimePASS из этого README. Before fullgates/PR
-ordinary merge generated+verified+published parents, exactcleanfreeze, bounded
-heavy only; actualnamedPG/TLS/upgrade/cancel cases/testSKIP0 и twicepinnedBufSQLC
-drift0 required. Native only approved fresh rtc_test_UUID schemas +own TLS/certs,
-no sharedCompose/S3/SDK/download/flag. Pending media cleanup/real device/NAT/TURN/
-group sound remain UNVERIFIED.
+## Guard для legacy media slot
 
-## План guard foundation для legacy mic-slot
-
-Source preparation отдельного slice по ADR097 — dormant constructor policy,
+Реализована dormant constructor policy по ADR-097,
 default off, без env activation. `NewRepositoryWithMediaSlotGuard` и
 `NewMediaStoreWithMediaSlotGuard` явно выбирают policy; обычные constructors,
 main и config её не включают. Она сериализует legacy Create/Join и group Reserve под общим
@@ -117,113 +101,46 @@ Guard охватывает legacy Leave/End, ended-orphan repair, stale conflict
 удерживает slot. Typed pending превращается в sanitized FailedPrecondition,
 без successful left/ended response; существующий flag-off lobby/direct/stale
 lifecycle сохраняется. В этом foundation cleanup не начинается и Leave/End
-не объявляется принятым к исполнению. Source preparation ещё не native PASS.
+не объявляется принятым к исполнению. Durable Leave/End coordinator описан ниже.
 
-WS close, mute и expiry токена не являются SFU teardown ACK. Future matching
-proxy/SFU acknowledgement и отдельный durable call-wide End/Leave coordinator
-нужны до media enable; one-grant finalizer не расширяется скрыто. Public status,
-SDK/proxy/worker/UI/audio исключены. До generation/full checks/publication —
-ordinary merge generated+verified+published Identity→Chat→registration parents,
-новый clean freeze и собственные receipts; прежние PASS не переносятся.
+## Durable Leave / End coordinator
 
-## Accepted план public media Leave / End coordinator
+`MediaControlStore` сохраняет immutable parent intent, child/participant/room
+snapshots и pending history. Registered migrations 000000–000003 применяются
+embedded bootstrap при startup/upgrade. Open End barrier удерживает admission
+и terminal transition даже при нуле held grants/participants до matching room ACK.
+Child release допустим только после полного собственного action ACK; call/room
+завершает parent после всех exact child и room journals. Empty UNKNOWN остаётся
+pending. DB-clock claim/lease/fence/attempt CAS исключает stale worker completion.
 
-План принят координатором 2026-10-12 по ADR097; additive контракты сгенерированы
-и reviewed, но compile/native/runtime acceptance ещё не завершена. Additive commands с call_id/request_id и
-fresh-authorized operation status, immutable parent intent + one-grant children
-и room-generation cleanup journal. Live authority/provider adapters не реализованы.
-Own Leave требует exact active auth session/device binding, включая own
-reader/removed subject. End разрешён call creator +fresh eligible Chat role;
-GroupOwner/admin не получает это право автоматически. Новая active own session
-может читать minimal own Leave status без roster; revoked/anonymous bearer нет.
+Actor/RoomClaim и journal ACK — model facts. Они не доказывают фактическое
+удаление participant/room в SFU. WS close, mute, HTTP200 и token expiry не являются
+trusted teardown ACK; pending history не удаляется. Default lobby/direct behavior
+сохраняется; отдельный media feature не включён.
 
-OPEN END INTENT удерживает admission/terminal barrier даже при0held/0participants
-и всех grants REVOKED, пока selected room ACK pending. Legacy End/last-Leave/
-stale/orphan paths не пишут premature ENDED/CLOSED; same-group Start и все
-Join/Reserve/Activate/RegisterLease/reconnect закрыты. Child release допустим
-только после full own ACK, parent End завершается лишь после ALL exact child
-и room-generation trusted ACK в atomic finalizer. Empty UNKNOWN не complete.
+## Authorized media control factory
 
-Fresh lookup вне TX и sorted parents→rooms→users/recheck внутри не обещают
-distributed auth atomicity. Local Leave/mute/WS close/providerHTTP200/expiry не
-ACK; new leaf не наследует old targets, rotation unsupported. Pending history
-neverdelete. Existing lobby/direct off-mode неизменен; SDK/proxy/workers/UI/
-public enable не входят в coordinator foundation. Code только после Accepted
-ADR review/commit, own fresh gates и verified generated published parent merges.
+Фабрика использует opaque bearer через private Identity и свежие Chat facts.
+Own minimal status и сохранённый Leave replay доступны после fresh active Identity
+без fabricated Chat role. Новый Leave требует exact session/device held binding;
+End требует call creator и текущий eligible Chat subject. Отозванный/anonymous
+bearer отклоняется. Общий budget 5s начинается до Connect decode; body cap 4KiB,
+read/write deadlines и локальный guard ограничивают запрос до journal mutation.
+UNKNOWN provider facts возвращают PENDING, даже если reference model journal complete.
 
-GroupMediaControlService proto расположен в `proto/aerochat/rtc/v1/
-group_media_control_service.proto`. Он не регистрируется app/gateway; все три
-typed stubs — Unimplemented. Existing RtcControlService и gateway interface
-не меняются. `MediaControlStore` принимает validated model Actor/RoomClaim facts,
-а не live Identity/Chat response или trusted SFU/proxy ACK. Reference journal
-complete в native fixture не подтверждает звук/provider absence и не отдаётся
-public клиенту. Authorization/SDK/private ACK adapters — отдельные узкие slices.
+Фабрика не подключена к public app/gateway. Это не provider/token adapter,
+полный Chat main/Compose или реализация группового звука.
 
-Registered additive migration000003 применяется обычным embedded bootstrap;
-ledger теперь содержит четыре RTC migrations. Она удерживает immutable
-intent/children/participants/room targets и pending history. Persisted open End
-barrier действует независимо от constructor policy, включая zero-held phase.
-Own child finalizer освобождает собственный slot после full model action ACK,
-но call/room завершает только parent после всех child и room journals. Empty
-unknown intent не становится complete. Room claim использует DB clock,15s lease
-и guarded monotonic owner/fence/attempt CAS; это не benchmark и не worker loop.
+## Проверки
 
-Source tests подготовлены для exact targets/replay/status, observed End↔Join/
-lease barriers, zero-held pending End, rollback/cancel/fence expiry/exhaustion,
-other-room progress и actual registered003 upgrade/repeat retained history.
-Они ещё UNRUN. Старые pre-upgrade fixtures seed primitive SQLC queries под old
-schema; current writers вызываются после registered bootstrap, без42P01 bypass.
-Native profiles/schema ownership/heavy queue прежние; до запуска — verified
-published Identity→Chat→registration→guard ordinary merges и fresh freeze.
+Go 1.27.2; команды и ownership — в [development](../../docs/development.md).
+PostgreSQL schemas, selectors и profiles — в [storage testing](internal/storage/postgres/README.md).
+Native public-control scope использует настоящий Identity main и Chat test-host
+с production domain/repository/private TLS listener. Fixture не запускает Redis/S3.
+Ей нужны exact-source binaries и собственный PostgreSQL profile; выбранный native
+scope завершается ошибкой при отсутствии profile и не выдаётся за unit PASS.
 
-Первый whole check `check-wtqqnh9q` на generated HEAD `4e6ff3e` завершился
-compile FAIL до native tests: SQLC возвращает nullable `pgtype.Bool` для
-`MediaControlChildrenReady`, а source ожидал `bool`. Исправление учитывает
-`Valid` и `Bool`: неизвестный/false result сохраняет pending и не позволяет
-room action обойти children barrier. Generated SQL/proto не редактируются.
-Исторический FAIL сохраняется; native/provider completion не подтверждена
-и требует нового whole check на clean исправленном HEAD.
-
-Следующий whole check `check-ad__pjcv` на `fe1bbb7` собрал production
-RTC binary с exact-source VCS, но test package PostgreSQL не скомпилировался:
-в `media_control_test.go` остался неиспользуемый `pgxpool` import. Он удалён
-без изменения assertions. Остальные выполненные tests не принимают этот
-package: native coordinator и inherited PostgreSQL cases ещё UNRUN; полный
-результат требует нового clean-source whole check.
-
-Accepted adapter refinement 2026-10-12: own minimal status использует отдельный
-identity-only OwnStatusSubject/read после fresh active Identity, без требования
-Chat role/roster и без fabricated RoleRemoved/Reader при NOT_FOUND/unavailable.
-Saved same-user Leave replay из новой active session возвращает original
-minimal scoped receipt, не создаёт target и не меняет replacement generation;
-новый Leave требует exact current session/device held binding. End status
-по-прежнему fresh creator +eligible Chat role. Revoked/anonymous bearer denied.
-Model-complete Leave не становится public media COMPLETE: при UNKNOWN provider
-facts adapter возвращает media_PENDING. Уточнение пока docs-only, actual
-authorization/read adapters и SDK/admission/proxy ACK не реализованы.
-
-### Следующий адаптер авторизации media control
-
-Уточнение ADR-097 принято координатором 2026-10-12 до реализации. Отдельная
-фабрика без подключения к app/gateway должна проверять настоящий opaque bearer
-через private Identity и свежие Chat facts, разрешать own status/replay без
-подмены роли и возвращать PENDING до подтверждения provider cleanup. Общий
-бюджет 5s начинается до Connect decode; нужны actual read/write deadlines,
-body cap 4KiB и отдельные server limits для raw headers/cleanup. Обязательный
-локальный guard проверяется перед первой journal mutation и обоими commit paths.
-
-Основание coordinator `64c0251` прошло local whole `check-w3lhrem2`: 41 этап,
-768 actual PASS events, без failure/TestSKIP. Это не проверка нового адаптера
-или SFU. Его code/native scopes пока UNIMPLEMENTED/UNRUN. GitHub publication
-заблокирована ответом 403 account suspended; новые локальные проверки отдельно
-фиксируют exact source, сохраняя внешний publication gate BLOCKED. Существующие
-production stubs/feature flag остаются прежними; SDK, SFU и UI относятся к следующим slices.
-
-Native scope адаптера отдельно использует production Identity main и Chat
-test host с production PG repository/domain/group writers/private TLS listener,
-при максимуме трёх одновременных участников вместе с RTC test. Test-only typing
-storage очищает только отсутствующие entries при reader/remove; auth facts и
-roles остаются настоящими. Проверка не запускает Redis/S3 и не подтверждает
-полный Chat main/Compose; полный стек проверяется отдельной браузерной приёмкой.
-Accepted границы и allowlist зафиксированы в ADR-097 до fixture code. Этот новый
-native scope пока UNRUN.
+Тесты подтверждают соответствующий source/runtime scope. Исторические exact-SHA
+результаты — в [candidate report](../../docs/audits/2026-10-13-integration-candidate.md),
+актуальные ограничения и ручная приёмка — в [project status](../../docs/project-status.md).
+Physical audibility, devices/NAT/TURN и SFU cleanup остаются отдельной проверкой.

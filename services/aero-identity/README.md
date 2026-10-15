@@ -8,7 +8,7 @@ Public Identity API сохраняет auth/session/device semantics [ADR-006](.
 
 Session revoke/Logout выполняет NULL→revoked CAS, increment revision и source outbox insert в одной transaction. Device revoke атомарно меняет device и все её active sessions; один device event покрывает всю device. Ранее revoked sessions сохраняются. Повторный storage CAS не increment/version/event; public Logout retry с уже revoked bearer сохраняет прежний `unauthenticated` результат.
 
-Outbox содержит только server IDs, subject kind, revision, timestamp и static reason; bearer/hash/profile/key/audio/payload не сохраняются. Событие сохраняется до будущей delivery независимо от удаления source rows. Default-disabled Identity delivery journal/client/worker описан ниже; media ack и retention/capacity policy ещё не реализованы; наличие строки не означает завершённый media teardown. RTC grants/proxy/SFU/browser group audio отсутствуют, media feature не включена.
+Outbox содержит только server IDs, subject kind, revision, timestamp и static reason; bearer/hash/profile/key/audio/payload не сохраняются. Событие сохраняется независимо от удаления source rows. Identity delivery journal/client/worker реализован и по умолчанию выключен; trusted media teardown ACK и retention/capacity policy остаются отдельными этапами. RTC grant journal реализован, но proxy/SFU/browser group audio не подключены.
 
 ## Private session authority
 
@@ -39,13 +39,13 @@ agent-dev run --cwd "$PWD" --resource heavy -- go test -race -cover -count=1 -ta
 agent-dev run --cwd "$PWD" --resource heavy -- go vet -tags=integration ./...
 ```
 
-Использовать Go1.25.8 с корректным PATH/`GOTOOLCHAIN=go1.25.8`, pinned SQLC1.30.0 и финальный committed HEAD. Native state fixture принимает только dedicated local `aerochat_auth_test` на loopback25432, создаёт собственную новую `rtc_authority176_UUID` schema, проверяет отсутствие перед CREATE и удаляет только её. Existing151 integration cases используют собственные `identity_test_UUID` schemas. Docker/DB ownership и общий heavy lock согласуются по [development runbook](../../docs/development.md); эти команды не дают права на production или чужую БД.
+Использовать Go1.27.2 с корректным PATH/`GOTOOLCHAIN=go1.27.2`, pinned SQLC1.30.0 и финальный committed HEAD. Native state fixture принимает только dedicated local `aerochat_auth_test` на loopback25432, создаёт собственную новую `rtc_authority176_UUID` schema, проверяет отсутствие перед CREATE и удаляет только её. Existing151 integration cases используют собственные `identity_test_UUID` schemas. Docker/DB ownership и общий heavy lock согласуются по [development runbook](../../docs/development.md); эти команды не дают права на production или чужую БД.
 
-Integration cases проверяют clean/legacy migration, session/logout/device source transactions, retry/concurrency с отдельными PostgreSQL sessions и наблюдаемыми lock barriers, rollback при outbox/session-step fault, revision boundary и сохранение события после reconnect. Отдельная actual generated Connect/TLS+PostgreSQL fixture проверяет свежий revoke на том же connection; TLS negative matrix использует test-only standard x509 CA/certs. Это local source/caller evidence; оно не доказывает delivery, distributed atomic admission, SFU, audio или real device/network flow.
+Integration cases проверяют clean/legacy migration, session/logout/device source transactions, retry/concurrency с отдельными PostgreSQL sessions и наблюдаемыми lock barriers, rollback при outbox/session-step fault, revision boundary и сохранение события после reconnect. Отдельная actual generated Connect/TLS+PostgreSQL fixture проверяет свежий revoke на том же connection; TLS negative matrix использует test-only standard x509 CA/certs. Эта read-method fixture не доказывает sender delivery; для него ниже указан отдельный scope. Distributed atomic admission, SFU/audio и real device/network flow остаются отдельной приёмкой.
 
 ## Rollback и следующие этапы
 
-Старый binary не записывает новые revisions/outbox: rollback на него допустим только при media off и отсутствии active media grants. Schema, events и revisions при rollback не удаляются. До будущего media enable все authority writers должны поддерживать source outbox. Две private Identity read methods реализованы в этом slice; Chat authority, durable dispatch/operation status, retention/backpressure и RTC media cleanup внедряются отдельными reviewable PR. Успешный auth revoke не объявляется завершённым audio teardown.
+Старый binary не записывает новые revisions/outbox: rollback на него допустим только при media off и отсутствии active media grants. Schema, events и revisions при rollback не удаляются. До будущего media enable все authority writers должны поддерживать source outbox. Private Identity/Chat read methods и durable dispatch/operation journals реализованы. Provider wiring, retention/backpressure и trusted RTC media cleanup остаются отдельными этапами. Успешный auth revoke не объявляется завершённым audio teardown.
 
 ## Identity revocation sender
 
@@ -81,10 +81,10 @@ Runtime enable/cert provisioning назначает owner отдельно, medi
 
 Actual sender fixture требует root-reviewed exact RTC binary внеGit и только
 new own auth rtc_authority176_UUID +RTC rtc_test_UUID schemas по approved
-profiles/loopback25432. Native tests должны доказать committed source→actual
+profiles/loopback25432. Native tests проверяют committed source→actual
 TLS receiver, replay/crash/takeover/quarantine/counters/migration/rollback и
-no payload logs. Source prep/generation не являются passed gate; публикация
-требует clean committed exactHEAD full receipts/actualtestSKIP0. Physical audio,
+no payload logs. Результат относится к exact HEAD и выбранному scope; native evidence требует
+реально выполненных cases без пропусков. Physical audio,
 NAT/TURN и SDK/proxy teardown остаются UNVERIFIED.
 
 Для sender integration нужны `AERO_RTC_TEST_DATABASE_ENV_FILE` с PostgreSQL URL,
@@ -96,13 +96,11 @@ NAT/TURN и SDK/proxy teardown остаются UNVERIFIED.
 Перед запуском fixture повторно разбирает передаваемый URL и проверяет привязку
 к своей схеме. Значения профиля и URL в вывод не попадают.
 
-Go 1.25.8 не записывает VCS settings при сборке из checkout с `.git`-файлом
-([Go #58218](https://go.dev/issue/58218)). Для такого native gate создаётся новый
+Native gate требует проверяемых VCS settings. Для изолированной сборки создать
 private clone через `git clone --no-local --no-hardlinks --no-checkout`, затем
-`git checkout --detach` на проверенный SHA. До и после сборки проверяются SHA,
-Git tree, clean status и отсутствие object alternates. `GOWORK` явно указывает
-на `go.work` этого clone, `go env GOMOD` — на его RTC-модуль. Бинарник собирается
-тем же Go 1.25.8 с `-buildvcs=true` вне clone; `go version -m` должен показать
-точный package path, `vcs.revision` и `vcs.modified=false`. Исходный worktree
-тоже остаётся чистым на том же SHA. Отсутствие VCS metadata не принимается как
-успешная проверка происхождения бинарника.
+`git checkout --detach` на проверенный SHA. До и после сборки проверить SHA,
+Git tree, clean status и отсутствие object alternates. `GOWORK` должен указывать
+на `go.work` этой копии. Собирать Go 1.27.2 с `-buildvcs=true` вне source;
+`go version -m` должен показать точный package path, `vcs.revision` и
+`vcs.modified=false`. Отсутствие metadata не считается успешной проверкой
+происхождения. Исторические результаты — в [отчёте](../../docs/audits/2026-10-13-integration-candidate.md).

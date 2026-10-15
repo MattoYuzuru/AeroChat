@@ -29,7 +29,7 @@ Workflow не занимается:
 Перед автоматизированным rollout должны быть завершены предыдущие platform slices:
 
 - сервер подготовлен по
-  [single-server bootstrap runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/single-server-bootstrap.md);
+  [single-server bootstrap runbook](single-server-bootstrap.md);
 - deploy directory на VPS уже существует и содержит checkout выбранного release source SHA;
 - на VPS уже есть `.env.server` и `.env.server.secrets`;
 - compose stack AeroChat уже умеет подниматься на
@@ -163,7 +163,7 @@ Workflow намеренно не трогает:
 Рекомендуемый first launch checklist:
 
 1. Подготовить VPS и cluster edge по
-   [single-server bootstrap runbook](/home/mattoyudzuru/GolandProjects/AeroChat/docs/deploy/single-server-bootstrap.md).
+   [single-server bootstrap runbook](single-server-bootstrap.md).
 2. Проверить, что deploy directory на VPS содержит актуальный checkout этого operational slice.
 3. Проверить прямые upstream'ы:
 
@@ -221,7 +221,7 @@ ss -lntup | rg ':3478|:49160|:49200'
 13. При ручном API smoke для `CreateAttachmentUploadIntent` проверить, что presigned URL указывает на
     `https://media.<zone-domain>`,
     а не на внутренний `minio:9000`, основной application domain или nested host вида `media.<application-host>`.
-14. Зафиксировать предыдущий known-good tag и текущий deployed tag в операторском журнале или release notes.
+14. Зафиксировать предыдущие known-good и текущие deployed manifest digest/source SHA в операторском журнале или release notes; сохранить metadata с пятью image digests по [recovery runbook](data-recovery.md).
 
 Если register/login падают после успешного `upstream`- и `HTTPS`-smoke, отдельно проверь логи bootstrap:
 

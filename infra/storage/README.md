@@ -12,7 +12,7 @@ Source images следуют [ADR-087](../../docs/adr/087-pinned-storage-source-
 4. Собрать оба targets из immutable sources и checked overlay с `-mod=readonly`, `GOTOOLCHAIN=local`. Зафиксировать actual Go и linked dependency versions извлечённых бинарников, binary/image/config SHA-256 и source checkpoint.
 5. Проверить tiny private S3 CRUD/readiness на отдельном owned runtime. Проверка прочитанного lifecycle rule не доказывает истечение реального суточного TTL. Existing data и shared stack не использовать как disposable fixture.
 
-Baseline assessment неизменённых sources на Go1.27.2/Linux-arm64 дала 38 called advisory IDs MinIO и 11 mc; это callgraph diagnosis, не доказанная эксплуатация. Пока effective overlay и итоговые receipts не подготовлены, maintenance результат остаётся pending.
+Baseline assessment неизменённых sources на Go1.27.2/Linux-arm64 дала 38 called advisory IDs MinIO и 11 mc; это callgraph diagnosis, не доказанная эксплуатация. На exact f68 effective overlay прошёл actual source scans без called findings, отдельные cold builds и tiny private S3 runtime; подробности сохранены в [remediation](../../docs/audits/2026-10-11-remediation.md). Overlay включён в [candidate 13 октября](../../docs/audits/2026-10-13-integration-candidate.md). Свежие candidate provenance/parser tests не являются повторной сборкой, scan или runtime PASS. GO-2026-5932 остаётся module-only residual; ADR-087 license/operator decision остаётся Proposed.
 
 ## Источники внутри image
 
@@ -26,7 +26,7 @@ Cold acquisition проверяется в новом owned BuildKit state с я
 
 Тяжёлые проверки используют shared `heavy`; runtime mutations — отдельный exact project lock. Env, credentials, raw scanner logs и receipts остаются вне Git. Останавливаются только собственные fixture processes/containers; данные, архивы и builder state сохраняются до отдельного согласованного cleanup.
 
-Effective overlay включает gRPC1.83.2 — fixed patch для GO-2026-6443 (missing authority/Host server panic). Previous source/compiler receipt относится к overlay с1.83.1; после patch нужна свежая проверка. No-fixed GO-2026-5932 остаётся только module inventory неиспользуемого OpenPGP, без ID/package исключений.
+Effective overlay включает gRPC1.83.2 — fixed patch для GO-2026-6443 (missing authority/Host server panic). Overlay с1.83.2 прошёл source scan `check-lnvg9i0g`, отдельные cold builds и runtime09; результаты относятся к source f68, не к произвольной новой сборке. No-fixed GO-2026-5932 остаётся только module inventory неиспользуемого OpenPGP, без ID/package исключений.
 
 В Storage Bootstrap CI `check-vulnerabilities.py` проверяет обе source closure для Linux/amd64 до cold image build. Компилятор и scanner берутся из общего `infra/go-toolchain.json`; parser и called-symbol threshold используются из application gate, без отдельной политики исключений. Archive/original module checks выполняются до effective overlay; scanner запускается readonly. Даже при ошибке первого компонента gate сохраняет результат второго и отклоняет общий результат. Raw scanner output и status загружаются как CI artifact при неуспехе тоже. Локальная Linux/arm64 проверка относится к другому target и фиксируется отдельно.
 

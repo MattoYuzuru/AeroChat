@@ -1,5 +1,7 @@
 # Аудит готовности AeroChat — 11 октября 2026
 
+> Исторический аудит ревизии `eab87dd`. Текущие возможности и ограничения — в [состоянии проекта](../project-status.md); исправления — в [сводке](2026-10-11-remediation.md).
+
 Исходная ревизия: `eab87dd548ceddbf99570fb275eec39979f576e1`; ветка изменений: `codex/audit-portfolio-readiness`. Проверены локальный checkout, отдельный compose project `aerochat-audit`, браузерные test users и bounded fixtures. Production, SSH и другие проекты не входили в scope.
 
 **Итог:** рабочие базовые сценарии общения и shell подтверждены локально; готовность надёжного повседневного мессенджера со всеми заявленными звонками не подтверждена. Найдены дефекты realtime/session, RTC playback/lifecycle/recovery, media/self-host, сообщений и mobile layout. Всего создано **30 подробных issues** и [общий tracker](https://github.com/MattoYuzuru/AeroChat/issues/178); отсутствие всех багов этот аудит не доказывает.
@@ -103,45 +105,6 @@ Group lobby завершился без Leave/End:
 | Jobs / PWA | Scaffold jobs и текущие manifest/notification SW boundaries | Offline/runtime sync и полноценная job orchestra intentionally incomplete |
 
 Автоматическая проверка остановила backend-сабагента при подготовке security воспроизведений с сообщением о возможном cybersecurity risk. Они не перенимались другим агентом; в issues соответствующие claims ограничены source/SQL evidence. Обычные functional browser/API/fault checks и defensive remediation planning продолжились.
-
-## Очередь и следующая сессия
-
-| Issue | Приоритет | Область | Основание |
-| --- | --- | --- | --- |
-| [#149](https://github.com/MattoYuzuru/AeroChat/issues/149) — Realtime: прекращать доставку после отзыва сессии | P1 | security | code/SQL-confirmed; runtime regression pending |
-| [#150](https://github.com/MattoYuzuru/AeroChat/issues/150) — Web Push: ограничить URL подписок и исходящие запросы | P1 | security/media | code/SQL-confirmed; runtime regression pending |
-| [#151](https://github.com/MattoYuzuru/AeroChat/issues/151) — Crypto registry: сделать bootstrap первого устройства атомарным | P1 | security | code/SQL-confirmed; runtime regression pending |
-| [#152](https://github.com/MattoYuzuru/AeroChat/issues/152) — Media: ограничить upload и сделать final attachment неизменяемым | P1 | media | code/SQL-confirmed; runtime regression pending |
-| [#153](https://github.com/MattoYuzuru/AeroChat/issues/153) — RTC: сделать Join/Leave/End атомарными с participant slots | P1 | rtc/backend | code/SQL-confirmed; runtime regression pending |
-| [#154](https://github.com/MattoYuzuru/AeroChat/issues/154) — RTC: проверять актуальное право адресата получать signaling | P2 | rtc/backend | code/SQL-confirmed; runtime regression pending |
-| [#155](https://github.com/MattoYuzuru/AeroChat/issues/155) — Auth: отклонять malformed session IDs до repository panic | P2 | security | code/SQL-confirmed; runtime regression pending |
-| [#156](https://github.com/MattoYuzuru/AeroChat/issues/156) — Chat: отвязать ordering и read watermark от часов клиента | P2 | chat/backend | code/SQL-confirmed; runtime regression pending |
-| [#157](https://github.com/MattoYuzuru/AeroChat/issues/157) — RTC audio: прекратить повторный play/pause на каждом render | P1 | rtc/frontend | bounded React/handler reproduction |
-| [#158](https://github.com/MattoYuzuru/AeroChat/issues/158) — RTC capture: отменять поздний start/join после закрытия окна | P1 | rtc/frontend | bounded React/handler reproduction |
-| [#159](https://github.com/MattoYuzuru/AeroChat/issues/159) — RTC recovery: поздний ICE не должен отменять retry | P2 | rtc/frontend | bounded React/handler reproduction |
-| [#160](https://github.com/MattoYuzuru/AeroChat/issues/160) — Read/unread: не читать сообщения в свёрнутых окнах | P2 | frontend | source-confirmed; full browser regression pending |
-| [#161](https://github.com/MattoYuzuru/AeroChat/issues/161) — Composer: сохранять новый draft и исключить повторный Enter send | P2 | frontend | bounded React/handler reproduction |
-| [#162](https://github.com/MattoYuzuru/AeroChat/issues/162) — Group lobby: поддерживать liveness joined участников | P2 | rtc/frontend | source-confirmed; full browser regression pending |
-| [#163](https://github.com/MattoYuzuru/AeroChat/issues/163) — Self-host: восстановить cold-cache object-storage bootstrap | P1 | devops | local runtime failure |
-| [#164](https://github.com/MattoYuzuru/AeroChat/issues/164) — Release: публиковать images только после gates точного SHA | P1 | devops | release workflow gap |
-| [#165](https://github.com/MattoYuzuru/AeroChat/issues/165) — Media presign: получать bucket region через внутренний S3 endpoint | P1 | media | ordinary upload500 reproduced |
-| [#166](https://github.com/MattoYuzuru/AeroChat/issues/166) — Readiness: отражать отказ media storage и восстановление | P2 | devops | bounded owned runtime fault |
-| [#167](https://github.com/MattoYuzuru/AeroChat/issues/167) — DX: упорядочить зависимые шаги task check | P2 | devops | workflow semantics |
-| [#168](https://github.com/MattoYuzuru/AeroChat/issues/168) — Codegen: закрепить Buf plugins и проверять generated drift | P1 | devops/contracts | generation incompatibility reproduced |
-| [#169](https://github.com/MattoYuzuru/AeroChat/issues/169) — Rollout: сохранить known-good state и проверить DB-aware rollback | P2 | devops | design/recovery risk |
-| [#170](https://github.com/MattoYuzuru/AeroChat/issues/170) — Mobile: удержать composer в viewport и расширить ввод | P2 | frontend | confirmed browser320px |
-| [#171](https://github.com/MattoYuzuru/AeroChat/issues/171) — UX: убрать неработающие темы и техническую product copy | P2 | frontend/product | source/UI-confirmed |
-| [#172](https://github.com/MattoYuzuru/AeroChat/issues/172) — Accessibility: согласовать keyboard focus окон и dialogs | P2 | frontend | source-confirmed gap; keyboard runtime pending |
-| [#173](https://github.com/MattoYuzuru/AeroChat/issues/173) — Performance: разделить загрузку shell и тяжёлых приложений | P2 | frontend | policy debt; performance not measured |
-| [#174](https://github.com/MattoYuzuru/AeroChat/issues/174) — Media config: передавать detached retention в оба Compose runtime | P2 | media/devops | explicit gap/maintenance; see body |
-| [#175](https://github.com/MattoYuzuru/AeroChat/issues/175) — Dependencies: обновить React Router с advisory reachability review | P2 | frontend/devops | explicit gap/maintenance; see body |
-| [#176](https://github.com/MattoYuzuru/AeroChat/issues/176) — Group calls: определить и реализовать реальный media flow | P1 target | architecture/rtc | explicit gap/maintenance; see body |
-| [#177](https://github.com/MattoYuzuru/AeroChat/issues/177) — Auth: определить abuse limits и bounded resource admission | P1 target | security/devops | explicit gap/maintenance; see body |
-
-
-| [#179](https://github.com/MattoYuzuru/AeroChat/issues/179) — Go toolchain/dependency lifecycle и govulncheck triage | P1 maintenance | devops/dependencies | scanner candidates; runtime triage |
-
-Пять исполнителей: auth/trust, media/egress, RTC, frontend/UX, delivery/runtime. Запускать не больше доступных concurrent slots; пересечение `ChatsPage`/RTC изменений сериализовать. Один issue → один узкий PR. Подробный [промпт координатора](2026-10-11-next-session.md) содержит порядок, runtime ownership и критерии окончания.
 
 ## Документация и использованные навыки
 

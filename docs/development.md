@@ -1,6 +1,6 @@
 # Разработка AeroChat
 
-Правила изменений находятся в [AGENTS.md](../AGENTS.md), карта контекста — в [навигаторе](README.md). Команды ниже сверены с [Taskfile](../Taskfile.yml), [web package](../apps/web/package.json) и [CI](../.github/workflows/ci.yml); фактические результаты проверок фиксируются отдельно в [аудите](audits/2026-10-11-readiness.md).
+Правила изменений находятся в [AGENTS.md](../AGENTS.md), карта контекста — в [навигаторе](README.md). Команды ниже сверены с [Taskfile](../Taskfile.yml), [web package](../apps/web/package.json) и [CI](../.github/workflows/ci.yml); актуальные границы проверок — в [состоянии проекта](project-status.md), результаты конкретных SHA — в GitHub Actions.
 
 ## Инструменты
 
@@ -93,6 +93,8 @@ Task по умолчанию отдаёт precedence inherited environment: root
 
 Go unit tests сами по себе не доказывают работу storage/runtime. Для integration evidence нужен отдельный стенд и явный setup изменяемого модуля; если соответствующего suite ещё нет, фиксировать этот gap. `pass` с пропущенной integration-веткой не означает, что storage проверен. Evidence каждого прогона должен содержать checkout/HEAD, команду, версии инструментов, runtime/env profile без секретов, exit code и список skipped checks.
 
+Native public-control RTC tests запускаются отдельно с `-tags=integration`: job `native-rtc-control` собирает exact-source Identity/Chat hosts и использует собственный PostgreSQL. Missing profile, skipped case и неполный cleanup проваливают проверку; [профиль и evidence](testing/rtc-control-native.md).
+
 ## Совместная работа агентов
 
 Для регрессии автоматического чтения: `node apps/web/tests/read/read-effects.mjs`. Передать `PLAYWRIGHT_MODULE` (путь к установленному Playwright) и `CHROMIUM_EXECUTABLE` (путь к Chromium); fixture использует только свой Vite на `127.0.0.1:25174` (`READ_FIXTURE_PORT` позволяет сменить порт). Он исполняет исходные React read effects для direct/self и group с синтетическим gateway. Проверяются minimize/restore, скрытая вкладка и информация группы; это не замена приёмке с двумя аккаунтами. `READ_EFFECT_SOURCE_ROOT` задаёт другой `apps/web/` для воспроизведения исходного дефекта без редактирования checkout.
@@ -146,7 +148,7 @@ Application images для пяти services проходят reusable CI на т
 
 Encrypted web после ADR-096 требует серверный `serverSequence` как положительную decimal int64 строку; read position использует `lastReadServerSequence`. Sender `createdAt` остаётся display/AAD metadata. HTTP без корректного порядка показывает ошибку, некорректные realtime events не применяются. Обновление backend и web согласуется при cutover; старый backend без sequence с новым web несовместим. Переиндексация локального поиска меняет только memory cache, сохраняя pending outbound и локальный ключевой материал.
 
-Accepted timestamp clarification в [ADR-063](adr/063-web-encrypted-direct-message-v2-outbound-bootstrap-send-foundation.md#уточнение-12-октября-2026-совместимость-timestamp-в-aad) и [ADR-068](adr/068-web-encrypted-group-outbound-text-bootstrap.md#уточнение-12-октября-2026-совместимость-timestamp-в-aad) допускает после raw `OperationError` только один distinct same-instant UTC ISO-ms3 candidate. Raw AAD остаётся первым; nonzero sub-millisecond digits не округляются, а оба group authentication layers используют один candidate. Решение принято до реализации: codec/transport regressions, fresh web gates и новый actual browser core/media run ещё требуются. Historical core04 FAIL и отдельный actual two-account timestamp witness сохраняются как разные результаты.
+Accepted timestamp clarification в [ADR-063](adr/063-web-encrypted-direct-message-v2-outbound-bootstrap-send-foundation.md#уточнение-12-октября-2026-совместимость-timestamp-в-aad) и [ADR-068](adr/068-web-encrypted-group-outbound-text-bootstrap.md#уточнение-12-октября-2026-совместимость-timestamp-в-aad) допускает после raw `OperationError` только один distinct same-instant UTC ISO-ms3 candidate. Raw AAD остаётся первым; nonzero sub-millisecond digits не округляются, а оба group authentication layers используют один candidate. Совместимость реализована и покрыта codec/transport regressions; последующая backend/browser приёмка прошла 33 сценария, включая 12 media downloads. Исторические результаты и точные границы — в [отчёте](audits/2026-10-13-integration-candidate.md).
 
 Local content projection хранит origin `serverSequence` для history/read и `lastAppliedServerSequence` для convergence. Accepted operation sequence определяет выбранную mutation; `revision` остаётся ciphertext metadata и не считается backend CAS. Reverse/split realtime, fetch и send result должны давать одну projection даже при одинаковых или уменьшающихся revisions.
 
@@ -173,18 +175,18 @@ Geometry regression использует настоящий LegacyAppShell и pr
 Send feedback выбранного direct/self thread размещается внутри собственного scroll composer, отдельно от скрываемого mobile overview. Длинный alert ограничен собственной высотой и доступен через Tab; reveal меняет только composer scroll, сохраняя draft/focus/history. `apps/web/tests/composer-feedback/feedback.mjs` связывает regression с production JSX-site/компонентом и точными send/change handlers, использует настоящий LegacyAppShell/CSS и synthetic HTTP503 adapter. Это дополняет geometry fixture; реальный отказ gateway в полной message page проверяется в отдельном owned runtime.
 
 
-## Local call-capture owner: подготовленный browser regression
+## Local call-capture owner: browser regression
 
 `apps/web/tests/rtc/owner.mjs` проверяет actual direct hook/local slot на React с
 bounded synthetic media/PC/RPC и новым private external `LOCAL_CALL_OWNER_ARTIFACT_DIR`.
 Запуск: `agent-dev run --cwd "$PWD" --node 22 --resource heavy -- node apps/web/tests/rtc/owner.mjs`,
 с согласованным `RTC_FIXTURE_PORT` и внешними Playwright/Chromium paths из RTC README.
-Контракт [call-only owner](product/local-call-capture-owner-plan.md) не включает notes,
+Контракт [call-only owner](product/local-call-capture-owner.md) не включает notes,
 не заменяет backend admission/ACK и не подтверждает SDK/group audio или physical devices.
 Новый source gate/receipt обязателен; preparation не является выполненным PASS.
 
 
-## Sender projection: подготовленная регрессия lifetime context
+## Sender projection: регрессия lifetime context
 
 `node apps/web/tests/sender-projection/sender-projection.mjs` требует `PLAYWRIGHT_MODULE` и `CHROMIUM_EXECUTABLE`; `SENDER_PROJECTION_SOURCE_ROOT` выбирает исходный `apps/web/` для RED/исправленного GREEN без редактирования другого checkout. Фикстура использует только собственный Vite `127.0.0.1:25174` (`SENDER_PROJECTION_FIXTURE_PORT` меняет порт), настоящий production hook/outbound buffer/merge и synthetic gateway/deferred decrypt adapter. Проверяются pending-state context identity, поздний HTTP local publish, authoritative ready/failure и отмена при смене scope; текущие исходники SHA читаются до/после. `SENDER_PROJECTION_JUNIT` задаёт новый абсолютный XML файл с actual семью cases и zero skips. Это не actual backend/WebCrypto или whole browser core PASS; такая приёмка проводится отдельно. Source наличие fixture не означает PASS.
 

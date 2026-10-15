@@ -8,7 +8,7 @@ PostgreSQL integration suite требует отдельную тестовую 
 
 ```bash
 agent-dev run --cwd /absolute/AeroChat --resource heavy -- \
-  env GOTOOLCHAIN=go1.25.8 AERO_IDENTITY_TEST_ENV_FILE=/outside-Git/auth-fixture.env \
+  env GOTOOLCHAIN=go1.27.2 AERO_IDENTITY_TEST_ENV_FILE=/outside-Git/auth-fixture.env \
   go test -tags=integration -race -count=1 -v ./services/aero-identity/internal/storage/postgres
 ```
 
