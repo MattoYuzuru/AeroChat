@@ -40,7 +40,7 @@ MinIO и bootstrap client собираются из pinned upstream sources по
 | `AERO_MEDIA_S3_INTERNAL_ENDPOINT`, `AERO_MEDIA_S3_PRESIGN_ENDPOINT` (source-mode); `MEDIA_S3_PUBLIC_ENDPOINT` (compose) | Внутренний service-to-storage endpoint и отдельный browser-visible endpoint для presigned URL; браузеру нельзя отдавать compose-host `minio:9000`. |
 | `MEDIA_S3_CORS_ALLOWED_ORIGINS` | Origins для browser upload; локальный compose применяет CORS и bootstrap приватного bucket. |
 | `AERO_MEDIA_USER_QUOTA_BYTES` | Per-user budget по backend attachment state; `detached`, `expired`, `deleted` не удерживают активный budget. |
-| `AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION` | Grace period перед удалением detached objects; source-mode читает ключ, оба compose пока не пробрасывают его ([#174](https://github.com/MattoYuzuru/AeroChat/issues/174)). |
+| `AERO_MEDIA_DETACHED_ATTACHMENT_RETENTION` | Grace period перед удалением detached objects; source-mode и оба Compose профиля применяют значение, default `168h` (7 дней). Короткий TTL допустим для отдельного disposable fixture; `attached` objects не становятся eligible по возрасту. Правила [ADR-050](adr/050-attachment-retention-delete-semantics-foundation.md) и [ADR-073](adr/073-encrypted-media-retention-and-tombstone-parity.md) сохраняются. |
 | `AERO_MAX_ACTIVE_GROUP_MEMBERSHIPS_PER_USER` | Лимит активных membership для create/join; leave/remove освобождают capacity. |
 | `AERO_WEB_PUSH_SUBSCRIBER`, `AERO_WEB_PUSH_VAPID_PUBLIC_KEY`, `AERO_WEB_PUSH_VAPID_PRIVATE_KEY` | Полный VAPID-блок нужен для background push; частичная конфигурация считается ошибкой старта, пустая отключает push. |
 
